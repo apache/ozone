@@ -231,6 +231,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- the version of Hadoop declared in the version resources; can be overridden
     so that Hadoop 3.x can declare itself a 2.x artifact. -->
     <declared.hadoop.version>${hadoop.version}</declared.hadoop.version>
+    <proto-backwards-compatibility.version>1.0.5</proto-backwards-compatibility.version>
 
     <swagger-annotations-version>1.5.4</swagger-annotations-version>
     <snakeyaml.version>1.16</snakeyaml.version>
@@ -1595,8 +1596,30 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
   </dependencyManagement>
 
   <build>
+    <extensions>
+      <extension>
+        <groupId>kr.motd.maven</groupId>
+        <artifactId>os-maven-plugin</artifactId>
+        <version>${os-maven-plugin.version}</version>
+      </extension>
+    </extensions>
     <pluginManagement>
       <plugins>
+        <plugin>
+          <groupId>com.salesforce.servicelibs</groupId>
+          <artifactId>proto-backwards-compatibility</artifactId>
+          <version>${proto-backwards-compatibility.version}</version>
+          <configuration>
+            <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
+          </configuration>
+          <executions>
+            <execution>
+              <goals>
+                <goal>backwards-compatibility-check</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
         <plugin>
           <groupId>com.github.eirslett</groupId>
           <artifactId>frontend-maven-plugin</artifactId>

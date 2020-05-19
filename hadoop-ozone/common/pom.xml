@@ -84,6 +84,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     </resources>
     <plugins>
       <plugin>
+        <groupId>com.salesforce.servicelibs</groupId>
+        <artifactId>proto-backwards-compatibility</artifactId>
+      </plugin>
+      <plugin>
         <groupId>org.xolstice.maven.plugins</groupId>
         <artifactId>protobuf-maven-plugin</artifactId>
         <version>${protobuf-maven-plugin.version}</version>

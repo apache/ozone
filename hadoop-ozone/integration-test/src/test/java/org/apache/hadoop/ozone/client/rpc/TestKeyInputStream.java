@@ -36,6 +36,8 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -101,6 +103,9 @@ public class TestKeyInputStream {
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
+  @Rule
+  public Timeout timeout = new Timeout(300_000);
+
   /**
    * Shutdown MiniDFSCluster.
    */
@@ -115,18 +120,9 @@ public class TestKeyInputStream {
     return UUID.randomUUID().toString();
   }
 
-  private OzoneOutputStream createKey(String keyName, ReplicationType type,
-      long size) throws Exception {
-    return TestHelper
-        .createKey(keyName, type, size, objectStore, volumeName, bucketName);
-  }
-
 
   @Test
   public void testSeekRandomly() throws Exception {
-    XceiverClientMetrics metrics = XceiverClientManager
-        .getXceiverClientMetrics();
-
     String keyName = getKeyName();
     OzoneOutputStream key = TestHelper.createKey(keyName,
         ReplicationType.RATIS, 0, objectStore, volumeName, bucketName);

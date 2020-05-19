@@ -89,6 +89,8 @@ public final class OzoneConsts {
   public static final String OZONE_RPC_SCHEME = "o3";
   public static final String OZONE_HTTP_SCHEME = "http";
   public static final String OZONE_URI_DELIMITER = "/";
+  public static final String OZONE_ROOT = OZONE_URI_DELIMITER;
+
 
   public static final String CONTAINER_EXTENSION = ".container";
   public static final String CONTAINER_META = ".meta";
@@ -122,7 +124,6 @@ public final class OzoneConsts {
   public static final String STORAGE_DIR_CHUNKS = "chunks";
   public static final String OZONE_DB_CHECKPOINT_REQUEST_FLUSH =
       "flushBeforeCheckpoint";
-  public static final String S3_VOLUME_NAME = "s3v";
 
   /**
    * Supports Bucket Versioning.
