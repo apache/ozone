@@ -219,6 +219,16 @@ public final class HddsClientUtils {
   }
 
   /**
+   * Returns the s3VolumeName configured in ConfigurationSource.
+   * @param conf Configuration object
+   * @return s3 volume name
+   */
+  public static String getS3VolumeName(ConfigurationSource conf) {
+    return conf.get(OzoneConfigKeys.OZONE_S3_VOLUME_NAME,
+            OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT);
+  }
+
+  /**
    * Returns the maximum no of outstanding async requests to be handled by
    * Standalone and Ratis client.
    */
