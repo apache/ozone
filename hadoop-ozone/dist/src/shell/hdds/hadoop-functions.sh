@@ -1551,7 +1551,7 @@ function hadoop_add_default_gc_opts
 {
   if [[ "${HADOOP_SUBCMD_SUPPORTDAEMONIZATION}" == true ]]; then
     if [[ ! "$HADOOP_OPTS" =~ "-XX" ]] ; then
-       hadoop_error "No '-XX:...' jvm parameters are used. Adding safer GC settings to the HADOOP_OPTS"
+       hadoop_error "No '-XX:...' jvm parameters are set. Adding safer GC settings '-XX:ParallelGCThreads=8 -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled' to the HADOOP_OPTS"
        HADOOP_OPTS="${HADOOP_OPTS} -XX:ParallelGCThreads=8 -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled"
     fi
   fi
