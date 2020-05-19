@@ -53,6 +53,7 @@ import java.util.function.Function;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.NO_REPLICA_FOUND;
 
 /**
  * XceiverClientManager is responsible for the lifecycle of XceiverClient
@@ -168,7 +169,8 @@ public class XceiverClientManager implements Closeable {
       throws IOException {
     Preconditions.checkNotNull(pipeline);
     Preconditions.checkArgument(pipeline.getNodes() != null);
-    Preconditions.checkArgument(!pipeline.getNodes().isEmpty());
+    Preconditions.checkArgument(!pipeline.getNodes().isEmpty(),
+        NO_REPLICA_FOUND);
 
     synchronized (clientCache) {
       XceiverClientSpi info = getClient(pipeline, read);

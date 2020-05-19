@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -49,10 +50,13 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
+import static junit.framework.TestCase.assertEquals;
+import static junit.framework.TestCase.assertTrue;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
+import static org.junit.Assert.assertFalse;
 
 /**
  * Test for PipelinePlacementPolicy.
@@ -362,6 +366,77 @@ public class TestPipelinePlacementPolicy {
     // NODES should NOT be sufficient and exception should be thrown.
     Assert.assertNull(pickedNodes2);
     Assert.assertTrue(thrown);
+  }
+
+  @Test
+  public void testValidatePlacementPolicyOK() {
+    cluster = initTopology();
+    nodeManager = new MockNodeManager(cluster, getNodesWithRackAwareness(),
+        false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
+    placementPolicy = new PipelinePlacementPolicy(
+        nodeManager, stateManager, conf);
+
+    List<DatanodeDetails> dns = new ArrayList<>();
+    dns.add(MockDatanodeDetails
+        .createDatanodeDetails("host1", "/rack1"));
+    dns.add(MockDatanodeDetails
+        .createDatanodeDetails("host2", "/rack1"));
+    dns.add(MockDatanodeDetails
+        .createDatanodeDetails("host3", "/rack2"));
+    for (DatanodeDetails dn : dns) {
+      cluster.add(dn);
+    }
+    ContainerPlacementStatus status =
+        placementPolicy.validateContainerPlacement(dns, 3);
+    assertTrue(status.isPolicySatisfied());
+    assertEquals(0, status.misReplicationCount());
+
+
+    List<DatanodeDetails> subSet = new ArrayList<>();
+    // Cut it down to two nodes, two racks
+    subSet.add(dns.get(0));
+    subSet.add(dns.get(2));
+    status = placementPolicy.validateContainerPlacement(subSet, 3);
+    assertTrue(status.isPolicySatisfied());
+    assertEquals(0, status.misReplicationCount());
+
+    // Cut it down to two nodes, one racks
+    subSet = new ArrayList<>();
+    subSet.add(dns.get(0));
+    subSet.add(dns.get(1));
+    status = placementPolicy.validateContainerPlacement(subSet, 3);
+    assertFalse(status.isPolicySatisfied());
+    assertEquals(1, status.misReplicationCount());
+
+    // One node, but only one replica
+    subSet = new ArrayList<>();
+    subSet.add(dns.get(0));
+    status = placementPolicy.validateContainerPlacement(subSet, 1);
+    assertTrue(status.isPolicySatisfied());
+  }
+
+  @Test
+  public void testValidatePlacementPolicySingleRackInCluster() {
+    cluster = initTopology();
+    nodeManager = new MockNodeManager(cluster, new ArrayList<>(),
+        false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
+    placementPolicy = new PipelinePlacementPolicy(
+        nodeManager, stateManager, conf);
+
+    List<DatanodeDetails> dns = new ArrayList<>();
+    dns.add(MockDatanodeDetails
+        .createDatanodeDetails("host1", "/rack1"));
+    dns.add(MockDatanodeDetails
+        .createDatanodeDetails("host2", "/rack1"));
+    dns.add(MockDatanodeDetails
+        .createDatanodeDetails("host3", "/rack1"));
+    for (DatanodeDetails dn : dns) {
+      cluster.add(dn);
+    }
+    ContainerPlacementStatus status =
+        placementPolicy.validateContainerPlacement(dns, 3);
+    assertTrue(status.isPolicySatisfied());
+    assertEquals(0, status.misReplicationCount());
   }
 
   private boolean checkDuplicateNodesUUID(List<DatanodeDetails> nodes) {

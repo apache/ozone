@@ -23,6 +23,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import javax.ws.rs.core.Response;
 
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 
 import org.apache.hadoop.ozone.s3.SignatureProcessor;
@@ -46,7 +47,7 @@ import java.time.LocalDate;
 public class TestBucketPut {
 
   private String bucketName = OzoneConsts.BUCKET;
-  private OzoneClientStub clientStub;
+  private OzoneClient clientStub;
   private BucketEndpoint bucketEndpoint;
 
   @Before

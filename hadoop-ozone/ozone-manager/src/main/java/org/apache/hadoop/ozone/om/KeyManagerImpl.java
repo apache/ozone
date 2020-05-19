@@ -1614,8 +1614,15 @@ public class KeyManagerImpl implements KeyManager {
           OzoneFileStatus fileStatus = getFileStatus(args);
           keyInfo = fileStatus.getKeyInfo();
         } catch (IOException e) {
-          throw new OMException("Key not found, checkAccess failed. Key:" +
-              objectKey, KEY_NOT_FOUND);
+          // OzoneFS will check whether the key exists when write a new key.
+          // For Acl Type "READ", when the key is not exist return true.
+          // To Avoid KEY_NOT_FOUND Exception.
+          if (context.getAclRights() == IAccessAuthorizer.ACLType.READ) {
+            return true;
+          } else {
+            throw new OMException("Key not found, checkAccess failed. Key:" +
+                objectKey, KEY_NOT_FOUND);
+          }
         }
       }
 

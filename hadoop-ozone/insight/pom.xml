@@ -78,7 +78,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>io.dropwizard.metrics</groupId>
       <artifactId>metrics-core</artifactId>
-      <version>3.2.4</version>
     </dependency>
     <dependency>
       <groupId>com.github.spotbugs</groupId>

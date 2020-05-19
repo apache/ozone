@@ -32,7 +32,7 @@ public class ContainerChunkInfo {
   private String containerPath;
   private List<DatanodeDetails> dataNodeList;
   private List<ChunkDetails> chunkInfos;
-  private List<String> chunks;
+  private List<String> files;
   private List<ChunkDataNodeDetails> chunkDataNodeDetails;
   private UUID pipelineID;
   private Pipeline pipeline;
@@ -42,8 +42,8 @@ public class ContainerChunkInfo {
     this.chunkDataNodeDetails = chunkDataNodeDetails;
   }
 
-  public void setChunks(List<String> chunks) {
-    this.chunks = chunks;
+  public void setFiles(List<String> files) {
+    this.files = files;
   }
 
   public void setPipelineID(UUID pipelineID) {
@@ -83,8 +83,8 @@ public class ContainerChunkInfo {
             + ", pipeline="
             + pipeline
             + '}'
-            + "chunks="
-            + chunks
+            + "files="
+            + files
             + "chunkdatanodeDetails="
             + chunkDataNodeDetails
             + "PipelineID="

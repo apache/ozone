@@ -52,9 +52,9 @@ public class TestReconInternalSchemaDefinition extends AbstractReconSqlDBTest {
 
     expectedPairs.add(new ImmutablePair<>("task_name", Types.VARCHAR));
     expectedPairs.add(new ImmutablePair<>("last_updated_timestamp",
-        Types.INTEGER));
+        Types.BIGINT));
     expectedPairs.add(new ImmutablePair<>("last_updated_seq_number",
-        Types.INTEGER));
+        Types.BIGINT));
 
     List<Pair<String, Integer>> actualPairs = new ArrayList<>();
 

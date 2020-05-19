@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockRequest;
@@ -119,12 +120,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveA
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenewDelegationTokenResponseProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3BucketInfoRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3BucketInfoResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3CreateBucketRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3DeleteBucketRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3ListBucketsRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclRequest;
@@ -184,7 +179,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    */
   @Override
   public void close() throws IOException {
-
+    //transport is not reusable
+    transport.close();
   }
 
   /**
@@ -235,14 +231,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   /**
-   * Changes the owner of a volume.
-   *
-   * @param volume - Name of the volume.
-   * @param owner - Name of the owner.
-   * @throws IOException
+   * {@inheritDoc}
    */
   @Override
-  public void setOwner(String volume, String owner) throws IOException {
+  public boolean setOwner(String volume, String owner) throws IOException {
     SetVolumePropertyRequest.Builder req =
         SetVolumePropertyRequest.newBuilder();
     req.setVolumeName(volume).setOwnerName(owner);
@@ -252,7 +244,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .build();
 
     OMResponse omResponse = submitRequest(omRequest);
-    handleError(omResponse);
+    OzoneManagerProtocolProtos.SetVolumePropertyResponse response =
+        handleError(omResponse).getSetVolumePropertyResponse();
+
+    return response.getResponse();
   }
 
   /**
@@ -769,83 +764,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .map(OmKeyInfo::getFromProtobuf)
             .collect(Collectors.toList()));
     return keys;
-
-  }
-
-  @Override
-  public void createS3Bucket(String userName, String s3BucketName)
-      throws IOException {
-    S3CreateBucketRequest req = S3CreateBucketRequest.newBuilder()
-        .setUserName(userName)
-        .setS3Bucketname(s3BucketName)
-        .build();
-
-    OMRequest omRequest = createOMRequest(Type.CreateS3Bucket)
-        .setCreateS3BucketRequest(req)
-        .build();
-
-    handleError(submitRequest(omRequest));
-
-  }
-
-  @Override
-  public void deleteS3Bucket(String s3BucketName) throws IOException {
-    S3DeleteBucketRequest request  = S3DeleteBucketRequest.newBuilder()
-        .setS3BucketName(s3BucketName)
-        .build();
-
-    OMRequest omRequest = createOMRequest(Type.DeleteS3Bucket)
-        .setDeleteS3BucketRequest(request)
-        .build();
-
-    handleError(submitRequest(omRequest));
-
-  }
-
-  @Override
-  public String getOzoneBucketMapping(String s3BucketName)
-      throws IOException {
-    S3BucketInfoRequest request  = S3BucketInfoRequest.newBuilder()
-        .setS3BucketName(s3BucketName)
-        .build();
-
-    OMRequest omRequest = createOMRequest(Type.InfoS3Bucket)
-        .setInfoS3BucketRequest(request)
-        .build();
-
-    S3BucketInfoResponse resp = handleError(submitRequest(omRequest))
-        .getInfoS3BucketResponse();
-    return resp.getOzoneMapping();
-  }
-
-  @Override
-  public List<OmBucketInfo> listS3Buckets(String userName, String startKey,
-                                          String prefix, int count)
-      throws IOException {
-    List<OmBucketInfo> buckets = new ArrayList<>();
-    S3ListBucketsRequest.Builder reqBuilder = S3ListBucketsRequest.newBuilder();
-    reqBuilder.setUserName(userName);
-    reqBuilder.setCount(count);
-    if (startKey != null) {
-      reqBuilder.setStartKey(startKey);
-    }
-    if (prefix != null) {
-      reqBuilder.setPrefix(prefix);
-    }
-    S3ListBucketsRequest request = reqBuilder.build();
-
-    OMRequest omRequest = createOMRequest(Type.ListS3Buckets)
-        .setListS3BucketsRequest(request)
-        .build();
-
-    S3ListBucketsResponse resp = handleError(submitRequest(omRequest))
-        .getListS3BucketsResponse();
-
-    buckets.addAll(
-        resp.getBucketInfoList().stream()
-            .map(OmBucketInfo::getFromProtobuf)
-            .collect(Collectors.toList()));
-    return buckets;
 
   }
 
@@ -1494,15 +1412,14 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         "The destination bucket name cannot be null or empty. " +
         "Please enter a valid destination bucket name.");
 
-    RecoverTrashRequest recoverRequest = RecoverTrashRequest.newBuilder()
+    RecoverTrashRequest.Builder req = RecoverTrashRequest.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setDestinationBucket(destinationBucket)
-        .build();
+        .setDestinationBucket(destinationBucket);
 
     OMRequest omRequest = createOMRequest(Type.RecoverTrash)
-        .setRecoverTrashRequest(recoverRequest)
+        .setRecoverTrashRequest(req)
         .build();
 
     RecoverTrashResponse recoverResponse =

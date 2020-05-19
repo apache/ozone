@@ -145,10 +145,6 @@ public class OMException extends IOException {
 
     SCM_VERSION_MISMATCH_ERROR,
 
-    S3_BUCKET_NOT_FOUND,
-
-    S3_BUCKET_ALREADY_EXISTS,
-
     INITIATE_MULTIPART_UPLOAD_ERROR,
 
     MULTIPART_UPLOAD_PARTFILE_ERROR,
@@ -202,8 +198,6 @@ public class OMException extends IOException {
     TIMEOUT, // Error codes used during acl validation
 
     PREFIX_NOT_FOUND,
-
-    S3_BUCKET_INVALID_LENGTH,
 
     RATIS_ERROR, // Error in Ratis server
 

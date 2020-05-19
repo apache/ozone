@@ -478,7 +478,8 @@ public class TestOzoneManagerHA {
     // multipart upload is happening successfully or not.
 
     // The OMFailoverProxyProvider will point to the current leader OM node.
-    String leaderOMNodeId = cluster.getOMLeader().getOMNodeId();
+    String leaderOMNodeId = getFailoverProxyProvider()
+        .getCurrentProxyOMNodeId();
 
     // Stop one of the ozone manager, to see when the OM leader changes
     // multipart upload is happening successfully or not.
@@ -487,7 +488,9 @@ public class TestOzoneManagerHA {
 
     createMultipartKeyAndReadKey(ozoneBucket, keyName, uploadID);
 
-    Assert.assertTrue(leaderOMNodeId != cluster.getOMLeader().getOMNodeId());
+    String newLeaderOMNodeId =
+        getFailoverProxyProvider().getCurrentProxyOMNodeId();
+    Assert.assertNotEquals(leaderOMNodeId, newLeaderOMNodeId);
   }
 
   /**
@@ -692,7 +695,12 @@ public class TestOzoneManagerHA {
   private OMFailoverProxyProvider getFailoverProxyProvider()
       throws IOException {
     RpcClient clientProxy =
-        (RpcClient) cluster.getRpcClient().getObjectStore().getClientProxy();
+        (RpcClient) objectStore.getClientProxy();
+    return getFailoverProxyProvider(clientProxy);
+  }
+
+  private OMFailoverProxyProvider getFailoverProxyProvider(
+      RpcClient clientProxy) {
     OzoneManagerProtocolClientSideTranslatorPB ozoneManagerClient =
         (OzoneManagerProtocolClientSideTranslatorPB) clientProxy
             .getOzoneManagerClient();
@@ -816,7 +824,8 @@ public class TestOzoneManagerHA {
       // Get the ObjectStore and FailoverProxyProvider for OM at index i
       final ObjectStore store = OzoneClientFactory.getRpcClient(
           omServiceId, conf).getObjectStore();
-      final OMFailoverProxyProvider proxyProvider = getFailoverProxyProvider();
+      final OMFailoverProxyProvider proxyProvider =
+          getFailoverProxyProvider((RpcClient) store.getClientProxy());
 
       // Failover to the OM node that the objectStore points to
       omFailoverProxyProvider.performFailoverIfRequired(
