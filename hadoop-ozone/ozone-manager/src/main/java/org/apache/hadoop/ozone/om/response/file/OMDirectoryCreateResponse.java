@@ -30,7 +30,10 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
+
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 
 /**
  * Response for create directory request.
@@ -39,6 +42,8 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(OMDirectoryCreateResponse.class);
+
+  private static final List<String> OPERATED_TABLES = Arrays.asList(KEY_TABLE);
   private OmKeyInfo dirKeyInfo;
   private List<OmKeyInfo> parentKeyInfos;
 
@@ -87,5 +92,10 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
       LOG.debug("Response Status is OK, dirKeyInfo is null in " +
           "OMDirectoryCreateResponse");
     }
+  }
+
+  @Override
+  public List<String> operatedTables() {
+    return OPERATED_TABLES;
   }
 }

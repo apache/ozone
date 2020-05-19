@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import javax.annotation.Nonnull;
 
@@ -31,10 +32,15 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
+
 /**
  * Response for CreateKey request.
  */
 public class OMKeyCreateResponse extends OMClientResponse {
+
+  private static final List<String> OPERATED_TABLES =
+      Arrays.asList(OPEN_KEY_TABLE);
 
   public static final Logger LOG =
       LoggerFactory.getLogger(OMKeyCreateResponse.class);
@@ -87,6 +93,11 @@ public class OMKeyCreateResponse extends OMClientResponse {
         omKeyInfo.getBucketName(), omKeyInfo.getKeyName(), openKeySessionID);
     omMetadataManager.getOpenKeyTable().putWithBatch(batchOperation,
         openKey, omKeyInfo);
+  }
+
+  @Override
+  public List<String> operatedTables() {
+    return OPERATED_TABLES;
   }
 }
 

@@ -29,12 +29,18 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
+
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELEGATION_TOKEN_TABLE;
 
 /**
  * Handle response for RenewDelegationToken request.
  */
 public class OMRenewDelegationTokenResponse extends OMClientResponse {
 
+  private static final List<String> OPERATED_TABLES =
+      Arrays.asList(DELEGATION_TOKEN_TABLE);
   private OzoneTokenIdentifier ozoneTokenIdentifier;
   private long renewTime = -1L;
 
@@ -54,5 +60,11 @@ public class OMRenewDelegationTokenResponse extends OMClientResponse {
       table.putWithBatch(batchOperation, ozoneTokenIdentifier, renewTime);
     }
   }
+
+  @Override
+  public List<String> operatedTables() {
+    return OPERATED_TABLES;
+  }
+
 }
 

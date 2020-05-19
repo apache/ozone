@@ -26,13 +26,19 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 
 import javax.annotation.Nonnull;
+
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 
 /**
  * Response for set quota request.
  */
 public class OMVolumeSetQuotaResponse extends OMClientResponse {
+  private static final List<String> OPERATED_TABLES =
+      Arrays.asList(VOLUME_TABLE);
   private OmVolumeArgs omVolumeArgs;
 
   public OMVolumeSetQuotaResponse(@Nonnull OMResponse omResponse,
@@ -58,4 +64,10 @@ public class OMVolumeSetQuotaResponse extends OMClientResponse {
         omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
         omVolumeArgs);
   }
+
+  @Override
+  public List<String> operatedTables() {
+    return OPERATED_TABLES;
+  }
+
 }

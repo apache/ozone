@@ -25,13 +25,19 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import javax.annotation.Nonnull;
+
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 
 /**
  * Response for {@link OMKeyPurgeRequest} request.
  */
 public class OMKeyPurgeResponse extends OMClientResponse {
+
+  private static final List<String> OPERATED_TABLES =
+      Arrays.asList(DELETED_TABLE);
 
   private List<String> purgeKeyList;
 
@@ -59,4 +65,10 @@ public class OMKeyPurgeResponse extends OMClientResponse {
           key);
     }
   }
+
+  @Override
+  public List<String> operatedTables() {
+    return OPERATED_TABLES;
+  }
+
 }

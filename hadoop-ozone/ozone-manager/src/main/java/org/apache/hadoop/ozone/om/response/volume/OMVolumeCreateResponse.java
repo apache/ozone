@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.om.response.volume;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -32,10 +34,14 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
+
 /**
  * Response for CreateVolume request.
  */
 public class OMVolumeCreateResponse extends OMClientResponse {
+  private static final List<String> OPERATED_TABLES =
+      Arrays.asList(VOLUME_TABLE);
 
   private UserVolumeInfo userVolumeInfo;
   private OmVolumeArgs omVolumeArgs;
@@ -75,6 +81,11 @@ public class OMVolumeCreateResponse extends OMClientResponse {
   @VisibleForTesting
   public OmVolumeArgs getOmVolumeArgs() {
     return omVolumeArgs;
+  }
+
+  @Override
+  public List<String> operatedTables() {
+    return OPERATED_TABLES;
   }
 
 }

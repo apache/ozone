@@ -25,12 +25,20 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 import javax.annotation.Nonnull;
+
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 
 /**
  * Response for CommitKey request.
  */
 public class OMKeyCommitResponse extends OMClientResponse {
+
+  private static final List<String> OPERATED_TABLES =
+      Arrays.asList(OPEN_KEY_TABLE, KEY_TABLE);
 
   private OmKeyInfo omKeyInfo;
   private String ozoneKeyName;
@@ -82,4 +90,10 @@ public class OMKeyCommitResponse extends OMClientResponse {
           omKeyInfo);
     }
   }
+
+  @Override
+  public List<String> operatedTables() {
+    return OPERATED_TABLES;
+  }
+
 }

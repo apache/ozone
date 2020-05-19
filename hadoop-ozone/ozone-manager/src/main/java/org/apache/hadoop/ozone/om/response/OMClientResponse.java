@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.response;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.common.base.Preconditions;
@@ -89,6 +90,13 @@ public abstract class OMClientResponse {
   public CompletableFuture<Void> getFlushFuture() {
     return flushFuture;
   }
+
+  /**
+   * List of tables affected by this operation. This information will be used
+   * during cleanup table cache.
+   * @return list of table names.
+   */
+  public abstract List<String> operatedTables();
 
 }
 

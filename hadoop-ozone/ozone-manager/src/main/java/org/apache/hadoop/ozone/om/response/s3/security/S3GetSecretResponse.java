@@ -28,12 +28,18 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
+
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.S3_SECRET_TABLE;
 
 /**
  * Response for GetS3Secret request.
  */
 public class S3GetSecretResponse extends OMClientResponse {
 
+  private static final List<String> OPERATED_TABLES =
+      Arrays.asList(S3_SECRET_TABLE);
 
   private S3SecretValue s3SecretValue;
 
@@ -52,5 +58,10 @@ public class S3GetSecretResponse extends OMClientResponse {
       omMetadataManager.getS3SecretTable().putWithBatch(batchOperation,
           s3SecretValue.getKerberosID(), s3SecretValue);
     }
+  }
+
+  @Override
+  public List<String> operatedTables() {
+    return OPERATED_TABLES;
   }
 }

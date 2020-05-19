@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.om.response.volume;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -30,10 +32,15 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
+
 /**
  * Response for DeleteVolume request.
  */
 public class OMVolumeDeleteResponse extends OMClientResponse {
+
+  private static final List<String> OPERATED_TABLES =
+      Arrays.asList(VOLUME_TABLE);
   private String volume;
   private String owner;
   private UserVolumeInfo updatedVolumeList;
@@ -71,6 +78,11 @@ public class OMVolumeDeleteResponse extends OMClientResponse {
     }
     omMetadataManager.getVolumeTable().deleteWithBatch(batchOperation,
         omMetadataManager.getVolumeKey(volume));
+  }
+
+  @Override
+  public List<String> operatedTables() {
+    return OPERATED_TABLES;
   }
 }
 

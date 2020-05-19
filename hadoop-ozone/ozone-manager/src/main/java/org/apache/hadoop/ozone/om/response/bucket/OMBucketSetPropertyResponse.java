@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.om.response.bucket;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -28,11 +30,16 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+
 /**
  * Response for SetBucketProperty request.
  */
 public class OMBucketSetPropertyResponse extends OMClientResponse {
   private OmBucketInfo omBucketInfo;
+
+  private static final List<String> OPERATED_TABLES =
+      Arrays.asList(BUCKET_TABLE);
 
   public OMBucketSetPropertyResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmBucketInfo omBucketInfo) {
@@ -58,6 +65,11 @@ public class OMBucketSetPropertyResponse extends OMClientResponse {
             omBucketInfo.getBucketName());
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
         dbBucketKey, omBucketInfo);
+  }
+
+  @Override
+  public List<String> operatedTables() {
+    return OPERATED_TABLES;
   }
 
 }

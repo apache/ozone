@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.om.response.bucket;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -28,10 +30,15 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+
 /**
  * Response for DeleteBucket request.
  */
 public final class OMBucketDeleteResponse extends OMClientResponse {
+
+  private static final List<String> OPERATED_TABLES =
+      Arrays.asList(BUCKET_TABLE);
 
   private String volumeName;
   private String bucketName;
@@ -68,6 +75,11 @@ public final class OMBucketDeleteResponse extends OMClientResponse {
 
   public String getBucketName() {
     return bucketName;
+  }
+
+  @Override
+  public List<String> operatedTables() {
+    return OPERATED_TABLES;
   }
 
 }

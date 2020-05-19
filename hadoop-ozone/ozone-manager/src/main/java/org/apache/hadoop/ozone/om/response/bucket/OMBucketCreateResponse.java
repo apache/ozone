@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.om.response.bucket;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -30,10 +32,15 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+
 /**
  * Response for CreateBucket request.
  */
 public final class OMBucketCreateResponse extends OMClientResponse {
+
+  private static final List<String> OPERATED_TABLES =
+      Arrays.asList(BUCKET_TABLE);
 
   private final OmBucketInfo omBucketInfo;
 
@@ -67,6 +74,11 @@ public final class OMBucketCreateResponse extends OMClientResponse {
   @Nullable
   public OmBucketInfo getOmBucketInfo() {
     return omBucketInfo;
+  }
+
+  @Override
+  public List<String> operatedTables() {
+    return OPERATED_TABLES;
   }
 
 }

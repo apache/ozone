@@ -29,12 +29,19 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
+
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.MULTIPARTINFO_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 
 /**
  * Response for S3 Initiate Multipart Upload request.
  */
 public class S3InitiateMultipartUploadResponse extends OMClientResponse {
 
+  private static final List<String> OPERATED_TABLES =
+      Arrays.asList(OPEN_KEY_TABLE, MULTIPARTINFO_TABLE);
   private OmMultipartKeyInfo omMultipartKeyInfo;
   private OmKeyInfo omKeyInfo;
 
@@ -79,5 +86,10 @@ public class S3InitiateMultipartUploadResponse extends OMClientResponse {
   @VisibleForTesting
   public OmKeyInfo getOmKeyInfo() {
     return omKeyInfo;
+  }
+
+  @Override
+  public List<String> operatedTables() {
+    return OPERATED_TABLES;
   }
 }

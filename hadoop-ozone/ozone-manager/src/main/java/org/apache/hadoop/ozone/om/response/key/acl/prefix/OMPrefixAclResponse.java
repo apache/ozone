@@ -26,11 +26,18 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
+
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.PREFIX_TABLE;
 
 /**
  * Response for Prefix Acl request.
  */
 public class OMPrefixAclResponse extends OMClientResponse {
+
+  private static final List<String> OPERATED_TABLES =
+      Arrays.asList(PREFIX_TABLE);
 
   private OmPrefixInfo prefixInfo;
 
@@ -61,6 +68,11 @@ public class OMPrefixAclResponse extends OMClientResponse {
       omMetadataManager.getPrefixTable().putWithBatch(batchOperation,
           prefixInfo.getName(), prefixInfo);
     }
+  }
+
+  @Override
+  public List< String > operatedTables() {
+    return OPERATED_TABLES;
   }
 }
 

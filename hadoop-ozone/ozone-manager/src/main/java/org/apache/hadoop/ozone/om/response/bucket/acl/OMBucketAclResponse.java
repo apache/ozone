@@ -27,6 +27,10 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
+
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 
 /**
  * Response for Bucket acl request.
@@ -34,6 +38,8 @@ import java.io.IOException;
 public class OMBucketAclResponse extends OMClientResponse {
 
   private final OmBucketInfo omBucketInfo;
+  private static final List<String> OPERATED_TABLES =
+      Arrays.asList(BUCKET_TABLE);
 
   public OMBucketAclResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmBucketInfo omBucketInfo) {
@@ -65,5 +71,9 @@ public class OMBucketAclResponse extends OMClientResponse {
     }
   }
 
+  @Override
+  public List<String> operatedTables() {
+    return OPERATED_TABLES;
+  }
 }
 

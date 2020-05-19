@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -31,10 +32,19 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.MULTIPARTINFO_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
+
 /**
  * Response for Multipart Upload Complete request.
  */
 public class S3MultipartUploadCompleteResponse extends OMClientResponse {
+
+  private static final List<String> OPERATED_TABLES =
+      Arrays.asList(OPEN_KEY_TABLE, KEY_TABLE, DELETED_TABLE,
+          MULTIPARTINFO_TABLE);
   private String multipartKey;
   private OmKeyInfo omKeyInfo;
   private List<OmKeyInfo> partsUnusedList;
@@ -103,4 +113,10 @@ public class S3MultipartUploadCompleteResponse extends OMClientResponse {
       }
     }
   }
+
+  @Override
+  public List<String> operatedTables() {
+    return OPERATED_TABLES;
+  }
+
 }

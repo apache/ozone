@@ -19,7 +19,11 @@
 package org.apache.hadoop.ozone.om.ratis;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -47,6 +51,10 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.ratis.util.ExitUtils;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.BUCKET;
+import static org.apache.hadoop.ozone.OzoneConsts.VOLUME;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteBucket;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteVolume;
 
 /**
  * This class implements DoubleBuffer implementation of OMClientResponse's. In
@@ -230,6 +238,10 @@ public final class OzoneManagerDoubleBuffer {
     while (isRunning.get()) {
       try {
         if (canFlush()) {
+          Map<String, List<Long>> cleanupEpochs = new HashMap<>();
+          omMetadataManager.listTableNames().forEach(tableName ->
+              cleanupEpochs.put(tableName, new ArrayList<>()));
+
           setReadyBuffer();
           List<Long> flushedEpochs = null;
           try(BatchOperation batchOperation = omMetadataManager.getStore()
@@ -246,6 +258,9 @@ public final class OzoneManagerDoubleBuffer {
                           batchOperation);
                       return null;
                     });
+
+                setCleanupEpoch(entry, cleanupEpochs);
+
               } catch (IOException ex) {
                 // During Adding to RocksDB batch entry got an exception.
                 // We should terminate the OM.
@@ -317,9 +332,10 @@ public final class OzoneManagerDoubleBuffer {
           }
 
 
-          cleanupCache(flushedEpochs);
-
           // Clean up committed transactions.
+
+          cleanupCache(cleanupEpochs);
+
           readyBuffer.clear();
 
           // update the last updated index in OzoneManagerStateMachine.
@@ -353,29 +369,45 @@ public final class OzoneManagerDoubleBuffer {
     }
   }
 
-  private void cleanupCache(List<Long> lastRatisTransactionIndex) {
-    // As now only volume and bucket transactions are handled only called
-    // cleanupCache on bucketTable.
-    // TODO: After supporting all write operations we need to call
-    //  cleanupCache on the tables only when buffer has entries for that table.
-    omMetadataManager.getBucketTable().cleanupCache(lastRatisTransactionIndex);
-    omMetadataManager.getVolumeTable().cleanupCache(lastRatisTransactionIndex);
-    omMetadataManager.getUserTable().cleanupCache(lastRatisTransactionIndex);
+  /**
+   * Set cleanup epoch for the DoubleBufferEntry.
+   * @param entry
+   * @param cleanupEpochs
+   */
+  private void setCleanupEpoch(DoubleBufferEntry entry, Map<String,
+      List<Long>> cleanupEpochs) {
+    // Add epochs depending on operated tables. In this way
+    // cleanup will be called only when required.
 
-    //TODO: Optimization we can do here is for key transactions we can only
-    // cleanup cache when it is key commit transaction. In this way all
-    // intermediate transactions for a key will be read from in-memory cache.
-    omMetadataManager.getOpenKeyTable().cleanupCache(lastRatisTransactionIndex);
-    omMetadataManager.getKeyTable().cleanupCache(lastRatisTransactionIndex);
-    omMetadataManager.getDeletedTable().cleanupCache(lastRatisTransactionIndex);
-    omMetadataManager.getMultipartInfoTable().cleanupCache(
-        lastRatisTransactionIndex);
-    omMetadataManager.getS3SecretTable().cleanupCache(
-        lastRatisTransactionIndex);
-    omMetadataManager.getDelegationTokenTable().cleanupCache(
-        lastRatisTransactionIndex);
-    omMetadataManager.getPrefixTable().cleanupCache(lastRatisTransactionIndex);
+    // As bucket and volume table is full cache add cleanup
+    // epochs only when request is delete to cleanup deleted
+    // entries.
 
+    String opName =
+        entry.getResponse().getOMResponse().getCmdType().name();
+
+    if (opName.toLowerCase().contains(VOLUME) ||
+        opName.toLowerCase().contains(BUCKET)) {
+      if (DeleteBucket.name().equals(opName)
+          || DeleteVolume.name().equals(opName)) {
+        entry.getResponse().operatedTables().forEach(
+            table -> cleanupEpochs.get(table)
+                .add(entry.getTrxLogIndex()));
+      }
+    } else {
+      entry.getResponse().operatedTables().forEach(
+          table -> cleanupEpochs.get(table)
+              .add(entry.getTrxLogIndex()));
+    }
+  }
+
+  private void cleanupCache(Map<String, List<Long>> cleanupEpochs) {
+    cleanupEpochs.forEach((tableName, epochs) -> {
+      if (!epochs.isEmpty()) {
+        Collections.sort(epochs);
+        omMetadataManager.getTable(tableName).cleanupCache(epochs);
+      }
+    });
   }
 
   /**

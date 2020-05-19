@@ -27,11 +27,18 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
+
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 
 /**
  * Response for om volume acl operation request.
  */
 public class OMVolumeAclOpResponse extends OMClientResponse {
+
+  private static final List<String> OPERATED_TABLES =
+      Arrays.asList(VOLUME_TABLE);
 
   private OmVolumeArgs omVolumeArgs;
 
@@ -62,6 +69,11 @@ public class OMVolumeAclOpResponse extends OMClientResponse {
   @VisibleForTesting
   public OmVolumeArgs getOmVolumeArgs() {
     return omVolumeArgs;
+  }
+
+  @Override
+  public List<String> operatedTables() {
+    return OPERATED_TABLES;
   }
 }
 

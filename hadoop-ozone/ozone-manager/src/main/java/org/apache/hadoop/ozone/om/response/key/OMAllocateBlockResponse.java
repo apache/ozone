@@ -26,12 +26,19 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 import javax.annotation.Nonnull;
+
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 
 /**
  * Response for AllocateBlock request.
  */
 public class OMAllocateBlockResponse extends OMClientResponse {
+
+  private static final List<String> OPERATED_TABLES =
+      Arrays.asList(OPEN_KEY_TABLE);
 
   private OmKeyInfo omKeyInfo;
   private long clientID;
@@ -60,5 +67,10 @@ public class OMAllocateBlockResponse extends OMClientResponse {
         omKeyInfo.getBucketName(), omKeyInfo.getKeyName(), clientID);
     omMetadataManager.getOpenKeyTable().putWithBatch(batchOperation, openKey,
         omKeyInfo);
+  }
+
+  @Override
+  public List<String> operatedTables() {
+    return OPERATED_TABLES;
   }
 }

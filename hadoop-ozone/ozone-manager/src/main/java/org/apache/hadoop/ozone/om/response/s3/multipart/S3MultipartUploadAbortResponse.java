@@ -31,14 +31,23 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import javax.annotation.Nonnull;
+
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.MULTIPARTINFO_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 
 /**
  * Response for Multipart Abort Request.
  */
 public class S3MultipartUploadAbortResponse extends OMClientResponse {
+
+  private static final List<String> OPERATED_TABLES =
+      Arrays.asList(OPEN_KEY_TABLE, DELETED_TABLE, MULTIPARTINFO_TABLE);
 
   private String multipartKey;
   private OmMultipartKeyInfo omMultipartKeyInfo;
@@ -90,5 +99,10 @@ public class S3MultipartUploadAbortResponse extends OMClientResponse {
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
           partKeyInfo.getPartName(), repeatedOmKeyInfo);
     }
+  }
+
+  @Override
+  public List<String> operatedTables() {
+    return OPERATED_TABLES;
   }
 }
