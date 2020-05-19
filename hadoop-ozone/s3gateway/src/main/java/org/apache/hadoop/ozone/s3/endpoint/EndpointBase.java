@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.function.Function;
 
+import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -33,8 +34,6 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
 import com.google.common.annotations.VisibleForTesting;
-
-import static org.apache.hadoop.ozone.OzoneConsts.S3_VOLUME_NAME;
 
 /**
  * Basic helpers for all the REST endpoints.
@@ -79,7 +78,9 @@ public class EndpointBase {
   }
 
   protected OzoneVolume getVolume() throws IOException {
-    return client.getObjectStore().getVolume(S3_VOLUME_NAME);
+    String s3VolumeName = HddsClientUtils.getS3VolumeName(
+        client.getConfiguration());
+    return client.getObjectStore().getVolume(s3VolumeName);
   }
 
   /**

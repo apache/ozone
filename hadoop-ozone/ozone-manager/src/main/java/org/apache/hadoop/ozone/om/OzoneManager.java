@@ -186,7 +186,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
@@ -284,7 +283,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private List<OMNodeDetails> peerNodes;
   private File omRatisSnapshotDir;
   private final OMRatisSnapshotInfo omRatisSnapshotInfo;
-  private final Collection<String> ozAdmins;
 
   private KeyProviderCryptoExtension kmsProvider = null;
   private static String keyProviderUriKeyName =
@@ -349,12 +347,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           omStorage.getState().name() + ". Please ensure 'ozone om --init' "
           + "command is executed once before starting the OM service.",
           ResultCodes.OM_NOT_INITIALIZED);
-    }
-
-    ozAdmins = conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
-    String omSPN = UserGroupInformation.getCurrentUser().getUserName();
-    if (!ozAdmins.contains(omSPN)) {
-      ozAdmins.add(omSPN);
     }
     omMetaDir = OMStorage.getOmDbDir(configuration);
     this.isAclEnabled = conf.getBoolean(OZONE_ACL_ENABLED,
@@ -503,6 +495,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         authorizer.setBucketManager(bucketManager);
         authorizer.setKeyManager(keyManager);
         authorizer.setPrefixManager(prefixManager);
+        authorizer.setOzoneAdmins(getOzoneAdmins(configuration));
       }
     } else {
       accessAuthorizer = null;
@@ -1145,6 +1138,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("OM HttpServer failed to start.", ex);
     }
     registerMXBean();
+
+    startJVMPauseMonitor();
     setStartTime();
     omState = State.RUNNING;
   }
@@ -1198,10 +1193,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     registerMXBean();
 
-    // Start jvm monitor
-    jvmPauseMonitor = new JvmPauseMonitor();
-    jvmPauseMonitor.init(configuration);
-    jvmPauseMonitor.start();
+    startJVMPauseMonitor();
     setStartTime();
     omState = State.RUNNING;
   }
@@ -1567,7 +1559,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void createVolume(OmVolumeArgs args) throws IOException {
     try {
       metrics.incNumVolumeCreates();
-      checkAdmin();
+      if(isAclEnabled) {
+        checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.CREATE,
+            args.getVolume(), null, null);
+      }
       volumeManager.createVolume(args);
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.CREATE_VOLUME,
           (args == null) ? null : args.toAuditMap()));
@@ -1919,7 +1914,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       metrics.incNumVolumeLists();
       if (!allowListAllVolumes) {
         // Only admin can list all volumes when disallowed in config
-        checkAdmin();
+        if(isAclEnabled) {
+          checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.LIST,
+              OzoneConsts.OZONE_ROOT, null, null);
+        }
       }
       return volumeManager.listVolumes(null, prefix, prevKey, maxKeys);
     } catch (Exception ex) {
@@ -1932,20 +1930,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if(auditSuccess){
         AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.LIST_VOLUMES,
             auditMap));
-      }
-    }
-  }
-
-  private void checkAdmin() throws OMException {
-    if(isAclEnabled) {
-      if (!ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD) &&
-          !ozAdmins.contains(ProtobufRpcEngine.Server.getRemoteUser()
-              .getUserName())) {
-        LOG.error("Only admin users are authorized to create or list " +
-                "Ozone volumes. User :{} is not an admin.",
-            ProtobufRpcEngine.Server.getRemoteUser().getUserName());
-        throw new OMException("Only admin users are authorized to create " +
-            "or list Ozone volumes.", ResultCodes.PERMISSION_DENIED);
       }
     }
   }
@@ -3293,7 +3277,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * Return list of OzoneAdministrators.
    */
-  public Collection<String> getOzoneAdmins() {
+  private Collection<String> getOzoneAdmins(OzoneConfiguration conf)
+      throws IOException {
+    Collection<String> ozAdmins =
+        conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
+    String omSPN = UserGroupInformation.getCurrentUser().getShortUserName();
+    if (!ozAdmins.contains(omSPN)) {
+      ozAdmins.add(omSPN);
+    }
     return ozAdmins;
   }
 
@@ -3308,5 +3299,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public boolean isRunning() {
     return omState == State.RUNNING;
+  }
+
+  private void startJVMPauseMonitor() {
+    // Start jvm monitor
+    jvmPauseMonitor = new JvmPauseMonitor();
+    jvmPauseMonitor.init(configuration);
+    jvmPauseMonitor.start();
   }
 }
