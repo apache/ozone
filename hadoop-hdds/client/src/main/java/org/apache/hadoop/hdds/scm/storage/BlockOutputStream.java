@@ -317,8 +317,14 @@ public class BlockOutputStream extends OutputStream {
       if (!commitWatcher.getFutureMap().isEmpty()) {
         waitOnFlushFutures();
       }
-    } catch (InterruptedException | ExecutionException e) {
+    } catch (ExecutionException e) {
       setIoException(e);
+      adjustBuffersOnException();
+      throw getIoException();
+    } catch (InterruptedException ex) {
+      LOG.error("Command execution was interrupted.");
+      Thread.currentThread().interrupt();
+      setIoException(ex);
       adjustBuffersOnException();
       throw getIoException();
     }
@@ -427,9 +433,14 @@ public class BlockOutputStream extends OutputStream {
         setIoException(ce);
         throw ce;
       });
-    } catch (IOException | InterruptedException | ExecutionException e) {
+    } catch (IOException | ExecutionException e) {
       throw new IOException(
           "Unexpected Storage Container Exception: " + e.toString(), e);
+    } catch (InterruptedException ex) {
+      LOG.error("Command execution was interrupted.");
+      Thread.currentThread().interrupt();
+      throw new IOException(
+          "Unexpected Storage Container Exception: " + ex.toString(), ex);
     }
     commitWatcher.getFutureMap().put(flushPos, flushFuture);
     return flushFuture;
@@ -443,10 +454,16 @@ public class BlockOutputStream extends OutputStream {
             writtenDataLength - totalDataFlushedLength >= streamBufferSize)) {
       try {
         handleFlush(false);
-      } catch (InterruptedException | ExecutionException e) {
+      } catch (ExecutionException e) {
         // just set the exception here as well in order to maintain sanctity of
         // ioException field
         setIoException(e);
+        adjustBuffersOnException();
+        throw getIoException();
+      } catch (InterruptedException ex) {
+        LOG.error("Command execution was interrupted.");
+        Thread.currentThread().interrupt();
+        setIoException(ex);
         adjustBuffersOnException();
         throw getIoException();
       }
@@ -506,8 +523,14 @@ public class BlockOutputStream extends OutputStream {
         && bufferPool != null && bufferPool.getSize() > 0) {
       try {
         handleFlush(true);
-      } catch (InterruptedException | ExecutionException e) {
+      } catch (ExecutionException e) {
         setIoException(e);
+        adjustBuffersOnException();
+        throw getIoException();
+      } catch (InterruptedException ex) {
+        LOG.error("Command execution was interrupted.");
+        Thread.currentThread().interrupt();
+        setIoException(ex);
         adjustBuffersOnException();
         throw getIoException();
       } finally {
@@ -643,9 +666,14 @@ public class BlockOutputStream extends OutputStream {
         setIoException(ce);
         throw ce;
       });
-    } catch (IOException | InterruptedException | ExecutionException e) {
+    } catch (IOException | ExecutionException e) {
       throw new IOException(
           "Unexpected Storage Container Exception: " + e.toString(), e);
+    } catch (InterruptedException ex) {
+      LOG.error("Command execution was interrupted.");
+      Thread.currentThread().interrupt();
+      throw new IOException(
+          "Unexpected Storage Container Exception: " + ex.toString(), ex);
     }
     containerBlockData.addChunks(chunkInfo);
   }
