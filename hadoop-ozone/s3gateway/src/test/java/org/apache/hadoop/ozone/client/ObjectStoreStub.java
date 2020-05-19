@@ -26,7 +26,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_ALREADY_EXISTS;
@@ -45,6 +46,7 @@ public class ObjectStoreStub extends ObjectStore {
 
   private Map<String, OzoneVolumeStub> volumes = new HashMap<>();
   private Map<String, Boolean> bucketEmptyStatus = new HashMap<>();
+  private static OzoneConfiguration conf = new OzoneConfiguration();
 
   @Override
   public void createVolume(String volumeName) throws IOException {
@@ -121,11 +123,12 @@ public class ObjectStoreStub extends ObjectStore {
   public void createS3Bucket(String s3BucketName) throws
       IOException {
     if (!bucketEmptyStatus.containsKey(s3BucketName)) {
+      String volumeName = HddsClientUtils.getS3VolumeName(conf);
       bucketEmptyStatus.put(s3BucketName, true);
-      if (!volumes.containsKey(OzoneConsts.S3_VOLUME_NAME)) {
-        createVolume(OzoneConsts.S3_VOLUME_NAME);
+      if (!volumes.containsKey(volumeName)) {
+        createVolume(volumeName);
       }
-      volumes.get(OzoneConsts.S3_VOLUME_NAME).createBucket(s3BucketName);
+      volumes.get(volumeName).createBucket(s3BucketName);
     } else {
       throw new OMException("", BUCKET_ALREADY_EXISTS);
     }
