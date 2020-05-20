@@ -199,7 +199,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
                 new RatisDropwizardExports(
                     registry.getDropWizardMetricRegistry()));
           } catch (NullPointerException e) {
-            // TODO
+            // TODO: refactor ratis to avoid use singleton of
+            //  MetricRegistries.global()
             // This should only happen in test.
             // Because 3 datanodes and om in mini-cluster share one
             // MetricRegistries.global(). When datanode1 start,
