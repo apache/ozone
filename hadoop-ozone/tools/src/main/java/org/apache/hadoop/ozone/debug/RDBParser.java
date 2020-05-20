@@ -59,11 +59,11 @@ public class RDBParser extends GenericCli {
   private static HashMap<String, DBColumnFamilyDefinition>
       constructColumnFamilyMap() {
     columnFamilyMap = new HashMap<String, DBColumnFamilyDefinition>();
-    columnFamilyMap.put("validCerts", SCMDBDefinition.VALID_CERTS);
-    columnFamilyMap.put("deletedBlocks", SCMDBDefinition.DELETED_BLOCKS);
-    columnFamilyMap.put("pipelines", SCMDBDefinition.PIPELINES);
-    columnFamilyMap.put("revokedCerts", SCMDBDefinition.REVOKED_CERTS);
-    columnFamilyMap.put("containers", SCMDBDefinition.CONTAINERS);
+    DBColumnFamilyDefinition[] columnFamilyDefinitions = new SCMDBDefinition()
+            .getColumnFamilies();
+    for(DBColumnFamilyDefinition definition:columnFamilyDefinitions){
+      columnFamilyMap.put(definition.getTableName(), definition);
+    }
     return columnFamilyMap;
   }
 

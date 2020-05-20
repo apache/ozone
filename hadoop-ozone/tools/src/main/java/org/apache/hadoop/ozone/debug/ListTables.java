@@ -18,7 +18,9 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import org.rocksdb.*;
+import org.rocksdb.Options;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksDBException;
 import picocli.CommandLine;
 
 import java.nio.charset.StandardCharsets;
@@ -46,13 +48,10 @@ public class ListTables implements Callable<Void> {
     return null;
   }
 
-  private static List<byte[]> getColumnFamilyList(String dbPath) {
+  private static List<byte[]> getColumnFamilyList(String dbPath)
+      throws RocksDBException {
     List<byte[]> cfList = null;
-    try {
-      cfList = RocksDB.listColumnFamilies(new Options(), dbPath);
-    } catch (RocksDBException e) {
-      e.printStackTrace();
-    }
+    cfList = RocksDB.listColumnFamilies(new Options(), dbPath);
     return cfList;
   }
 }

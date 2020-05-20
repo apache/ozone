@@ -52,6 +52,9 @@ public class SCMDBParser implements Callable<Void> {
     ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
             dbColumnFamilyDefinition.getTableName()
                     .getBytes(StandardCharsets.UTF_8), list);
+    if (columnFamilyHandle==null){
+      throw new IllegalArgumentException("columnFamilyHandle is null");
+    }
     RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle);
     iterator.seekToFirst();
     while (iterator.isValid()){
