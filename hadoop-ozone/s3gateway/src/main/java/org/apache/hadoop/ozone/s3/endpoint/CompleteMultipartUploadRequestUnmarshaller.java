@@ -32,13 +32,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
+import javax.ws.rs.ext.Provider;
 
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_XML_NAMESPACE;
 
 /**
  * Custom unmarshaller to read CompleteMultipartUploadRequest wo namespace.
  */
-
+@Provider
 public class CompleteMultipartUploadRequestUnmarshaller
     implements MessageBodyReader<CompleteMultipartUploadRequest> {
 
