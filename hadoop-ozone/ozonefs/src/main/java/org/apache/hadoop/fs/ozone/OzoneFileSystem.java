@@ -18,19 +18,17 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URI;
-
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderTokenIssuer;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.GlobalStorageStatistics;
 import org.apache.hadoop.fs.StorageStatistics;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.security.token.DelegationTokenIssuer;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
 
 /**
  * The Ozone Filesystem implementation.
@@ -81,27 +79,6 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
   protected void incrementCounter(Statistic statistic) {
     if (storageStatistics != null) {
       storageStatistics.incrementCounter(statistic, 1);
-    }
-  }
-
-  @Override
-  protected OzoneClientAdapter createAdapter(ConfigurationSource conf,
-      String bucketStr,
-      String volumeStr, String omHost, int omPort,
-      boolean isolatedClassloader) throws IOException {
-
-    this.storageStatistics =
-        (OzoneFSStorageStatistics) GlobalStorageStatistics.INSTANCE
-            .put(OzoneFSStorageStatistics.NAME,
-                OzoneFSStorageStatistics::new);
-
-    if (isolatedClassloader) {
-      return OzoneClientAdapterFactory.createAdapter(volumeStr, bucketStr,
-          storageStatistics);
-
-    } else {
-      return new OzoneClientAdapterImpl(omHost, omPort, conf,
-          volumeStr, bucketStr, storageStatistics);
     }
   }
 
