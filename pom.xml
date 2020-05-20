@@ -1909,6 +1909,9 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <goals>
               <goal>prepare-agent</goal>
             </goals>
+            <configuration>
+              <includes>org.apache.hadoop.hdds.*,org.apache.hadoop.ozone.*</includes>
+            </configuration>
           </execution>
         </executions>
       </plugin>
