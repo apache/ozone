@@ -280,6 +280,7 @@
             <exclude>**/yarn.lock</exclude>
             <exclude>**/ozone-recon-web/build/**</exclude>
             <exclude>src/main/license/**</exclude>
+            <exclude>src/main/proto/proto.lock</exclude>
           </excludes>
         </configuration>
       </plugin>

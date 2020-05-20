@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.MiniOzoneChaosCluster.FailureService;
+import org.apache.hadoop.ozone.failure.Failures;
 import org.apache.hadoop.ozone.loadgenerators.RandomLoadGenerator;
 import org.apache.hadoop.ozone.loadgenerators.ReadOnlyLoadGenerator;
 import org.apache.hadoop.ozone.loadgenerators.FilesystemLoadGenerator;
@@ -92,17 +93,36 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
   @BeforeClass
   public static void init() throws Exception {
     OzoneConfiguration configuration = new OzoneConfiguration();
-    String omServiceID =
-        FailureService.of(failureService) == FailureService.OZONE_MANAGER ?
-            OM_SERVICE_ID : null;
+    FailureService service = FailureService.of(failureService);
+    String omServiceID;
 
-    cluster = new MiniOzoneChaosCluster.Builder(configuration)
+    MiniOzoneChaosCluster.Builder builder =
+        new MiniOzoneChaosCluster.Builder(configuration);
+
+    switch (service) {
+    case DATANODE:
+      omServiceID = null;
+      builder
+          .addFailures(Failures.DatanodeRestartFailure.class)
+          .addFailures(Failures.DatanodeStartStopFailure.class);
+      break;
+    case OZONE_MANAGER:
+      omServiceID = OM_SERVICE_ID;
+      builder
+          .addFailures(Failures.OzoneManagerStartStopFailure.class)
+          .addFailures(Failures.OzoneManagerRestartFailure.class);
+      break;
+    default:
+      throw new IllegalArgumentException();
+    }
+
+    builder
         .setNumDatanodes(numDatanodes)
         .setNumOzoneManagers(numOzoneManagers)
-        .setFailureService(failureService)
         .setOMServiceID(omServiceID)
-        .setNumDataVolumes(numDataVolumes)
-        .build();
+        .setNumDataVolumes(numDataVolumes);
+
+    cluster = builder.build();
     cluster.waitForClusterToBeReady();
 
     String volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();

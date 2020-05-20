@@ -1435,6 +1435,14 @@
   </property>
 
   <property>
+    <name>ozone.s3g.volume.name</name>
+    <value>s3v</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      The volume name to access through the s3gateway.
+    </description>
+  </property>
+  <property>
     <name>ozone.s3g.domain.name</name>
     <value/>
     <tag>OZONE, S3GATEWAY</tag>

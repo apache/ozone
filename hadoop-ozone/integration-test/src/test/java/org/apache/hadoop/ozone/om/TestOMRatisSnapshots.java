@@ -16,11 +16,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
-
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -31,9 +27,6 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
-
-import org.apache.commons.lang3.RandomStringUtils;
-import static org.apache.hadoop.ozone.om.TestOzoneManagerHA.createKey;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.After;
 import org.junit.Assert;
@@ -43,6 +36,13 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.Timeout;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+import static org.apache.hadoop.ozone.om.TestOzoneManagerHA.createKey;
 
 /**
  * Tests the Ratis snaphsots feature in OM.
