@@ -35,8 +35,8 @@
     <module>ozone-manager</module>
     <module>tools</module>
     <module>integration-test</module>
-    <module>ozonefs</module>
     <module>ozonefs-common</module>
+    <module>ozonefs</module>
     <module>datanode</module>
     <module>s3gateway</module>
     <module>dist</module>
@@ -94,6 +94,11 @@
       <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-ozone-filesystem</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-ozone-filesystem-shaded</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
@@ -366,6 +371,7 @@
         </property>
       </activation>
       <modules>
+        <module>ozonefs-shaded</module>
         <module>ozonefs-hadoop2</module>
         <module>ozonefs-hadoop3</module>
       </modules>

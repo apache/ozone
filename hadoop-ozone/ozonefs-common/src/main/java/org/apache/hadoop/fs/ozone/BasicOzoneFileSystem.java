@@ -18,20 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.EnumSet;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Objects;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CreateFlag;
@@ -53,16 +40,29 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
+import org.apache.http.client.utils.URIBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import com.google.common.base.Preconditions;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.EnumSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_USER_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
-import org.apache.http.client.utils.URIBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * The minimal Ozone Filesystem implementation.
@@ -145,18 +145,6 @@ public class BasicOzoneFileSystem extends FileSystem {
           .build();
       LOG.trace("Ozone URI for ozfs initialization is {}", uri);
 
-      //isolated is the default for ozonefs-lib-legacy which includes the
-      // /ozonefs.txt, otherwise the default is false. It could be overridden.
-      boolean defaultValue =
-          BasicOzoneFileSystem.class.getClassLoader()
-              .getResource("ozonefs.txt")
-              != null;
-
-      //Use string here instead of the constant as constant may not be available
-      //on the classpath of a hadoop 2.7
-      boolean isolatedClassloader =
-          conf.getBoolean("ozone.fs.isolated-classloader", defaultValue);
-
       ConfigurationSource source;
       if (conf instanceof OzoneConfiguration) {
         source = (ConfigurationSource) conf;
@@ -165,8 +153,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       }
       this.adapter =
           createAdapter(source, bucketStr,
-              volumeStr, omHost, omPort,
-          isolatedClassloader);
+              volumeStr, omHost, omPort);
 
       try {
         this.userName =
@@ -186,19 +173,10 @@ public class BasicOzoneFileSystem extends FileSystem {
 
   protected OzoneClientAdapter createAdapter(ConfigurationSource conf,
       String bucketStr,
-      String volumeStr, String omHost, int omPort,
-      boolean isolatedClassloader) throws IOException {
+      String volumeStr, String omHost, int omPort) throws IOException {
 
-    if (isolatedClassloader) {
-
-      return OzoneClientAdapterFactory
-          .createAdapter(volumeStr, bucketStr);
-
-    } else {
-
-      return new BasicOzoneClientAdapterImpl(omHost, omPort, conf,
-          volumeStr, bucketStr);
-    }
+    return new BasicOzoneClientAdapterImpl(omHost, omPort, conf,
+        volumeStr, bucketStr);
   }
 
   @Override

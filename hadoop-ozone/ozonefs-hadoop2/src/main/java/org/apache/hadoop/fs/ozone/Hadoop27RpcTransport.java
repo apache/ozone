@@ -36,6 +36,7 @@ public class Hadoop27RpcTransport implements OmTransport {
     InetSocketAddress socket = OmUtils.getOmAddressForClients(conf);
     long version = RPC.getProtocolVersion(OzoneManagerProtocolPB.class);
     OzoneConfiguration ozoneConfiguration = OzoneConfiguration.of(conf);
+
     RPC.setProtocolEngine(ozoneConfiguration,
         OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
@@ -58,6 +59,10 @@ public class Hadoop27RpcTransport implements OmTransport {
   @Override
   public Text getDelegationTokenService() {
     return null;
+  }
+
+  @Override
+  public void close() throws IOException {
   }
 
 }
