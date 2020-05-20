@@ -2043,7 +2043,7 @@
     <name>ozone.scm.ratis.server.request.timeout</name>
     <value>3s</value>
     <tag>OZONE, SCM, HA, RATIS</tag>
-    <description>The timeout duration for SCM's ratis server request .</description>
+    <description>The timeout duration for SCM's ratis server request.</description>
   </property>
 
   <property>
@@ -2062,7 +2062,7 @@
   </property>
 
   <property>
-    <name>ozone.scm.leader.election.minimum.timeout.duration</name>
+    <name>ozone.scm.ratis.leader.election.minimum.timeout.duration</name>
     <value>1s</value>
     <tag>OZONE, SCM, HA, RATIS</tag>
     <description>The minimum timeout duration for SCM ratis leader election.
