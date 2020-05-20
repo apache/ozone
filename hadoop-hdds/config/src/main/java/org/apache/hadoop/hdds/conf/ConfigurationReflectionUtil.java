@@ -84,6 +84,10 @@ public final class ConfigurationReflectionUtil {
             forcedFieldSet(field, configuration,
                 from.getTimeDuration(key, "0s", configAnnotation.timeUnit()));
             break;
+          case SIZE:
+            forcedFieldSet(field, configuration,
+                from.getStorageSize(key, "0B", configAnnotation.sizeUnit()));
+            break;
           default:
             throw new ConfigurationException(
                 "Unsupported ConfigType " + type + " on " + fieldLocation);
