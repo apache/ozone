@@ -158,7 +158,7 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY =
       "ozone.client.stream.buffer.flush.delay";
   public static final boolean OOZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY_DEFAULT =
-      false;
+      true;
 
   // This defines the overall connection limit for the connection pool used in
   // RestClient.
