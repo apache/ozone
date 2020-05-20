@@ -42,10 +42,21 @@ public class TestOmBucketInfo {
         .setStorageType(StorageType.ARCHIVE)
         .build();
 
-    OmBucketInfo afterSerialization =
-        OmBucketInfo.getFromProtobuf(bucket.getProtobuf());
+    Assert.assertEquals(bucket,
+        OmBucketInfo.getFromProtobuf(bucket.getProtobuf()));
+  }
 
-    Assert.assertEquals(bucket, afterSerialization);
+  @Test
+  public void protobufConversionOfBucketLink() {
+    OmBucketInfo bucket = OmBucketInfo.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("vol1")
+        .setSourceVolume("otherVol")
+        .setSourceBucket("someBucket")
+        .build();
+
+    Assert.assertEquals(bucket,
+        OmBucketInfo.getFromProtobuf(bucket.getProtobuf()));
   }
 
   @Test
@@ -66,7 +77,10 @@ public class TestOmBucketInfo {
 
     /* Clone an omBucketInfo. */
     OmBucketInfo cloneBucketInfo = omBucketInfo.copyObject();
-    Assert.assertEquals(omBucketInfo, cloneBucketInfo);
+    Assert.assertNotSame(omBucketInfo, cloneBucketInfo);
+    Assert.assertEquals("Expected " + omBucketInfo + " and " + cloneBucketInfo
+            + " to be equal",
+        omBucketInfo, cloneBucketInfo);
 
     /* Reset acl & check not equal. */
     omBucketInfo.setAcls(Collections.singletonList(new OzoneAcl(

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.shell.bucket;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -46,6 +47,12 @@ public class CreateBucketHandler extends BucketHandler {
           "false/unspecified indicates otherwise")
   private Boolean isGdprEnforced;
 
+  @Option(names = {"--link-to", "-l"},
+      description = "if specified, the created bucket will be a link to the " +
+          "given bucket",
+      converter = BucketUri.class)
+  private OzoneAddress source;
+
   /**
    * Executes create bucket.
    */
@@ -56,6 +63,15 @@ public class CreateBucketHandler extends BucketHandler {
     BucketArgs.Builder bb = new BucketArgs.Builder()
         .setStorageType(StorageType.DEFAULT)
         .setVersioning(false);
+
+    if (source != null) {
+      Preconditions.checkArgument(isGdprEnforced == null,
+          "GDPR flag cannot be specified for bucket links");
+      Preconditions.checkArgument(bekName == null,
+          "Encryption key cannot be specified for bucket links");
+      bb.setSourceVolume(source.getVolumeName());
+      bb.setSourceBucket(source.getBucketName());
+    }
 
     if (isGdprEnforced != null) {
       bb.addMetadata(OzoneConsts.GDPR_FLAG, String.valueOf(isGdprEnforced));

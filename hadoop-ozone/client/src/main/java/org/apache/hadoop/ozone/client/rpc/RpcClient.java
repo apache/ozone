@@ -441,6 +441,8 @@ public class RpcClient implements ClientProtocol {
         .setIsVersionEnabled(isVersionEnabled)
         .addAllMetadata(bucketArgs.getMetadata())
         .setStorageType(storageType)
+        .setSourceVolume(bucketArgs.getSourceVolume())
+        .setSourceBucket(bucketArgs.getSourceBucket())
         .setAcls(listOfAcls.stream().distinct().collect(Collectors.toList()));
 
     if (bek != null) {
