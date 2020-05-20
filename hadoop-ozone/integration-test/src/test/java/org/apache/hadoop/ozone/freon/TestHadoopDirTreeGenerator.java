@@ -109,7 +109,7 @@ public class TestHadoopDirTreeGenerator {
   }
 
   private void verifyDirTree(String volumeName, String bucketName, int depth,
-                             int span, int fileCount, int perFileSizeInKBs)
+                             int span, int fileCount, int perFileSizeInBytes)
           throws IOException {
 
     store.createVolume(volumeName);
@@ -120,7 +120,7 @@ public class TestHadoopDirTreeGenerator {
     new Freon().execute(
         new String[]{"-conf", confPath, "dtsg", "-d", depth + "", "-c",
             fileCount + "", "-s", span + "", "-n", "1", "-r", rootPath,
-                     "-g", perFileSizeInKBs + ""});
+                     "-g", perFileSizeInBytes + ""});
     // verify the directory structure
     FileSystem fileSystem = FileSystem.get(URI.create(rootPath),
             conf);
@@ -132,7 +132,7 @@ public class TestHadoopDirTreeGenerator {
       // as it has only one dir at root.
       verifyActualSpan(1, fileStatuses);
       int actualDepth = traverseToLeaf(fileSystem, fileStatus.getPath(),
-              1, depth, span, fileCount, perFileSizeInKBs);
+              1, depth, span, fileCount, perFileSizeInBytes);
       Assert.assertEquals("Mismatch depth in a path",
               depth, actualDepth);
     }
@@ -140,7 +140,7 @@ public class TestHadoopDirTreeGenerator {
 
   private int traverseToLeaf(FileSystem fs, Path dirPath, int depth,
                              int expectedDepth, int expectedSpanCnt,
-                             int expectedFileCnt, int perFileSizeInKBs)
+                             int expectedFileCnt, int perFileSizeInBytes)
           throws IOException {
     FileStatus[] fileStatuses = fs.listStatus(dirPath);
     // check the num of peer directories except root and leaf as both
@@ -153,10 +153,10 @@ public class TestHadoopDirTreeGenerator {
       if (fileStatus.isDirectory()) {
         ++depth;
         return traverseToLeaf(fs, fileStatus.getPath(), depth, expectedDepth,
-                expectedSpanCnt, expectedFileCnt, perFileSizeInKBs);
+                expectedSpanCnt, expectedFileCnt, perFileSizeInBytes);
       } else {
         Assert.assertEquals("Mismatches file len",
-                perFileSizeInKBs * 1024, fileStatus.getLen());
+                perFileSizeInBytes, fileStatus.getLen());
         actualNumFiles++;
       }
     }
