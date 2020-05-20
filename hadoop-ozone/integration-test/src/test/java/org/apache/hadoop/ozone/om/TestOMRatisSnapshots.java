@@ -42,7 +42,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import static org.apache.hadoop.ozone.om.TestOzoneManagerHA.createKey;
+import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
 
 /**
  * Tests the Ratis snaphsots feature in OM.
