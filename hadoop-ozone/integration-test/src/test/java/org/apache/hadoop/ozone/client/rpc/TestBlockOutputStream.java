@@ -49,6 +49,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 
 /**
  * Tests BlockOutputStream class.
+ * This class is used to test the behavior of the OutputStream(
+ * ozone.client.stream.buffer.flush.delay=false).
  */
 public class TestBlockOutputStream {
   private static MiniOzoneCluster cluster;
@@ -82,6 +84,8 @@ public class TestBlockOutputStream {
     conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
         StorageUnit.MB);
+    conf.setBoolean(
+        OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY, false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(7)
         .setTotalPipelineNumLimit(10)

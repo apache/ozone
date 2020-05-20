@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
+import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -30,6 +31,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.ContainerStateMachine;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.RatisServerConfiguration;
@@ -47,8 +49,10 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
@@ -66,6 +70,11 @@ public class TestContainerStateMachine {
   private String volumeName;
   private String bucketName;
   private String path;
+  private static int chunkSize;
+  private static int flushSize;
+  private static int maxFlushSize;
+  private static int blockSize;
+  private static String keyString;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -74,6 +83,11 @@ public class TestContainerStateMachine {
    */
   @Before
   public void setup() throws Exception {
+    chunkSize = 100;
+    flushSize = 2 * chunkSize;
+    maxFlushSize = 2 * flushSize;
+    blockSize = 2 * maxFlushSize;
+    keyString = UUID.randomUUID().toString();
     path = GenericTestUtils
         .getTempPath(TestContainerStateMachine.class.getSimpleName());
     File baseDir = new File(path);
@@ -93,6 +107,11 @@ public class TestContainerStateMachine {
     //  conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.toString());
     cluster =
         MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1)
+            .setBlockSize(blockSize)
+            .setChunkSize(chunkSize)
+            .setStreamBufferFlushSize(flushSize)
+            .setStreamBufferMaxSize(maxFlushSize)
+            .setStreamBufferSizeUnit(StorageUnit.BYTES)
             .setHbInterval(200)
             .setCertificateClient(new CertificateClientTestImpl(conf))
             .build();
@@ -123,8 +142,14 @@ public class TestContainerStateMachine {
         objectStore.getVolume(volumeName).getBucket(bucketName)
             .createKey("ratis", 1024, ReplicationType.RATIS,
                 ReplicationFactor.ONE, new HashMap<>());
+    // Now ozone.client.stream.buffer.flush.delay is currently enabled
+    // by default. Here we  written data(length 110) greater than chunk
+    // Size(length 100), make sure flush will sync data.
+    byte[] data =
+        ContainerTestHelper.getFixedLengthString(keyString, 110)
+        .getBytes(UTF_8);
     // First write and flush creates a container in the datanode
-    key.write("ratis".getBytes());
+    key.write(data);
     key.flush();
     key.write("ratis".getBytes());
 

@@ -130,7 +130,8 @@ public class TestOzoneClientRetriesOnException {
   @Test
   public void testGroupMismatchExceptionHandling() throws Exception {
     String keyName = getKeyName();
-    int dataLength = maxFlushSize + 50;
+    // make sure flush will sync data.
+    int dataLength = maxFlushSize + chunkSize;
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS,
             dataLength);
     // write data more than 1 chunk

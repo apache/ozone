@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.StaticMapping;
@@ -397,12 +398,14 @@ public class TestFailureHandlingByClient {
     key.write(data.getBytes());
     key.write(data.getBytes());
     key.flush();
+    List<PipelineID> pipelineIDList =
+        keyOutputStream.getExcludeList().getPipelineIds();
+    List<ContainerID> containerIDList =
+        keyOutputStream.getExcludeList().getContainerIds();
+    Assert.assertTrue(pipelineIDList.contains(pipeline.getId()));
+    Assert.assertTrue(containerIDList.isEmpty());
     Assert.assertTrue(keyOutputStream.getExcludeList().getPipelineIds()
         .contains(pipeline.getId()));
-    Assert.assertTrue(
-        keyOutputStream.getExcludeList().getContainerIds().isEmpty());
-    Assert.assertTrue(
-        keyOutputStream.getExcludeList().getDatanodes().isEmpty());
     // The close will just write to the buffer
     key.close();
 

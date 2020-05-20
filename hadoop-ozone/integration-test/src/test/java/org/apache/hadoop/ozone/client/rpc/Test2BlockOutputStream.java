@@ -43,10 +43,11 @@ import java.util.concurrent.TimeUnit;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY;
 
 /**
- * Tests BlockOutputStream class.
+ * Tests Block2OutputStream class.
+ * This class complements TestBlockOutputStream, is used to test the behavior
+ * of the OutputStream when ozone.client.stream.buffer.flush.delay=true.
  */
 public class Test2BlockOutputStream {
   private static MiniOzoneCluster cluster;
