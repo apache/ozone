@@ -28,7 +28,7 @@ mvn -B -DskipShade -Dskip.yarn -fae test -pl \!:hadoop-ozone-integration-test,\!
 rc=$?
 
 #Archive combined jacoco records
-mvn -B jacoco:merge -Djacoco.destFile=$REPORT_DIR/jacoco-combined.exec
+mvn -B -N jacoco:merge -Djacoco.destFile=$REPORT_DIR/jacoco-combined.exec
 
 # shellcheck source=hadoop-ozone/dev-support/checks/_mvn_unit_report.sh
 source "$DIR/_mvn_unit_report.sh"
