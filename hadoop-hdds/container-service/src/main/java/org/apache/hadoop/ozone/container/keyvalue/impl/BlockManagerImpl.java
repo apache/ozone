@@ -108,11 +108,9 @@ public class BlockManagerImpl implements BlockManager {
         // transaction is reapplied in the ContainerStateMachine on restart.
         // It also implies that the given block must already exist in the db.
         // just log and return
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("blockCommitSequenceId {} in the Container Db is greater"
-                  + " than the supplied value {}. Ignoring it",
-              containerBCSId, bcsId);
-        }
+        LOG.debug("blockCommitSequenceId {} in the Container Db is greater"
+                + " than the supplied value {}. Ignoring it",
+            containerBCSId, bcsId);
         return data.getSize();
       }
       // update the blockData as well as BlockCommitSequenceId here
