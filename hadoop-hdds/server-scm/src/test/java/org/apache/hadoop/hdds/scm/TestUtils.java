@@ -497,7 +497,7 @@ public final class TestUtils {
       // writes the version file properties
       scmStore.initialize();
     }
-    return new StorageContainerManager(conf, configurator);
+    return StorageContainerManager.createSCM(conf, configurator);
   }
 
   public static ContainerInfo getContainer(
