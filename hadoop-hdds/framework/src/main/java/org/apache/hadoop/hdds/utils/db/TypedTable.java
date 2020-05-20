@@ -178,9 +178,10 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   /**
-   * This method needs returns the value if it exists in cache, and return the
-   * same copy in cache, if it does not get the value from the underlying
-   * rockdb table.
+   * This method needs returns the value if it exists in cache, if it 
+   * does not get the value from the underlying rockdb table. If it 
+   * exists in cache, it returns the same reference of the cached value.
+   * 
    *
    * Caller's of this method should use synchronization mechanism, when
    * accessing. First it will check from cache, if it has entry return the
@@ -188,9 +189,9 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
    * responsibility to not to use the returned object outside the lock.
    *
    * This method will be helpful in OM, when validating volume exists in
-   * bucket request and also where we need actual value volume info if it
-   * exists, and once we add the bucket response to double buffer, only
-   * bucket info will be used, we don't use volume info. So, there is no case
+   * bucket requests and also where we need actual value volume info if it
+   * exists. Once bucket response is added to the double buffer, only
+   * bucket info is required to flush to DB. So, there is no case
    * of concurrent threads modifying the same cached object.
    * @param key metadata key
    * @return VALUE
