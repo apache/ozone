@@ -44,6 +44,7 @@ import java.io.OutputStream;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -76,6 +77,8 @@ import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls
 public class BlockOutputStream extends OutputStream {
   public static final Logger LOG =
       LoggerFactory.getLogger(BlockOutputStream.class);
+  public static final String EXCEPTION_MSG =
+      "Unexpected Storage Container Exception: ";
 
   private AtomicReference<BlockID> blockID;
 
@@ -318,15 +321,10 @@ public class BlockOutputStream extends OutputStream {
         waitOnFlushFutures();
       }
     } catch (ExecutionException e) {
-      setIoException(e);
-      adjustBuffersOnException();
-      throw getIoException();
+      handleExecutionException(e);
     } catch (InterruptedException ex) {
-      LOG.error("Command execution was interrupted.");
       Thread.currentThread().interrupt();
-      setIoException(ex);
-      adjustBuffersOnException();
-      throw getIoException();
+      handleInterruptedException(ex, Optional.of(Boolean.TRUE));
     }
     watchForCommit(true);
   }
@@ -389,7 +387,7 @@ public class BlockOutputStream extends OutputStream {
     }
 
     CompletableFuture<ContainerProtos.
-        ContainerCommandResponseProto> flushFuture;
+        ContainerCommandResponseProto> flushFuture = null;
     try {
       BlockData blockData = containerBlockData.build();
       XceiverClientReply asyncReply =
@@ -434,13 +432,10 @@ public class BlockOutputStream extends OutputStream {
         throw ce;
       });
     } catch (IOException | ExecutionException e) {
-      throw new IOException(
-          "Unexpected Storage Container Exception: " + e.toString(), e);
+      throw new IOException(EXCEPTION_MSG + e.toString(), e);
     } catch (InterruptedException ex) {
-      LOG.error("Command execution was interrupted.");
       Thread.currentThread().interrupt();
-      throw new IOException(
-          "Unexpected Storage Container Exception: " + ex.toString(), ex);
+      handleInterruptedException(ex, Optional.empty());
     }
     commitWatcher.getFutureMap().put(flushPos, flushFuture);
     return flushFuture;
@@ -457,15 +452,10 @@ public class BlockOutputStream extends OutputStream {
       } catch (ExecutionException e) {
         // just set the exception here as well in order to maintain sanctity of
         // ioException field
-        setIoException(e);
-        adjustBuffersOnException();
-        throw getIoException();
+        handleExecutionException(e);
       } catch (InterruptedException ex) {
-        LOG.error("Command execution was interrupted.");
         Thread.currentThread().interrupt();
-        setIoException(ex);
-        adjustBuffersOnException();
-        throw getIoException();
+        handleInterruptedException(ex, Optional.of(Boolean.TRUE));
       }
     }
   }
@@ -524,15 +514,10 @@ public class BlockOutputStream extends OutputStream {
       try {
         handleFlush(true);
       } catch (ExecutionException e) {
-        setIoException(e);
-        adjustBuffersOnException();
-        throw getIoException();
+        handleExecutionException(e);
       } catch (InterruptedException ex) {
-        LOG.error("Command execution was interrupted.");
         Thread.currentThread().interrupt();
-        setIoException(ex);
-        adjustBuffersOnException();
-        throw getIoException();
+        handleInterruptedException(ex, Optional.of(Boolean.TRUE));
       } finally {
         cleanup(false);
       }
@@ -575,8 +560,7 @@ public class BlockOutputStream extends OutputStream {
   private void setIoException(Exception e) {
     IOException ioe = getIoException();
     if (ioe == null) {
-      IOException exception =  new IOException(
-          "Unexpected Storage Container Exception: " + e.toString(), e);
+      IOException exception =  new IOException(EXCEPTION_MSG + e.toString(), e);
       ioException.compareAndSet(null, exception);
     } else {
       LOG.debug("Previous request had already failed with " + ioe.toString()
@@ -600,7 +584,7 @@ public class BlockOutputStream extends OutputStream {
   }
 
   /**
-   * Checks if the stream is open or exception has occured.
+   * Checks if the stream is open or exception has occurred.
    * If not, throws an exception.
    *
    * @throws IOException if stream is closed
@@ -667,13 +651,10 @@ public class BlockOutputStream extends OutputStream {
         throw ce;
       });
     } catch (IOException | ExecutionException e) {
-      throw new IOException(
-          "Unexpected Storage Container Exception: " + e.toString(), e);
+      throw new IOException(EXCEPTION_MSG + e.toString(), e);
     } catch (InterruptedException ex) {
-      LOG.error("Command execution was interrupted.");
       Thread.currentThread().interrupt();
-      throw new IOException(
-          "Unexpected Storage Container Exception: " + ex.toString(), ex);
+      handleInterruptedException(ex, Optional.empty());
     }
     containerBlockData.addChunks(chunkInfo);
   }
@@ -681,5 +662,36 @@ public class BlockOutputStream extends OutputStream {
   @VisibleForTesting
   public void setXceiverClient(XceiverClientSpi xceiverClient) {
     this.xceiverClient = xceiverClient;
+  }
+
+  /**
+   * Handles InterruptedExecution.
+   *
+   * @param ex
+   * @param skipExecutionException is optional, if passed as TRUE, then
+   * handle ExecutionException else skip it.
+   * @throws IOException
+   */
+  private void handleInterruptedException(Exception ex,
+      Optional<Boolean> skipExecutionException)
+      throws IOException {
+    LOG.error("Command execution was interrupted.");
+    if(skipExecutionException.isPresent() &&
+        skipExecutionException.get().equals(Boolean.TRUE)) {
+      handleExecutionException(ex);
+    } else {
+      throw new IOException(EXCEPTION_MSG + ex.toString(), ex);
+    }
+  }
+
+  /**
+   * Handles ExecutionException by adjusting buffers.
+   * @param ex
+   * @throws IOException
+   */
+  private void handleExecutionException(Exception ex) throws IOException {
+    setIoException(ex);
+    adjustBuffersOnException();
+    throw getIoException();
   }
 }
