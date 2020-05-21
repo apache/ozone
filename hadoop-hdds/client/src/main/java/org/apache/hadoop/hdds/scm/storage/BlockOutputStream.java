@@ -323,7 +323,7 @@ public class BlockOutputStream extends OutputStream {
       handleExecutionException(e);
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
-      handleInterruptedException(ex, Boolean.TRUE);
+      handleInterruptedException(ex, true);
     }
     watchForCommit(true);
   }
@@ -434,7 +434,7 @@ public class BlockOutputStream extends OutputStream {
       throw new IOException(EXCEPTION_MSG + e.toString(), e);
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
-      handleInterruptedException(ex, Boolean.FALSE);
+      handleInterruptedException(ex, false);
     }
     commitWatcher.getFutureMap().put(flushPos, flushFuture);
     return flushFuture;
@@ -454,7 +454,7 @@ public class BlockOutputStream extends OutputStream {
         handleExecutionException(e);
       } catch (InterruptedException ex) {
         Thread.currentThread().interrupt();
-        handleInterruptedException(ex, Boolean.TRUE);
+        handleInterruptedException(ex, true);
       }
     }
   }
@@ -516,7 +516,7 @@ public class BlockOutputStream extends OutputStream {
         handleExecutionException(e);
       } catch (InterruptedException ex) {
         Thread.currentThread().interrupt();
-        handleInterruptedException(ex, Boolean.TRUE);
+        handleInterruptedException(ex, true);
       } finally {
         cleanup(false);
       }
@@ -653,7 +653,7 @@ public class BlockOutputStream extends OutputStream {
       throw new IOException(EXCEPTION_MSG + e.toString(), e);
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
-      handleInterruptedException(ex, Boolean.FALSE);
+      handleInterruptedException(ex, false);
     }
     containerBlockData.addChunks(chunkInfo);
   }
