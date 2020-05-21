@@ -28,9 +28,18 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
  */
 public interface OmTransport {
 
+  /**
+   * The main method to send out the request on the defined transport.
+   */
   OMResponse submitRequest(OMRequest payload) throws IOException;
 
+  /**
+   * Return the addresses of the Ozone Managers, used for delegation token.
+   */
   Text getDelegationTokenService();
 
+  /**
+   * Optional hook to close all the opened resources.
+   */
   void close() throws IOException;
 }

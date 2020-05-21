@@ -46,7 +46,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Full-featured Hadoop RPC + HA implementation.
+ * Full-featured Hadoop RPC implementation with failover support.
  */
 public class Hadoop3OmTransport implements OmTransport {
 
@@ -55,8 +55,8 @@ public class Hadoop3OmTransport implements OmTransport {
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
 
-  private static final Logger FAILOVER_PROXY_PROVIDER_LOG =
-      LoggerFactory.getLogger(OMFailoverProxyProvider.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(Hadoop3OmTransport.class);
 
   private final OMFailoverProxyProvider omFailoverProxyProvider;
 
@@ -133,7 +133,7 @@ public class Hadoop3OmTransport implements OmTransport {
               getNotLeaderException(exception);
           if (notLeaderException != null &&
               notLeaderException.getSuggestedLeaderNodeId() != null) {
-            FAILOVER_PROXY_PROVIDER_LOG.info("RetryProxy: {}",
+            LOG.info("RetryProxy: {}",
                 notLeaderException.getMessage());
 
             // TODO: NotLeaderException should include the host
@@ -153,7 +153,7 @@ public class Hadoop3OmTransport implements OmTransport {
           // does not perform any failover.
           // So Just retry with same OM node.
           if (leaderNotReadyException != null) {
-            FAILOVER_PROXY_PROVIDER_LOG.info("RetryProxy: {}",
+            LOG.info("RetryProxy: {}",
                 leaderNotReadyException.getMessage());
             // HDDS-3465. OM index will not change, but LastOmID will be
             // updated to currentOMId, so that wiatTime calculation will
@@ -175,7 +175,7 @@ public class Hadoop3OmTransport implements OmTransport {
         } else {
           exceptionMsg = exception.getMessage();
         }
-        FAILOVER_PROXY_PROVIDER_LOG.info("RetryProxy: {}", exceptionMsg);
+        LOG.info("RetryProxy: {}", exceptionMsg);
         omFailoverProxyProvider.performFailoverToNextProxy();
         return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
       }
@@ -186,7 +186,7 @@ public class Hadoop3OmTransport implements OmTransport {
           return new RetryAction(fallbackAction,
               omFailoverProxyProvider.getWaitTime());
         } else {
-          FAILOVER_PROXY_PROVIDER_LOG.error("Failed to connect to OMs: {}. " +
+          LOG.error("Failed to connect to OMs: {}. " +
                   "Attempted {} failovers.",
               omFailoverProxyProvider.getOMProxyInfos(), maxFailovers);
           return RetryAction.FAIL;

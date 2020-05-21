@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.security.UserGroupInformation;
 
 /**
- * Factory to crate the default Hadoop 3 + HA transport.
+ * Factory to create the default Hadoop 3 transport with failover support.
  */
 public class Hadoop3OmTransportFactory implements OmTransportFactory {
   @Override

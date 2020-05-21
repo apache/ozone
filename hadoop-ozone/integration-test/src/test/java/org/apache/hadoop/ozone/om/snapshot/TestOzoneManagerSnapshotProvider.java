@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 
 import org.apache.commons.lang3.RandomStringUtils;
@@ -106,7 +107,11 @@ public class TestOzoneManagerSnapshotProvider {
     retVolumeinfo.createBucket(bucketName);
     OzoneBucket ozoneBucket = retVolumeinfo.getBucket(bucketName);
 
-    OzoneManager ozoneManager = cluster.getOMLeader();
+    String leaderOMNodeId = OmFailoverProxyUtil
+        .getFailoverProxyProvider(objectStore.getClientProxy())
+        .getCurrentProxyOMNodeId();
+
+    OzoneManager ozoneManager = cluster.getOzoneManager(leaderOMNodeId);
 
     // Get a follower OM
     String followerNodeId = ozoneManager.getPeerNodes().get(0).getOMNodeId();
@@ -114,7 +119,7 @@ public class TestOzoneManagerSnapshotProvider {
 
     // Download latest checkpoint from leader OM to follower OM
     DBCheckpoint omSnapshot = followerOM.getOmSnapshotProvider()
-        .getOzoneManagerDBSnapshot(ozoneManager.getOMNodeId());
+        .getOzoneManagerDBSnapshot(leaderOMNodeId);
 
     long leaderSnapshotIndex = ozoneManager.getRatisSnapshotIndex();
     long downloadedSnapshotIndex = omSnapshot.getRatisSnapshotIndex();
