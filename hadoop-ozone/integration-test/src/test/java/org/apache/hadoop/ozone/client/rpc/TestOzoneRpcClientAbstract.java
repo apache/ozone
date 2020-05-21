@@ -76,9 +76,12 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueBlockIterator;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -210,8 +213,27 @@ public abstract class TestOzoneRpcClientAbstract {
     return TestOzoneRpcClientAbstract.store;
   }
 
-  public static void setScmId(String scmId){
+  public static void setScmId(String scmId) {
     TestOzoneRpcClientAbstract.scmId = scmId;
+  }
+
+  /**
+   * Test OM Proxy Provider.
+   */
+  @Test
+  public void testOMClientProxyProvider() {
+
+    OMFailoverProxyProvider omFailoverProxyProvider =
+        OmFailoverProxyUtil.getFailoverProxyProvider(store.getClientProxy());
+
+    List<OMProxyInfo> omProxies = omFailoverProxyProvider.getOMProxyInfos();
+
+    // For a non-HA OM service, there should be only one OM proxy.
+    Assert.assertEquals(1, omProxies.size());
+    // The address in OMProxyInfo object, which client will connect to,
+    // should match the OM's RPC address.
+    Assert.assertTrue(omProxies.get(0).getAddress().equals(
+        ozoneManager.getOmRpcServerAddr()));
   }
 
   @Test
