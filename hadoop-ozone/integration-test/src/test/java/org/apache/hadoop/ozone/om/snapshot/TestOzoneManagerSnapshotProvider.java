@@ -110,7 +110,7 @@ public class TestOzoneManagerSnapshotProvider {
     String leaderOMNodeId = OmFailoverProxyUtil
         .getFailoverProxyProvider(objectStore.getClientProxy())
         .getCurrentProxyOMNodeId();
-    
+
     OzoneManager ozoneManager = cluster.getOzoneManager(leaderOMNodeId);
 
     // Get a follower OM

@@ -37,8 +37,9 @@ public final class OmFailoverProxyUtil {
       ClientProtocol clientProtocol) {
 
     OzoneManagerProtocolClientSideTranslatorPB ozoneManagerClient =
-        (OzoneManagerProtocolClientSideTranslatorPB) ((RpcClient) clientProtocol)
-            .getOzoneManagerClient();
+        (OzoneManagerProtocolClientSideTranslatorPB)
+            ((RpcClient) clientProtocol).getOzoneManagerClient();
+    
     Hadoop3OmTransport transport =
         (Hadoop3OmTransport) ozoneManagerClient.getTransport();
     return transport.getOmFailoverProxyProvider();
