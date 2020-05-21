@@ -2060,6 +2060,21 @@
             ]
           },
           {
+            "name": "FileHandle",
+            "fields": [
+              {
+                "id": 1,
+                "name": "fhObjectID",
+                "type": "uint64"
+              },
+              {
+                "id": 2,
+                "name": "fhObjectStr",
+                "type": "string"
+              }
+            ]
+          },
+          {
             "name": "KeyInfo",
             "fields": [
               {
@@ -2139,6 +2154,11 @@
                 "id": 15,
                 "name": "updateID",
                 "type": "uint64"
+              },
+              {
+                "id": 16,
+                "name": "fileHandleInfo",
+                "type": "FileHandle"
               }
             ]
           },
@@ -2828,6 +2848,11 @@
                 "id": 7,
                 "name": "updateID",
                 "type": "uint64"
+              },
+              {
+                "id": 8,
+                "name": "fileHandleInfo",
+                "type": "FileHandle"
               }
             ]
           },

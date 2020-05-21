@@ -20,6 +20,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FileHandle;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -35,14 +36,17 @@ public class OmMultipartKeyInfo extends WithObjectID {
   private final ReplicationType replicationType;
   private final ReplicationFactor replicationFactor;
   private TreeMap<Integer, PartKeyInfo> partKeyInfoList;
+  private long fileHandleInfo;
 
   /**
    * Construct OmMultipartKeyInfo object which holds multipart upload
    * information for a key.
    */
+  @SuppressWarnings("parameternumber")
   public OmMultipartKeyInfo(String id, long creationTime,
       ReplicationType replicationType, ReplicationFactor replicationFactor,
-      Map<Integer, PartKeyInfo> list, long objectID, long updateID) {
+      Map<Integer, PartKeyInfo> list, long objectID, long updateID,
+                            long fileHandleInfo) {
     this.uploadID = id;
     this.creationTime = creationTime;
     this.replicationType = replicationType;
@@ -50,6 +54,19 @@ public class OmMultipartKeyInfo extends WithObjectID {
     this.partKeyInfoList = new TreeMap<>(list);
     this.objectID = objectID;
     this.updateID = updateID;
+    if (fileHandleInfo != 0) {
+        this.fileHandleInfo = fileHandleInfo;
+    } else {
+        this.fileHandleInfo = objectID;
+    }
+  }
+
+  public long getFileHandleInfo() {
+    return fileHandleInfo;
+  }
+
+  public void setFileHandleInfo(long fileHandleInfo) {
+    this.fileHandleInfo = fileHandleInfo;
   }
 
   /**
@@ -95,6 +112,7 @@ public class OmMultipartKeyInfo extends WithObjectID {
     private TreeMap<Integer, PartKeyInfo> partKeyInfoList;
     private long objectID;
     private long updateID;
+    private long fileHandleInfo;
 
     public Builder() {
       this.partKeyInfoList = new TreeMap<>();
@@ -139,6 +157,11 @@ public class OmMultipartKeyInfo extends WithObjectID {
       return this;
     }
 
+    public Builder setFileHandleInfo(long fh) {
+      this.fileHandleInfo = fh;
+      return this;
+    }
+
     public Builder setUpdateID(long id) {
       this.updateID = id;
       return this;
@@ -146,7 +169,8 @@ public class OmMultipartKeyInfo extends WithObjectID {
 
     public OmMultipartKeyInfo build() {
       return new OmMultipartKeyInfo(uploadID, creationTime, replicationType,
-          replicationFactor, partKeyInfoList, objectID, updateID);
+          replicationFactor, partKeyInfoList, objectID, updateID,
+          fileHandleInfo);
     }
   }
 
@@ -160,10 +184,17 @@ public class OmMultipartKeyInfo extends WithObjectID {
     Map<Integer, PartKeyInfo> list = new HashMap<>();
     multipartKeyInfo.getPartKeyInfoListList().forEach(partKeyInfo ->
         list.put(partKeyInfo.getPartNumber(), partKeyInfo));
+    long fhid = 0;
+    if (multipartKeyInfo.hasFileHandleInfo()) {
+      FileHandle fh = multipartKeyInfo.getFileHandleInfo();
+      if (fh.hasFhObjectID()) { 
+        fhid = fh.getFhObjectID();
+      }
+    }
     return new OmMultipartKeyInfo(multipartKeyInfo.getUploadID(),
         multipartKeyInfo.getCreationTime(), multipartKeyInfo.getType(),
         multipartKeyInfo.getFactor(), list, multipartKeyInfo.getObjectID(),
-        multipartKeyInfo.getUpdateID());
+        multipartKeyInfo.getUpdateID(), fhid);
   }
 
   /**
@@ -171,13 +202,16 @@ public class OmMultipartKeyInfo extends WithObjectID {
    * @return MultipartKeyInfo
    */
   public MultipartKeyInfo getProto() {
+    FileHandle.Builder fb = FileHandle.newBuilder()
+        .setFhObjectID(fileHandleInfo);
     MultipartKeyInfo.Builder builder = MultipartKeyInfo.newBuilder()
         .setUploadID(uploadID)
         .setCreationTime(creationTime)
         .setType(replicationType)
         .setFactor(replicationFactor)
         .setObjectID(objectID)
-        .setUpdateID(updateID);
+        .setUpdateID(updateID)
+        .setFileHandleInfo(fb.build());
     partKeyInfoList.forEach((key, value) -> builder.addPartKeyInfoList(value));
     return builder.build();
   }
@@ -205,7 +239,8 @@ public class OmMultipartKeyInfo extends WithObjectID {
     // For partKeyInfoList we can do shallow copy here, as the PartKeyInfo is
     // immutable here.
     return new OmMultipartKeyInfo(uploadID, creationTime, replicationType,
-        replicationFactor, new TreeMap<>(partKeyInfoList), objectID, updateID);
+        replicationFactor, new TreeMap<>(partKeyInfoList), objectID, updateID,
+        fileHandleInfo);
   }
 
 }
