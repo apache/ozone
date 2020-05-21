@@ -667,15 +667,15 @@ public class BlockOutputStream extends OutputStream {
    * Handles InterruptedExecution.
    *
    * @param ex
-   * @param skipExecutionException is optional, if passed as TRUE, then
+   * @param processExecutionException is optional, if passed as TRUE, then
    * handle ExecutionException else skip it.
    * @throws IOException
    */
   private void handleInterruptedException(Exception ex,
-      boolean skipExecutionException)
+      boolean processExecutionException)
       throws IOException {
     LOG.error("Command execution was interrupted.");
-    if(skipExecutionException) {
+    if(processExecutionException) {
       handleExecutionException(ex);
     } else {
       throw new IOException(EXCEPTION_MSG + ex.toString(), ex);
