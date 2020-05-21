@@ -161,7 +161,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
           BUCKET_LOCK, volumeName, bucketName);
 
       OmVolumeArgs omVolumeArgs =
-          metadataManager.getVolumeTable().get(volumeKey);
+          metadataManager.getVolumeTable().getReadCopy(volumeKey);
       //Check if the volume exists
       if (omVolumeArgs == null) {
         LOG.debug("volume: {} not found ", volumeName);
@@ -171,7 +171,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
       //Check if bucket already exists
       OmBucketInfo dbBucketInfo = metadataManager.getBucketTable()
-          .get(bucketKey);
+          .getReadCopy(bucketKey);
       if (dbBucketInfo != null) {
         // Check if this transaction is a replay of ratis logs.
         if (isReplay(ozoneManager, dbBucketInfo, transactionLogIndex)) {

@@ -115,7 +115,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       //Check if bucket exists
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
       OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable()
-          .get(bucketKey);
+          .getReadCopy(bucketKey);
       if (omBucketInfo == null) {
         LOG.debug("bucket: {} not found ", bucketName);
         throw new OMException("Bucket doesn't exist",
