@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.ratis.protocol.GroupMismatchException;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.ratis.protocol.RaftRetryFailureException;
 import org.junit.After;
 import org.junit.Assert;
