@@ -1299,16 +1299,16 @@
     <value>true</value>
     <tag>OZONE, SCM, PIPELINE</tag>
     <description>
-      SCM BackgroundPipelineCreator will skip create pipeline while the count of
-      current available pipeline achieve this value.
+      If enabled, SCM will auto create RATIS factor ONE pipeline.
     </description>
   </property>
   <property>
-    <name>ozone.scm.pipeline.creation.auto.limit</name>
-    <value>3</value>
+    <name>ozone.scm.pipeline.creation.auto.limit.rate</name>
+    <value>0.0</value>
     <tag>OZONE, SCM, PIPELINE</tag>
     <description>
-      If enabled, SCM will auto create RATIS factor ONE pipeline.
+      SCM BackgroundPipelineCreator will skip create pipeline while the count of
+      current available pipeline achieve this datanodeNum * auto.limit.rate.
     </description>
   </property>
   <property>

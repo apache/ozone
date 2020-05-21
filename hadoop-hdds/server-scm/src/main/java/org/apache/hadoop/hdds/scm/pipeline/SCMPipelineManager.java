@@ -115,7 +115,7 @@ public class SCMPipelineManager implements PipelineManager {
     // TODO: See if thread priority needs to be set for these threads
     scheduler = new Scheduler("RatisPipelineUtilsThread", false, 1);
     this.backgroundPipelineCreator =
-        new BackgroundPipelineCreator(this, scheduler, conf);
+        new BackgroundPipelineCreator(this, nodeManager, scheduler, conf);
     this.eventPublisher = eventPublisher;
     this.nodeManager = nodeManager;
     this.metrics = SCMPipelineMetrics.create();

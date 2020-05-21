@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.hdds.utils.Scheduler;
 import org.slf4j.Logger;
@@ -42,13 +43,15 @@ class BackgroundPipelineCreator {
   private final AtomicBoolean isPipelineCreatorRunning;
   private final PipelineManager pipelineManager;
   private final ConfigurationSource conf;
+  private final NodeManager nodeManager;
   private ScheduledFuture<?> periodicTask;
 
   BackgroundPipelineCreator(PipelineManager pipelineManager,
-      Scheduler scheduler, ConfigurationSource conf) {
+      NodeManager nodeManager, Scheduler scheduler, ConfigurationSource conf) {
     this.pipelineManager = pipelineManager;
     this.conf = conf;
     this.scheduler = scheduler;
+    this.nodeManager = nodeManager;
     isPipelineCreatorRunning = new AtomicBoolean(false);
   }
 
@@ -105,9 +108,9 @@ class BackgroundPipelineCreator {
     HddsProtos.ReplicationType type = HddsProtos.ReplicationType.valueOf(
         conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
             OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT));
-    int autoCreateLimit = conf.getInt(
-        ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_LIMIT,
-        ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_LIMIT_DEFAULT);
+    float autoCreateLimit = conf.getFloat(
+        ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_LIMIT_RATE,
+        ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_LIMIT_RATE_DEFAULT);
     boolean autoCreateFactorOne = conf.getBoolean(
         ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
         ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE_DEFAULT);
@@ -135,7 +138,10 @@ class BackgroundPipelineCreator {
           int currentAvailablePipelineCount =
               pipelineManager.getPipelines(type, factor,
                   Pipeline.PipelineState.OPEN).size();
-          if (currentAvailablePipelineCount >= autoCreateLimit) {
+          int healthyDnNum =
+              nodeManager.getNodeCount(HddsProtos.NodeState.HEALTHY);
+          if (currentAvailablePipelineCount >=
+              healthyDnNum * autoCreateLimit) {
             break;
           }
           pipelineManager.createPipeline(type, factor);

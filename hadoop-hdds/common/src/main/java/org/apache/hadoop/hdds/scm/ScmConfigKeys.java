@@ -344,9 +344,10 @@ public final class ScmConfigKeys {
   public static final boolean
       OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE_DEFAULT = true;
 
-  public static final String OZONE_SCM_PIPELINE_AUTO_CREATE_LIMIT =
-      "ozone.scm.pipeline.creation.auto.limit";
-  public static final int OZONE_SCM_PIPELINE_AUTO_CREATE_LIMIT_DEFAULT = 3;
+  public static final String OZONE_SCM_PIPELINE_AUTO_CREATE_LIMIT_RATE =
+      "ozone.scm.pipeline.creation.auto.limit.rate";
+  public static final float OZONE_SCM_PIPELINE_AUTO_CREATE_LIMIT_RATE_DEFAULT =
+      0.0f;
 
   public static final String OZONE_SCM_BLOCK_DELETION_MAX_RETRY =
       "ozone.scm.block.deletion.max.retry";
