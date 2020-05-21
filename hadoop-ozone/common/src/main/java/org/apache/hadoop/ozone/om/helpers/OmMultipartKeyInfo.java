@@ -55,9 +55,9 @@ public class OmMultipartKeyInfo extends WithObjectID {
     this.objectID = objectID;
     this.updateID = updateID;
     if (fileHandleInfo != 0) {
-        this.fileHandleInfo = fileHandleInfo;
+      this.fileHandleInfo = fileHandleInfo;
     } else {
-        this.fileHandleInfo = objectID;
+      this.fileHandleInfo = objectID;
     }
   }
 
