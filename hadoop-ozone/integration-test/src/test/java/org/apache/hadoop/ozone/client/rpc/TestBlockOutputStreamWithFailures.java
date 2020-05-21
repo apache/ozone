@@ -110,8 +110,6 @@ public class TestBlockOutputStreamWithFailures {
                     "watch.request.timeout",
             3, TimeUnit.SECONDS);
     conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 15);
-    conf.setBoolean(
-        OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY, false);
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(7)
         .setTotalPipelineNumLimit(10).setBlockSize(blockSize)
         .setChunkSize(chunkSize).setStreamBufferFlushSize(flushSize)
@@ -147,7 +145,7 @@ public class TestBlockOutputStreamWithFailures {
       throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
-    int dataLength = maxFlushSize + 50;
+    int dataLength = maxFlushSize + chunkSize;
     // write data more than 1 chunk
     byte[] data1 =
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
@@ -236,7 +234,7 @@ public class TestBlockOutputStreamWithFailures {
   public void testWatchForCommitDatanodeFailure() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
-    int dataLength = maxFlushSize + 50;
+    int dataLength = maxFlushSize + chunkSize;
     // write data more than 1 chunk
     byte[] data1 =
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
@@ -323,7 +321,7 @@ public class TestBlockOutputStreamWithFailures {
   public void test2DatanodesFailure() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
-    int dataLength = maxFlushSize + 50;
+    int dataLength = maxFlushSize + chunkSize;
     // write data more than 1 chunk
     byte[] data1 =
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
@@ -429,7 +427,7 @@ public class TestBlockOutputStreamWithFailures {
   public void testFailureWithPrimeSizedData() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
-    int dataLength = maxFlushSize + 69;
+    int dataLength = maxFlushSize + chunkSize;
     // write data more than 1 chunk
     byte[] data1 =
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
@@ -565,7 +563,7 @@ public class TestBlockOutputStreamWithFailures {
     String keyName = getKeyName();
     OzoneOutputStream key =
         createKey(keyName, ReplicationType.RATIS, 0, ReplicationFactor.ONE);
-    int dataLength = maxFlushSize + 50;
+    int dataLength = maxFlushSize + chunkSize;
     // write data more than 1 chunk
     byte[] data1 =
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
@@ -656,7 +654,7 @@ public class TestBlockOutputStreamWithFailures {
     String keyName = getKeyName();
     OzoneOutputStream key =
         createKey(keyName, ReplicationType.RATIS, 0, ReplicationFactor.ONE);
-    int dataLength = maxFlushSize + 50;
+    int dataLength = maxFlushSize + chunkSize;
     // write data more than 1 chunk
     byte[] data1 =
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
@@ -750,7 +748,7 @@ public class TestBlockOutputStreamWithFailures {
     OzoneOutputStream key =
         createKey(keyName, ReplicationType.RATIS, 3 * blockSize,
             ReplicationFactor.ONE);
-    int dataLength = maxFlushSize + 50;
+    int dataLength = maxFlushSize + chunkSize;
     // write data more than 1 chunk
     byte[] data1 =
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
