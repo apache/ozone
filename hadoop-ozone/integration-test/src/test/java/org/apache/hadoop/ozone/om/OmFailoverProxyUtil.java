@@ -31,20 +31,16 @@ public final class OmFailoverProxyUtil {
   }
 
   /**
-   * Get FailoverProxyProvider from RpcClient.
+   * Get FailoverProxyProvider from RpcClient / ClientProtocol.
    */
   public static OMFailoverProxyProvider getFailoverProxyProvider(
-      RpcClient clientProxy) {
+      ClientProtocol clientProtocol) {
+
     OzoneManagerProtocolClientSideTranslatorPB ozoneManagerClient =
-        (OzoneManagerProtocolClientSideTranslatorPB) clientProxy
+        (OzoneManagerProtocolClientSideTranslatorPB) ((RpcClient) clientProtocol)
             .getOzoneManagerClient();
     Hadoop3OmTransport transport =
         (Hadoop3OmTransport) ozoneManagerClient.getTransport();
     return transport.getOmFailoverProxyProvider();
-  }
-
-  public static OMFailoverProxyProvider getFailoverProxyProvider(
-      ClientProtocol clientProtocol) {
-    return getFailoverProxyProvider((RpcClient) clientProtocol);
   }
 }
