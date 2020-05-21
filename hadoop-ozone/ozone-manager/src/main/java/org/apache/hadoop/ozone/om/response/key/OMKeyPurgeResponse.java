@@ -55,8 +55,8 @@ public class OMKeyPurgeResponse extends OMClientResponse {
       BatchOperation batchOperation) throws IOException {
 
     for (String key : purgeKeyList) {
-      omMetadataManager.getDeletedTable().deleteWithBatch(batchOperation,
-          key);
+      omMetadataManager.getDeletedTable().deleteWithBatch(batchOperation, key);
+      omMetadataManager.getTrashTable().deleteWithBatch(batchOperation, key);
     }
   }
 }

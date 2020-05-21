@@ -24,10 +24,13 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.google.common.base.Optional;
 import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
@@ -196,6 +199,7 @@ public class KeyDeletingService extends BackgroundService {
     private int deleteAllKeys(List<DeleteBlockGroupResult> results)
         throws RocksDBException, IOException {
       Table deletedTable = manager.getMetadataManager().getDeletedTable();
+      Table trashTable = manager.getMetadataManager().getTrashTable();
 
       DBStore store = manager.getMetadataManager().getStore();
 
@@ -207,6 +211,13 @@ public class KeyDeletingService extends BackgroundService {
             // Purge key from OM DB.
             deletedTable.deleteWithBatch(writeBatch,
                 result.getObjectKey());
+            // Purge deleted key from OM DB.
+            trashTable.deleteWithBatch(writeBatch,
+                result.getObjectKey());
+            // Clean the cache.
+            trashTable.addCacheEntry(
+                new CacheKey<>(result.getObjectKey()),
+                new CacheValue<>(Optional.absent(), 0L));
             LOG.debug("Key {} deleted from OM DB", result.getObjectKey());
             deletedCount++;
           }

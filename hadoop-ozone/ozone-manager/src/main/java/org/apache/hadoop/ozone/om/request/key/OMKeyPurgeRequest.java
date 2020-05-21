@@ -20,6 +20,10 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
 import java.util.ArrayList;
+
+import com.google.common.base.Optional;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -85,6 +89,10 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
         for (String deletedKey : bucketWithDeleteKeys.getKeysList()) {
           RepeatedOmKeyInfo repeatedOmKeyInfo =
               omMetadataManager.getDeletedTable().get(deletedKey);
+          // Update cache of trashTable.
+          omMetadataManager.getTrashTable().addCacheEntry(
+              new CacheKey<>(deletedKey),
+              new CacheValue<>(Optional.absent(), trxnLogIndex));
           boolean purgeKey = true;
           if (repeatedOmKeyInfo != null) {
             for (OmKeyInfo omKeyInfo : repeatedOmKeyInfo.getOmKeyInfoList()) {

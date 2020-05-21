@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.util.Map;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -146,6 +148,22 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
           new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
               keyName)),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
+
+      // Check recover-setting to update cache of trashTable.
+      String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+      boolean trashEnabled = omMetadataManager.getBucketTable()
+          .getCacheValue(new CacheKey<>(bucketKey)).getCacheValue()
+          .getTrashEnabled();
+      if (trashEnabled) {
+        RepeatedOmKeyInfo repeatedOmKeyInfo = omMetadataManager
+            .getTrashTable().get(objectKey);
+        repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(omKeyInfo,
+            repeatedOmKeyInfo, trxnLogIndex, ozoneManager.isRatisEnabled());
+
+        omMetadataManager.getTrashTable().addCacheEntry(
+            new CacheKey<>(objectKey),
+            new CacheValue<>(Optional.of(repeatedOmKeyInfo), trxnLogIndex));
+      }
 
       // No need to add cache entries to delete table. As delete table will
       // be used by DeleteKeyService only, not used for any client response

@@ -288,6 +288,13 @@ public interface OMMetadataManager {
   Table<String, RepeatedOmKeyInfo> getDeletedTable();
 
   /**
+   * Get Trash Table.
+   *
+   * @return TrashTable.
+   */
+  Table<String, RepeatedOmKeyInfo> getTrashTable();
+
+  /**
    * Gets the OpenKeyTable.
    *
    * @return Table.

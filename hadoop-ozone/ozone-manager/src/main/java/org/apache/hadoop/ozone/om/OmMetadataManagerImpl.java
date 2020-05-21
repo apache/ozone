@@ -78,7 +78,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-
+import org.apache.hadoop.util.Time;
 import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,6 +109,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * | deletedTable       | /volumeName/bucketName/keyName->RepeatedKeyInfo |
    * |----------------------------------------------------------------------|
+   * | trashTable         | /volumeName/bucketName/keyName->RepeatedKeyInfo |
+   * |----------------------------------------------------------------------|
    * | openKey            | /volumeName/bucketName/keyName/id->KeyInfo      |
    * |----------------------------------------------------------------------|
    * | s3SecretTable      | s3g_access_key_id -> s3Secret                   |
@@ -129,6 +131,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String BUCKET_TABLE = "bucketTable";
   public static final String KEY_TABLE = "keyTable";
   public static final String DELETED_TABLE = "deletedTable";
+  public static final String TRASH_TABLE = "trashTable";
   public static final String OPEN_KEY_TABLE = "openKeyTable";
   public static final String MULTIPARTINFO_TABLE = "multipartInfoTable";
   public static final String S3_SECRET_TABLE = "s3SecretTable";
@@ -147,6 +150,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table bucketTable;
   private Table keyTable;
   private Table deletedTable;
+  private Table trashTable;
   private Table openKeyTable;
   private Table<String, OmMultipartKeyInfo> multipartInfoTable;
   private Table s3SecretTable;
@@ -206,6 +210,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public Table<String, RepeatedOmKeyInfo> getDeletedTable() {
     return deletedTable;
+  }
+
+  @Override
+  public Table<String, RepeatedOmKeyInfo> getTrashTable() {
+    return trashTable;
   }
 
   @Override
@@ -285,6 +294,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(BUCKET_TABLE)
         .addTable(KEY_TABLE)
         .addTable(DELETED_TABLE)
+        .addTable(TRASH_TABLE)
         .addTable(OPEN_KEY_TABLE)
         .addTable(MULTIPARTINFO_TABLE)
         .addTable(DELEGATION_TOKEN_TABLE)
@@ -333,6 +343,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     deletedTable = this.store.getTable(DELETED_TABLE, String.class,
         RepeatedOmKeyInfo.class);
     checkTableStatus(deletedTable, DELETED_TABLE);
+
+    // We set trashTable partial-cache here.
+    trashTable = this.store.getTable(TRASH_TABLE, String.class,
+        RepeatedOmKeyInfo.class);
+    checkTableStatus(trashTable, TRASH_TABLE);
 
     openKeyTable =
         this.store.getTable(OPEN_KEY_TABLE, String.class, OmKeyInfo.class);
@@ -942,23 +957,55 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
         if (kv != null) {
           RepeatedOmKeyInfo infoList = kv.getValue();
-          // Get block keys as a list.
-          for(OmKeyInfo info : infoList.getOmKeyInfoList()){
-            OmKeyLocationInfoGroup latest = info.getLatestVersionLocations();
-            List<BlockID> item = latest.getLocationList().stream()
-                .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))
-                .collect(Collectors.toList());
-            BlockGroup keyBlocks = BlockGroup.newBuilder()
-                .setKeyName(kv.getKey())
-                .addAllBlockIDs(item)
-                .build();
-            keyBlocksList.add(keyBlocks);
-            currentCount++;
-          }
+          int lastKeyIndex = infoList.getOmKeyInfoList().size() - 1;
+          OmKeyInfo lastKeyInfo = infoList.getOmKeyInfoList().get(lastKeyIndex);
+          /*
+           * Once the last OmKeyInfo is checked to not delete now,
+           * we skip the flow of processing <String, RepeatedOmKeyInfo> here.
+           * This way would keep this <String, RepeatedOmKeyInfo>
+           * from deleting by DB.
+           */
+          if (shouldPendDeleting(lastKeyInfo)) {
+            // Get block keys as a list.
+            for (OmKeyInfo info : infoList.getOmKeyInfoList()) {
+              OmKeyLocationInfoGroup latest = info.getLatestVersionLocations();
+              List<BlockID> item = latest.getLocationList().stream()
+                  .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))
+                  .collect(Collectors.toList());
+              BlockGroup keyBlocks = BlockGroup.newBuilder()
+                  .setKeyName(kv.getKey())
+                  .addAllBlockIDs(item)
+                  .build();
+              keyBlocksList.add(keyBlocks);
+              currentCount++;
+            }
+          } /* else do no-op*/
         }
       }
     }
     return keyBlocksList;
+  }
+  /*
+   * Check the key should be deleting by KeyDeletingService in this time or not.
+   *
+   * If the remaining-time of key is more than recover-window,
+   *  it should be deleted.
+   * @return true If key should be deleted.
+   */
+  private boolean shouldPendDeleting(OmKeyInfo keyInfo) throws IOException {
+    String bucketKey =
+        getBucketKey(keyInfo.getVolumeName(), keyInfo.getBucketName());
+    long recoverWindow = getBucketTable().get(bucketKey).getRecoverWindow();
+
+    final long currentTime = Time.now();
+    /**
+     * Because setting recover-window in 0 when creating trash-disabled bucket,
+     * here we could not check the trash-enabled of bucket.
+     */
+    if (currentTime - keyInfo.getModificationTime() > recoverWindow) {
+      return true;
+    }
+    return false;
   }
 
   @Override

@@ -86,6 +86,9 @@ public class OMKeyDeleteResponse extends OMClientResponse {
             isRatisEnabled);
         omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
             ozoneKey, repeatedOmKeyInfo);
+        // Update trashTable in DB.
+        omMetadataManager.getTrashTable().putWithBatch(batchOperation,
+            ozoneKey, repeatedOmKeyInfo);
       }
     }
   }
