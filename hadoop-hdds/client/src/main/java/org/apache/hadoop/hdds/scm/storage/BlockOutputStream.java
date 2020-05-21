@@ -324,7 +324,7 @@ public class BlockOutputStream extends OutputStream {
       handleExecutionException(e);
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
-      handleInterruptedException(ex, Optional.of(Boolean.TRUE));
+      handleInterruptedException(ex, Boolean.TRUE);
     }
     watchForCommit(true);
   }
@@ -435,7 +435,7 @@ public class BlockOutputStream extends OutputStream {
       throw new IOException(EXCEPTION_MSG + e.toString(), e);
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
-      handleInterruptedException(ex, Optional.empty());
+      handleInterruptedException(ex, Boolean.FALSE);
     }
     commitWatcher.getFutureMap().put(flushPos, flushFuture);
     return flushFuture;
@@ -455,7 +455,7 @@ public class BlockOutputStream extends OutputStream {
         handleExecutionException(e);
       } catch (InterruptedException ex) {
         Thread.currentThread().interrupt();
-        handleInterruptedException(ex, Optional.of(Boolean.TRUE));
+        handleInterruptedException(ex, Boolean.TRUE);
       }
     }
   }
@@ -517,7 +517,7 @@ public class BlockOutputStream extends OutputStream {
         handleExecutionException(e);
       } catch (InterruptedException ex) {
         Thread.currentThread().interrupt();
-        handleInterruptedException(ex, Optional.of(Boolean.TRUE));
+        handleInterruptedException(ex, Boolean.TRUE);
       } finally {
         cleanup(false);
       }
@@ -654,7 +654,7 @@ public class BlockOutputStream extends OutputStream {
       throw new IOException(EXCEPTION_MSG + e.toString(), e);
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
-      handleInterruptedException(ex, Optional.empty());
+      handleInterruptedException(ex, Boolean.FALSE);
     }
     containerBlockData.addChunks(chunkInfo);
   }
@@ -673,11 +673,10 @@ public class BlockOutputStream extends OutputStream {
    * @throws IOException
    */
   private void handleInterruptedException(Exception ex,
-      Optional<Boolean> skipExecutionException)
+      boolean skipExecutionException)
       throws IOException {
     LOG.error("Command execution was interrupted.");
-    if(skipExecutionException.isPresent() &&
-        skipExecutionException.get().equals(Boolean.TRUE)) {
+    if(skipExecutionException) {
       handleExecutionException(ex);
     } else {
       throw new IOException(EXCEPTION_MSG + ex.toString(), ex);
