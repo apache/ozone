@@ -46,7 +46,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Full-featured Hadoop RPC + HA implementation.
+ * Full-featured Hadoop RPC implementation with failover support.
  */
 public class Hadoop3OmTransport implements OmTransport {
 
