@@ -149,6 +149,17 @@ public final class OzoneConfigKeys {
   public static final TimeDuration OZONE_CLIENT_RETRY_INTERVAL_DEFAULT =
       TimeDuration.valueOf(0, TimeUnit.MILLISECONDS);
 
+  /**
+   * If this value is true, when the client calls the flush() method,
+   * it checks whether the data in the buffer is greater than
+   * OZONE_CLIENT_STREAM_BUFFER_SIZE_DEFAULT. If greater than,
+   * send the data in the buffer to the datanode.
+   * */
+  public static final String OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY =
+      "ozone.client.stream.buffer.flush.delay";
+  public static final boolean OOZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY_DEFAULT =
+      false;
+
   // This defines the overall connection limit for the connection pool used in
   // RestClient.
   public static final String OZONE_REST_CLIENT_HTTP_CONNECTION_MAX =
@@ -347,6 +358,10 @@ public final class OzoneConfigKeys {
       "ozone.security.enabled";
   public static final boolean OZONE_SECURITY_ENABLED_DEFAULT = false;
 
+  public static final String OZONE_HTTP_SECURITY_ENABLED_KEY =
+      "ozone.security.http.kerberos.enabled";
+  public static final boolean OZONE_HTTP_SECURITY_ENABLED_DEFAULT = false;
+
   public static final String OZONE_CONTAINER_COPY_WORKDIR =
       "hdds.datanode.replication.work.dir";
 
@@ -375,6 +390,10 @@ public final class OzoneConfigKeys {
       "ozone.acl.enabled";
   public static final boolean OZONE_ACL_ENABLED_DEFAULT =
       false;
+  public static final String OZONE_S3_VOLUME_NAME =
+          "ozone.s3g.volume.name";
+  public static final String OZONE_S3_VOLUME_NAME_DEFAULT =
+          "s3v";
   public static final String OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY =
       "ozone.s3.token.max.lifetime";
   public static final String OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY_DEFAULT = "3m";
@@ -388,14 +407,10 @@ public final class OzoneConfigKeys {
       "ozone.client.failover.max.attempts";
   public static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT =
       15;
-  public static final String OZONE_CLIENT_FAILOVER_SLEEP_BASE_MILLIS_KEY =
-      "ozone.client.failover.sleep.base.millis";
-  public static final int OZONE_CLIENT_FAILOVER_SLEEP_BASE_MILLIS_DEFAULT =
-      500;
-  public static final String OZONE_CLIENT_FAILOVER_SLEEP_MAX_MILLIS_KEY =
-      "ozone.client.failover.sleep.max.millis";
-  public static final int OZONE_CLIENT_FAILOVER_SLEEP_MAX_MILLIS_DEFAULT =
-      15000;
+  public static final String OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY =
+      "ozone.client.wait.between.retries.millis";
+  public static final long OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT =
+      2000;
 
   public static final String OZONE_FREON_HTTP_ENABLED_KEY =
       "ozone.freon.http.enabled";
@@ -413,10 +428,15 @@ public final class OzoneConfigKeys {
   public static final int OZONE_FREON_HTTPS_BIND_PORT_DEFAULT = 9885;
   public static final String
       OZONE_FREON_HTTP_KERBEROS_PRINCIPAL_KEY =
-      "ozone.freon.http.kerberos.principal";
+      "ozone.freon.http.auth.kerberos.principal";
   public static final String
       OZONE_FREON_HTTP_KERBEROS_KEYTAB_FILE_KEY =
-      "ozone.freon.http.kerberos.keytab";
+      "ozone.freon.http.auth.kerberos.keytab";
+  public static final String OZONE_FREON_HTTP_AUTH_TYPE =
+      "ozone.freon.http.auth.type";
+  public static final String OZONE_FREON_HTTP_AUTH_CONFIG_PREFIX =
+      "ozone.freon.http.auth.";
+
 
   public static final String OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY =
       "ozone.network.topology.aware.read";

@@ -17,47 +17,51 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import org.apache.commons.lang3.RandomUtils;
-import org.apache.hadoop.conf.Configuration;
+import java.io.File;
+import java.io.IOException;
+
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.test.GenericTestUtils;
+
+import org.apache.commons.lang3.RandomUtils;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
-
-import java.io.File;
-import java.io.IOException;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
-import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
-import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 
 /**
  * Tests the closeContainerEventHandler class.
  */
 public class TestCloseContainerEventHandler {
 
-  private static Configuration configuration;
+  private static OzoneConfiguration configuration;
   private static MockNodeManager nodeManager;
   private static SCMPipelineManager pipelineManager;
   private static SCMContainerManager containerManager;
   private static long size;
   private static File testDir;
   private static EventQueue eventQueue;
+  private static DBStore dbStore;
 
   @BeforeClass
   public static void setUp() throws Exception {
@@ -71,14 +75,19 @@ public class TestCloseContainerEventHandler {
     configuration.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, 16);
     nodeManager = new MockNodeManager(true, 10);
     eventQueue = new EventQueue();
+    dbStore =
+        DBStoreBuilder.createDBStore(configuration, new SCMDBDefinition());
     pipelineManager =
-        new SCMPipelineManager(configuration, nodeManager, eventQueue);
+        new SCMPipelineManager(configuration, nodeManager,
+            SCMDBDefinition.PIPELINES.getTable(dbStore), eventQueue);
+    pipelineManager.allowPipelineCreation();
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), configuration, eventQueue);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
-    containerManager = new SCMContainerManager(configuration, pipelineManager);
+    containerManager = new SCMContainerManager(configuration,
+        SCMDBDefinition.CONTAINERS.getTable(dbStore), dbStore, pipelineManager);
     pipelineManager.triggerPipelineCreation();
     eventQueue.addHandler(CLOSE_CONTAINER,
         new CloseContainerEventHandler(pipelineManager, containerManager));
@@ -95,6 +104,9 @@ public class TestCloseContainerEventHandler {
     }
     if (pipelineManager != null) {
       pipelineManager.close();
+    }
+    if (dbStore != null) {
+      dbStore.close();
     }
     FileUtil.fullyDelete(testDir);
   }

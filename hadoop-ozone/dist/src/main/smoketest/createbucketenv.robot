@@ -21,7 +21,7 @@ Test Timeout        2 minute
 
 
 *** Variables ***
-${volume}       vol1
+${volume}       volume1
 ${bucket}       bucket1
 
 

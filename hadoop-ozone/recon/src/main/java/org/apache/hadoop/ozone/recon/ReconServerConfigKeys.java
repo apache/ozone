@@ -39,17 +39,14 @@ public final class ReconServerConfigKeys {
       "ozone.recon.http-address";
   public static final String OZONE_RECON_HTTPS_ADDRESS_KEY =
       "ozone.recon.https-address";
-  // Deprecated config
-  public static final String OZONE_RECON_HTTP_KEYTAB_FILE_OLD =
-      "ozone.recon.keytab.file";
   public static final String OZONE_RECON_HTTP_KEYTAB_FILE =
-      "ozone.recon.http.kerberos.keytab.file";
+      "ozone.recon.http.auth.kerberos.keytab";
   public static final String OZONE_RECON_HTTP_BIND_HOST_DEFAULT =
       "0.0.0.0";
   public static final int OZONE_RECON_HTTP_BIND_PORT_DEFAULT = 9888;
   public static final int OZONE_RECON_HTTPS_BIND_PORT_DEFAULT = 9889;
   public static final String OZONE_RECON_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL =
-      "ozone.recon.authentication.kerberos.principal";
+      "ozone.recon.http.auth.kerberos.principal";
 
   public static final String OZONE_RECON_CONTAINER_DB_CACHE_SIZE_MB =
       "ozone.recon.container.db.cache.size.mb";
@@ -96,33 +93,17 @@ public final class ReconServerConfigKeys {
   public static final String RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM =
       "recon.om.snapshot.task.flush.param";
 
-  // Persistence properties
-  public static final String OZONE_RECON_SQL_DB_DRIVER =
-      "ozone.recon.sql.db.driver";
-  public static final String OZONE_RECON_SQL_DB_JDBC_URL =
-      "ozone.recon.sql.db.jdbc.url";
-  public static final String OZONE_RECON_SQL_DB_USER =
-      "ozone.recon.sql.db.username";
-  public static final String OZONE_RECON_SQL_DB_PASSWORD =
-      "ozone.recon.sql.db.password";
-  public static final String OZONE_RECON_SQL_AUTO_COMMIT =
-      "ozone.recon.sql.db.auto.commit";
-  public static final String OZONE_RECON_SQL_CONNECTION_TIMEOUT =
-      "ozone.recon.sql.db.conn.timeout";
-  public static final String OZONE_RECON_SQL_MAX_ACTIVE_CONNECTIONS =
-      "ozone.recon.sql.db.conn.max.active";
-  public static final String OZONE_RECON_SQL_MAX_CONNECTION_AGE =
-      "ozone.recon.sql.db.conn.max.age";
-  public static final String OZONE_RECON_SQL_MAX_IDLE_CONNECTION_AGE =
-      "ozone.recon.sql.db.conn.idle.max.age";
-  public static final String OZONE_RECON_SQL_IDLE_CONNECTION_TEST_PERIOD =
-      "ozone.recon.sql.db.conn.idle.test.period";
-  public static final String OZONE_RECON_SQL_MAX_IDLE_CONNECTION_TEST_STMT =
-      "ozone.recon.sql.db.conn.idle.test";
-
   public static final String OZONE_RECON_TASK_THREAD_COUNT_KEY =
       "ozone.recon.task.thread.count";
   public static final int OZONE_RECON_TASK_THREAD_COUNT_DEFAULT = 5;
+
+  public static final String OZONE_RECON_HTTP_AUTH_CONFIG_PREFIX =
+      "ozone.recon.http.auth.";
+
+  public static final String OZONE_RECON_HTTP_AUTH_TYPE =
+      OZONE_RECON_HTTP_AUTH_CONFIG_PREFIX + "type";
+
+
 
   /**
    * Private constructor for utility class.

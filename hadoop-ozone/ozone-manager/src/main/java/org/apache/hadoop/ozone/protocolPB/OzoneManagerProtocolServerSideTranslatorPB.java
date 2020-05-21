@@ -16,7 +16,13 @@
  */
 package org.apache.hadoop.ozone.protocolPB;
 
+import java.io.IOException;
+import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicLong;
+
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -27,21 +33,16 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
+import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.Optional;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * This class is the server-side translator that forwards requests received on
@@ -69,16 +70,20 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   public OzoneManagerProtocolServerSideTranslatorPB(
       OzoneManager impl,
       OzoneManagerRatisServer ratisServer,
-      ProtocolMessageMetrics metrics,
+      ProtocolMessageMetrics<ProtocolMessageEnum> metrics,
       boolean enableRatis) {
     this.ozoneManager = impl;
     this.isRatisEnabled = enableRatis;
-    this.ozoneManagerDoubleBuffer =
-        new OzoneManagerDoubleBuffer(ozoneManager.getMetadataManager(), (i) -> {
-          // Do nothing.
-          // For OM NON-HA code, there is no need to save transaction index.
-          // As we wait until the double buffer flushes DB to disk.
-        }, isRatisEnabled);
+    this.ozoneManagerDoubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+        .setOmMetadataManager(ozoneManager.getMetadataManager())
+        // Do nothing.
+        // For OM NON-HA code, there is no need to save transaction index.
+        // As we wait until the double buffer flushes DB to disk.
+        .setOzoneManagerRatisSnapShot((i) -> {})
+        .enableRatis(isRatisEnabled)
+        .enableTracing(TracingUtil.isTracingEnabled(
+            ozoneManager.getConfiguration()))
+        .build();
     handler = new OzoneManagerRequestHandler(impl, ozoneManagerDoubleBuffer);
     this.omRatisServer = ratisServer;
     dispatcher = new OzoneProtocolMessageDispatcher<>("OzoneProtocol",
@@ -140,14 +145,13 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
    */
   private OMResponse createErrorResponse(
       OMRequest omRequest, IOException exception) {
-    OzoneManagerProtocolProtos.Type cmdType = omRequest.getCmdType();
     // Added all write command types here, because in future if any of the
     // preExecute is changed to return IOException, we can return the error
     // OMResponse to the client.
     OMResponse.Builder omResponse = OMResponse.newBuilder()
-        .setStatus(
-            OzoneManagerRatisUtils.exceptionToResponseStatus(exception))
-        .setCmdType(cmdType)
+        .setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(exception))
+        .setCmdType(omRequest.getCmdType())
+        .setTraceID(omRequest.getTraceID())
         .setSuccess(false);
     if (exception.getMessage() != null) {
       omResponse.setMessage(exception.getMessage());

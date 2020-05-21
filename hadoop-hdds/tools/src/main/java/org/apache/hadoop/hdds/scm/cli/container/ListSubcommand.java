@@ -25,6 +25,12 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -57,10 +63,23 @@ public class ListSubcommand implements Callable<Void> {
       defaultValue = "20", showDefaultValue = Visibility.ALWAYS)
   private int count = 20;
 
+  private static final ObjectWriter WRITER;
+
+  static {
+    ObjectMapper mapper = new ObjectMapper()
+        .registerModule(new JavaTimeModule())
+        .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+    mapper.setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY);
+    mapper
+        .setVisibility(PropertyAccessor.GETTER, JsonAutoDetect.Visibility.NONE);
+    WRITER = mapper.writerWithDefaultPrettyPrinter();
+  }
+
+
   private void outputContainerInfo(ContainerInfo containerInfo)
       throws IOException {
     // Print container report info.
-    LOG.info("{}", containerInfo.toJsonString());
+    LOG.info("{}", WRITER.writeValueAsString(containerInfo));
   }
 
   @Override

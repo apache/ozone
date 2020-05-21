@@ -25,16 +25,15 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -57,7 +56,9 @@ import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,7 +113,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   public BasicOzoneClientAdapterImpl(String omHost, int omPort,
-      Configuration hadoopConf, String volumeStr, String bucketStr)
+      ConfigurationSource hadoopConf, String volumeStr, String bucketStr)
       throws IOException {
 
     ClassLoader contextClassLoader =
@@ -121,7 +122,6 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
     try {
       OzoneConfiguration conf = OzoneConfiguration.of(hadoopConf);
-
       if (omHost == null && OmUtils.isServiceIdsDefined(conf)) {
         // When the host name or service id isn't given
         // but ozone.om.service.ids is defined, declare failure.
@@ -294,8 +294,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     try {
       incrementCounter(Statistic.OBJECTS_QUERY);
       OzoneFileStatus status = bucket.getFileStatus(key);
-      makeQualified(status, uri, qualifiedPath, userName);
-      return toFileStatusAdapter(status);
+      return toFileStatusAdapter(status, userName, uri, qualifiedPath);
 
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
@@ -306,15 +305,6 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     }
   }
 
-  public void makeQualified(FileStatus status, URI uri, Path path,
-      String username) {
-    if (status instanceof OzoneFileStatus) {
-      ((OzoneFileStatus) status)
-          .makeQualified(uri, path,
-              username, username);
-    }
-
-  }
 
   @Override
   public Iterator<BasicKeyInfo> listKeys(String pathKey) {
@@ -332,9 +322,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
       List<FileStatusAdapter> result = new ArrayList<>();
       for (OzoneFileStatus status : statuses) {
-        Path qualifiedPath = status.getPath().makeQualified(uri, workingDir);
-        makeQualified(status, uri, qualifiedPath, username);
-        result.add(toFileStatusAdapter(status));
+        result.add(toFileStatusAdapter(status, username, uri, workingDir));
       }
       return result;
     } catch (OMException e) {
@@ -404,8 +392,10 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
         throws IOException, InterruptedException {
       Token<OzoneTokenIdentifier> ozoneDt =
           (Token<OzoneTokenIdentifier>) token;
+
       OzoneClient ozoneClient =
-          OzoneClientFactory.getRpcClient(conf);
+          OzoneClientFactory.getOzoneClient(OzoneConfiguration.of(conf),
+              ozoneDt);
       return ozoneClient.getObjectStore().renewDelegationToken(ozoneDt);
     }
 
@@ -415,7 +405,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       Token<OzoneTokenIdentifier> ozoneDt =
           (Token<OzoneTokenIdentifier>) token;
       OzoneClient ozoneClient =
-          OzoneClientFactory.getRpcClient(conf);
+          OzoneClientFactory.getOzoneClient(OzoneConfiguration.of(conf),
+              ozoneDt);
       ozoneClient.getObjectStore().cancelDelegationToken(ozoneDt);
     }
   }
@@ -451,19 +442,23 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     }
   }
 
-  private FileStatusAdapter toFileStatusAdapter(OzoneFileStatus status) {
+  private FileStatusAdapter toFileStatusAdapter(OzoneFileStatus status,
+      String owner, URI defaultUri, Path workingDir) {
+    OmKeyInfo keyInfo = status.getKeyInfo();
+    short replication = (short) keyInfo.getFactor().getNumber();
     return new FileStatusAdapter(
-        status.getLen(),
-        status.getPath(),
+        keyInfo.getDataSize(),
+        new Path(OZONE_URI_DELIMITER + keyInfo.getKeyName())
+            .makeQualified(defaultUri, workingDir),
         status.isDirectory(),
-        status.getReplication(),
+        replication,
         status.getBlockSize(),
-        status.getModificationTime(),
-        status.getAccessTime(),
-        status.getPermission().toShort(),
-        status.getOwner(),
-        status.getGroup(),
-        status.getPath(),
+        keyInfo.getModificationTime(),
+        keyInfo.getModificationTime(),
+        status.isDirectory() ? (short) 00777 : (short) 00666,
+        owner,
+        owner,
+        null,
         getBlockLocations(status)
     );
   }

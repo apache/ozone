@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,4 +16,24 @@
  * limitations under the License.
  */
 
+import moment from 'moment';
+import {notification} from 'antd';
+
 export const getCapacityPercent = (used: number, total: number) => Math.round((used / total) * 100);
+
+export const timeFormat = (time: number) => time > 0 ?
+  moment(time).format('lll') : 'NA';
+
+const showErrorNotification = (title: string, description: string) => {
+  const args = {
+    message: title,
+    description,
+    duration: 15
+  };
+  notification.error(args);
+};
+
+export const showDataFetchError = (error: string) => {
+  const title = 'Error while fetching data';
+  showErrorNotification(title, error);
+};

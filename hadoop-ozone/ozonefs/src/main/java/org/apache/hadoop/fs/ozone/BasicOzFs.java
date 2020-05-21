@@ -18,15 +18,15 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.DelegateToFileSystem;
-import org.apache.hadoop.ozone.OzoneConsts;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.DelegateToFileSystem;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
  * ozone implementation of AbstractFileSystem.
@@ -42,4 +42,8 @@ public class BasicOzFs extends DelegateToFileSystem {
         OzoneConsts.OZONE_URI_SCHEME, false);
   }
 
+  @Override
+  public int getUriDefaultPort() {
+    return -1;
+  }
 }

@@ -69,8 +69,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   private int waitForOMToBeReadyTimeout = 120000; // 2 min
 
   private static final Random RANDOM = new Random();
-  private static final int RATIS_LEADER_ELECTION_TIMEOUT = 1000; // 1 seconds
-
+  private static final int RATIS_LEADER_ELECTION_TIMEOUT = 1000; // 1 second
   public static final int NODE_FAILURE_TIMEOUT = 2000; // 2 seconds
 
   /**
@@ -207,20 +206,13 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     }
   }
 
-  void shutdownOzoneManager(int omNodeIndex) {
-    OzoneManager ozoneManager = ozoneManagers.get(omNodeIndex);
+  public void shutdownOzoneManager(OzoneManager ozoneManager) {
     LOG.info("Shutting down OzoneManager " + ozoneManager.getOMNodeId());
 
     ozoneManager.stop();
   }
 
-  void restartOzoneManager(int omNodeIndex, boolean waitForOM)
-      throws IOException, TimeoutException, InterruptedException {
-    OzoneManager ozoneManager = ozoneManagers.get(omNodeIndex);
-    restartOzoneManager(ozoneManager, waitForOM);
-  }
-
-  void restartOzoneManager(OzoneManager ozoneManager, boolean waitForOM)
+  public void restartOzoneManager(OzoneManager ozoneManager, boolean waitForOM)
       throws IOException, TimeoutException, InterruptedException {
     LOG.info("Restarting OzoneManager " + ozoneManager.getOMNodeId());
     ozoneManager.restart();
@@ -245,10 +237,12 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   public void stopOzoneManager(int index) {
     ozoneManagers.get(index).stop();
+    ozoneManagers.get(index).join();
   }
 
   public void stopOzoneManager(String omNodeId) {
     ozoneManagerMap.get(omNodeId).stop();
+    ozoneManagerMap.get(omNodeId).join();
   }
 
   /**
@@ -314,16 +308,32 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     protected void initOMRatisConf() {
       conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
       conf.setInt(OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY, numOfOmHandlers);
-      conf.setLong(
-          OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
-          100L);
-      conf.setLong(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, 200L);
+      // If test change the following config values we will respect,
+      // otherwise we will set lower timeout values.
+      long defaultDuration =
+          OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT
+              .getDuration();
+      long curLeaderElectionTimeout = conf.getTimeDuration(
+          OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
+              defaultDuration, TimeUnit.MILLISECONDS);
       conf.setTimeDuration(
           OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
-          RATIS_LEADER_ELECTION_TIMEOUT, TimeUnit.MILLISECONDS);
+          defaultDuration == curLeaderElectionTimeout ?
+              RATIS_LEADER_ELECTION_TIMEOUT : curLeaderElectionTimeout,
+          TimeUnit.MILLISECONDS);
+      long defaultNodeFailureTimeout =
+          OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT.
+              getDuration();
+      long curNodeFailureTimeout = conf.getTimeDuration(
+          OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_KEY,
+          defaultNodeFailureTimeout,
+          OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT.
+              getUnit());
       conf.setTimeDuration(
           OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_KEY,
-          NODE_FAILURE_TIMEOUT, TimeUnit.MILLISECONDS);
+          curNodeFailureTimeout == defaultNodeFailureTimeout ?
+              NODE_FAILURE_TIMEOUT : curNodeFailureTimeout,
+          TimeUnit.MILLISECONDS);
     }
 
     /**

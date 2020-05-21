@@ -21,13 +21,12 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 
 import static org.junit.Assert.assertEquals;
 
 import org.apache.hadoop.ozone.s3.SignatureProcessor;
-import org.apache.hadoop.ozone.s3.util.OzoneS3Util;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -36,17 +35,14 @@ import org.junit.Test;
  */
 public class TestRootList {
 
-  private OzoneClientStub clientStub;
-  private ObjectStore objectStoreStub;
+  private OzoneClient clientStub;
   private RootEndpoint rootEndpoint;
-  private String userName = OzoneConsts.OZONE;
 
   @Before
   public void setup() throws Exception {
 
     //Create client stub and object store stub.
     clientStub = new OzoneClientStub();
-    objectStoreStub = clientStub.getObjectStore();
 
     // Create HeadBucket and setClient to OzoneClientStub
     rootEndpoint = new RootEndpoint();
@@ -60,7 +56,7 @@ public class TestRootList {
 
     rootEndpoint.setSignatureProcessor(new SignatureProcessor() {
       @Override
-      public String getStringToSign() throws Exception {
+      public String getStringToSign() {
         return null;
       }
 
@@ -78,11 +74,10 @@ public class TestRootList {
     ListBucketResponse response =
         (ListBucketResponse) rootEndpoint.get().getEntity();
     assertEquals(0, response.getBucketsNum());
-    String s3Username = OzoneS3Util.getS3Username(this.userName);
 
     String bucketBaseName = "bucket-" + getClass().getName();
     for(int i = 0; i < 10; i++) {
-      objectStoreStub.createS3Bucket(s3Username, bucketBaseName + i);
+      clientStub.getObjectStore().createS3Bucket(bucketBaseName + i);
     }
     response = (ListBucketResponse) rootEndpoint.get().getEntity();
     assertEquals(10, response.getBucketsNum());

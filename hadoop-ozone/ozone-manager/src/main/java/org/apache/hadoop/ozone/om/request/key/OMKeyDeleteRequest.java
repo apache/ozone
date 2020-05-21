@@ -23,6 +23,7 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
@@ -48,10 +49,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .Status;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .Type;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -107,10 +104,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
     Map<String, String> auditMap = buildKeyArgsAuditMap(deleteKeyArgs);
 
-    OMResponse.Builder omResponse = OMResponse.newBuilder()
-        .setCmdType(Type.DeleteKey)
-        .setStatus(Status.OK)
-        .setSuccess(true);
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     IOException exception = null;
     boolean acquiredLock = false;

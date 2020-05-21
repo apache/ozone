@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -37,8 +38,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
@@ -106,6 +105,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
@@ -687,36 +688,45 @@ public class KeyManagerImpl implements KeyManager {
    */
   @VisibleForTesting
   protected void refreshPipeline(OmKeyInfo value) throws IOException {
-    if (value != null &&
-        CollectionUtils.isNotEmpty(value.getKeyLocationVersions())) {
-      Map<Long, ContainerWithPipeline> containerWithPipelineMap =
-          new HashMap<>();
-      for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
-        for (OmKeyLocationInfo k : key.getLocationList()) {
-          // TODO: fix Some tests that may not initialize container client
-          // The production should always have containerClient initialized.
-          if (scmClient.getContainerClient() != null) {
-            try {
-              if (!containerWithPipelineMap.containsKey(k.getContainerID())) {
-                ContainerWithPipeline containerWithPipeline = scmClient
-                    .getContainerClient()
-                    .getContainerWithPipeline(k.getContainerID());
-                containerWithPipelineMap.put(k.getContainerID(),
-                    containerWithPipeline);
-              }
-            } catch (IOException ioEx) {
-              LOG.debug("Get containerPipeline failed for volume:{} bucket:{} "
-                      + "key:{}", value.getVolumeName(), value.getBucketName(),
-                  value.getKeyName(), ioEx);
-              throw new OMException(ioEx.getMessage(),
-                  SCM_GET_PIPELINE_EXCEPTION);
-            }
-            ContainerWithPipeline cp =
-                containerWithPipelineMap.get(k.getContainerID());
-            if (!cp.getPipeline().equals(k.getPipeline())) {
-              k.setPipeline(cp.getPipeline());
-            }
-          }
+    final List<OmKeyLocationInfoGroup> locationInfoGroups = value == null ?
+        null : value.getKeyLocationVersions();
+
+    // TODO: fix Some tests that may not initialize container client
+    // The production should always have containerClient initialized.
+    if (scmClient.getContainerClient() == null ||
+        CollectionUtils.isEmpty(locationInfoGroups)) {
+      return;
+    }
+
+    Set<Long> containerIDs = new HashSet<>();
+    for (OmKeyLocationInfoGroup key : locationInfoGroups) {
+      for (OmKeyLocationInfo k : key.getLocationList()) {
+        containerIDs.add(k.getContainerID());
+      }
+    }
+
+    Map<Long, ContainerWithPipeline> containerWithPipelineMap = new HashMap<>();
+
+    try {
+      List<ContainerWithPipeline> cpList = scmClient.getContainerClient().
+          getContainerWithPipelineBatch(new ArrayList<>(containerIDs));
+      for (ContainerWithPipeline cp : cpList) {
+        containerWithPipelineMap.put(
+            cp.getContainerInfo().getContainerID(), cp);
+      }
+    } catch (IOException ioEx) {
+      LOG.debug("Get containerPipeline failed for volume:{} bucket:{} " +
+          "key:{}", value.getVolumeName(), value.getBucketName(),
+          value.getKeyName(), ioEx);
+      throw new OMException(ioEx.getMessage(), SCM_GET_PIPELINE_EXCEPTION);
+    }
+
+    for (OmKeyLocationInfoGroup key : locationInfoGroups) {
+      for (OmKeyLocationInfo k : key.getLocationList()) {
+        ContainerWithPipeline cp =
+            containerWithPipelineMap.get(k.getContainerID());
+        if (!cp.getPipeline().equals(k.getPipeline())) {
+          k.setPipeline(cp.getPipeline());
         }
       }
     }
@@ -1604,8 +1614,15 @@ public class KeyManagerImpl implements KeyManager {
           OzoneFileStatus fileStatus = getFileStatus(args);
           keyInfo = fileStatus.getKeyInfo();
         } catch (IOException e) {
-          throw new OMException("Key not found, checkAccess failed. Key:" +
-              objectKey, KEY_NOT_FOUND);
+          // OzoneFS will check whether the key exists when write a new key.
+          // For Acl Type "READ", when the key is not exist return true.
+          // To Avoid KEY_NOT_FOUND Exception.
+          if (context.getAclRights() == IAccessAuthorizer.ACLType.READ) {
+            return true;
+          } else {
+            throw new OMException("Key not found, checkAccess failed. Key:" +
+                objectKey, KEY_NOT_FOUND);
+          }
         }
       }
 
@@ -1684,7 +1701,7 @@ public class KeyManagerImpl implements KeyManager {
       // Check if this is the root of the filesystem.
       if (keyName.length() == 0) {
         validateBucket(volumeName, bucketName);
-        return new OzoneFileStatus(OZONE_URI_DELIMITER);
+        return new OzoneFileStatus();
       }
 
       // Check if the key is a file.
@@ -1748,7 +1765,7 @@ public class KeyManagerImpl implements KeyManager {
       Path keyPath = Paths.get(keyName);
       OzoneFileStatus status =
           verifyNoFilesInPath(volumeName, bucketName, keyPath, false);
-      if (status != null && OzoneFSUtils.pathToKey(status.getPath())
+      if (status != null && status.getTrimmedName()
           .equals(keyName)) {
         // if directory already exists
         return;
@@ -2020,8 +2037,13 @@ public class KeyManagerImpl implements KeyManager {
                 // if entry is a directory
                 if (!deletedKeySet.contains(entryInDb)) {
                   if (!entryKeyName.equals(immediateChild)) {
+                    OmKeyInfo fakeDirEntry = new OmKeyInfo.Builder()
+                        .setVolumeName(omKeyInfo.getVolumeName())
+                        .setBucketName(omKeyInfo.getBucketName())
+                        .setKeyName(immediateChild)
+                        .build();
                     cacheKeyMap.put(entryInDb,
-                        new OzoneFileStatus(immediateChild));
+                        new OzoneFileStatus(fakeDirEntry, scmBlockSize, true));
                   } else {
                     // If entryKeyName matches dir name, we have the info
                     cacheKeyMap.put(entryInDb,

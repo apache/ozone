@@ -19,20 +19,19 @@
 package org.apache.hadoop.ozone.recon.fsck;
 
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
-import javax.inject.Inject;
 
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.util.Time;
-import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
-import org.hadoop.ozone.recon.schema.tables.pojos.MissingContainers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.util.CollectionUtils;
@@ -47,17 +46,19 @@ public class MissingContainerTask extends ReconScmTask {
       LoggerFactory.getLogger(MissingContainerTask.class);
 
   private ContainerManager containerManager;
-  private MissingContainersDao missingContainersDao;
-  private static final long INTERVAL = 5 * 60 * 1000L;
+  private ContainerSchemaManager containerSchemaManager;
+  private final long interval;
 
-  @Inject
   public MissingContainerTask(
-      OzoneStorageContainerManager ozoneStorageContainerManager,
+      ContainerManager containerManager,
       ReconTaskStatusDao reconTaskStatusDao,
-      MissingContainersDao missingContainersDao) {
+      ContainerSchemaManager containerSchemaManager,
+      ReconTaskConfig reconTaskConfig) {
     super(reconTaskStatusDao);
-    this.missingContainersDao = missingContainersDao;
-    this.containerManager = ozoneStorageContainerManager.getContainerManager();
+    this.containerSchemaManager = containerSchemaManager;
+    this.containerManager = containerManager;
+    this.interval = TimeUnit.SECONDS.toMillis(
+        reconTaskConfig.getMissingContainerTaskInterval());
   }
 
   public synchronized void run() {
@@ -73,7 +74,7 @@ public class MissingContainerTask extends ReconScmTask {
         LOG.info("Missing Container task Thread took {} milliseconds for" +
                 " processing {} containers.", Time.monotonicNow() - start,
             containerIds.size());
-        wait(INTERVAL);
+        wait(interval);
       }
     } catch (Throwable t) {
       LOG.error("Exception in Missing Container task Thread.", t);
@@ -89,17 +90,20 @@ public class MissingContainerTask extends ReconScmTask {
       boolean isAllUnhealthy =
           containerReplicas.stream().allMatch(replica ->
               replica.getState().equals(State.UNHEALTHY));
+      boolean isMissingContainer =
+          containerSchemaManager.isMissingContainer(containerID.getId());
       if (CollectionUtils.isEmpty(containerReplicas) || isAllUnhealthy) {
-        if (!missingContainersDao.existsById(containerID.getId())) {
-          LOG.info("Found a missing container with ID {}. Adding it to the " +
-              "database", containerID.getId());
-          MissingContainers newRecord =
-              new MissingContainers(containerID.getId(), currentTime);
-          missingContainersDao.insert(newRecord);
+        if (!isMissingContainer) {
+          LOG.info("Found a missing container with ID {}.",
+              containerID.getId());
+          containerSchemaManager.addMissingContainer(containerID.getId(),
+              currentTime);
         }
       } else {
-        if (missingContainersDao.existsById(containerID.getId())) {
-          missingContainersDao.deleteById(containerID.getId());
+        if (isMissingContainer) {
+          LOG.info("Missing container with ID {} is no longer missing.",
+              containerID.getId());
+          containerSchemaManager.deleteMissingContainer(containerID.getId());
         }
       }
     } catch (ContainerNotFoundException e) {

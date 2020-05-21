@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.thirdparty.io.grpc.Context;
 import org.apache.ratis.thirdparty.io.grpc.Metadata;
@@ -88,6 +89,8 @@ public final class OzoneConsts {
   public static final String OZONE_RPC_SCHEME = "o3";
   public static final String OZONE_HTTP_SCHEME = "http";
   public static final String OZONE_URI_DELIMITER = "/";
+  public static final String OZONE_ROOT = OZONE_URI_DELIMITER;
+
 
   public static final String CONTAINER_EXTENSION = ".container";
   public static final String CONTAINER_META = ".meta";
@@ -114,14 +117,9 @@ public final class OzoneConsts {
    */
   public static final String CONTAINER_DB_SUFFIX = "container.db";
   public static final String PIPELINE_DB_SUFFIX = "pipeline.db";
-  public static final String SCM_CONTAINER_DB = "scm-" + CONTAINER_DB_SUFFIX;
-  public static final String SCM_PIPELINE_DB = "scm-" + PIPELINE_DB_SUFFIX;
   public static final String DN_CONTAINER_DB = "-dn-"+ CONTAINER_DB_SUFFIX;
-  public static final String DELETED_BLOCK_DB = "deletedBlock.db";
   public static final String OM_DB_NAME = "om.db";
   public static final String OM_DB_BACKUP_PREFIX = "om.db.backup.";
-  public static final String OZONE_MANAGER_TOKEN_DB_NAME = "om-token.db";
-  public static final String SCM_DB_NAME = "scm.db";
 
   public static final String STORAGE_DIR_CHUNKS = "chunks";
   public static final String OZONE_DB_CHECKPOINT_REQUEST_FLUSH =
@@ -142,6 +140,25 @@ public final class OzoneConsts {
   public static final String DELETED_KEY_PREFIX = "#deleted#";
   public static final String DELETE_TRANSACTION_KEY_PREFIX = "#delTX#";
   public static final String BLOCK_COMMIT_SEQUENCE_ID_PREFIX = "#BCSID";
+
+  public static final String BLOCK_COUNT = "#BLOCKCOUNT";
+  public static final String CONTAINER_BYTES_USED = "#BYTESUSED";
+  public static final String PENDING_DELETE_BLOCK_COUNT =
+      "#PENDINGDELETEBLOCKCOUNT";
+
+
+  public static final byte[] DB_BLOCK_COUNT_KEY =
+      DFSUtil.string2Bytes(OzoneConsts.BLOCK_COUNT);
+  public static final byte[] DB_CONTAINER_BYTES_USED_KEY =
+      DFSUtil.string2Bytes(OzoneConsts.CONTAINER_BYTES_USED);
+  public static final byte[] DB_PENDING_DELETE_BLOCK_COUNT_KEY =
+      DFSUtil.string2Bytes(PENDING_DELETE_BLOCK_COUNT);
+  public static final byte[] DB_CONTAINER_DELETE_TRANSACTION_KEY =
+      DFSUtil.string2Bytes(DELETE_TRANSACTION_KEY_PREFIX);
+  public static final byte[] DB_BLOCK_COMMIT_SEQUENCE_ID_KEY =
+      DFSUtil.string2Bytes(BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
+
+
 
   /**
    * OM LevelDB prefixes.
@@ -239,7 +256,6 @@ public final class OzoneConsts {
   public static final String KEY = "key";
   public static final String SRC_KEY = "srcKey";
   public static final String DST_KEY = "dstKey";
-  public static final String QUOTA = "quota";
   public static final String QUOTA_IN_BYTES = "quotaInBytes";
   public static final String OBJECT_ID = "objectID";
   public static final String UPDATE_ID = "updateID";
@@ -275,6 +291,7 @@ public final class OzoneConsts {
   public static final String S3_GETSECRET_USER = "S3GetSecretUser";
   public static final String MULTIPART_UPLOAD_PART_NUMBER = "partNumber";
   public static final String MULTIPART_UPLOAD_PART_NAME = "partName";
+  public static final String BUCKET_ENCRYPTION_KEY = "bucketEncryptionKey";
 
 
 

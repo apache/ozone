@@ -85,4 +85,14 @@ public class ReconHttpServer extends BaseHttpServer {
   protected String getEnabledKey() {
     return ReconServerConfigKeys.OZONE_RECON_HTTP_ENABLED_KEY;
   }
+
+  @Override
+  protected String getHttpAuthType() {
+    return ReconServerConfigKeys.OZONE_RECON_HTTP_AUTH_TYPE;
+  }
+
+  @Override
+  protected String getHttpAuthConfigPrefix() {
+    return ReconServerConfigKeys.OZONE_RECON_HTTP_AUTH_CONFIG_PREFIX;
+  }
 }

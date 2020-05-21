@@ -39,6 +39,8 @@ execute_robot_test scm admincli
 
 execute_robot_test scm recon
 
+execute_robot_test scm spnego
+
 stop_docker_env
 
 generate_report

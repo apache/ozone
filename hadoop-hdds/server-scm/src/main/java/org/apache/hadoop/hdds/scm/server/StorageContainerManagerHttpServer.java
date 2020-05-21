@@ -17,18 +17,18 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
-import org.apache.hadoop.conf.Configuration;
+import java.io.IOException;
+
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
-
-import java.io.IOException;
 
 /**
  * HttpServer2 wrapper for the Ozone Storage Container Manager.
  */
 public class StorageContainerManagerHttpServer extends BaseHttpServer {
 
-  public StorageContainerManagerHttpServer(Configuration conf)
+  public StorageContainerManagerHttpServer(ConfigurationSource conf)
       throws IOException {
     super(conf, "scm");
   }
@@ -73,6 +73,16 @@ public class StorageContainerManagerHttpServer extends BaseHttpServer {
 
   @Override protected String getEnabledKey() {
     return ScmConfigKeys.OZONE_SCM_HTTP_ENABLED_KEY;
+  }
+
+  @Override
+  protected String getHttpAuthType() {
+    return SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_AUTH_TYPE;
+  }
+
+  @Override
+  protected String getHttpAuthConfigPrefix() {
+    return SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_AUTH_CONFIG_PREFIX;
   }
 
 }

@@ -28,7 +28,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -51,7 +51,6 @@ import org.apache.ratis.retry.RetryPolicies;
 import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
-import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
@@ -65,8 +64,9 @@ public interface RatisHelper {
 
   // Prefix for Ratis Server GRPC and Ratis client conf.
   String HDDS_DATANODE_RATIS_PREFIX_KEY = "hdds.ratis.";
+  String RAFT_SERVER_PREFIX_KEY = "raft.server";
   String HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY =
-      HDDS_DATANODE_RATIS_PREFIX_KEY + RaftServerConfigKeys.PREFIX;
+      HDDS_DATANODE_RATIS_PREFIX_KEY + RAFT_SERVER_PREFIX_KEY;
   String HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY =
       HDDS_DATANODE_RATIS_PREFIX_KEY + RaftClientConfigKeys.PREFIX;
   String HDDS_DATANODE_RATIS_GRPC_PREFIX_KEY =
@@ -146,27 +146,27 @@ public interface RatisHelper {
 
   static RaftClient newRaftClient(RpcType rpcType, Pipeline pipeline,
       RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig,
-      Configuration ozoneConfiguration) throws IOException {
+      ConfigurationSource ozoneConfiguration) throws IOException {
     return newRaftClient(rpcType,
         toRaftPeerId(pipeline.getLeaderNode()),
         newRaftGroup(RaftGroupId.valueOf(pipeline.getId().getId()),
             pipeline.getNodes()), retryPolicy, tlsConfig, ozoneConfiguration);
   }
 
-  static RpcType getRpcType(Configuration conf) {
+  static RpcType getRpcType(ConfigurationSource conf) {
     return SupportedRpcType.valueOfIgnoreCase(conf.get(
         ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY,
         ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT));
   }
 
-  static RaftClient newRaftClient(RaftPeer leader, Configuration conf) {
+  static RaftClient newRaftClient(RaftPeer leader, ConfigurationSource conf) {
     return newRaftClient(getRpcType(conf), leader,
         RatisHelper.createRetryPolicy(conf), conf);
   }
 
   static RaftClient newRaftClient(RpcType rpcType, RaftPeer leader,
       RetryPolicy retryPolicy, GrpcTlsConfig tlsConfig,
-      Configuration configuration) {
+      ConfigurationSource configuration) {
     return newRaftClient(rpcType, leader.getId(),
         newRaftGroup(Collections.singletonList(leader)), retryPolicy,
         tlsConfig, configuration);
@@ -174,7 +174,7 @@ public interface RatisHelper {
 
   static RaftClient newRaftClient(RpcType rpcType, RaftPeer leader,
       RetryPolicy retryPolicy,
-      Configuration ozoneConfiguration) {
+      ConfigurationSource ozoneConfiguration) {
     return newRaftClient(rpcType, leader.getId(),
         newRaftGroup(Collections.singletonList(leader)), retryPolicy, null,
         ozoneConfiguration);
@@ -183,7 +183,7 @@ public interface RatisHelper {
   @SuppressWarnings("checkstyle:ParameterNumber")
   static RaftClient newRaftClient(RpcType rpcType, RaftPeerId leader,
       RaftGroup group, RetryPolicy retryPolicy,
-      GrpcTlsConfig tlsConfig, Configuration ozoneConfiguration) {
+      GrpcTlsConfig tlsConfig, ConfigurationSource ozoneConfiguration) {
     if (LOG.isTraceEnabled()) {
       LOG.trace("newRaftClient: {}, leader={}, group={}",
           rpcType, leader, group);
@@ -215,14 +215,14 @@ public interface RatisHelper {
    * @param ozoneConf
    * @param raftProperties
    */
-  static void createRaftClientProperties(Configuration ozoneConf,
+  static void createRaftClientProperties(ConfigurationSource ozoneConf,
       RaftProperties raftProperties) {
 
     // As for client we do not require server and grpc server/tls. exclude them.
     Map<String, String> ratisClientConf =
         ozoneConf.getPropsWithPrefix(HDDS_DATANODE_RATIS_PREFIX_KEY);
     ratisClientConf.forEach((key, val) -> {
-      if (!(key.startsWith(RaftServerConfigKeys.PREFIX) ||
+      if (!(key.startsWith(RAFT_SERVER_PREFIX_KEY) ||
           key.startsWith(GrpcConfigKeys.TLS.PREFIX) ||
           key.startsWith(GrpcConfigKeys.Server.PREFIX))) {
         raftProperties.set(key, val);
@@ -238,7 +238,7 @@ public interface RatisHelper {
    * @param ozoneConf
    * @param raftProperties
    */
-  static void createRaftServerProperties(Configuration ozoneConf,
+  static void createRaftServerProperties(ConfigurationSource ozoneConf,
        RaftProperties raftProperties) {
 
     Map<String, String> ratisServerConf =
@@ -253,7 +253,7 @@ public interface RatisHelper {
 
 
   static Map<String, String> getDatanodeRatisPrefixProps(
-      Configuration configuration) {
+      ConfigurationSource configuration) {
     return configuration.getPropsWithPrefix(HDDS_DATANODE_RATIS_PREFIX_KEY);
   }
 
@@ -269,11 +269,7 @@ public interface RatisHelper {
     return tlsConfig;
   }
 
-
-
-
-
-  static RetryPolicy createRetryPolicy(Configuration conf) {
+  static RetryPolicy createRetryPolicy(ConfigurationSource conf) {
     int maxRetryCount =
         conf.getInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY,
             OzoneConfigKeys.

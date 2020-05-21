@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -56,6 +56,8 @@ public final class SCMContainerPlacementRackAware
   private static final int RACK_LEVEL = 1;
   private static final int MAX_RETRY= 3;
   private final SCMContainerPlacementMetrics metrics;
+  // Used to check the placement policy is validated in the parent class
+  private static final int REQUIRED_RACKS = 2;
 
   /**
    * Constructs a Container Placement with rack awareness.
@@ -68,7 +70,7 @@ public final class SCMContainerPlacementRackAware
    *                 for closed container placement.
    */
   public SCMContainerPlacementRackAware(final NodeManager nodeManager,
-      final Configuration conf, final NetworkTopology networkTopology,
+      final ConfigurationSource conf, final NetworkTopology networkTopology,
       final boolean fallback, final SCMContainerPlacementMetrics metrics) {
     super(nodeManager, conf);
     this.networkTopology = networkTopology;
@@ -344,5 +346,10 @@ public final class SCMContainerPlacementRackAware
         return Arrays.asList(chosenNodes.toArray(new DatanodeDetails[0]));
       }
     }
+  }
+
+  @Override
+  protected int getRequiredRackCount() {
+    return REQUIRED_RACKS;
   }
 }

@@ -17,53 +17,48 @@
  */
 package org.apache.hadoop.hdds.scm.metadata;
 
-import java.io.File;
+import java.io.IOException;
 import java.math.BigInteger;
-import java.nio.file.Paths;
 import java.security.cert.X509Certificate;
 import java.util.concurrent.atomic.AtomicLong;
+
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import java.io.IOException;
-import org.apache.hadoop.hdds.security.x509.certificate.authority
-    .CertificateStore;
-import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
+import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CONTAINERS;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.DELETED_BLOCKS;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.PIPELINES;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.REVOKED_CERTS;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.VALID_CERTS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.OzoneConsts.SCM_DB_NAME;
-
 /**
  * A RocksDB based implementation of SCM Metadata Store.
- * <p>
- * <p>
- * +---------------+------------------+-------------------------+
- * | Column Family |    Key           |          Value          |
- * +---------------+------------------+-------------------------+
- * | DeletedBlocks | TXID(Long)       | DeletedBlockTransaction |
- * +---------------+------------------+-------------------------+
- * | ValidCerts    | Serial (BigInt)  | X509Certificate         |
- * +---------------+------------------+-------------------------+
- * |RevokedCerts   | Serial (BigInt)  | X509Certificate         |
- * +---------------+------------------+-------------------------+
+ *
  */
 public class SCMMetadataStoreRDBImpl implements SCMMetadataStore {
 
-  private static final String DELETED_BLOCKS_TABLE = "deletedBlocks";
-  private Table deletedBlocksTable;
+  private Table<Long, DeletedBlocksTransaction> deletedBlocksTable;
 
-  private static final String VALID_CERTS_TABLE = "validCerts";
-  private Table validCertsTable;
+  private Table<BigInteger, X509Certificate> validCertsTable;
 
-  private static final String REVOKED_CERTS_TABLE = "revokedCerts";
-  private Table revokedCertsTable;
+  private Table<BigInteger, X509Certificate> revokedCertsTable;
 
+  private Table<ContainerID, ContainerInfo> containerTable;
 
+  private Table<PipelineID, Pipeline> pipelineTable;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMMetadataStoreRDBImpl.class);
@@ -88,31 +83,26 @@ public class SCMMetadataStoreRDBImpl implements SCMMetadataStore {
   public void start(OzoneConfiguration config)
       throws IOException {
     if (this.store == null) {
-      File metaDir = ServerUtils.getScmDbDir(configuration);
 
-      this.store = DBStoreBuilder.newBuilder(configuration)
-          .setName(SCM_DB_NAME)
-          .setPath(Paths.get(metaDir.getPath()))
-          .addTable(DELETED_BLOCKS_TABLE)
-          .addTable(VALID_CERTS_TABLE)
-          .addTable(REVOKED_CERTS_TABLE)
-          .addCodec(DeletedBlocksTransaction.class,
-              new DeletedBlocksTransactionCodec())
-          .addCodec(BigInteger.class, new BigIntegerCodec())
-          .addCodec(X509Certificate.class, new X509CertificateCodec())
-          .build();
+      this.store = DBStoreBuilder.createDBStore(config, new SCMDBDefinition());
 
-      deletedBlocksTable = this.store.getTable(DELETED_BLOCKS_TABLE,
-          Long.class, DeletedBlocksTransaction.class);
-      checkTableStatus(deletedBlocksTable, DELETED_BLOCKS_TABLE);
+      deletedBlocksTable =
+          DELETED_BLOCKS.getTable(this.store);
 
-      validCertsTable = this.store.getTable(VALID_CERTS_TABLE,
-          BigInteger.class, X509Certificate.class);
-      checkTableStatus(validCertsTable, VALID_CERTS_TABLE);
+      checkTableStatus(deletedBlocksTable,
+          DELETED_BLOCKS.getName());
 
-      revokedCertsTable = this.store.getTable(REVOKED_CERTS_TABLE,
-          BigInteger.class, X509Certificate.class);
-      checkTableStatus(revokedCertsTable, REVOKED_CERTS_TABLE);
+      validCertsTable = VALID_CERTS.getTable(store);
+
+      checkTableStatus(validCertsTable, VALID_CERTS.getName());
+
+      revokedCertsTable = REVOKED_CERTS.getTable(store);
+
+      checkTableStatus(revokedCertsTable, REVOKED_CERTS.getName());
+
+      pipelineTable = PIPELINES.getTable(store);
+
+      containerTable = CONTAINERS.getTable(store);
     }
   }
 
@@ -163,6 +153,21 @@ public class SCMMetadataStoreRDBImpl implements SCMMetadataStore {
   }
 
   @Override
+  public Table<PipelineID, Pipeline> getPipelineTable() {
+    return pipelineTable;
+  }
+
+  @Override
+  public BatchOperationHandler getBatchHandler() {
+    return this.store;
+  }
+
+  @Override
+  public Table<ContainerID, ContainerInfo> getContainerTable() {
+    return containerTable;
+  }
+
+  @Override
   public Long getCurrentTXID() {
     return this.txID.get();
   }
@@ -174,8 +179,8 @@ public class SCMMetadataStoreRDBImpl implements SCMMetadataStore {
    * @throws IOException
    */
   private Long getLargestRecordedTXID() throws IOException {
-    try (TableIterator<Long, DeletedBlocksTransaction> txIter =
-             deletedBlocksTable.iterator()) {
+    try (TableIterator<Long, ? extends KeyValue<Long, DeletedBlocksTransaction>>
+        txIter = deletedBlocksTable.iterator()) {
       txIter.seekToLast();
       Long txid = txIter.key();
       if (txid != null) {

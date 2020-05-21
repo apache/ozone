@@ -42,13 +42,13 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
+import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
-import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
 import org.hadoop.ozone.recon.schema.tables.pojos.MissingContainers;
 import org.jooq.Configuration;
@@ -70,6 +70,9 @@ public class ContainerDBServiceProviderImpl
   private GlobalStatsDao globalStatsDao;
 
   @Inject
+  private ContainerSchemaManager containerSchemaManager;
+
+  @Inject
   private OzoneConfiguration configuration;
 
   @Inject
@@ -80,9 +83,6 @@ public class ContainerDBServiceProviderImpl
 
   @Inject
   private ReconUtils reconUtils;
-
-  @Inject
-  private MissingContainersDao missingContainersDao;
 
   @Inject
   public ContainerDBServiceProviderImpl(DBStore dbStore,
@@ -359,7 +359,7 @@ public class ContainerDBServiceProviderImpl
   }
 
   public List<MissingContainers> getMissingContainers() {
-    return missingContainersDao.findAll();
+    return containerSchemaManager.getAllMissingContainers();
   }
 
   @Override

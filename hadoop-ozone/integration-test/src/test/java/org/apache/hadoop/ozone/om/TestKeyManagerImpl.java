@@ -33,10 +33,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 
-import com.google.common.base.Optional;
-import com.google.common.collect.Sets;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.RandomStringUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -46,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -90,8 +87,22 @@ import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.LambdaTestUtils;
-
 import org.apache.hadoop.util.Time;
+
+import com.google.common.base.Optional;
+import com.google.common.collect.Sets;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.RandomStringUtils;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -101,21 +112,8 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import static org.mockito.Matchers.anyList;
 import org.mockito.Mockito;
-
-import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
-
-import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
-import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_GET_PIPELINE_EXCEPTION;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
-import static org.mockito.Matchers.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -205,11 +203,11 @@ public class TestKeyManagerImpl {
     for (OzoneFileStatus fileStatus : fileStatuses) {
       if (fileStatus.isFile()) {
         keyManager.deleteKey(
-            createKeyArgs(fileStatus.getPath().toString().substring(1)));
+            createKeyArgs(fileStatus.getKeyInfo().getKeyName()));
       } else {
         keyManager.deleteKey(createKeyArgs(OzoneFSUtils
             .addTrailingSlashIfNeeded(
-                fileStatus.getPath().toString().substring(1))));
+                fileStatus.getKeyInfo().getKeyName())));
       }
     }
   }
@@ -1078,8 +1076,9 @@ public class TestKeyManagerImpl {
       Set<OzoneFileStatus> tmpStatusSet = new HashSet<>();
       do {
         tempFileStatus = keyManager.listStatus(dirArgs, false,
-            tempFileStatus != null ? OzoneFSUtils.pathToKey(
-                tempFileStatus.get(tempFileStatus.size() - 1).getPath()) : null,
+            tempFileStatus != null ?
+                tempFileStatus.get(tempFileStatus.size() - 1).getKeyInfo()
+                    .getKeyName() : null,
             2);
         tmpStatusSet.addAll(tempFileStatus);
       } while (tempFileStatus.size() == 2);
@@ -1094,8 +1093,10 @@ public class TestKeyManagerImpl {
       tmpStatusSet = new HashSet<>();
       do {
         tempFileStatus = keyManager.listStatus(dirArgs, true,
-            tempFileStatus != null ? OzoneFSUtils.pathToKey(
-                tempFileStatus.get(tempFileStatus.size() - 1).getPath()) : null,
+            tempFileStatus != null ?
+                tempFileStatus.get(tempFileStatus.size() - 1).getKeyInfo()
+                    .getKeyName() :
+                null,
             2);
         tmpStatusSet.addAll(tempFileStatus);
       } while (tempFileStatus.size() == 2);
@@ -1114,12 +1115,27 @@ public class TestKeyManagerImpl {
 
       StorageContainerLocationProtocol sclProtocolMock = mock(
           StorageContainerLocationProtocol.class);
-      ContainerWithPipeline containerWithPipelineMock =
-          mock(ContainerWithPipeline.class);
-      when(containerWithPipelineMock.getPipeline())
-          .thenReturn(getRandomPipeline());
-      when(sclProtocolMock.getContainerWithPipeline(anyLong()))
-          .thenReturn(containerWithPipelineMock);
+
+      List<Long> containerIDs = new ArrayList<>();
+      containerIDs.add(100L);
+      containerIDs.add(200L);
+
+      List<ContainerWithPipeline> cps = new ArrayList<>();
+      for (Long containerID : containerIDs) {
+        ContainerWithPipeline containerWithPipelineMock =
+            mock(ContainerWithPipeline.class);
+        when(containerWithPipelineMock.getPipeline())
+            .thenReturn(getRandomPipeline());
+
+        ContainerInfo ci = mock(ContainerInfo.class);
+        when(ci.getContainerID()).thenReturn(containerID);
+        when(containerWithPipelineMock.getContainerInfo()).thenReturn(ci);
+
+        cps.add(containerWithPipelineMock);
+      }
+
+      when(sclProtocolMock.getContainerWithPipelineBatch(containerIDs))
+          .thenReturn(cps);
 
       ScmClient scmClientMock = mock(ScmClient.class);
       when(scmClientMock.getContainerClient()).thenReturn(sclProtocolMock);
@@ -1158,9 +1174,8 @@ public class TestKeyManagerImpl {
 
       keyManagerImpl.refreshPipeline(omKeyInfo);
 
-      verify(sclProtocolMock, times(2)).getContainerWithPipeline(anyLong());
-      verify(sclProtocolMock, times(1)).getContainerWithPipeline(100L);
-      verify(sclProtocolMock, times(1)).getContainerWithPipeline(200L);
+      verify(sclProtocolMock, times(1))
+          .getContainerWithPipelineBatch(containerIDs);
     } finally {
       cluster.shutdown();
     }
@@ -1178,7 +1193,7 @@ public class TestKeyManagerImpl {
       StorageContainerLocationProtocol sclProtocolMock = mock(
           StorageContainerLocationProtocol.class);
       doThrow(new IOException(errorMessage)).when(sclProtocolMock)
-          .getContainerWithPipeline(anyLong());
+          .getContainerWithPipelineBatch(anyList());
 
       ScmClient scmClientMock = mock(ScmClient.class);
       when(scmClientMock.getContainerClient()).thenReturn(sclProtocolMock);
@@ -1263,8 +1278,10 @@ public class TestKeyManagerImpl {
       Set<String> fileSet, boolean recursive) {
 
     for (OzoneFileStatus fileStatus : fileStatuses) {
-      String keyName = OzoneFSUtils.pathToKey(fileStatus.getPath());
-      String parent = Paths.get(keyName).getParent().toString();
+      String normalizedKeyName = fileStatus.getTrimmedName();
+      String parent =
+          Paths.get(fileStatus.getKeyInfo().getKeyName()).getParent()
+              .toString();
       if (!recursive) {
         // if recursive is false, verify all the statuses have the input
         // directory as parent
@@ -1272,9 +1289,13 @@ public class TestKeyManagerImpl {
       }
       // verify filestatus is present in directory or file set accordingly
       if (fileStatus.isDirectory()) {
-        Assert.assertTrue(directorySet.contains(keyName));
+        Assert
+            .assertTrue(directorySet + " doesn't contain " + normalizedKeyName,
+                directorySet.contains(normalizedKeyName));
       } else {
-        Assert.assertTrue(fileSet.contains(keyName));
+        Assert
+            .assertTrue(fileSet + " doesn't contain " + normalizedKeyName,
+                fileSet.contains(normalizedKeyName));
       }
     }
 

@@ -34,7 +34,7 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
@@ -605,7 +605,7 @@ public final class TestSecureOzoneCluster {
 
     // Setup secure OM for start.
     OzoneConfiguration newConf = new OzoneConfiguration(conf);
-    int tokenMaxLifetime = 500;
+    int tokenMaxLifetime = 1000;
     newConf.setLong(DELEGATION_TOKEN_MAX_LIFETIME_KEY, tokenMaxLifetime);
     setupOm(newConf);
     long omVersion =

@@ -76,6 +76,9 @@ public final class OMConfigKeys {
       "ozone.om.db.cache.size.mb";
   public static final int OZONE_OM_DB_CACHE_SIZE_DEFAULT = 128;
 
+  public static final String OZONE_OM_VOLUME_LISTALL_ALLOWED =
+      "ozone.om.volume.listall.allowed";
+  public static final boolean OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT = true;
   public static final String OZONE_OM_USER_MAX_VOLUME =
       "ozone.om.user.max.volume";
   public static final int OZONE_OM_USER_MAX_VOLUME_DEFAULT = 1024;
@@ -200,9 +203,14 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_KERBEROS_PRINCIPAL_KEY = "ozone.om"
       + ".kerberos.principal";
   public static final String OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE =
-      "ozone.om.http.kerberos.keytab";
+      "ozone.om.http.auth.kerberos.keytab";
   public static final String OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY
-      = "ozone.om.http.kerberos.principal";
+      = "ozone.om.http.auth.kerberos.principal";
+  public static final String OZONE_OM_HTTP_AUTH_TYPE =
+      "ozone.om.http.auth.type";
+  public static final String OZONE_OM_HTTP_AUTH_CONFIG_PREFIX =
+      "ozone.om.http.auth.";
+
   // Delegation token related keys
   public static final String  DELEGATION_REMOVER_SCAN_INTERVAL_KEY =
       "ozone.manager.delegation.remover.scan.interval";

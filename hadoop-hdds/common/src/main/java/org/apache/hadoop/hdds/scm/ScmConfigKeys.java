@@ -47,7 +47,7 @@ public final class ScmConfigKeys {
   public static final String DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY
       = "dfs.container.ratis.num.write.chunk.threads";
   public static final int DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT
-      = 60;
+      = 10;
   public static final String DFS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY
       = "dfs.container.ratis.replication.level";
   public static final ReplicationLevel
@@ -361,7 +361,7 @@ public final class ScmConfigKeys {
       "network-topology-default.xml";
 
   public static final String HDDS_TRACING_ENABLED = "hdds.tracing.enabled";
-  public static final boolean HDDS_TRACING_ENABLED_DEFAULT = true;
+  public static final boolean HDDS_TRACING_ENABLED_DEFAULT = false;
 
   /**
    * Never constructed.

@@ -29,11 +29,11 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -57,8 +57,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -139,6 +137,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
     newKeyArgs.addAllKeyLocations(omKeyLocationInfoList.stream()
         .map(OmKeyLocationInfo::getProtobuf).collect(Collectors.toList()));
 
+    generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
     CreateFileRequest.Builder newCreateFileRequest =
         createFileRequest.toBuilder().setKeyArgs(newKeyArgs)
             .setClientID(UniqueId.next());
@@ -177,15 +176,14 @@ public class OMFileCreateRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     boolean acquiredLock = false;
-    Optional<FileEncryptionInfo> encryptionInfo = Optional.absent();
+
     OmKeyInfo omKeyInfo = null;
     final List<OmKeyLocationInfo> locations = new ArrayList<>();
     List<OmKeyInfo> missingParentInfos;
 
     OMClientResponse omClientResponse = null;
-    OMResponse.Builder omResponse = OMResponse.newBuilder()
-        .setCmdType(Type.CreateFile)
-        .setStatus(Status.OK);
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
     IOException exception = null;
     Result result = null;
     try {
@@ -257,10 +255,9 @@ public class OMFileCreateRequest extends OMKeyRequest {
       // do open key
       OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
           omMetadataManager.getBucketKey(volumeName, bucketName));
-      encryptionInfo = getFileEncryptionInfo(ozoneManager, bucketInfo);
 
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
-          keyArgs.getDataSize(), locations, encryptionInfo.orNull(),
+          keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),
           ozoneManager.getPrefixManager(), bucketInfo, trxnLogIndex,
           ozoneManager.isRatisEnabled());
 
