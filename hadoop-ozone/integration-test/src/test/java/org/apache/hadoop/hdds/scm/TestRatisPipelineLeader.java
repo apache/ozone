@@ -51,7 +51,6 @@ import org.slf4j.LoggerFactory;
  */
 @Ignore("HDDS-3265")
 public class TestRatisPipelineLeader {
-
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
   private static final org.slf4j.Logger LOG =

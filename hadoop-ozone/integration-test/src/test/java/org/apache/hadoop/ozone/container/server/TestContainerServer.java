@@ -84,7 +84,6 @@ import static org.mockito.Mockito.mock;
  */
 @Ignore("Takes too long to run this test. Ignoring for time being.")
 public class TestContainerServer {
-
   static final String TEST_DIR = GenericTestUtils.getTestDir("dfs")
       .getAbsolutePath() + File.separator;
   private static final OzoneConfiguration CONF = new OzoneConfiguration();

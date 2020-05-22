@@ -66,7 +66,6 @@ import org.junit.Test;
  */
 @Ignore("see HDDS-3294")
 public class TestContainerStateMachineFailureOnRead {
-
   private MiniOzoneCluster cluster;
   private ObjectStore objectStore;
   private String volumeName;
