@@ -37,7 +37,7 @@ import java.io.InputStream;
  * Cat an existing key.
  */
 @Command(name = "cat",
-    description = "Cat a specific key from ozone server")
+    description = "Copies a specific Ozone key to standard output")
 public class CatKeyHandler extends KeyHandler {
 
   @Override
