@@ -32,3 +32,7 @@ Run list pipeline
 Run create pipeline
     ${output} =         Execute          ozone admin pipeline create
                         Should contain   ${output}   is created. Factor: ONE, Type: STAND_ALONE
+
+Run close pipeline
+    ${output} =         Execute          ozone admin pipeline close ALL
+                        Should contain   ${output}   Unsuccessfully closed: 0
