@@ -39,11 +39,14 @@ public class TestOmMultipartKeyInfo {
         .setCreationTime(Time.now())
         .setReplicationType(HddsProtos.ReplicationType.RATIS)
         .setReplicationFactor(HddsProtos.ReplicationFactor.THREE)
+        .setFileHandleInfo(1234L)
         .build();
 
     OmMultipartKeyInfo cloneMultipartKeyInfo = omMultipartKeyInfo.copyObject();
 
     Assert.assertEquals(cloneMultipartKeyInfo, omMultipartKeyInfo);
+    Assert.assertEquals(cloneMultipartKeyInfo.getFileHandleInfo(),
+        omMultipartKeyInfo.getFileHandleInfo());
 
     // Just setting dummy values for this test.
     omMultipartKeyInfo.addPartKeyInfo(1,
