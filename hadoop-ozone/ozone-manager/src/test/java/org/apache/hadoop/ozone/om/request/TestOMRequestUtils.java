@@ -428,7 +428,7 @@ public final class TestOMRequestUtils {
   }
 
   /**
-   * Deletes key from Key table and adds it to DeletedKeys table.
+   * Deletes key from Key table and adds it to deletedTable and trashTable.
    * @return the deletedKey name
    */
   public static String deleteKey(String ozoneKey,
@@ -447,6 +447,12 @@ public final class TestOMRequestUtils {
         repeatedOmKeyInfo, trxnLogIndex, true);
 
     omMetadataManager.getDeletedTable().put(ozoneKey, repeatedOmKeyInfo);
+
+    // Update cache of trashTable and update trashTable in OM DB.
+    omMetadataManager.getTrashTable().addCacheEntry(
+        new CacheKey<>(ozoneKey),
+        new CacheValue<>(Optional.of(repeatedOmKeyInfo), trxnLogIndex));
+    omMetadataManager.getTrashTable().put(ozoneKey, repeatedOmKeyInfo);
 
     return ozoneKey;
   }
