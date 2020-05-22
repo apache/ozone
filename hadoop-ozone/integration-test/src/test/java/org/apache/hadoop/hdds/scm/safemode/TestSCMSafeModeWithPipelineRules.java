@@ -35,7 +35,6 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-import org.junit.rules.Timeout;
 
 import java.util.List;
 import java.util.concurrent.TimeoutException;
@@ -49,12 +48,6 @@ import static org.junit.Assert.fail;
 
 @Ignore
 public class TestSCMSafeModeWithPipelineRules {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = new Timeout(300000);
 
   private static MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
