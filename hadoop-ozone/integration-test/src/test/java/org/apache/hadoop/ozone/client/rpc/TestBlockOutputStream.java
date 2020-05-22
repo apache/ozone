@@ -187,14 +187,16 @@ public class TestBlockOutputStream {
     Assert.assertEquals(1, blockOutputStream.getBufferPool().getSize());
     Assert.assertEquals(0,
         blockOutputStream.getBufferPool().getBuffer(0).position());
-    Assert.assertEquals(totalWriteDataLength, blockOutputStream.getWrittenDataLength());
+    Assert.assertEquals(totalWriteDataLength,
+        blockOutputStream.getWrittenDataLength());
     Assert.assertEquals(totalWriteDataLength,
         blockOutputStream.getTotalDataFlushedLength());
     Assert.assertEquals(0,
         blockOutputStream.getCommitIndex2flushedDataMap().size());
 
     // flush ensures watchForCommit updates the total length acknowledged
-    Assert.assertEquals(totalWriteDataLength, blockOutputStream.getTotalAckDataLength());
+    Assert.assertEquals(totalWriteDataLength,
+        blockOutputStream.getTotalAckDataLength());
 
     Assert.assertEquals(1, keyOutputStream.getStreamEntries().size());
     // now close the stream, It will update the ack length after watchForCommit
@@ -214,7 +216,8 @@ public class TestBlockOutputStream {
     // make sure the bufferPool is empty
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
-    Assert.assertEquals(totalWriteDataLength, blockOutputStream.getTotalAckDataLength());
+    Assert.assertEquals(totalWriteDataLength,
+        blockOutputStream.getTotalAckDataLength());
     Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
     Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
     validateData(keyName, data1);
@@ -284,8 +287,8 @@ public class TestBlockOutputStream {
 
     // No action is triggered when execute flush and BlockOutputStream will not
     // be updated.
-    Assert
-        .assertEquals(dataLength, blockOutputStream.getBufferPool().computeBufferData());
+    Assert.assertEquals(dataLength,
+        blockOutputStream.getBufferPool().computeBufferData());
     Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
     Assert.assertEquals(dataLength,
         blockOutputStream.getTotalDataFlushedLength());
