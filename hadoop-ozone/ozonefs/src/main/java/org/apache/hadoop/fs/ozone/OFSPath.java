@@ -24,7 +24,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.http.ParseException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.http.client.utils.URIBuilder;
 
 import java.math.BigInteger;
 import java.net.URI;
@@ -256,14 +255,13 @@ class OFSPath {
   public Path getTrashRoot() {
     try {
       String username = UserGroupInformation.getCurrentUser().getUserName();
-      URI uri = new URIBuilder().setScheme(OZONE_OFS_URI_SCHEME)
-          .setHost(authority).setPath(OZONE_URI_DELIMITER + volumeName +
-              OZONE_URI_DELIMITER + bucketName +
-              OZONE_URI_DELIMITER + TRASH_PREFIX +
-              OZONE_URI_DELIMITER + username)
-          .build();
-      return new Path(uri);
-    } catch (Exception ex) {
+      final Path pathRoot = new Path(
+          OZONE_OFS_URI_SCHEME, authority, OZONE_URI_DELIMITER);
+      final Path pathToVolume = new Path(pathRoot, volumeName);
+      final Path pathToBucket = new Path(pathToVolume, bucketName);
+      final Path pathToTrash = new Path(pathToBucket, TRASH_PREFIX);
+      return new Path(pathToTrash, username);
+    } catch (IOException ex) {
       throw new RuntimeException("getTrashRoot failed.", ex);
     }
   }
