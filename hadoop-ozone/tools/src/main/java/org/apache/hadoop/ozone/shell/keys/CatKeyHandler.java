@@ -18,10 +18,6 @@
 
 package org.apache.hadoop.ozone.shell.keys;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
-
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -48,13 +44,10 @@ public class CatKeyHandler extends KeyHandler {
     String bucketName = address.getBucketName();
     String keyName = address.getKeyName();
 
-    int chunkSize = (int) getConf().getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY,
-        OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
-
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = vol.getBucket(bucketName);
     try (InputStream input = bucket.readKey(keyName)) {
-      IOUtils.copyBytes(input, System.out, chunkSize);
+      IOUtils.copyBytes(input, System.out, 4096);
     }
   }
 }
