@@ -206,20 +206,13 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     }
   }
 
-  void shutdownOzoneManager(int omNodeIndex) {
-    OzoneManager ozoneManager = ozoneManagers.get(omNodeIndex);
+  public void shutdownOzoneManager(OzoneManager ozoneManager) {
     LOG.info("Shutting down OzoneManager " + ozoneManager.getOMNodeId());
 
     ozoneManager.stop();
   }
 
-  void restartOzoneManager(int omNodeIndex, boolean waitForOM)
-      throws IOException, TimeoutException, InterruptedException {
-    OzoneManager ozoneManager = ozoneManagers.get(omNodeIndex);
-    restartOzoneManager(ozoneManager, waitForOM);
-  }
-
-  void restartOzoneManager(OzoneManager ozoneManager, boolean waitForOM)
+  public void restartOzoneManager(OzoneManager ozoneManager, boolean waitForOM)
       throws IOException, TimeoutException, InterruptedException {
     LOG.info("Restarting OzoneManager " + ozoneManager.getOMNodeId());
     ozoneManager.restart();
