@@ -1573,6 +1573,15 @@
   </property>
 
   <property>
+    <name>ozone.client.read.timeout</name>
+    <value>30s</value>
+    <tag>OZONE, CLIENT, MANAGEMENT</tag>
+    <description>
+      Timeout for ozone grpc client during read.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.lock.fair</name>
     <value>false</value>
     <description>If this is true, the Ozone Manager lock will be used in Fair
