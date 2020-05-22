@@ -319,7 +319,7 @@ public class TestBlockOutputStreamWithFailures {
     String dataString = new String(data1, UTF_8);
     validateData(keyName, dataString.concat(dataString).getBytes());
   }
-
+  
   @Test
   public void test2DatanodesFailure() throws Exception {
     String keyName = getKeyName();
