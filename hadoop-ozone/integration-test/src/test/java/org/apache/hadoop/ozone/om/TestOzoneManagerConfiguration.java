@@ -24,6 +24,7 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
+import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftPeer;
@@ -38,8 +39,9 @@ import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * Tests OM related configurations.
@@ -235,6 +237,89 @@ public class TestOzoneManagerConfiguration {
       case omNode3Id :
         // Ratis port is not set for node3. So it should take the default port
         expectedPeerAddress = "124.0.0.124:9898";
+        break;
+      default : Assert.fail("Unrecognized RaftPeerId");
+      }
+      Assert.assertEquals(expectedPeerAddress, peer.getAddress());
+    }
+  }
+
+  /**
+   * Test configurating an OM service with three OM nodes.
+   * @throws Exception
+   */
+  @Test
+  public void testOMHAWithUnresolvedAddresses() throws Exception {
+    // Set the configuration for 3 node OM service. Set one node's rpc
+    // address to localhost. OM will parse all configurations and find the
+    // nodeId representing the localhost
+
+    final String omServiceId = "om-test-unresolved-addresses";
+    final String omNode1Id = "omNode1";
+    final String omNode2Id = "omNode2";
+    final String omNode3Id = "omNode3";
+    final String node1Hostname = "node1.example.com";
+    final String node3Hostname = "node3.example.com";
+
+    String omNodesKeyValue = omNode1Id + "," + omNode2Id + "," + omNode3Id;
+    String omNodesKey = OmUtils.addKeySuffixes(
+        OMConfigKeys.OZONE_OM_NODES_KEY, omServiceId);
+
+    String omNode1RpcAddrKey = getOMAddrKeyWithSuffix(omServiceId, omNode1Id);
+    String omNode2RpcAddrKey = getOMAddrKeyWithSuffix(omServiceId, omNode2Id);
+    String omNode3RpcAddrKey = getOMAddrKeyWithSuffix(omServiceId, omNode3Id);
+
+    String omNode3RatisPortKey = OmUtils.addKeySuffixes(
+        OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, omServiceId, omNode3Id);
+
+    conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
+    conf.set(omNodesKey, omNodesKeyValue);
+
+    // Set node2 to localhost and the other two nodes to dummy addresses
+    conf.set(omNode1RpcAddrKey, node1Hostname + ":9862");
+    conf.set(omNode2RpcAddrKey, "0.0.0.0:9862");
+    conf.set(omNode3RpcAddrKey, node3Hostname + ":9804");
+
+    conf.setInt(omNode3RatisPortKey, 9898);
+
+    startCluster();
+    om = cluster.getOzoneManager();
+    omRatisServer = om.getOmRatisServer();
+
+    // Verify Peer details
+    List<OMNodeDetails> peerNodes = om.getPeerNodes();
+    for (OMNodeDetails peerNode : peerNodes) {
+      Assert.assertTrue(peerNode.isHostUnresolved());
+      Assert.assertNull(peerNode.getInetAddress());
+    }
+
+    Assert.assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
+
+    // OM's Ratis server should have 3 peers in its RaftGroup
+    Collection<RaftPeer> peers = omRatisServer.getRaftGroup().getPeers();
+    Assert.assertEquals(3, peers.size());
+
+    // Ratis server RaftPeerId should match with omNode2 ID as node2 is the
+    // localhost
+    Assert.assertEquals(omNode2Id, omRatisServer.getRaftPeerId().toString());
+
+    // Verify peer details
+    for (RaftPeer peer : peers) {
+      String expectedPeerAddress = null;
+
+      switch (peer.getId().toString()) {
+      case omNode1Id :
+        // Ratis port is not set for node1. So it should take the default port
+        expectedPeerAddress = node1Hostname + ":" +
+            OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
+        break;
+      case omNode2Id :
+        expectedPeerAddress = "0.0.0.0:"+
+            OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
+        break;
+      case omNode3Id :
+        // Ratis port is not set for node3. So it should take the default port
+        expectedPeerAddress = node3Hostname + ":9898";
         break;
       default : Assert.fail("Unrecognized RaftPeerId");
       }

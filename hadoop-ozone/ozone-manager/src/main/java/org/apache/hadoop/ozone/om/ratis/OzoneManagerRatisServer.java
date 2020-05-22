@@ -320,7 +320,7 @@ public final class OzoneManagerRatisServer {
       RaftPeerId raftPeerId = RaftPeerId.valueOf(peerNodeId);
       RaftPeer raftPeer;
       if (peerInfo.isHostUnresolved()) {
-        raftPeer = new RaftPeer(raftPeerId, peerInfo.getHostPortStr());
+        raftPeer = new RaftPeer(raftPeerId, peerInfo.getRatisHostPortStr());
       } else {
         InetSocketAddress peerRatisAddr = new InetSocketAddress(
             peerInfo.getInetAddress(), peerInfo.getRatisPort());

@@ -141,11 +141,11 @@ public final class OMNodeDetails {
     return rpcAddress.getHostName();
   }
 
-  public String getHostPortStr() {
+  public String getRatisHostPortStr() {
     StringBuilder hostPort = new StringBuilder();
     hostPort.append(getHostName())
         .append(":")
-        .append(rpcPort);
+        .append(ratisPort);
     return hostPort.toString();
   }
 
