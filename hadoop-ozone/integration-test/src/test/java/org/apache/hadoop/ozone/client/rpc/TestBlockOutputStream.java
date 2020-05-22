@@ -49,8 +49,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 
 /**
  * Tests BlockOutputStream class.
- * This class is used to test the behavior of the OutputStream(
- * ozone.client.stream.buffer.flush.delay=false).
  */
 public class TestBlockOutputStream {
   private static MiniOzoneCluster cluster;
