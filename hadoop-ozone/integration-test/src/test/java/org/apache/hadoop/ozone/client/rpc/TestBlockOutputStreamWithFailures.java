@@ -42,7 +42,6 @@ import org.apache.ratis.protocol.RaftRetryFailureException;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -317,8 +316,7 @@ public class TestBlockOutputStreamWithFailures {
     String dataString = new String(data1, UTF_8);
     validateData(keyName, dataString.concat(dataString).getBytes());
   }
-
-  @Ignore("Will be fixed via https://issues.apache.org/jira/browse/HDDS-3629")
+  
   @Test
   public void test2DatanodesFailure() throws Exception {
     String keyName = getKeyName();
