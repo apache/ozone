@@ -330,6 +330,7 @@ message RecoverTrashRequest {
     required string bucketName = 2;
     required string keyName = 3;
     required string destinationBucket = 4;
+    optional uint64 modificationTime = 5;
 }
 
 message RecoverTrashResponse {

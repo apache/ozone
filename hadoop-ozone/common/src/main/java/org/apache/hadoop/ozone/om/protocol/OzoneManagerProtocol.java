@@ -494,9 +494,11 @@ public interface OzoneManagerProtocol
    * @param volumeName - The volume name.
    * @param bucketName - The bucket name.
    * @param keyName - The key user want to recover.
-   * @param destinationBucket - The bucket user want to recover to.
+   * @param destinationBucket - The bucket under volumeName
+   *                         user want to recover to.
    * @return The result of recovering operation is success or not.
    * @throws IOException
+   * TODO: throw NotImplementedException when cleanup old write path.
    */
   default boolean recoverTrash(String volumeName, String bucketName,
       String keyName, String destinationBucket) throws IOException {

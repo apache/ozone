@@ -20,10 +20,19 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
 
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.key.OMTrashRecoverResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,10 +45,14 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .RecoverTrashResponse;
 
+
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.RECOVERED_KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
+    .RECOVERED_KEY_NOT_FOUND;
 
 /**
  * Handles RecoverTrash request.
@@ -58,7 +71,13 @@ public class OMTrashRecoverRequest extends OMKeyRequest {
         .getRecoverTrashRequest();
     Preconditions.checkNotNull(recoverTrashRequest);
 
-    return getOmRequest().toBuilder().build();
+    long modificationTime = Time.now();
+
+    return getOmRequest().toBuilder()
+        .setRecoverTrashRequest(
+            recoverTrashRequest.toBuilder()
+                .setModificationTime(modificationTime))
+        .setUserInfo(getUserInfo()).build();
   }
 
   @Override
@@ -78,13 +97,14 @@ public class OMTrashRecoverRequest extends OMKeyRequest {
      *  OMMetrics omMetrics = ozoneManager.getMetrics();
      */
 
-    OMResponse.Builder omResponse = OMResponse.newBuilder()
-        .setCmdType(Type.RecoverTrash).setStatus(Status.OK)
-        .setSuccess(true);
+    OMResponse.Builder omResponse = OmResponseUtil
+        .getOMResponseBuilder(getOmRequest());
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean acquireLock = false;
     OMClientResponse omClientResponse = null;
+    //TODO: HDDS-2818. New Metrics for Trash Key Recover and Fails.
+    Result result = null;
     try {
       // Check acl for the destination bucket.
       checkBucketAcls(ozoneManager, volumeName, destinationBucket, keyName,
@@ -93,31 +113,89 @@ public class OMTrashRecoverRequest extends OMKeyRequest {
       acquireLock = omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, destinationBucket);
 
-      // Validate.
+      // Validate original vol/buc, destinationBucket exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       validateBucketAndVolume(omMetadataManager, volumeName, destinationBucket);
 
+      // TODO: HDDS-2425. recovering trash in non-existing bucket.
 
-      /** TODO: HDDS-2425. HDDS-2426.
-       *  Update cache.
-       *    omMetadataManager.getKeyTable().addCacheEntry(
-       *    new CacheKey<>(),
-       *    new CacheValue<>()
-       *    );
-       *
-       *  Execute recovering trash in non-existing bucket.
-       *  Execute recovering trash in existing bucket.
-       *    omClientResponse = new OMTrashRecoverResponse(omKeyInfo,
-       *    omResponse.setRecoverTrashResponse(
-       *    RecoverTrashResponse.newBuilder())
-       *    .build());
-       */
-      omClientResponse = null;
+      String trashTableKey = omMetadataManager
+          .getOzoneKey(volumeName, bucketName, keyName);
+      RepeatedOmKeyInfo trashRepeatedKeyInfo =
+          omMetadataManager.getTrashTable().get(trashTableKey);
+      OmKeyInfo trashKeyInfo = null;
+      if (trashRepeatedKeyInfo != null) {
+        int lastKeyIndex = trashRepeatedKeyInfo.getOmKeyInfoList().size() - 1;
+        trashKeyInfo = trashRepeatedKeyInfo
+            .getOmKeyInfoList().get(lastKeyIndex);
+        // update modificationTime after recovering.
+        trashKeyInfo.setModificationTime(
+            recoverTrashRequest.getModificationTime());
 
+        // Check this transaction is replayed or not.
+        if (isReplay(ozoneManager, trashKeyInfo, transactionLogIndex)) {
+          throw new OMReplayException();
+        }
+
+        // Set the updateID to current transactionLogIndex.
+        trashKeyInfo.setUpdateID(transactionLogIndex,
+            ozoneManager.isRatisEnabled());
+
+        // Update cache of keyTable,
+        if (omMetadataManager.getKeyTable().get(trashTableKey) != null) {
+          throw new OMException(
+              "The bucket has key of same name as recovered key",
+              RECOVERED_KEY_ALREADY_EXISTS);
+        } else {
+          omMetadataManager.getKeyTable().addCacheEntry(
+              new CacheKey<>(trashTableKey),
+              new CacheValue<>(Optional.of(trashKeyInfo), transactionLogIndex));
+        }
+
+        // Update cache of trashTable.
+        trashRepeatedKeyInfo.getOmKeyInfoList().remove(lastKeyIndex);
+        omMetadataManager.getTrashTable().addCacheEntry(
+            new CacheKey<>(trashTableKey),
+            new CacheValue<>(Optional.of(trashRepeatedKeyInfo),
+                transactionLogIndex));
+
+        // Update cache of deletedTable.
+        omMetadataManager.getDeletedTable().addCacheEntry(
+            new CacheKey<>(trashTableKey),
+            new CacheValue<>(Optional.of(trashRepeatedKeyInfo),
+                transactionLogIndex));
+
+        omResponse.setSuccess(true);
+
+      } else {
+        /* key we want to recover not exist */
+        throw new OMException("Recovered key is not in trash table",
+            RECOVERED_KEY_NOT_FOUND);
+      }
+
+      result = Result.SUCCESS;
+      omClientResponse = new OMTrashRecoverResponse(trashRepeatedKeyInfo,
+          trashKeyInfo,
+          omResponse.setRecoverTrashResponse(
+              RecoverTrashResponse.newBuilder().setResponse(true))
+              .build());
+
+    } catch (OMException | OMReplayException ex) {
+      LOG.error("Fail for recovering trash.", ex);
+      if (ex instanceof OMReplayException) {
+        omClientResponse = new OMTrashRecoverResponse(null, null,
+            createReplayOMResponse(omResponse));
+        result = Result.REPLAY;
+      } else {
+        omClientResponse = new OMTrashRecoverResponse(null, null,
+            createErrorOMResponse(omResponse, ex));
+        result = Result.FAILURE;
+      }
     } catch (IOException ex) {
       LOG.error("Fail for recovering trash.", ex);
-      omClientResponse = new OMTrashRecoverResponse(null,
+      omClientResponse = new OMTrashRecoverResponse(null, null,
           createErrorOMResponse(omResponse, ex));
+      result = Result.FAILURE;
     } finally {
       if (omClientResponse != null) {
         omClientResponse.setFlushFuture(

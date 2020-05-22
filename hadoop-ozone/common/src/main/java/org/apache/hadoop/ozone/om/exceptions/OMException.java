@@ -223,6 +223,12 @@ public class OMException extends IOException {
 
     INVALID_VOLUME_NAME,
 
-    REPLAY // When ratis logs are replayed.
+    REPLAY, // When ratis logs are replayed.
+
+    // When recovering key that not in deletedTable.
+    RECOVERED_KEY_NOT_FOUND,
+
+    // When recovering key that has key of same name in bucket.
+    RECOVERED_KEY_ALREADY_EXISTS
   }
 }

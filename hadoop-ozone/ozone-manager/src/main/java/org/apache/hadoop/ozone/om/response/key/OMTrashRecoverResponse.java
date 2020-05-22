@@ -18,13 +18,14 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .Status;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
@@ -36,29 +37,38 @@ import javax.annotation.Nonnull;
  */
 public class OMTrashRecoverResponse extends OMClientResponse {
   private OmKeyInfo omKeyInfo;
+  private RepeatedOmKeyInfo trashRepeatedKeyInfo;
 
-  public OMTrashRecoverResponse(@Nullable OmKeyInfo omKeyInfo,
+  public OMTrashRecoverResponse(
+      @Nullable RepeatedOmKeyInfo trashRepeatedKeyInfo,
+      @Nullable OmKeyInfo omKeyInfo,
       @Nonnull OMResponse omResponse) {
     super(omResponse);
+    this.trashRepeatedKeyInfo = trashRepeatedKeyInfo;
     this.omKeyInfo = omKeyInfo;
   }
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
+    // For omResponse with non-OK status, we do nothing.
+    if (getOMResponse().getStatus() == Status.OK) {
+      String trashTableKey = omMetadataManager.getOzoneKey(
+          omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
+          omKeyInfo.getKeyName());
 
-      /* TODO: HDDS-2425. HDDS-2426. */
-    String trashKey = omMetadataManager
-        .getOzoneKey(omKeyInfo.getVolumeName(),
-            omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
-    RepeatedOmKeyInfo repeatedOmKeyInfo = omMetadataManager
-        .getDeletedTable().get(trashKey);
-    omKeyInfo = OmUtils.prepareKeyForRecover(omKeyInfo, repeatedOmKeyInfo);
-    omMetadataManager.getDeletedTable()
-        .deleteWithBatch(batchOperation, omKeyInfo.getKeyName());
-    /* TODO: trashKey should be updated to destinationBucket. */
-    omMetadataManager.getKeyTable()
-        .putWithBatch(batchOperation, trashKey, omKeyInfo);
+      // Update keyTable in OMDB.
+      omMetadataManager.getKeyTable()
+          .putWithBatch(batchOperation, trashTableKey, omKeyInfo);
+
+      // Update trashTable in OMDB
+      omMetadataManager.getTrashTable()
+          .putWithBatch(batchOperation, trashTableKey, trashRepeatedKeyInfo);
+
+      // Update deletedTable in OMDB
+      omMetadataManager.getDeletedTable()
+          .putWithBatch(batchOperation, trashTableKey, trashRepeatedKeyInfo);
+    }
   }
 
 }

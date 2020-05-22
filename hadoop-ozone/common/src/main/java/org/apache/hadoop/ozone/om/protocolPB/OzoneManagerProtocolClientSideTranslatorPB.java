@@ -1396,19 +1396,19 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   public boolean recoverTrash(String volumeName, String bucketName,
       String keyName, String destinationBucket) throws IOException {
 
-    Preconditions.checkArgument(Strings.isNullOrEmpty(volumeName),
+    Preconditions.checkArgument(!Strings.isNullOrEmpty(volumeName),
         "The volume name cannot be null or empty. " +
         "Please enter a valid volume name.");
 
-    Preconditions.checkArgument(Strings.isNullOrEmpty(bucketName),
+    Preconditions.checkArgument(!Strings.isNullOrEmpty(bucketName),
         "The bucket name cannot be null or empty. " +
         "Please enter a valid bucket name.");
 
-    Preconditions.checkArgument(Strings.isNullOrEmpty(keyName),
+    Preconditions.checkArgument(!Strings.isNullOrEmpty(keyName),
         "The key name cannot be null or empty. " +
         "Please enter a valid key name.");
 
-    Preconditions.checkArgument(Strings.isNullOrEmpty(destinationBucket),
+    Preconditions.checkArgument(!Strings.isNullOrEmpty(destinationBucket),
         "The destination bucket name cannot be null or empty. " +
         "Please enter a valid destination bucket name.");
 
@@ -1424,6 +1424,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     RecoverTrashResponse recoverResponse =
         handleError(submitRequest(omRequest)).getRecoverTrashResponse();
+    recoverResponse.toBuilder().setResponse(true).build();
 
     return recoverResponse.getResponse();
   }
