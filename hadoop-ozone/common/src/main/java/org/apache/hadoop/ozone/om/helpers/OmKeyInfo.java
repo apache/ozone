@@ -30,6 +30,7 @@ import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FileHandle;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.util.Time;
 
@@ -52,6 +53,7 @@ public final class OmKeyInfo extends WithObjectID {
   private HddsProtos.ReplicationType type;
   private HddsProtos.ReplicationFactor factor;
   private FileEncryptionInfo encInfo;
+  private long fileHandleInfo;
 
   /**
    * ACL Information.
@@ -66,7 +68,7 @@ public final class OmKeyInfo extends WithObjectID {
       HddsProtos.ReplicationFactor factor,
       Map<String, String> metadata,
       FileEncryptionInfo encInfo, List<OzoneAcl> acls,
-      long objectID, long updateID) {
+      long objectID, long updateID, long fileHandleInfo) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyName = keyName;
@@ -92,6 +94,11 @@ public final class OmKeyInfo extends WithObjectID {
     this.acls = acls;
     this.objectID = objectID;
     this.updateID = updateID;
+    if (fileHandleInfo != 0) {
+      this.fileHandleInfo = fileHandleInfo;
+    } else {
+      this.fileHandleInfo = objectID;
+    }
   }
 
   public String getVolumeName() {
@@ -137,6 +144,14 @@ public final class OmKeyInfo extends WithObjectID {
 
   public void updateModifcationTime() {
     this.modificationTime = Time.monotonicNow();
+  }
+
+  public long getFileHandleInfo() {
+    return fileHandleInfo;
+  }
+
+  public void setFileHandleInfo(long fileHandleInfo) {
+    this.fileHandleInfo = fileHandleInfo;
   }
 
   /**
@@ -271,6 +286,7 @@ public final class OmKeyInfo extends WithObjectID {
     private List<OzoneAcl> acls;
     private long objectID;
     private long updateID;
+    private long fileHandleInfo;
 
     public Builder() {
       this.metadata = new HashMap<>();
@@ -368,6 +384,11 @@ public final class OmKeyInfo extends WithObjectID {
       return this;
     }
 
+    public Builder setFileHandleInfo(long fh) {
+      this.fileHandleInfo = fh;
+      return this;
+    }
+
     public Builder setUpdateID(long id) {
       this.updateID = id;
       return this;
@@ -377,13 +398,15 @@ public final class OmKeyInfo extends WithObjectID {
       return new OmKeyInfo(
           volumeName, bucketName, keyName, omKeyLocationInfoGroups,
           dataSize, creationTime, modificationTime, type, factor, metadata,
-          encInfo, acls, objectID, updateID);
+          encInfo, acls, objectID, updateID, fileHandleInfo);
     }
   }
 
   public KeyInfo getProtobuf() {
     long latestVersion = keyLocationVersions.size() == 0 ? -1 :
         keyLocationVersions.get(keyLocationVersions.size() - 1).getVersion();
+    FileHandle.Builder fb = FileHandle.newBuilder()
+        .setFhObjectID(fileHandleInfo);
     KeyInfo.Builder kb = KeyInfo.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -400,7 +423,8 @@ public final class OmKeyInfo extends WithObjectID {
         .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
         .addAllAcls(OzoneAclUtil.toProtobuf(acls))
         .setObjectID(objectID)
-        .setUpdateID(updateID);
+        .setUpdateID(updateID)
+        .setFileHandleInfo(fb.build());
     if (encInfo != null) {
       kb.setFileEncryptionInfo(OMPBHelper.convert(encInfo));
     }
@@ -432,6 +456,12 @@ public final class OmKeyInfo extends WithObjectID {
     }
     if (keyInfo.hasUpdateID()) {
       builder.setUpdateID(keyInfo.getUpdateID());
+    }
+    if (keyInfo.hasFileHandleInfo()) {
+      FileHandle fh = keyInfo.getFileHandleInfo();
+      if (fh.hasFhObjectID()) {
+        builder.setFileHandleInfo(fh.getFhObjectID());
+      }
     }
     return builder.build();
   }
@@ -471,7 +501,9 @@ public final class OmKeyInfo extends WithObjectID {
         Objects.equals(metadata, omKeyInfo.metadata) &&
         Objects.equals(acls, omKeyInfo.acls) &&
         objectID == omKeyInfo.objectID &&
-        updateID == omKeyInfo.updateID;
+        updateID == omKeyInfo.updateID &&
+        (fileHandleInfo != 0 ?
+            fileHandleInfo == omKeyInfo.fileHandleInfo : true);
   }
 
   @Override
@@ -493,8 +525,9 @@ public final class OmKeyInfo extends WithObjectID {
         .setReplicationType(type)
         .setReplicationFactor(factor)
         .setFileEncryptionInfo(encInfo)
-        .setObjectID(objectID).setUpdateID(updateID);
-
+        .setObjectID(objectID)
+        .setUpdateID(updateID)
+        .setFileHandleInfo(fileHandleInfo);
 
     keyLocationVersions.forEach(keyLocationVersion -> {
       List<OmKeyLocationInfo> keyLocationInfos = new ArrayList<>();

@@ -56,6 +56,8 @@ public class TestOmKeyInfo {
         .setReplicationType(ReplicationType.RATIS)
         .addMetadata("key1", "value1")
         .addMetadata("key2", "value2")
+        .addMetadata("key2", "value2")
+        .setFileHandleInfo(1234L)
         .build();
 
     OmKeyInfo keyAfterSerialization =
@@ -79,9 +81,12 @@ public class TestOmKeyInfo {
         .addMetadata("key2", "value2")
         .setOmKeyLocationInfos(
             Collections.singletonList(createOmKeyLocationInfoGroup()))
+        .setFileHandleInfo(1234L)
         .build();
 
     OmKeyInfo cloneKey = key.copyObject();
+
+    Assert.assertEquals(key.getFileHandleInfo(), cloneKey.getFileHandleInfo());
 
     // Because for OmKeyLocationInfoGroup we have not implemented equals()
     // method, so it checks only references.

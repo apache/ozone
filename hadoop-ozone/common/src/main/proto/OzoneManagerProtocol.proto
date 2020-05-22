@@ -719,6 +719,11 @@ message KeyLocationList {
     optional FileEncryptionInfoProto fileEncryptionInfo = 3;
 }
 
+message FileHandle {
+    optional uint64 fhObjectID = 1;
+    optional string fhObjectStr = 2;
+}
+
 message KeyInfo {
     required string volumeName = 1;
     required string bucketName = 2;
@@ -735,6 +740,7 @@ message KeyInfo {
     repeated OzoneAclInfo acls = 13;
     optional uint64 objectID = 14;
     optional uint64 updateID = 15;
+    optional FileHandle fileHandleInfo = 16;
 }
 
 message RepeatedKeyInfo {
@@ -992,6 +998,7 @@ message MultipartKeyInfo {
     repeated PartKeyInfo partKeyInfoList = 5;
     optional uint64 objectID = 6;
     optional uint64 updateID = 7;
+    optional FileHandle fileHandleInfo = 8;
 }
 
 message PartKeyInfo {
