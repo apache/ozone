@@ -1,13 +1,16 @@
-NoiseInjector
-==============
+Fault Injection Service
+========================
 
 About
 ------
-TBD
+Fault Injection Service is designed to validate Ozone under heavy stress and
+failed or failing system components. This service runs independently of Ozone
+and offers a client tool to inject errors.
 
 Development Status                                                              
 ------------------
-TBD
+Currently this service can inject errors on the IO path. The next step would be
+to add ability to inject similar errors on the network path as well.
 
 Supported Platforms                                                             
 ------------------- 
