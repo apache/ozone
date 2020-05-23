@@ -850,7 +850,7 @@ public class TestSCMNodeManager {
     final long remaining = capacity - used;
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
-    EventQueue eventQueue = (EventQueue) scm.getEventQueue();
+      EventQueue eventQueue = (EventQueue) scm.getEventQueue();
       for (int x = 0; x < nodeCount; x++) {
         DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
         UUID dnId = dn.getUuid();
