@@ -114,6 +114,12 @@ Test key handling
                     Execute             rm -f /tmp/NOTICE.txt.1
                     Execute             ozone sh key get ${protocol}${server}/${volume}/bb1/key1 /tmp/NOTICE.txt.1
                     Execute             diff -q /opt/hadoop/NOTICE.txt /tmp/NOTICE.txt.1
+                    Execute             ozone sh key put ${protocol}${server}/${volume}/bb1/key1_STAND_ALONE /opt/hadoop/NOTICE.txt
+                    Execute             rm -f /tmp/key1_STAND_ALONE
+                    Execute             ozone sh key get ${protocol}${server}/${volume}/bb1/key1_STAND_ALONE /tmp/key1_STAND_ALONE
+                    Execute             diff -q /opt/hadoop/NOTICE.txt /tmp/key1_STAND_ALONE
+    ${result} =     Execute             ozone sh key info ${protocol}${server}/${volume}/bb1/key1_STAND_ALONE | jq -r '. | select(.name=="key1_STAND_ALONE")'
+                    Should contain      ${result}       STAND_ALONE
     ${result} =     Execute And Ignore Error    ozone sh key get ${protocol}${server}/${volume}/bb1/key1 /tmp/NOTICE.txt.1
                     Should Contain      ${result}       NOTICE.txt.1 exists
     ${result} =     Execute             ozone sh key get --force ${protocol}${server}/${volume}/bb1/key1 /tmp/NOTICE.txt.1
