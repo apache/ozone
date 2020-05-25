@@ -30,8 +30,11 @@ import org.apache.ratis.protocol.Message;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.statemachine.impl.BaseStateMachine;
 
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocolProtos.RequestType;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 
+/**
+ * TODO.
+ */
 public class SCMStateMachine extends BaseStateMachine {
 
   private final Map<RequestType, Object> handlers;

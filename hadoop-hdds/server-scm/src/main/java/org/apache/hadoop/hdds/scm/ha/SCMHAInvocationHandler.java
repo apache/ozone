@@ -21,23 +21,28 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocolProtos.RequestType;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * InvocationHandler which checks for {@link Replicate} annotation and
+ * dispatches the request to Ratis Server.
+ */
 public class SCMHAInvocationHandler implements InvocationHandler {
 
 
-  private static final Logger LOG = LoggerFactory.getLogger(SCMHAInvocationHandler.class);
+  private static final Logger LOG = LoggerFactory
+      .getLogger(SCMHAInvocationHandler.class);
 
   private final RequestType requestType;
   private final Object localHandler;
   private final SCMRatisServer ratisHandler;
 
   /**
-   *
+   * TODO.
    */
   public SCMHAInvocationHandler(final RequestType requestType,
                                 final Object localHandler,
@@ -61,12 +66,18 @@ public class SCMHAInvocationHandler implements InvocationHandler {
     }
   }
 
+  /**
+   * TODO.
+   */
   private Object invokeLocal(Method method, Object[] args)
       throws InvocationTargetException, IllegalAccessException {
     LOG.trace("Invoking method {} on target {}", method, localHandler);
     return method.invoke(method, args);
   }
 
+  /**
+   * TODO.
+   */
   private Object invokeRatis(Method method, Object[] args)
       throws Exception {
     LOG.trace("Invoking method {} on target {}", method, ratisHandler);

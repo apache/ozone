@@ -17,7 +17,7 @@
  */
 
 option java_package = "org.apache.hadoop.hdds.protocol.proto";
-option java_outer_classname = "SCMRatisProtocolProtos";
+option java_outer_classname = "SCMRatisProtocol";
 option java_generate_equals_and_hash = true;
 
 enum RequestType {

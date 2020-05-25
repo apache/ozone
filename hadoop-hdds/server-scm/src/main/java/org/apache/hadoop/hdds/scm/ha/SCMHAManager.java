@@ -21,30 +21,55 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 
 import java.io.IOException;
 
+/**
+ * SCMHAManager provides HA service for SCM.
+ *
+ * It uses Apache Ratis for HA implementation. We will have a 2N+1
+ * node Ratis ring. The Ratis ring will have one Leader node and 2N follower
+ * nodes.
+ *
+ * TODO
+ *
+ */
 public class SCMHAManager {
 
   private static boolean isLeader = true;
 
   private final SCMRatisServer ratisServer;
 
-  public SCMHAManager(ConfigurationSource conf) throws IOException {
+  /**
+   * Creates SCMHAManager instance.
+   */
+  public SCMHAManager(final ConfigurationSource conf) throws IOException {
     this.ratisServer = new SCMRatisServer(
         conf.getObject(SCMHAConfiguration.class), conf);
   }
 
+  /**
+   * Starts HA service.
+   */
+  public void start() throws IOException {
+    ratisServer.start();
+  }
+
+  /**
+   * Returns true if the current SCM is the leader.
+   */
   public static boolean isLeader() {
     return isLeader;
   }
 
-  public void startRatisServer() throws IOException {
-    ratisServer.start();
-  }
-
+  /**
+   * Returns RatisServer instance associated with the SCM instance.
+   */
   public SCMRatisServer getRatisServer() {
     return ratisServer;
   }
 
-  public void stopRatisServer() throws IOException {
+  /**
+   * Stops the HA service.
+   */
+  public void shutdown() throws IOException {
     ratisServer.stop();
   }
 

@@ -24,11 +24,14 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.GeneratedMessage;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.ProtocolMessageEnum;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocolProtos.SCMRatisResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.SCMRatisResponseProto;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
 
-public class SCMRatisResponse {
+/**
+ * Represents the response from RatisServer.
+ */
+public final class SCMRatisResponse {
 
   private final boolean success;
   private final Object result;
@@ -98,14 +101,14 @@ public class SCMRatisResponse {
     final SCMRatisResponseProto responseProto =
         SCMRatisResponseProto.parseFrom(response);
     try {
-      final Class<?> clazz = HAUtil.getClass(responseProto.getType());
+      final Class<?> clazz = ReflectionUtil.getClass(responseProto.getType());
       if (GeneratedMessage.class.isAssignableFrom(clazz)) {
-        return HAUtil.getMethod(clazz, "parseFrom", byte[].class)
+        return ReflectionUtil.getMethod(clazz, "parseFrom", byte[].class)
             .invoke(null, (Object) responseProto.getValue().toByteArray());
       }
 
       if (Enum.class.isAssignableFrom(clazz)) {
-        return HAUtil.getMethod(clazz, "valueOf", int.class)
+        return ReflectionUtil.getMethod(clazz, "valueOf", int.class)
             .invoke(null, new BigInteger(
                 responseProto.getValue().toByteArray()).intValue());
       }

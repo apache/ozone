@@ -56,19 +56,20 @@ public interface ContainerStateManagerV2 {
   /**
    *
    */
-  ContainerInfo getContainer(final ContainerID containerID)
+  ContainerInfo getContainer(ContainerID containerID)
       throws ContainerNotFoundException;
 
   /**
    *
    */
-  Set<ContainerReplica> getContainerReplicas(
-      final ContainerID containerID) throws ContainerNotFoundException;
+  Set<ContainerReplica> getContainerReplicas(ContainerID containerID)
+      throws ContainerNotFoundException;
 
   /**
    *
    */
   @Replicate
-  void addContainer(final ContainerInfoProto containerInfo) throws IOException;
+  void addContainer(ContainerInfoProto containerInfo)
+      throws IOException;
 
 }

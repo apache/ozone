@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import java.net.InetSocketAddress;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
@@ -86,7 +87,7 @@ public class SCMHAConfiguration {
       description = "The size of the buffer which is preallocated for" +
           " raft segment used by Apache Ratis on SCM.(16 KB by default)"
   )
-  private long preallocatedSize = 16 * 1024;
+  private long raftSegmentPreAllocatedSize = 16 * 1024;
 
   @Config(key = "ratis.log.appender.queue.num-elements",
       type = ConfigType.INT,
@@ -94,7 +95,7 @@ public class SCMHAConfiguration {
       tags = {SCM, OZONE, HA, RATIS},
       description = "Number of operation pending with Raft's Log Worker."
   )
-  private int logAppenderQueueNum = 1024;
+  private int raftLogAppenderQueueNum = 1024;
 
   @Config(key = "ratis.log.appender.queue.byte-limit",
       type = ConfigType.SIZE,
@@ -102,7 +103,7 @@ public class SCMHAConfiguration {
       tags = {SCM, OZONE, HA, RATIS},
       description = "Byte limit for Raft's Log Worker queue."
   )
-  private int logAppenderQueueByteLimit = 32 * 1024 * 1024;
+  private int raftLogAppenderQueueByteLimit = 32 * 1024 * 1024;
 
   @Config(key = "ratis.log.purge.gap",
       type = ConfigType.INT,
@@ -111,15 +112,15 @@ public class SCMHAConfiguration {
       description = "The minimum gap between log indices for Raft server to" +
           " purge its log segments after taking snapshot."
   )
-  private int logPurgeGap = 1000000;
+  private int raftLogPurgeGap = 1000000;
 
-  @Config(key = "ratis.server.request.timeout",
+  @Config(key = "ratis.request.timeout",
       type = ConfigType.TIME,
-      defaultValue = "3s",
+      defaultValue = "3000ms",
       tags = {SCM, OZONE, HA, RATIS},
-      description = "The timeout duration for SCM's ratis server request."
+      description = "The timeout duration for SCM's Ratis server RPC."
   )
-  private long requestTimeout = 3 * 1000L;
+  private long ratisRequestTimeout = 3000L;
 
   @Config(key = "ratis.server.retry.cache.timeout",
       type = ConfigType.TIME,
@@ -127,24 +128,17 @@ public class SCMHAConfiguration {
       tags = {SCM, OZONE, HA, RATIS},
       description = "Retry Cache entry timeout for SCM's ratis server."
   )
-  private long retryCacheTimeout = 60 * 1000L;
+  private long ratisRetryCacheTimeout = 60 * 1000L;
 
-  @Config(key = "ratis.minimum.timeout",
-      type = ConfigType.TIME,
-      defaultValue = "1s",
-      tags = {SCM, OZONE, HA, RATIS},
-      description = "The minimum timeout duration for SCM's Ratis server rpc."
-  )
-  private long minTimeout = 1 * 1000L;
 
-  @Config(key = "ratis.leader.election.minimum.timeout.duration",
+  @Config(key = "ratis.leader.election.timeout",
       type = ConfigType.TIME,
       defaultValue = "1s",
       tags = {SCM, OZONE, HA, RATIS},
       description = "The minimum timeout duration for SCM ratis leader" +
           " election. Default is 1s."
   )
-  private long minLeaderElectionTimeout = 1 * 1000L;
+  private long ratisLeaderElectionTimeout = 1 * 1000L;
 
   @Config(key = "ratis.server.failure.timeout.duration",
       type = ConfigType.TIME,
@@ -154,7 +148,7 @@ public class SCMHAConfiguration {
           " detection, once the threshold has reached, the ratis state" +
           " machine will be informed about the failure in the ratis ring."
   )
-  private long failureTimeout = 120 * 1000L;
+  private long ratisNodeFailureTimeout = 120 * 1000L;
 
   @Config(key = "ratis.server.role.check.interval",
       type = ConfigType.TIME,
@@ -165,7 +159,7 @@ public class SCMHAConfiguration {
           " the leader role. The scheduled check is an secondary check to" +
           " ensure that the leader role is updated periodically"
   )
-  private long roleCheckerInterval = 15 * 1000L;
+  private long ratisRoleCheckerInterval = 15 * 1000L;
 
   public String getRatisStorageDir() {
     return ratisStorageDir;
@@ -183,44 +177,49 @@ public class SCMHAConfiguration {
     return raftSegmentSize;
   }
 
-  public long getPreallocatedSize() {
-    return preallocatedSize;
+  public long getRaftSegmentPreAllocatedSize() {
+    return raftSegmentPreAllocatedSize;
   }
 
-  public int getLogAppenderQueueNum() {
-    return logAppenderQueueNum;
+  public int getRaftLogAppenderQueueNum() {
+    return raftLogAppenderQueueNum;
   }
 
-  public int getLogAppenderQueueByteLimit() {
-    return logAppenderQueueByteLimit;
+  public int getRaftLogAppenderQueueByteLimit() {
+    return raftLogAppenderQueueByteLimit;
   }
 
-  public int getLogPurgeGap() {
-    return logPurgeGap;
+  public int getRaftLogPurgeGap() {
+    return raftLogPurgeGap;
   }
 
-  public long getRequestTimeout() {
-    return requestTimeout;
+  public long getRatisRetryCacheTimeout() {
+    return ratisRetryCacheTimeout;
   }
 
-  public long getRetryCacheTimeout() {
-    return retryCacheTimeout;
+  public long getRatisRequestTimeout() {
+    Preconditions.checkArgument(ratisRequestTimeout > 1000L,
+        "Ratis request timeout cannot be less than 1000ms.");
+    return ratisRequestTimeout;
   }
 
-  public long getMinTimeout() {
-    return minTimeout;
+  public long getRatisRequestMinTimeout() {
+    return ratisRequestTimeout - 1000L;
   }
 
-  public long getMinLeaderElectionTimeout() {
-    return minLeaderElectionTimeout;
+  public long getRatisRequestMaxTimeout() {
+    return ratisRequestTimeout + 1000L;
   }
 
-  public long getFailureTimeout() {
-    return failureTimeout;
+  public long getRatisLeaderElectionTimeout() {
+    return ratisLeaderElectionTimeout;
   }
 
+  public long getRatisNodeFailureTimeout() {
+    return ratisNodeFailureTimeout;
+  }
 
-  public long getRoleCheckerInterval() {
-    return roleCheckerInterval;
+  public long getRatisRoleCheckerInterval() {
+    return ratisRoleCheckerInterval;
   }
 }

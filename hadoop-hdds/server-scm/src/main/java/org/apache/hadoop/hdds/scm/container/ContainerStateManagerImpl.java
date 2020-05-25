@@ -28,7 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocolProtos.RequestType;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
@@ -56,7 +56,8 @@ import org.apache.hadoop.ozone.common.statemachine.StateMachine;
 /**
  * TODO: Add javadoc.
  */
-public class ContainerStateManagerImpl implements ContainerStateManagerV2 {
+public final class ContainerStateManagerImpl
+    implements ContainerStateManagerV2 {
 
   /* **********************************************************************
    * Container Life Cycle                                                 *
@@ -109,7 +110,7 @@ public class ContainerStateManagerImpl implements ContainerStateManagerV2 {
    *
    */
   private static final Logger LOG = LoggerFactory.getLogger(
-    ContainerStateManagerImpl.class);
+      ContainerStateManagerImpl.class);
 
   /**
    *
@@ -272,7 +273,8 @@ public class ContainerStateManagerImpl implements ContainerStateManagerV2 {
   }
 
   @Override
-  public void addContainer(final ContainerInfoProto containerInfo) throws IOException {
+  public void addContainer(final ContainerInfoProto containerInfo)
+      throws IOException {
 
     // Change the exception thrown to PipelineNotFound and
     // ClosedPipelineException once ClosedPipelineException is introduced
@@ -342,6 +344,9 @@ public class ContainerStateManagerImpl implements ContainerStateManagerV2 {
     return new Builder();
   }
 
+  /**
+   * Builder for ContainerStateManager.
+   */
   public static class Builder {
     private Configuration conf;
     private PipelineManager pipelineMgr;

@@ -17,6 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.List;
+
 import com.google.common.primitives.Ints;
 import com.google.protobuf.GeneratedMessage;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -26,17 +30,16 @@ import com.google.protobuf.ProtocolMessageEnum;
 
 import org.apache.ratis.protocol.Message;
 
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocolProtos.Method;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocolProtos.MethodArgument;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocolProtos.RequestType;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocolProtos.SCMRatisRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.Method;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.MethodArgument;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.SCMRatisRequestProto;
 
 
-import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.List;
-
-public class SCMRatisRequest {
+/**
+ * Represents the request that is sent to RatisServer.
+ */
+public final class SCMRatisRequest {
 
   private final RequestType type;
   private final String operation;
@@ -55,18 +58,30 @@ public class SCMRatisRequest {
     return new SCMRatisRequest(type, operation, arguments);
   }
 
+  /**
+   * Returns the type of request.
+   */
   public RequestType getType() {
     return type;
   }
 
+  /**
+   * Returns the operation that this request represents.
+   */
   public String getOperation() {
     return operation;
   }
 
+  /**
+   * Returns the arguments encoded in the request.
+   */
   public Object[] getArguments() {
-    return arguments;
+    return arguments.clone();
   }
 
+  /**
+   * Encodes the request into Ratis Message.
+   */
   public Message encode() throws InvalidProtocolBufferException {
     final SCMRatisRequestProto.Builder requestProtoBuilder =
         SCMRatisRequestProto.newBuilder();
@@ -96,6 +111,9 @@ public class SCMRatisRequest {
             requestProtoBuilder.build().toByteArray()));
   }
 
+  /**
+   * Decodes the request from Ratis Message.
+   */
   public static SCMRatisRequest decode(Message message)
       throws InvalidProtocolBufferException {
     final SCMRatisRequestProto requestProto =
@@ -104,12 +122,12 @@ public class SCMRatisRequest {
     List<Object> args = new ArrayList<>();
     for (MethodArgument argument : method.getArgsList()) {
       try {
-        final Class<?> clazz = HAUtil.getClass(argument.getType());
+        final Class<?> clazz = ReflectionUtil.getClass(argument.getType());
         if (GeneratedMessage.class.isAssignableFrom(clazz)) {
-          args.add(HAUtil.getMethod(clazz, "parseFrom", byte[].class)
+          args.add(ReflectionUtil.getMethod(clazz, "parseFrom", byte[].class)
               .invoke(null, (Object) argument.getValue().toByteArray()));
         } else if (Enum.class.isAssignableFrom(clazz)) {
-          args.add(HAUtil.getMethod(clazz, "valueOf", int.class)
+          args.add(ReflectionUtil.getMethod(clazz, "valueOf", int.class)
               .invoke(null, Ints.fromByteArray(
                   argument.getValue().toByteArray())));
         } else {

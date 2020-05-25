@@ -179,7 +179,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             </goals>
             <configuration>
               <protocVersion>${protobuf.version}</protocVersion>
-              <protocCommand>${protoc.path}</protocCommand>
               <imports>
                 <param>
                   ${basedir}/src/main/proto
@@ -194,6 +193,13 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             </configuration>
           </execution>
         </executions>
+      </plugin>
+      <plugin>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-maven-plugin</artifactId>
+        <configuration>
+          <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml</excludeFilterFile>
+        </configuration>
       </plugin>
     </plugins>
     <testResources>

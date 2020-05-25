@@ -175,7 +175,8 @@ public interface ContainerManagerV2 extends Closeable {
    * @return ContainerInfo for the matching container.
    */
   ContainerInfo getMatchingContainer(long size, String owner,
-                                     Pipeline pipeline, List<ContainerID> excludedContainerIDS);
+                                     Pipeline pipeline,
+                                     List<ContainerID> excludedContainerIDS);
 
   /**
    * Once after report processor handler completes, call this to notify

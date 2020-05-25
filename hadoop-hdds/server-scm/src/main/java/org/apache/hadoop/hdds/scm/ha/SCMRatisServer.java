@@ -27,7 +27,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.RaftClientReply;
@@ -38,6 +38,9 @@ import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.RaftServer;
 
+/**
+ * TODO.
+ */
 public class SCMRatisServer {
 
   private final InetSocketAddress address;
@@ -50,8 +53,10 @@ public class SCMRatisServer {
   private final AtomicLong callId = new AtomicLong();
 
 
-  // TODO: Refactor and remove ConfigurationSource and use only SCMHAConfiguration.
-  SCMRatisServer(final SCMHAConfiguration haConf, final ConfigurationSource conf)
+  // TODO: Refactor and remove ConfigurationSource and use only
+  //  SCMHAConfiguration.
+  SCMRatisServer(final SCMHAConfiguration haConf,
+                 final ConfigurationSource conf)
       throws IOException {
     final String scmServiceId = "SCM-HA-Service";
     final String scmNodeId = "localhost";
@@ -60,8 +65,10 @@ public class SCMRatisServer {
     final RaftPeer localRaftPeer = new RaftPeer(raftPeerId, address);
     final List<RaftPeer> raftPeers = new ArrayList<>();
     raftPeers.add(localRaftPeer);
-    final RaftProperties serverProperties = RatisUtil.newRaftProperties(haConf, conf);
-    this.raftGroupId = RaftGroupId.valueOf(UUID.nameUUIDFromBytes(scmServiceId.getBytes(StandardCharsets.UTF_8)));
+    final RaftProperties serverProperties = RatisUtil
+        .newRaftProperties(haConf, conf);
+    this.raftGroupId = RaftGroupId.valueOf(
+        UUID.nameUUIDFromBytes(scmServiceId.getBytes(StandardCharsets.UTF_8)));
     this.raftGroup = RaftGroup.valueOf(raftGroupId, raftPeers);
     this.scmStateMachine = new SCMStateMachine();
     this.server = RaftServer.newBuilder()
@@ -76,7 +83,7 @@ public class SCMRatisServer {
     server.start();
   }
 
-  public void registerStateMachineHandler(final SCMRatisProtocolProtos.RequestType handlerType,
+  public void registerStateMachineHandler(final RequestType handlerType,
                                           final Object handler) {
     scmStateMachine.registerHandler(handlerType, handler);
   }
@@ -86,7 +93,8 @@ public class SCMRatisServer {
     final RaftClientRequest raftClientRequest = new RaftClientRequest(
         clientId, server.getId(), raftGroupId, nextCallId(), request.encode(),
         RaftClientRequest.writeRequestType(), null);
-    final RaftClientReply raftClientReply = server.submitClientRequestAsync(raftClientRequest).get();
+    final RaftClientReply raftClientReply =
+        server.submitClientRequestAsync(raftClientRequest).get();
     return SCMRatisResponse.decode(raftClientReply);
   }
 
@@ -95,7 +103,7 @@ public class SCMRatisServer {
   }
 
   void stop() throws IOException {
-      server.close();
+    server.close();
   }
 
 }

@@ -21,13 +21,24 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
-public class HAUtil {
+/**
+ * Reflection util for SCM HA.
+ */
+public final class ReflectionUtil {
 
   private static Map<String, Class<?>> classCache = new HashMap<>();
 
-  private HAUtil() {
+  private ReflectionUtil() {
   }
 
+  /**
+   * Returns the {@code Class} object associated with the given string name.
+   *
+   * @param className the fully qualified name of the desired class.
+   * @return the {@code Class} object for the class with the
+   *         specified name.
+   * @throws ClassNotFoundException if the class cannot be located
+   */
   public static Class<?> getClass(String className)
       throws ClassNotFoundException {
     if (!classCache.containsKey(className)) {
@@ -36,6 +47,18 @@ public class HAUtil {
     return classCache.get(className);
   }
 
+  /**
+   * Returns a {@code Method} object that reflects the specified public
+   * member method of the given {@code Class} object.
+   *
+   * @param clazz the class object which has the method
+   * @param methodName the name of the method
+   * @param arg the list of parameters
+   * @return the {@code Method} object that matches the specified
+   *         {@code name} and {@code parameterTypes}
+   * @throws NoSuchMethodException if a matching method is not found
+   *         or if the name is "&lt;init&gt;"or "&lt;clinit&gt;".
+   */
   public static Method getMethod(
       final Class<?> clazz, final String methodName, final Class<?>... arg)
       throws NoSuchMethodException {
