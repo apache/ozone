@@ -543,7 +543,7 @@ public class OzoneDelegationTokenSecretManager
    * @throws IOException
    */
   @Override
-  public synchronized void stop() throws IOException {
+  public void stop() throws IOException {
     super.stop();
     stopThreads();
     if (this.store != null) {
