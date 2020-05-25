@@ -302,14 +302,6 @@ public interface OMMetadataManager {
   Table<OzoneTokenIdentifier, Long> getDelegationTokenTable();
 
   /**
-   * Gets the S3Bucket to Ozone Volume/bucket mapping table.
-   *
-   * @return Table.
-   */
-
-  Table<String, String> getS3Table();
-
-  /**
    * Gets the Ozone prefix path to its acl mapping table.
    * @return Table.
    */
