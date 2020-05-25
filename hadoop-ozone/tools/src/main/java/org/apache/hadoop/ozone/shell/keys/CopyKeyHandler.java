@@ -21,6 +21,7 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
@@ -34,6 +35,8 @@ import picocli.CommandLine.Parameters;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
@@ -89,11 +92,17 @@ public class CopyKeyHandler extends BucketHandler {
               OZONE_REPLICATION_TYPE_DEFAULT));
     }
 
+    Map<String, String> keyMetadata = new HashMap<>();
+    String gdprEnabled = bucket.getMetadata().get(OzoneConsts.GDPR_FLAG);
+    if (Boolean.parseBoolean(gdprEnabled)) {
+      keyMetadata.put(OzoneConsts.GDPR_FLAG, Boolean.TRUE.toString());
+    }
+
     int chunkSize = (int) getConf().getStorageSize(OZONE_SCM_CHUNK_SIZE_KEY,
         OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
     try (InputStream input = bucket.readKey(fromKey);
          OutputStream output = bucket.createKey(toKey, input.available(),
-             replicationType, replicationFactor, bucket.getMetadata())) {
+             replicationType, replicationFactor, keyMetadata)) {
       IOUtils.copyBytes(input, output, chunkSize);
     }
 
