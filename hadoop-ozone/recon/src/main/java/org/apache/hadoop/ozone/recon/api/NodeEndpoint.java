@@ -96,7 +96,7 @@ public class NodeEndpoint {
               leaderNode
           );
           pipelines.add(datanodePipeline);
-          if (pipeline.getLeaderId().equals(datanode.getUuid())) {
+          if (datanode.getUuid().equals(pipeline.getLeaderId())) {
             leaderCount.getAndIncrement();
           }
         } catch (PipelineNotFoundException ex) {
