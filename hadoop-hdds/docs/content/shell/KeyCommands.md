@@ -153,4 +153,4 @@ The `key cat` command displays the contents a specific Ozone key to standard out
 {{< highlight bash >}}
 ozone sh key cat /hive/jan/hello.txt
 {{< /highlight >}}
-Copies the file hello.txt from the _/hive/jan_ bucket to standard output.
+Displays the contents of the key hello.txt from the _/hive/jan_ bucket to standard output.
