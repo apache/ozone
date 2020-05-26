@@ -141,7 +141,7 @@ The above command will rename _sales.orc_ to _new\_name.orc_ in the bucket _/hiv
 
 ### Cat
 
-The `key cat` command copies a specific Ozone key to standard output.
+The `key cat` command displays the contents a specific Ozone key to standard output.
 
 ***Params:***
 
