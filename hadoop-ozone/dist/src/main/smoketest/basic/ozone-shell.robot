@@ -114,7 +114,7 @@ Test key handling
                     Execute             rm -f /tmp/NOTICE.txt.1
                     Execute             ozone sh key get ${protocol}${server}/${volume}/bb1/key1 /tmp/NOTICE.txt.1
                     Execute             diff -q /opt/hadoop/NOTICE.txt /tmp/NOTICE.txt.1
-                    Execute             ozone sh key put ${protocol}${server}/${volume}/bb1/key1_STAND_ALONE /opt/hadoop/NOTICE.txt
+                    Execute             ozone sh key put -t STAND_ALONE ${protocol}${server}/${volume}/bb1/key1_STAND_ALONE /opt/hadoop/NOTICE.txt
                     Execute             rm -f /tmp/key1_STAND_ALONE
                     Execute             ozone sh key get ${protocol}${server}/${volume}/bb1/key1_STAND_ALONE /tmp/key1_STAND_ALONE
                     Execute             diff -q /opt/hadoop/NOTICE.txt /tmp/key1_STAND_ALONE
