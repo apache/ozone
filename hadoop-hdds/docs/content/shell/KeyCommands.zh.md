@@ -29,6 +29,7 @@ Ozone shell 提供以下键命令：
   * [查看](#查看)
   * [列举](#列举)
   * [重命名](#重命名)
+  * [Cat](#cat)
 
 
 ### 下载
@@ -136,3 +137,19 @@ ozone sh key rename /hive/jan sales.orc new_name.orc
 {{< /highlight >}}
 
 上述命令会将 _/hive/jan_ 桶中的 _sales.orc_ 重命名为 _new\_name.orc_ 。
+
+### Cat
+
+`key cat` 命令用来把指定的键的内容输出到终端。
+
+***参数:***
+
+| 参数名                          |  说明                                |
+|--------------------------------|-----------------------------------------|
+|  Uri                           | 键名，格式为 **/volume/bucket/key**
+
+
+{{< highlight bash >}}
+ozone sh key cat /hive/jan/hello.txt
+{{< /highlight >}}
+上述命令会将 _/hive/jan_ 桶中的 hello.txt 的内容输出到标准输出中来。

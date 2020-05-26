@@ -30,6 +30,7 @@ Ozone shell supports the following key commands.
   * [info](#info)
   * [list](#list)
   * [rename](#rename)
+  * [cat](#cat)
 
 
 ### Get
@@ -137,3 +138,19 @@ The `key rename` command changes the name of an existing key in the specified bu
 ozone sh key rename /hive/jan sales.orc new_name.orc
 {{< /highlight >}}
 The above command will rename _sales.orc_ to _new\_name.orc_ in the bucket _/hive/jan_.
+
+### Cat
+
+The `key cat` command copies a specific Ozone key to standard output.
+
+***Params:***
+
+| Arguments                      |  Comment                                |
+|--------------------------------|-----------------------------------------|
+|  Uri                           | The name of the key in **/volume/bucket/key** format.
+
+
+{{< highlight bash >}}
+ozone sh key cat /hive/jan/hello.txt
+{{< /highlight >}}
+Copies the file hello.txt from the _/hive/jan_ bucket to standard output.
