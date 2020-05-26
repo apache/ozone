@@ -473,6 +473,14 @@ public final class HddsUtils {
   }
 
   /**
+   * Get the current time in milliseconds.
+   * @return the current time in milliseconds.
+   */
+  public static long getTime() {
+    return System.currentTimeMillis();
+  }
+
+  /**
    * Basic validation for {@code path}: checks that it is a descendant of
    * (or the same as) the given {@code ancestor}.
    * @param path the path to be validated

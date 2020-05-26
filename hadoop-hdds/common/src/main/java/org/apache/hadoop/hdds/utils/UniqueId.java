@@ -59,11 +59,11 @@ public final class UniqueId {
    * @return unique long value
    */
   public static synchronized long next() {
-    long utcTime = HddsUtils.getUtcTime();
-    if ((utcTime & 0xFFFF000000000000L) == 0) {
-      return utcTime << Short.SIZE | (offset++ & 0x0000FFFF);
+    long time = HddsUtils.getTime();
+    if ((time & 0xFFFF000000000000L) == 0) {
+      return time << Short.SIZE | (offset++ & 0x0000FFFF);
     }
-    throw new RuntimeException("Got invalid UTC time," +
-        " cannot generate unique Id. UTC Time: " + utcTime);
+    throw new RuntimeException("Got invalid time," +
+        " cannot generate unique Id. Current time: " + time);
   }
 }
