@@ -302,6 +302,11 @@ enum Status {
 
     // When transactions are replayed
     REPLAY = 100;
+
+    // When recovering key that not in deletedTable.
+    RECOVERED_KEY_NOT_FOUND = 70;
+    // When recovering key that has key of same name in bucket.
+    RECOVERED_KEY_ALREADY_EXISTS = 71;
 }
 
 /**

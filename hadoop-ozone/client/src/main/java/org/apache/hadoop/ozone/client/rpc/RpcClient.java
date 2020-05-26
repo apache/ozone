@@ -431,8 +431,11 @@ public class RpcClient implements ClientProtocol {
     }
 
     boolean trashEnabled = bucketArgs.getTrashEnabled();
-    long recoverWindow = OzoneRecoverWindow
-        .parseWindow(bucketArgs.getRecoverWindow())
+    String recoverWindow = bucketArgs.getRecoverWindow() == null ?
+        OzoneConfigKeys.OZONE_TRASH_RECOVER_WINDOW_DEFAULT :
+        bucketArgs.getRecoverWindow();
+    long recoverWindowLength = OzoneRecoverWindow
+        .parseWindow(recoverWindow)
         .lengthInSeconds();
 
     List<OzoneAcl> listOfAcls = getAclList();
@@ -449,7 +452,7 @@ public class RpcClient implements ClientProtocol {
         .setStorageType(storageType)
         .setAcls(listOfAcls.stream().distinct().collect(Collectors.toList()))
         .setTrashEnabled(trashEnabled)
-        .setRecoverWindow(recoverWindow);
+        .setRecoverWindow(recoverWindowLength);
 
     if (bek != null) {
       builder.setBucketEncryptionKey(bek);

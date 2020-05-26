@@ -291,7 +291,9 @@ public final class TestOMRequestUtils {
             .setVolumeName(volumeName)
             .setIsVersionEnabled(isVersionEnabled)
             .setStorageType(storageTypeProto)
-            .addAllMetadata(getMetadataList()).build();
+            .addAllMetadata(getMetadataList())
+            .setTrashEnabled(false)
+            .setRecoverWindow(0).build();
     OzoneManagerProtocolProtos.CreateBucketRequest.Builder req =
         OzoneManagerProtocolProtos.CreateBucketRequest.newBuilder();
     req.setBucketInfo(bucketInfo);
