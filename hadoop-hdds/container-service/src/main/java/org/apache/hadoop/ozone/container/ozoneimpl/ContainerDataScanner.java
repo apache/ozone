@@ -67,7 +67,7 @@ public class ContainerDataScanner extends Thread {
     throttler = new HddsDataTransferThrottler(conf.getBandwidthPerVolume());
     canceler = new Canceler();
     metrics = ContainerDataScrubberMetrics.create(volume.toString());
-    setName(NAME + volume + ")");
+    setName(String.format(NAME_FORMAT, volume));
     setDaemon(true);
   }
 
