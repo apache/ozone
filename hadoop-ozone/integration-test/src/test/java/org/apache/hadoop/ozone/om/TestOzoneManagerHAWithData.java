@@ -16,25 +16,17 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import java.net.ConnectException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
-import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Test;
-
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -42,12 +34,18 @@ import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.VolumeArgs;
-import org.apache.hadoop.ozone.client.ObjectStore;
+import org.junit.Assert;
+import org.junit.Ignore;
+import org.junit.Test;
 
-import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl
-    .NODE_FAILURE_TIMEOUT;
+import java.net.ConnectException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
@@ -259,7 +257,8 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     // multipart upload is happening successfully or not.
 
     OMFailoverProxyProvider omFailoverProxyProvider =
-        getObjectStore().getClientProxy().getOMProxyProvider();
+        OmFailoverProxyUtil
+            .getFailoverProxyProvider(getObjectStore().getClientProxy());
 
     // The OMFailoverProxyProvider will point to the current leader OM node.
     String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
@@ -292,7 +291,8 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
         OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY,
         OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT);
     OMFailoverProxyProvider omFailoverProxyProvider =
-        getObjectStore().getClientProxy().getOMProxyProvider();
+        OmFailoverProxyUtil
+            .getFailoverProxyProvider(getObjectStore().getClientProxy());
 
     // The OMFailoverProxyProvider will point to the current leader OM node.
     String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
@@ -425,8 +425,10 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     retVolumeinfo.createBucket(bucketName);
     OzoneBucket ozoneBucket = retVolumeinfo.getBucket(bucketName);
 
-    String leaderOMNodeId = objectStore.getClientProxy().getOMProxyProvider()
+    String leaderOMNodeId = OmFailoverProxyUtil
+        .getFailoverProxyProvider(objectStore.getClientProxy())
         .getCurrentProxyOMNodeId();
+
     OzoneManager ozoneManager = getCluster().getOzoneManager(leaderOMNodeId);
 
     // Send commands to ratis to increase the log index so that ratis
@@ -481,8 +483,10 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
   public void testOMRestart() throws Exception {
     ObjectStore objectStore = getObjectStore();
     // Get the leader OM
-    String leaderOMNodeId = objectStore.getClientProxy().getOMProxyProvider()
+    String leaderOMNodeId = OmFailoverProxyUtil
+        .getFailoverProxyProvider(objectStore.getClientProxy())
         .getCurrentProxyOMNodeId();
+
     OzoneManager leaderOM = getCluster().getOzoneManager(leaderOMNodeId);
 
     // Get follower OMs
