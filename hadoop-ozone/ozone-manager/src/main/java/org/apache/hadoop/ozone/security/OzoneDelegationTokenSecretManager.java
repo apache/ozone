@@ -530,6 +530,7 @@ public class OzoneDelegationTokenSecretManager
       try {
         tokenRemoverThread.join();
       } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
         throw new RuntimeException(
             "Unable to join on token removal thread", e);
       }
@@ -593,14 +594,15 @@ public class OzoneDelegationTokenSecretManager
             removeExpiredToken();
             lastTokenCacheCleanup = now;
           }
-          try {
-            Thread.sleep(Math.min(5000,
-                getTokenRemoverScanInterval())); // 5 seconds
-          } catch (InterruptedException ie) {
-            LOG.error("ExpiredTokenRemover received {}", ie);
-          }
+
+          // Sleep for 5 seconds
+          Thread.sleep(Math.min(5000, getTokenRemoverScanInterval()));
+
         }
-      } catch (Throwable t) {
+      } catch (InterruptedException ie) {
+        LOG.error("ExpiredTokenRemover received {}", ie);
+        Thread.currentThread().interrupt();
+      } catch (Exception t) {
         LOG.error("ExpiredTokenRemover thread received unexpected exception",
             t);
         Runtime.getRuntime().exit(-1);
