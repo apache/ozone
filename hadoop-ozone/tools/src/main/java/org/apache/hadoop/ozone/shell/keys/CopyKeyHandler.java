@@ -22,10 +22,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientException;
-import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.*;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.bucket.BucketHandler;
 import picocli.CommandLine.Command;
@@ -92,7 +89,11 @@ public class CopyKeyHandler extends BucketHandler {
               OZONE_REPLICATION_TYPE_DEFAULT));
     }
 
-    Map<String, String> keyMetadata = new HashMap<>();
+    OzoneKeyDetails keyDetail = bucket.getKey(fromKey);
+    Map<String, String> keyMetadata = new HashMap<>(keyDetail.getMetadata());
+    keyMetadata.remove(OzoneConsts.GDPR_SECRET);
+    keyMetadata.remove(OzoneConsts.GDPR_ALGORITHM);
+
     String gdprEnabled = bucket.getMetadata().get(OzoneConsts.GDPR_FLAG);
     if (Boolean.parseBoolean(gdprEnabled)) {
       keyMetadata.put(OzoneConsts.GDPR_FLAG, Boolean.TRUE.toString());
