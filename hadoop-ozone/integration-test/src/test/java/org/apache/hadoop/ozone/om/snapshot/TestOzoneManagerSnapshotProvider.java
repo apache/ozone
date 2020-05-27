@@ -18,8 +18,10 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import org.apache.commons.lang3.RandomStringUtils;
+import java.util.UUID;
+
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -28,16 +30,16 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+
+import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
-
-import java.util.UUID;
 
 /**
  * Test OM's snapshot provider service.
@@ -105,8 +107,10 @@ public class TestOzoneManagerSnapshotProvider {
     retVolumeinfo.createBucket(bucketName);
     OzoneBucket ozoneBucket = retVolumeinfo.getBucket(bucketName);
 
-    String leaderOMNodeId = objectStore.getClientProxy().getOMProxyProvider()
+    String leaderOMNodeId = OmFailoverProxyUtil
+        .getFailoverProxyProvider(objectStore.getClientProxy())
         .getCurrentProxyOMNodeId();
+
     OzoneManager ozoneManager = cluster.getOzoneManager(leaderOMNodeId);
 
     // Get a follower OM
