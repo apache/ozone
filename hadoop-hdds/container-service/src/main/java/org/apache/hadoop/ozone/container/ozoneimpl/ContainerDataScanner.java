@@ -49,7 +49,7 @@ public class ContainerDataScanner extends Thread {
   private final Canceler canceler;
   private final ContainerDataScrubberMetrics metrics;
   private final long dataScanInterval;
-  private static final String NAME = "ContainerDataScanner(";
+  private static final String NAME_FORMAT = "ContainerDataScanner(%s)";
 
   /**
    * True if the thread is stopping.<p/>
