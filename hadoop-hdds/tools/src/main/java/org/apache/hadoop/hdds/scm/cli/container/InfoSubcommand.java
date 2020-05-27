@@ -73,7 +73,7 @@ public class InfoSubcommand implements Callable<Void> {
     }
   }
 
-  private static String buildDatanodeDisplay(DatanodeDetails details) {
+  private static String buildDatanodeDetails(DatanodeDetails details) {
     return details.getUuidString() + "/" + details.getHostName();
   }
 }
