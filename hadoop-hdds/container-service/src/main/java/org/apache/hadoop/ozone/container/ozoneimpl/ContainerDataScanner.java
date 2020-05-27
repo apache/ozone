@@ -165,7 +165,7 @@ public class ContainerDataScanner extends Thread {
 
   public synchronized void shutdown() {
     this.stopping = true;
-    this.canceler.cancel(NAME + volume + ") is shutting down");
+    this.canceler.cancel(String.format(NAME_FORMAT, volume) + " is shutting down");
     this.interrupt();
     try {
       this.join();
