@@ -18,14 +18,11 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
@@ -35,18 +32,26 @@ import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.client.*;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
+import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.keys.KeyHandler;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import org.apache.ratis.protocol.ClientId;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
@@ -76,14 +81,15 @@ public class ChunkKeyHandler  extends KeyHandler {
   protected void execute(OzoneClient client, OzoneAddress address)
           throws IOException, OzoneClientException {
     containerOperationClient = new
-            ContainerOperationClient(createOzoneConfiguration());
+        ContainerOperationClient(createOzoneConfiguration());
     xceiverClientManager = containerOperationClient
-            .getXceiverClientManager();
+        .getXceiverClientManager();
+    OmTransport omTransport = OmTransportFactory
+        .create(getConf(), UserGroupInformation.getCurrentUser(), null);
     ozoneManagerClient = TracingUtil.createProxy(
-            new OzoneManagerProtocolClientSideTranslatorPB(
-            getConf(), clientId.toString(),
-            null, UserGroupInformation.getCurrentUser()),
-            OzoneManagerProtocol.class, getConf());
+        new OzoneManagerProtocolClientSideTranslatorPB(
+            omTransport, clientId.toString()),
+        OzoneManagerProtocol.class, getConf());
     address.ensureKeyAddress();
     JsonObject jsonObj = new JsonObject();
     JsonElement element;

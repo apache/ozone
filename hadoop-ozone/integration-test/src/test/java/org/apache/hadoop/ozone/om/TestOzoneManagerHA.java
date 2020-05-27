@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Before;
@@ -209,7 +210,8 @@ public abstract class TestOzoneManagerHA {
   protected void stopLeaderOM() {
     //Stop the leader OM.
     OMFailoverProxyProvider omFailoverProxyProvider =
-        objectStore.getClientProxy().getOMProxyProvider();
+        OmFailoverProxyUtil.getFailoverProxyProvider(
+            (RpcClient) objectStore.getClientProxy());
 
     // The OMFailoverProxyProvider will point to the current leader OM node.
     String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();

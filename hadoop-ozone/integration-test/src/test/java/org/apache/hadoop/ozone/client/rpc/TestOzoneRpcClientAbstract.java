@@ -76,6 +76,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueBlockIterator;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -212,7 +213,7 @@ public abstract class TestOzoneRpcClientAbstract {
     return TestOzoneRpcClientAbstract.store;
   }
 
-  public static void setScmId(String scmId){
+  public static void setScmId(String scmId) {
     TestOzoneRpcClientAbstract.scmId = scmId;
   }
 
@@ -221,8 +222,10 @@ public abstract class TestOzoneRpcClientAbstract {
    */
   @Test
   public void testOMClientProxyProvider() {
-    OMFailoverProxyProvider omFailoverProxyProvider = store.getClientProxy()
-        .getOMProxyProvider();
+
+    OMFailoverProxyProvider omFailoverProxyProvider =
+        OmFailoverProxyUtil.getFailoverProxyProvider(store.getClientProxy());
+
     List<OMProxyInfo> omProxies = omFailoverProxyProvider.getOMProxyInfos();
 
     // For a non-HA OM service, there should be only one OM proxy.
