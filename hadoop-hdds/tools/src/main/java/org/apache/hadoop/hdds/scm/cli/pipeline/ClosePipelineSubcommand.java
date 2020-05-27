@@ -53,12 +53,6 @@ public class ClosePipelineSubcommand implements Callable<Void> {
       required = false)
   private String factor;
 
-  @CommandLine.Option(names = {"-fst", "--filterByState"},
-      description = "Filter listed pipelines by State(OPEN/CLOSE)",
-      defaultValue = "",
-      required = false)
-  private String state;
-
   @Override
   public Void call() throws Exception {
     try (ScmClient scmClient = parent.getParent().createScmClient()) {
@@ -67,11 +61,8 @@ public class ClosePipelineSubcommand implements Callable<Void> {
         List<Pipeline> unsuccessList = new LinkedList<>();
 
         scmClient.listPipelines().stream()
-            .filter(p -> ((Strings.isNullOrEmpty(factor) ||
-                (p.getFactor().toString().compareToIgnoreCase(factor) == 0))
-                && (Strings.isNullOrEmpty(state) ||
-                (p.getPipelineState().toString().compareToIgnoreCase(state)
-                    == 0))))
+            .filter(p -> (Strings.isNullOrEmpty(factor) ||
+                (p.getFactor().toString().compareToIgnoreCase(factor) == 0)))
             .forEach(pipeline -> {
               try {
                 scmClient.closePipeline(
