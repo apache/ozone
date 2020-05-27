@@ -1793,7 +1793,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <plugin>
           <groupId>org.jacoco</groupId>
           <artifactId>jacoco-maven-plugin</artifactId>
-          <version>0.8.3</version>
+          <version>0.8.5</version>
         </plugin>
         <plugin>
           <groupId>io.fabric8</groupId>
@@ -1892,12 +1892,26 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
+        <configuration>
+          <fileSets>
+            <fileSet>
+              <directory>${project.basedir}</directory>
+              <includes>
+                <include>**/jacoco.exec</include>
+              </includes>
+              <useDefaultExcludes>false</useDefaultExcludes>
+            </fileSet>
+          </fileSets>
+        </configuration>
         <executions>
           <execution>
             <id>default-prepare-agent</id>
             <goals>
               <goal>prepare-agent</goal>
             </goals>
+            <configuration>
+              <includes>org.apache.hadoop.hdds.*,org.apache.hadoop.ozone.*</includes>
+            </configuration>
           </execution>
         </executions>
       </plugin>

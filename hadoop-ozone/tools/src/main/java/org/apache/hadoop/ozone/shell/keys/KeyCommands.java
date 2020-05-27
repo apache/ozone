@@ -38,6 +38,7 @@ import picocli.CommandLine.ParentCommand;
         InfoKeyHandler.class,
         ListKeyHandler.class,
         GetKeyHandler.class,
+        CatKeyHandler.class,
         PutKeyHandler.class,
         RenameKeyHandler.class,
         DeleteKeyHandler.class,
