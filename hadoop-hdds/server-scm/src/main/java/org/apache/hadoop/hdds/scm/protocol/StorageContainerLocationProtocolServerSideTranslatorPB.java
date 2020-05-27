@@ -270,7 +270,6 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
       }
-
     } catch (IOException e) {
       throw new ServiceException(e);
     }
