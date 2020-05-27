@@ -259,6 +259,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setGetPipelineResponse(getPipeline(
                 request.getGetPipelineRequest()))
             .build();
+      case DeleteContainer:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setScmDeleteContainerResponse(deleteContainer(
+                request.getScmDeleteContainerRequest()))
+            .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
