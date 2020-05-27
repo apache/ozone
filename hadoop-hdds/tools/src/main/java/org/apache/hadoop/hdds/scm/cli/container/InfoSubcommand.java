@@ -66,9 +66,14 @@ public class InfoSubcommand implements Callable<Void> {
 
       // Print pipeline of an existing container.
       String machinesStr = container.getPipeline().getNodes().stream().map(
-              DatanodeDetails::getHostName).collect(Collectors.joining(","));
+          InfoSubcommand::buildDatanodeDetails)
+          .collect(Collectors.joining(",\n"));
       LOG.info("Datanodes: [{}]", machinesStr);
       return null;
     }
+  }
+
+  private static String buildDatanodeDetails(DatanodeDetails details) {
+    return details.getUuidString() + "/" + details.getHostName();
   }
 }
