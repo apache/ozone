@@ -221,9 +221,31 @@ jobs:
             path: mnt/ozone
         - uses: ./mnt/ozone/.github/buildenv
           with:
-             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -Pozone
+            args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -Pozone
         - uses: actions/upload-artifact@master
           if: always()
           with:
             name: it-ozone
             path: mnt/ozone/target/integration
+    coverage:
+      name: coverage
+      runs-on: ubuntu-18.04
+      needs:
+        - it-ozone
+        - it-hdds-om
+        - it-client
+        - it-filesystem-contract
+        - it-filesystem
+        - it-freon
+        - unit
+      steps:
+        - uses: actions/checkout@v2
+        - uses: ./.github/buildenv
+          with:
+            args: ./hadoop-ozone/dev-support/checks/build.sh
+        - uses: actions/download-artifact@v2
+          with:
+            path: target/artifacts
+        - name: Setup tmate session
+          uses: mxschmitt/action-tmate@v2
+        - run: ./github/coverage-report.sh
