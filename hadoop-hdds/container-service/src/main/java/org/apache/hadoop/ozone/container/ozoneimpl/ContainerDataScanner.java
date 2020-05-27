@@ -183,7 +183,7 @@ public class ContainerDataScanner extends Thread {
 
   @Override
   public String toString() {
-    return NAME + volume + ", " + volume.getStorageID() + ")";
+    return String.format(NAME_FORMAT, volume + ", " + volume.getStorageID());
   }
 
   private class HddsDataTransferThrottler extends DataTransferThrottler {
