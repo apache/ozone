@@ -114,7 +114,7 @@ Test key handling
                     Execute             rm -f /tmp/NOTICE.txt.1
                     Execute             ozone sh key get ${protocol}${server}/${volume}/bb1/key1 /tmp/NOTICE.txt.1
                     Execute             diff -q /opt/hadoop/NOTICE.txt /tmp/NOTICE.txt.1
-                    Execute             ozone sh key cp ${protocol}${server}/${volume}/bb1/key1 ${protocol}${server}/${volume}/bb1/key1-copy
+                    Execute             ozone sh key cp ${protocol}${server}/${volume}/bb1 key1 key1-copy
                     Execute             rm -f /tmp/key1-copy
                     Execute             ozone sh key get ${protocol}${server}/${volume}/bb1/key1-copy /tmp/key1-copy
                     Execute             diff -q /opt/hadoop/NOTICE.txt /tmp/key1-copy
