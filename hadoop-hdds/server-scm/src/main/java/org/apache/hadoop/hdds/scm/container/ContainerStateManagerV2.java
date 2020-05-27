@@ -17,20 +17,26 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import java.io.IOException;
+import java.util.Set;
+
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 
-import java.io.IOException;
-import java.util.Set;
-
 /**
+ * A ContainerStateManager is responsible for keeping track of all the
+ * container and its state inside SCM, it also exposes methods to read and
+ * modify the container and its state.
  *
- * TODO: Add proper javadoc.
+ * All the mutation operations are marked with {@link Replicate} annotation so
+ * that when SCM-HA is enabled, the mutations are replicated from leader SCM
+ * to the followers.
  *
- * Implementation of methods marked with {@code @Replicate} annotation should be
+ * When a method is marked with {@link Replicate} annotation it should follow
+ * the below rules.
  *
- * 1. Idempotent
+ * 1. The method call should be Idempotent
  * 2. Arguments should be of protobuf objects
  * 3. Return type should be of protobuf object
  * 4. The declaration should throw RaftException
@@ -38,13 +44,65 @@ import java.util.Set;
  */
 public interface ContainerStateManagerV2 {
 
+  //TODO: Rename this to ContainerStateManager
+
+  /* **********************************************************************
+   * Container Life Cycle                                                 *
+   *                                                                      *
+   * Event and State Transition Mapping:                                  *
+   *                                                                      *
+   * State: OPEN         ----------------> CLOSING                        *
+   * Event:                    FINALIZE                                   *
+   *                                                                      *
+   * State: CLOSING      ----------------> QUASI_CLOSED                   *
+   * Event:                  QUASI_CLOSE                                  *
+   *                                                                      *
+   * State: CLOSING      ----------------> CLOSED                         *
+   * Event:                     CLOSE                                     *
+   *                                                                      *
+   * State: QUASI_CLOSED ----------------> CLOSED                         *
+   * Event:                  FORCE_CLOSE                                  *
+   *                                                                      *
+   * State: CLOSED       ----------------> DELETING                       *
+   * Event:                    DELETE                                     *
+   *                                                                      *
+   * State: DELETING     ----------------> DELETED                        *
+   * Event:                    CLEANUP                                    *
+   *                                                                      *
+   *                                                                      *
+   * Container State Flow:                                                *
+   *                                                                      *
+   * [OPEN]--------------->[CLOSING]--------------->[QUASI_CLOSED]        *
+   *          (FINALIZE)      |      (QUASI_CLOSE)        |               *
+   *                          |                           |               *
+   *                          |                           |               *
+   *                  (CLOSE) |             (FORCE_CLOSE) |               *
+   *                          |                           |               *
+   *                          |                           |               *
+   *                          +--------->[CLOSED]<--------+               *
+   *                                        |                             *
+   *                                (DELETE)|                             *
+   *                                        |                             *
+   *                                        |                             *
+   *                                   [DELETING]                         *
+   *                                        |                             *
+   *                              (CLEANUP) |                             *
+   *                                        |                             *
+   *                                        V                             *
+   *                                    [DELETED]                         *
+   *                                                                      *
+   ************************************************************************/
+
   /**
-   *
+   * Returns a new container ID which can be used for allocating a new
+   * container.
    */
   ContainerID getNextContainerID();
 
   /**
+   * Returns the ID of all the managed containers.
    *
+   * @return Set of {@link ContainerID}
    */
   Set<ContainerID> getContainerIDs();
 
@@ -72,4 +130,8 @@ public interface ContainerStateManagerV2 {
   void addContainer(ContainerInfoProto containerInfo)
       throws IOException;
 
+  /**
+   *
+   */
+  void close() throws Exception;
 }
