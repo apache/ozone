@@ -24,10 +24,12 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.StringUtils;
@@ -41,6 +43,7 @@ import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.DBOptions;
 import org.rocksdb.FlushOptions;
+import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.TransactionLogIterator;
@@ -94,6 +97,14 @@ public class RDBStore implements DBStore {
     this.writeOptions = writeOptions;
 
     try {
+      List<TableConfig> columnFamiliesInDb = getColumnFamiliesInExistingDb();
+      List<TableConfig> extraCf = columnFamiliesInDb.stream().filter(
+          cf -> !families.contains(cf)).collect(Collectors.toList());
+      for (TableConfig family : extraCf) {
+        LOG.info("Adding column family {}", family.getName());
+        columnFamilyDescriptors.add(family.getDescriptor());
+      }
+
       db = RocksDB.open(dbOptions, dbLocation.getAbsolutePath(),
           columnFamilyDescriptors, columnFamilyHandles);
 
@@ -147,6 +158,24 @@ public class RDBStore implements DBStore {
       LOG.debug("[Option] createIfMissing = {}", options.createIfMissing());
       LOG.debug("[Option] maxOpenFiles= {}", options.maxOpenFiles());
     }
+  }
+
+  /**
+   * Read DB and return existing column families.
+   * @return List of column families
+   * @throws RocksDBException on Error.
+   */
+  private List<TableConfig> getColumnFamiliesInExistingDb()
+      throws RocksDBException {
+    List<byte[]> bytes = RocksDB.listColumnFamilies(new Options(),
+        dbLocation.getAbsolutePath());
+    List<TableConfig> columnFamiliesInDb = bytes.stream()
+        .map(cfbytes -> new TableConfig(StringUtils.bytes2String(cfbytes),
+            DBProfile.DISK.getColumnFamilyOptions()))
+        .collect(Collectors.toList());
+    LOG.info("Found column Families in DB : {}",
+        Arrays.toString(columnFamiliesInDb.toArray()));
+    return columnFamiliesInDb;
   }
 
   public static IOException toIOException(String msg, RocksDBException e) {
