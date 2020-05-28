@@ -140,7 +140,7 @@ public final class OzoneManagerDoubleBuffer {
 
     public OzoneManagerDoubleBuffer build() {
       if (isRatisEnabled) {
-        Preconditions.checkNotNull(indexToTerm, "When ratis is enabled, " +
+        Preconditions.checkNotNull(rs, "When ratis is enabled, " +
                 "OzoneManagerRatisSnapshot should not be null");
         Preconditions.checkNotNull(indexToTerm, "When ratis is enabled " +
             "indexToTerm should not be null");
@@ -307,7 +307,7 @@ public final class OzoneManagerDoubleBuffer {
           }
 
           // When non-HA do the sort step here, as the sorted list is not
-          // require for flush to DB. As in non-HA We want to complete
+          // required for flush to DB. As in non-HA we want to complete
           // futures as quick as possible after flush to DB, to release rpc
           // handler threads.
           if (!isRatisEnabled) {
