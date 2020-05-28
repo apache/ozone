@@ -209,6 +209,7 @@ public class ReplicationManager
       inflightReplication.clear();
       inflightDeletion.clear();
       running = false;
+      DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
       notifyAll();
     } else {
       LOG.info("Replication Monitor Thread is not running.");
