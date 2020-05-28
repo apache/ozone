@@ -50,6 +50,7 @@ public class SCMHAInvocationHandler implements InvocationHandler {
     this.requestType = requestType;
     this.localHandler = localHandler;
     this.ratisHandler = ratisHandler;
+    ratisHandler.registerStateMachineHandler(requestType, localHandler);
   }
 
   @Override
@@ -71,8 +72,9 @@ public class SCMHAInvocationHandler implements InvocationHandler {
    */
   private Object invokeLocal(Method method, Object[] args)
       throws InvocationTargetException, IllegalAccessException {
-    LOG.trace("Invoking method {} on target {}", method, localHandler);
-    return method.invoke(method, args);
+    LOG.trace("Invoking method {} on target {} with arguments {}",
+        method, localHandler, args);
+    return method.invoke(localHandler, args);
   }
 
   /**

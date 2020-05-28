@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
@@ -36,8 +35,8 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
  * mapping. This is used by SCM when allocating new locations and when
  * looking up a key.
  */
-public interface ContainerManagerV2 extends Closeable {
-
+public interface ContainerManagerV2 extends AutoCloseable {
+  // TODO: Rename this to ContainerManager
 
   /**
    * Returns all the container Ids managed by ContainerManager.
