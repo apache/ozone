@@ -72,7 +72,6 @@ public final class HddsUtils {
   public static final String OZONE_SCM_SERVICE_ID = "OzoneScmService";
   public static final String OZONE_SCM_SERVICE_INSTANCE_ID =
       "OzoneScmServiceInstance";
-  private static final TimeZone UTC_ZONE = TimeZone.getTimeZone("UTC");
 
   private static final String MULTIPLE_SCM_NOT_YET_SUPPORTED =
       ScmConfigKeys.OZONE_SCM_NAMES + " must contain a single hostname."
