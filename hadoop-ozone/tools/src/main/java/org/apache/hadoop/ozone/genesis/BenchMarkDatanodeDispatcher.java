@@ -130,7 +130,7 @@ public class BenchMarkDatanodeDispatcher {
 
     // Create containers
     for (int x = 0; x < INIT_CONTAINERS; x++) {
-      long containerID = HddsUtils.getUtcTime() + x;
+      long containerID = HddsUtils.getTime() + x;
       ContainerCommandRequestProto req = getCreateContainerCommand(containerID);
       dispatcher.dispatch(req, null);
       containers.add(containerID);
@@ -138,7 +138,7 @@ public class BenchMarkDatanodeDispatcher {
     }
 
     for (int x = 0; x < INIT_KEYS; x++) {
-      keys.add(HddsUtils.getUtcTime()+x);
+      keys.add(HddsUtils.getTime()+x);
     }
 
     for (int x = 0; x < INIT_CHUNKS; x++) {
