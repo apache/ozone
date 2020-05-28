@@ -20,11 +20,11 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import com.google.common.primitives.Longs;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -130,7 +130,7 @@ public class TestContainerReader {
         byte[] blkInfo = metadataStore.getStore().get(blkBytes);
 
         byte[] deletingKeyBytes =
-            DFSUtil.string2Bytes(OzoneConsts.DELETING_KEY_PREFIX +
+            StringUtils.string2Bytes(OzoneConsts.DELETING_KEY_PREFIX +
                 blockNames.get(i));
 
         metadataStore.getStore().delete(blkBytes);
