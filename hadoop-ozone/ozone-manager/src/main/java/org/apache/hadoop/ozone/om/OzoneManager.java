@@ -240,6 +240,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       AuditLoggerType.OMLOGGER);
 
   private static final String OM_DAEMON = "om";
+
   private static boolean securityEnabled = false;
   private OzoneDelegationTokenSecretManager delegationTokenMgr;
   private OzoneBlockTokenSecretManager blockTokenMgr;
@@ -2200,11 +2201,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public List<OmKeyInfo> listKeys(String volumeName, String bucketName,
       String startKey, String keyPrefix, int maxKeys) throws IOException {
-    // TODO handle bucket links
-    if(isAclEnabled) {
-      checkAcls(ResourceType.BUCKET,
-          StoreType.OZONE, ACLType.LIST, volumeName, bucketName, keyPrefix);
-    }
+
+    Pair<String, String> resolvedVolumeAndBucket = resolveBucketLink(
+        Pair.of(volumeName, bucketName),
+        volumeAndBucket -> {
+          if(isAclEnabled) {
+            checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
+                volumeAndBucket.getLeft(), volumeAndBucket.getRight(),
+                keyPrefix);
+          }
+        }
+    );
+    volumeName = resolvedVolumeAndBucket.getLeft();
+    bucketName = resolvedVolumeAndBucket.getRight();
+
     boolean auditSuccess = true;
     Map<String, String> auditMap = buildAuditMap(volumeName);
     auditMap.put(OzoneConsts.BUCKET, bucketName);
@@ -2233,6 +2243,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public List<RepeatedOmKeyInfo> listTrash(String volumeName,
       String bucketName, String startKeyName, String keyPrefix, int maxKeys)
       throws IOException {
+
+    // bucket links not supported
 
     if (isAclEnabled) {
       checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
@@ -2516,17 +2528,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public OmMultipartInfo initiateMultipartUpload(OmKeyArgs keyArgs) throws
       IOException {
+
+    Preconditions.checkNotNull(keyArgs);
+    keyArgs = resolveBucketLink(keyArgs, args -> {});
+
     OmMultipartInfo multipartInfo;
     metrics.incNumInitiateMultipartUploads();
     try {
       multipartInfo = keyManager.initiateMultipartUpload(keyArgs);
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-          OMAction.INITIATE_MULTIPART_UPLOAD, (keyArgs == null) ? null :
-              keyArgs.toAuditMap()));
+          OMAction.INITIATE_MULTIPART_UPLOAD, keyArgs.toAuditMap()));
     } catch (IOException ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
-          OMAction.INITIATE_MULTIPART_UPLOAD,
-          (keyArgs == null) ? null : keyArgs.toAuditMap(), ex));
+          OMAction.INITIATE_MULTIPART_UPLOAD, keyArgs.toAuditMap(), ex));
       metrics.incNumInitiateMultipartUploadFails();
       throw ex;
     }
@@ -2536,6 +2550,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public OmMultipartCommitUploadPartInfo commitMultipartUploadPart(
       OmKeyArgs keyArgs, long clientID) throws IOException {
+
+    Preconditions.checkNotNull(keyArgs);
+    keyArgs = resolveBucketLink(keyArgs, args -> {});
+
     boolean auditSuccess = false;
     OmMultipartCommitUploadPartInfo commitUploadPartInfo;
     metrics.incNumCommitMultipartUploadParts();
@@ -2544,16 +2562,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           clientID);
       auditSuccess = true;
     } catch (IOException ex) {
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction
-              .INITIATE_MULTIPART_UPLOAD, (keyArgs == null) ? null : keyArgs
-          .toAuditMap(), ex));
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          OMAction.INITIATE_MULTIPART_UPLOAD, keyArgs.toAuditMap(), ex));
       metrics.incNumCommitMultipartUploadPartFails();
       throw ex;
     } finally {
       if(auditSuccess) {
         AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-            OMAction.COMMIT_MULTIPART_UPLOAD_PARTKEY, (keyArgs == null) ? null :
-                keyArgs.toAuditMap()));
+            OMAction.COMMIT_MULTIPART_UPLOAD_PARTKEY, keyArgs.toAuditMap()));
       }
     }
     return commitUploadPartInfo;
@@ -2563,11 +2579,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public OmMultipartUploadCompleteInfo completeMultipartUpload(
       OmKeyArgs omKeyArgs, OmMultipartUploadCompleteList multipartUploadList)
       throws IOException {
+
+    Preconditions.checkNotNull(omKeyArgs);
+    omKeyArgs = resolveBucketLink(omKeyArgs, args -> {});
+
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo;
     metrics.incNumCompleteMultipartUploads();
 
-    Map<String, String> auditMap = (omKeyArgs == null) ? new LinkedHashMap<>() :
-        omKeyArgs.toAuditMap();
+    Map<String, String> auditMap = omKeyArgs.toAuditMap();
     auditMap.put(OzoneConsts.MULTIPART_LIST, multipartUploadList
         .getMultipartMap().toString());
     try {
@@ -2587,8 +2606,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public void abortMultipartUpload(OmKeyArgs omKeyArgs) throws IOException {
 
-    Map<String, String> auditMap = (omKeyArgs == null) ? new LinkedHashMap<>() :
-        omKeyArgs.toAuditMap();
+    Preconditions.checkNotNull(omKeyArgs);
+    omKeyArgs = resolveBucketLink(omKeyArgs, args -> {});
+
+    Map<String, String> auditMap = omKeyArgs.toAuditMap();
     metrics.incNumAbortMultipartUploads();
     try {
       keyManager.abortMultipartUpload(omKeyArgs);
@@ -2607,6 +2628,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public OmMultipartUploadListParts listParts(String volumeName,
       String bucketName, String keyName, String uploadID, int partNumberMarker,
       int maxParts)  throws IOException {
+
+    Pair<String, String> resolvedVolumeAndBucket = resolveBucketLink(
+        Pair.of(volumeName, bucketName), args -> {});
+    volumeName = resolvedVolumeAndBucket.getLeft();
+    bucketName = resolvedVolumeAndBucket.getRight();
+
     Map<String, String> auditMap = new HashMap<>();
     auditMap.put(OzoneConsts.VOLUME, volumeName);
     auditMap.put(OzoneConsts.BUCKET, bucketName);
@@ -2635,6 +2662,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public OmMultipartUploadList listMultipartUploads(String volumeName,
       String bucketName, String prefix) throws IOException {
 
+    Pair<String, String> resolvedVolumeAndBucket = resolveBucketLink(
+        Pair.of(volumeName, bucketName), args -> {});
+    volumeName = resolvedVolumeAndBucket.getLeft();
+    bucketName = resolvedVolumeAndBucket.getRight();
+
     Map<String, String> auditMap = new HashMap<>();
     auditMap.put(OzoneConsts.VOLUME, volumeName);
     auditMap.put(OzoneConsts.BUCKET, bucketName);
@@ -2660,12 +2692,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public OzoneFileStatus getFileStatus(OmKeyArgs args) throws IOException {
-    args = resolveBucketLink(args, key -> {
-      if (isAclEnabled) {
-        checkAcls(getResourceType(key), StoreType.OZONE, ACLType.READ,
-            key.getVolumeName(), key.getBucketName(), key.getKeyName());
-      }
-    });
+    args = resolveBucketLink(args, this::checkAclForRead);
+
     boolean auditSuccess = true;
     try {
       metrics.incNumGetFileStatus();
@@ -2775,11 +2803,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries) throws IOException {
-    // TODO resolve links?
-    if(isAclEnabled) {
-      checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
-          args.getVolumeName(), args.getBucketName(), args.getKeyName());
-    }
+
+    args = resolveBucketLink(args, this::checkAclForRead);
+
     boolean auditSuccess = true;
     try {
       metrics.incNumListStatus();
@@ -3303,6 +3329,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     );
   }
 
+  private Pair<String, String> resolveBucketLink(
+      Pair<String, String> volumeAndBucket,
+      CheckedConsumer<Pair<String, String>, IOException> aclCheck)
+      throws IOException {
+
+    return resolveBucketLink(volumeAndBucket, aclCheck, new HashSet<>(),
+        Function.identity(),
+        (x, sourceVolumeAndBucket) -> sourceVolumeAndBucket
+    );
+  }
+
   /**
    *
    * @param keyArgs information to describe a key, whose bucket should be
@@ -3344,17 +3381,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         visited, extractor, updater);
   }
 
-  private void checkAclForKeyCreate(OmKeyArgs key) throws OMException {
+  private void checkAclForRead(OmKeyArgs args) throws OMException {
+    if (isAclEnabled) {
+      checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
+          args.getVolumeName(), args.getBucketName(), args.getKeyName());
+    }
+  }
+
+  private void checkAclForKeyCreate(OmKeyArgs args) throws OMException {
     if (isAclEnabled) {
       try {
         checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.WRITE,
-            key.getVolumeName(), key.getBucketName(), key.getKeyName());
+            args.getVolumeName(), args.getBucketName(), args.getKeyName());
       } catch (OMException ex) {
         // For new keys key checkAccess call will fail as key doesn't exist.
         // Check user access for bucket.
         if (ex.getResult().equals(KEY_NOT_FOUND)) {
           checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.WRITE,
-              key.getVolumeName(), key.getBucketName(), key.getKeyName());
+              args.getVolumeName(), args.getBucketName(), args.getKeyName());
         } else {
           throw ex;
         }

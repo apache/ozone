@@ -101,21 +101,18 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
 
     RenameKeyRequest renameKeyRequest = getOmRequest().getRenameKeyRequest();
-    OzoneManagerProtocolProtos.KeyArgs renameKeyArgs =
+    OzoneManagerProtocolProtos.KeyArgs keyArgs =
         renameKeyRequest.getKeyArgs();
 
-    String volumeName = renameKeyArgs.getVolumeName();
-    String bucketName = renameKeyArgs.getBucketName();
-    String fromKeyName = renameKeyArgs.getKeyName();
+    String volumeName = keyArgs.getVolumeName();
+    String bucketName = keyArgs.getBucketName();
+    String fromKeyName = keyArgs.getKeyName();
     String toKeyName = renameKeyRequest.getToKeyName();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumKeyRenames();
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
-
-    Map<String, String> auditMap =
-        buildAuditMap(renameKeyArgs, renameKeyRequest);
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -132,12 +129,18 @@ public class OMKeyRenameRequest extends OMKeyRequest {
         throw new OMException("Key name is empty",
             OMException.ResultCodes.INVALID_KEY_NAME);
       }
-      // check Acls to see if user has access to perform delete operation on
-      // old key and create operation on new key
-      checkKeyAcls(ozoneManager, volumeName, bucketName, fromKeyName,
-          IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
-      checkKeyAcls(ozoneManager, volumeName, bucketName, toKeyName,
-          IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
+
+      keyArgs = ozoneManager.resolveBucketLink(keyArgs,
+          key -> {
+            checkKeyAcls(ozoneManager,
+                key.getVolumeName(), key.getBucketName(), key.getKeyName(),
+                IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
+            checkKeyAcls(ozoneManager,
+                key.getVolumeName(), key.getBucketName(), toKeyName,
+                IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
+      });
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
 
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);
@@ -214,7 +217,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
 
         fromKeyValue.setKeyName(toKeyName);
         //Set modification time
-        fromKeyValue.setModificationTime(renameKeyArgs.getModificationTime());
+        fromKeyValue.setModificationTime(keyArgs.getModificationTime());
 
         // Add to cache.
         // fromKey should be deleted, toKey should be added with newly updated
@@ -248,6 +251,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     }
 
     if (result == Result.SUCCESS || result == Result.FAILURE) {
+      Map<String, String> auditMap = buildAuditMap(keyArgs, renameKeyRequest);
       auditLog(auditLogger, buildAuditMessage(OMAction.RENAME_KEY, auditMap,
           exception, getOmRequest().getUserInfo()));
     }

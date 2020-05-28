@@ -89,20 +89,18 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
     DeleteKeyRequest deleteKeyRequest = getOmRequest().getDeleteKeyRequest();
 
-    OzoneManagerProtocolProtos.KeyArgs deleteKeyArgs =
+    OzoneManagerProtocolProtos.KeyArgs keyArgs =
         deleteKeyRequest.getKeyArgs();
 
-    String volumeName = deleteKeyArgs.getVolumeName();
-    String bucketName = deleteKeyArgs.getBucketName();
-    String keyName = deleteKeyArgs.getKeyName();
+    String volumeName = keyArgs.getVolumeName();
+    String bucketName = keyArgs.getBucketName();
+    String keyName = keyArgs.getKeyName();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumKeyDeletes();
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
-
-    Map<String, String> auditMap = buildKeyArgsAuditMap(deleteKeyArgs);
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -112,9 +110,12 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
     Result result = null;
     try {
-      // check Acl
-      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-          IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
+      keyArgs = ozoneManager.resolveBucketLink(keyArgs,
+          key -> checkKeyAcls(ozoneManager,
+              key.getVolumeName(), key.getBucketName(), key.getKeyName(),
+              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY));
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
 
       String objectKey = omMetadataManager.getOzoneKey(
           volumeName, bucketName, keyName);
@@ -179,6 +180,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
     // Performing audit logging outside of the lock.
     if (result != Result.REPLAY) {
+      Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
       auditLog(auditLogger, buildAuditMessage(OMAction.DELETE_KEY, auditMap,
           exception, userInfo));
     }
@@ -195,7 +197,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       break;
     case FAILURE:
       omMetrics.incNumKeyDeleteFails();
-      LOG.error("Key delete failed. Volume:{}, Bucket:{}, Key{}. Exception:{}",
+      LOG.error("Key delete failed. Volume:{}, Bucket:{}, Key{}",
           volumeName, bucketName, keyName, exception);
       break;
     default:
