@@ -44,6 +44,8 @@ import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
+
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -214,17 +216,17 @@ public class ReconUtils {
 
   /**
    * Make HTTP GET call on the URL and return inputstream to the response.
-   * @param httpClient HttpClient to use.
+   * @param connectionFactory URLConnectionFactory to use.
    * @param url url to call
+   * @param isSpnego is SPNEGO enabled
    * @return Inputstream to the response of the HTTP call.
-   * @throws IOException While reading the response.
+   * @throws IOException, AuthenticationException While reading the response.
    */
   public InputStream makeHttpCall(URLConnectionFactory connectionFactory,
-                                  String url)
-      throws IOException {
-
+                                  String url, boolean isSpnego)
+      throws IOException, AuthenticationException {
     URLConnection urlConnection =
-          connectionFactory.openConnection(new URL(url));
+          connectionFactory.openConnection(new URL(url), isSpnego);
     urlConnection.connect();
     return urlConnection.getInputStream();
   }

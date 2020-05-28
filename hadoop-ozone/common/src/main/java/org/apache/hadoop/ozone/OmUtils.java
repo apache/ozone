@@ -229,9 +229,6 @@ public final class OmUtils {
     case LookupKey:
     case ListKeys:
     case ListTrash:
-    case RecoverTrash:
-    case InfoS3Bucket:
-    case ListS3Buckets:
     case ServiceList:
     case ListMultiPartUploadParts:
     case GetFileStatus:
@@ -252,8 +249,6 @@ public final class OmUtils {
     case DeleteKey:
     case CommitKey:
     case AllocateBlock:
-    case CreateS3Bucket:
-    case DeleteS3Bucket:
     case InitiateMultiPartUpload:
     case CommitMultiPartUpload:
     case CompleteMultiPartUpload:
@@ -268,6 +263,7 @@ public final class OmUtils {
     case SetAcl:
     case AddAcl:
     case PurgeKeys:
+    case RecoverTrash:
       return false;
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);
@@ -505,5 +501,19 @@ public final class OmUtils {
   public static long getOMClientRpcTimeOut(Configuration configuration) {
     return OzoneConfiguration.of(configuration)
         .getObject(OMClientConfig.class).getRpcTimeOut();
+  }
+
+  /**
+   * Return OmKeyInfo that would be recovered.
+   */
+  public static OmKeyInfo prepareKeyForRecover(OmKeyInfo keyInfo,
+      RepeatedOmKeyInfo repeatedOmKeyInfo) {
+
+    /* TODO: HDDS-2425. HDDS-2426.*/
+    if (repeatedOmKeyInfo.getOmKeyInfoList().contains(keyInfo)) {
+      return keyInfo;
+    } else {
+      return null;
+    }
   }
 }

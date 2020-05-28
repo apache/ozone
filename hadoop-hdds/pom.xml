@@ -44,14 +44,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <module>test-utils</module>
   </modules>
 
-  <properties>
-    <protobuf-maven-plugin.version>0.5.1</protobuf-maven-plugin.version>
-    <os-maven-plugin.version>1.5.0.Final</os-maven-plugin.version>
-
-    <maven-surefire-plugin.version>3.0.0-M1</maven-surefire-plugin.version>
-
-    <junit.jupiter.version>5.3.1</junit.jupiter.version>
-  </properties>
   <repositories>
     <repository>
       <id>apache.snapshots.https</id>
@@ -164,18 +156,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       </dependency>
 
       <dependency>
-        <groupId>org.openjdk.jmh</groupId>
-        <artifactId>jmh-core</artifactId>
-        <version>1.19</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.openjdk.jmh</groupId>
-        <artifactId>jmh-generator-annprocess</artifactId>
-        <version>1.19</version>
-      </dependency>
-
-      <dependency>
         <groupId>org.apache.ratis</groupId>
         <artifactId>ratis-proto-shaded</artifactId>
         <version>${ratis.version}</version>
@@ -215,13 +195,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcpkix-jdk15on</artifactId>
         <version>${bouncycastle.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter-api</artifactId>
-        <version>${junit.jupiter.version}</version>
-        <scope>test</scope>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -275,6 +248,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             <exclude>src/test/resources/incorrect.checksum.container</exclude>
             <exclude>src/test/resources/incorrect.container</exclude>
             <exclude>src/test/resources/test.db.ini</exclude>
+            <exclude>src/main/proto/proto.lock</exclude>
           </excludes>
         </configuration>
       </plugin>

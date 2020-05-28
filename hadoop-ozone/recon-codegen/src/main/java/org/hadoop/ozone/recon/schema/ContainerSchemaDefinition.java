@@ -18,6 +18,8 @@
 
 package org.hadoop.ozone.recon.schema;
 
+import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
+
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import org.jooq.DSLContext;
@@ -35,9 +37,9 @@ import java.sql.SQLException;
 public class ContainerSchemaDefinition implements ReconSchemaDefinition {
 
   public static final String CONTAINER_HISTORY_TABLE_NAME =
-      "container_history";
+      "CONTAINER_HISTORY";
   public static final String MISSING_CONTAINERS_TABLE_NAME =
-      "missing_containers";
+      "MISSING_CONTAINERS";
   private static final String CONTAINER_ID = "container_id";
   private final DataSource dataSource;
   private DSLContext dslContext;
@@ -51,8 +53,12 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
   public void initializeSchema() throws SQLException {
     Connection conn = dataSource.getConnection();
     dslContext = DSL.using(conn);
-    createContainerHistoryTable();
-    createMissingContainersTable();
+    if (!TABLE_EXISTS_CHECK.test(conn, CONTAINER_HISTORY_TABLE_NAME)) {
+      createContainerHistoryTable();
+    }
+    if (!TABLE_EXISTS_CHECK.test(conn, MISSING_CONTAINERS_TABLE_NAME)) {
+      createMissingContainersTable();
+    }
   }
 
   /**

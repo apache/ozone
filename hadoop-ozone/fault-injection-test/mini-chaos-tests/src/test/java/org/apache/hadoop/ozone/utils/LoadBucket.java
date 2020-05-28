@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.utils;
 
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.ozone.OzoneFileSystem;
@@ -29,6 +30,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import java.io.InputStream;
 import java.io.OutputStream;
+import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,6 +76,16 @@ public class LoadBucket {
                        String keyName) throws Exception {
     Op writeOp = new WriteOp(fsOp, keyName, buffer);
     writeOp.execute();
+  }
+
+  public void createDirectory(String keyName) throws Exception {
+    Op dirOp = new DirectoryOp(keyName, false);
+    dirOp.execute();
+  }
+
+  public void readDirectory(String keyName) throws Exception {
+    Op dirOp = new DirectoryOp(keyName, true);
+    dirOp.execute();
   }
 
   // Read ops.
@@ -144,6 +156,46 @@ public class LoadBucket {
     @Override
     public String toString() {
       return "opType=" + opName + " keyName=" + keyName;
+    }
+  }
+
+  /**
+   * Create and Read Directories.
+   */
+  public class DirectoryOp extends Op {
+    private final boolean readDir;
+
+    DirectoryOp(String keyName, boolean readDir) {
+      super(true, keyName);
+      this.readDir = readDir;
+    }
+
+    @Override
+    void doFsOp(Path p) throws IOException {
+      if (readDir) {
+        FileStatus status = fs.getFileStatus(p);
+        Assert.assertTrue(status.isDirectory());
+        Assert.assertEquals(p,
+            Path.getPathWithoutSchemeAndAuthority(status.getPath()));
+      } else {
+        Assert.assertTrue(fs.mkdirs(p));
+      }
+    }
+
+    @Override
+    void doBucketOp(String key) throws IOException {
+      // nothing to do here
+    }
+
+    @Override
+    void doPostOp() throws IOException {
+      // Nothing to do here
+    }
+
+    @Override
+    public String toString() {
+      return super.toString() + " "
+          + (readDir ? "readDirectory": "writeDirectory");
     }
   }
 

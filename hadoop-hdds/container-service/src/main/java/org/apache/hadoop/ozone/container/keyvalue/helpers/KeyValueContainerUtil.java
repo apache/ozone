@@ -22,16 +22,18 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.Map;
 
+import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueBlockIterator;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.hdds.utils.MetadataStore;
 import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
 
@@ -40,6 +42,12 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.ozone.OzoneConsts.DB_BLOCK_COMMIT_SEQUENCE_ID_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_BLOCK_COUNT_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_CONTAINER_BYTES_USED_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_CONTAINER_DELETE_TRANSACTION_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_PENDING_DELETE_BLOCK_COUNT_KEY;
 
 /**
  * Class which defines utility methods for KeyValueContainer.
@@ -126,7 +134,9 @@ public final class KeyValueContainerUtil {
   }
 
   /**
-   * Parse KeyValueContainerData and verify checksum.
+   * Parse KeyValueContainerData and verify checksum. Set block related
+   * metadata like block commit sequence id, block count, bytes used and
+   * pending delete block count and delete transaction id.
    * @param kvContainerData
    * @param config
    * @throws IOException
@@ -150,29 +160,109 @@ public final class KeyValueContainerUtil {
     }
     kvContainerData.setDbFile(dbFile);
 
-    try(ReferenceCountedDB metadata =
-            BlockUtils.getDB(kvContainerData, config)) {
-      long bytesUsed = 0;
-      List<Map.Entry<byte[], byte[]>> liveKeys = metadata.getStore()
-          .getRangeKVs(null, Integer.MAX_VALUE,
-              MetadataKeyFilters.getNormalKeyFilter());
 
-      bytesUsed = liveKeys.parallelStream().mapToLong(e-> {
-        BlockData blockData;
-        try {
-          blockData = BlockUtils.getBlockData(e.getValue());
-          return blockData.getSize();
-        } catch (IOException ex) {
-          return 0L;
-        }
-      }).sum();
-      kvContainerData.setBytesUsed(bytesUsed);
-      kvContainerData.setKeyCount(liveKeys.size());
-      byte[] bcsId = metadata.getStore().get(DFSUtil.string2Bytes(
-          OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX));
-      if (bcsId != null) {
-        kvContainerData.updateBlockCommitSequenceId(Longs.fromByteArray(bcsId));
+    boolean isBlockMetadataSet = false;
+
+    try(ReferenceCountedDB containerDB = BlockUtils.getDB(kvContainerData,
+        config)) {
+
+      // Set pending deleted block count.
+      byte[] pendingDeleteBlockCount =
+          containerDB.getStore().get(DB_PENDING_DELETE_BLOCK_COUNT_KEY);
+      if (pendingDeleteBlockCount != null) {
+        kvContainerData.incrPendingDeletionBlocks(
+            Ints.fromByteArray(pendingDeleteBlockCount));
+      } else {
+        // Set pending deleted block count.
+        MetadataKeyFilters.KeyPrefixFilter filter =
+            new MetadataKeyFilters.KeyPrefixFilter()
+                .addFilter(OzoneConsts.DELETING_KEY_PREFIX);
+        int numPendingDeletionBlocks =
+            containerDB.getStore().getSequentialRangeKVs(null,
+                Integer.MAX_VALUE, filter)
+                .size();
+        kvContainerData.incrPendingDeletionBlocks(numPendingDeletionBlocks);
       }
+
+      // Set delete transaction id.
+      byte[] delTxnId =
+          containerDB.getStore().get(DB_CONTAINER_DELETE_TRANSACTION_KEY);
+      if (delTxnId != null) {
+        kvContainerData
+            .updateDeleteTransactionId(Longs.fromByteArray(delTxnId));
+      }
+
+      // Set BlockCommitSequenceId.
+      byte[] bcsId = containerDB.getStore().get(
+          DB_BLOCK_COMMIT_SEQUENCE_ID_KEY);
+      if (bcsId != null) {
+        kvContainerData
+            .updateBlockCommitSequenceId(Longs.fromByteArray(bcsId));
+      }
+
+      // Set bytes used.
+      // commitSpace for Open Containers relies on usedBytes
+      byte[] bytesUsed =
+          containerDB.getStore().get(DB_CONTAINER_BYTES_USED_KEY);
+      if (bytesUsed != null) {
+        isBlockMetadataSet = true;
+        kvContainerData.setBytesUsed(Longs.fromByteArray(bytesUsed));
+      }
+
+      // Set block count.
+      byte[] blockCount = containerDB.getStore().get(DB_BLOCK_COUNT_KEY);
+      if (blockCount != null) {
+        isBlockMetadataSet = true;
+        kvContainerData.setKeyCount(Longs.fromByteArray(blockCount));
+      }
+    }
+
+    if (!isBlockMetadataSet) {
+      initializeUsedBytesAndBlockCount(kvContainerData);
+    }
+  }
+
+
+  /**
+   * Initialize bytes used and block count.
+   * @param kvContainerData
+   * @throws IOException
+   */
+  private static void initializeUsedBytesAndBlockCount(
+      KeyValueContainerData kvContainerData) throws IOException {
+
+    long blockCount = 0;
+    try (KeyValueBlockIterator blockIter = new KeyValueBlockIterator(
+        kvContainerData.getContainerID(),
+        new File(kvContainerData.getContainerPath()))) {
+      long usedBytes = 0;
+
+
+      boolean success = true;
+      while (success) {
+        try {
+          if (blockIter.hasNext()) {
+            BlockData block = blockIter.nextBlock();
+            long blockLen = 0;
+
+            List< ContainerProtos.ChunkInfo > chunkInfoList = block.getChunks();
+            for (ContainerProtos.ChunkInfo chunk : chunkInfoList) {
+              ChunkInfo info = ChunkInfo.getFromProtoBuf(chunk);
+              blockLen += info.getLen();
+            }
+
+            usedBytes += blockLen;
+            blockCount++;
+          } else {
+            success = false;
+          }
+        } catch (IOException ex) {
+          LOG.error("Failed to parse block data for Container {}",
+              kvContainerData.getContainerID());
+        }
+      }
+      kvContainerData.setBytesUsed(usedBytes);
+      kvContainerData.setKeyCount(blockCount);
     }
   }
 

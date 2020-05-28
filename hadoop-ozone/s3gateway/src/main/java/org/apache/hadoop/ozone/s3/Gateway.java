@@ -24,8 +24,9 @@ import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
+
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -52,7 +53,7 @@ public class Gateway extends GenericCli {
     OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
     TracingUtil.initTracing("S3gateway", ozoneConfiguration);
     OzoneConfigurationHolder.setConfiguration(ozoneConfiguration);
-    ozoneConfiguration.set("hadoop.http.authentication.type", "simple");
+    UserGroupInformation.setConfiguration(ozoneConfiguration);
     httpServer = new S3GatewayHttpServer(ozoneConfiguration, "s3gateway");
     start();
     return null;

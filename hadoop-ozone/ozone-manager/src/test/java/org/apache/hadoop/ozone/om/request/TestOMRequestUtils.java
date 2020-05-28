@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.request.s3.bucket.S3BucketCreateRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .MultipartUploadAbortRequest;
@@ -241,15 +240,6 @@ public final class TestOMRequestUtils {
     addVolumeToDB(volumeName, UUID.randomUUID().toString(), omMetadataManager);
   }
 
-  public static void addS3BucketToDB(String volumeName, String s3BucketName,
-      OMMetadataManager omMetadataManager) throws Exception {
-    omMetadataManager.getS3Table().put(s3BucketName,
-        S3BucketCreateRequest.formatS3MappingName(volumeName, s3BucketName));
-    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName).setBucketName(s3BucketName).build();
-    addBucketToOM(omMetadataManager, omBucketInfo);
-  }
-
   /**
    * Add volume creation entry to OM DB.
    * @param volumeName
@@ -308,30 +298,6 @@ public final class TestOMRequestUtils {
     return OzoneManagerProtocolProtos.OMRequest.newBuilder()
         .setCreateBucketRequest(req)
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
-        .setClientId(UUID.randomUUID().toString()).build();
-  }
-
-  public static OzoneManagerProtocolProtos.OMRequest createS3BucketRequest(
-      String userName, String s3BucketName) {
-    OzoneManagerProtocolProtos.S3CreateBucketRequest request =
-        OzoneManagerProtocolProtos.S3CreateBucketRequest.newBuilder()
-            .setUserName(userName)
-            .setS3Bucketname(s3BucketName).build();
-
-    return OzoneManagerProtocolProtos.OMRequest.newBuilder()
-        .setCreateS3BucketRequest(request)
-        .setCmdType(OzoneManagerProtocolProtos.Type.CreateS3Bucket)
-        .setClientId(UUID.randomUUID().toString()).build();
-  }
-
-  public static OzoneManagerProtocolProtos.OMRequest deleteS3BucketRequest(
-      String s3BucketName) {
-    OzoneManagerProtocolProtos.S3DeleteBucketRequest request =
-        OzoneManagerProtocolProtos.S3DeleteBucketRequest.newBuilder()
-            .setS3BucketName(s3BucketName).build();
-    return OzoneManagerProtocolProtos.OMRequest.newBuilder()
-        .setDeleteS3BucketRequest(request)
-        .setCmdType(OzoneManagerProtocolProtos.Type.DeleteS3Bucket)
         .setClientId(UUID.randomUUID().toString()).build();
   }
 

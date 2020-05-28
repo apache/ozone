@@ -24,6 +24,7 @@ import java.util.Map;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,9 +75,8 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
 
     Preconditions.checkNotNull(setVolumePropertyRequest);
 
-    OMResponse.Builder omResponse = OMResponse.newBuilder().setCmdType(
-        OzoneManagerProtocolProtos.Type.SetVolumeProperty).setStatus(
-        OzoneManagerProtocolProtos.Status.OK).setSuccess(true);
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
 
     // In production this will never happen, this request will be called only
     // when we have quota in bytes is set in setVolumePropertyRequest.

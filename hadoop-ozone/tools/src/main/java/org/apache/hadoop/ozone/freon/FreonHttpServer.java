@@ -71,4 +71,14 @@ public class FreonHttpServer extends BaseHttpServer {
   @Override protected String getEnabledKey() {
     return OzoneConfigKeys.OZONE_FREON_HTTP_ENABLED_KEY;
   }
+
+  @Override
+  protected String getHttpAuthType() {
+    return OzoneConfigKeys.OZONE_FREON_HTTP_AUTH_TYPE;
+  }
+
+  @Override
+  protected String getHttpAuthConfigPrefix() {
+    return OzoneConfigKeys.OZONE_FREON_HTTP_AUTH_CONFIG_PREFIX;
+  }
 }

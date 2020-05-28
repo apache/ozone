@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.junit.Assert;
 import org.junit.Before;
@@ -35,6 +36,7 @@ import org.junit.rules.TemporaryFolder;
 import java.util.List;
 import java.util.TreeSet;
 
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 
 /**
@@ -55,6 +57,29 @@ public class TestOmMetadataManager {
     ozoneConfiguration.set(OZONE_OM_DB_DIRS,
         folder.getRoot().getAbsolutePath());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
+  }
+
+  @Test
+  public void testTransactionTable() throws Exception {
+    omMetadataManager.getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
+        new OMTransactionInfo.Builder().setCurrentTerm(1)
+            .setTransactionIndex(100).build());
+
+    omMetadataManager.getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
+        new OMTransactionInfo.Builder().setCurrentTerm(2)
+            .setTransactionIndex(200).build());
+
+    omMetadataManager.getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
+        new OMTransactionInfo.Builder().setCurrentTerm(3)
+            .setTransactionIndex(250).build());
+
+    OMTransactionInfo omTransactionInfo =
+        omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
+
+    Assert.assertEquals(3, omTransactionInfo.getCurrentTerm());
+    Assert.assertEquals(250, omTransactionInfo.getTransactionIndex());
+
+
   }
 
   @Test

@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ContainerHistoryDao;
@@ -87,10 +88,11 @@ public class TestMissingContainerTask extends AbstractReconSqlDBTest {
 
     long currentTime = System.currentTimeMillis();
     ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
+    ReconTaskConfig reconTaskConfig = new ReconTaskConfig();
+    reconTaskConfig.setMissingContainerTaskInterval(60);
     MissingContainerTask missingContainerTask =
-        new MissingContainerTask(scmMock, reconTaskStatusDao,
-            containerSchemaManager);
-    missingContainerTask.register();
+        new MissingContainerTask(scmMock.getContainerManager(),
+            reconTaskStatusDao, containerSchemaManager, reconTaskConfig);
     missingContainerTask.start();
 
     LambdaTestUtils.await(6000, 1000, () ->
