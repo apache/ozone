@@ -238,14 +238,14 @@ jobs:
       - it-filesystem
       - it-freon
       - unit
-      steps:
-        - uses: actions/checkout@v2
-        - uses: ./.github/buildenv
-          with:
-            args: ./hadoop-ozone/dev-support/checks/build.sh
-        - uses: actions/download-artifact@v2
-          with:
-            path: target/artifacts
-        - name: Setup tmate session
-          uses: mxschmitt/action-tmate@v2
-        - run: ./github/coverage-report.sh
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ./.github/buildenv
+        with:
+          args: ./hadoop-ozone/dev-support/checks/build.sh
+      - uses: actions/download-artifact@v2
+        with:
+          path: target/artifacts
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v2
+      - run: ./github/coverage-report.sh
