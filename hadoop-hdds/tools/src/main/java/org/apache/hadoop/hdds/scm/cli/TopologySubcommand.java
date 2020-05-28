@@ -131,7 +131,8 @@ public class TopologySubcommand implements Callable<Void> {
   // Format "ipAddress(hostName):PortName1=PortValue1    networkLocation"
   private void printNodesWithLocation(Collection<HddsProtos.Node> nodes) {
     nodes.forEach(node -> {
-      System.out.print(" " + node.getNodeID().getIpAddress() + "(" +
+      System.out.print(" " + node.getNodeID().getUuid() + "/" +
+          node.getNodeID().getIpAddress() + "(" +
           node.getNodeID().getHostName() + ")" +
           ":" + formatPortOutput(node.getNodeID().getPortsList()));
       System.out.println("    " +
