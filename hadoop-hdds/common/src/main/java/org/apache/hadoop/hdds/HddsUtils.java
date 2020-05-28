@@ -465,14 +465,6 @@ public final class HddsUtils {
   }
 
   /**
-   * Get the current UTC time in milliseconds.
-   * @return the current UTC time in milliseconds.
-   */
-  public static long getUtcTime() {
-    return Calendar.getInstance(UTC_ZONE).getTimeInMillis();
-  }
-
-  /**
    * Get the current time in milliseconds.
    * @return the current time in milliseconds.
    */
