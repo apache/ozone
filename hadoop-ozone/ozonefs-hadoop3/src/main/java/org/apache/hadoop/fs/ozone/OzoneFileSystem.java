@@ -91,8 +91,8 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
   protected OzoneClientAdapter createAdapter(ConfigurationSource conf,
       String bucketStr, String volumeStr, String omHost, int omPort)
       throws IOException {
-    return new OzoneClientAdapterImpl(omHost, omPort, conf, bucketStr,
-        volumeStr,
+    return new OzoneClientAdapterImpl(omHost, omPort, conf, volumeStr,
+        bucketStr,
         storageStatistics);
   }
 
