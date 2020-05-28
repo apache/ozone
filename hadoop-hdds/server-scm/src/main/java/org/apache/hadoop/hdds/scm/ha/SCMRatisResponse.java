@@ -67,6 +67,10 @@ public final class SCMRatisResponse {
   public static Message encode(final Object result)
       throws InvalidProtocolBufferException {
 
+    if (result == null) {
+      return Message.EMPTY;
+    }
+
     final ByteString value;
     if (result instanceof GeneratedMessage) {
       value = ((GeneratedMessage) result).toByteString();
@@ -98,6 +102,10 @@ public final class SCMRatisResponse {
 
   private static Object deserializeResult(byte[] response)
       throws InvalidProtocolBufferException {
+    if (response.length == 0) {
+      return null;
+    }
+
     final SCMRatisResponseProto responseProto =
         SCMRatisResponseProto.parseFrom(response);
     try {
