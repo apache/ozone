@@ -232,7 +232,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   public List<DatanodeDetails> getResultSet(
       int nodesRequired, List<DatanodeDetails> healthyNodes)
       throws SCMException {
-    if (nodesRequired != HddsProtos.ReplicationFactor.THREE.getNumber()) {
+    if (nodesRequired != HddsProtos.ReplicationFactor.THREE.getNumber() &&
+        nodesRequired != HddsProtos.ReplicationFactor.TWO.getNumber()) {
       throw new SCMException("Nodes required number is not supported: " +
           nodesRequired, SCMException.ResultCodes.INVALID_CAPACITY);
     }

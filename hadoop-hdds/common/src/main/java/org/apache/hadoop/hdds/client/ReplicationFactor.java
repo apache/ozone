@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
  */
 public enum ReplicationFactor {
   ONE(1),
+  TWO(2),
   THREE(3);
 
   /**
@@ -49,6 +50,9 @@ public enum ReplicationFactor {
     if(value == 1) {
       return ONE;
     }
+    if(value == 2) {
+      return TWO;
+    }
     if (value == 3) {
       return THREE;
     }
@@ -63,6 +67,8 @@ public enum ReplicationFactor {
     switch (replicationFactor) {
     case ONE:
       return ReplicationFactor.ONE;
+    case TWO:
+      return ReplicationFactor.TWO;
     case THREE:
       return ReplicationFactor.THREE;
     default:

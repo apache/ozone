@@ -113,6 +113,7 @@ public class RatisPipelineProvider extends PipelineProvider {
     case ONE:
       dns = pickNodesNeverUsed(ReplicationType.RATIS, ReplicationFactor.ONE);
       break;
+    case TWO:
     case THREE:
       dns = placementPolicy.chooseDatanodes(null,
           null, factor.getNumber(), 0);

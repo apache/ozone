@@ -254,10 +254,12 @@ public class ContainerStateManager {
 
     boolean bgCreateOne = (type == ReplicationType.RATIS) && replicationFactor
         == ReplicationFactor.ONE && autoCreateRatisOne;
+    boolean bgCreateTwo = (type == ReplicationType.RATIS) && replicationFactor
+        == ReplicationFactor.TWO;
     boolean bgCreateThree = (type == ReplicationType.RATIS) && replicationFactor
         == ReplicationFactor.THREE;
 
-    if (!pipelines.isEmpty() && (bgCreateOne || bgCreateThree)) {
+    if (!pipelines.isEmpty() && (bgCreateOne || bgCreateTwo || bgCreateThree)) {
       // let background create Ratis pipelines.
       pipeline = pipelines.get((int) containerCount.get() % pipelines.size());
     } else {

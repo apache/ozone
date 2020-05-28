@@ -412,7 +412,9 @@ public class SCMPipelineManager implements PipelineManager {
   @Override
   public void scrubPipeline(ReplicationType type, ReplicationFactor factor)
       throws IOException{
-    if (type != ReplicationType.RATIS || factor != ReplicationFactor.THREE) {
+    if (type != ReplicationType.RATIS ||
+        (factor != ReplicationFactor.THREE &&
+            factor != ReplicationFactor.TWO)) {
       // Only srub pipeline for RATIS THREE pipeline
       return;
     }

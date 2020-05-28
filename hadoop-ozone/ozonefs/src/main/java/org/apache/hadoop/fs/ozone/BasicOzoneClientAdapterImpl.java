@@ -221,6 +221,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     try {
       OzoneOutputStream ozoneOutputStream = null;
       if (replication == ReplicationFactor.ONE.getValue()
+          || replication == ReplicationFactor.TWO.getValue()
           || replication == ReplicationFactor.THREE.getValue()) {
         ReplicationFactor clientReplication = ReplicationFactor
             .valueOf(replication);
