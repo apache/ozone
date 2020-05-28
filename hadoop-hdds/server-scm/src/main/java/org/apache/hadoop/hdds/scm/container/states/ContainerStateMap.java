@@ -535,6 +535,7 @@ public class ContainerStateMap {
     }
   }
 
+  // TODO: Move container not found exception to upper layer.
   private void checkIfContainerExist(ContainerID containerID)
       throws ContainerNotFoundException {
     if (!containerMap.containsKey(containerID)) {
