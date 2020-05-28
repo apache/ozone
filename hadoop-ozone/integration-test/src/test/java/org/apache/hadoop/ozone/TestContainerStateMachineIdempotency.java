@@ -43,11 +43,19 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 
 /**
  * Tests the idempotent operations in ContainerStateMachine.
  */
 public class TestContainerStateMachineIdempotency {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration ozoneConfig;
   private static StorageContainerLocationProtocolClientSideTranslatorPB

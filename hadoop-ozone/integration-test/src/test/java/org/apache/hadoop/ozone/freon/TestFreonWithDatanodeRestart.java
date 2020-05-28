@@ -34,12 +34,20 @@ import org.junit.Test;
 
 import java.util.concurrent.TimeUnit;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.*;
 
 /**
  * Tests Freon with Datanode restarts.
  */
 public class TestFreonWithDatanodeRestart {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;

@@ -58,6 +58,8 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.
         OZONE_SCM_STALENODE_INTERVAL;
@@ -66,6 +68,12 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.
  * Class to test CommitWatcher functionality.
  */
 public class TestCommitWatcher {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf = new OzoneConfiguration();
   private static OzoneClient client;

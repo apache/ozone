@@ -1945,6 +1945,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <java.security.egd>${java.security.egd}</java.security.egd>
             <require.test.libhadoop>${require.test.libhadoop}</require.test.libhadoop>
           </systemPropertyVariables>
+          <properties>
+            <property>
+              <name>listener</name>
+              <value>org.apache.hadoop.test.TimedOutTestsListener</value>
+            </property>
+          </properties>
           <includes>
             <include>**/Test*.java</include>
           </includes>

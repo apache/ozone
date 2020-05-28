@@ -49,7 +49,9 @@ import static org.junit.Assert.fail;
 
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.After;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,6 +59,12 @@ import org.slf4j.LoggerFactory;
  * Ozone file system tests that are not covered by contract tests.
  */
 public class TestOzoneFileSystem {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystem.class);
