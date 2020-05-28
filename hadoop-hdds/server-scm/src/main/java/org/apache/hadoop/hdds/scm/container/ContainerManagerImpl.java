@@ -47,6 +47,10 @@ import org.slf4j.LoggerFactory;
  */
 public class ContainerManagerImpl implements ContainerManagerV2 {
 
+  /*
+   * TODO: Introduce container level locks.
+   */
+
   /**
    *
    */
@@ -72,17 +76,18 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
    *
    */
   public ContainerManagerImpl(
-      // Introduce builder for this class?
-      final Configuration conf, final PipelineManager pipelineManager,
-      final SCMHAManager scmhaManager,
+      final Configuration conf,
+      final SCMHAManager scmHaManager,
+      final PipelineManager pipelineManager,
       final Table<ContainerID, ContainerInfo> containerStore)
       throws IOException {
+    // Introduce builder for this class?
     this.lock = new ReentrantReadWriteLock();
     this.pipelineManager = pipelineManager;
-    this.containerStateManager =  ContainerStateManagerImpl.newBuilder()
+    this.containerStateManager = ContainerStateManagerImpl.newBuilder()
         .setConfiguration(conf)
         .setPipelineManager(pipelineManager)
-        .setRatisServer(scmhaManager.getRatisServer())
+        .setRatisServer(scmHaManager.getRatisServer())
         .setContainerStore(containerStore)
         .build();
   }
@@ -275,8 +280,8 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   }
 
   @Override
-  public void close() throws IOException {
-    throw new UnsupportedOperationException("Not yet implemented!");
+  public void close() throws Exception {
+    containerStateManager.close();
   }
 
 }
