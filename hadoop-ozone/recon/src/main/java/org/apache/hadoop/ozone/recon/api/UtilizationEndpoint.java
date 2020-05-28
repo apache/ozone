@@ -34,7 +34,7 @@ import java.util.List;
  */
 @Path("/utilization")
 @Produces(MediaType.APPLICATION_JSON)
-public class UtilizationService {
+public class UtilizationEndpoint {
 
   @Inject
   private FileCountBySizeDao fileCountBySizeDao;
