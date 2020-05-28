@@ -37,6 +37,7 @@ public class TestOFSPath {
     Assert.assertEquals("dir3/key4", ofsPath.getKeyName());
     Assert.assertEquals("/volume1/bucket2", ofsPath.getNonKeyPath());
     Assert.assertFalse(ofsPath.isMount());
+    Assert.assertEquals("/volume1/bucket2/dir3/key4", ofsPath.toString());
 
     // The ending '/' matters for key inside a bucket, indicating directory
     ofsPath = new OFSPath("/volume1/bucket2/dir3/dir5/");
@@ -47,6 +48,7 @@ public class TestOFSPath {
     Assert.assertEquals("dir3/dir5/", ofsPath.getKeyName());
     Assert.assertEquals("/volume1/bucket2", ofsPath.getNonKeyPath());
     Assert.assertFalse(ofsPath.isMount());
+    Assert.assertEquals("/volume1/bucket2/dir3/dir5/", ofsPath.toString());
   }
 
   @Test
@@ -60,8 +62,9 @@ public class TestOFSPath {
     Assert.assertEquals("", ofsPath.getKeyName());
     Assert.assertEquals("/volume1/bucket2", ofsPath.getNonKeyPath());
     Assert.assertFalse(ofsPath.isMount());
+    Assert.assertEquals("/volume1/bucket2/", ofsPath.toString());
 
-    // The ending '/' shouldn't for buckets
+    // The trailing '/' doesn't matter when parsing a bucket path
     ofsPath = new OFSPath("/volume1/bucket2");
     Assert.assertEquals("", ofsPath.getAuthority());
     Assert.assertEquals("volume1", ofsPath.getVolumeName());
@@ -70,6 +73,7 @@ public class TestOFSPath {
     Assert.assertEquals("", ofsPath.getKeyName());
     Assert.assertEquals("/volume1/bucket2", ofsPath.getNonKeyPath());
     Assert.assertFalse(ofsPath.isMount());
+    Assert.assertEquals("/volume1/bucket2/", ofsPath.toString());
   }
 
   @Test
@@ -83,8 +87,9 @@ public class TestOFSPath {
     Assert.assertEquals("", ofsPath.getKeyName());
     Assert.assertEquals("/volume1/", ofsPath.getNonKeyPath());
     Assert.assertFalse(ofsPath.isMount());
+    Assert.assertEquals("/volume1/", ofsPath.toString());
 
-    // Ending '/' shouldn't matter
+    // The trailing '/' doesn't matter when parsing a volume path
     ofsPath = new OFSPath("/volume1");
     Assert.assertEquals("", ofsPath.getAuthority());
     Assert.assertEquals("volume1", ofsPath.getVolumeName());
@@ -96,6 +101,7 @@ public class TestOFSPath {
     //  The behavior might change in the future.
     Assert.assertEquals("/volume1/", ofsPath.getNonKeyPath());
     Assert.assertFalse(ofsPath.isMount());
+    Assert.assertEquals("/volume1/", ofsPath.toString());
   }
 
   @Test
@@ -107,6 +113,7 @@ public class TestOFSPath {
     Assert.assertEquals("dir3/", ofsPath.getKeyName());
     Assert.assertEquals("/volume1/bucket2", ofsPath.getNonKeyPath());
     Assert.assertFalse(ofsPath.isMount());
+    Assert.assertEquals("ofs://svc1:9876/volume1/bucket2/dir3/", ofsPath.toString());
   }
 
   @Test
@@ -129,6 +136,7 @@ public class TestOFSPath {
     Assert.assertEquals("", ofsPath.getKeyName());
     Assert.assertEquals("/tmp", ofsPath.getNonKeyPath());
     Assert.assertTrue(ofsPath.isMount());
+    Assert.assertEquals("/tmp/", ofsPath.toString());
 
     // Mount with key
     ofsPath = new OFSPath("/tmp/key1");
@@ -140,5 +148,6 @@ public class TestOFSPath {
     Assert.assertEquals("key1", ofsPath.getKeyName());
     Assert.assertEquals("/tmp", ofsPath.getNonKeyPath());
     Assert.assertTrue(ofsPath.isMount());
+    Assert.assertEquals("/tmp/key1", ofsPath.toString());
   }
 }

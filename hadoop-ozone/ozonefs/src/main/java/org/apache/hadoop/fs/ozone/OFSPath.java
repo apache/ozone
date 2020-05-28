@@ -145,6 +145,39 @@ class OFSPath {
   }
 
   /**
+   * Return the reconstructed path string.
+   * Directories including volumes and buckets will have a trailing '/'.
+   */
+  @Override
+  public String toString() {
+    Preconditions.checkNotNull(authority);
+    StringBuilder sb = new StringBuilder();
+    if (!isMount()) {
+      sb.append(volumeName);
+      sb.append(OZONE_URI_DELIMITER);
+      if (!bucketName.isEmpty()) {
+        sb.append(bucketName);
+        sb.append(OZONE_URI_DELIMITER);
+      }
+    } else {
+      sb.append(mountName);
+      sb.append(OZONE_URI_DELIMITER);
+    }
+    if (!keyName.isEmpty()) {
+      sb.append(keyName);
+    }
+    if (authority.isEmpty()) {
+      sb.insert(0, OZONE_URI_DELIMITER);
+      return sb.toString();
+    } else {
+      final Path pathWithSchemeAuthority = new Path(
+          OZONE_OFS_URI_SCHEME, authority, OZONE_URI_DELIMITER);
+      sb.insert(0, pathWithSchemeAuthority.toString());
+      return sb.toString();
+    }
+  }
+
+  /**
    * Get the volume & bucket or mount name (non-key path).
    * @return String of path excluding key in bucket.
    */
