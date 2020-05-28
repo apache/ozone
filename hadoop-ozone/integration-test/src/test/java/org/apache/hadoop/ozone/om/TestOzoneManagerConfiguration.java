@@ -40,11 +40,19 @@ import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 
 /**
  * Tests OM related configurations.
  */
 public class TestOzoneManagerConfiguration {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private OzoneConfiguration conf;
   private MiniOzoneCluster cluster;

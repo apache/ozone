@@ -53,6 +53,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import org.junit.rules.ExpectedException;
+import org.junit.rules.Timeout;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -65,6 +66,12 @@ import static org.junit.Assert.fail;
  * Test read retries from multiple nodes in the pipeline.
  */
 public class TestReadRetries {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();

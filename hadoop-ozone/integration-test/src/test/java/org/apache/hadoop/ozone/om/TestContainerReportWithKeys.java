@@ -36,6 +36,7 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,6 +47,12 @@ import java.util.HashMap;
  * This class tests container report with DN container state info.
  */
 public class TestContainerReportWithKeys {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   private static final Logger LOG = LoggerFactory.getLogger(
       TestContainerReportWithKeys.class);
   private static MiniOzoneCluster cluster = null;

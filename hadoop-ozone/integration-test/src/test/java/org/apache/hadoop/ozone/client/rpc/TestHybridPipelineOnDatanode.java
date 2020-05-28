@@ -46,11 +46,19 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.HashMap;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 
 /**
  * Tests Hybrid Pipeline Creation and IO on same set of Datanodes.
  */
 public class TestHybridPipelineOnDatanode {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
