@@ -50,12 +50,12 @@ class OFSPath {
    * Assuming /tmp is mounted to /tempVol/tempBucket
    * (empty) = empty string "".
    *
-   * Path                  volumeName     bucketName     mountName    keyName
+   * Path                  volumeName   bucketName       mountName    keyName
    * --------------------------------------------------------------------------
-   * /vol1/buc2/dir3/key4  vol1           buc2           (empty)      dir3/key4
-   * /vol1/buc2            vol1           buc2           (empty)      (empty)
-   * /vol1                 vol1           (empty)        (empty)      (empty)
-   * /tmp/dir3/key4        tmp            <username>     tmp          dir3/key4
+   * /vol1/buc2/dir3/key4  vol1         buc2             (empty)      dir3/key4
+   * /vol1/buc2            vol1         buc2             (empty)      (empty)
+   * /vol1                 vol1         (empty)          (empty)      (empty)
+   * /tmp/dir3/key4        tmp          md5(<username>)  tmp          dir3/key4
    *
    * Note the leading '/' doesn't matter.
    */
@@ -69,42 +69,37 @@ class OFSPath {
   static final String OFS_MOUNT_TMP_VOLUMENAME = "tmp";
 
   OFSPath(Path path) {
-    URI uri = path.toUri();
-    // scheme is case-insensitive
-    if (!uri.getScheme().toLowerCase().equals(OZONE_OFS_URI_SCHEME)) {
-      throw new ParseException("Can't parse schemes other than ofs://.");
-    }
-    authority = uri.getAuthority();
-    String pathStr = uri.getPath();
-    initOFSPath(pathStr);
+    initOFSPath(path.toUri());
   }
 
   OFSPath(String pathStr) {
-    initOFSPath(pathStr);
+    try {
+      initOFSPath(new URI(pathStr));
+    } catch (URISyntaxException ex) {
+      throw new RuntimeException(ex);
+    }
   }
 
-  private void initOFSPath(String pathStr) {
-    // pathStr should not have authority
-    try {
-      URI uri = new URI(pathStr);
-      String auth = uri.getAuthority();
-      if (auth != null && !auth.isEmpty()) {
-        throw new ParseException("Invalid path " + pathStr +
-            ". Shouldn't contain authority.");
+  private void initOFSPath(URI uri) {
+    // Scheme is case-insensitive
+    String scheme = uri.getScheme();
+    if (scheme != null) {
+      if (!scheme.toLowerCase().equals(OZONE_OFS_URI_SCHEME)) {
+        throw new ParseException("Can't parse schemes other than ofs://.");
       }
-    } catch (URISyntaxException ex) {
-      throw new ParseException("Failed to parse path " + pathStr + " as URI.");
     }
-    // tokenize
+    // authority could be empty
+    authority = uri.getAuthority() == null ? "" : uri.getAuthority();
+    String pathStr = uri.getPath();
     StringTokenizer token = new StringTokenizer(pathStr, OZONE_URI_DELIMITER);
     int numToken = token.countTokens();
+
     if (numToken > 0) {
       String firstToken = token.nextToken();
-      // TODO: Compare a keyword list instead for future expansion.
+      // TODO: Compare a list of mounts in the future.
       if (firstToken.equals(OFS_MOUNT_NAME_TMP)) {
         mountName = firstToken;
-        // TODO: In the future, may retrieve volume and bucket from
-        //  UserVolumeInfo on the server side. TBD.
+        // TODO: Make this configurable in the future.
         volumeName = OFS_MOUNT_TMP_VOLUMENAME;
         try {
           bucketName = getTempMountBucketNameOfCurrentUser();
@@ -126,6 +121,10 @@ class OFSPath {
     if (token.hasMoreTokens()) {
       keyName = token.nextToken("").substring(1);
     }
+  }
+
+  public String getAuthority() {
+    return authority;
   }
 
   public String getVolumeName() {
@@ -185,15 +184,15 @@ class OFSPath {
 
   /**
    * If both volume and bucket names are empty, the given path is root.
-   * i.e. /
+   * i.e. / is root.
    */
   public boolean isRoot() {
     return this.getVolumeName().isEmpty() && this.getBucketName().isEmpty();
   }
 
   /**
-   * If bucket name is empty but volume name is not, the given path is volume.
-   * e.g. /volume1
+   * If bucket name is empty but volume name is not, the given path is a volume.
+   * e.g. /volume1 is a volume.
    */
   public boolean isVolume() {
     return this.getBucketName().isEmpty() && !this.getVolumeName().isEmpty();
@@ -201,13 +200,21 @@ class OFSPath {
 
   /**
    * If key name is empty but volume and bucket names are not, the given path
-   * it bucket.
-   * e.g. /volume1/bucket2
+   * is a bucket.
+   * e.g. /volume1/bucket2 is a bucket.
    */
   public boolean isBucket() {
     return this.getKeyName().isEmpty() &&
         !this.getBucketName().isEmpty() &&
         !this.getVolumeName().isEmpty();
+  }
+
+  /**
+   * If key name is not empty, the given path is a key.
+   * e.g. /volume1/bucket2/key3 is a key.
+   */
+  public boolean isKey() {
+    return !this.getKeyName().isEmpty();
   }
 
   private static String md5Hex(String input) {
@@ -250,9 +257,12 @@ class OFSPath {
 
   /**
    * Return trash root for the given path.
-   * @return trash root for the given path
+   * @return trash root for the given path.
    */
   public Path getTrashRoot() {
+    if (!this.isKey()) {
+      throw new RuntimeException("Volume or bucket doesn't have trash root.");
+    }
     try {
       String username = UserGroupInformation.getCurrentUser().getUserName();
       final Path pathRoot = new Path(
