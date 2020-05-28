@@ -50,7 +50,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -73,7 +72,6 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -94,6 +92,8 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
+import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
@@ -108,6 +108,7 @@ import org.apache.hadoop.security.token.Token;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.commons.io.IOUtils;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import org.apache.logging.log4j.util.Strings;
 import org.apache.ratis.protocol.ClientId;
@@ -161,12 +162,14 @@ public class RpcClient implements ClientProtocol {
     this.userRights = aclConfig.getUserDefaultRights();
     this.groupRights = aclConfig.getGroupDefaultRights();
 
+    OmTransport omTransport = OmTransportFactory.create(conf, ugi, omServiceId);
+
     this.ozoneManagerClient = TracingUtil.createProxy(
-        new OzoneManagerProtocolClientSideTranslatorPB(
-            this.conf, clientId.toString(), omServiceId, ugi),
+        new OzoneManagerProtocolClientSideTranslatorPB(omTransport,
+            clientId.toString()),
         OzoneManagerProtocol.class, conf
     );
-
+    dtService = omTransport.getDelegationTokenService();
     ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
     String caCertPem = null;
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
@@ -236,7 +239,6 @@ public class RpcClient implements ClientProtocol {
     retryInterval = OzoneUtils.getTimeDurationInMS(conf,
         OzoneConfigKeys.OZONE_CLIENT_RETRY_INTERVAL,
         OzoneConfigKeys.OZONE_CLIENT_RETRY_INTERVAL_DEFAULT);
-    dtService = getOMProxyProvider().getCurrentProxyDelegationToken();
     topologyAwareReadEnabled = conf.getBoolean(
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY,
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT);
@@ -546,12 +548,6 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  @VisibleForTesting
-  public OMFailoverProxyProvider getOMProxyProvider() {
-    return ozoneManagerClient.getOMFailoverProxyProvider();
-  }
-
-  @Override
   public void setBucketVersioning(
       String volumeName, String bucketName, Boolean versioning)
       throws IOException {
@@ -799,8 +795,7 @@ public class RpcClient implements ClientProtocol {
 
   @Override
   public void close() throws IOException {
-    IOUtils.cleanupWithLogger(LOG, ozoneManagerClient);
-    IOUtils.cleanupWithLogger(LOG, xceiverClientManager);
+    IOUtils.closeQuietly(ozoneManagerClient, xceiverClientManager);
   }
 
   @Override
@@ -1227,5 +1222,10 @@ public class RpcClient implements ClientProtocol {
   @Override
   public String getCanonicalServiceName() {
     return (dtService != null) ? dtService.toString() : null;
+  }
+
+  @VisibleForTesting
+  public OzoneManagerProtocol getOzoneManagerClient() {
+    return ozoneManagerClient;
   }
 }

@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -75,6 +76,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueBlockIterator;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -160,7 +162,8 @@ public abstract class TestOzoneRpcClientAbstract {
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);
     store = ozClient.getObjectStore();
-    store.createVolume(OzoneConsts.S3_VOLUME_NAME);
+    String volumeName = HddsClientUtils.getS3VolumeName(conf);
+    store.createVolume(volumeName);
     storageContainerLocationClient =
         cluster.getStorageContainerLocationClient();
     ozoneManager = cluster.getOzoneManager();
@@ -210,7 +213,7 @@ public abstract class TestOzoneRpcClientAbstract {
     return TestOzoneRpcClientAbstract.store;
   }
 
-  public static void setScmId(String scmId){
+  public static void setScmId(String scmId) {
     TestOzoneRpcClientAbstract.scmId = scmId;
   }
 
@@ -219,8 +222,10 @@ public abstract class TestOzoneRpcClientAbstract {
    */
   @Test
   public void testOMClientProxyProvider() {
-    OMFailoverProxyProvider omFailoverProxyProvider = store.getClientProxy()
-        .getOMProxyProvider();
+
+    OMFailoverProxyProvider omFailoverProxyProvider =
+        OmFailoverProxyUtil.getFailoverProxyProvider(store.getClientProxy());
+
     List<OMProxyInfo> omProxies = omFailoverProxyProvider.getOMProxyInfos();
 
     // For a non-HA OM service, there should be only one OM proxy.

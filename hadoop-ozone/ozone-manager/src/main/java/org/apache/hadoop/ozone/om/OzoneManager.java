@@ -44,7 +44,6 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
@@ -52,13 +51,12 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -73,7 +71,10 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.OMCertificateClie
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
+import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.utils.RetriableTask;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -103,7 +104,6 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
-import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
 import org.apache.hadoop.ozone.om.ha.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
@@ -136,7 +136,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleI
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
-import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
 import org.apache.hadoop.ozone.security.OzoneSecurityException;
@@ -170,6 +169,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
+import io.prometheus.client.CollectorRegistry;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
@@ -186,7 +186,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
@@ -201,16 +200,15 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_F
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService.newReflectiveBlockingService;
-
 import org.apache.ratis.metrics.MetricRegistries;
 import org.apache.ratis.metrics.MetricsReporting;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
@@ -220,8 +218,6 @@ import org.apache.ratis.util.LifeCycle;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import io.prometheus.client.CollectorRegistry;
 
 /**
  * Ozone Manager is the metadata manager of ozone.
@@ -287,7 +283,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private List<OMNodeDetails> peerNodes;
   private File omRatisSnapshotDir;
   private final OMRatisSnapshotInfo omRatisSnapshotInfo;
-  private final Collection<String> ozAdmins;
 
   private KeyProviderCryptoExtension kmsProvider = null;
   private static String keyProviderUriKeyName =
@@ -352,12 +347,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           omStorage.getState().name() + ". Please ensure 'ozone om --init' "
           + "command is executed once before starting the OM service.",
           ResultCodes.OM_NOT_INITIALIZED);
-    }
-
-    ozAdmins = conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
-    String omSPN = UserGroupInformation.getCurrentUser().getUserName();
-    if (!ozAdmins.contains(omSPN)) {
-      ozAdmins.add(omSPN);
     }
     omMetaDir = OMStorage.getOmDbDir(configuration);
     this.isAclEnabled = conf.getBoolean(OZONE_ACL_ENABLED,
@@ -506,6 +495,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         authorizer.setBucketManager(bucketManager);
         authorizer.setKeyManager(keyManager);
         authorizer.setPrefixManager(prefixManager);
+        authorizer.setOzoneAdmins(getOzoneAdmins(configuration));
       }
     } else {
       accessAuthorizer = null;
@@ -1148,6 +1138,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("OM HttpServer failed to start.", ex);
     }
     registerMXBean();
+
+    startJVMPauseMonitor();
     setStartTime();
     omState = State.RUNNING;
   }
@@ -1201,10 +1193,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     registerMXBean();
 
-    // Start jvm monitor
-    jvmPauseMonitor = new JvmPauseMonitor();
-    jvmPauseMonitor.init(configuration);
-    jvmPauseMonitor.start();
+    startJVMPauseMonitor();
     setStartTime();
     omState = State.RUNNING;
   }
@@ -1570,7 +1559,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void createVolume(OmVolumeArgs args) throws IOException {
     try {
       metrics.incNumVolumeCreates();
-      checkAdmin();
+      if(isAclEnabled) {
+        checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.CREATE,
+            args.getVolume(), null, null);
+      }
       volumeManager.createVolume(args);
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.CREATE_VOLUME,
           (args == null) ? null : args.toAuditMap()));
@@ -1922,7 +1914,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       metrics.incNumVolumeLists();
       if (!allowListAllVolumes) {
         // Only admin can list all volumes when disallowed in config
-        checkAdmin();
+        if(isAclEnabled) {
+          checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.LIST,
+              OzoneConsts.OZONE_ROOT, null, null);
+        }
       }
       return volumeManager.listVolumes(null, prefix, prevKey, maxKeys);
     } catch (Exception ex) {
@@ -1935,20 +1930,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if(auditSuccess){
         AUDIT.logReadSuccess(buildAuditMessageForSuccess(OMAction.LIST_VOLUMES,
             auditMap));
-      }
-    }
-  }
-
-  private void checkAdmin() throws OMException {
-    if(isAclEnabled) {
-      if (!ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD) &&
-          !ozAdmins.contains(ProtobufRpcEngine.Server.getRemoteUser()
-              .getUserName())) {
-        LOG.error("Only admin users are authorized to create or list " +
-                "Ozone volumes. User :{} is not an admin.",
-            ProtobufRpcEngine.Server.getRemoteUser().getUserName());
-        throw new OMException("Only admin users are authorized to create " +
-            "or list Ozone volumes.", ResultCodes.PERMISSION_DENIED);
       }
     }
   }
@@ -3239,10 +3220,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return omComponent;
   }
 
-  @Override
-  public OMFailoverProxyProvider getOMFailoverProxyProvider() {
-    return null;
-  }
 
   /**
    * Return maximum volumes count per user.
@@ -3300,7 +3277,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   /**
    * Return list of OzoneAdministrators.
    */
-  public Collection<String> getOzoneAdmins() {
+  private Collection<String> getOzoneAdmins(OzoneConfiguration conf)
+      throws IOException {
+    Collection<String> ozAdmins =
+        conf.getTrimmedStringCollection(OZONE_ADMINISTRATORS);
+    String omSPN = UserGroupInformation.getCurrentUser().getShortUserName();
+    if (!ozAdmins.contains(omSPN)) {
+      ozAdmins.add(omSPN);
+    }
     return ozAdmins;
   }
 
@@ -3315,5 +3299,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public boolean isRunning() {
     return omState == State.RUNNING;
+  }
+
+  private void startJVMPauseMonitor() {
+    // Start jvm monitor
+    jvmPauseMonitor = new JvmPauseMonitor();
+    jvmPauseMonitor.init(configuration);
+    jvmPauseMonitor.start();
   }
 }

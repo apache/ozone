@@ -40,7 +40,7 @@ Create volume bucket with wrong credentials
 Create volume with non-admin user
     Run Keyword         Kinit test user     testuser2     testuser2.keytab
     ${rc}               ${output} =          Run And Return Rc And Output       ozone sh volume create o3://om/fstest
-    Should contain      ${output}       Only admin users are authorized to create
+    Should contain      ${output}       doesn't have CREATE permission to access volume
 
 Create volume bucket with credentials
                         # Authenticate testuser

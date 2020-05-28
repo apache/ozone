@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
+import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .UserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -301,14 +302,6 @@ public interface OMMetadataManager {
   Table<OzoneTokenIdentifier, Long> getDelegationTokenTable();
 
   /**
-   * Gets the S3Bucket to Ozone Volume/bucket mapping table.
-   *
-   * @return Table.
-   */
-
-  Table<String, String> getS3Table();
-
-  /**
    * Gets the Ozone prefix path to its acl mapping table.
    * @return Table.
    */
@@ -339,6 +332,8 @@ public interface OMMetadataManager {
    * @return Table
    */
   Table<String, S3SecretValue> getS3SecretTable();
+
+  Table<String, OMTransactionInfo> getTransactionInfoTable();
 
   /**
    * Returns number of rows in a table.  This should not be used for very
