@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.freon;
 
+import com.codahale.metrics.Timer;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -27,10 +28,9 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
-import java.io.IOException;
 import java.net.URI;
-import java.util.Random;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Directory & File Generator tool to test OM performance.
@@ -67,8 +67,13 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
   @Option(names = {"-g", "--fileSize"},
       description = "Generated data size(in bytes) of each file to be " +
               "written in each directory",
-      defaultValue = "1")
+      defaultValue = "4096")
   private int fileSizeInBytes;
+
+  @Option(names = {"-b", "--buffer"},
+          description = "Size of buffer used to generated the file content.",
+          defaultValue = "1024")
+  private int bufferSize;
 
   @Option(names = {"-s", "--span"},
       description =
@@ -82,7 +87,11 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
       defaultValue = "10")
   private int length;
 
-  private long totalDirsCnt;
+  private AtomicLong totalDirsCnt = new AtomicLong();
+
+  private Timer timer;
+
+  private ContentGenerator contentGenerator;
 
   private FileSystem fileSystem;
 
@@ -92,6 +101,10 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
     init();
     OzoneConfiguration configuration = createOzoneConfiguration();
     fileSystem = FileSystem.get(URI.create(rootPath), configuration);
+
+    contentGenerator = new ContentGenerator(fileSizeInBytes, bufferSize);
+    timer = getMetrics().timer("file-create");
+
     runTests(this::createDir);
     return null;
 
@@ -138,8 +151,9 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
     if (depth > 1) {
       createSubDirRecursively(dir, 1, 1);
     }
-    System.out.println("Successfully created directories & files. Total Dir " +
-            "Count=" + totalDirsCnt);
+    System.out.println("Successfully created directories & files. Total Dirs " +
+            "Count=" + totalDirsCnt.get() + ", Total Files Count=" +
+            timer.getCount());
   }
 
   private void createSubDirRecursively(String parent, int depthIndex,
@@ -174,44 +188,34 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
   }
 
   private String makeDirWithGivenNumberOfFiles(String parent)
-          throws IOException {
+          throws Exception {
     String dir = RandomStringUtils.randomAlphanumeric(length);
     dir = parent.toString().concat("/").concat(dir);
     fileSystem.mkdirs(new Path(dir));
-    totalDirsCnt++;
+    totalDirsCnt.incrementAndGet();
     // Add given number of files into the created directory.
     createFiles(dir);
     return dir;
   }
 
-  private void createFiles(String dir) throws IOException {
+  private void createFile(String dir, long counter) throws Exception {
+    String fileName = dir.concat("/").concat(RandomStringUtils.
+            randomAlphanumeric(length));
+    Path file = new Path(fileName);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("FilePath:{}", file);
+    }
+    timer.time(() -> {
+      try (FSDataOutputStream output = fileSystem.create(file)) {
+        contentGenerator.write(output);
+      }
+      return null;
+    });
+  }
+
+  private void createFiles(String dir) throws Exception {
     for (int i = 0; i < fileCount; i++) {
-      String fileName = dir.concat("/").concat(RandomStringUtils.
-              randomAlphanumeric(length));
-
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("FilePath:{}", fileName);
-      }
-
-      FSDataOutputStream out =
-              fileSystem.create(new Path(fileName), true);
-      if (fileSizeInBytes > 0) {
-        int bufferLen = 1024;
-        int seed = 0;
-        byte[] toWrite = new byte[bufferLen];
-        Random rb = new Random(seed);
-        long bytesToWrite = fileSizeInBytes;
-        while (bytesToWrite > 0) {
-          rb.nextBytes(toWrite);
-          int bytesToWriteNext = (bufferLen < bytesToWrite) ? bufferLen
-                  : (int) bytesToWrite;
-
-          out.write(toWrite, 0, bytesToWriteNext);
-          bytesToWrite -= bytesToWriteNext;
-        }
-      }
-      out.flush();
-      out.close();
+      createFile(dir, i);
     }
   }
 }
