@@ -43,7 +43,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
-class OFSPath {
+public class OFSPath {
   private String authority = "";
   /**
    * Here is a table illustrating what each name variable is given an input path
@@ -68,11 +68,11 @@ class OFSPath {
   @VisibleForTesting
   static final String OFS_MOUNT_TMP_VOLUMENAME = "tmp";
 
-  OFSPath(Path path) {
+  public OFSPath(Path path) {
     initOFSPath(path.toUri());
   }
 
-  OFSPath(String pathStr) {
+  public OFSPath(String pathStr) {
     try {
       initOFSPath(new URI(pathStr));
     } catch (URISyntaxException ex) {

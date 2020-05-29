@@ -18,7 +18,11 @@
 package org.apache.hadoop.ozone.shell;
 
 import com.google.common.base.Strings;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.ozone.OFSPath;
 import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -56,6 +60,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
+import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.junit.Assert.fail;
 
@@ -448,21 +453,39 @@ public class TestOzoneShellHA {
 
   @Test
   public void testDeleteToTrash() throws Exception {
+    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
     OzoneConfiguration confcli = new OzoneConfiguration(conf);
-    confcli.setInt(FS_TRASH_INTERVAL_KEY, 60);
     confcli.set("fs.ofs.impl",
         "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
+    confcli.set(FS_DEFAULT_NAME_KEY, hostPrefix);
+    confcli.setInt(FS_TRASH_INTERVAL_KEY, 60);
     OzoneFsShell shell = new OzoneFsShell(confcli);
-    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
-    final String dirPrefix = hostPrefix + "/volumed2t/bucket1/dir1";
+    FileSystem fs = FileSystem.get(confcli);
+    final String strDir1 = hostPrefix + "/volumed2t/bucket1/dir1";
+    final String strKey1 = strDir1 + "/key1";
+    final Path pathKey1 = new Path(strKey1);
+    final OFSPath ofsPathKey1 = new OFSPath(strKey1);
+    final Path trashPathKey1 = Path.mergePaths(
+        new Path(ofsPathKey1.getTrashRoot(), "Current"), pathKey1);
     int res;
     try {
-      res = ToolRunner.run(shell, new String[]{"-mkdir", "-p", dirPrefix});
+      res = ToolRunner.run(shell, new String[]{"-mkdir", "-p", strDir1});
       Assert.assertEquals(0, res);
-      res = ToolRunner.run(shell, new String[]{"-touch", dirPrefix + "/key1"});
+      res = ToolRunner.run(shell, new String[]{"-touch", strKey1});
       Assert.assertEquals(0, res);
-      res = ToolRunner.run(shell, new String[]{"-rm", dirPrefix + "/key1"});
+      // Verify key1 creation
+      FileStatus statusPathKey1 = fs.getFileStatus(pathKey1);
+      Assert.assertEquals(strKey1, statusPathKey1.getPath().toString());
+      // rm without skipTrash. since trash interval > 0, should moved to trash
+      res = ToolRunner.run(shell, new String[]{"-rm", strKey1});
       Assert.assertEquals(0, res);
+      // Verify that the file is moved to the correct trash location
+      FileStatus statusTrashPathKey1 = fs.getFileStatus(trashPathKey1);
+      // It'd be more meaningful if we actually write some content to the file
+      Assert.assertEquals(
+          statusPathKey1.getLen(), statusTrashPathKey1.getLen());
+      Assert.assertEquals(
+          fs.getFileChecksum(pathKey1), fs.getFileChecksum(trashPathKey1));
     } finally {
       shell.close();
     }
