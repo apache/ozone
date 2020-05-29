@@ -18,33 +18,36 @@
 
 package org.apache.hadoop.ozone.debug;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
+import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.rocksdb.*;
 import picocli.CommandLine;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.Callable;
 
 /**
  * Parser for scm.db file.
  */
 @CommandLine.Command(
-        name = "scmdbparser",
+        name = "scan",
         description = "Parse specified metadataTable"
 )
-public class SCMDBParser implements Callable<Void> {
+public class DBScanner implements Callable<Void> {
 
-  @CommandLine.Option(names = {"-table"},
+  @CommandLine.Option(names = {"--column_family"},
             description = "Table name")
   private String tableName;
 
   @CommandLine.ParentCommand
   private RDBParser parent;
 
+  private HashMap<String, DBColumnFamilyDefinition> columnFamilyMap;
 
   private static void displayTable(RocksDB rocksDB,
         DBColumnFamilyDefinition dbColumnFamilyDefinition,
@@ -60,7 +63,9 @@ public class SCMDBParser implements Callable<Void> {
     while (iterator.isValid()){
       Object o = dbColumnFamilyDefinition.getValueCodec()
               .fromPersistedFormat(iterator.value());
-      System.out.println(o);
+      Gson gson = new GsonBuilder().setPrettyPrinting().create();
+      String result = gson.toJson(o);
+      System.out.println(result);
       iterator.next();
     }
   }
@@ -81,43 +86,60 @@ public class SCMDBParser implements Callable<Void> {
             .orElse(null);
   }
 
+  private void constructColumnFamilyMap(DBDefinition dbDefinition) {
+    this.columnFamilyMap = new HashMap<>();
+    DBColumnFamilyDefinition[] columnFamilyDefinitions = dbDefinition
+            .getColumnFamilies();
+    for(DBColumnFamilyDefinition definition:columnFamilyDefinitions){
+      this.columnFamilyMap.put(definition.getTableName(), definition);
+    }
+  }
+
   @Override
   public Void call() throws Exception {
     List<ColumnFamilyDescriptor> cfs = new ArrayList<>();
     final List<ColumnFamilyHandle> columnFamilyHandleList =
             new ArrayList<>();
     List<byte[]> cfList = null;
-    try {
-      cfList = RocksDB.listColumnFamilies(new Options(),
-                    parent.getDbPath());
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
+    cfList = RocksDB.listColumnFamilies(new Options(),
+            parent.getDbPath());
     if (cfList != null) {
       for (byte[] b : cfList) {
         cfs.add(new ColumnFamilyDescriptor(b));
       }
     }
     RocksDB rocksDB = null;
-    try {
-      rocksDB = RocksDB.openReadOnly(parent.getDbPath(),
-              cfs, columnFamilyHandleList);
-    } catch (RocksDBException e) {
-      e.printStackTrace();
-    }
-    printAppropriateTable(columnFamilyHandleList, rocksDB);
+    rocksDB = RocksDB.openReadOnly(parent.getDbPath(),
+            cfs, columnFamilyHandleList);
+    this.printAppropriateTable(columnFamilyHandleList,
+           rocksDB, parent.getDbPath());
     return null;
   }
 
   private void printAppropriateTable(
-      List<ColumnFamilyHandle> columnFamilyHandleList,
-      RocksDB rocksDB) throws IOException {
-    if (!RDBParser.getColumnFamilyMap().containsKey(tableName)){
-      System.out.print("Table with specified name does not exist");
-    } else {
-      DBColumnFamilyDefinition columnFamilyDefinition =
-              RDBParser.getColumnFamilyMap().get(tableName);
-      displayTable(rocksDB, columnFamilyDefinition, columnFamilyHandleList);
+          List<ColumnFamilyHandle> columnFamilyHandleList,
+          RocksDB rocksDB, String dbPath) throws IOException {
+    dbPath = removeTrailingSlashIfNeeded(dbPath);
+    if (dbPath.endsWith(new SCMDBDefinition().getName())){
+      this.constructColumnFamilyMap(new SCMDBDefinition());
     }
+    if (this.columnFamilyMap !=null) {
+      if (!this.columnFamilyMap.containsKey(tableName)) {
+        System.out.print("Table with specified name does not exist");
+      } else {
+        DBColumnFamilyDefinition columnFamilyDefinition =
+                this.columnFamilyMap.get(tableName);
+        displayTable(rocksDB, columnFamilyDefinition, columnFamilyHandleList);
+      }
+    } else {
+      System.out.println("Incorrect db Path");
+    }
+  }
+
+  private String removeTrailingSlashIfNeeded(String dbPath) {
+    if(dbPath.endsWith(OzoneConsts.OZONE_URI_DELIMITER)){
+      dbPath = dbPath.substring(0, dbPath.length()-1);
+    }
+    return dbPath;
   }
 }

@@ -19,52 +19,26 @@
 package org.apache.hadoop.ozone.debug;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
-import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
-import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import picocli.CommandLine;
-
-import java.util.HashMap;
 
 /**
  * Tool that parses rocksdb file.
  */
 @CommandLine.Command(
-        name = "rdbparser",
+        name = "ldb",
         description = "Parse rocksdb file content",
         subcommands = {
-                SCMDBParser.class,
+                DBScanner.class,
                 ListTables.class
         })
 public class RDBParser extends GenericCli {
 
-  @CommandLine.Option(names = {"-path"},
+  @CommandLine.Option(names = {"--db"},
             description = "Database File Path")
-    private String dbPath;
-
-  public static HashMap<String, DBColumnFamilyDefinition>
-      getColumnFamilyMap() {
-    return columnFamilyMap;
-  }
-
-  private static HashMap<String, DBColumnFamilyDefinition>  columnFamilyMap;
+    private  String dbPath;
 
   public String getDbPath() {
     return dbPath;
-  }
-
-  static {
-    columnFamilyMap = constructColumnFamilyMap();
-  }
-
-  private static HashMap<String, DBColumnFamilyDefinition>
-      constructColumnFamilyMap() {
-    columnFamilyMap = new HashMap<String, DBColumnFamilyDefinition>();
-    DBColumnFamilyDefinition[] columnFamilyDefinitions = new SCMDBDefinition()
-            .getColumnFamilies();
-    for(DBColumnFamilyDefinition definition:columnFamilyDefinitions){
-      columnFamilyMap.put(definition.getTableName(), definition);
-    }
-    return columnFamilyMap;
   }
 
   @Override

@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.debug;
 
 import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
-import org.rocksdb.RocksDBException;
 import picocli.CommandLine;
 
 import java.nio.charset.StandardCharsets;
@@ -31,8 +30,9 @@ import java.util.concurrent.Callable;
  * List all column Families/Tables in db.
  */
 @CommandLine.Command(
-        name = "list",
-        description = "list all tables in db."
+        name = "list_column_families",
+        aliases = "ls",
+        description = "list all column families in db."
 )
 public class ListTables implements Callable<Void> {
 
@@ -41,17 +41,11 @@ public class ListTables implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    List<byte[]> cfList = getColumnFamilyList(parent.getDbPath());
-    for (byte[] b : cfList) {
+    List<byte[]> columnFamilies = RocksDB.listColumnFamilies(new Options(),
+            parent.getDbPath());
+    for (byte[] b : columnFamilies) {
       System.out.println(new String(b, StandardCharsets.UTF_8));
     }
     return null;
-  }
-
-  private static List<byte[]> getColumnFamilyList(String dbPath)
-      throws RocksDBException {
-    List<byte[]> cfList = null;
-    cfList = RocksDB.listColumnFamilies(new Options(), dbPath);
-    return cfList;
   }
 }
