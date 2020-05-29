@@ -265,14 +265,15 @@ public class FilePerChunkStrategy implements ChunkManager {
       return;
     }
 
-    boolean allowed = info.getLen() == chunkFile.length()
+    long chunkFileSize = chunkFile.length();
+    boolean allowed = info.getLen() == chunkFileSize
         // chunk written by new client to old datanode, expected
         // file length is offset + real chunk length; see HDDS-3644
-        || info.getLen() + info.getOffset() == chunkFile.length();
+        || info.getLen() + info.getOffset() == chunkFileSize;
     if (allowed) {
       FileUtil.fullyDelete(chunkFile);
       LOG.info("Deleted chunk file {} (size {}) for chunk {}",
-          chunkFile, chunkFile.length(), info);
+          chunkFile, chunkFileSize, info);
     } else {
       LOG.error("Not Supported Operation. Trying to delete a " +
           "chunk that is in shared file. chunk info : {}", info);
