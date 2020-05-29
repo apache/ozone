@@ -188,7 +188,7 @@ public class DatanodeStateMachine implements Closeable {
   /**
    * Runs the state machine at a fixed frequency.
    */
-  private void start() {
+  private void start() throws IOException {
     long now = 0;
 
     reportManager.init();
@@ -216,6 +216,7 @@ public class DatanodeStateMachine implements Closeable {
         // 1. Trigger heartbeat immediately
         // 2. Shutdown has been initiated.
         Thread.currentThread().interrupt();
+        throw new IOException("Unable to finish the execution.", e);
       } catch (Exception e) {
         LOG.error("Unable to finish the execution.", e);
       }
