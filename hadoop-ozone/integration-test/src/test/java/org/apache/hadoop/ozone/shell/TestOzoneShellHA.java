@@ -524,8 +524,7 @@ public class TestOzoneShellHA {
       try {
         fs.getFileStatus(trashPathKey2);
         Assert.fail("getFileStatus on non-existent should throw.");
-      }
-      catch (FileNotFoundException ignored) {
+      } catch (FileNotFoundException ignored) {
       }
     } finally {
       shell.close();
