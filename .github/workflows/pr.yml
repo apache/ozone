@@ -220,3 +220,7 @@ jobs:
           with:
             name: it-ozone
             path: mnt/ozone/target/integration
+        - uses: actions/upload-artifact@master
+          with:
+            name: coverage
+            path: target/coverage
