@@ -38,6 +38,7 @@ import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.net.ConnectException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -435,15 +436,20 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     // triggers a snapshot on the state machine.
 
     long appliedLogIndex = 0;
-    while (appliedLogIndex <= getSnapshotThreshold()) {
+    long transactionCount = 50;
+    while (appliedLogIndex <= transactionCount) {
       createKey(ozoneBucket);
       appliedLogIndex = ozoneManager.getOmRatisServer()
           .getLastAppliedTermIndex().getIndex();
     }
 
     GenericTestUtils.waitFor(() -> {
-      if (ozoneManager.getRatisSnapshotIndex() > 0) {
-        return true;
+      try {
+        if (ozoneManager.getRatisSnapshotIndex() > 0) {
+          return true;
+        }
+      } catch (IOException ex) {
+        fail("test failed during transactionInfo read");
       }
       return false;
     }, 1000, 100000);
@@ -459,15 +465,19 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
         smLastAppliedIndex >= ratisSnapshotIndex);
 
     // Add more transactions to Ratis to trigger another snapshot
-    while (appliedLogIndex <= (smLastAppliedIndex + getSnapshotThreshold())) {
+    while (appliedLogIndex <= (smLastAppliedIndex + transactionCount)) {
       createKey(ozoneBucket);
       appliedLogIndex = ozoneManager.getOmRatisServer()
           .getLastAppliedTermIndex().getIndex();
     }
 
     GenericTestUtils.waitFor(() -> {
-      if (ozoneManager.getRatisSnapshotIndex() > 0) {
-        return true;
+      try {
+        if (ozoneManager.getRatisSnapshotIndex() > 0) {
+          return true;
+        }
+      } catch (IOException ex) {
+        fail("test failed during transactionInfo read");
       }
       return false;
     }, 1000, 100000);
@@ -541,7 +551,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     followerOM1.restart();
 
     // Get the latest snapshotIndex from the leader OM.
-    long leaderOMSnaphsotIndex = leaderOM.saveRatisSnapshot().getIndex();
+    long leaderOMSnaphsotIndex = leaderOM.getRatisSnapshotIndex();
 
     // The recently started OM should be lagging behind the leader OM.
     long followerOMLastAppliedIndex =
@@ -569,13 +579,6 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
         .getLastAppliedTermIndex().getIndex();
     Assert.assertTrue(followerOM1lastAppliedIndex >
         leaderOMSnaphsotIndex);
-
-    // The follower OMs should be in sync. There can be a small lag between
-    // leader OM and follower OMs as txns are applied first on leader OM.
-    long followerOM2lastAppliedIndex = followerOM1.getOmRatisServer()
-        .getLastAppliedTermIndex().getIndex();
-    Assert.assertEquals(followerOM1lastAppliedIndex,
-        followerOM2lastAppliedIndex);
 
   }
 

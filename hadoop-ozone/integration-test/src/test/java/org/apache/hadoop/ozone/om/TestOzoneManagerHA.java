@@ -68,7 +68,6 @@ public abstract class TestOzoneManagerHA {
   private String scmId;
   private String omServiceId;
   private static int numOfOMs = 3;
-  private static final long SNAPSHOT_THRESHOLD = 50;
   private static final int LOG_PURGE_GAP = 50;
   /* Reduce max number of retries to speed up unit test. */
   private static final int OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS = 5;
@@ -98,10 +97,6 @@ public abstract class TestOzoneManagerHA {
 
   public static int getLogPurgeGap() {
     return LOG_PURGE_GAP;
-  }
-
-  public static long getSnapshotThreshold() {
-    return SNAPSHOT_THRESHOLD;
   }
 
   public static int getNumOfOMs() {
@@ -135,9 +130,6 @@ public abstract class TestOzoneManagerHA {
         IPC_CLIENT_CONNECT_MAX_RETRIES);
     /* Reduce IPC retry interval to speed up unit test. */
     conf.setInt(IPC_CLIENT_CONNECT_RETRY_INTERVAL_KEY, 200);
-    conf.setLong(
-        OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
-        SNAPSHOT_THRESHOLD);
     conf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, LOG_PURGE_GAP);
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(clusterId)

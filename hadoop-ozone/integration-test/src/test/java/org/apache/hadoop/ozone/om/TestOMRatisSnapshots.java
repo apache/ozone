@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
+import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 
 import org.apache.commons.lang3.RandomStringUtils;
@@ -57,7 +58,6 @@ public class TestOMRatisSnapshots {
   private String scmId;
   private String omServiceId;
   private int numOfOMs = 3;
-  private static final long SNAPSHOT_THRESHOLD = 50;
   private static final int LOG_PURGE_GAP = 50;
 
   @Rule
@@ -79,9 +79,6 @@ public class TestOMRatisSnapshots {
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
-    conf.setLong(
-        OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
-        SNAPSHOT_THRESHOLD);
     conf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, LOG_PURGE_GAP);
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(clusterId)
@@ -150,7 +147,11 @@ public class TestOMRatisSnapshots {
     }
 
     // Get the latest db checkpoint from the leader OM.
-    TermIndex leaderOMTermIndex = leaderOM.saveRatisSnapshot();
+    OMTransactionInfo omTransactionInfo =
+        OMTransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
+    TermIndex leaderOMTermIndex =
+        TermIndex.newTermIndex(omTransactionInfo.getCurrentTerm(),
+            omTransactionInfo.getTransactionIndex());
     long leaderOMSnaphsotIndex = leaderOMTermIndex.getIndex();
     long leaderOMSnapshotTermIndex = leaderOMTermIndex.getTerm();
 
