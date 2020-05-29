@@ -34,8 +34,34 @@ import java.util.NavigableSet;
  */
 public interface PipelineStateManagerV2 {
 
+  /**
+   * Adding pipeline would be replicated to Ratis.
+   * @param pipelineProto
+   * @throws IOException
+   */
   @Replicate
   void addPipeline(HddsProtos.Pipeline pipelineProto) throws IOException;
+
+  /**
+   * Removing pipeline would be replicated to Ratis.
+   * @param pipelineIDProto
+   * @return Pipeline removed
+   * @throws IOException
+   */
+  @Replicate
+  Pipeline removePipeline(HddsProtos.PipelineID pipelineIDProto)
+      throws IOException;
+
+  /**
+   * Updating pipeline state would be replicated to Ratis.
+   * @param pipelineIDProto
+   * @param newState
+   * @throws IOException
+   */
+  @Replicate
+  void updatePipelineState(HddsProtos.PipelineID pipelineIDProto,
+                           HddsProtos.PipelineState newState)
+      throws IOException;
 
   void addContainerToPipeline(PipelineID pipelineID,
                               ContainerID containerID) throws IOException;
@@ -67,17 +93,9 @@ public interface PipelineStateManagerV2 {
 
   int getNumberOfContainers(PipelineID pipelineID) throws IOException;
 
-  @Replicate
-  Pipeline removePipeline(HddsProtos.PipelineID pipelineIDProto)
-      throws IOException;
 
   void removeContainerFromPipeline(PipelineID pipelineID,
                                    ContainerID containerID) throws IOException;
-
-  @Replicate
-  void updatePipelineState(HddsProtos.PipelineID pipelineIDProto,
-                           HddsProtos.PipelineState newState)
-      throws IOException;
 
   boolean isPipelineStoreEmpty() throws IOException;
 
