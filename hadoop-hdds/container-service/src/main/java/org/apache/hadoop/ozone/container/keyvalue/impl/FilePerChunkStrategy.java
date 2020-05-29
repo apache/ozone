@@ -261,17 +261,24 @@ public class FilePerChunkStrategy implements ChunkManager {
     // The call might be because of reapply of transactions on datanode
     // restart.
     if (!chunkFile.exists()) {
-      LOG.warn("Chunk file doe not exist. chunk info :" + info.toString());
+      LOG.warn("Chunk file not found for chunk {}", info);
       return;
     }
-    if (info.getLen() == chunkFile.length()) {
+
+    boolean allowed = info.getLen() == chunkFile.length()
+        // chunk written by new client to old datanode, expected
+        // file length is offset + real chunk length; see HDDS-3644
+        || info.getLen() + info.getOffset() == chunkFile.length();
+    if (allowed) {
       FileUtil.fullyDelete(chunkFile);
+      LOG.info("Deleted chunk file {} (size {}) for chunk {}",
+          chunkFile, chunkFile.length(), info);
     } else {
       LOG.error("Not Supported Operation. Trying to delete a " +
-          "chunk that is in shared file. chunk info : {}", info.toString());
+          "chunk that is in shared file. chunk info : {}", info);
       throw new StorageContainerException("Not Supported Operation. " +
           "Trying to delete a chunk that is in shared file. chunk info : "
-          + info.toString(), UNSUPPORTED_REQUEST);
+          + info, UNSUPPORTED_REQUEST);
     }
   }
 
