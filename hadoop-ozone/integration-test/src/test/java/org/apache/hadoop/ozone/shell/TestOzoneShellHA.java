@@ -54,6 +54,7 @@ import picocli.CommandLine.RunLast;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.List;
@@ -451,32 +452,55 @@ public class TestOzoneShellHA {
     Assert.assertEquals(0, getNumOfBuckets("bucket"));
   }
 
-  @Test
-  public void testDeleteToTrash() throws Exception {
-    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
-    OzoneConfiguration confcli = new OzoneConfiguration(conf);
-    confcli.set("fs.ofs.impl",
+  /**
+   * Helper function to retrieve Ozone client configuration for trash testing.
+   * @param hostPrefix Scheme + Authority. e.g. ofs://om-service-test1
+   * @param configuration Server config to generate client config from.
+   * @return Config added with fs.ofs.impl, fs.defaultFS and fs.trash.interval.
+   */
+  private OzoneConfiguration getClientConfForOFS(
+      String hostPrefix, OzoneConfiguration configuration) {
+
+    OzoneConfiguration clientConf = new OzoneConfiguration(configuration);
+    clientConf.set("fs.ofs.impl",
         "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
-    confcli.set(FS_DEFAULT_NAME_KEY, hostPrefix);
-    confcli.setInt(FS_TRASH_INTERVAL_KEY, 60);
-    OzoneFsShell shell = new OzoneFsShell(confcli);
-    FileSystem fs = FileSystem.get(confcli);
+    clientConf.set(FS_DEFAULT_NAME_KEY, hostPrefix);
+    clientConf.setInt(FS_TRASH_INTERVAL_KEY, 60);
+    return clientConf;
+  }
+
+  @SuppressWarnings("checkstyle:RightCurly") @Test
+  public void testDeleteToTrashOrSkipTrash() throws Exception {
+    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
+    OzoneConfiguration clientConf = getClientConfForOFS(hostPrefix, conf);
+    OzoneFsShell shell = new OzoneFsShell(clientConf);
+    FileSystem fs = FileSystem.get(clientConf);
     final String strDir1 = hostPrefix + "/volumed2t/bucket1/dir1";
+    // Note: CURRENT is also privately defined in TrashPolicyDefault
+    final Path trashCurrent = new Path("Current");
+
     final String strKey1 = strDir1 + "/key1";
     final Path pathKey1 = new Path(strKey1);
-    final OFSPath ofsPathKey1 = new OFSPath(strKey1);
-    final Path trashPathKey1 = Path.mergePaths(
-        new Path(ofsPathKey1.getTrashRoot(), "Current"), pathKey1);
+    final Path trashPathKey1 = Path.mergePaths(new Path(
+        new OFSPath(strKey1).getTrashRoot(), trashCurrent), pathKey1);
+
+    final String strKey2 = strDir1 + "/key2";
+    final Path pathKey2 = new Path(strKey2);
+    final Path trashPathKey2 = Path.mergePaths(new Path(
+        new OFSPath(strKey2).getTrashRoot(), trashCurrent), pathKey2);
+
     int res;
     try {
       res = ToolRunner.run(shell, new String[]{"-mkdir", "-p", strDir1});
       Assert.assertEquals(0, res);
+
+      // Check delete to trash behavior
       res = ToolRunner.run(shell, new String[]{"-touch", strKey1});
       Assert.assertEquals(0, res);
       // Verify key1 creation
       FileStatus statusPathKey1 = fs.getFileStatus(pathKey1);
       Assert.assertEquals(strKey1, statusPathKey1.getPath().toString());
-      // rm without skipTrash. since trash interval > 0, should moved to trash
+      // rm without -skipTrash. since trash interval > 0, should moved to trash
       res = ToolRunner.run(shell, new String[]{"-rm", strKey1});
       Assert.assertEquals(0, res);
       // Verify that the file is moved to the correct trash location
@@ -486,6 +510,23 @@ public class TestOzoneShellHA {
           statusPathKey1.getLen(), statusTrashPathKey1.getLen());
       Assert.assertEquals(
           fs.getFileChecksum(pathKey1), fs.getFileChecksum(trashPathKey1));
+
+      // Check delete skip trash behavior
+      res = ToolRunner.run(shell, new String[]{"-touch", strKey2});
+      Assert.assertEquals(0, res);
+      // Verify key2 creation
+      FileStatus statusPathKey2 = fs.getFileStatus(pathKey2);
+      Assert.assertEquals(strKey2, statusPathKey2.getPath().toString());
+      // rm with -skipTrash
+      res = ToolRunner.run(shell, new String[]{"-rm", "-skipTrash", strKey2});
+      Assert.assertEquals(0, res);
+      // Verify that the file is NOT moved to the trash location
+      try {
+        fs.getFileStatus(trashPathKey2);
+        Assert.fail("getFileStatus on non-existent should throw.");
+      }
+      catch (FileNotFoundException ignored) {
+      }
     } finally {
       shell.close();
     }
