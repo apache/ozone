@@ -42,31 +42,13 @@ jobs:
           with:
             name: it-freon
             path: mnt/ozone/target/integration
-  it-client:
-    name: it-client
-    runs-on: ubuntu-18.04
-    needs:
-        - build
-    steps:
-        - run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
-        - uses: actions/checkout@master
-          with:
-            path: mnt/ozone
-        - uses: ./mnt/ozone/.github/buildenv
-          with:
-             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -Pclient
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: it-client
-            path: mnt/ozone/target/integration
   coverage:
     name: coverage
     runs-on: ubuntu-18.04
     needs:
 #      - it-ozone
       #      - it-hdds-om
-      - it-client
+      #- it-client
       #      - it-filesystem-contract
       #      - it-filesystem
       - it-freon
@@ -79,4 +61,5 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           path: target/artifacts
-      - run: ./github/coverage-report.sh
+      - run: find -type f
+      - run: ./.github/coverage-report.sh
