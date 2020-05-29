@@ -63,3 +63,7 @@ jobs:
           path: target/artifacts
       - run: find -type f
       - run: ./.github/coverage-report.sh
+      - uses: actions/upload-artifact@master
+        with:
+          name: coverage
+          path: target/coverage
