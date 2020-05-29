@@ -19,6 +19,7 @@
 package org.apache.hadoop.fs.ozone;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeoutException;
@@ -31,15 +32,23 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import org.apache.commons.io.IOUtils;
+
+import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -49,6 +58,7 @@ import static org.junit.Assert.fail;
 
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -160,6 +170,7 @@ public class TestOzoneFileSystem {
 
     testListStatusOnRoot();
     testListStatus();
+    testListStatusWithIntermediateDir();
     testListStatusOnSubDirs();
     testListStatusOnLargeDirectory();
 
@@ -278,6 +289,30 @@ public class TestOzoneFileSystem {
     fileStatuses = o3fs.listStatus(parent);
     assertEquals("FileStatus did not return all children of the directory",
         3, fileStatuses.length);
+  }
+
+  private void testListStatusWithIntermediateDir() throws IOException {
+    String keyName = "object-dir/object-name";
+    OzoneClient ozClient =
+        OzoneClientFactory.getRpcClient(new OzoneConfiguration());
+    ObjectStore store = ozClient.getObjectStore();
+    OzoneVolume volume = store.getVolume(volumeName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // create a key
+    String value = "sample value";
+    try (OzoneOutputStream out = bucket.createKey(keyName,
+        value.getBytes().length, ReplicationType.RATIS,
+        THREE, new HashMap<>())) {
+      out.write(value.getBytes());
+    }
+
+    Path parent = new Path("");
+    FileStatus[] fileStatuses = o3fs.listStatus(parent);
+
+    // the number of immediate children of root is 1
+    Assert.assertEquals(1, fileStatuses.length);
+    bucket.deleteKey(keyName);
   }
 
   /**
