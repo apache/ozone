@@ -50,4 +50,4 @@ find -name freon -type d | xargs rm -rf
 find -name genesis -type d | xargs rm -rf
 
 #generate the reports
-jacoco report "$REPORT_DIR/jacoco-all.exec" --classfiles target/classes --html "$REPORT_DIR/all" --xml "$REPORT_DIR/all.xml"
+jacoco report "$REPORT_DIR/jacoco-all.exec" --classfiles target/coverage-classes --html "$REPORT_DIR/all" --xml "$REPORT_DIR/all.xml"
