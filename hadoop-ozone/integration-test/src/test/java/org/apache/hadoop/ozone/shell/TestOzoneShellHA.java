@@ -469,7 +469,7 @@ public class TestOzoneShellHA {
     return clientConf;
   }
 
-  @SuppressWarnings("checkstyle:RightCurly") @Test
+  @Test
   public void testDeleteToTrashOrSkipTrash() throws Exception {
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
     OzoneConfiguration clientConf = getClientConfForOFS(hostPrefix, conf);
