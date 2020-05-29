@@ -22,7 +22,7 @@ cd "$DIR/.." || exit 1
 
 set -x
 
-REPORT_DIR="$DIR/target/coverage"
+REPORT_DIR="$DIR/../target/coverage"
 
 mkdir -p "$REPORT_DIR"
 
