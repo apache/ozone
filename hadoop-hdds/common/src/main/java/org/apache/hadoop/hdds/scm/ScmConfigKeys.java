@@ -320,12 +320,6 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT =
       "5m";
 
-  public static final String OZONE_SCM_CONTAINER_CREATION_LEASE_TIMEOUT =
-      "ozone.scm.container.creation.lease.timeout";
-
-  public static final String
-      OZONE_SCM_CONTAINER_CREATION_LEASE_TIMEOUT_DEFAULT = "60s";
-
   public static final String OZONE_SCM_PIPELINE_DESTROY_TIMEOUT =
       "ozone.scm.pipeline.destroy.timeout";
 
