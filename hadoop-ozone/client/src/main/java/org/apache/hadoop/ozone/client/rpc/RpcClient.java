@@ -795,7 +795,7 @@ public class RpcClient implements ClientProtocol {
 
   @Override
   public void close() throws IOException {
-    IOUtils.closeQuietly(ozoneManagerClient, xceiverClientManager);
+    IOUtils.cleanupWithLogger(LOG, ozoneManagerClient, xceiverClientManager);
   }
 
   @Override
