@@ -113,7 +113,8 @@ public class TestOFSPath {
     Assert.assertEquals("dir3/", ofsPath.getKeyName());
     Assert.assertEquals("/volume1/bucket2", ofsPath.getNonKeyPath());
     Assert.assertFalse(ofsPath.isMount());
-    Assert.assertEquals("ofs://svc1:9876/volume1/bucket2/dir3/", ofsPath.toString());
+    Assert.assertEquals("ofs://svc1:9876/volume1/bucket2/dir3/",
+        ofsPath.toString());
   }
 
   @Test
