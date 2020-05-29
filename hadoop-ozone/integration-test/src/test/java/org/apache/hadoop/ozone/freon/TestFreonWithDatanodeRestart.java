@@ -68,8 +68,6 @@ public class TestFreonWithDatanodeRestart {
         TimeUnit.SECONDS);
     conf.setTimeDuration(HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL, 1,
         TimeUnit.SECONDS);
-    conf.setTimeDuration(OZONE_SCM_CONTAINER_CREATION_LEASE_TIMEOUT, 5,
-        TimeUnit.SECONDS);
     conf.setTimeDuration(
             RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
                     DatanodeRatisServerConfig.RATIS_SERVER_REQUEST_TIMEOUT_KEY,
