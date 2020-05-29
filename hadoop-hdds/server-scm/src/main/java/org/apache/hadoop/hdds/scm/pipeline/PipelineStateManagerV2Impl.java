@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.ha.SCMHAInvocationHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.slf4j.Logger;
@@ -47,22 +48,42 @@ public class PipelineStateManagerV2Impl implements PipelineStateManagerV2 {
       LoggerFactory.getLogger(PipelineStateManager.class);
 
   private final PipelineStateMap pipelineStateMap;
+  private final NodeManager nodeManager;
   private Table<PipelineID, Pipeline> pipelineStore;
 
-  public PipelineStateManagerV2Impl(Table<PipelineID, Pipeline> pipelineStore) {
+  public PipelineStateManagerV2Impl(
+      Table<PipelineID, Pipeline> pipelineStore, NodeManager nodeManager)
+      throws IOException {
     this.pipelineStateMap = new PipelineStateMap();
+    this.nodeManager = nodeManager;
     this.pipelineStore = pipelineStore;
+    initialize();
+  }
+
+  private void initialize() throws IOException {
+    if (pipelineStore == null || nodeManager == null) {
+      throw new IOException("PipelineStore cannot be null");
+    }
+    if (pipelineStore.isEmpty()) {
+      LOG.info("No pipeline exists in current db");
+      return;
+    }
+    TableIterator<PipelineID, ? extends Table.KeyValue<PipelineID, Pipeline>>
+        iterator = pipelineStore.iterator();
+    while (iterator.hasNext()) {
+      Pipeline pipeline = iterator.next().getValue();
+      addPipeline(pipeline.getProtobufMessage());
+    }
   }
 
   @Override
   public void addPipeline(HddsProtos.Pipeline pipelineProto)
       throws IOException {
     Pipeline pipeline = Pipeline.getFromProtobuf(pipelineProto);
-    if (pipelineStore != null) {
-      pipelineStore.put(pipeline.getId(), pipeline);
-    }
+    pipelineStore.put(pipeline.getId(), pipeline);
     pipelineStateMap.addPipeline(pipeline);
-    LOG.info("Created pipeline {}", pipeline);
+    nodeManager.addPipeline(pipeline);
+    LOG.info("Created pipeline {}.", pipeline);
   }
 
   @Override
@@ -128,15 +149,14 @@ public class PipelineStateManagerV2Impl implements PipelineStateManagerV2 {
   }
 
   @Override
-  public Pipeline removePipeline(HddsProtos.PipelineID pipelineIDProto)
+  public void removePipeline(HddsProtos.PipelineID pipelineIDProto)
       throws IOException {
     PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineIDProto);
-    if (pipelineStore != null) {
-      pipelineStore.delete(pipelineID);
-    }
+    pipelineStore.delete(pipelineID);
     Pipeline pipeline = pipelineStateMap.removePipeline(pipelineID);
-    LOG.info("Pipeline {} removed from db", pipeline);
-    return pipeline;
+    nodeManager.removePipeline(pipeline);
+    LOG.info("Pipeline {} removed.", pipeline);
+    return;
   }
 
 
@@ -156,23 +176,6 @@ public class PipelineStateManagerV2Impl implements PipelineStateManagerV2 {
   }
 
   @Override
-  public boolean isPipelineStoreEmpty() throws IOException {
-    if (pipelineStore == null) {
-      throw new IOException("PipelineStore cannot be null");
-    }
-    return pipelineStore.isEmpty();
-  }
-
-  @Override
-  public TableIterator<PipelineID, ? extends Table.KeyValue<
-      PipelineID, Pipeline>> getPipelineStoreIterator() throws IOException {
-    if (pipelineStore == null) {
-      throw new IOException("PipelineStore cannot be null");
-    }
-    return pipelineStore.iterator();
-  }
-
-  @Override
   public void close() throws Exception {
     pipelineStore.close();
   }
@@ -186,10 +189,16 @@ public class PipelineStateManagerV2Impl implements PipelineStateManagerV2 {
    */
   public static class Builder {
     private Table<PipelineID, Pipeline> pipelineStore;
+    private NodeManager nodeManager;
     private SCMRatisServer scmRatisServer;
 
     public Builder setRatisServer(final SCMRatisServer ratisServer) {
       scmRatisServer = ratisServer;
+      return this;
+    }
+
+    public Builder setNodeManager(final NodeManager scmNodeManager) {
+      nodeManager = scmNodeManager;
       return this;
     }
 
@@ -199,11 +208,11 @@ public class PipelineStateManagerV2Impl implements PipelineStateManagerV2 {
       return this;
     }
 
-    public PipelineStateManagerV2 build() {
+    public PipelineStateManagerV2 build() throws IOException {
       Preconditions.checkNotNull(pipelineStore);
 
       final PipelineStateManagerV2 pipelineStateManager =
-          new PipelineStateManagerV2Impl(pipelineStore);
+          new PipelineStateManagerV2Impl(pipelineStore, nodeManager);
 
       final SCMHAInvocationHandler invocationHandler =
           new SCMHAInvocationHandler(SCMRatisProtocol.RequestType.PIPELINE,

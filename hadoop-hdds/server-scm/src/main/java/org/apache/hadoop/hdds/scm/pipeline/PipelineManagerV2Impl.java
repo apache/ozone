@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -68,7 +67,6 @@ public class PipelineManagerV2Impl implements PipelineManager {
   private PipelineStateManagerV2 stateManager;
   private Scheduler scheduler;
   private BackgroundPipelineCreator backgroundPipelineCreator;
-  private final NodeManager nodeManager;
   private final ConfigurationSource conf;
   // Pipeline Manager MXBean
   private ObjectName pmInfoBean;
@@ -82,12 +80,10 @@ public class PipelineManagerV2Impl implements PipelineManager {
   public PipelineManagerV2Impl(ConfigurationSource conf,
                                NodeManager nodeManager,
                                PipelineStateManagerV2 pipelineStateManager,
-                               PipelineFactory pipelineFactory)
-      throws IOException {
+                               PipelineFactory pipelineFactory) {
     this.lock = new ReentrantReadWriteLock();
     this.pipelineFactory = pipelineFactory;
     this.stateManager = pipelineStateManager;
-    this.nodeManager = nodeManager;
     this.conf = conf;
     this.pmInfoBean = MBeans.register("SCMPipelineManager",
         "SCMPipelineManagerInfo", this);
@@ -102,7 +98,6 @@ public class PipelineManagerV2Impl implements PipelineManager {
     // Pipeline creation is only allowed after the safemode prechecks have
     // passed, eg sufficient nodes have registered.
     this.pipelineCreationAllowed = new AtomicBoolean(!this.isInSafeMode.get());
-    initializePipelineState();
   }
 
   public static PipelineManager newPipelineManager(
@@ -112,7 +107,9 @@ public class PipelineManagerV2Impl implements PipelineManager {
     // Create PipelineStateManager
     PipelineStateManagerV2 stateManager = PipelineStateManagerV2Impl
         .newBuilder().setPipelineStore(pipelineStore)
-        .setRatisServer(scmhaManager.getRatisServer()).build();
+        .setRatisServer(scmhaManager.getRatisServer())
+        .setNodeManager(nodeManager)
+        .build();
 
     // Create PipelineManager
     PipelineManagerV2Impl pipelineManager = new PipelineManagerV2Impl(conf,
@@ -129,20 +126,6 @@ public class PipelineManagerV2Impl implements PipelineManager {
     return pipelineManager;
   }
 
-  protected void initializePipelineState() throws IOException {
-    if (stateManager.isPipelineStoreEmpty()) {
-      LOG.info("No pipeline exists in current db");
-      return;
-    }
-    TableIterator<PipelineID, ? extends Table.KeyValue<PipelineID, Pipeline>>
-        iterator = stateManager.getPipelineStoreIterator();
-    while (iterator.hasNext()) {
-      Pipeline pipeline = iterator.next().getValue();
-      stateManager.addPipeline(pipeline.getProtobufMessage());
-      nodeManager.addPipeline(pipeline);
-    }
-  }
-
   @Override
   public Pipeline createPipeline(ReplicationType type,
                                  ReplicationFactor factor) throws IOException {
@@ -156,7 +139,6 @@ public class PipelineManagerV2Impl implements PipelineManager {
     try {
       Pipeline pipeline = pipelineFactory.create(type, factor);
       stateManager.addPipeline(pipeline.getProtobufMessage());
-      nodeManager.addPipeline(pipeline);
       recordMetricsForPipeline(pipeline);
       return pipeline;
     } catch (IOException ex) {
@@ -403,9 +385,7 @@ public class PipelineManagerV2Impl implements PipelineManager {
   protected void removePipeline(PipelineID pipelineId) throws IOException {
     lock.writeLock().lock();
     try {
-      Pipeline pipeline = stateManager.removePipeline(
-          pipelineId.getProtobuf());
-      nodeManager.removePipeline(pipeline);
+      stateManager.removePipeline(pipelineId.getProtobuf());
       metrics.incNumPipelineDestroyed();
     } catch (IOException ex) {
       metrics.incNumPipelineDestroyFailed();

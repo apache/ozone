@@ -21,8 +21,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -49,7 +47,7 @@ public interface PipelineStateManagerV2 {
    * @throws IOException
    */
   @Replicate
-  Pipeline removePipeline(HddsProtos.PipelineID pipelineIDProto)
+  void removePipeline(HddsProtos.PipelineID pipelineIDProto)
       throws IOException;
 
   /**
@@ -96,11 +94,6 @@ public interface PipelineStateManagerV2 {
 
   void removeContainerFromPipeline(PipelineID pipelineID,
                                    ContainerID containerID) throws IOException;
-
-  boolean isPipelineStoreEmpty() throws IOException;
-
-  TableIterator<PipelineID, ? extends Table.KeyValue<PipelineID, Pipeline>>
-      getPipelineStoreIterator() throws IOException;
 
   void close() throws Exception;
 }
