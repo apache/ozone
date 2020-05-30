@@ -40,7 +40,7 @@ rm -rf target/coverage-classes || true
 mkdir -p target/coverage-classes
 
 #Unzip all the classes from the last build
-find hadoop-ozone/dist/target/*/share/ozone/lib -name "hadoop-*.jar" | grep -E 'hdds|ozone' | grep -v legacy | grep -v current | xargs -n1 unzip -q -d target/coverage-classes
+find hadoop-ozone/dist/target/*/share/ozone/lib -name "hadoop-*.jar" | grep -E 'hdds|ozone' | grep -v legacy | grep -v current | xargs -n1 unzip -o -q -d target/coverage-classes
 
 #Exclude some classes from the coverage
 find target/coverage-classes -name proto -type d | xargs rm -rf
