@@ -34,7 +34,7 @@ jacoco() {
 }
 
 #Merge all the jacoco.exec files
-jacoco merge "$(find target/artifacts -name jacoco-combined.exec)" --destfile "$REPORT_DIR/jacoco-all.exec"
+jacoco merge $(find target/artifacts -name jacoco-combined.exec) --destfile "$REPORT_DIR/jacoco-all.exec"
 
 rm -rf target/coverage-classes || true
 mkdir -p target/coverage-classes
