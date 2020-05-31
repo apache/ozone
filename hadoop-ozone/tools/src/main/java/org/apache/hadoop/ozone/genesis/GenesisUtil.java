@@ -149,7 +149,8 @@ public final class GenesisUtil {
 
   static void addPipelines(HddsProtos.ReplicationFactor factor,
       int numPipelines, ConfigurationSource conf) throws Exception {
-    SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl((OzoneConfiguration)conf);
+    SCMMetadataStore scmMetadataStore =
+            new SCMMetadataStoreImpl((OzoneConfiguration)conf);
 
     Table<PipelineID, Pipeline> pipelineTable =
         scmMetadataStore.getPipelineTable();

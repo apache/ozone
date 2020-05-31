@@ -58,7 +58,8 @@ public class TestHealthyPipelineSafeModeRule {
             new ArrayList<>(HddsTestUtils.getContainerInfo(1));
 
     String storageDir = GenericTestUtils.getTempPath(
-            TestHealthyPipelineSafeModeRule.class.getName() + UUID.randomUUID());
+            TestHealthyPipelineSafeModeRule.class.getName() +
+                    UUID.randomUUID());
     OzoneConfiguration config = new OzoneConfiguration();
     MockNodeManager nodeManager = new MockNodeManager(true, 0);
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);

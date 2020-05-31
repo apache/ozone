@@ -69,7 +69,8 @@ public class TestOneReplicaPipelineSafeModeRule {
 
     eventQueue = new EventQueue();
 
-    SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(ozoneConfiguration);
+    SCMMetadataStore scmMetadataStore =
+            new SCMMetadataStoreImpl(ozoneConfiguration);
 
     pipelineManager =
         new SCMPipelineManager(ozoneConfiguration, mockNodeManager,

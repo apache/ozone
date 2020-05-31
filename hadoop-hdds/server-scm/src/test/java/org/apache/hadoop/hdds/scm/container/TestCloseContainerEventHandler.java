@@ -89,7 +89,9 @@ public class TestCloseContainerEventHandler {
         scmMetadataStore.getContainerTable(), scmMetadataStore.getStore(), pipelineManager);
     pipelineManager.triggerPipelineCreation();
     eventQueue.addHandler(CLOSE_CONTAINER,
-        new CloseContainerEventHandler(pipelineManager, containerManager));
+        new CloseContainerEventHandler(
+                pipelineManager,
+                containerManager));
     eventQueue.addHandler(DATANODE_COMMAND, nodeManager);
     // Move all pipelines created by background from ALLOCATED to OPEN state
     Thread.sleep(2000);
