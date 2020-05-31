@@ -43,6 +43,7 @@ import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -282,6 +283,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private List<OMNodeDetails> peerNodes;
   private File omRatisSnapshotDir;
   private final OMRatisSnapshotInfo omRatisSnapshotInfo;
+  private final AtomicReference<RatisDropwizardExports>
+      ratisDropwizardExports = new AtomicReference<>();
 
   private KeyProviderCryptoExtension kmsProvider = null;
   private static String keyProviderUriKeyName =
@@ -449,20 +452,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     ShutdownHookManager.get().addShutdownHook(shutdownHook,
         SHUTDOWN_HOOK_PRIORITY);
     omState = State.INITIALIZED;
-  }
-
-  /**
-   * Register Ratis metrics reporters.
-   */
-  private void registerRatisMetricReporters() {
-    // All the Ratis metrics (registered from now) will be published via JMX
-    // and via the prometheus exporter (used by the /prom servlet
-    MetricRegistries.global()
-        .addReporterRegistration(MetricsReporting.jmxReporter());
-    MetricRegistries.global().addReporterRegistration(
-        registry -> CollectorRegistry.defaultRegistry.register(
-            new RatisDropwizardExports(
-                registry.getDropWizardMetricRegistry())));
   }
 
   /**
@@ -1232,7 +1221,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (isRatisEnabled) {
       if (omRatisServer == null) {
         // This needs to be done before initializing Ratis.
-        registerRatisMetricReporters();
+        RatisDropwizardExports.
+            registerRatisMetricReporters(ratisDropwizardExports);
         omRatisServer = OzoneManagerRatisServer.newOMRatisServer(
             configuration, this, omNodeDetails, peerNodes);
       }

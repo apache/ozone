@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
@@ -95,7 +96,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private boolean printBanner;
   private String[] args;
   private volatile AtomicBoolean isStopped = new AtomicBoolean(false);
-
+  private final AtomicReference<RatisDropwizardExports>
+      ratisDropwizardExports = new AtomicReference<>();
   //Constructor for DataNode PluginService
   public HddsDatanodeService(){}
 
@@ -181,15 +183,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   public void start() {
-
-    //All the Ratis metrics (registered from now) will be published via JMX and
-    //via the prometheus exporter (used by the /prom servlet
-    MetricRegistries.global()
-        .addReporterRegistration(MetricsReporting.jmxReporter());
-    MetricRegistries.global().addReporterRegistration(
-        registry -> CollectorRegistry.defaultRegistry.register(
-            new RatisDropwizardExports(
-                registry.getDropWizardMetricRegistry())));
+    RatisDropwizardExports.
+        registerRatisMetricReporters(ratisDropwizardExports);
 
     OzoneConfiguration.activate();
     HddsServerUtil.initializeMetrics(conf, "HddsDatanode");
