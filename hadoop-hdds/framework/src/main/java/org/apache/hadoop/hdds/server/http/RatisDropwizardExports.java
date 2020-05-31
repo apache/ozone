@@ -52,7 +52,7 @@ public class RatisDropwizardExports extends DropwizardExports {
             MetricsReporting.stopJmxReporter());
     MetricRegistries.global().addReporterRegistration(
         r1 -> registerDropwizard(r1, ratisDropwizardExports),
-        r2 -> deregisterDropwizard(r2, ratisDropwizardExports);
+        r2 -> deregisterDropwizard(r2, ratisDropwizardExports));
   }
 
   private static void registerDropwizard(RatisMetricRegistry registry,
