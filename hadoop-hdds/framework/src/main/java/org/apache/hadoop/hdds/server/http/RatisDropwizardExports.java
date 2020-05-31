@@ -56,7 +56,7 @@ public class RatisDropwizardExports extends DropwizardExports {
   }
 
   private static void registerDropwizard(RatisMetricRegistry registry,
-    AtomicReference<RatisDropwizardExports> ratisDropwizardExports) {
+      AtomicReference<RatisDropwizardExports> ratisDropwizardExports) {
     RatisDropwizardExports rde = new RatisDropwizardExports(
         registry.getDropWizardMetricRegistry());
     CollectorRegistry.defaultRegistry.register(rde);
@@ -65,7 +65,7 @@ public class RatisDropwizardExports extends DropwizardExports {
   }
 
   private static void deregisterDropwizard(RatisMetricRegistry registry,
-    AtomicReference<RatisDropwizardExports> ratisDropwizardExports) {
+      AtomicReference<RatisDropwizardExports> ratisDropwizardExports) {
     Collector c = ratisDropwizardExports.getAndSet(null);
     if (c != null) {
       CollectorRegistry.defaultRegistry.unregister(c);
