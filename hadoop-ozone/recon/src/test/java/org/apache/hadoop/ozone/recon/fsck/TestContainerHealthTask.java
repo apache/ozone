@@ -57,7 +57,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 /**
- * Class to test single run of Missing Container Task.
+ * Class to test a single run of the Container Health Task.
  */
 public class TestContainerHealthTask extends AbstractReconSqlDBTest {
   @Test

@@ -39,7 +39,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * Test to ensure the correct container state is return by a
- * ContainerHealthyStatus instance.
+ * ContainerHealthStatus instance.
  */
 public class TestContainerHealthStatus {
 
