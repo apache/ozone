@@ -382,6 +382,15 @@ public class TestRDBStore {
         Assert.assertNotNull(val);
       }
     }
+
+    // Technically the extra column family should also be open, even though
+    // we do not use it.
+    String extraFamily = families.get(families.size() - 1);
+    try (Table table = rdbStore.getTable(extraFamily)) {
+      Assert.assertNotNull(extraFamily + "is null", table);
+      Object val = table.get(extraFamily.getBytes(StandardCharsets.UTF_8));
+      Assert.assertNotNull(val);
+    }
   }
 
 }

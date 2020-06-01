@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.RocksDBStoreMBean;
@@ -100,9 +101,10 @@ public class RDBStore implements DBStore {
       List<TableConfig> columnFamiliesInDb = getColumnFamiliesInExistingDb();
       List<TableConfig> extraCf = columnFamiliesInDb.stream().filter(
           cf -> !families.contains(cf)).collect(Collectors.toList());
-      for (TableConfig family : extraCf) {
-        LOG.info("Adding column family {}", family.getName());
-        columnFamilyDescriptors.add(family.getDescriptor());
+      if (CollectionUtils.isNotEmpty(extraCf)) {
+        LOG.info("Found the following extra column families in existing DB : " +
+                "{}", Arrays.toString(extraCf.toArray()));
+        extraCf.forEach(cf -> columnFamilyDescriptors.add(cf.getDescriptor()));
       }
 
       db = RocksDB.open(dbOptions, dbLocation.getAbsolutePath(),
@@ -173,8 +175,10 @@ public class RDBStore implements DBStore {
         .map(cfbytes -> new TableConfig(StringUtils.bytes2String(cfbytes),
             DBProfile.DISK.getColumnFamilyOptions()))
         .collect(Collectors.toList());
-    LOG.info("Found column Families in DB : {}",
-        Arrays.toString(columnFamiliesInDb.toArray()));
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Found column Families in DB : {}",
+          Arrays.toString(columnFamiliesInDb.toArray()));
+    }
     return columnFamiliesInDb;
   }
 
