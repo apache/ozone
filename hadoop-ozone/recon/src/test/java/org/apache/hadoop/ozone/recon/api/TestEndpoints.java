@@ -468,14 +468,18 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     assertEquals(3, fileCountBySizeDao.count());
     Response response = utilizationEndpoint.getFileCounts(null, null, 0);
-    List<FileCountBySize> resultSet = (List<FileCountBySize>) response.getEntity();
+    List<FileCountBySize> resultSet =
+        (List<FileCountBySize>) response.getEntity();
     assertEquals(3, resultSet.size());
     assertTrue(resultSet.stream().anyMatch(o -> o.getVolume().equals("vol1") &&
-        o.getBucket().equals("bucket1") && o.getFileSize() == 1024L && o.getCount() == 1L));
+        o.getBucket().equals("bucket1") && o.getFileSize() == 1024L &&
+        o.getCount() == 1L));
     assertTrue(resultSet.stream().anyMatch(o -> o.getVolume().equals("vol1") &&
-        o.getBucket().equals("bucket1") && o.getFileSize() == 131072 && o.getCount() == 1L));
+        o.getBucket().equals("bucket1") && o.getFileSize() == 131072 &&
+        o.getCount() == 1L));
     assertTrue(resultSet.stream().anyMatch(o -> o.getVolume().equals("vol2") &&
-        o.getBucket().equals("bucket1") && o.getFileSize() == 1024L && o.getCount() == 1L));
+        o.getBucket().equals("bucket1") && o.getFileSize() == 1024L &&
+        o.getCount() == 1L));
 
     // Test for "volume" query param
     response = utilizationEndpoint.getFileCounts("vol1", null, 0);

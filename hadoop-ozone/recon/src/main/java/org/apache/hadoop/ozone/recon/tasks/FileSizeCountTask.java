@@ -55,8 +55,6 @@ public class FileSizeCountTask implements ReconOmTask {
   // 1125899906842624L = 1PB
   private static final long MAX_FILE_SIZE_UPPER_BOUND = 1125899906842624L;
   private FileCountBySizeDao fileCountBySizeDao;
-  // Map to store file counts in each <volume,bucket,fileSizeUpperBound>
-  private Map<FileSizeCountKey, Long> fileSizeCountMap;
   private DSLContext dslContext;
 
   @Inject
@@ -86,12 +84,12 @@ public class FileSizeCountTask implements ReconOmTask {
   @Override
   public Pair<String, Boolean> reprocess(OMMetadataManager omMetadataManager) {
     Table<String, OmKeyInfo> omKeyInfoTable = omMetadataManager.getKeyTable();
-    fileSizeCountMap = new HashMap<>();
+    Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
         keyIter = omKeyInfoTable.iterator()) {
       while (keyIter.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
-        handlePutKeyEvent(kv.getValue());
+        handlePutKeyEvent(kv.getValue(), fileSizeCountMap);
       }
     } catch (IOException ioEx) {
       LOG.error("Unable to populate File Size Count in Recon DB. ", ioEx);
@@ -99,7 +97,7 @@ public class FileSizeCountTask implements ReconOmTask {
     }
     // Truncate table before inserting new rows
     dslContext.truncate(FILE_COUNT_BY_SIZE);
-    writeCountsToDB(true);
+    writeCountsToDB(true, fileSizeCountMap);
 
     LOG.info("Completed a 'reprocess' run of FileSizeCountTask.");
     return new ImmutablePair<>(getTaskName(), true);
@@ -125,7 +123,7 @@ public class FileSizeCountTask implements ReconOmTask {
   @Override
   public Pair<String, Boolean> process(OMUpdateEventBatch events) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
-    fileSizeCountMap = new HashMap<>();
+    Map<FileSizeCountKey, Long> fileSizeCountMap = new HashMap<>();
 
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, OmKeyInfo> omdbUpdateEvent = eventIterator.next();
@@ -135,16 +133,17 @@ public class FileSizeCountTask implements ReconOmTask {
       try{
         switch (omdbUpdateEvent.getAction()) {
         case PUT:
-          handlePutKeyEvent(omKeyInfo);
+          handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
           break;
 
         case DELETE:
-          handleDeleteKeyEvent(updatedKey, omKeyInfo);
+          handleDeleteKeyEvent(updatedKey, omKeyInfo, fileSizeCountMap);
           break;
 
         case UPDATE:
-          handleDeleteKeyEvent(updatedKey, omdbUpdateEvent.getOldValue());
-          handlePutKeyEvent(omKeyInfo);
+          handleDeleteKeyEvent(updatedKey, omdbUpdateEvent.getOldValue(),
+              fileSizeCountMap);
+          handlePutKeyEvent(omKeyInfo, fileSizeCountMap);
           break;
 
         default: LOG.trace("Skipping DB update event : {}",
@@ -156,7 +155,7 @@ public class FileSizeCountTask implements ReconOmTask {
         return new ImmutablePair<>(getTaskName(), false);
       }
     }
-    writeCountsToDB(false);
+    writeCountsToDB(false, fileSizeCountMap);
     LOG.info("Completed a 'process' run of FileSizeCountTask.");
     return new ImmutablePair<>(getTaskName(), true);
   }
@@ -177,7 +176,8 @@ public class FileSizeCountTask implements ReconOmTask {
    * using the dao.
    *
    */
-  private void writeCountsToDB(boolean isDbTruncated) {
+  private void writeCountsToDB(boolean isDbTruncated,
+                               Map<FileSizeCountKey, Long> fileSizeCountMap) {
     fileSizeCountMap.keySet().forEach((FileSizeCountKey key) -> {
       FileCountBySize newRecord = new FileCountBySize();
       newRecord.setVolume(key.volume);
@@ -224,7 +224,8 @@ public class FileSizeCountTask implements ReconOmTask {
    *
    * @param omKeyInfo OmKey being updated for count
    */
-  private void handlePutKeyEvent(OmKeyInfo omKeyInfo) {
+  private void handlePutKeyEvent(OmKeyInfo omKeyInfo,
+                                 Map<FileSizeCountKey, Long> fileSizeCountMap) {
     FileSizeCountKey key = getFileSizeCountKey(omKeyInfo);
     Long count = fileSizeCountMap.containsKey(key) ?
         fileSizeCountMap.get(key) + 1L : 1L;
@@ -238,7 +239,9 @@ public class FileSizeCountTask implements ReconOmTask {
    *
    * @param omKeyInfo OmKey being updated for count
    */
-  private void handleDeleteKeyEvent(String key, OmKeyInfo omKeyInfo) {
+  private void handleDeleteKeyEvent(String key, OmKeyInfo omKeyInfo,
+                                    Map<FileSizeCountKey, Long>
+                                        fileSizeCountMap) {
     if (omKeyInfo == null) {
       LOG.warn("Unexpected error while handling DELETE key event. Key not " +
           "found in Recon OM DB : {}", key);
