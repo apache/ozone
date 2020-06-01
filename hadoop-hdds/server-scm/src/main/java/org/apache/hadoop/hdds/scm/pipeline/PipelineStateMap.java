@@ -373,13 +373,20 @@ class PipelineStateMap {
     Pipeline updatedPipeline = pipelineMap.compute(pipelineID,
         (id, p) -> Pipeline.newBuilder(pipeline).setState(state).build());
     PipelineQuery query = new PipelineQuery(pipeline);
+    List<Pipeline> pipelineList = query2OpenPipelines.get(query);
     if (updatedPipeline.getPipelineState() == PipelineState.OPEN) {
       // for transition to OPEN state add pipeline to query2OpenPipelines
-      query2OpenPipelines.get(query).add(updatedPipeline);
+      if (pipelineList == null) {
+        pipelineList = new CopyOnWriteArrayList<>();
+        query2OpenPipelines.put(query, pipelineList);
+      }
+      pipelineList.add(updatedPipeline);
     } else {
       // for transition from OPEN to CLOSED state remove pipeline from
       // query2OpenPipelines
-      query2OpenPipelines.get(query).remove(pipeline);
+      if (pipelineList != null) {
+        pipelineList.remove(pipeline);
+      }
     }
     return updatedPipeline;
   }
