@@ -430,7 +430,7 @@ public class RpcClient implements ClientProtocol {
           .setKeyName(bucketArgs.getEncryptionKey()).build();
     }
 
-    boolean trashEnabled = bucketArgs.getTrashEnabled();
+    boolean trashEnabled = bucketArgs.isTrashEnabled();
     String recoverWindow = bucketArgs.getRecoverWindow() == null ?
         OzoneConfigKeys.OZONE_TRASH_RECOVER_WINDOW_DEFAULT :
         bucketArgs.getRecoverWindow();

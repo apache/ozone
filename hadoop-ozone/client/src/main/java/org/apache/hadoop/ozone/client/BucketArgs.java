@@ -133,7 +133,7 @@ public final class BucketArgs {
    * Returns the bucket is trash enabled or not.
    * @return boolean
    */
-  public boolean getTrashEnabled() {
+  public boolean isTrashEnabled() {
     return trashEnabled;
   }
 

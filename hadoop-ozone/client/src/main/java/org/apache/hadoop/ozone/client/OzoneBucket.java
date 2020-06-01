@@ -318,7 +318,7 @@ public class OzoneBucket extends WithMetadata {
   /**
    * Return bucket is trash enabled or not.
    */
-  public boolean getTrashEnabled() {
+  public boolean isTrashEnabled() {
     return trashEnabled;
   }
 
