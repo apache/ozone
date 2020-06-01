@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -65,6 +66,8 @@ import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
+import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
+
 import org.apache.ratis.thirdparty.com.google.protobuf.ProtocolMessageEnum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,7 +116,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     this.tokenVerifier = tokenVerifier;
 
     protocolMetrics =
-        new ProtocolMessageMetrics<ProtocolMessageEnum>(
+        new ProtocolMessageMetrics<>(
             "HddsDispatcher",
             "HDDS dispatcher metrics",
             ContainerProtos.Type.values());
@@ -175,7 +178,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       ContainerCommandRequestProto msg, DispatcherContext dispatcherContext) {
     Preconditions.checkNotNull(msg);
     if (LOG.isTraceEnabled()) {
-      LOG.trace("Command {}, trace ID: {} ", msg.getCmdType().toString(),
+      LOG.trace("Command {}, trace ID: {} ", msg.getCmdType(),
           msg.getTraceID());
     }
 
@@ -490,10 +493,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     try {
       validateBlockToken(msg);
     } catch (IOException ioe) {
-      StorageContainerException sce = new StorageContainerException(
+      throw new StorageContainerException(
           "Block token verification failed. " + ioe.getMessage(), ioe,
           ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED);
-      throw sce;
     }
   }
 
@@ -583,14 +585,16 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     AuditMessage amsg;
     switch (result) {
     case SUCCESS:
-      if(eventType == EventType.READ &&
-          AUDIT.getLogger().isInfoEnabled(AuditMarker.READ.getMarker())) {
-        amsg = buildAuditMessageForSuccess(action, params);
-        AUDIT.logReadSuccess(amsg);
-      } else if(eventType == EventType.WRITE &&
-          AUDIT.getLogger().isInfoEnabled(AuditMarker.WRITE.getMarker())) {
-        amsg = buildAuditMessageForSuccess(action, params);
-        AUDIT.logWriteSuccess(amsg);
+      if(action.getAction().contains("CONTAINER")) {
+        if(eventType == EventType.READ &&
+            AUDIT.getLogger().isInfoEnabled(AuditMarker.READ.getMarker())) {
+          amsg = buildAuditMessageForSuccess(action, params);
+          AUDIT.logReadSuccess(amsg);
+        } else if(eventType == EventType.WRITE &&
+            AUDIT.getLogger().isInfoEnabled(AuditMarker.WRITE.getMarker())) {
+          amsg = buildAuditMessageForSuccess(action, params);
+          AUDIT.logWriteSuccess(amsg);
+        }
       }
       break;
 
@@ -613,28 +617,26 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
   }
 
-  //TODO: use GRPC to fetch user and ip details
   @Override
   public AuditMessage buildAuditMessageForSuccess(AuditAction op,
       Map<String, String> auditMap) {
 
     return new AuditMessage.Builder()
-        .setUser(null)
-        .atIp(null)
+        .setUser(getRemoteUserName())
+        .atIp(Server.getRemoteAddress())
         .forOperation(op)
         .withParams(auditMap)
         .withResult(AuditEventStatus.SUCCESS)
         .build();
   }
 
-  //TODO: use GRPC to fetch user and ip details
   @Override
   public AuditMessage buildAuditMessageForFailure(AuditAction op,
       Map<String, String> auditMap, Throwable throwable) {
 
     return new AuditMessage.Builder()
-        .setUser(null)
-        .atIp(null)
+        .setUser(getRemoteUserName())
+        .atIp(Server.getRemoteAddress())
         .forOperation(op)
         .withParams(auditMap)
         .withResult(AuditEventStatus.FAILURE)
