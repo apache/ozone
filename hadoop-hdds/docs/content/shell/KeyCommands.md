@@ -63,6 +63,7 @@ The `key put` command uploads a file from the local file system to the specified
 |  Uri                           | The name of the key in **/volume/bucket/key** format.
 |  FileName                      | Local file to upload.
 | -r, \-\-replication              | Optional, Number of copies, ONE or THREE are the options. Picks up the default from cluster configuration.
+| -t, \-\-type                   | Optional, replication type of the new key. RATIS and STAND_ALONE are the options. Picks up the default from cluster configuration.
 
 {{< highlight bash >}}
 ozone sh key put /hive/jan/corrected-sales.orc sales.orc

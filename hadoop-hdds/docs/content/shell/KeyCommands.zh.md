@@ -61,6 +61,7 @@ ozone sh key get /hive/jan/sales.orc sales.orc
 |  Uri                           | 键名，格式为 **/volume/bucket/key**
 |  FileName                      | 待上传的本地文件
 | -r, \-\-replication              | 可选，上传后的副本数，合法值为 ONE 或者 THREE，如果不设置，将采用集群配置中的默认值。
+| -t, \-\-type                   | 可选，副本类型，合法值为 RATIS 或 STAND_ALONE，如果不设置，将采用集群配置中的默认值。
 
 {{< highlight bash >}}
 ozone sh key put /hive/jan/corrected-sales.orc sales.orc
