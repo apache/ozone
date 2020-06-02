@@ -107,12 +107,10 @@ public class ContainerHealthTask extends ReconScmTask {
 
   private void completeProcessingContainer(ContainerHealthStatus container,
       Set<String> existingRecords, long currentTime) {
-    if (container != null) {
-      containerSchemaManager.insertUnhealthyContainerRecords(
-          ContainerHealthRecords.generateUnhealthyRecords(
-              container, existingRecords, currentTime));
-      processedContainers.add(container.getContainer());
-    }
+    containerSchemaManager.insertUnhealthyContainerRecords(
+        ContainerHealthRecords.generateUnhealthyRecords(
+            container, existingRecords, currentTime));
+    processedContainers.add(container.getContainer());
   }
 
   /**
@@ -139,8 +137,10 @@ public class ContainerHealthTask extends ReconScmTask {
         recordCount++;
         UnhealthyContainersRecord rec = cursor.fetchNext();
         try {
-          if (currentContainer == null
-              || currentContainer.getContainerID() != rec.getContainerId()) {
+          if (currentContainer == null) {
+            currentContainer = setCurrentContainer(rec.getContainerId());
+          }
+          if (currentContainer.getContainerID() != rec.getContainerId()) {
             completeProcessingContainer(
                 currentContainer, existingRecords, currentTime);
             existingRecords.clear();
@@ -161,8 +161,10 @@ public class ContainerHealthTask extends ReconScmTask {
         }
       }
       // Remember to finish processing the last container
-      completeProcessingContainer(
-          currentContainer, existingRecords, currentTime);
+      if (currentContainer != null) {
+        completeProcessingContainer(
+            currentContainer, existingRecords, currentTime);
+      }
     }
     return recordCount;
   }
