@@ -699,12 +699,18 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     LOG.trace("getFileStatus() path:{}", f);
     Path qualifiedPath = f.makeQualified(uri, workingDir);
     String key = pathToKey(qualifiedPath);
+    // Handle DistCp /NONE path
+    if (key.equals("NONE")) {
+      throw new FileNotFoundException("File not found. path /NONE.");
+    }
     FileStatus fileStatus = null;
     try {
       fileStatus = convertFileStatus(
           adapter.getFileStatus(key, uri, qualifiedPath, getUsername()));
     } catch (OMException ex) {
-      if (ex.getResult().equals(OMException.ResultCodes.KEY_NOT_FOUND)) {
+      if (ex.getResult().equals(OMException.ResultCodes.KEY_NOT_FOUND) ||
+          ex.getResult().equals(OMException.ResultCodes.BUCKET_NOT_FOUND) ||
+          ex.getResult().equals(OMException.ResultCodes.VOLUME_NOT_FOUND)) {
         throw new FileNotFoundException("File not found. path:" + f);
       }
     }
