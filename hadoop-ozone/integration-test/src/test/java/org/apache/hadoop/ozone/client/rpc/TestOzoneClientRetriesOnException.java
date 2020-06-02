@@ -57,6 +57,7 @@ import org.junit.Rule;
 import org.junit.rules.Timeout;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY;
 
 /**
  * Tests failure detection and handling in BlockOutputStream Class.
@@ -100,6 +101,7 @@ public class TestOzoneClientRetriesOnException {
     conf.setInt(OzoneConfigKeys.OZONE_CLIENT_MAX_RETRIES, 3);
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 3);
     conf.setQuietMode(false);
+    conf.setBoolean(OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY, false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(7)
         .setTotalPipelineNumLimit(10)
@@ -138,8 +140,7 @@ public class TestOzoneClientRetriesOnException {
   @Test
   public void testGroupMismatchExceptionHandling() throws Exception {
     String keyName = getKeyName();
-    // make sure flush will sync data.
-    int dataLength = maxFlushSize + chunkSize;
+    int dataLength = maxFlushSize + 50;
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS,
             dataLength);
     // write data more than 1 chunk

@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -42,6 +41,7 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -79,8 +79,6 @@ public class TestFailureHandlingByClient {
   private OzoneClient client;
   private ObjectStore objectStore;
   private int chunkSize;
-  private int flushSize;
-  private int maxFlushSize;
   private int blockSize;
   private String volumeName;
   private String bucketName;
@@ -95,9 +93,7 @@ public class TestFailureHandlingByClient {
    */
   private void init() throws Exception {
     conf = new OzoneConfiguration();
-    chunkSize = 100;
-    flushSize = 2 * chunkSize;
-    maxFlushSize = 2 * flushSize;
+    chunkSize = (int) OzoneConsts.MB;
     blockSize = 4 * chunkSize;
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 100, TimeUnit.SECONDS);
     conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 10);
@@ -127,8 +123,8 @@ public class TestFailureHandlingByClient {
             RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
                     "watch.request.timeout",
             3, TimeUnit.SECONDS);
-//    conf.setBoolean(
-//        OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY, false);
+    conf.setBoolean(
+        OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY, false);
     conf.setQuietMode(false);
     conf.setClass(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class, DNSToSwitchMapping.class);
@@ -136,13 +132,7 @@ public class TestFailureHandlingByClient {
         Collections.singleton(HddsUtils.getHostName(conf))).get(0),
         "/rack1");
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(10)
-        .setTotalPipelineNumLimit(15)
-        .setChunkSize(chunkSize)
-        .setBlockSize(blockSize)
-        .setStreamBufferFlushSize(flushSize)
-        .setStreamBufferMaxSize(maxFlushSize)
-        .setStreamBufferSizeUnit(StorageUnit.BYTES).build();
+        .setNumDatanodes(10).setTotalPipelineNumLimit(15).build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
@@ -414,14 +404,14 @@ public class TestFailureHandlingByClient {
     cluster.shutdownHddsDatanode(datanodes.get(1));
 
     key.write(data.getBytes());
+    key.write(data.getBytes());
     key.flush();
+    Assert.assertTrue(keyOutputStream.getExcludeList().getPipelineIds()
+        .contains(pipeline.getId()));
     Assert.assertTrue(
         keyOutputStream.getExcludeList().getContainerIds().isEmpty());
     Assert.assertTrue(
         keyOutputStream.getExcludeList().getDatanodes().isEmpty());
-    Assert.assertTrue(
-        keyOutputStream.getExcludeList().getDatanodes().isEmpty());
-    key.write(data.getBytes());
     // The close will just write to the buffer
     key.close();
 
