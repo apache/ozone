@@ -60,8 +60,7 @@ public class RatisDropwizardExports extends DropwizardExports {
     RatisDropwizardExports rde = new RatisDropwizardExports(
         registry.getDropWizardMetricRegistry());
     CollectorRegistry.defaultRegistry.register(rde);
-    Preconditions.checkArgument(
-        ratisDropwizardExports.compareAndSet(null, rde));
+    ratisDropwizardExports.set(rde);
   }
 
   private static void deregisterDropwizard(RatisMetricRegistry registry,
@@ -69,7 +68,6 @@ public class RatisDropwizardExports extends DropwizardExports {
     Collector c = ratisDropwizardExports.getAndSet(null);
     if (c != null) {
       CollectorRegistry.defaultRegistry.unregister(c);
-      ratisDropwizardExports.set(null);
     }
   }
 }

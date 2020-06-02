@@ -281,7 +281,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private File omRatisSnapshotDir;
   private final OMRatisSnapshotInfo omRatisSnapshotInfo;
   private final AtomicReference<RatisDropwizardExports>
-      ratisDropwizardExports = new AtomicReference<>();
+      ratisDropwizardExports = new AtomicReference<>(null);
 
   private KeyProviderCryptoExtension kmsProvider = null;
   private static String keyProviderUriKeyName =
