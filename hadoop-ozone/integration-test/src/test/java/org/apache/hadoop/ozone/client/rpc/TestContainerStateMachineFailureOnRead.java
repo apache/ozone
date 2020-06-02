@@ -98,7 +98,6 @@ public class TestContainerStateMachineFailureOnRead {
         RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
             DatanodeRatisServerConfig.RATIS_SERVER_NO_LEADER_TIMEOUT_KEY,
         1000, TimeUnit.SECONDS);
-    conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 10);
     conf.setTimeDuration(
         RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
             DatanodeRatisServerConfig.RATIS_SERVER_REQUEST_TIMEOUT_KEY,
