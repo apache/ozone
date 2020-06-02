@@ -192,7 +192,7 @@ public class DatanodeStateMachine implements Closeable {
     long now = 0;
 
     reportManager.init();
-    initCommandHandlerThread(conf);
+    initCommandHandlerThread();
 
     // Start jvm monitor
     jvmPauseMonitor = new JvmPauseMonitor();
@@ -208,15 +208,15 @@ public class DatanodeStateMachine implements Closeable {
         context.execute(executorService, heartbeatFrequency,
             TimeUnit.MILLISECONDS);
         now = Time.monotonicNow();
-        if (now < nextHB.get()) {
-          if(!Thread.interrupted()) {
-            Thread.sleep(nextHB.get() - now);
-          }
+        if (now < nextHB.get() && !Thread.interrupted()) {
+          Thread.sleep(nextHB.get() - now);
         }
       } catch (InterruptedException e) {
         // Some one has sent interrupt signal, this could be because
         // 1. Trigger heartbeat immediately
-        // 2. Shutdown has be initiated.
+        // 2. Shutdown has been initiated.
+        Thread.currentThread().interrupt();
+        throw new IOException("Unable to finish the execution.", e);
       } catch (Exception e) {
         LOG.error("Unable to finish the execution.", e);
       }
@@ -442,16 +442,14 @@ public class DatanodeStateMachine implements Closeable {
 
   /**
    * Create a command handler thread.
-   *
-   * @param config
    */
-  private void initCommandHandlerThread(ConfigurationSource config) {
+  private void initCommandHandlerThread() {
 
     /**
      * Task that periodically checks if we have any outstanding commands.
      * It is assumed that commands can be processed slowly and in order.
      * This assumption might change in future. Right now due to this assumption
-     * we have single command  queue process thread.
+     * we have single command queue process thread.
      */
     Runnable processCommandQueue = () -> {
       long now;
@@ -468,7 +466,7 @@ public class DatanodeStateMachine implements Closeable {
               Thread.sleep((nextHB.get() - now) + 1000L);
             }
           } catch (InterruptedException e) {
-            // Ignore this exception.
+            Thread.currentThread().interrupt();
           }
         }
       }
