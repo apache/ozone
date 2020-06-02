@@ -43,6 +43,8 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 
 import java.io.File;
 import java.io.IOException;
@@ -62,6 +64,12 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.*;
  * Tests the containerStateMachine failure handling.
  */
 public class TestContainerStateMachine {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();

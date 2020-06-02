@@ -49,6 +49,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.
     HDDS_SCM_WATCHER_TIMEOUT;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.
     OZONE_SCM_STALENODE_INTERVAL;
 
@@ -56,6 +58,12 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.
  * Tests the validity BCSID of a container.
  */
 public class TestBCSID {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static OzoneConfiguration conf = new OzoneConfiguration();
   private static MiniOzoneCluster cluster;

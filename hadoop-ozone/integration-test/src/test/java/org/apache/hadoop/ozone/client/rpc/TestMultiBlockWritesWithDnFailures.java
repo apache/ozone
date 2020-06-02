@@ -50,12 +50,20 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.*;
 
 /**
  * Tests MultiBlock Writes with Dn failures by Ozone Client.
  */
 public class TestMultiBlockWritesWithDnFailures {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;

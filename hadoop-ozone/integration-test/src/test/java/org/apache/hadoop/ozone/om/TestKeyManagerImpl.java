@@ -112,6 +112,7 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.junit.rules.Timeout;
 import static org.mockito.Matchers.anyList;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.doThrow;
@@ -124,6 +125,12 @@ import static org.mockito.Mockito.when;
  * Test class for @{@link KeyManagerImpl}.
  */
 public class TestKeyManagerImpl {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static PrefixManager prefixManager;
   private static KeyManagerImpl keyManager;

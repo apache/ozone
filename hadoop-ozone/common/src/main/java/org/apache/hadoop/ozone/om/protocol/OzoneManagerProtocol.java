@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -358,12 +357,6 @@ public interface OzoneManagerProtocol
    * @throws IOException
    */
   S3SecretValue getS3Secret(String kerberosID) throws IOException;
-
-  /**
-   * Get the OM Client's Retry and Failover Proxy provider.
-   * @return OMFailoverProxyProvider
-   */
-  OMFailoverProxyProvider getOMFailoverProxyProvider();
 
   /**
    * OzoneFS api to get file status for an entry.

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.csi;
 
 import java.util.concurrent.Callable;
 
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.Config;
@@ -27,7 +28,7 @@ import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 
 import io.grpc.Server;
 import io.grpc.netty.NettyServerBuilder;
@@ -84,8 +85,8 @@ public class CsiServer extends GenericCli implements Callable<Void> {
   }
 
   public static void main(String[] args) {
-
-    StringUtils.startupShutdownMessage(CsiServer.class, args, LOG);
+    StringUtils.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
+        CsiServer.class, args, LOG);
     new CsiServer().run(args);
   }
 

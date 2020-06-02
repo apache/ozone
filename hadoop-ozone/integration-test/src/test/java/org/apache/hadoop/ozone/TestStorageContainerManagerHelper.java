@@ -40,12 +40,20 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.primitives.Longs;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 
 /**
  * A helper class used by {@link TestStorageContainerManager} to generate
  * some keys and helps to verify containers and blocks locations.
  */
 public class TestStorageContainerManagerHelper {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private final MiniOzoneCluster cluster;
   private final OzoneConfiguration conf;

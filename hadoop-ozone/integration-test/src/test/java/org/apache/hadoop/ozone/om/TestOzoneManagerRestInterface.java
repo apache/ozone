@@ -43,6 +43,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
 import static org.apache.hadoop.ozone.OmUtils.getOmAddressForClients;
 
@@ -50,6 +52,12 @@ import static org.apache.hadoop.ozone.OmUtils.getOmAddressForClients;
  * This class is to test the REST interface exposed by OzoneManager.
  */
 public class TestOzoneManagerRestInterface {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
