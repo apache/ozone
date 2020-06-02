@@ -37,7 +37,7 @@ import java.util.Set;
  */
 public class TestPipelineStateManager {
 
-  private PipelineStateManager stateManager;
+  private StateManager stateManager;
 
   @Before
   public void init() throws Exception {

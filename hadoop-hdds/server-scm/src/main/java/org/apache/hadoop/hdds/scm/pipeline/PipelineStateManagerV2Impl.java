@@ -42,7 +42,7 @@ import java.util.NavigableSet;
  * state. All the read and write operations in PipelineStateMap are protected
  * by a read write lock.
  */
-public class PipelineStateManagerV2Impl implements PipelineStateManagerV2 {
+public class PipelineStateManagerV2Impl implements StateManager {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(PipelineStateManager.class);
@@ -180,6 +180,48 @@ public class PipelineStateManagerV2Impl implements PipelineStateManagerV2 {
     pipelineStore.close();
   }
 
+  // TODO Remove legacy
+  @Override
+  public void addPipeline(Pipeline pipeline) throws IOException {
+    throw new IOException("Not supported.");
+  }
+
+  @Override
+  public Pipeline removePipeline(PipelineID pipelineID) throws IOException {
+    throw new IOException("Not supported.");
+  }
+
+  @Override
+  public void updatePipelineState(PipelineID id,
+                                  Pipeline.PipelineState newState)
+      throws IOException {
+    throw new IOException("Not supported.");
+  }
+
+  @Override
+  public Pipeline finalizePipeline(PipelineID pipelineId)
+      throws IOException {
+    throw new IOException("Not supported.");
+  }
+
+
+  @Override
+  public Pipeline openPipeline(PipelineID pipelineId) throws IOException {
+    throw new IOException("Not supported.");
+  }
+
+  @Override
+  public void activatePipeline(PipelineID pipelineID) throws IOException {
+    throw new IOException("Not supported.");
+  }
+
+  @Override
+  public void deactivatePipeline(PipelineID pipelineID) throws IOException {
+    throw new IOException("Not supported.");
+  }
+
+  // legacy interfaces end
+
   public static Builder newBuilder() {
     return new Builder();
   }
@@ -208,19 +250,19 @@ public class PipelineStateManagerV2Impl implements PipelineStateManagerV2 {
       return this;
     }
 
-    public PipelineStateManagerV2 build() throws IOException {
+    public StateManager build() throws IOException {
       Preconditions.checkNotNull(pipelineStore);
 
-      final PipelineStateManagerV2 pipelineStateManager =
+      final StateManager pipelineStateManager =
           new PipelineStateManagerV2Impl(pipelineStore, nodeManager);
 
       final SCMHAInvocationHandler invocationHandler =
           new SCMHAInvocationHandler(SCMRatisProtocol.RequestType.PIPELINE,
               pipelineStateManager, scmRatisServer);
 
-      return (PipelineStateManagerV2) Proxy.newProxyInstance(
+      return (StateManager) Proxy.newProxyInstance(
           SCMHAInvocationHandler.class.getClassLoader(),
-          new Class<?>[]{PipelineStateManagerV2.class}, invocationHandler);
+          new Class<?>[]{StateManager.class}, invocationHandler);
     }
   }
 }
