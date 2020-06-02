@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -34,6 +35,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -59,6 +62,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
 
@@ -514,6 +518,49 @@ public class BasicRootedOzoneClientAdapterImpl
       }
       throw e;
     }
+  }
+
+  public Collection<FileStatus> getTrashRoots(boolean allUsers,
+      BasicRootedOzoneFileSystem fs) {
+    List<FileStatus> ret = new ArrayList<>();
+    try {
+      Iterator<? extends OzoneVolume> iterVol;
+      String username = UserGroupInformation.getCurrentUser().getUserName();
+      if (allUsers) {
+        iterVol = objectStore.listVolumes("");
+      } else {
+        iterVol = objectStore.listVolumesByUser(username, "", "");
+      }
+      while (iterVol.hasNext()) {
+        OzoneVolume volume = iterVol.next();
+        Path volumePath = new Path(OZONE_URI_DELIMITER, volume.getName());
+        Iterator<? extends OzoneBucket> bucketIter = volume.listBuckets("");
+        while (bucketIter.hasNext()) {
+          OzoneBucket bucket = bucketIter.next();
+          Path bucketPath = new Path(volumePath, bucket.getName());
+          Path trashRoot = new Path(bucketPath, FileSystem.TRASH_PREFIX);
+          if (allUsers) {
+            if (!fs.exists(trashRoot)) {
+              continue;
+            }
+            for (FileStatus candidate : fs.listStatus(trashRoot)) {
+              if (fs.exists(candidate.getPath())) {
+                ret.add(candidate);
+              }
+            }
+          } else {
+            Path userTrash = new Path(trashRoot, username);
+            if (!fs.exists(userTrash)) {
+              continue;
+            }
+            ret.add(fs.getFileStatus(userTrash));
+          }
+        }
+      }
+    } catch (IOException ex) {
+      throw new RuntimeException(ex);
+    }
+    return ret;
   }
 
   @Override

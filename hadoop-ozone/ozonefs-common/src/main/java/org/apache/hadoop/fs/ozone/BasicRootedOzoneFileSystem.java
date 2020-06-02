@@ -49,6 +49,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -648,6 +649,17 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   public Path getTrashRoot(Path path) {
     OFSPath ofsPath = new OFSPath(path);
     return ofsPath.getTrashRoot();
+  }
+
+  /**
+   * Get all the trash roots of OFS for current user or for all the users.
+   * @param allUsers return trashRoots of all users if true, used by emptier
+   * @return trash roots
+   */
+  public Collection<FileStatus> getTrashRoots(boolean allUsers) {
+    // Since get all trash roots for one or more users requires listing all
+    // volumes and buckets, we will let adapter impl handle it.
+    return adapterImpl.getTrashRoots(allUsers, this);
   }
 
   /**
