@@ -68,6 +68,12 @@ public class OMKeyDeleteResponse extends OMClientResponse {
       omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
           ozoneKey);
 
+      if (omKeyInfo.getFileHandleInfo() != 0) {
+        omMetadataManager.getKeyIdTable().deleteWithBatch(batchOperation,
+            omMetadataManager.getOzoneKeyIdTableKey(
+                omKeyInfo.getFileHandleInfo()));
+      }
+
       // If Key is not empty add this to delete table.
       if (!isKeyEmpty(omKeyInfo)) {
         // If a deleted key is put in the table where a key with the same

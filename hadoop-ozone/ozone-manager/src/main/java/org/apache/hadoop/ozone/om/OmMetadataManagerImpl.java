@@ -118,12 +118,19 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * |  multipartInfoTable| /volumeName/bucketName/keyName/uploadId ->...   |
    * |----------------------------------------------------------------------|
+   * | keyIdTable         | /volumeName/bucketName/keyId -> KeyName         |
+   * |----------------------------------------------------------------------|
+   *
+   * TBD : Renames need to be made keyIdTable aware. Also KeyId based lookups
+   * should be able to handle any possible race with renames/deletes.
+   *
    */
 
   public static final String USER_TABLE = "userTable";
   public static final String VOLUME_TABLE = "volumeTable";
   public static final String BUCKET_TABLE = "bucketTable";
   public static final String KEY_TABLE = "keyTable";
+  public static final String KEY_ID_TABLE = "keyIdTable";
   public static final String DELETED_TABLE = "deletedTable";
   public static final String OPEN_KEY_TABLE = "openKeyTable";
   public static final String S3_TABLE = "s3Table";
@@ -141,6 +148,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table volumeTable;
   private Table bucketTable;
   private Table keyTable;
+  private Table keyIdTable;
   private Table deletedTable;
   private Table openKeyTable;
   private Table s3Table;
@@ -195,6 +203,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public Table<String, OmKeyInfo> getKeyTable() {
     return keyTable;
+  }
+
+  @Override
+  public Table<String, String> getKeyIdTable() {
+    return keyIdTable;
   }
 
   @Override
@@ -282,6 +295,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(DELEGATION_TOKEN_TABLE)
         .addTable(S3_SECRET_TABLE)
         .addTable(PREFIX_TABLE)
+        .addTable(KEY_ID_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
         .addCodec(OmKeyInfo.class, new OmKeyInfoCodec())
         .addCodec(RepeatedOmKeyInfo.class, new RepeatedOmKeyInfoCodec())
@@ -319,6 +333,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
     keyTable = this.store.getTable(KEY_TABLE, String.class, OmKeyInfo.class);
     checkTableStatus(keyTable, KEY_TABLE);
+
+    keyIdTable = this.store.getTable(KEY_ID_TABLE, String.class,
+        String.class);
+    checkTableStatus(keyIdTable, KEY_ID_TABLE);
 
     deletedTable = this.store.getTable(DELETED_TABLE, String.class,
         RepeatedOmKeyInfo.class);
@@ -420,6 +438,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       }
     }
     return builder.toString();
+  }
+
+  @Override
+
+  public String getOzoneKeyIdTableKey(long uniqueKeyId) {
+    return Long.toString(uniqueKeyId);
   }
 
   @Override
