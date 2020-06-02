@@ -585,7 +585,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     AuditMessage amsg;
     switch (result) {
     case SUCCESS:
-      if(action.getAction().contains("CONTAINER")) {
+      if(isAllowed(action.getAction())) {
         if(eventType == EventType.READ &&
             AUDIT.getLogger().isInfoEnabled(AuditMarker.READ.getMarker())) {
           amsg = buildAuditMessageForSuccess(action, params);
@@ -617,13 +617,14 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     }
   }
 
+  //TODO: use GRPC to fetch user and ip details
   @Override
   public AuditMessage buildAuditMessageForSuccess(AuditAction op,
       Map<String, String> auditMap) {
 
     return new AuditMessage.Builder()
-        .setUser(getRemoteUserName())
-        .atIp(Server.getRemoteAddress())
+        .setUser(null)
+        .atIp(null)
         .forOperation(op)
         .withParams(auditMap)
         .withResult(AuditEventStatus.SUCCESS)
@@ -635,8 +636,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       Map<String, String> auditMap, Throwable throwable) {
 
     return new AuditMessage.Builder()
-        .setUser(getRemoteUserName())
-        .atIp(Server.getRemoteAddress())
+        .setUser(null)
+        .atIp(null)
         .forOperation(op)
         .withParams(auditMap)
         .withResult(AuditEventStatus.FAILURE)
@@ -647,5 +648,24 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   enum EventType {
     READ,
     WRITE
+  }
+
+  /**
+   * Checks if the action is allowed for audit.
+   * @param action
+   * @return true or false accordingly.
+   */
+  private boolean isAllowed(String action) {
+    switch(action) {
+    case "CLOSE_CONTAINER":
+    case "CREATE_CONTAINER":
+    case "LIST_CONTAINER":
+    case "DELETE_CONTAINER":
+    case "READ_CONTAINER":
+    case "UPDATE_CONTAINER":
+    case "DELETE_BLOCK":
+      return true;
+    default: return false;
+    }
   }
 }
