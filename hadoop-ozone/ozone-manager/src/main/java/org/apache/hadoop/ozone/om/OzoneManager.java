@@ -80,7 +80,6 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBUpdatesWrapper;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc.Client;
@@ -855,7 +854,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setSecretManager(delegationTokenMgr)
         .build();
 
-    DFSUtil.addPBProtocol(conf, protocol, instance, rpcServer);
+    HddsServerUtil.addPBProtocol(conf, protocol, instance, rpcServer);
 
     if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
         false)) {
