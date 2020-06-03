@@ -28,6 +28,9 @@ mvn -B -fae test -pl :hadoop-ozone-integration-test,:mini-chaos-tests "$@" \
   | tee "${REPORT_DIR}/output.log"
 rc=$?
 
+#Archive combined jacoco records
+mvn -B -N jacoco:merge -Djacoco.destFile=$REPORT_DIR/jacoco-combined.exec
+
 # shellcheck source=hadoop-ozone/dev-support/checks/_mvn_unit_report.sh
 source "$DIR/_mvn_unit_report.sh"
 

@@ -43,6 +43,7 @@ import picocli.CommandLine.Option;
         OmBucketGenerator.class,
         HadoopFsGenerator.class,
         HadoopNestedDirGenerator.class,
+        HadoopDirTreeGenerator.class,
         HadoopFsValidator.class,
         SameKeyReader.class,
         S3KeyGenerator.class,

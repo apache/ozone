@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockResponse;
@@ -69,10 +70,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Multipa
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadListPartsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3BucketInfoRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3BucketInfoResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3ListBucketsRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
@@ -120,9 +117,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       LOG.debug("Received OMRequest: {}, ", request);
     }
     Type cmdType = request.getCmdType();
-    OMResponse.Builder responseBuilder = OMResponse.newBuilder()
-        .setCmdType(cmdType)
-        .setStatus(Status.OK);
+    OMResponse.Builder responseBuilder = OmResponseUtil.getOMResponseBuilder(
+        request);
     try {
       switch (cmdType) {
       case CheckVolumeAccess:
@@ -164,16 +160,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         ListTrashResponse listTrashResponse = listTrash(
             request.getListTrashRequest());
         responseBuilder.setListTrashResponse(listTrashResponse);
-        break;
-      case InfoS3Bucket:
-        S3BucketInfoResponse s3BucketInfoResponse = getS3Bucketinfo(
-            request.getInfoS3BucketRequest());
-        responseBuilder.setInfoS3BucketResponse(s3BucketInfoResponse);
-        break;
-      case ListS3Buckets:
-        S3ListBucketsResponse s3ListBucketsResponse = listS3Buckets(
-            request.getListS3BucketsRequest());
-        responseBuilder.setListS3BucketsResponse(s3ListBucketsResponse);
         break;
       case ListMultiPartUploadParts:
         MultipartUploadListPartsResponse listPartsResponse =
@@ -468,31 +454,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     if (serviceInfoEx.getCaCertificate() != null) {
       resp.setCaCertificate(serviceInfoEx.getCaCertificate());
     }
-    return resp.build();
-  }
-
-  private S3BucketInfoResponse getS3Bucketinfo(S3BucketInfoRequest request)
-      throws IOException {
-    S3BucketInfoResponse.Builder resp = S3BucketInfoResponse.newBuilder();
-
-    resp.setOzoneMapping(
-        impl.getOzoneBucketMapping(request.getS3BucketName()));
-    return resp.build();
-  }
-
-  private S3ListBucketsResponse listS3Buckets(S3ListBucketsRequest request)
-      throws IOException {
-    S3ListBucketsResponse.Builder resp = S3ListBucketsResponse.newBuilder();
-
-    List<OmBucketInfo> buckets = impl.listS3Buckets(
-        request.getUserName(),
-        request.getStartKey(),
-        request.getPrefix(),
-        request.getCount());
-    for (OmBucketInfo bucket : buckets) {
-      resp.addBucketInfo(bucket.getProtobuf());
-    }
-
     return resp.build();
   }
 

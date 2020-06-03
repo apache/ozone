@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.server.http;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -37,7 +36,7 @@ public class LogStreamServlet extends HttpServlet {
 
   @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse resp)
-      throws ServletException, IOException {
+      throws IOException {
 
     WriterAppender appender =
         new WriterAppender(new PatternLayout(PATTERN), resp.getWriter());
@@ -48,7 +47,7 @@ public class LogStreamServlet extends HttpServlet {
       try {
         Thread.sleep(Integer.MAX_VALUE);
       } catch (InterruptedException e) {
-        //interrupted
+        Thread.currentThread().interrupt();
       }
     } finally {
       Logger.getRootLogger().removeAppender(appender);

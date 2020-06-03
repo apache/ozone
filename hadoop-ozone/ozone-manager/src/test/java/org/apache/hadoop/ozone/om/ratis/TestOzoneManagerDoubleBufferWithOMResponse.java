@@ -61,6 +61,8 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Daemon;
 import org.mockito.Mockito;
 
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -81,6 +83,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   private final AtomicLong trxId = new AtomicLong(0);
   private OzoneManagerRatisSnapshot ozoneManagerRatisSnapshot;
   private volatile long lastAppliedIndex;
+  private long term = 1L;
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -103,8 +106,12 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     ozoneManagerRatisSnapshot = index -> {
       lastAppliedIndex = index.get(index.size() - 1);
     };
-    doubleBuffer = new OzoneManagerDoubleBuffer(omMetadataManager,
-        ozoneManagerRatisSnapshot);
+    doubleBuffer = new OzoneManagerDoubleBuffer.Builder().
+        setOmMetadataManager(omMetadataManager).
+        setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
+        .enableRatis(true)
+        .setIndexToTerm((i) -> term)
+        .build();
     ozoneManagerDoubleBufferHelper = doubleBuffer::add;
   }
 
@@ -187,6 +194,15 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
 
     // Check lastAppliedIndex is updated correctly or not.
     Assert.assertEquals(bucketCount + deleteCount + 1, lastAppliedIndex);
+
+
+    OMTransactionInfo omTransactionInfo =
+        omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
+    assertNotNull(omTransactionInfo);
+
+    Assert.assertEquals(lastAppliedIndex,
+        omTransactionInfo.getTransactionIndex());
+    Assert.assertEquals(term, omTransactionInfo.getCurrentTerm());
   }
 
   /**

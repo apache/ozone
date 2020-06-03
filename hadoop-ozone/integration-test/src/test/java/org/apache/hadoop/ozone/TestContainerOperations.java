@@ -29,6 +29,8 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -36,6 +38,12 @@ import static org.junit.Assert.assertEquals;
  * from cblock clients.
  */
 public class TestContainerOperations {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static ScmClient storageClient;
   private static MiniOzoneCluster cluster;

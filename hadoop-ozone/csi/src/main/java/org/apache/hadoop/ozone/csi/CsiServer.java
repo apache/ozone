@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.csi;
 
 import java.util.concurrent.Callable;
 
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.Config;
@@ -27,7 +28,7 @@ import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 
 import io.grpc.Server;
 import io.grpc.netty.NettyServerBuilder;
@@ -47,7 +48,7 @@ import picocli.CommandLine.Command;
     mixinStandardHelpOptions = true)
 public class CsiServer extends GenericCli implements Callable<Void> {
 
-  private final static Logger LOG = LoggerFactory.getLogger(CsiServer.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CsiServer.class);
 
   @Override
   public Void call() throws Exception {
@@ -73,7 +74,7 @@ public class CsiServer extends GenericCli implements Callable<Void> {
             .bossEventLoopGroup(group)
             .addService(new IdentitiyService())
             .addService(new ControllerService(rpcClient,
-                csiConfig.getDefaultVolumeSize(), csiConfig.getVolumeOwner()))
+                csiConfig.getDefaultVolumeSize()))
             .addService(new NodeService(csiConfig))
             .build();
 
@@ -84,8 +85,8 @@ public class CsiServer extends GenericCli implements Callable<Void> {
   }
 
   public static void main(String[] args) {
-
-    StringUtils.startupShutdownMessage(CsiServer.class, args, LOG);
+    StringUtils.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
+        CsiServer.class, args, LOG);
     new CsiServer().run(args);
   }
 
@@ -112,8 +113,7 @@ public class CsiServer extends GenericCli implements Callable<Void> {
     @Config(key = "s3g.address",
         defaultValue = "http://localhost:9878",
         description =
-            "The defaul t size of the created volumes (if not specified in the"
-                + " requests).",
+            "The address of S3 Gateway endpoint.",
         tags = ConfigTag.STORAGE)
     private String s3gAddress;
 

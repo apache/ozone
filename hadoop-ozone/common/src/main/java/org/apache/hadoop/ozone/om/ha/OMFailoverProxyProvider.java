@@ -198,7 +198,13 @@ public class OMFailoverProxyProvider implements
     if (proxyInfo.proxy == null) {
       InetSocketAddress address = omProxyInfos.get(nodeId).getAddress();
       try {
-        proxyInfo.proxy = createOMProxy(address);
+        OzoneManagerProtocolPB proxy = createOMProxy(address);
+        try {
+          proxyInfo.proxy = proxy;
+        } catch (IllegalAccessError iae) {
+          omProxies.put(nodeId,
+              new ProxyInfo<>(proxy, proxyInfo.proxyInfo));
+        }
       } catch (IOException ioe) {
         LOG.error("{} Failed to create RPC proxy to OM at {}",
             this.getClass().getSimpleName(), address, ioe);
@@ -213,7 +219,7 @@ public class OMFailoverProxyProvider implements
 
   private Text computeDelegationTokenService() {
     // For HA, this will return "," separated address of all OM's.
-    StringBuilder rpcAddress = new StringBuilder();
+    List<String> addresses = new ArrayList<>();
 
     for (Map.Entry<String, OMProxyInfo> omProxyInfoSet :
         omProxyInfos.entrySet()) {
@@ -222,12 +228,13 @@ public class OMFailoverProxyProvider implements
       // During client object creation when one of the OM configured address
       // in unreachable, dtService can be null.
       if (dtService != null) {
-        rpcAddress.append(",").append(dtService);
+        addresses.add(dtService.toString());
       }
     }
 
-    if (!rpcAddress.toString().isEmpty()) {
-      return new Text(rpcAddress.toString().substring(1));
+    if (!addresses.isEmpty()) {
+      Collections.sort(addresses);
+      return new Text(String.join(",", addresses));
     } else {
       // If all OM addresses are unresolvable, set dt service to null. Let
       // this fail in later step when during connection setup.
@@ -317,10 +324,13 @@ public class OMFailoverProxyProvider implements
   synchronized boolean updateLeaderOMNodeId(String newLeaderOMNodeId) {
     if (!currentProxyOMNodeId.equals(newLeaderOMNodeId)) {
       if (omProxies.containsKey(newLeaderOMNodeId)) {
+        lastAttemptedOM = currentProxyOMNodeId;
         currentProxyOMNodeId = newLeaderOMNodeId;
         currentProxyIndex = omNodeIDList.indexOf(currentProxyOMNodeId);
         return true;
       }
+    } else {
+      lastAttemptedOM = currentProxyOMNodeId;
     }
     return false;
   }

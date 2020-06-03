@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -132,9 +133,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
     String volumeName = bucketInfo.getVolumeName();
     String bucketName = bucketInfo.getBucketName();
 
-    OMResponse.Builder omResponse = OMResponse.newBuilder().setCmdType(
-        OzoneManagerProtocolProtos.Type.CreateBucket).setStatus(
-        OzoneManagerProtocolProtos.Status.OK);
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
     OmBucketInfo omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo);
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
@@ -161,7 +161,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
           BUCKET_LOCK, volumeName, bucketName);
 
       OmVolumeArgs omVolumeArgs =
-          metadataManager.getVolumeTable().get(volumeKey);
+          metadataManager.getVolumeTable().getReadCopy(volumeKey);
       //Check if the volume exists
       if (omVolumeArgs == null) {
         LOG.debug("volume: {} not found ", volumeName);
@@ -171,7 +171,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
       //Check if bucket already exists
       OmBucketInfo dbBucketInfo = metadataManager.getBucketTable()
-          .get(bucketKey);
+          .getReadCopy(bucketKey);
       if (dbBucketInfo != null) {
         // Check if this transaction is a replay of ratis logs.
         if (isReplay(ozoneManager, dbBucketInfo, transactionLogIndex)) {

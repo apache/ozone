@@ -21,12 +21,13 @@
  */
 package org.apache.hadoop.hdds.scm.server;
 
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.ozone.common.StorageInfo;
-import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -128,8 +129,8 @@ public class StorageContainerManagerStarter extends GenericCli {
 
     String[] originalArgs = getCmd().getParseResult().originalArgs()
         .toArray(new String[0]);
-    StringUtils.startupShutdownMessage(StorageContainerManager.class,
-        originalArgs, LOG);
+    StringUtils.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
+        StorageContainerManager.class, originalArgs, LOG);
   }
 
   /**
