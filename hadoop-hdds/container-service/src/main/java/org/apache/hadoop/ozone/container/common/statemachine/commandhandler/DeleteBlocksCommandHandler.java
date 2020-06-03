@@ -17,13 +17,13 @@
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import com.google.common.primitives.Longs;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -215,9 +215,9 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         byte[] blkInfo = containerDB.getStore().get(blkBytes);
         if (blkInfo != null) {
           byte[] deletingKeyBytes =
-              DFSUtil.string2Bytes(OzoneConsts.DELETING_KEY_PREFIX + blk);
+              StringUtils.string2Bytes(OzoneConsts.DELETING_KEY_PREFIX + blk);
           byte[] deletedKeyBytes =
-              DFSUtil.string2Bytes(OzoneConsts.DELETED_KEY_PREFIX + blk);
+              StringUtils.string2Bytes(OzoneConsts.DELETED_KEY_PREFIX + blk);
           if (containerDB.getStore().get(deletingKeyBytes) != null
               || containerDB.getStore().get(deletedKeyBytes) != null) {
             if (LOG.isDebugEnabled()) {
