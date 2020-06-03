@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -118,7 +117,7 @@ public class ReconPipelineManager extends SCMPipelineManager {
         if (!p.getPipelineState().equals(CLOSED)) {
           try {
             getStateManager().updatePipelineState(pipelineID, CLOSED);
-          } catch (PipelineNotFoundException e) {
+          } catch (IOException e) {
             LOG.warn("Pipeline {} not found while updating state. ",
                 p.getId(), e);
           }

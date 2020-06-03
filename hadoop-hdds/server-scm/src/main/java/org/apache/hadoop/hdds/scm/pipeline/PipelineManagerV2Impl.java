@@ -58,13 +58,13 @@ import java.util.stream.Collectors;
  * All the write operations for pipelines must come via PipelineManager.
  * It synchronises all write and read operations via a ReadWriteLock.
  */
-public class PipelineManagerV2Impl implements PipelineManager {
+public final class PipelineManagerV2Impl implements PipelineManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMPipelineManager.class);
 
   private final ReadWriteLock lock;
   private PipelineFactory pipelineFactory;
-  private PipelineStateManagerV2 stateManager;
+  private StateManager stateManager;
   private Scheduler scheduler;
   private BackgroundPipelineCreator backgroundPipelineCreator;
   private final ConfigurationSource conf;
@@ -77,9 +77,9 @@ public class PipelineManagerV2Impl implements PipelineManager {
   // to prevent pipelines being created until sufficient nodes have registered.
   private final AtomicBoolean pipelineCreationAllowed;
 
-  public PipelineManagerV2Impl(ConfigurationSource conf,
+  private PipelineManagerV2Impl(ConfigurationSource conf,
                                NodeManager nodeManager,
-                               PipelineStateManagerV2 pipelineStateManager,
+                               StateManager pipelineStateManager,
                                PipelineFactory pipelineFactory) {
     this.lock = new ReentrantReadWriteLock();
     this.pipelineFactory = pipelineFactory;
@@ -100,17 +100,20 @@ public class PipelineManagerV2Impl implements PipelineManager {
     this.pipelineCreationAllowed = new AtomicBoolean(!this.isInSafeMode.get());
   }
 
-  public static PipelineManager newPipelineManager(
+  public static PipelineManagerV2Impl newPipelineManager(
       ConfigurationSource conf, SCMHAManager scmhaManager,
       NodeManager nodeManager, Table<PipelineID, Pipeline> pipelineStore,
-      PipelineFactory pipelineFactory) throws IOException {
+      EventPublisher eventPublisher) throws IOException {
     // Create PipelineStateManager
-    PipelineStateManagerV2 stateManager = PipelineStateManagerV2Impl
+    StateManager stateManager = PipelineStateManagerV2Impl
         .newBuilder().setPipelineStore(pipelineStore)
         .setRatisServer(scmhaManager.getRatisServer())
         .setNodeManager(nodeManager)
         .build();
 
+    // Create PipelineFactory
+    PipelineFactory pipelineFactory = new PipelineFactory(
+        nodeManager, stateManager, conf, eventPublisher);
     // Create PipelineManager
     PipelineManagerV2Impl pipelineManager = new PipelineManagerV2Impl(conf,
         nodeManager, stateManager, pipelineFactory);
@@ -570,6 +573,11 @@ public class PipelineManagerV2Impl implements PipelineManager {
   @VisibleForTesting
   public boolean isPipelineCreationAllowed() {
     return pipelineCreationAllowed.get();
+  }
+
+  @VisibleForTesting
+  public void allowPipelineCreation() {
+    this.pipelineCreationAllowed.set(true);
   }
 
   private void setBackgroundPipelineCreator(

@@ -34,7 +34,7 @@ import java.util.List;
 public class SimplePipelineProvider extends PipelineProvider {
 
   public SimplePipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager) {
+      StateManager stateManager) {
     super(nodeManager, stateManager);
   }
 

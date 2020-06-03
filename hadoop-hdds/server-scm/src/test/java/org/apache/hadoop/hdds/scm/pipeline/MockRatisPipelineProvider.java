@@ -36,29 +36,31 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
   private boolean autoOpenPipeline;
   private  boolean isHealthy;
 
-  public MockRatisPipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager, ConfigurationSource conf,
-      EventPublisher eventPublisher, boolean autoOpen) {
+  public MockRatisPipelineProvider(
+      NodeManager nodeManager, StateManager stateManager,
+      ConfigurationSource conf, EventPublisher eventPublisher,
+      boolean autoOpen) {
     super(nodeManager, stateManager, conf, eventPublisher);
     autoOpenPipeline = autoOpen;
   }
 
   public MockRatisPipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager,
+      StateManager stateManager,
       ConfigurationSource conf) {
     super(nodeManager, stateManager, conf, new EventQueue());
   }
 
   public MockRatisPipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager,
-      ConfigurationSource conf, boolean isHealthy) {
+                                   StateManager stateManager,
+                                   ConfigurationSource conf,
+                                   boolean isHealthy) {
     super(nodeManager, stateManager, conf, new EventQueue());
     this.isHealthy = isHealthy;
   }
 
-  public MockRatisPipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager, ConfigurationSource conf,
-      EventPublisher eventPublisher) {
+  public MockRatisPipelineProvider(
+      NodeManager nodeManager, StateManager stateManager,
+      ConfigurationSource conf, EventPublisher eventPublisher) {
     super(nodeManager, stateManager, conf, eventPublisher);
     autoOpenPipeline = true;
   }

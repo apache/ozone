@@ -127,7 +127,7 @@ public final class RatisPipelineUtils {
    * @return list of matched pipeline
    */
   static List<Pipeline> checkPipelineContainSameDatanodes(
-      PipelineStateManagerV2 stateManager, Pipeline pipeline) {
+      StateManager stateManager, Pipeline pipeline) {
     return stateManager.getPipelines(
         HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.THREE)

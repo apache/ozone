@@ -37,10 +37,10 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 public abstract class PipelineProvider {
 
   private final NodeManager nodeManager;
-  private final PipelineStateManager stateManager;
+  private final StateManager stateManager;
 
   public PipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager) {
+      StateManager stateManager) {
     this.nodeManager = nodeManager;
     this.stateManager = stateManager;
   }
@@ -54,7 +54,7 @@ public abstract class PipelineProvider {
     return nodeManager;
   }
 
-  public PipelineStateManager getPipelineStateManager() {
+  public StateManager getPipelineStateManager() {
     return stateManager;
   }
 
