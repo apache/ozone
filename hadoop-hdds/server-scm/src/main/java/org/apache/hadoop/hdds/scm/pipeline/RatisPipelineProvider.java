@@ -54,8 +54,8 @@ public class RatisPipelineProvider extends PipelineProvider {
   private int maxPipelinePerDatanode;
 
   RatisPipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager, ConfigurationSource conf,
-      EventPublisher eventPublisher) {
+                        StateManager stateManager, ConfigurationSource conf,
+                        EventPublisher eventPublisher) {
     super(nodeManager, stateManager);
     this.conf = conf;
     this.eventPublisher = eventPublisher;

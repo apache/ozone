@@ -68,7 +68,7 @@ public class SCMPipelineManager implements PipelineManager {
 
   private final ReadWriteLock lock;
   private PipelineFactory pipelineFactory;
-  private PipelineStateManager stateManager;
+  private StateManager stateManager;
   private final BackgroundPipelineCreator backgroundPipelineCreator;
   private Scheduler scheduler;
 
@@ -133,7 +133,7 @@ public class SCMPipelineManager implements PipelineManager {
     this.pipelineCreationAllowed = new AtomicBoolean(!this.isInSafeMode.get());
   }
 
-  public PipelineStateManager getStateManager() {
+  public StateManager getStateManager() {
     return stateManager;
   }
 

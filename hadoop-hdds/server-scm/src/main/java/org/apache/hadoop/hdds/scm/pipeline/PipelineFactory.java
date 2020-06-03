@@ -39,7 +39,7 @@ public class PipelineFactory {
 
   private Map<ReplicationType, PipelineProvider> providers;
 
-  PipelineFactory(NodeManager nodeManager, PipelineStateManager stateManager,
+  PipelineFactory(NodeManager nodeManager, StateManager stateManager,
       ConfigurationSource conf, EventPublisher eventPublisher) {
     providers = new HashMap<>();
     providers.put(ReplicationType.STAND_ALONE,

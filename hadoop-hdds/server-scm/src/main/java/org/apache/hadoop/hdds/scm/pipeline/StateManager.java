@@ -29,8 +29,9 @@ import java.util.NavigableSet;
 
 /**
  * Manages the state of pipelines in SCM.
+ * TODO Rename to PipelineStateManager once the old state manager is removed.
  */
-public interface PipelineStateManagerV2 {
+public interface StateManager {
 
   /**
    * Adding pipeline would be replicated to Ratis.
@@ -96,4 +97,24 @@ public interface PipelineStateManagerV2 {
                                    ContainerID containerID) throws IOException;
 
   void close() throws Exception;
+
+  // TODO remove legacy interfaces once we switch to Ratis based.
+
+  void addPipeline(Pipeline pipeline) throws IOException;
+
+  Pipeline removePipeline(PipelineID pipelineID) throws IOException;
+
+  void updatePipelineState(PipelineID id, Pipeline.PipelineState newState)
+      throws IOException;
+
+  Pipeline finalizePipeline(PipelineID pipelineId)
+      throws IOException;
+
+  Pipeline openPipeline(PipelineID pipelineId) throws IOException;
+
+  void activatePipeline(PipelineID pipelineID)
+      throws IOException;
+
+  void deactivatePipeline(PipelineID pipelineID)
+      throws IOException;
 }
