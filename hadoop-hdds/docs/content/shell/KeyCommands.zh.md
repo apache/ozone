@@ -30,6 +30,7 @@ Ozone shell 提供以下键命令：
   * [列举](#列举)
   * [重命名](#重命名)
   * [Cat](#cat)
+  * [Cp](#cp)
 
 
 ### 下载
@@ -154,3 +155,22 @@ ozone sh key rename /hive/jan sales.orc new_name.orc
 ozone sh key cat /hive/jan/hello.txt
 {{< /highlight >}}
 上述命令会将 _/hive/jan_ 桶中的 hello.txt 的内容输出到标准输出中来。
+
+### Cp
+
+`key cp` 命令用来在同一个bucket下，从一个key复制出另一个key。
+
+***Params:***
+
+| 参数名                          |  说明                                |
+|--------------------------------|-----------------------------------------|
+|  Uri                           | 桶名 格式为**/volume/bucket**。
+|  FromKey                       | 现有的键名
+|  ToKey                         | 新的键名
+| -r, \-\-replication            | 可选，上传后的副本数，合法值为 ONE 或者 THREE，如果不设置，将采用集群配置中的默认值。
+| -t, \-\-type                   | 可选，副本类型，合法值为 RATIS 或 STAND_ALONE，如果不设置，将采用集群配置中的默认值。
+
+{{< highlight bash >}}
+ozone sh key cp /hive/jan sales.orc new_one.orc
+{{< /highlight >}}
+上述命令会将  _/hive/jan_ 桶中的 _sales.orc_ 复制到 _new\_one.orc_ 。

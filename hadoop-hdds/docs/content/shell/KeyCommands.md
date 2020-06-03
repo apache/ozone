@@ -31,6 +31,7 @@ Ozone shell supports the following key commands.
   * [list](#list)
   * [rename](#rename)
   * [cat](#cat)
+  * [copy](#cp)
 
 
 ### Get
@@ -155,3 +156,22 @@ The `key cat` command displays the contents of a specific Ozone key to standard 
 ozone sh key cat /hive/jan/hello.txt
 {{< /highlight >}}
 Displays the contents of the key hello.txt from the _/hive/jan_ bucket to standard output.
+
+### Cp
+
+The `key cp` command copies a key to another one in the specified bucket.
+
+***Params:***
+
+| Arguments                      |  Comment                                |
+|--------------------------------|-----------------------------------------|
+|  Uri                           | The name of the bucket in **/volume/bucket** format.
+|  FromKey                       | The existing key to be copied
+|  ToKey                         | The name of the new key
+| -r, \-\-replication            | Optional, Number of copies, ONE or THREE are the options. Picks up the default from cluster configuration.
+| -t, \-\-type                   | Optional, replication type of the new key. RATIS and STAND_ALONE are the options. Picks up the default from cluster configuration.
+
+{{< highlight bash >}}
+ozone sh key cp /hive/jan sales.orc new_one.orc
+{{< /highlight >}}
+The above command will copy _sales.orc_ to _new\_one.orc_ in the bucket _/hive/jan_.
