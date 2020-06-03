@@ -24,6 +24,8 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.TimeUnit;
 
+import com.google.protobuf.BlockingService;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -78,6 +80,19 @@ public final class HddsServerUtil {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       HddsServerUtil.class);
+
+  /**
+   * Add protobuf-based protocol to the {@link RPC.Server}.
+   * @param conf configuration
+   * @param protocol Protocol interface
+   * @param service service that implements the protocol
+   * @param server RPC server to which the protocol & implementation is added to
+   */
+  public static void addPBProtocol(Configuration conf, Class<?> protocol,
+      BlockingService service, RPC.Server server) throws IOException {
+    RPC.setProtocolEngine(conf, protocol, ProtobufRpcEngine.class);
+    server.addProtocol(RPC.RpcKind.RPC_PROTOCOL_BUFFER, protocol, service);
+  }
 
   /**
    * Retrieve the socket address that should be used by DataNodes to connect
