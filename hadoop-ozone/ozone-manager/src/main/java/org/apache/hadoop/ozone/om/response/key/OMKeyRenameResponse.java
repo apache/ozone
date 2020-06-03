@@ -88,7 +88,6 @@ public class OMKeyRenameResponse extends OMClientResponse {
           omMetadataManager.getOzoneKey(volumeName, bucketName, fromKeyName));
     } else if (createToKeyAndDeleteFromKey()) {
       // If both from and toKeyName are equal do nothing
-      if (!toKeyName.equals(fromKeyName)) {
         omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
             omMetadataManager.getOzoneKey(volumeName, bucketName, fromKeyName));
         omMetadataManager.getKeyTable().putWithBatch(batchOperation,
@@ -103,7 +102,6 @@ public class OMKeyRenameResponse extends OMClientResponse {
               omMetadataManager.getOzoneKeyIdTableKey(
                   newKeyInfo.getFileHandleInfo()));
         }
-      }
     }
   }
 
