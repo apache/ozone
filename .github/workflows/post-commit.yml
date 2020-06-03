@@ -246,7 +246,6 @@ jobs:
        - uses: actions/download-artifact@v2
          with:
             path: target/artifacts
-       - run: find -type f
        - run: ./.github/coverage-report.sh
        - uses: actions/upload-artifact@master
          with:
