@@ -45,7 +45,7 @@ Ozone 使用 token 的方法来防止 Kerberos 服务器负载过重，当每秒
 
 用户通过块 token 来读写一个块，它的作用是让数据节点知道用户是否有对块进行读和修改的权限。
 
-### S3 Token ###
+### S3AuthInfo ###
 
 S3 使用了一种不一样的共享秘密的安全机制，Ozone 支持 AWS Signature Version 4 协议，从用户的角度来看，Ozone 的 s3 感觉与 AWS S3 无异。 
 
