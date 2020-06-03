@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
+import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -30,37 +31,29 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.TestHelper;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.ContainerStateMachine;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.RatisServerConfiguration;
+import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.*;
+import org.junit.rules.Timeout;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Rule;
-import org.junit.rules.Timeout;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.*;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.HddsConfigKeys.*;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
 /**
- * Tests the containerStateMachine failure handling.
+ * Tests the containerStateMachine failure handling by set flush delay.
  */
-public class TestContainerStateMachine {
+public class TestContainerStateMachineFlushDelay {
 
   /**
     * Set a timeout for each test.
@@ -75,6 +68,11 @@ public class TestContainerStateMachine {
   private String volumeName;
   private String bucketName;
   private String path;
+  private static int chunkSize;
+  private static int flushSize;
+  private static int maxFlushSize;
+  private static int blockSize;
+  private static String keyString;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -83,8 +81,13 @@ public class TestContainerStateMachine {
    */
   @Before
   public void setup() throws Exception {
+    chunkSize = 100;
+    flushSize = 2 * chunkSize;
+    maxFlushSize = 2 * flushSize;
+    blockSize = 2 * maxFlushSize;
+    keyString = UUID.randomUUID().toString();
     path = GenericTestUtils
-        .getTempPath(TestContainerStateMachine.class.getSimpleName());
+        .getTempPath(TestContainerStateMachineFlushDelay.class.getSimpleName());
     File baseDir = new File(path);
     baseDir.mkdirs();
 
@@ -99,10 +102,14 @@ public class TestContainerStateMachine {
     conf.setQuietMode(false);
     OzoneManager.setTestSecureOmFlag(true);
     conf.setLong(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
-    conf.setBoolean(OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY, false);
     //  conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.toString());
     cluster =
         MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1)
+            .setBlockSize(blockSize)
+            .setChunkSize(chunkSize)
+            .setStreamBufferFlushSize(flushSize)
+            .setStreamBufferMaxSize(maxFlushSize)
+            .setStreamBufferSizeUnit(StorageUnit.BYTES)
             .setHbInterval(200)
             .setCertificateClient(new CertificateClientTestImpl(conf))
             .build();
@@ -133,8 +140,14 @@ public class TestContainerStateMachine {
         objectStore.getVolume(volumeName).getBucket(bucketName)
             .createKey("ratis", 1024, ReplicationType.RATIS,
                 ReplicationFactor.ONE, new HashMap<>());
+    // Now ozone.client.stream.buffer.flush.delay is currently enabled
+    // by default. Here we  written data(length 110) greater than chunk
+    // Size(length 100), make sure flush will sync data.
+    byte[] data =
+        ContainerTestHelper.getFixedLengthString(keyString, 110)
+        .getBytes(UTF_8);
     // First write and flush creates a container in the datanode
-    key.write("ratis".getBytes());
+    key.write(data);
     key.flush();
     key.write("ratis".getBytes());
 
@@ -162,60 +175,6 @@ public class TestContainerStateMachine {
             .getContainer(omKeyLocationInfo.getContainerID())
             .getContainerState()
             == ContainerProtos.ContainerDataProto.State.UNHEALTHY);
-  }
-
-  @Test
-  public void testRatisSnapshotRetention() throws Exception {
-
-    ContainerStateMachine stateMachine =
-        (ContainerStateMachine) TestHelper.getStateMachine(cluster);
-    SimpleStateMachineStorage storage =
-        (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
-    Assert.assertNull(storage.findLatestSnapshot());
-
-    // Write 10 keys. Num snapshots should be equal to config value.
-    for (int i = 1; i <= 10; i++) {
-      OzoneOutputStream key =
-          objectStore.getVolume(volumeName).getBucket(bucketName)
-              .createKey(("ratis" + i), 1024, ReplicationType.RATIS,
-                  ReplicationFactor.ONE, new HashMap<>());
-      // First write and flush creates a container in the datanode
-      key.write(("ratis" + i).getBytes());
-      key.flush();
-      key.write(("ratis" + i).getBytes());
-      key.close();
-    }
-
-    RatisServerConfiguration ratisServerConfiguration =
-        conf.getObject(RatisServerConfiguration.class);
-
-    stateMachine =
-        (ContainerStateMachine) TestHelper.getStateMachine(cluster);
-    storage = (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
-    Path parentPath = storage.findLatestSnapshot().getFile().getPath();
-    int numSnapshots = parentPath.getParent().toFile().listFiles().length;
-    Assert.assertTrue(Math.abs(ratisServerConfiguration
-        .getNumSnapshotsRetained() - numSnapshots) <= 1);
-
-    // Write 10 more keys. Num Snapshots should remain the same.
-    for (int i = 11; i <= 20; i++) {
-      OzoneOutputStream key =
-          objectStore.getVolume(volumeName).getBucket(bucketName)
-              .createKey(("ratis" + i), 1024, ReplicationType.RATIS,
-                  ReplicationFactor.ONE, new HashMap<>());
-      // First write and flush creates a container in the datanode
-      key.write(("ratis" + i).getBytes());
-      key.flush();
-      key.write(("ratis" + i).getBytes());
-      key.close();
-    }
-    stateMachine =
-        (ContainerStateMachine) TestHelper.getStateMachine(cluster);
-    storage = (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
-    parentPath = storage.findLatestSnapshot().getFile().getPath();
-    numSnapshots = parentPath.getParent().toFile().listFiles().length;
-    Assert.assertTrue(Math.abs(ratisServerConfiguration
-        .getNumSnapshotsRetained() - numSnapshots) <= 1);
   }
 
 }

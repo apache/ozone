@@ -390,11 +390,13 @@
   </property>
   <property>
     <name>ozone.client.stream.buffer.flush.delay</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, CLIENT</tag>
-    <description>If set true, when call flush() and determine whether the
-      data in the current buffer is greater than ozone.client.stream.buffer.size.
-      if greater than then send buffer to the datanode.
+    <description>
+      Default true, when call flush() and determine whether the data in the
+      current buffer is greater than ozone.client.stream.buffer.size, if
+      greater than then send buffer to the datanode. You can turn this off
+      by setting this configuration to false.
     </description>
   </property>
   <property>
