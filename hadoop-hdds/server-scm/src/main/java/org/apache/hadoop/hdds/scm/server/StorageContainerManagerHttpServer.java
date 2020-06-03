@@ -75,4 +75,14 @@ public class StorageContainerManagerHttpServer extends BaseHttpServer {
     return ScmConfigKeys.OZONE_SCM_HTTP_ENABLED_KEY;
   }
 
+  @Override
+  protected String getHttpAuthType() {
+    return SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_AUTH_TYPE;
+  }
+
+  @Override
+  protected String getHttpAuthConfigPrefix() {
+    return SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_AUTH_CONFIG_PREFIX;
+  }
+
 }

@@ -50,6 +50,8 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.UUID;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostPort;
 
@@ -57,6 +59,12 @@ import static org.apache.hadoop.hdds.HddsUtils.getHostPort;
  * Test client-side URI handling with Ozone Manager HA.
  */
 public class TestOzoneFsHAURLs {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   public static final Logger LOG = LoggerFactory.getLogger(
       TestOzoneFsHAURLs.class);
 

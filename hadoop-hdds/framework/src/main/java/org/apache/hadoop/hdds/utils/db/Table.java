@@ -81,6 +81,23 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    */
   VALUE get(KEY key) throws IOException;
 
+
+  /**
+   * Returns the value mapped to the given key in byte array or returns null
+   * if the key is not found.
+   *
+   * This method is specific to tables implementation. Refer java doc of the
+   * implementation for the behavior.
+   *
+   * @param key metadata key
+   * @return value in byte array or null if the key is not found.
+   * @throws IOException on Failure
+   */
+  default VALUE getReadCopy(KEY key) throws IOException {
+    throw new NotImplementedException("getReadCopy is not implemented");
+  }
+
+
   /**
    * Returns the value mapped to the given key in byte array or returns null
    * if the key is not found.

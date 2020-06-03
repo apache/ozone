@@ -42,4 +42,8 @@ public class BasicOzFs extends DelegateToFileSystem {
         OzoneConsts.OZONE_URI_SCHEME, false);
   }
 
+  @Override
+  public int getUriDefaultPort() {
+    return -1;
+  }
 }

@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
@@ -131,6 +132,12 @@ public class TestContainerPlacementFactory {
         List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes,
         int nodesRequired, long sizeRequired) {
       return null;
+    }
+
+    @Override
+    public ContainerPlacementStatus
+        validateContainerPlacement(List<DatanodeDetails> dns, int replicas) {
+      return new ContainerPlacementStatusDefault(1, 1, 1);
     }
   }
 

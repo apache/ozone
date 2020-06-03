@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.utils;
 
+import java.io.IOException;
 import java.util.Collection;
 
 import org.apache.hadoop.conf.Configuration;
@@ -37,6 +38,11 @@ public class LegacyHadoopConfigurationSource implements ConfigurationSource {
   @Override
   public String get(String key) {
     return configuration.getRaw(key);
+  }
+
+  @Override
+  public char[] getPassword(String key) throws IOException {
+    return configuration.getPassword(key);
   }
 
   @Override

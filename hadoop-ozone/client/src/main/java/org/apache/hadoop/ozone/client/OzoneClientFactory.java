@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.client;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.lang.reflect.Proxy;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -157,12 +156,7 @@ public final class OzoneClientFactory {
    */
   private static OzoneClient getRpcClient(ClientProtocol clientProtocol,
                                        ConfigurationSource config) {
-    OzoneClientInvocationHandler clientHandler =
-        new OzoneClientInvocationHandler(clientProtocol);
-    ClientProtocol proxy = (ClientProtocol) Proxy.newProxyInstance(
-        OzoneClientInvocationHandler.class.getClassLoader(),
-        new Class<?>[]{ClientProtocol.class}, clientHandler);
-    return new OzoneClient(config, proxy);
+    return new OzoneClient(config, clientProtocol);
   }
 
   /**

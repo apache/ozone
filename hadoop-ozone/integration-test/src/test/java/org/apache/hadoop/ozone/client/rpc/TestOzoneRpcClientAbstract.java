@@ -42,11 +42,11 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -75,6 +75,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueBlockIterator;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -87,7 +88,6 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.s3.util.OzoneS3Util;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -101,6 +101,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.StringUtils;
+
+import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
@@ -108,20 +110,16 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.CoreMatchers.either;
+
 import org.junit.Assert;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import org.junit.Ignore;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This is an abstract class to test all the public facing APIs of Ozone
@@ -132,8 +130,6 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class TestOzoneRpcClientAbstract {
 
-  static final Logger LOG =
-      LoggerFactory.getLogger(TestOzoneRpcClientAbstract.class);
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient ozClient = null;
   private static ObjectStore store = null;
@@ -167,6 +163,8 @@ public abstract class TestOzoneRpcClientAbstract {
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);
     store = ozClient.getObjectStore();
+    String volumeName = HddsClientUtils.getS3VolumeName(conf);
+    store.createVolume(volumeName);
     storageContainerLocationClient =
         cluster.getStorageContainerLocationClient();
     ozoneManager = cluster.getOzoneManager();
@@ -216,7 +214,7 @@ public abstract class TestOzoneRpcClientAbstract {
     return TestOzoneRpcClientAbstract.store;
   }
 
-  public static void setScmId(String scmId){
+  public static void setScmId(String scmId) {
     TestOzoneRpcClientAbstract.scmId = scmId;
   }
 
@@ -225,8 +223,10 @@ public abstract class TestOzoneRpcClientAbstract {
    */
   @Test
   public void testOMClientProxyProvider() {
-    OMFailoverProxyProvider omFailoverProxyProvider = store.getClientProxy()
-        .getOMProxyProvider();
+
+    OMFailoverProxyProvider omFailoverProxyProvider =
+        OmFailoverProxyUtil.getFailoverProxyProvider(store.getClientProxy());
+
     List<OMProxyInfo> omProxies = omFailoverProxyProvider.getOMProxyInfos();
 
     // For a non-HA OM service, there should be only one OM proxy.
@@ -325,80 +325,26 @@ public abstract class TestOzoneRpcClientAbstract {
   public void testCreateS3Bucket()
       throws IOException {
     Instant testStartTime = Instant.now();
-    String userName = UserGroupInformation.getCurrentUser().getUserName();
     String bucketName = UUID.randomUUID().toString();
-    store.createS3Bucket(userName, bucketName);
-    String volumeName = store.getOzoneVolumeName(bucketName);
-    OzoneVolume volume = store.getVolume(volumeName);
-    OzoneBucket bucket = volume.getBucket(bucketName);
+    store.createS3Bucket(bucketName);
+    OzoneBucket bucket = store.getS3Bucket(bucketName);
     Assert.assertEquals(bucketName, bucket.getName());
     Assert.assertFalse(bucket.getCreationTime().isBefore(testStartTime));
-    Assert.assertFalse(volume.getCreationTime().isBefore(testStartTime));
-  }
-
-  @Test
-  public void testCreateSecureS3Bucket() throws IOException {
-    Instant testStartTime = Instant.now();
-    String userName = "ozone/localhost@EXAMPLE.COM";
-    String bucketName = UUID.randomUUID().toString();
-    String s3VolumeName = OzoneS3Util.getS3Username(userName);
-    store.createS3Bucket(s3VolumeName, bucketName);
-    String volumeName = store.getOzoneVolumeName(bucketName);
-    assertEquals(volumeName, "s3" + s3VolumeName);
-
-    OzoneVolume volume = store.getVolume(volumeName);
-    OzoneBucket bucket = volume.getBucket(bucketName);
-    Assert.assertEquals(bucketName, bucket.getName());
-    Assert.assertFalse(bucket.getCreationTime().isBefore(testStartTime));
-    Assert.assertFalse(volume.getCreationTime().isBefore(testStartTime));
-  }
-
-
-  @Test
-  public void testListS3Buckets()
-      throws IOException {
-    String userName = "ozone100";
-    String bucketName1 = UUID.randomUUID().toString();
-    String bucketName2 = UUID.randomUUID().toString();
-    store.createS3Bucket(userName, bucketName1);
-    store.createS3Bucket(userName, bucketName2);
-    Iterator<? extends OzoneBucket> iterator = store.listS3Buckets(userName,
-        null);
-
-    while (iterator.hasNext()) {
-      assertThat(iterator.next().getName(), either(containsString(bucketName1))
-          .or(containsString(bucketName2)));
-    }
-
-  }
-
-  @Test
-  public void testListS3BucketsFail() {
-    String userName = "randomUser";
-    Iterator<? extends OzoneBucket> iterator = store.listS3Buckets(userName,
-        null);
-
-    Assert.assertFalse(iterator.hasNext());
-
   }
 
   @Test
   public void testDeleteS3Bucket()
       throws Exception {
     Instant testStartTime = Instant.now();
-    String userName = "ozone1";
     String bucketName = UUID.randomUUID().toString();
-    store.createS3Bucket(userName, bucketName);
-    String volumeName = store.getOzoneVolumeName(bucketName);
-    OzoneVolume volume = store.getVolume(volumeName);
-    OzoneBucket bucket = volume.getBucket(bucketName);
+    store.createS3Bucket(bucketName);
+    OzoneBucket bucket = store.getS3Bucket(bucketName);
     Assert.assertEquals(bucketName, bucket.getName());
     Assert.assertFalse(bucket.getCreationTime().isBefore(testStartTime));
-    Assert.assertFalse(volume.getCreationTime().isBefore(testStartTime));
     store.deleteS3Bucket(bucketName);
 
-    OzoneTestUtils.expectOmException(ResultCodes.S3_BUCKET_NOT_FOUND,
-        () -> store.getOzoneVolumeName(bucketName));
+    OzoneTestUtils.expectOmException(ResultCodes.BUCKET_NOT_FOUND,
+        () -> store.getS3Bucket(bucketName));
   }
 
   @Test
@@ -408,24 +354,6 @@ public abstract class TestOzoneRpcClientAbstract {
     } catch (IOException ex) {
       GenericTestUtils.assertExceptionContains("NOT_FOUND", ex);
     }
-  }
-
-  @Test
-  public void testCreateS3BucketMapping()
-      throws IOException {
-    String userName = OzoneConsts.OZONE;
-    String bucketName = UUID.randomUUID().toString();
-    store.createS3Bucket(userName, bucketName);
-    String volumeName = store.getOzoneVolumeName(bucketName);
-    OzoneVolume volume = store.getVolume(volumeName);
-    OzoneBucket bucket = volume.getBucket(bucketName);
-    Assert.assertEquals(bucketName, bucket.getName());
-
-    String mapping = store.getOzoneBucketMapping(bucketName);
-    Assert.assertEquals("s3"+userName+"/"+bucketName, mapping);
-    Assert.assertEquals(bucketName, store.getOzoneBucketName(bucketName));
-    Assert.assertEquals("s3"+userName, store.getOzoneVolumeName(bucketName));
-
   }
 
   @Test
@@ -507,7 +435,7 @@ public abstract class TestOzoneRpcClientAbstract {
     String bucketName = "invalid#bucket";
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
-    LambdaTestUtils.intercept(IllegalArgumentException.class,
+    LambdaTestUtils.intercept(OMException.class,
         "Bucket or Volume name has an unsupported" +
             " character : #",
         () -> volume.createBucket(bucketName));
@@ -1681,8 +1609,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), 1, uploadID);
-    ozoneOutputStream.write(DFSUtil.string2Bytes(sampleData), 0,
-        sampleData.length());
+    ozoneOutputStream.write(string2Bytes(sampleData), 0, sampleData.length());
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo commitUploadPartInfo = ozoneOutputStream
@@ -1719,8 +1646,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), partNumber, uploadID);
-    ozoneOutputStream.write(DFSUtil.string2Bytes(sampleData), 0,
-        sampleData.length());
+    ozoneOutputStream.write(string2Bytes(sampleData), 0, sampleData.length());
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo commitUploadPartInfo = ozoneOutputStream
@@ -1734,8 +1660,7 @@ public abstract class TestOzoneRpcClientAbstract {
     sampleData = "sample Data Changed";
     ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), partNumber, uploadID);
-    ozoneOutputStream.write(DFSUtil.string2Bytes(sampleData), 0, "name"
-        .length());
+    ozoneOutputStream.write(string2Bytes(sampleData), 0, "name".length());
     ozoneOutputStream.close();
 
     commitUploadPartInfo = ozoneOutputStream
@@ -1775,8 +1700,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), partNumber, uploadID);
-    ozoneOutputStream.write(DFSUtil.string2Bytes(sampleData), 0,
-        sampleData.length());
+    ozoneOutputStream.write(string2Bytes(sampleData), 0, sampleData.length());
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo commitUploadPartInfo = ozoneOutputStream
@@ -1790,8 +1714,7 @@ public abstract class TestOzoneRpcClientAbstract {
     sampleData = "sample Data Changed";
     ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), partNumber, uploadID);
-    ozoneOutputStream.write(DFSUtil.string2Bytes(sampleData), 0, "name"
-        .length());
+    ozoneOutputStream.write(string2Bytes(sampleData), 0, "name".length());
     ozoneOutputStream.close();
 
     commitUploadPartInfo = ozoneOutputStream

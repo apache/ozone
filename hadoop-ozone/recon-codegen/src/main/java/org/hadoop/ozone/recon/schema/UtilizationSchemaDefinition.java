@@ -17,14 +17,19 @@
  */
 package org.hadoop.ozone.recon.schema;
 
+import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
+
 import java.sql.Connection;
 import java.sql.SQLException;
 
 import javax.sql.DataSource;
 
 import com.google.inject.Singleton;
+
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.google.inject.Inject;
@@ -35,13 +40,15 @@ import com.google.inject.Inject;
 @Singleton
 public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(UtilizationSchemaDefinition.class);
+
   private final DataSource dataSource;
 
   public static final String CLUSTER_GROWTH_DAILY_TABLE_NAME =
-      "cluster_growth_daily";
-
+      "CLUSTER_GROWTH_DAILY";
   public static final String FILE_COUNT_BY_SIZE_TABLE_NAME =
-      "file_count_by_size";
+      "FILE_COUNT_BY_SIZE";
 
   @Inject
   UtilizationSchemaDefinition(DataSource dataSource) {
@@ -52,8 +59,12 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
   @Transactional
   public void initializeSchema() throws SQLException {
     Connection conn = dataSource.getConnection();
-    createClusterGrowthTable(conn);
-    createFileSizeCount(conn);
+    if (!TABLE_EXISTS_CHECK.test(conn, FILE_COUNT_BY_SIZE_TABLE_NAME)) {
+      createFileSizeCountTable(conn);
+    }
+    if (!TABLE_EXISTS_CHECK.test(conn, CLUSTER_GROWTH_DAILY_TABLE_NAME)) {
+      createClusterGrowthTable(conn);
+    }
   }
 
   private void createClusterGrowthTable(Connection conn) {
@@ -71,7 +82,7 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
         .execute();
   }
 
-  private void createFileSizeCount(Connection conn) {
+  private void createFileSizeCountTable(Connection conn) {
     DSL.using(conn).createTableIfNotExists(FILE_COUNT_BY_SIZE_TABLE_NAME)
         .column("file_size", SQLDataType.BIGINT)
         .column("count", SQLDataType.BIGINT)

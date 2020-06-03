@@ -80,4 +80,14 @@ public class OzoneManagerHttpServer extends BaseHttpServer {
   @Override protected String getEnabledKey() {
     return OMConfigKeys.OZONE_OM_HTTP_ENABLED_KEY;
   }
+
+  @Override
+  protected String getHttpAuthType() {
+    return OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
+  }
+
+  @Override
+  protected String getHttpAuthConfigPrefix() {
+    return OMConfigKeys.OZONE_OM_HTTP_AUTH_CONFIG_PREFIX;
+  }
 }

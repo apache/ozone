@@ -43,7 +43,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -631,8 +631,8 @@ public class SCMPipelineManager implements PipelineManager {
   }
 
   @Override
-  public synchronized void handleSafeModeTransition(
-      SCMSafeModeManager.SafeModeStatus status) {
+  public void onMessage(SafeModeStatus status,
+      EventPublisher publisher) {
     // TODO: #CLUTIL - handle safemode getting re-enabled
     boolean currentAllowPipelines =
         pipelineCreationAllowed.getAndSet(status.isPreCheckComplete());
@@ -649,5 +649,4 @@ public class SCMPipelineManager implements PipelineManager {
       startPipelineCreator();
     }
   }
-
 }

@@ -184,12 +184,13 @@ public class OzoneVolume extends WithMetadata {
 
   /**
    * Sets/Changes the owner of this Volume.
-   * @param owner new owner
+   * @param userName new owner
    * @throws IOException
    */
-  public void setOwner(String owner) throws IOException {
-    proxy.setVolumeOwner(name, owner);
-    this.owner = owner;
+  public boolean setOwner(String userName) throws IOException {
+    boolean result = proxy.setVolumeOwner(name, userName);
+    this.owner = userName;
+    return result;
   }
 
   /**
@@ -197,7 +198,7 @@ public class OzoneVolume extends WithMetadata {
    * @param quota new quota
    * @throws IOException
    */
-  public void setQuota(OzoneQuota  quota) throws IOException {
+  public void setQuota(OzoneQuota quota) throws IOException {
     proxy.setVolumeQuota(name, quota);
     this.quotaInBytes = quota.sizeInBytes();
   }

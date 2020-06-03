@@ -53,6 +53,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import org.junit.rules.ExpectedException;
+import org.junit.rules.Timeout;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -65,6 +66,12 @@ import static org.junit.Assert.fail;
  * Test read retries from multiple nodes in the pipeline.
  */
 public class TestReadRetries {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
@@ -88,10 +95,12 @@ public class TestReadRetries {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(10)
+        .setNumDatanodes(3)
         .setScmId(SCM_ID)
         .build();
     cluster.waitForClusterToBeReady();
+    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
+            180000);
     ozClient = OzoneClientFactory.getRpcClient(conf);
     store = ozClient.getObjectStore();
     storageContainerLocationClient =
@@ -177,22 +186,13 @@ public class TestReadRetries {
     ratisClient.watchForCommit(keyInfo.getBlockCommitSequenceId());
     // shutdown the datanode
     cluster.shutdownHddsDatanode(datanodeDetails);
-
-    Assert.assertTrue(container.getState()
-        == HddsProtos.LifeCycleState.OPEN);
-    // try to read, this shouls be successful
+    // try to read, this should be successful
     readKey(bucket, keyName, value);
-
-    Assert.assertTrue(container.getState()
-        == HddsProtos.LifeCycleState.OPEN);
     // shutdown the second datanode
     datanodeDetails = datanodes.get(1);
     cluster.shutdownHddsDatanode(datanodeDetails);
-    Assert.assertTrue(container.getState()
-        == HddsProtos.LifeCycleState.OPEN);
 
-    // the container is open and with loss of 2 nodes we still should be able
-    // to read via Standalone protocol
+    // we still should be able to read via Standalone protocol
     // try to read
     readKey(bucket, keyName, value);
 

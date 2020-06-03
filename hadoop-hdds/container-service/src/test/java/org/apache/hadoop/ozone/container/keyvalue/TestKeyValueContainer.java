@@ -215,6 +215,11 @@ public class TestKeyValueContainer {
         metadataStore.getStore().put(("test" + i).getBytes(UTF_8),
             "test".getBytes(UTF_8));
       }
+
+      // As now when we put blocks, we increment block count and update in DB.
+      // As for test, we are doing manually so adding key count to DB.
+      metadataStore.getStore().put(OzoneConsts.DB_BLOCK_COUNT_KEY,
+          Longs.toByteArray(numberOfKeysToWrite));
     }
     BlockUtils.removeDB(keyValueContainerData, conf);
 

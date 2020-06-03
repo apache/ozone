@@ -90,6 +90,10 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private ContainerReportsProto containerReportsProto;
   private DatanodeDetailsProto datanodeDetailsProto;
   private Pipeline pipeline;
+  private final String host1 = "host1.datanode";
+  private final String host2 = "host2.datanode";
+  private final String ip1 = "1.1.1.1";
+  private final String ip2 = "2.2.2.2";
 
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
@@ -100,6 +104,10 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         temporaryFolder.newFolder());
     datanodeDetails = randomDatanodeDetails();
     datanodeDetails2 = randomDatanodeDetails();
+    datanodeDetails.setHostName(host1);
+    datanodeDetails.setIpAddress(ip1);
+    datanodeDetails2.setHostName(host2);
+    datanodeDetails2.setIpAddress(ip2);
     pipeline = getRandomPipeline(datanodeDetails);
     pipelineId = pipeline.getId().getId().toString();
 
@@ -175,9 +183,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .addPipelineReport(pipelineReport).build();
     datanodeDetailsProto =
         DatanodeDetailsProto.newBuilder()
-            .setHostName("host1.datanode")
+            .setHostName(host1)
             .setUuid(datanodeId)
-            .setIpAddress("1.1.1.1")
+            .setIpAddress(ip1)
             .build();
     StorageReportProto storageReportProto1 =
         StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
@@ -198,9 +206,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     DatanodeDetailsProto datanodeDetailsProto2 =
         DatanodeDetailsProto.newBuilder()
-        .setHostName("host2.datanode")
+        .setHostName(host2)
         .setUuid(datanodeId2)
-        .setIpAddress("2.2.2.2")
+        .setIpAddress(ip2)
         .build();
     StorageReportProto storageReportProto3 =
         StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
@@ -267,10 +275,11 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     writeDataToOm(reconOMMetadataManager, "key_three");
   }
 
-  private void testDatanodeResponse(DatanodeMetadata datanodeMetadata) {
+  private void testDatanodeResponse(DatanodeMetadata datanodeMetadata)
+      throws IOException {
     String hostname = datanodeMetadata.getHostname();
     switch (hostname) {
-    case "host1.datanode":
+    case host1:
       Assert.assertEquals(75000,
           datanodeMetadata.getDatanodeStorageReport().getCapacity());
       Assert.assertEquals(15400,
@@ -285,8 +294,11 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
           datanodeMetadata.getPipelines().get(0).getReplicationFactor());
       Assert.assertEquals(pipeline.getType().toString(),
           datanodeMetadata.getPipelines().get(0).getReplicationType());
+      Assert.assertEquals(pipeline.getLeaderNode().getHostName(),
+          datanodeMetadata.getPipelines().get(0).getLeaderNode());
+      Assert.assertEquals(1, datanodeMetadata.getLeaderCount());
       break;
-    case "host2.datanode":
+    case host2:
       Assert.assertEquals(130000,
           datanodeMetadata.getDatanodeStorageReport().getCapacity());
       Assert.assertEquals(17800,
@@ -295,6 +307,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
           datanodeMetadata.getDatanodeStorageReport().getUsed());
 
       Assert.assertEquals(0, datanodeMetadata.getPipelines().size());
+      Assert.assertEquals(0, datanodeMetadata.getLeaderCount());
       break;
     default:
       Assert.fail(String.format("Datanode %s not registered",
@@ -310,7 +323,13 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     Assert.assertEquals(2, datanodesResponse.getTotalCount());
     Assert.assertEquals(2, datanodesResponse.getDatanodes().size());
 
-    datanodesResponse.getDatanodes().forEach(this::testDatanodeResponse);
+    datanodesResponse.getDatanodes().forEach(datanodeMetadata -> {
+      try {
+        testDatanodeResponse(datanodeMetadata);
+      } catch (IOException e) {
+        Assert.fail(e.getMessage());
+      }
+    });
 
     waitAndCheckConditionAfterHeartbeat(() -> {
       Response response1 = nodeEndpoint.getDatanodes();

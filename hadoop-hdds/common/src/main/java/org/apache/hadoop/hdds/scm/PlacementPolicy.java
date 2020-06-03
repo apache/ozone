@@ -42,4 +42,14 @@ public interface PlacementPolicy {
   List<DatanodeDetails> chooseDatanodes(List<DatanodeDetails> excludedNodes,
       List<DatanodeDetails> favoredNodes, int nodesRequired, long sizeRequired)
       throws IOException;
+
+  /**
+   * Given a list of datanode and the number of replicas required, return
+   * a PlacementPolicyStatus object indicating if the container meets the
+   * placement policy - ie is it on the correct number of racks, etc.
+   * @param dns List of datanodes holding a replica of the container
+   * @param replicas The expected number of replicas
+   */
+  ContainerPlacementStatus validateContainerPlacement(
+      List<DatanodeDetails> dns, int replicas);
 }

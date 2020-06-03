@@ -71,6 +71,10 @@ public class TopologySubcommand implements Callable<Void> {
       description = "Print Topology ordered by network location")
   private boolean order;
 
+  @CommandLine.Option(names = {"-f", "--full"},
+      description = "Print Topology with full node infos")
+  private boolean fullInfo;
+
   @Override
   public Void call() throws Exception {
     try (ScmClient scmClient = parent.createScmClient()) {
@@ -116,12 +120,29 @@ public class TopologySubcommand implements Callable<Void> {
     });
   }
 
+  private String formatPortOutput(List<HddsProtos.Port> ports) {
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < ports.size(); i++) {
+      HddsProtos.Port port = ports.get(i);
+      sb.append(port.getName() + "=" + port.getValue());
+      if (i < ports.size() - 1) {
+        sb.append(",");
+      }
+    }
+    return sb.toString();
+  }
 
-  // Format "ipAddress(hostName)    networkLocation"
+  private String getAdditionNodeOutput(HddsProtos.Node node) {
+    return fullInfo ? node.getNodeID().getUuid() + "/" : "";
+  }
+
+  // Format "ipAddress(hostName):PortName1=PortValue1    networkLocation"
   private void printNodesWithLocation(Collection<HddsProtos.Node> nodes) {
     nodes.forEach(node -> {
-      System.out.print(" " + node.getNodeID().getIpAddress() + "(" +
-          node.getNodeID().getHostName() + ")");
+      System.out.print(" " + getAdditionNodeOutput(node) +
+          node.getNodeID().getIpAddress() + "(" +
+          node.getNodeID().getHostName() + ")" +
+          ":" + formatPortOutput(node.getNodeID().getPortsList()));
       System.out.println("    " +
           (node.getNodeID().getNetworkLocation() != null ?
               node.getNodeID().getNetworkLocation() : "NA"));

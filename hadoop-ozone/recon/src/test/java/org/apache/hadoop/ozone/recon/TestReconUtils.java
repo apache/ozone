@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.recon.ReconUtils.createTarFile;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -148,10 +149,10 @@ public class TestReconUtils {
         mock(URLConnectionFactory.class);
     URLConnection urlConnectionMock = mock(URLConnection.class);
     when(urlConnectionMock.getInputStream()).thenReturn(fileInputStream);
-    when(connectionFactoryMock.openConnection(any(URL.class)))
+    when(connectionFactoryMock.openConnection(any(URL.class), anyBoolean()))
         .thenReturn(urlConnectionMock);
     try (InputStream inputStream = new ReconUtils()
-        .makeHttpCall(connectionFactoryMock, url)) {
+        .makeHttpCall(connectionFactoryMock, url, false)) {
       contents = IOUtils.toString(inputStream, Charset.defaultCharset());
     }
 

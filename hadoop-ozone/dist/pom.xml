@@ -28,7 +28,7 @@
   <properties>
     <file.encoding>UTF-8</file.encoding>
     <downloadSources>true</downloadSources>
-    <docker.ozone-runner.version>20200403-1</docker.ozone-runner.version>
+    <docker.ozone-runner.version>20200420-1</docker.ozone-runner.version>
   </properties>
 
   <build>
@@ -164,7 +164,7 @@
                 <artifactItem>
                   <groupId>com.google.protobuf</groupId>
                   <artifactId>protobuf-java</artifactId>
-                  <version>3.5.1</version>
+                  <version>${protobuf-compile.version}</version>
                 </artifactItem>
               </artifactItems>
             </configuration>
@@ -173,7 +173,6 @@
       </plugin>
       <plugin>
         <artifactId>maven-resources-plugin</artifactId>
-        <version>3.1.0</version>
         <executions>
           <execution>
             <id>copy-compose-files</id>
@@ -428,7 +427,6 @@
           <plugin>
             <groupId>io.fabric8</groupId>
             <artifactId>docker-maven-plugin</artifactId>
-            <version>0.29.0</version>
             <executions>
               <execution>
                 <goals>
@@ -460,7 +458,6 @@
           <plugin>
             <groupId>io.fabric8</groupId>
             <artifactId>docker-maven-plugin</artifactId>
-            <version>0.29.0</version>
             <executions>
               <execution>
                 <goals>

@@ -23,7 +23,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import javax.ws.rs.core.Response;
 
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 
 import org.junit.Assert;
@@ -37,19 +37,13 @@ import org.junit.Test;
 public class TestBucketHead {
 
   private String bucketName = OzoneConsts.BUCKET;
-  private String userName = OzoneConsts.OZONE;
-  private OzoneClientStub clientStub;
-  private ObjectStore objectStoreStub;
+  private OzoneClient clientStub;
   private BucketEndpoint bucketEndpoint;
 
   @Before
   public void setup() throws Exception {
-
-    //Create client stub and object store stub.
     clientStub = new OzoneClientStub();
-    objectStoreStub = clientStub.getObjectStore();
-
-    objectStoreStub.createS3Bucket(userName, bucketName);
+    clientStub.getObjectStore().createS3Bucket(bucketName);
 
     // Create HeadBucket and setClient to OzoneClientStub
     bucketEndpoint = new BucketEndpoint();

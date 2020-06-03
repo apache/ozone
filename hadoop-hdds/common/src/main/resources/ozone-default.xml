@@ -197,10 +197,12 @@
   </property>
   <property>
     <name>dfs.container.ratis.num.write.chunk.threads</name>
-    <value>60</value>
+    <value>10</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
-    <description>Maximum number of threads in the thread pool that Ratis
-      will use for writing chunks (60 by default).
+    <description>Maximum number of threads in the thread pool that Datanode
+      will use for writing replicated chunks.
+      This is a per configured locations!
+      (10 thread per disk by default).
     </description>
   </property>
   <property>
@@ -388,18 +390,21 @@
   </property>
   <property>
     <name>ozone.client.stream.buffer.flush.delay</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, CLIENT</tag>
-    <description>If set true, when call flush() and determine whether the
-      data in the current buffer is greater than ozone.client.stream.buffer.size.
-      if greater than then send buffer to the datanode.
+    <description>
+      Default true, when call flush() and determine whether the data in the
+      current buffer is greater than ozone.client.stream.buffer.size, if
+      greater than then send buffer to the datanode. You can turn this off
+      by setting this configuration to false.
     </description>
   </property>
   <property>
     <name>ozone.client.stream.buffer.size</name>
     <value>4MB</value>
     <tag>OZONE, CLIENT</tag>
-    <description>The size of chunks the client will send to the server.</description>
+    <description>The size of chunks the client will send to the server.
+    </description>
   </property>
   <property>
     <name>ozone.client.stream.buffer.flush.size</name>
@@ -1086,19 +1091,6 @@
   </property>
 
   <property>
-    <name>ozone.scm.container.creation.lease.timeout</name>
-    <value>60s</value>
-    <tag>OZONE, SCM</tag>
-    <description>
-      Container creation timeout in milliseconds to be used by SCM. When
-      BEGIN_CREATE event happens the container is moved from ALLOCATED to
-      CREATING state, SCM will now wait for the configured amount of time
-      to get COMPLETE_CREATE event if it doesn't receive it will move the
-      container to DELETING.
-    </description>
-  </property>
-
-  <property>
     <name>ozone.key.preallocation.max.blocks</name>
     <value>64</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
@@ -1432,15 +1424,13 @@
   </property>
 
   <property>
-    <name>ozone.s3g.authentication.kerberos.principal</name>
-    <value/>
+    <name>ozone.s3g.volume.name</name>
+    <value>s3v</value>
     <tag>OZONE, S3GATEWAY</tag>
-    <description>The server principal used by Ozone S3Gateway server. This is
-      typically set to
-      HTTP/_HOST@REALM.TLD The SPNEGO server principal begins with the prefix
-      HTTP/ by convention.</description>
+    <description>
+      The volume name to access through the s3gateway.
+    </description>
   </property>
-
   <property>
     <name>ozone.s3g.domain.name</name>
     <value/>
@@ -1497,7 +1487,17 @@
   </property>
 
   <property>
-    <name>ozone.s3g.keytab.file</name>
+    <name>ozone.s3g.http.auth.kerberos.principal</name>
+    <value/>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>The server principal used by Ozone S3Gateway server. This is
+      typically set to
+      HTTP/_HOST@REALM.TLD The SPNEGO server principal begins with the prefix
+      HTTP/ by convention.</description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.http.auth.kerberos.keytab</name>
     <value/>
     <tag>OZONE, S3GATEWAY</tag>
     <description>The keytab file used by the S3Gateway server to login as its
@@ -1558,6 +1558,15 @@
     <tag>OZONE, CLIENT, MANAGEMENT</tag>
     <description>
       Ozone client to verify checksum of the checksum blocksize data.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.read.timeout</name>
+    <value>30s</value>
+    <tag>OZONE, CLIENT, MANAGEMENT</tag>
+    <description>
+      Timeout for ozone grpc client during read.
     </description>
   </property>
 
@@ -1782,14 +1791,14 @@
     <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM</description>
   </property>
   <property>
-    <name>ozone.om.http.kerberos.principal</name>
+    <name>ozone.om.http.auth.kerberos.principal</name>
     <value>HTTP/_HOST@EXAMPLE.COM</value>
     <description>
       OzoneManager http server kerberos principal.
     </description>
   </property>
   <property>
-    <name>ozone.om.http.kerberos.keytab</name>
+    <name>ozone.om.http.auth.kerberos.keytab</name>
     <value>/etc/security/keytabs/HTTP.keytab</value>
     <description>
       OzoneManager http server kerberos keytab.
@@ -2021,7 +2030,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.freon.http.kerberos.principal</name>
+    <name>ozone.freon.http.auth.kerberos.principal</name>
     <value>HTTP/_HOST@EXAMPLE.COM</value>
     <tag>SECURITY</tag>
     <description>
@@ -2029,7 +2038,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.freon.http.kerberos.keytab</name>
+    <name>ozone.freon.http.auth.kerberos.keytab</name>
     <value>/etc/security/keytabs/HTTP.keytab</value>
     <tag>SECURITY</tag>
     <description>
@@ -2083,7 +2092,7 @@
   </property>
 
   <property>
-    <name>hdds.datanode.http.kerberos.principal</name>
+    <name>hdds.datanode.http.auth.kerberos.principal</name>
     <value>HTTP/_HOST@EXAMPLE.COM</value>
     <tag>HDDS, SECURITY, MANAGEMENT</tag>
     <description>
@@ -2091,7 +2100,7 @@
     </description>
   </property>
   <property>
-    <name>hdds.datanode.http.kerberos.keytab</name>
+    <name>hdds.datanode.http.auth.kerberos.keytab</name>
     <value>/etc/security/keytabs/HTTP.keytab</value>
     <tag>HDDS, SECURITY, MANAGEMENT</tag>
     <description>
@@ -2217,16 +2226,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.recon.keytab.file</name>
-    <value/>
-    <tag>RECON, SECURITY</tag>
-    <description>
-      DEPRECATED. Use "ozone.recon.http.kerberos.keytab.file" instead.
-      The keytab file for HTTP Kerberos authentication in Recon.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.http.kerberos.keytab.file</name>
+    <name>ozone.recon.http.auth.kerberos.keytab</name>
     <value/>
     <tag>RECON, SECURITY</tag>
     <description>
@@ -2234,12 +2234,52 @@
     </description>
   </property>
   <property>
-    <name>ozone.recon.authentication.kerberos.principal</name>
+    <name>ozone.recon.http.auth.kerberos.principal</name>
     <value/>
     <tag>RECON</tag>
     <description>The server principal used by Ozone Recon server. This is
       typically set to HTTP/_HOST@REALM.TLD The SPNEGO server principal
       begins with the prefix HTTP/ by convention.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.http.auth.type </name>
+    <value>simple</value>
+    <tag>DATANODE, SECURITY</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
+  </property>
+  <property>
+    <name>ozone.freon.http.auth.type </name>
+    <value>simple</value>
+    <tag>FREON, SECURITY</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.http.auth.type </name>
+    <value>simple</value>
+    <tag>OM, SECURITY</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.http.auth.type </name>
+    <value>simple</value>
+    <tag>RECON, SECURITY</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.http.auth.type </name>
+    <value>simple</value>
+    <tag>S3G, SECURITY</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
     </description>
   </property>
   <property>
@@ -2365,105 +2405,10 @@
   </property>
   <property>
     <name>hdds.tracing.enabled</name>
-    <value>true</value>
+    <value>false</value>
     <tag>OZONE, HDDS</tag>
     <description>
       If enabled, tracing information is sent to tracing server.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.sql.db.driver</name>
-    <value>org.sqlite.JDBC</value>
-    <tag>OZONE, RECON</tag>
-    <description>
-      Database driver class name available on the
-      Ozone Recon classpath.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.sql.db.jdbc.url</name>
-    <value>jdbc:sqlite:${ozone.recon.db.dir}/ozone_recon_sqlite.db</value>
-    <tag>OZONE, RECON</tag>
-    <description>
-      Ozone Recon SQL database jdbc url.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.sql.db.username</name>
-    <value/>
-    <tag>OZONE, RECON</tag>
-    <description>
-      Ozone Recon SQL database username.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.sql.db.password</name>
-    <value/>
-    <tag>OZONE, RECON</tag>
-    <description>
-      Ozone Recon database password.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.sql.db.auto.commit</name>
-    <value>false</value>
-    <tag>OZONE, RECON</tag>
-    <description>
-      Sets the Ozone Recon database connection property of auto-commit to
-      true/false.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.sql.db.conn.timeout</name>
-    <value>30000</value>
-    <tag>OZONE, RECON</tag>
-    <description>
-      Sets time in milliseconds before call to getConnection is timed out.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.sql.db.conn.max.active</name>
-    <value>1</value>
-    <tag>OZONE, RECON</tag>
-    <description>
-      The max active connections to the SQL database. The default SQLite
-      database only allows single active connection, set this to a
-      reasonable value like 10, for external production database.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.sql.db.conn.max.age</name>
-    <value>1800</value>
-    <tag>OZONE, RECON</tag>
-    <description>
-      Sets maximum time a connection can be active in seconds.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.sql.db.conn.idle.max.age</name>
-    <value>3600</value>
-    <tag>OZONE, RECON</tag>
-    <description>
-      Sets maximum time to live for idle connection in seconds.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.sql.db.conn.idle.test.period</name>
-    <value>60</value>
-    <tag>OZONE, RECON</tag>
-    <description>
-      This sets the time (in seconds), for a connection to remain idle before
-      sending a test query to the DB. This is useful to prevent a DB from
-      timing out connections on its end.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.sql.db.conn.idle.test</name>
-    <value>SELECT 1</value>
-    <tag>OZONE, RECON</tag>
-    <description>
-      The query to send to the DB to maintain keep-alives and test for dead
-      connections.
     </description>
   </property>
   <property>

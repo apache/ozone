@@ -28,6 +28,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -39,7 +40,6 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.BatchOperation;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -278,7 +278,7 @@ public class BlockDeletingService extends BackgroundService {
             .getHandler(container.getContainerType()));
 
         toDeleteBlocks.forEach(entry -> {
-          String blockName = DFSUtil.bytes2String(entry.getKey());
+          String blockName = StringUtils.bytes2String(entry.getKey());
           LOG.debug("Deleting block {}", blockName);
           try {
             ContainerProtos.BlockData data =
@@ -299,13 +299,19 @@ public class BlockDeletingService extends BackgroundService {
           String blockId =
               entry.substring(OzoneConsts.DELETING_KEY_PREFIX.length());
           String deletedEntry = OzoneConsts.DELETED_KEY_PREFIX + blockId;
-          batch.put(DFSUtil.string2Bytes(deletedEntry),
-              DFSUtil.string2Bytes(blockId));
-          batch.delete(DFSUtil.string2Bytes(entry));
+          batch.put(StringUtils.string2Bytes(deletedEntry),
+              StringUtils.string2Bytes(blockId));
+          batch.delete(StringUtils.string2Bytes(entry));
         });
-        meta.getStore().writeBatch(batch);
-        // update count of pending deletion blocks in in-memory container status
-        containerData.decrPendingDeletionBlocks(succeedBlocks.size());
+
+
+        int deleteBlockCount = succeedBlocks.size();
+        containerData.updateAndCommitDBCounters(meta, batch, deleteBlockCount);
+
+        // update count of pending deletion blocks and block count in in-memory
+        // container status.
+        containerData.decrPendingDeletionBlocks(deleteBlockCount);
+        containerData.decrKeyCount(deleteBlockCount);
 
         if (!succeedBlocks.isEmpty()) {
           LOG.info("Container: {}, deleted blocks: {}, task elapsed time: {}ms",

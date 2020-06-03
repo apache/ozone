@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -79,9 +78,11 @@ public interface OzoneManagerProtocol
    * Changes the owner of a volume.
    * @param volume  - Name of the volume.
    * @param owner - Name of the owner.
+   * @return true if operation succeeded, false if specified user is
+   *         already the owner.
    * @throws IOException
    */
-  void setOwner(String volume, String owner) throws IOException;
+  boolean setOwner(String volume, String owner) throws IOException;
 
   /**
    * Changes the Quota on a volume.
@@ -294,55 +295,6 @@ public interface OzoneManagerProtocol
    */
 
   /**
-   * Creates an S3 bucket inside Ozone manager and creates the mapping needed
-   * to access via both S3 and Ozone.
-   * @param userName - S3 user name.
-   * @param s3BucketName - S3 bucket Name.
-   * @throws IOException - On failure, throws an exception like Bucket exists.
-   */
-  void createS3Bucket(String userName, String s3BucketName) throws IOException;
-
-  /**
-   * Delets an S3 bucket inside Ozone manager and deletes the mapping.
-   * @param s3BucketName - S3 bucket Name.
-   * @throws IOException in case the bucket cannot be deleted.
-   */
-  void deleteS3Bucket(String s3BucketName) throws IOException;
-
-  /**
-   * Returns the Ozone Namespace for the S3Bucket. It will return the
-   * OzoneVolume/OzoneBucketName.
-   * @param s3BucketName  - S3 Bucket Name.
-   * @return String - The Ozone canonical name for this s3 bucket. This
-   * string is useful for mounting an OzoneFS.
-   * @throws IOException - Error is throw if the s3bucket does not exist.
-   */
-  String getOzoneBucketMapping(String s3BucketName) throws IOException;
-
-  /**
-   * Returns a list of buckets represented by {@link OmBucketInfo}
-   * for the given user. Argument username is required, others
-   * are optional.
-   *
-   * @param userName
-   *   user Name.
-   * @param startBucketName
-   *   the start bucket name, only the buckets whose name is
-   *   after this value will be included in the result.
-   * @param bucketPrefix
-   *   bucket name prefix, only the buckets whose name has
-   *   this prefix will be included in the result.
-   * @param maxNumOfBuckets
-   *   the maximum number of buckets to return. It ensures
-   *   the size of the result will not exceed this limit.
-   * @return a list of buckets.
-   * @throws IOException
-   */
-  List<OmBucketInfo> listS3Buckets(String userName, String startBucketName,
-                                   String bucketPrefix, int maxNumOfBuckets)
-      throws IOException;
-
-  /**
    * Initiate multipart upload for the specified key.
    * @param keyArgs
    * @return MultipartInfo
@@ -405,12 +357,6 @@ public interface OzoneManagerProtocol
    * @throws IOException
    */
   S3SecretValue getS3Secret(String kerberosID) throws IOException;
-
-  /**
-   * Get the OM Client's Retry and Failover Proxy provider.
-   * @return OMFailoverProxyProvider
-   */
-  OMFailoverProxyProvider getOMFailoverProxyProvider();
 
   /**
    * OzoneFS api to get file status for an entry.
@@ -549,10 +495,12 @@ public interface OzoneManagerProtocol
    * @param bucketName - The bucket name.
    * @param keyName - The key user want to recover.
    * @param destinationBucket - The bucket user want to recover to.
-   * @return The recoverTrash
+   * @return The result of recovering operation is success or not.
    * @throws IOException
    */
-  boolean recoverTrash(String volumeName, String bucketName, String keyName,
-      String destinationBucket) throws IOException;
+  default boolean recoverTrash(String volumeName, String bucketName,
+      String keyName, String destinationBucket) throws IOException {
+    return false;
+  }
 
 }
