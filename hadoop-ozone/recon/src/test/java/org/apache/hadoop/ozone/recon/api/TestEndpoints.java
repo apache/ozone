@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -37,7 +38,11 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStateResponse;
@@ -52,7 +57,11 @@ import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
 import org.apache.hadoop.test.LambdaTestUtils;
+import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
+import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
+import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -64,12 +73,16 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandom
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import javax.ws.rs.core.Response;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
@@ -80,7 +93,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private NodeEndpoint nodeEndpoint;
   private PipelineEndpoint pipelineEndpoint;
   private ClusterStateEndpoint clusterStateEndpoint;
+  private UtilizationEndpoint utilizationEndpoint;
   private ReconOMMetadataManager reconOMMetadataManager;
+  private FileSizeCountTask fileSizeCountTask;
   private ReconStorageContainerManagerFacade reconScm;
   private boolean isSetupDone = false;
   private String pipelineId;
@@ -90,6 +105,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private ContainerReportsProto containerReportsProto;
   private DatanodeDetailsProto datanodeDetailsProto;
   private Pipeline pipeline;
+  private FileCountBySizeDao fileCountBySizeDao;
   private final String host1 = "host1.datanode";
   private final String host2 = "host2.datanode";
   private final String ip1 = "1.1.1.1";
@@ -143,6 +159,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .addBinding(ClusterStateEndpoint.class)
             .addBinding(NodeEndpoint.class)
             .addBinding(ContainerSchemaManager.class)
+            .addBinding(UtilizationEndpoint.class)
             .addBinding(StorageContainerLocationProtocol.class, mockScmClient)
             .build();
 
@@ -150,6 +167,13 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     pipelineEndpoint = reconTestInjector.getInstance(PipelineEndpoint.class);
     clusterStateEndpoint =
         reconTestInjector.getInstance(ClusterStateEndpoint.class);
+    fileCountBySizeDao = getDao(FileCountBySizeDao.class);
+    UtilizationSchemaDefinition utilizationSchemaDefinition =
+        getSchemaDefinition(UtilizationSchemaDefinition.class);
+    utilizationEndpoint = new UtilizationEndpoint(
+        fileCountBySizeDao, utilizationSchemaDefinition);
+    fileSizeCountTask =
+        new FileSizeCountTask(fileCountBySizeDao, utilizationSchemaDefinition);
     reconScm = (ReconStorageContainerManagerFacade)
         reconTestInjector.getInstance(OzoneStorageContainerManager.class);
   }
@@ -396,6 +420,104 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       return (clusterStateResponse1.getContainers() == 1);
     });
   }
+
+  @Test
+  public void testGetFileCounts() throws Exception {
+    OmKeyInfo omKeyInfo1 = mock(OmKeyInfo.class);
+    given(omKeyInfo1.getKeyName()).willReturn("key1");
+    given(omKeyInfo1.getVolumeName()).willReturn("vol1");
+    given(omKeyInfo1.getBucketName()).willReturn("bucket1");
+    given(omKeyInfo1.getDataSize()).willReturn(1000L);
+
+    OmKeyInfo omKeyInfo2 = mock(OmKeyInfo.class);
+    given(omKeyInfo2.getKeyName()).willReturn("key2");
+    given(omKeyInfo2.getVolumeName()).willReturn("vol1");
+    given(omKeyInfo2.getBucketName()).willReturn("bucket1");
+    given(omKeyInfo2.getDataSize()).willReturn(100000L);
+
+    OmKeyInfo omKeyInfo3 = mock(OmKeyInfo.class);
+    given(omKeyInfo3.getKeyName()).willReturn("key1");
+    given(omKeyInfo3.getVolumeName()).willReturn("vol2");
+    given(omKeyInfo3.getBucketName()).willReturn("bucket1");
+    given(omKeyInfo3.getDataSize()).willReturn(1000L);
+
+    OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
+    TypedTable<String, OmKeyInfo> keyTable = mock(TypedTable.class);
+
+    TypedTable.TypedTableIterator mockKeyIter = mock(TypedTable
+        .TypedTableIterator.class);
+    TypedTable.TypedKeyValue mockKeyValue = mock(
+        TypedTable.TypedKeyValue.class);
+
+    when(keyTable.iterator()).thenReturn(mockKeyIter);
+    when(omMetadataManager.getKeyTable()).thenReturn(keyTable);
+    when(mockKeyIter.hasNext())
+        .thenReturn(true)
+        .thenReturn(true)
+        .thenReturn(true)
+        .thenReturn(false);
+    when(mockKeyIter.next()).thenReturn(mockKeyValue);
+    when(mockKeyValue.getValue())
+        .thenReturn(omKeyInfo1)
+        .thenReturn(omKeyInfo2)
+        .thenReturn(omKeyInfo3);
+
+    Pair<String, Boolean> result =
+        fileSizeCountTask.reprocess(omMetadataManager);
+    assertTrue(result.getRight());
+
+    assertEquals(3, fileCountBySizeDao.count());
+    Response response = utilizationEndpoint.getFileCounts(null, null, 0);
+    List<FileCountBySize> resultSet =
+        (List<FileCountBySize>) response.getEntity();
+    assertEquals(3, resultSet.size());
+    assertTrue(resultSet.stream().anyMatch(o -> o.getVolume().equals("vol1") &&
+        o.getBucket().equals("bucket1") && o.getFileSize() == 1024L &&
+        o.getCount() == 1L));
+    assertTrue(resultSet.stream().anyMatch(o -> o.getVolume().equals("vol1") &&
+        o.getBucket().equals("bucket1") && o.getFileSize() == 131072 &&
+        o.getCount() == 1L));
+    assertTrue(resultSet.stream().anyMatch(o -> o.getVolume().equals("vol2") &&
+        o.getBucket().equals("bucket1") && o.getFileSize() == 1024L &&
+        o.getCount() == 1L));
+
+    // Test for "volume" query param
+    response = utilizationEndpoint.getFileCounts("vol1", null, 0);
+    resultSet = (List<FileCountBySize>) response.getEntity();
+    assertEquals(2, resultSet.size());
+    assertTrue(resultSet.stream().allMatch(o -> o.getVolume().equals("vol1")));
+
+    // Test for non-existent volume
+    response = utilizationEndpoint.getFileCounts("vol", null, 0);
+    resultSet = (List<FileCountBySize>) response.getEntity();
+    assertEquals(0, resultSet.size());
+
+    // Test for "volume" + "bucket" query param
+    response = utilizationEndpoint.getFileCounts("vol1", "bucket1", 0);
+    resultSet = (List<FileCountBySize>) response.getEntity();
+    assertEquals(2, resultSet.size());
+    assertTrue(resultSet.stream().allMatch(o -> o.getVolume().equals("vol1") &&
+        o.getBucket().equals("bucket1")));
+
+    // Test for non-existent bucket
+    response = utilizationEndpoint.getFileCounts("vol1", "bucket", 0);
+    resultSet = (List<FileCountBySize>) response.getEntity();
+    assertEquals(0, resultSet.size());
+
+    // Test for "volume" + "bucket" + "fileSize" query params
+    response = utilizationEndpoint.getFileCounts("vol1", "bucket1", 131072);
+    resultSet = (List<FileCountBySize>) response.getEntity();
+    assertEquals(1, resultSet.size());
+    FileCountBySize o = resultSet.get(0);
+    assertTrue(o.getVolume().equals("vol1") && o.getBucket().equals(
+        "bucket1") && o.getFileSize() == 131072);
+
+    // Test for non-existent fileSize
+    response = utilizationEndpoint.getFileCounts("vol1", "bucket1", 1310725);
+    resultSet = (List<FileCountBySize>) response.getEntity();
+    assertEquals(0, resultSet.size());
+  }
+
 
   private void waitAndCheckConditionAfterHeartbeat(Callable<Boolean> check)
       throws Exception {
