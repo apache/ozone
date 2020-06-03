@@ -48,16 +48,15 @@ import org.junit.rules.Timeout;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY;
 
 /**
- * Tests BlockOutputStream class.
+ * Tests TestBlockOutputStreamFlushDelay class.
  */
-public class TestBlockOutputStream {
+public class TestBlockOutputStreamFlushDelay {
 
   /**
-    * Set a timeout for each test.
-    */
+   * Set a timeout for each test.
+   */
   @Rule
   public Timeout timeout = new Timeout(300000);
   private static MiniOzoneCluster cluster;
@@ -91,7 +90,6 @@ public class TestBlockOutputStream {
     conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
         StorageUnit.MB);
-    conf.setBoolean(OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY, false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(7)
         .setTotalPipelineNumLimit(10)
@@ -142,6 +140,7 @@ public class TestBlockOutputStream {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
     int dataLength = 50;
+    int totalWriteDataLength = dataLength * 2;
     byte[] data1 =
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
@@ -176,7 +175,9 @@ public class TestBlockOutputStream {
     // commitIndex2FlushedData Map will be empty here
     Assert.assertTrue(
         blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
-
+    // Total write data greater than or equal one chunk
+    // size to make sure flush will sync data.
+    key.write(data1);
     // Now do a flush. This will flush the data and update the flush length and
     // the map.
     key.flush();
@@ -192,14 +193,16 @@ public class TestBlockOutputStream {
     Assert.assertEquals(1, blockOutputStream.getBufferPool().getSize());
     Assert.assertEquals(0,
         blockOutputStream.getBufferPool().getBuffer(0).position());
-    Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
-    Assert.assertEquals(dataLength,
+    Assert.assertEquals(totalWriteDataLength,
+        blockOutputStream.getWrittenDataLength());
+    Assert.assertEquals(totalWriteDataLength,
         blockOutputStream.getTotalDataFlushedLength());
     Assert.assertEquals(0,
         blockOutputStream.getCommitIndex2flushedDataMap().size());
 
     // flush ensures watchForCommit updates the total length acknowledged
-    Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
+    Assert.assertEquals(totalWriteDataLength,
+        blockOutputStream.getTotalAckDataLength());
 
     Assert.assertEquals(1, keyOutputStream.getStreamEntries().size());
     // now close the stream, It will update the ack length after watchForCommit
@@ -219,7 +222,8 @@ public class TestBlockOutputStream {
     // make sure the bufferPool is empty
     Assert
         .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
-    Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
+    Assert.assertEquals(totalWriteDataLength,
+        blockOutputStream.getTotalAckDataLength());
     Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
     Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
     validateData(keyName, data1);
@@ -273,31 +277,31 @@ public class TestBlockOutputStream {
     Assert.assertEquals(0,
         blockOutputStream.getCommitIndex2flushedDataMap().size());
 
-    // Now do a flush. This will flush the data and update the flush length and
-    // the map.
+    // Now do a flush.
     key.flush();
     Assert.assertEquals(1, keyOutputStream.getStreamEntries().size());
-    // flush is a sync call, all pending operations will complete
-    Assert.assertEquals(pendingWriteChunkCount, metrics
+    // The previously written data is equal to flushSize,so no action is
+    // triggered when execute flush.
+    Assert.assertEquals(pendingWriteChunkCount  + 2, metrics
         .getPendingContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
-    Assert.assertEquals(pendingPutBlockCount, metrics
+    Assert.assertEquals(pendingPutBlockCount + 1, metrics
         .getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
 
     // Since the data in the buffer is already flushed, flush here will have
     // no impact on the counters and data structures
-
     Assert.assertEquals(2, blockOutputStream.getBufferPool().getSize());
-    Assert
-        .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
-    Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
+    // No action is triggered when execute flush and BlockOutputStream will not
+    // be updated.
+    Assert.assertEquals(dataLength,
+        blockOutputStream.getBufferPool().computeBufferData());
+    Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
     Assert.assertEquals(dataLength,
         blockOutputStream.getTotalDataFlushedLength());
     Assert.assertEquals(0,
         blockOutputStream.getCommitIndex2flushedDataMap().size());
+    Assert.assertEquals(0, blockOutputStream.getTotalAckDataLength());
 
-    // flush ensures watchForCommit updates the total length acknowledged
-    Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
     // now close the stream, It will update the ack length after watchForCommit
     key.close();
     Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
@@ -652,8 +656,7 @@ public class TestBlockOutputStream {
     Assert.assertTrue(
         blockOutputStream.getCommitIndex2flushedDataMap().size() <= 1);
 
-    // Now do a flush. This will flush the data and update the flush length and
-    // the map.
+    // Now do a flush.
     key.flush();
     Assert.assertEquals(1, keyOutputStream.getStreamEntries().size());
     Assert.assertEquals(pendingWriteChunkCount, metrics
@@ -666,10 +669,10 @@ public class TestBlockOutputStream {
 
     Assert.assertEquals(4, blockOutputStream.getBufferPool().getSize());
     Assert.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
-
-    Assert.assertEquals(dataLength,
+    // dataLength = maxFlushSize + 50, the final data length of 50 is smaller
+    // than the chunkSize(100) and will not be sync when called flush.
+    Assert.assertEquals(dataLength - 50,
         blockOutputStream.getTotalDataFlushedLength());
-    // flush will make sure one more entry gets updated in the map
     Assert.assertTrue(
         blockOutputStream.getCommitIndex2flushedDataMap().size() <= 2);
 
@@ -685,9 +688,10 @@ public class TestBlockOutputStream {
         .getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
     Assert.assertEquals(writeChunkCount + 5,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
-    Assert.assertEquals(putBlockCount + 4,
+    // The previous flush did not trigger any action.
+    Assert.assertEquals(putBlockCount + 3,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
-    Assert.assertEquals(totalOpCount + 9,
+    Assert.assertEquals(totalOpCount + 8,
         metrics.getTotalOpCount());
     Assert.assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
     Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
@@ -696,7 +700,7 @@ public class TestBlockOutputStream {
   }
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
-      long size) throws Exception {
+                                      long size) throws Exception {
     return TestHelper
         .createKey(keyName, type, size, objectStore, volumeName, bucketName);
   }
