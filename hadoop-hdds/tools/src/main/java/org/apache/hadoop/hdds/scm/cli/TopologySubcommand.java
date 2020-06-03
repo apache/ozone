@@ -71,6 +71,10 @@ public class TopologySubcommand implements Callable<Void> {
       description = "Print Topology ordered by network location")
   private boolean order;
 
+  @CommandLine.Option(names = {"-f", "--full"},
+      description = "Print Topology with full node infos")
+  private boolean fullInfo;
+
   @Override
   public Void call() throws Exception {
     try (ScmClient scmClient = parent.createScmClient()) {
@@ -128,10 +132,15 @@ public class TopologySubcommand implements Callable<Void> {
     return sb.toString();
   }
 
+  private String getAdditionNodeOutput(HddsProtos.Node node) {
+    return fullInfo ? node.getNodeID().getUuid() + "/" : "";
+  }
+
   // Format "ipAddress(hostName):PortName1=PortValue1    networkLocation"
   private void printNodesWithLocation(Collection<HddsProtos.Node> nodes) {
     nodes.forEach(node -> {
-      System.out.print(" " + node.getNodeID().getIpAddress() + "(" +
+      System.out.print(" " + getAdditionNodeOutput(node) +
+          node.getNodeID().getIpAddress() + "(" +
           node.getNodeID().getHostName() + ")" +
           ":" + formatPortOutput(node.getNodeID().getPortsList()));
       System.out.println("    " +

@@ -110,8 +110,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * | openKey            | /volumeName/bucketName/keyName/id->KeyInfo      |
    * |----------------------------------------------------------------------|
-   * | s3Table            | s3BucketName -> /volumeName/bucketName          |
-   * |----------------------------------------------------------------------|
    * | s3SecretTable      | s3g_access_key_id -> s3Secret                   |
    * |----------------------------------------------------------------------|
    * | dTokenTable        | s3g_access_key_id -> s3Secret                   |
@@ -131,7 +129,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String KEY_TABLE = "keyTable";
   public static final String DELETED_TABLE = "deletedTable";
   public static final String OPEN_KEY_TABLE = "openKeyTable";
-  public static final String S3_TABLE = "s3Table";
   public static final String MULTIPARTINFO_TABLE = "multipartInfoTable";
   public static final String S3_SECRET_TABLE = "s3SecretTable";
   public static final String DELEGATION_TOKEN_TABLE = "dTokenTable";
@@ -150,7 +147,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table keyTable;
   private Table deletedTable;
   private Table openKeyTable;
-  private Table s3Table;
   private Table<String, OmMultipartKeyInfo> multipartInfoTable;
   private Table s3SecretTable;
   private Table dTokenTable;
@@ -213,11 +209,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public Table<String, OmKeyInfo> getOpenKeyTable() {
     return openKeyTable;
-  }
-
-  @Override
-  public Table<String, String> getS3Table() {
-    return s3Table;
   }
 
   @Override
@@ -285,7 +276,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(KEY_TABLE)
         .addTable(DELETED_TABLE)
         .addTable(OPEN_KEY_TABLE)
-        .addTable(S3_TABLE)
         .addTable(MULTIPARTINFO_TABLE)
         .addTable(DELEGATION_TOKEN_TABLE)
         .addTable(S3_SECRET_TABLE)
@@ -337,9 +327,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     openKeyTable =
         this.store.getTable(OPEN_KEY_TABLE, String.class, OmKeyInfo.class);
     checkTableStatus(openKeyTable, OPEN_KEY_TABLE);
-
-    s3Table = this.store.getTable(S3_TABLE, String.class, String.class);
-    checkTableStatus(s3Table, S3_TABLE);
 
     multipartInfoTable = this.store.getTable(MULTIPARTINFO_TABLE,
         String.class, OmMultipartKeyInfo.class);

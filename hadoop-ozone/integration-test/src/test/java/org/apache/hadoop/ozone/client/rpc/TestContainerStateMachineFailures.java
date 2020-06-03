@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.rpc;
 
 import com.google.common.primitives.Longs;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -28,7 +29,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -605,7 +605,7 @@ public class TestContainerStateMachineFailures {
     ReferenceCountedDB db = BlockUtils.
         getDB(keyValueContainerData, conf);
     byte[] blockCommitSequenceIdKey =
-        DFSUtil.string2Bytes(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
+        StringUtils.string2Bytes(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
 
     // modify the bcsid for the container in the ROCKS DB thereby inducing
     // corruption

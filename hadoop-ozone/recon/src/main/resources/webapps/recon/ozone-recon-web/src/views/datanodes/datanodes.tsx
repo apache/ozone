@@ -37,6 +37,7 @@ interface IDatanodeResponse {
   pipelines: IPipeline[];
   containers: number;
   leaderCount: number;
+  uuid: string;
 }
 
 interface IDatanodesResponse {
@@ -54,6 +55,7 @@ interface IDatanode {
   pipelines: IPipeline[];
   containers: number;
   leaderCount: number;
+  uuid: string;
 }
 
 interface IPipeline {
@@ -89,6 +91,13 @@ const COLUMNS = [
     key: 'state',
     render: (text: DatanodeStatus) => renderDatanodeStatus(text),
     sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state)
+  },
+  {
+    title: 'Uuid',
+    dataIndex: 'uuid',
+    key: 'uuid',
+    sorter: (a: IDatanode, b: IDatanode) => a.uuid.localeCompare(b.uuid),
+    defaultSortOrder: 'ascend' as const
   },
   {
     title: 'Hostname',
@@ -182,6 +191,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       const dataSource: IDatanode[] = datanodes.map(datanode => {
         return {
           hostname: datanode.hostname,
+          uuid: datanode.uuid,
           state: datanode.state,
           lastHeartbeat: datanode.lastHeartbeat,
           storageUsed: datanode.storageReport.used,

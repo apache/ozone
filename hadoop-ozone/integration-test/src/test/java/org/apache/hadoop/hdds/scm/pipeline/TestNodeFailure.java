@@ -34,11 +34,19 @@ import org.junit.Test;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 
 /**
  * Test Node failure detection and handling in Ratis.
  */
 public class TestNodeFailure {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static MiniOzoneCluster cluster;
   private static List<Pipeline> ratisPipelines;
