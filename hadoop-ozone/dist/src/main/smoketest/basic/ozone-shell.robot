@@ -18,7 +18,7 @@ Documentation       Test ozone shell CLI usage
 Library             OperatingSystem
 Resource            ../commonlib.robot
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
-Test Timeout        3 minute
+Test Timeout        2 minute
 Suite Setup         Generate prefix
 
 *** Variables ***
@@ -114,14 +114,27 @@ Test key handling
                     Execute             rm -f /tmp/NOTICE.txt.1
                     Execute             ozone sh key get ${protocol}${server}/${volume}/bb1/key1 /tmp/NOTICE.txt.1
                     Execute             diff -q /opt/hadoop/NOTICE.txt /tmp/NOTICE.txt.1
+
+                    Execute             ozone sh key put -t RATIS ${protocol}${server}/${volume}/bb1/key1_RATIS /opt/hadoop/NOTICE.txt
+                    Execute             rm -f /tmp/key1_RATIS
+                    Execute             ozone sh key get ${protocol}${server}/${volume}/bb1/key1_RATIS /tmp/key1_RATIS
+                    Execute             diff -q /opt/hadoop/NOTICE.txt /tmp/key1_RATIS
+    ${result} =     Execute             ozone sh key info ${protocol}${server}/${volume}/bb1/key1_RATIS | jq -r '. | select(.name=="key1_RATIS")'
+                    Should contain      ${result}       RATIS
+                    Execute             ozone sh key delete ${protocol}${server}/${volume}/bb1/key1_RATIS
+
+                    Execute             ozone sh key cp ${protocol}${server}/${volume}/bb1 key1 key1-copy
+                    Execute             rm -f /tmp/key1-copy
+                    Execute             ozone sh key get ${protocol}${server}/${volume}/bb1/key1-copy /tmp/key1-copy
+                    Execute             diff -q /opt/hadoop/NOTICE.txt /tmp/key1-copy
+                    Execute             ozone sh key delete ${protocol}${server}/${volume}/bb1/key1-copy
+
     ${result} =     Execute And Ignore Error    ozone sh key get ${protocol}${server}/${volume}/bb1/key1 /tmp/NOTICE.txt.1
                     Should Contain      ${result}       NOTICE.txt.1 exists
     ${result} =     Execute             ozone sh key get --force ${protocol}${server}/${volume}/bb1/key1 /tmp/NOTICE.txt.1
                     Should Not Contain  ${result}       NOTICE.txt.1 exists
     ${result} =     Execute             ozone sh key info ${protocol}${server}/${volume}/bb1/key1 | jq -r '. | select(.name=="key1")'
                     Should contain      ${result}       creationTime
-    ${result} =     Execute             ozone debug chunkinfo ${protocol}${server}/${volume}/bb1/key1 | jq -r '.[]'
-                    Should contain      ${result}       chunks
     ${result} =     Execute             ozone sh key list ${protocol}${server}/${volume}/bb1 | jq -r '. | select(.name=="key1") | .name'
                     Should Be Equal     ${result}       key1
                     Execute             ozone sh key rename ${protocol}${server}/${volume}/bb1 key1 key2

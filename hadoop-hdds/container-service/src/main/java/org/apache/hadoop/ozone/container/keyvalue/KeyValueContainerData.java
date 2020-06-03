@@ -20,13 +20,18 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+
+import java.io.IOException;
 import java.util.Collections;
 
+import com.google.common.primitives.Longs;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto;
+import org.apache.hadoop.hdds.utils.BatchOperation;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.yaml.snakeyaml.nodes.Tag;
 
 
@@ -36,9 +41,12 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.lang.Math.max;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_BLOCK_COUNT_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.CHUNKS_PATH;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_CONTAINER_BYTES_USED_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE;
 import static org.apache.hadoop.ozone.OzoneConsts.METADATA_PATH;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_PENDING_DELETE_BLOCK_COUNT_KEY;
 
 /**
  * This class represents the KeyValueContainer metadata, which is the
@@ -247,5 +255,26 @@ public class KeyValueContainerData extends ContainerData {
   public static List<String> getYamlFields() {
     return Collections.unmodifiableList(KV_YAML_FIELDS);
   }
+
+  /**
+   * Update DB counters related to block metadata.
+   * @param db - Reference to container DB.
+   * @param batchOperation - Batch Operation to batch DB operations.
+   * @param deletedBlockCount - Number of blocks deleted.
+   * @throws IOException
+   */
+  public void updateAndCommitDBCounters(
+      ReferenceCountedDB db, BatchOperation batchOperation,
+      int deletedBlockCount) throws IOException {
+    // Set Bytes used and block count key.
+    batchOperation.put(DB_CONTAINER_BYTES_USED_KEY,
+        Longs.toByteArray(getBytesUsed()));
+    batchOperation.put(DB_BLOCK_COUNT_KEY, Longs.toByteArray(
+        getKeyCount() - deletedBlockCount));
+    batchOperation.put(DB_PENDING_DELETE_BLOCK_COUNT_KEY, Longs.toByteArray(
+        getNumPendingDeletionBlocks() - deletedBlockCount));
+    db.getStore().writeBatch(batchOperation);
+  }
+
 
 }

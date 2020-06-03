@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.Map;
 
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.common.base.Optional;
@@ -73,10 +74,8 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
         getOmRequest().getSetVolumePropertyRequest();
     Preconditions.checkNotNull(setVolumePropertyRequest);
 
-    OMResponse.Builder omResponse = OMResponse.newBuilder().setCmdType(
-        OzoneManagerProtocolProtos.Type.SetVolumeProperty).setStatus(
-        OzoneManagerProtocolProtos.Status.OK).setSuccess(true);
-
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
     // In production this will never happen, this request will be called only
     // when we have ownerName in setVolumePropertyRequest.
     if (!setVolumePropertyRequest.hasOwnerName()) {
@@ -146,7 +145,7 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
             "Volume '" + volume + "' owner is already '" + newOwner + "'.")
           .setSuccess(false);
         omResponse.setSetVolumePropertyResponse(
-            SetVolumePropertyResponse.newBuilder().build());
+            SetVolumePropertyResponse.newBuilder().setResponse(false).build());
         omClientResponse = new OMVolumeSetOwnerResponse(omResponse.build());
         // Note: addResponseToDoubleBuffer would be executed in finally block.
         return omClientResponse;
@@ -182,7 +181,7 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
           new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
 
       omResponse.setSetVolumePropertyResponse(
-          SetVolumePropertyResponse.newBuilder().build());
+          SetVolumePropertyResponse.newBuilder().setResponse(true).build());
       omClientResponse = new OMVolumeSetOwnerResponse(omResponse.build(),
           oldOwner, oldOwnerVolumeList, newOwnerVolumeList, omVolumeArgs);
 

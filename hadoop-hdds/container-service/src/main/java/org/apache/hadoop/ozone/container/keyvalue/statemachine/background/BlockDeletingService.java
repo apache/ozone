@@ -303,9 +303,15 @@ public class BlockDeletingService extends BackgroundService {
               DFSUtil.string2Bytes(blockId));
           batch.delete(DFSUtil.string2Bytes(entry));
         });
-        meta.getStore().writeBatch(batch);
-        // update count of pending deletion blocks in in-memory container status
-        containerData.decrPendingDeletionBlocks(succeedBlocks.size());
+
+
+        int deleteBlockCount = succeedBlocks.size();
+        containerData.updateAndCommitDBCounters(meta, batch, deleteBlockCount);
+
+        // update count of pending deletion blocks and block count in in-memory
+        // container status.
+        containerData.decrPendingDeletionBlocks(deleteBlockCount);
+        containerData.decrKeyCount(deleteBlockCount);
 
         if (!succeedBlocks.isEmpty()) {
           LOG.info("Container: {}, deleted blocks: {}, task elapsed time: {}ms",

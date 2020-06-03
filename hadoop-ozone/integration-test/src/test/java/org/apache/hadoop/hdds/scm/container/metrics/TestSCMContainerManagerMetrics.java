@@ -42,6 +42,8 @@ import java.util.HashMap;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 import static org.junit.Assert.fail;
@@ -50,6 +52,12 @@ import static org.junit.Assert.fail;
  * Class used to test {@link SCMContainerManagerMetrics}.
  */
 public class TestSCMContainerManagerMetrics {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private MiniOzoneCluster cluster;
   private StorageContainerManager scm;

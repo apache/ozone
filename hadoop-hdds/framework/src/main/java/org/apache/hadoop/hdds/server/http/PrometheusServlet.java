@@ -34,6 +34,9 @@ import io.prometheus.client.exporter.common.TextFormat;
  */
 public class PrometheusServlet extends HttpServlet {
 
+  public static final String SECURITY_TOKEN = "PROMETHEUS_SECURITY_TOKEN";
+  public static final String BEARER = "Bearer";
+
   public PrometheusMetricsSink getPrometheusSink() {
     return
         (PrometheusMetricsSink) getServletContext().getAttribute(
@@ -43,6 +46,18 @@ public class PrometheusServlet extends HttpServlet {
   @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse resp)
       throws ServletException, IOException {
+    String securityToken =
+        (String) getServletContext().getAttribute(SECURITY_TOKEN);
+    if (securityToken != null) {
+      String authorizationHeader = req.getHeader("Authorization");
+      if (authorizationHeader == null
+          || !authorizationHeader.startsWith(BEARER)
+          || !securityToken.equals(
+              authorizationHeader.substring(BEARER.length() + 1))) {
+        resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        return;
+      }
+    }
     DefaultMetricsSystem.instance().publishMetricsNow();
     PrintWriter writer = resp.getWriter();
     getPrometheusSink().writeMetrics(writer);

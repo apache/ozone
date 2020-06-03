@@ -245,16 +245,20 @@ public final class HddsConfigKeys {
   public static final String HDDS_DATANODE_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int HDDS_DATANODE_HTTP_BIND_PORT_DEFAULT = 9882;
   public static final int HDDS_DATANODE_HTTPS_BIND_PORT_DEFAULT = 9883;
+
+  public static final String OZONE_DATANODE_HTTP_AUTH_CONFIG_PREFIX =
+      "hdds.datanode.http.auth.";
+  public static final String HDDS_DATANODE_HTTP_AUTH_TYPE =
+      OZONE_DATANODE_HTTP_AUTH_CONFIG_PREFIX + "type";
   public static final String
       HDDS_DATANODE_HTTP_KERBEROS_PRINCIPAL_KEY =
-      "hdds.datanode.http.kerberos.principal";
+      OZONE_DATANODE_HTTP_AUTH_CONFIG_PREFIX +  "kerberos.principal";
   public static final String
       HDDS_DATANODE_HTTP_KERBEROS_KEYTAB_FILE_KEY =
-      "hdds.datanode.http.kerberos.keytab";
+      OZONE_DATANODE_HTTP_AUTH_CONFIG_PREFIX + "kerberos.keytab";
 
   public static final String HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT =
       "hdds.datanode.ratis.server.request.timeout";
   public static final String
       HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT = "2m";
-
 }

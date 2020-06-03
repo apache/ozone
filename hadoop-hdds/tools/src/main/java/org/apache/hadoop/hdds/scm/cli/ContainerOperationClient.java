@@ -383,7 +383,7 @@ public class ContainerOperationClient implements ScmClient {
       Pipeline pipeline) throws IOException {
     XceiverClientSpi client = null;
     try {
-      client = xceiverClientManager.acquireClient(pipeline);
+      client = xceiverClientManager.acquireClientForReadData(pipeline);
       ReadContainerResponseProto response =
           ContainerProtocolCalls.readContainer(client, containerID, null);
       if (LOG.isDebugEnabled()) {

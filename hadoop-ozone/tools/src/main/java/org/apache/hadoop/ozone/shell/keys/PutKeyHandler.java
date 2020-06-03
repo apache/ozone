@@ -63,6 +63,11 @@ public class PutKeyHandler extends KeyHandler {
           + "Default is specified in the cluster-wide config.")
   private ReplicationFactor replicationFactor;
 
+  @Option(names = {"-t", "--type"},
+      description = "Replication type of the new key. (use RATIS or " +
+          "STAND_ALONE) Default is specified in the cluster-wide config.")
+  private ReplicationType replicationType;
+
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException, OzoneClientException {
@@ -85,8 +90,11 @@ public class PutKeyHandler extends KeyHandler {
           getConf().getInt(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT));
     }
 
-    ReplicationType replicationType = ReplicationType.valueOf(
-        getConf().get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT));
+    if (replicationType == null) {
+      replicationType = ReplicationType.valueOf(
+          getConf()
+              .get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT));
+    }
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = vol.getBucket(bucketName);
 

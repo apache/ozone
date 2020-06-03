@@ -51,12 +51,14 @@ import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdatesHandler;
 import org.apache.hadoop.ozone.recon.tasks.OMUpdateEventBatch;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.io.FileUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_CONNECTION_REQUEST_TIMEOUT;
@@ -68,11 +70,6 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SNAPS
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INTERVAL;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SOCKET_TIMEOUT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_SOCKET_TIMEOUT_DEFAULT;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
 import static org.apache.ratis.proto.RaftProtos.RaftPeerRole.LEADER;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
@@ -94,7 +91,6 @@ public class OzoneManagerServiceProviderImpl
       LoggerFactory.getLogger(OzoneManagerServiceProviderImpl.class);
   private URLConnectionFactory connectionFactory;
 
-  private final CloseableHttpClient httpClient;
   private File omSnapshotDBParentDir = null;
   private String omDBSnapshotUrl;
 
@@ -124,8 +120,17 @@ public class OzoneManagerServiceProviderImpl
       ReconUtils reconUtils,
       OzoneManagerProtocol ozoneManagerClient) {
 
+    int connectionTimeout = (int) configuration.getTimeDuration(
+        RECON_OM_CONNECTION_TIMEOUT,
+        RECON_OM_CONNECTION_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
+    int connectionRequestTimeout = (int)configuration.getTimeDuration(
+        RECON_OM_CONNECTION_REQUEST_TIMEOUT,
+        RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
+
     connectionFactory =
-        URLConnectionFactory.newDefaultURLConnectionFactory(configuration);
+        URLConnectionFactory.newDefaultURLConnectionFactory(connectionTimeout,
+            connectionRequestTimeout, configuration);
+
     String ozoneManagerHttpAddress = configuration.get(OMConfigKeys
         .OZONE_OM_HTTP_ADDRESS_KEY);
 
@@ -136,26 +141,6 @@ public class OzoneManagerServiceProviderImpl
         OZONE_RECON_OM_SNAPSHOT_DB_DIR);
 
     HttpConfig.Policy policy = HttpConfig.getHttpPolicy(configuration);
-
-    int socketTimeout = (int) configuration.getTimeDuration(
-        RECON_OM_SOCKET_TIMEOUT, RECON_OM_SOCKET_TIMEOUT_DEFAULT,
-            TimeUnit.MILLISECONDS);
-    int connectionTimeout = (int) configuration.getTimeDuration(
-        RECON_OM_CONNECTION_TIMEOUT,
-        RECON_OM_CONNECTION_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
-    int connectionRequestTimeout = (int)configuration.getTimeDuration(
-        RECON_OM_CONNECTION_REQUEST_TIMEOUT,
-        RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
-
-    RequestConfig config = RequestConfig.custom()
-        .setConnectTimeout(socketTimeout)
-        .setConnectionRequestTimeout(connectionTimeout)
-        .setSocketTimeout(connectionRequestTimeout).build();
-
-    httpClient = HttpClientBuilder
-        .create()
-        .setDefaultRequestConfig(config)
-        .build();
 
     omDBSnapshotUrl = "http://" + ozoneManagerHttpAddress +
         OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
@@ -246,6 +231,7 @@ public class OzoneManagerServiceProviderImpl
     omMetadataManager.stop();
     scheduler.shutdownNow();
     metrics.unRegister();
+    connectionFactory.destroy();
   }
 
   /**
@@ -276,6 +262,11 @@ public class OzoneManagerServiceProviderImpl
     return omLeaderUrl;
   }
 
+  private boolean isOmSpengoEnabled() {
+    return configuration.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
+        .equals("kerberos");
+  }
+
   /**
    * Method to obtain current OM DB Snapshot.
    * @return DBCheckpoint instance.
@@ -287,11 +278,14 @@ public class OzoneManagerServiceProviderImpl
     File targetFile = new File(omSnapshotDBParentDir, snapshotFileName +
         ".tar.gz");
     try {
-      try (InputStream inputStream = reconUtils.makeHttpCall(connectionFactory,
-          getOzoneManagerSnapshotUrl())) {
-        FileUtils.copyInputStreamToFile(inputStream, targetFile);
-      }
-
+      SecurityUtil.doAsLoginUser(() -> {
+        try (InputStream inputStream = reconUtils.makeHttpCall(
+            connectionFactory, getOzoneManagerSnapshotUrl(),
+            isOmSpengoEnabled())) {
+          FileUtils.copyInputStreamToFile(inputStream, targetFile);
+        }
+        return null;
+      });
       // Untar the checkpoint file.
       Path untarredDbDir = Paths.get(omSnapshotDBParentDir.getAbsolutePath(),
           snapshotFileName);

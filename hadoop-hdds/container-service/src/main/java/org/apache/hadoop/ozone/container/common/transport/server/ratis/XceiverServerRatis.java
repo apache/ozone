@@ -62,6 +62,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -778,10 +779,15 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private static List<ThreadPoolExecutor> createChunkExecutors(
       ConfigurationSource conf) {
     // TODO create single pool with N threads if using non-incremental chunks
-    final int threadCount = conf.getInt(
+    final int threadCountPerDisk = conf.getInt(
         OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT);
-    ThreadPoolExecutor[] executors = new ThreadPoolExecutor[threadCount];
+
+    final int numberOfDisks =
+        MutableVolumeSet.getDatanodeStorageDirs(conf).size();
+
+    ThreadPoolExecutor[] executors =
+        new ThreadPoolExecutor[threadCountPerDisk * numberOfDisks];
     for (int i = 0; i < executors.length; i++) {
       ThreadFactory threadFactory = new ThreadFactoryBuilder()
           .setDaemon(true)

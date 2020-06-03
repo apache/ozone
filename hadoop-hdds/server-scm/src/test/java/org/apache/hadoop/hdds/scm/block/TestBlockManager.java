@@ -151,8 +151,9 @@ public class TestBlockManager {
     factor = HddsProtos.ReplicationFactor.THREE;
     type = HddsProtos.ReplicationType.RATIS;
 
-    blockManager.handleSafeModeTransition(
-        new SCMSafeModeManager.SafeModeStatus(false, false));
+
+    blockManager.onMessage(
+        new SCMSafeModeManager.SafeModeStatus(false, false), null);
   }
 
   @After
@@ -247,8 +248,8 @@ public class TestBlockManager {
 
   @Test
   public void testAllocateBlockFailureInSafeMode() throws Exception {
-    blockManager.handleSafeModeTransition(
-        new SCMSafeModeManager.SafeModeStatus(true, true));
+    blockManager.onMessage(
+        new SCMSafeModeManager.SafeModeStatus(true, true), null);
     // Test1: In safe mode expect an SCMException.
     thrown.expectMessage("SafeModePrecheck failed for "
         + "allocateBlock");

@@ -22,6 +22,16 @@ package org.apache.hadoop.ozone.loadgenerators;
  * Interface for load generator.
  */
 public abstract class LoadGenerator {
+  /*
+   * The implemented LoadGenerators constructors should have the
+   * constructor with the signature as following
+   * class NewLoadGen implements LoadGenerator {
+   *
+   *   NewLoadGen(DataBuffer buffer, LoadBucket bucket) {
+   *     // Add code here
+   *   }
+   * }
+   */
 
   private final String keyNameDelimiter = "_";
 

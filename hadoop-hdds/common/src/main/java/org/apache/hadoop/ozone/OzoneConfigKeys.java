@@ -157,8 +157,8 @@ public final class OzoneConfigKeys {
    * */
   public static final String OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY =
       "ozone.client.stream.buffer.flush.delay";
-  public static final boolean OOZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY_DEFAULT =
-      false;
+  public static final boolean OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY_DEFAULT =
+      true;
 
   // This defines the overall connection limit for the connection pool used in
   // RestClient.
@@ -380,6 +380,9 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CLIENT_VERIFY_CHECKSUM =
       "ozone.client.verify.checksum";
   public static final boolean OZONE_CLIENT_VERIFY_CHECKSUM_DEFAULT = true;
+  public static final String OZONE_CLIENT_READ_TIMEOUT
+          = "ozone.client.read.timeout";
+  public static final String OZONE_CLIENT_READ_TIMEOUT_DEFAULT = "30s";
   public static final String OZONE_ACL_AUTHORIZER_CLASS =
       "ozone.acl.authorizer.class";
   public static final String OZONE_ACL_AUTHORIZER_CLASS_DEFAULT =
@@ -390,6 +393,10 @@ public final class OzoneConfigKeys {
       "ozone.acl.enabled";
   public static final boolean OZONE_ACL_ENABLED_DEFAULT =
       false;
+  public static final String OZONE_S3_VOLUME_NAME =
+          "ozone.s3g.volume.name";
+  public static final String OZONE_S3_VOLUME_NAME_DEFAULT =
+          "s3v";
   public static final String OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY =
       "ozone.s3.token.max.lifetime";
   public static final String OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY_DEFAULT = "3m";
@@ -424,10 +431,15 @@ public final class OzoneConfigKeys {
   public static final int OZONE_FREON_HTTPS_BIND_PORT_DEFAULT = 9885;
   public static final String
       OZONE_FREON_HTTP_KERBEROS_PRINCIPAL_KEY =
-      "ozone.freon.http.kerberos.principal";
+      "ozone.freon.http.auth.kerberos.principal";
   public static final String
       OZONE_FREON_HTTP_KERBEROS_KEYTAB_FILE_KEY =
-      "ozone.freon.http.kerberos.keytab";
+      "ozone.freon.http.auth.kerberos.keytab";
+  public static final String OZONE_FREON_HTTP_AUTH_TYPE =
+      "ozone.freon.http.auth.type";
+  public static final String OZONE_FREON_HTTP_AUTH_CONFIG_PREFIX =
+      "ozone.freon.http.auth.";
+
 
   public static final String OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY =
       "ozone.network.topology.aware.read";

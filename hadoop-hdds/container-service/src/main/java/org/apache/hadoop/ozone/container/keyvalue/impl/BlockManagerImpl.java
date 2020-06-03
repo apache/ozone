@@ -25,8 +25,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 
-import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -47,6 +45,10 @@ import java.util.Map;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BCSID_MISMATCH;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_BLOCK_COMMIT_SEQUENCE_ID_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_BLOCK_COUNT_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_CONTAINER_BYTES_USED_KEY;
+
 /**
  * This class is for performing block related operations on the KeyValue
  * Container.
@@ -54,8 +56,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 public class BlockManagerImpl implements BlockManager {
 
   static final Logger LOG = LoggerFactory.getLogger(BlockManagerImpl.class);
-  private static byte[] blockCommitSequenceIdKey =
-          DFSUtil.string2Bytes(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
+
 
   private ConfigurationSource config;
 
@@ -107,8 +108,8 @@ public class BlockManagerImpl implements BlockManager {
         // transaction is reapplied in the ContainerStateMachine on restart.
         // It also implies that the given block must already exist in the db.
         // just log and return
-        LOG.warn("blockCommitSequenceId {} in the Container Db is greater than"
-            + " the supplied value {}. Ignoring it",
+        LOG.debug("blockCommitSequenceId {} in the Container Db is greater"
+                + " than the supplied value {}. Ignoring it",
             containerBCSId, bcsId);
         return data.getSize();
       }
@@ -116,11 +117,25 @@ public class BlockManagerImpl implements BlockManager {
       BatchOperation batch = new BatchOperation();
       batch.put(Longs.toByteArray(data.getLocalID()),
           data.getProtoBufMessage().toByteArray());
-      batch.put(blockCommitSequenceIdKey,
-          Longs.toByteArray(bcsId));
+      batch.put(DB_BLOCK_COMMIT_SEQUENCE_ID_KEY, Longs.toByteArray(bcsId));
+
+      // Set Bytes used, this bytes used will be updated for every write and
+      // only get committed for every put block. In this way, when datanode
+      // is up, for computation of disk space by container only committed
+      // block length is used, And also on restart the blocks committed to DB
+      // is only used to compute the bytes used. This is done to keep the
+      // current behavior and avoid DB write during write chunk operation.
+      batch.put(DB_CONTAINER_BYTES_USED_KEY,
+          Longs.toByteArray(container.getContainerData().getBytesUsed()));
+
+      // Set Block Count for a container.
+      batch.put(DB_BLOCK_COUNT_KEY,
+          Longs.toByteArray(container.getContainerData().getKeyCount() + 1));
+
       db.getStore().writeBatch(batch);
+
       container.updateBlockCommitSequenceId(bcsId);
-      // Increment keycount here
+      // Increment block count finally here for in-memory.
       container.getContainerData().incrKeyCount();
       if (LOG.isDebugEnabled()) {
         LOG.debug(
@@ -224,11 +239,21 @@ public class BlockManagerImpl implements BlockManager {
       // are not atomic. Leaving it here since the impact is refusing
       // to delete a Block which might have just gotten inserted after
       // the get check.
-      byte[] kKey = Longs.toByteArray(blockID.getLocalID());
+      byte[] blockKey = Longs.toByteArray(blockID.getLocalID());
 
       getBlockByID(db, blockID);
-      db.getStore().delete(kKey);
-      // Decrement blockcount here
+
+      // Update DB to delete block and set block count and bytes used.
+      BatchOperation batch = new BatchOperation();
+      batch.delete(blockKey);
+      // Update DB to delete block and set block count.
+      // No need to set bytes used here, as bytes used is taken care during
+      // delete chunk.
+      batch.put(DB_BLOCK_COUNT_KEY,
+          Longs.toByteArray(container.getContainerData().getKeyCount() - 1));
+      db.getStore().writeBatch(batch);
+
+      // Decrement block count here
       container.getContainerData().decrKeyCount();
     }
   }

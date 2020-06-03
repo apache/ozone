@@ -83,4 +83,14 @@ public class HddsDatanodeHttpServer extends BaseHttpServer {
   protected String getEnabledKey() {
     return HddsConfigKeys.HDDS_DATANODE_HTTP_ENABLED_KEY;
   }
+
+  @Override
+  protected String getHttpAuthType() {
+    return HddsConfigKeys.HDDS_DATANODE_HTTP_AUTH_TYPE;
+  }
+
+  @Override
+  protected String getHttpAuthConfigPrefix() {
+    return HddsConfigKeys.OZONE_DATANODE_HTTP_AUTH_CONFIG_PREFIX;
+  }
 }
