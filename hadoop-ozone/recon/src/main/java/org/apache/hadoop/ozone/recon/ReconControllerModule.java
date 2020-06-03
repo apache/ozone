@@ -136,7 +136,8 @@ public class ReconControllerModule extends AbstractModule {
       RECON_DAO_LIST.forEach(aClass -> {
         try {
           bind(aClass).toConstructor(
-              (Constructor) aClass.getConstructor(Configuration.class));
+              (Constructor) aClass.getConstructor(Configuration.class))
+              .in(Singleton.class);
         } catch (NoSuchMethodException e) {
           LOG.error("Error creating DAO {} ", aClass.getSimpleName(), e);
         }
