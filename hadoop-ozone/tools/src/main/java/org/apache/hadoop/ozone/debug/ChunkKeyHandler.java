@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
-import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
@@ -40,9 +39,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
-import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
-import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.keys.KeyHandler;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -84,12 +80,8 @@ public class ChunkKeyHandler  extends KeyHandler {
         ContainerOperationClient(createOzoneConfiguration());
     xceiverClientManager = containerOperationClient
         .getXceiverClientManager();
-    OmTransport omTransport = OmTransportFactory
-        .create(getConf(), UserGroupInformation.getCurrentUser(), null);
-    ozoneManagerClient = TracingUtil.createProxy(
-        new OzoneManagerProtocolClientSideTranslatorPB(
-            omTransport, clientId.toString()),
-        OzoneManagerProtocol.class, getConf());
+    ozoneManagerClient = client.getObjectStore().getClientProxy()
+            .getOzoneManagerClient();
     address.ensureKeyAddress();
     JsonObject jsonObj = new JsonObject();
     JsonElement element;
