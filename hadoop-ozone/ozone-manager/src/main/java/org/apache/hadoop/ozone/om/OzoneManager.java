@@ -2467,7 +2467,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       for (OMNodeDetails peerNode : peerNodes) {
         ServiceInfo.Builder peerOmServiceInfoBuilder = ServiceInfo.newBuilder()
             .setNodeType(HddsProtos.NodeType.OM)
-            .setHostname(peerNode.getAddress().getHostName())
+            .setHostname(peerNode.getHostName())
             .addServicePort(ServicePort.newBuilder()
                 .setType(ServicePort.Type.RPC)
                 .setValue(peerNode.getRpcPort())
