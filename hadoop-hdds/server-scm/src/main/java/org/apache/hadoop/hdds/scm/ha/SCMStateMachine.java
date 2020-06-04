@@ -37,13 +37,14 @@ import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
  */
 public class SCMStateMachine extends BaseStateMachine {
 
-  private final Map<RequestType, Object> handlers;
+  private final Map<RequestType, SCMStateMachineHandler> handlers;
 
   public SCMStateMachine() {
     this.handlers = new EnumMap<>(RequestType.class);
   }
 
-  public void registerHandler(RequestType type, Object handler) {
+  public void registerHandler(final RequestType type,
+                              final SCMStateMachineHandler handler) {
     handlers.put(type, handler);
   }
 
@@ -65,7 +66,7 @@ public class SCMStateMachine extends BaseStateMachine {
   private Message process(final SCMRatisRequest request)
       throws Exception {
     try {
-      final Object handler = handlers.get(request.getType());
+      final SCMStateMachineHandler handler = handlers.get(request.getType());
 
       if (handler == null) {
         throw new IOException("No handler found for request type " +

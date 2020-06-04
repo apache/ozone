@@ -85,8 +85,8 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   }
 
   @Override
-  public void registerStateMachineHandler(final RequestType handlerType,
-                                          final Object handler) {
+  public void registerStateMachineHandler(
+      final RequestType handlerType, final SCMStateMachineHandler handler) {
     scmStateMachine.registerHandler(handlerType, handler);
   }
 

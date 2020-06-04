@@ -91,8 +91,8 @@ public final class MockSCMHAManager implements SCMHAManager {
     }
 
     @Override
-    public void registerStateMachineHandler(final RequestType handlerType,
-                                            final Object handler) {
+    public void registerStateMachineHandler(
+        final RequestType handlerType, final SCMStateMachineHandler handler) {
       handlers.put(handlerType, handler);
     }
 

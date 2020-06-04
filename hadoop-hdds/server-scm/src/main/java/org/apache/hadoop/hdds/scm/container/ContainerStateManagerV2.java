@@ -22,6 +22,7 @@ import java.util.Set;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.scm.ha.SCMStateMachineHandler;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 
 /**
@@ -42,7 +43,7 @@ import org.apache.hadoop.hdds.scm.metadata.Replicate;
  * 4. The declaration should throw RaftException
  *
  */
-public interface ContainerStateManagerV2 {
+public interface ContainerStateManagerV2 extends SCMStateMachineHandler {
 
   //TODO: Rename this to ContainerStateManager
 

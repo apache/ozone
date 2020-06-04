@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.ha.SCMStateMachineHandler;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 
 import java.io.IOException;
@@ -31,7 +32,7 @@ import java.util.NavigableSet;
  * Manages the state of pipelines in SCM.
  * TODO Rename to PipelineStateManager once the old state manager is removed.
  */
-public interface StateManager {
+public interface StateManager extends SCMStateMachineHandler {
 
   /**
    * Adding pipeline would be replicated to Ratis.

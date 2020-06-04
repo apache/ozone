@@ -38,19 +38,19 @@ public class SCMHAInvocationHandler implements InvocationHandler {
       .getLogger(SCMHAInvocationHandler.class);
 
   private final RequestType requestType;
-  private final Object localHandler;
-  private final SCMRatisServer ratisHandler;
+  private final SCMStateMachineHandler handler;
+  private final SCMRatisServer ratisServer;
 
   /**
    * TODO.
    */
   public SCMHAInvocationHandler(final RequestType requestType,
-                                final Object localHandler,
-                                final SCMRatisServer ratisHandler) {
+                                final SCMStateMachineHandler handler,
+                                final SCMRatisServer ratisServer) {
     this.requestType = requestType;
-    this.localHandler = localHandler;
-    this.ratisHandler = ratisHandler;
-    ratisHandler.registerStateMachineHandler(requestType, localHandler);
+    this.handler = handler;
+    this.ratisServer = ratisServer;
+    ratisServer.registerStateMachineHandler(requestType, handler);
   }
 
   @Override
@@ -73,8 +73,8 @@ public class SCMHAInvocationHandler implements InvocationHandler {
   private Object invokeLocal(Method method, Object[] args)
       throws InvocationTargetException, IllegalAccessException {
     LOG.trace("Invoking method {} on target {} with arguments {}",
-        method, localHandler, args);
-    return method.invoke(localHandler, args);
+        method, handler, args);
+    return method.invoke(handler, args);
   }
 
   /**
@@ -82,8 +82,8 @@ public class SCMHAInvocationHandler implements InvocationHandler {
    */
   private Object invokeRatis(Method method, Object[] args)
       throws Exception {
-    LOG.trace("Invoking method {} on target {}", method, ratisHandler);
-    final SCMRatisResponse response =  ratisHandler.submitRequest(
+    LOG.trace("Invoking method {} on target {}", method, ratisServer);
+    final SCMRatisResponse response =  ratisServer.submitRequest(
         SCMRatisRequest.of(requestType, method.getName(), args));
     if (response.isSuccess()) {
       return response.getResult();
