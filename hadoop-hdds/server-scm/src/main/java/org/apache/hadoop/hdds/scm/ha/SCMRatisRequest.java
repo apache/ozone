@@ -93,7 +93,7 @@ public final class SCMRatisRequest {
     final List<MethodArgument> args = new ArrayList<>();
     for (Object argument : arguments) {
       final MethodArgument.Builder argBuilder = MethodArgument.newBuilder();
-      argBuilder.setType(argument.getClass().getCanonicalName());
+      argBuilder.setType(argument.getClass().getName());
       if (argument instanceof GeneratedMessage) {
         argBuilder.setValue(((GeneratedMessage) argument).toByteString());
       } else if (argument instanceof ProtocolMessageEnum) {
