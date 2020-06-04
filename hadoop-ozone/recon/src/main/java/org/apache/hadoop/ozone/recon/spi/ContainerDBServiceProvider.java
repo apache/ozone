@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.hadoop.ozone.recon.schema.tables.pojos.MissingContainers;
+import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 
 /**
  * The Recon Container DB Service interface.
@@ -169,5 +169,5 @@ public interface ContainerDBServiceProvider {
    *
    * @return List of MissingContainers.
    */
-  List<MissingContainers> getMissingContainers();
+  List<UnhealthyContainers> getMissingContainers();
 }
