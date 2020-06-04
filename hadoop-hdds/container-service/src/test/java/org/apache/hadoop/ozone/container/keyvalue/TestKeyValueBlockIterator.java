@@ -28,11 +28,11 @@ import java.util.UUID;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -280,7 +280,7 @@ public class TestKeyValueBlockIterator {
         BlockID blockID = new BlockID(containerId, i);
         BlockData blockData = new BlockData(blockID);
         blockData.setChunks(chunkList);
-        metadataStore.getStore().put(DFSUtil.string2Bytes(OzoneConsts
+        metadataStore.getStore().put(StringUtils.string2Bytes(OzoneConsts
             .DELETING_KEY_PREFIX + blockID.getLocalID()), blockData
             .getProtoBufMessage().toByteArray());
       }

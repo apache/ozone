@@ -48,6 +48,9 @@ public final class ReconConstants {
   public static final String RECON_QUERY_PREVKEY = "prevKey";
   public static final String PREV_CONTAINER_ID_DEFAULT_VALUE = "0";
   public static final String RECON_QUERY_LIMIT = "limit";
+  public static final String RECON_QUERY_VOLUME = "volume";
+  public static final String RECON_QUERY_BUCKET = "bucket";
+  public static final String RECON_QUERY_FILE_SIZE = "fileSize";
 
   public static final String RECON_SCM_CONTAINER_DB =
       "recon-" + CONTAINER_DB_SUFFIX;

@@ -68,7 +68,9 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.pojos.ContainerHistory;
+import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -405,8 +407,18 @@ public class TestContainerEndpoint {
 
     // Add missing containers to the database
     long missingSince = System.currentTimeMillis();
-    containerSchemaManager.addMissingContainer(1L, missingSince);
-
+    UnhealthyContainers missing = new UnhealthyContainers();
+    missing.setContainerId(1L);
+    missing.setInStateSince(missingSince);
+    missing.setActualReplicaCount(0);
+    missing.setExpectedReplicaCount(3);
+    missing.setReplicaDelta(3);
+    missing.setContainerState(
+        ContainerSchemaDefinition.UnHealthyContainerStates.MISSING.toString());
+    ArrayList<UnhealthyContainers> missingList =
+        new ArrayList<UnhealthyContainers>();
+    missingList.add(missing);
+    containerSchemaManager.insertUnhealthyContainerRecords(missingList);
     // Add container history for id 1
     containerSchemaManager.upsertContainerHistory(1L, "host1", 1L);
     containerSchemaManager.upsertContainerHistory(1L, "host2", 2L);
