@@ -84,7 +84,7 @@ public final class SCMRatisResponse {
 
     final SCMRatisResponseProto response =
         SCMRatisResponseProto.newBuilder()
-            .setType(result.getClass().getCanonicalName())
+            .setType(result.getClass().getName())
             .setValue(value)
         .build();
     return Message.valueOf(
