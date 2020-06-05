@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.conf;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 
 /**
  * Reflection utilities for configuration injection.
@@ -49,6 +50,12 @@ public final class ConfigurationReflectionUtil {
       String prefix) {
     for (Field field : configurationClass.getDeclaredFields()) {
       if (field.isAnnotationPresent(Config.class)) {
+        if ((field.getModifiers() & Modifier.FINAL) != 0) {
+          throw new ConfigurationException(String.format(
+              "Trying to set final field %s#%s, probably indicates misplaced " +
+                  "@Config annotation",
+              configurationClass.getSimpleName(), field.getName()));
+        }
 
         String fieldLocation =
             configurationClass + "." + field.getName();

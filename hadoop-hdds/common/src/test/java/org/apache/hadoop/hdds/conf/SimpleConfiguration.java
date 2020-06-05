@@ -50,7 +50,7 @@ public class SimpleConfiguration extends SimpleConfigurationParent {
   @PostConstruct
   public void validate() {
     if (port < 0) {
-      throw new NumberFormatException("Please use a postitive port number");
+      throw new NumberFormatException("Please use a positive port number");
     }
   }
 
