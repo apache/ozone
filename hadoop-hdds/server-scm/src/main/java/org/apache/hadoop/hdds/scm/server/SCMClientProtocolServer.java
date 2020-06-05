@@ -27,8 +27,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -592,12 +590,7 @@ public class SCMClientProtocolServer implements
    * @return List of Datanodes that match the NodeState.
    */
   private List<DatanodeDetails> queryNodeState(HddsProtos.NodeState nodeState) {
-    List<DatanodeDetails> returnList = new ArrayList<>();
-    List<DatanodeDetails> tmp = scm.getScmNodeManager().getNodes(nodeState);
-    if ((tmp != null) && (tmp.size() > 0)) {
-      returnList.addAll(tmp);
-    }
-    return returnList;
+    return scm.getScmNodeManager().getNodes(nodeState);
   }
 
   @Override
