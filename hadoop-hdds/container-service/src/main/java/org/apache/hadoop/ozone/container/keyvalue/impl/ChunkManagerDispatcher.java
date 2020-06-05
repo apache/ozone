@@ -70,11 +70,11 @@ public class ChunkManagerDispatcher implements ChunkManager {
   }
 
   @Override
-  public void finishWriteChunk(KeyValueContainer kvContainer, BlockID blockID,
-      ChunkInfo info) throws IOException {
+  public void finishWriteChunks(KeyValueContainer kvContainer,
+      BlockData blockData) throws IOException {
 
     selectHandler(kvContainer)
-        .finishWriteChunk(kvContainer, blockID, info);
+        .finishWriteChunks(kvContainer, blockData);
   }
 
   @Override
