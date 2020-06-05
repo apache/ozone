@@ -173,7 +173,7 @@ public class RDBStore implements DBStore {
         dbLocation.getAbsolutePath());
     List<TableConfig> columnFamiliesInDb = bytes.stream()
         .map(cfbytes -> new TableConfig(StringUtils.bytes2String(cfbytes),
-            DBProfile.DISK.getColumnFamilyOptions()))
+            DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE.getColumnFamilyOptions()))
         .collect(Collectors.toList());
     if (LOG.isDebugEnabled()) {
       LOG.debug("Found column Families in DB : {}",
