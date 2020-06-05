@@ -672,6 +672,9 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     case UNHEALTHY:
       state = ContainerReplicaProto.State.UNHEALTHY;
       break;
+    case DELETED:
+      state = ContainerReplicaProto.State.DELETED;
+      break;
     default:
       throw new StorageContainerException("Invalid Container state found: " +
           containerData.getContainerID(), INVALID_CONTAINER_STATE);

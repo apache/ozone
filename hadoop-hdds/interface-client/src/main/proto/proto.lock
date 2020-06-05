@@ -276,6 +276,10 @@
               {
                 "name": "INVALID",
                 "integer": 6
+              },
+              {
+                "name": "DELETED",
+                "integer": 7
               }
             ]
           },
