@@ -175,7 +175,7 @@ public class RDBStore implements DBStore {
         .collect(Collectors.toList());
     if (LOG.isDebugEnabled()) {
       LOG.debug("Found column Families in DB : {}",
-          Arrays.toString(columnFamiliesInDb.toArray()));
+          columnFamiliesInDb);
     }
     return columnFamiliesInDb;
   }
