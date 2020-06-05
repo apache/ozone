@@ -421,10 +421,7 @@ public class KeyValueHandler extends Handler {
       Preconditions.checkNotNull(blockData);
 
       if (!request.getPutBlock().hasEof() || request.getPutBlock().getEof()) {
-        for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
-          chunkManager.finishWriteChunk(kvContainer, blockData.getBlockID(),
-              ChunkInfo.getFromProtoBuf(chunkInfo));
-        }
+        chunkManager.finishWriteChunks(kvContainer, blockData);
       }
 
       long bcsId =
@@ -773,7 +770,7 @@ public class KeyValueHandler extends Handler {
       // here. There is no need to maintain this info in openContainerBlockMap.
       chunkManager
           .writeChunk(kvContainer, blockID, chunkInfo, data, dispatcherContext);
-      chunkManager.finishWriteChunk(kvContainer, blockID, chunkInfo);
+      chunkManager.finishWriteChunks(kvContainer, blockData);
 
       List<ContainerProtos.ChunkInfo> chunks = new LinkedList<>();
       chunks.add(chunkInfoProto);
@@ -1069,5 +1066,7 @@ public class KeyValueHandler extends Handler {
     }
     // Avoid holding write locks for disk operations
     container.delete();
+    container.getContainerData().setState(State.DELETED);
+    sendICR(container);
   }
 }

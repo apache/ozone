@@ -56,6 +56,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY;
 
 /**
  * Tests failure detection and handling in BlockOutputStream Class.
@@ -119,6 +120,7 @@ public class TestBlockOutputStreamWithFailures {
                     "watch.request.timeout",
             3, TimeUnit.SECONDS);
     conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 15);
+    conf.setBoolean(OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY, false);
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(7)
         .setTotalPipelineNumLimit(10).setBlockSize(blockSize)
         .setChunkSize(chunkSize).setStreamBufferFlushSize(flushSize)

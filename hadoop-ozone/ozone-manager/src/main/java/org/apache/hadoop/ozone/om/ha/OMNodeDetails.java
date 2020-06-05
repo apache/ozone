@@ -129,8 +129,24 @@ public final class OMNodeDetails {
     return rpcAddress;
   }
 
-  public InetAddress getAddress() {
+  public boolean isHostUnresolved() {
+    return rpcAddress.isUnresolved();
+  }
+
+  public InetAddress getInetAddress() {
     return rpcAddress.getAddress();
+  }
+
+  public String getHostName() {
+    return rpcAddress.getHostName();
+  }
+
+  public String getRatisHostPortStr() {
+    StringBuilder hostPort = new StringBuilder();
+    hostPort.append(getHostName())
+        .append(":")
+        .append(ratisPort);
+    return hostPort.toString();
   }
 
   public int getRatisPort() {

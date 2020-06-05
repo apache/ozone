@@ -19,6 +19,8 @@
 package org.apache.hadoop.fs.ozone;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeoutException;
@@ -37,9 +39,12 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import org.apache.commons.io.IOUtils;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -49,6 +54,7 @@ import static org.junit.Assert.fail;
 
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -278,6 +284,29 @@ public class TestOzoneFileSystem {
     fileStatuses = o3fs.listStatus(parent);
     assertEquals("FileStatus did not return all children of the directory",
         3, fileStatuses.length);
+  }
+
+  @Test
+  public void testListStatusWithIntermediateDir() throws Exception {
+    setupOzoneFileSystem();
+    String keyName = "object-dir/object-name";
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setAcls(Collections.emptyList())
+        .setLocationInfoList(new ArrayList<>())
+        .build();
+
+    OpenKeySession session = cluster.getOzoneManager().openKey(keyArgs);
+    cluster.getOzoneManager().commitKey(keyArgs, session.getId());
+
+    Path parent = new Path("/");
+    FileStatus[] fileStatuses = fs.listStatus(parent);
+
+    // the number of immediate children of root is 1
+    Assert.assertEquals(1, fileStatuses.length);
+    cluster.getOzoneManager().deleteKey(keyArgs);
   }
 
   /**

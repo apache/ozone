@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.ozone;
 
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.thirdparty.io.grpc.Context;
 import org.apache.ratis.thirdparty.io.grpc.Metadata;
@@ -148,15 +148,15 @@ public final class OzoneConsts {
 
 
   public static final byte[] DB_BLOCK_COUNT_KEY =
-      DFSUtil.string2Bytes(OzoneConsts.BLOCK_COUNT);
+      StringUtils.string2Bytes(OzoneConsts.BLOCK_COUNT);
   public static final byte[] DB_CONTAINER_BYTES_USED_KEY =
-      DFSUtil.string2Bytes(OzoneConsts.CONTAINER_BYTES_USED);
+      StringUtils.string2Bytes(OzoneConsts.CONTAINER_BYTES_USED);
   public static final byte[] DB_PENDING_DELETE_BLOCK_COUNT_KEY =
-      DFSUtil.string2Bytes(PENDING_DELETE_BLOCK_COUNT);
+      StringUtils.string2Bytes(PENDING_DELETE_BLOCK_COUNT);
   public static final byte[] DB_CONTAINER_DELETE_TRANSACTION_KEY =
-      DFSUtil.string2Bytes(DELETE_TRANSACTION_KEY_PREFIX);
+      StringUtils.string2Bytes(DELETE_TRANSACTION_KEY_PREFIX);
   public static final byte[] DB_BLOCK_COMMIT_SEQUENCE_ID_KEY =
-      DFSUtil.string2Bytes(BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
+      StringUtils.string2Bytes(BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
 
 
 
