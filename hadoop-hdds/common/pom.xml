@@ -179,8 +179,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
-
-
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdds-interface-client</artifactId>
+    </dependency>
   </dependencies>
 
   <build>
@@ -208,84 +210,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       </extension>
     </extensions>
     <plugins>
-      <plugin>
-        <groupId>com.salesforce.servicelibs</groupId>
-        <artifactId>proto-backwards-compatibility</artifactId>
-      </plugin>
-      <plugin>
-        <groupId>org.xolstice.maven.plugins</groupId>
-        <artifactId>protobuf-maven-plugin</artifactId>
-        <version>${protobuf-maven-plugin.version}</version>
-        <extensions>true</extensions>
-        <executions>
-          <execution>
-            <id>compile-protoc-3</id>
-            <goals>
-              <goal>compile</goal>
-              <goal>test-compile</goal>
-              <goal>compile-custom</goal>
-              <goal>test-compile-custom</goal>
-            </goals>
-            <configuration>
-              <protocArtifact>
-                com.google.protobuf:protoc:${protobuf-compile.version}:exe:${os.detected.classifier}
-              </protocArtifact>
-              <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
-              <includes>
-                <include>DatanodeContainerProtocol.proto</include>
-              </includes>
-              <outputDirectory>target/generated-sources/java</outputDirectory>
-              <clearOutputDirectory>false</clearOutputDirectory>
-              <pluginId>grpc-java</pluginId>
-              <pluginArtifact>
-                io.grpc:protoc-gen-grpc-java:${grpc-compile.version}:exe:${os.detected.classifier}
-              </pluginArtifact>
-            </configuration>
-          </execution>
-          <execution>
-            <id>compile-protoc-2</id>
-            <goals>
-              <goal>compile</goal>
-              <goal>test-compile</goal>
-            </goals>
-            <configuration>
-              <protocArtifact>
-                com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}
-              </protocArtifact>
-              <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
-              <includes>
-                <include>StorageContainerLocationProtocol.proto</include>
-                <include>hdds.proto</include>
-                <include>ScmBlockLocationProtocol.proto</include>
-                <include>SCMSecurityProtocol.proto</include>
-              </includes>
-              <outputDirectory>target/generated-sources/java</outputDirectory>
-              <clearOutputDirectory>false</clearOutputDirectory>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <artifactId>maven-antrun-plugin</artifactId>
-        <executions>
-          <execution>
-            <phase>generate-sources</phase>
-            <configuration>
-              <tasks>
-                <replace token="com.google.protobuf" value="org.apache.ratis.thirdparty.com.google.protobuf"
-                  dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/datanode/proto">
-                </replace>
-                <replace token="io.grpc" value="org.apache.ratis.thirdparty.io.grpc"
-                  dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/datanode/proto">
-                </replace>
-              </tasks>
-            </configuration>
-            <goals>
-              <goal>run</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
       <plugin>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-maven-plugins</artifactId>
