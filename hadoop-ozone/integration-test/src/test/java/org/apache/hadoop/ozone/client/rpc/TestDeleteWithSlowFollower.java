@@ -73,7 +73,6 @@ import org.junit.Test;
  * Tests delete key operation with a slow follower in the datanode
  * pipeline.
  */
-@Ignore("HDDS-3330")
 public class TestDeleteWithSlowFollower {
 
   private static MiniOzoneCluster cluster;
