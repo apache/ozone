@@ -101,7 +101,7 @@ public class RDBStore implements DBStore {
           cf -> !families.contains(cf)).collect(Collectors.toList());
       if (CollectionUtils.isNotEmpty(extraCf)) {
         LOG.info("Found the following extra column families in existing DB : " +
-                "{}", Arrays.toString(extraCf.toArray()));
+                "{}", extraCf);
         extraCf.forEach(cf -> columnFamilyDescriptors.add(cf.getDescriptor()));
       }
 
