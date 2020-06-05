@@ -58,6 +58,13 @@ jobs:
         - uses: ./.github/buildenv
           with:
              args: ./hadoop-ozone/dev-support/checks/unit.sh
+        - uses: ./.github/buildenv
+          if: github.repository == 'apache/hadoop-ozone'
+          with:
+            args: ./hadoop-ozone/dev-support/checks/sonar.sh
+          env:
+            SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         - uses: actions/upload-artifact@master
           if: always()
           with:
@@ -220,34 +227,3 @@ jobs:
           with:
             name: it-ozone
             path: mnt/ozone/target/integration
-  coverage:
-    name: coverage
-    runs-on: ubuntu-18.04
-    needs:
-       - it-ozone
-       - it-hdds-om
-       - it-client
-       - it-filesystem-contract
-       - it-filesystem
-       - it-freon
-       - unit
-    steps:
-       - uses: actions/checkout@v2
-       - uses: ./.github/buildenv
-         with:
-            args: ./hadoop-ozone/dev-support/checks/build.sh
-       - uses: actions/download-artifact@v2
-         with:
-            path: target/artifacts
-       - run: ./.github/coverage-report.sh
-       - uses: ./.github/buildenv
-         if: github.repository == 'apache/hadoop-ozone'
-         with:
-           args: ./hadoop-ozone/dev-support/checks/sonar.sh
-         env:
-           SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
-           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-       - uses: actions/upload-artifact@master
-         with:
-           name: coverage
-           path: target/coverage
