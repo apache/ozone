@@ -47,7 +47,13 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>guava</artifactId>
       <scope>compile</scope>
     </dependency>
-
+    <!-- for the annotations in OzoneConfiguration -->
+    <dependency>
+      <groupId>com.sun.xml.bind</groupId>
+      <artifactId>jaxb-impl</artifactId>
+      <version>2.1.13</version>
+      <scope>provided</scope>
+    </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
