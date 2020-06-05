@@ -124,8 +124,8 @@ Note: Sanjay is added to the authors as the original proposal of this approach.
 
  * Let bucket mount operation create a link bucket.  Links are like regular buckets, stored in DB the same way, but with two new, optional pieces of information: source volume and bucket.
  * Existing bucket operations (info, delete, ACL) work on the link object in the same way as they do on regular buckets.  No new link-specific RPC is required.
- * Links are followed for key operations (list, get, put, etc.).  Checks for existence of the source bucket, as well as ACL, are performed at this time (similar to symlinks).  This avoids the need for reverse checks for each bucket delete or ACL change.
- * The same permission is required on both the link and the source bucket to be able to perform the operation via the link.  This allows finer-grained access control.
+ * Links are followed for key operations (list, get, put, etc.).  Read permission on the link is required for this.
+ * Checks for existence of the source bucket, as well as ACL, are performed only when following the link (similar to symlinks).  Source bucket is not checked when operating on the link bucket itself (eg. deleting it).  This avoids the need for reverse checks for each bucket delete or ACL change.
  * Bucket links are generic, not restricted to the `s3v` volume.
 
 ## Alternative approaches and reasons to reject
