@@ -42,7 +42,7 @@ mkdir -p target/coverage-classes
 #Unzip all the classes from the last build
 find hadoop-ozone/dist/target/*/share/ozone/lib -name "hadoop-*.jar" | \
     grep -E 'hadoop-ozone-|hadoop-hdds-' | \
-    grep -v -E 'hadoop2|hadoop3|tests' | \
+    grep -v -E 'legacy|current|tests' | \
     xargs -n1 unzip -o -q -d target/coverage-classes
 
 #Exclude some classes from the coverage
