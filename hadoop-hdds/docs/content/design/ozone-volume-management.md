@@ -102,27 +102,30 @@ This is an easy an fast method, but with this approach not all the volumes are a
  To implement the second (expose ozone buckets as s3 buckets) we have multiple options:
 
    1. Store some metadata (** s3 bucket name **) on each of the buckets
-   2. Implement a **bind mount** mechanic which makes it possible to *mount* any volume/buckets to the specific "s3" volume.
+   2. Implement a **symbolic link** mechanism which makes it possible to *link* to any volume/buckets from the "s3" volume.
 
 The first approach required a secondary cache table and it violates the naming hierarchy. The s3 bucket name is a global unique name, therefore it's more than just a single attribute on a specific object. It's more like an element in the hierachy. For this reason the second option is proposed:
 
 For example if the default s3 volume is `s3v`
 
  1. Every new buckets created via s3 interface will be placed under the `/s3v` volume
- 2. Any existing **Ozone** buckets can be exposed with mounting it to s3: `ozone sh mount /vol1/bucket1 /s3v/s3bucketname`
+ 2. Any existing **Ozone** buckets can be exposed by linking to it from s3: `ozone sh bucket link /vol1/bucket1 /s3v/s3bucketname`
 
 **Lock contention problem**
 
 One possible problem with using just one volume is using the locks of the same volume for all the S3 buckets (thanks Xiaoyu). But this shouldn't be a big problem.
 
  1. We hold only a READ lock. Most of the time it can acquired without any contention (writing lock is required only to change owner / set quota)
- 2. For symbolic link / bind mounts the read lock is only required for the first read. After that the lock of the referenced volume will be used. In case of any performance problem multiple volumes + bind mounts can be used.
+ 2. For symbolic link the read lock is only required for the first read. After that the lock of the referenced volume will be used. In case of any performance problem multiple volumes and links can be used.
 
 Note: Sanjay is added to the authors as the original proposal of this approach.
 
 #### Implementation details
 
- * Let bucket mount operation create a link bucket.  Links are like regular buckets, stored in DB the same way, but with two new, optional pieces of information: source volume and bucket.
+ * `bucket link` operation creates a link bucket.  Links are like regular buckets, stored in DB the same way, but with two new, optional pieces of information: source volume and bucket.  (The bucket being referenced by the link is called "source", not "target", to follow symlink terminology.)
+ * Link buckets share the namespace with regular buckets.  If a bucket or link with the same name already exists, a `BUCKET_ALREADY_EXISTS` result is returned.
+ * Link buckets are not inherently specific to a user, access is restricted only by ACL.
+ * Links are persistent, ie. they can be used until they are deleted.
  * Existing bucket operations (info, delete, ACL) work on the link object in the same way as they do on regular buckets.  No new link-specific RPC is required.
  * Links are followed for key operations (list, get, put, etc.).  Read permission on the link is required for this.
  * Checks for existence of the source bucket, as well as ACL, are performed only when following the link (similar to symlinks).  Source bucket is not checked when operating on the link bucket itself (eg. deleting it).  This avoids the need for reverse checks for each bucket delete or ACL change.
