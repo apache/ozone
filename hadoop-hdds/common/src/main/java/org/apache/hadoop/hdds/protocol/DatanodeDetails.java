@@ -241,7 +241,7 @@ public class DatanodeDetails extends NodeImpl implements
 
   @Override
   public String toString() {
-    return uuid.toString() + "{" +
+    return strUuid + "{" +
         "ip: " +
         ipAddress +
         ", host: " +
