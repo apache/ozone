@@ -96,6 +96,9 @@ public class RDBStore implements DBStore {
     this.writeOptions = writeOptions;
 
     try {
+      // This logic has been added to support old column families that have
+      // been removed, or those that may have been created in a future version.
+      // TODO : Revisit this logic during upgrade implementation.
       List<TableConfig> columnFamiliesInDb = getColumnFamiliesInExistingDb();
       List<TableConfig> extraCf = columnFamiliesInDb.stream().filter(
           cf -> !families.contains(cf)).collect(Collectors.toList());
