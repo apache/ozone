@@ -1066,5 +1066,7 @@ public class KeyValueHandler extends Handler {
     }
     // Avoid holding write locks for disk operations
     container.delete();
+    container.getContainerData().setState(State.DELETED);
+    sendICR(container);
   }
 }

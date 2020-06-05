@@ -185,6 +185,7 @@ message ContainerReplicaProto {
     CLOSED = 4;
     UNHEALTHY = 5;
     INVALID = 6;
+    DELETED = 7;
   }
   required int64 containerID = 1;
   required State state = 2;
