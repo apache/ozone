@@ -99,7 +99,7 @@ public class RDBStore implements DBStore {
       List<TableConfig> columnFamiliesInDb = getColumnFamiliesInExistingDb();
       List<TableConfig> extraCf = columnFamiliesInDb.stream().filter(
           cf -> !families.contains(cf)).collect(Collectors.toList());
-      if (CollectionUtils.isNotEmpty(extraCf)) {
+      if (!extraCf.isEmpty()) {
         LOG.info("Found the following extra column families in existing DB : " +
                 "{}", extraCf);
         extraCf.forEach(cf -> columnFamilyDescriptors.add(cf.getDescriptor()));
