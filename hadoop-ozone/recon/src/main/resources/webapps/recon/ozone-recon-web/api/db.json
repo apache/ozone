@@ -18,6 +18,7 @@
     "datanodes": [
       {
         "hostname": "localhost1.storage.enterprise.com",
+        "uuid": "b590734e-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
         "lastHeartbeat": 1574728876059,
         "storageReport": {
@@ -44,6 +45,7 @@
       },
       {
         "hostname": "localhost2.storage.enterprise.com",
+        "uuid": "b5907812-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
         "lastHeartbeat": 1574724876059,
         "storageReport": {
@@ -70,6 +72,7 @@
       },
       {
         "hostname": "localhost3.storage.enterprise.com",
+        "uuid": "b5907934-a5f2-11ea-bb37-0242ac130002",
         "state": "STALE",
         "lastHeartbeat": 1343544879843,
         "storageReport": {
@@ -102,6 +105,7 @@
       },
       {
         "hostname": "localhost4.storage.enterprise.com",
+        "uuid": "b5907a06-a5f2-11ea-bb37-0242ac130002",
         "state": "DEAD",
         "lastHeartbeat": 1074724876059,
         "storageReport": {
@@ -115,6 +119,7 @@
       },
       {
         "hostname": "localhost5.storage.enterprise.com",
+        "uuid": "b5907ac4-a5f2-11ea-bb37-0242ac130002",
         "state": "DECOMMISSIONING",
         "lastHeartbeat": 1574724876059,
         "storageReport": {
@@ -141,6 +146,7 @@
       },
       {
         "hostname": "localhost6.storage.enterprise.com",
+        "uuid": "b5907b82-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
         "lastHeartbeat": 1574724876059,
         "storageReport": {
@@ -167,6 +173,7 @@
       },
       {
         "hostname": "localhost7.storage.enterprise.com",
+        "uuid": "b5907c40-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
         "lastHeartbeat": 1574724876059,
         "storageReport": {
@@ -199,6 +206,7 @@
       },
       {
         "hostname": "localhost8.storage.enterprise.com",
+        "uuid": "b5907cf4-a5f2-11ea-bb37-0242ac130002",
         "state": "DECOMMISSIONED",
         "lastHeartbeat": 1574724876059,
         "storageReport": {
@@ -225,6 +233,7 @@
       },
       {
         "hostname": "localhost9.storage.enterprise.com",
+        "uuid": "b5907f4c-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
         "lastHeartbeat": 1574724874011,
         "storageReport": {
@@ -251,6 +260,7 @@
       },
       {
         "hostname": "localhost10.storage.enterprise.com",
+        "uuid": "b590801e-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
         "lastHeartbeat": 1574723876959,
         "storageReport": {
@@ -283,6 +293,7 @@
       },
       {
         "hostname": "localhost11.storage.enterprise.com",
+        "uuid": "b59080e6-a5f2-11ea-bb37-0242ac130002",
         "state": "STALE",
         "lastHeartbeat": 1474724876783,
         "storageReport": {
@@ -309,6 +320,7 @@
       },
       {
         "hostname": "localhost12.storage.enterprise.com",
+        "uuid": "b59081a4-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
         "lastHeartbeat": 1574724796532,
         "storageReport": {
@@ -506,5 +518,55 @@
         "ModificationTime": "2019-11-26T21:19:22.251Z"
       }
     ]
-  }
+  },
+  "fileSizeCounts": [
+    {
+      "volume": "vol1",
+      "bucket": "bucket1",
+      "fileSize": 1024,
+      "count": 56
+    },
+    {
+      "volume": "vol1",
+      "bucket": "bucket1",
+      "fileSize": 4096,
+      "count": 25
+    },
+    {
+      "volume": "vol1",
+      "bucket": "bucket1",
+      "fileSize": 32768,
+      "count": 312
+    },
+    {
+      "volume": "vol1",
+      "bucket": "bucket1",
+      "fileSize": 131072,
+      "count": 78
+    },
+    {
+      "volume": "vol1",
+      "bucket": "bucket2",
+      "fileSize": 1024,
+      "count": 123
+    },
+    {
+      "volume": "vol1",
+      "bucket": "bucket2",
+      "fileSize": 131072,
+      "count": 187
+    },
+    {
+      "volume": "vol2",
+      "bucket": "bucket1",
+      "fileSize": 1024,
+      "count": 54
+    },
+    {
+      "volume": "vol2",
+      "bucket": "bucket2",
+      "fileSize": 131072,
+      "count": 217
+    }
+  ]
 }
