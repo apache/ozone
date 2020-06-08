@@ -545,6 +545,8 @@ public final class OzoneManagerRatisServer {
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_DEFAULT);
 
+    RaftServerConfigKeys.Snapshot.setAutoTriggerThreshold(properties,
+        snapshotAutoTriggerThreshold);
     return properties;
   }
 
