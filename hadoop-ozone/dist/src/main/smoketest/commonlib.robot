@@ -65,3 +65,9 @@ Kinit test user
     ${hostname} =       Execute                    hostname
     Set Suite Variable  ${TEST_USER}               ${user}/${hostname}@EXAMPLE.COM
     Wait Until Keyword Succeeds      2min       10sec      Execute            kinit -k ${user}/${hostname}@EXAMPLE.COM -t /etc/security/keytabs/${keytab}
+
+Compare key to local file
+    [arguments]    ${key}    ${file}
+    Execute        ozone sh key get -f ${key} /tmp/tempkey
+    Execute        diff -q ${file} /tmp/tempkey
+    Execute        rm -f /tmp/tempkey

@@ -38,6 +38,7 @@ import picocli.CommandLine.ParentCommand;
         InfoBucketHandler.class,
         ListBucketHandler.class,
         CreateBucketHandler.class,
+        LinkBucketHandler.class,
         DeleteBucketHandler.class,
         AddAclBucketHandler.class,
         RemoveAclBucketHandler.class,

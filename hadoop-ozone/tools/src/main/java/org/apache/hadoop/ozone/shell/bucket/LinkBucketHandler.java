@@ -18,33 +18,39 @@
 package org.apache.hadoop.ozone.shell.bucket;
 
 import org.apache.hadoop.hdds.protocol.StorageType;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.shell.Handler;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
+import picocli.CommandLine.Parameters;
 
 import java.io.IOException;
 
 /**
- * create bucket handler.
+ * Creates a symlink to another bucket.
  */
-@Command(name = "create",
-    description = "creates a bucket in a given volume")
-public class CreateBucketHandler extends BucketHandler {
+@Command(name = "link",
+    description = "creates a symlink to another bucket")
+public class LinkBucketHandler extends Handler {
 
-  @Option(names = {"--bucketkey", "-k"},
-      description = "bucket encryption key name")
-  private String bekName;
+  @Parameters(index = "0", arity = "1..1",
+      description = "The bucket which the link should point to.",
+      converter = BucketUri.class)
+  private OzoneAddress source;
 
-  @Option(names = {"--enforcegdpr", "-g"},
-      description = "if true, indicates GDPR enforced bucket, " +
-          "false/unspecified indicates otherwise")
-  private Boolean isGdprEnforced;
+  @Parameters(index = "1", arity = "1..1",
+      description = "Address of the link bucket",
+      converter = BucketUri.class)
+  private OzoneAddress target;
+
+  @Override
+  protected OzoneAddress getAddress() {
+    return source;
+  }
 
   /**
    * Executes create bucket.
@@ -55,27 +61,12 @@ public class CreateBucketHandler extends BucketHandler {
 
     BucketArgs.Builder bb = new BucketArgs.Builder()
         .setStorageType(StorageType.DEFAULT)
-        .setVersioning(false);
+        .setVersioning(false)
+        .setSourceVolume(source.getVolumeName())
+        .setSourceBucket(source.getBucketName());
 
-    if (isGdprEnforced != null) {
-      bb.addMetadata(OzoneConsts.GDPR_FLAG, String.valueOf(isGdprEnforced));
-    }
-
-    if (bekName != null) {
-      if (!bekName.isEmpty()) {
-        bb.setBucketEncryptionKey(bekName);
-      } else {
-        throw new IllegalArgumentException("Bucket encryption key name must" +
-            " " + "be specified to enable bucket encryption!");
-      }
-      if (isVerbose()) {
-        out().printf("Bucket Encryption enabled with Key Name: %s%n",
-            bekName);
-      }
-    }
-
-    String volumeName = address.getVolumeName();
-    String bucketName = address.getBucketName();
+    String volumeName = target.getVolumeName();
+    String bucketName = target.getBucketName();
 
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
     vol.createBucket(bucketName, bb.build());
