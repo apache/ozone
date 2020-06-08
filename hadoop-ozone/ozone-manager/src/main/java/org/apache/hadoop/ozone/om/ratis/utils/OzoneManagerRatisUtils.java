@@ -225,6 +225,12 @@ public final class OzoneManagerRatisUtils {
     }
   }
 
+  /**
+   * Obtain Transaction info from downloaded snapshot DB.
+   * @param tempConfig
+   * @return OMTransactionInfo
+   * @throws Exception
+   */
   public static OMTransactionInfo getTransactionInfoFromDownloadedSnapshot(
       OzoneConfiguration tempConfig) throws Exception {
     tempConfig.setBoolean(OZONE_OM_SKIP_INITIALIZATION_TABLES, false);
@@ -242,8 +248,20 @@ public final class OzoneManagerRatisUtils {
     return omTransactionInfo;
   }
 
-  public static boolean verifyTransactionInfo(OMTransactionInfo omTransactionInfo,
-      long lastAppliedIndex, String leaderId, Path newDBlocation) {
+  /**
+   * Verify transaction info with provided lastAppliedIndex.
+   *
+   * If transaction info transaction Index is less than or equal to
+   * lastAppliedIndex, return false, else return true.
+   * @param omTransactionInfo
+   * @param lastAppliedIndex
+   * @param leaderId
+   * @param newDBlocation
+   * @return boolean
+   */
+  public static boolean verifyTransactionInfo(
+      OMTransactionInfo omTransactionInfo, long lastAppliedIndex,
+      String leaderId, Path newDBlocation) {
     if (omTransactionInfo.getTransactionIndex() <= lastAppliedIndex) {
       OzoneManager.LOG.error("Failed to install checkpoint from OM leader: {}" +
               ". The last applied index: {} is greater than or equal to the " +
