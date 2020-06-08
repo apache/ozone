@@ -204,9 +204,7 @@ public class SCMContainerManager implements ContainerManager {
   public boolean exists(ContainerID containerID) {
     lock.lock();
     try {
-      return (containerStateManager.getContainer(containerID) != null);
-    } catch (ContainerNotFoundException e) {
-      return false;
+      return containerStateManager.isContainerExist(containerID);
     } finally {
       lock.unlock();
     }

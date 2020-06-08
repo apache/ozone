@@ -130,13 +130,11 @@ public class NodeStateMap {
    * @throws NodeNotFoundException if the node is not present
    */
   public DatanodeInfo getNodeInfo(UUID uuid) throws NodeNotFoundException {
-    lock.readLock().lock();
-    try {
-      checkIfNodeExist(uuid);
-      return nodeMap.get(uuid);
-    } finally {
-      lock.readLock().unlock();
+    DatanodeInfo info = nodeMap.get(uuid);
+    if (info == null) {
+      throw new NodeNotFoundException("Node UUID: " + uuid);
     }
+    return info;
   }
 
 

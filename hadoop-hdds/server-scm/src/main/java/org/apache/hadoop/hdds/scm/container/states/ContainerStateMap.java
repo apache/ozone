@@ -183,13 +183,21 @@ public class ContainerStateMap {
    */
   public ContainerInfo getContainerInfo(final ContainerID containerID)
       throws ContainerNotFoundException {
-    lock.readLock().lock();
-    try {
-      checkIfContainerExist(containerID);
-      return containerMap.get(containerID);
-    } finally {
-      lock.readLock().unlock();
+    ContainerInfo info = containerMap.get(containerID);
+    if (info == null) {
+      throw new ContainerNotFoundException("Container with id #" +
+          containerID.getId() + " not found.");
     }
+    return info;
+  }
+
+  /**
+   * Returns whether container exist for the given container id.
+   * @param containerID id of the container
+   * @return true if container exists, otherwise false
+   */
+  public boolean isContainerExist(final ContainerID containerID) {
+    return containerMap.containsKey(containerID);
   }
 
   /**
@@ -202,14 +210,13 @@ public class ContainerStateMap {
   public Set<ContainerReplica> getContainerReplicas(
       final ContainerID containerID) throws ContainerNotFoundException {
     Preconditions.checkNotNull(containerID);
-    lock.readLock().lock();
-    try {
-      checkIfContainerExist(containerID);
-      return Collections
-          .unmodifiableSet(replicaMap.get(containerID));
-    } finally {
-      lock.readLock().unlock();
+    Set<ContainerReplica> replicas = replicaMap.get(containerID);
+    if (replicas == null) {
+      throw new ContainerNotFoundException("Container with id #" +
+          containerID.getId() + " not found.");
     }
+
+    return Collections.unmodifiableSet(replicas);
   }
 
   /**

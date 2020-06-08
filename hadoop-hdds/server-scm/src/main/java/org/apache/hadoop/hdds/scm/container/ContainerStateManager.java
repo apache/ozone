@@ -495,6 +495,15 @@ public class ContainerStateManager {
     return containers.getContainerInfo(containerID);
   }
 
+  /**
+   * Returns whether container exist for the given container id.
+   * @param containerID id of the container
+   * @return true if container exists, otherwise false
+   */
+  boolean isContainerExist(final ContainerID containerID) {
+    return containers.isContainerExist(containerID);
+  }
+
   void close() throws IOException {
   }
 
