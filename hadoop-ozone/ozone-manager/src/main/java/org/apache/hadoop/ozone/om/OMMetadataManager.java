@@ -104,7 +104,7 @@ public interface OMMetadataManager {
   String getOzoneKey(String volume, String bucket, String key);
 
   /**
-   * Given a volume, bucket, return the corresponding DB key.
+   * Given fileHandleInfo, return the corresponding DB key.
    *
    * @param fileHandleInfo - unique keyId that is used by NFS to create a
    *                       fileHandle.

@@ -86,6 +86,11 @@ public class S3MultipartUploadCompleteResponse extends OMClientResponse {
           omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
       omMetadataManager.getKeyTable().putWithBatch(batchOperation,
           ozoneKey, omKeyInfo);
+      if (omKeyInfo.getFileHandleInfo() != 0) {
+        omMetadataManager.getKeyIdTable().putWithBatch(batchOperation,
+            omMetadataManager.getOzoneKeyIdTableKey(
+                omKeyInfo.getFileHandleInfo()), ozoneKey);
+      }
 
       if (!partsUnusedList.isEmpty()) {
         // Add unused parts to deleted key table.
