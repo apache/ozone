@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.server.http;
 
 import com.codahale.metrics.MetricRegistry;
-import org.apache.ratis.util.Preconditions;
 import io.prometheus.client.Collector;
 import io.prometheus.client.CollectorRegistry;
 import io.prometheus.client.dropwizard.DropwizardExports;
