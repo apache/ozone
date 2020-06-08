@@ -436,8 +436,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     // triggers a snapshot on the state machine.
 
     long appliedLogIndex = 0;
-    long transactionCount = 50;
-    while (appliedLogIndex <= transactionCount) {
+    while (appliedLogIndex <= getSnapshotThreshold()) {
       createKey(ozoneBucket);
       appliedLogIndex = ozoneManager.getOmRatisServer()
           .getLastAppliedTermIndex().getIndex();
@@ -465,7 +464,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
         smLastAppliedIndex >= ratisSnapshotIndex);
 
     // Add more transactions to Ratis to trigger another snapshot
-    while (appliedLogIndex <= (smLastAppliedIndex + transactionCount)) {
+    while (appliedLogIndex <= (smLastAppliedIndex + getSnapshotThreshold())) {
       createKey(ozoneBucket);
       appliedLogIndex = ozoneManager.getOmRatisServer()
           .getLastAppliedTermIndex().getIndex();

@@ -130,6 +130,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OMRatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.OzoneManagerSnapshotProvider;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
@@ -193,6 +194,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAU
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_DEFAULT;
@@ -201,10 +203,12 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_F
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SKIP_INITIALIZATION_TABLES;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
@@ -3011,6 +3015,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     DBCheckpoint omDBcheckpoint = getDBCheckpointFromLeader(leaderId);
     Path newDBlocation = omDBcheckpoint.getCheckpointLocation();
 
+    LOG.info("Downloaded checkpoint from Leader {}, in to the location {}",
+        leaderId, newDBlocation);
+
     long lastAppliedIndex = omRatisServer.getLastAppliedTermIndex().getIndex();
 
     // Check if current ratis log index is smaller than the downloaded
@@ -3019,47 +3026,38 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // proceed with installSnapshot.
 
     OMTransactionInfo omTransactionInfo = null;
-    try {
-      // Set new DB location as DB path
-      OzoneConfiguration tempConfig = getConfiguration();
 
-      Path dbDir = newDBlocation.getParent();
-      if (dbDir != null) {
-        tempConfig.set(OZONE_OM_DB_DIRS, dbDir.toString());
-      } else {
-        LOG.error("Incorrect DB location path {} received from checkpoint.",
-            newDBlocation);
-        return null;
-      }
+    // Set new DB location as DB path and verify downloaded DB transaction
+    // index.
+    OzoneConfiguration tempConfig = new OzoneConfiguration(configuration);
 
-      OMMetadataManager tempMetadataMgr =
-          new OmMetadataManagerImpl(configuration);
-
-      omTransactionInfo =
-          OMTransactionInfo.readTransactionInfo(tempMetadataMgr);
-      tempMetadataMgr.stop();
-
-      if (omTransactionInfo.getTransactionIndex() <= lastAppliedIndex) {
-        LOG.error("Failed to install checkpoint from OM leader: {}. The last " +
-                "applied index: {} is greater than or equal to the " +
-                "checkpoint's applied index: {}. Deleting the downloaded " +
-                "checkpoint {}", leaderId, lastAppliedIndex,
-            omTransactionInfo.getTransactionIndex(), newDBlocation);
-        try {
-          FileUtils.deleteFully(newDBlocation);
-        } catch (IOException e) {
-          LOG.error("Failed to fully delete the downloaded DB checkpoint {} " +
-                  "from OM leader {}.", newDBlocation,
-              leaderId, e);
-          return null;
-        }
-      }
-    } catch (Exception ex) {
-      LOG.error("Failed during checking downloaded leader transaction index " +
-          "from leader.", ex);
+    Path dbDir = newDBlocation.getParent();
+    if (dbDir != null) {
+      tempConfig.set(OZONE_OM_DB_DIRS, dbDir.toString());
+    } else {
+      LOG.error("Incorrect DB location path {} received from checkpoint.",
+          newDBlocation);
       return null;
     }
 
+    try {
+      omTransactionInfo =
+          OzoneManagerRatisUtils.getTransactionInfoFromDownloadedSnapshot(
+              tempConfig);
+    } catch (Exception ex) {
+      LOG.error("Failed during opening downloaded snapshot from " +
+          "{} to obtain transaction index", newDBlocation, ex);
+      return null;
+    }
+
+    boolean canProceed =
+        OzoneManagerRatisUtils.verifyTransactionInfo(omTransactionInfo,
+        lastAppliedIndex, leaderId, newDBlocation);
+
+    // If downloaded DB has transaction info less than current one, return.
+    if (!canProceed) {
+      return null;
+    }
 
     long leaderIndex = omTransactionInfo.getTransactionIndex();
     long leaderTerm = omTransactionInfo.getCurrentTerm();

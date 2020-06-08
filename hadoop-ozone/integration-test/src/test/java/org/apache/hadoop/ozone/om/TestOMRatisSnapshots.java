@@ -58,6 +58,7 @@ public class TestOMRatisSnapshots {
   private String scmId;
   private String omServiceId;
   private int numOfOMs = 3;
+  private static final long SNAPSHOT_THRESHOLD = 50;
   private static final int LOG_PURGE_GAP = 50;
 
   @Rule
@@ -80,6 +81,9 @@ public class TestOMRatisSnapshots {
     scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
     conf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, LOG_PURGE_GAP);
+    conf.setLong(
+        OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
+        SNAPSHOT_THRESHOLD);
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)

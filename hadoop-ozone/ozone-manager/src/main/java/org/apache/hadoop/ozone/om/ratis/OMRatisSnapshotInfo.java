@@ -25,6 +25,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_SPLIT_KEY;
+
 /**
  * This class captures the snapshotIndex and term of the latest snapshot in
  * the OM.
@@ -66,5 +68,14 @@ public class OMRatisSnapshotInfo implements SnapshotInfo {
   @Override
   public List<FileInfo> getFiles() {
     return null;
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder stringBuilder = new StringBuilder();
+    stringBuilder.append(term);
+    stringBuilder.append(TRANSACTION_INFO_SPLIT_KEY);
+    stringBuilder.append(snapshotIndex);
+    return stringBuilder.toString();
   }
 }

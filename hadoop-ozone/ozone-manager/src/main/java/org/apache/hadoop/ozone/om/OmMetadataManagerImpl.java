@@ -78,6 +78,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SKIP_INITIALIZATION_TABLES;
+
 import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -264,7 +266,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
           .setPath(Paths.get(metaDir.getPath()));
 
       this.store = addOMTablesAndCodecs(dbStoreBuilder).build();
-      initializeOmTables();
+
+      // This value will be used internally, not to be exposed to end users.
+      if (configuration.getBoolean(OZONE_OM_SKIP_INITIALIZATION_TABLES, true)) {
+        initializeOmTables();
+      }
     }
   }
 

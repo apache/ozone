@@ -234,6 +234,9 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       conf.setInt(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 100);
       conf.setInt(OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_PURGE_GAP, 100);
       conf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, 100);
+
+      conf.setInt(OMConfigKeys.
+          OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY, 100);
     }
 
     /**

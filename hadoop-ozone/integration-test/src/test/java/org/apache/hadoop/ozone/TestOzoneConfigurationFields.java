@@ -67,7 +67,9 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OMConfigKeys.OZONE_OM_NODES_KEY,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE,
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY,
-        ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR
+        ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR,
+        OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
+        OMConfigKeys.OZONE_OM_SKIP_INITIALIZATION_TABLES
         // TODO HDDS-2856
     ));
   }

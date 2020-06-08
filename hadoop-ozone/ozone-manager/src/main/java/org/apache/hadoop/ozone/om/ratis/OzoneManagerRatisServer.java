@@ -531,10 +531,19 @@ public final class OzoneManagerRatisServer {
 
     // Set auto trigger snapshot. We don't need to configure auto trigger
     // threshold in OM, as last applied index is flushed during double buffer
-    // flush automatically. The transaction info value in OM DB is used as
+    // flush automatically. (But added this property internally, so that this
+    // helps during testing, when want to trigger snapshots frequently, and
+    // which will purge logs when purge gap condition is satisfied and which
+    // will trigger installSnapshot when logs are cleaned up.)
+    // The transaction info value in OM DB is used as
     // snapshot value after restart.
+
     RaftServerConfigKeys.Snapshot.setAutoTriggerEnabled(
         properties, true);
+
+    long snapshotAutoTriggerThreshold = conf.getLong(
+        OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
+        OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_DEFAULT);
 
     return properties;
   }

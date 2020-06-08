@@ -351,7 +351,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public long takeSnapshot() throws IOException {
     LOG.info("Current Snapshot Index {}", getLastAppliedTermIndex());
-    return getLastAppliedTermIndex().getIndex();
+    long lastAppliedIndex = getLastAppliedTermIndex().getIndex();
+    ozoneManager.getMetadataManager().getStore().flush();
+    return lastAppliedIndex;
   }
 
   /**
@@ -530,14 +532,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
           omTransactionInfo.getTransactionIndex()));
       snapshotInfo.updateTermIndex(omTransactionInfo.getCurrentTerm(),
           omTransactionInfo.getTransactionIndex());
-    } else {
-      // On a newly setup OM,it will not have any transaction info in DB,
-      // use default values.
-      setLastAppliedTermIndex(TermIndex.newTermIndex(snapshotInfo.getTerm(),
-          snapshotInfo.getIndex()));
     }
 
-    LOG.info("LastAppliedIndex is set from TransactionInfo from OM DB is {}",
+    LOG.info("LastAppliedIndex is set from TransactionInfo from OM DB as {}",
         getLastAppliedTermIndex());
   }
 
