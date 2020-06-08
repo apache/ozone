@@ -138,11 +138,22 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @Override
+  public void reinitialize() throws IOException {
+    OMTransactionInfo omTransactionInfo =
+        OMTransactionInfo.readTransactionInfo(
+            ozoneManager.getMetadataManager());
+    if (omTransactionInfo != null) {
+      setLastAppliedTermIndex(TermIndex.newTermIndex(
+          omTransactionInfo.getCurrentTerm(),
+          omTransactionInfo.getTransactionIndex()));
+      snapshotInfo.updateTermIndex(omTransactionInfo.getCurrentTerm(),
+          omTransactionInfo.getTransactionIndex());
+    }
+  }
+
+  @Override
   public SnapshotInfo getLatestSnapshot() {
-    TermIndex lastAppliedIndex = getLastAppliedTermIndex();
-    LOG.info("Latest Snapshot Info {}", lastAppliedIndex);
-    snapshotInfo.updateTermIndex(lastAppliedIndex.getTerm(),
-        lastAppliedIndex.getIndex());
+    LOG.info("Latest Snapshot Info {}", snapshotInfo);
     return snapshotInfo;
   }
 
@@ -521,19 +532,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     // This is done, as we have a check in Ratis for not throwing
     // LeaderNotReadyException, it checks stateMachineIndex >= raftLog
     // nextIndex (placeHolderIndex).
-
-    OMTransactionInfo omTransactionInfo =
-        OMTransactionInfo.readTransactionInfo(
-            ozoneManager.getMetadataManager());
-
-    if (omTransactionInfo != null) {
-      setLastAppliedTermIndex(TermIndex.newTermIndex(
-          omTransactionInfo.getCurrentTerm(),
-          omTransactionInfo.getTransactionIndex()));
-      snapshotInfo.updateTermIndex(omTransactionInfo.getCurrentTerm(),
-          omTransactionInfo.getTransactionIndex());
-    }
-
+    reinitialize();
     LOG.info("LastAppliedIndex is set from TransactionInfo from OM DB as {}",
         getLastAppliedTermIndex());
   }
