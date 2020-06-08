@@ -33,6 +33,6 @@ depth, please take a look at <a href="https://issues.apache.org/jira/secure/atta
 </div>
 
 Once you create a GDPR compliant bucket, any key created in that bucket will 
-automatically by GDPR compliant.
+automatically be GDPR compliant.
 
 
