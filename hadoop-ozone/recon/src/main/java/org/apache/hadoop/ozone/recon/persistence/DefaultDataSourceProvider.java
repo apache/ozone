@@ -1,6 +1,4 @@
-package org.apache.hadoop.ozone.recon.persistence;
-
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,11 +15,11 @@ package org.apache.hadoop.ozone.recon.persistence;
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.ozone.recon.persistence;
 
 import javax.sql.DataSource;
 
 import org.apache.commons.lang3.StringUtils;
-import org.sqlite.SQLiteDataSource;
 
 import com.google.inject.Inject;
 import com.google.inject.Provider;
@@ -44,14 +42,14 @@ public class DefaultDataSourceProvider implements Provider<DataSource> {
    */
   @Override
   public DataSource get() {
-    if (StringUtils.contains(configuration.getJdbcUrl(), "sqlite")) {
-      SQLiteDataSource ds = new SQLiteDataSource();
-      ds.setUrl(configuration.getJdbcUrl());
-      return ds;
+    String jdbcUrl = configuration.getJdbcUrl();
+    if (StringUtils.contains(jdbcUrl, "derby")) {
+      return new DerbyDataSourceProvider(configuration).get();
+    } else if (StringUtils.contains(jdbcUrl, "sqlite")) {
+      return new SqliteDataSourceProvider(configuration).get();
     }
 
     BoneCPDataSource cpDataSource = new BoneCPDataSource();
-
     cpDataSource.setDriverClass(configuration.getDriverClass());
     cpDataSource.setJdbcUrl(configuration.getJdbcUrl());
     cpDataSource.setUsername(configuration.getUserName());

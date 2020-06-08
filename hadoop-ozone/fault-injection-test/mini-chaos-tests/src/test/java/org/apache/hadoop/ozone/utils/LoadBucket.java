@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.utils;
 
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.ozone.OzoneFileSystem;
@@ -29,6 +30,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import java.io.InputStream;
 import java.io.OutputStream;
+import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,10 +51,15 @@ public class LoadBucket {
   private final OzoneBucket bucket;
   private final OzoneFileSystem fs;
 
-  public LoadBucket(OzoneBucket bucket, OzoneConfiguration conf)
-      throws Exception {
+  public LoadBucket(OzoneBucket bucket, OzoneConfiguration conf,
+      String omServiceID) throws Exception {
     this.bucket = bucket;
-    this.fs = (OzoneFileSystem)FileSystem.get(getFSUri(bucket), conf);
+    if (omServiceID == null) {
+      this.fs = (OzoneFileSystem) FileSystem.get(getFSUri(bucket), conf);
+    } else {
+      this.fs = (OzoneFileSystem) FileSystem.get(getFSUri(bucket, omServiceID),
+          conf);
+    }
   }
 
   private boolean isFsOp() {
@@ -69,6 +76,16 @@ public class LoadBucket {
                        String keyName) throws Exception {
     Op writeOp = new WriteOp(fsOp, keyName, buffer);
     writeOp.execute();
+  }
+
+  public void createDirectory(String keyName) throws Exception {
+    Op dirOp = new DirectoryOp(keyName, false);
+    dirOp.execute();
+  }
+
+  public void readDirectory(String keyName) throws Exception {
+    Op dirOp = new DirectoryOp(keyName, true);
+    dirOp.execute();
   }
 
   // Read ops.
@@ -97,6 +114,12 @@ public class LoadBucket {
       bucket.getName(), bucket.getVolumeName()));
   }
 
+  private static URI getFSUri(OzoneBucket bucket, String omServiceID)
+      throws URISyntaxException {
+    return new URI(String.format("%s://%s.%s.%s/", OzoneConsts.OZONE_URI_SCHEME,
+        bucket.getName(), bucket.getVolumeName(), omServiceID));
+  }
+
   abstract class Op {
     private final boolean fsOp;
     private final String opName;
@@ -110,7 +133,7 @@ public class LoadBucket {
     }
 
     public void execute() throws Exception {
-      LOG.info("Going to {} key {}", this.opName, keyName);
+      LOG.info("Going to {}", this);
       try {
         if (fsOp) {
           Path p = new Path("/", keyName);
@@ -119,9 +142,9 @@ public class LoadBucket {
           doBucketOp(keyName);
         }
         doPostOp();
-        LOG.trace("Done: {} key {}", this.opName, keyName);
+        LOG.trace("Done: {}", this);
       } catch (Throwable t) {
-        LOG.error("Unable to {} key:{}", this.opName, keyName, t);
+        LOG.error("Unable to {}", this, t);
         throw t;
       }
     }
@@ -132,7 +155,47 @@ public class LoadBucket {
 
     @Override
     public String toString() {
-      return "opType=" + opName;
+      return "opType=" + opName + " keyName=" + keyName;
+    }
+  }
+
+  /**
+   * Create and Read Directories.
+   */
+  public class DirectoryOp extends Op {
+    private final boolean readDir;
+
+    DirectoryOp(String keyName, boolean readDir) {
+      super(true, keyName);
+      this.readDir = readDir;
+    }
+
+    @Override
+    void doFsOp(Path p) throws IOException {
+      if (readDir) {
+        FileStatus status = fs.getFileStatus(p);
+        Assert.assertTrue(status.isDirectory());
+        Assert.assertEquals(p,
+            Path.getPathWithoutSchemeAndAuthority(status.getPath()));
+      } else {
+        Assert.assertTrue(fs.mkdirs(p));
+      }
+    }
+
+    @Override
+    void doBucketOp(String key) throws IOException {
+      // nothing to do here
+    }
+
+    @Override
+    void doPostOp() throws IOException {
+      // Nothing to do here
+    }
+
+    @Override
+    public String toString() {
+      return super.toString() + " "
+          + (readDir ? "readDirectory": "writeDirectory");
     }
   }
 
@@ -166,6 +229,11 @@ public class LoadBucket {
       } finally {
         os.close();
       }
+    }
+
+    @Override
+    public String toString() {
+      return super.toString() + " buffer:" + buffer.limit();
     }
   }
 
@@ -213,6 +281,11 @@ public class LoadBucket {
         is.close();
       }
     }
+
+    @Override
+    public String toString() {
+      return super.toString() + " buffer:" + buffer.limit();
+    }
   }
 
   /**
@@ -236,6 +309,11 @@ public class LoadBucket {
     @Override
     void doPostOp() {
       // Nothing to do here
+    }
+
+    @Override
+    public String toString() {
+      return super.toString();
     }
   }
 }

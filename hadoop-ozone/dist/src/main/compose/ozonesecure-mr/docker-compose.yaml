@@ -57,6 +57,7 @@ services:
       - ../..:/opt/hadoop
     ports:
       - 9874:9874
+      - 9862:9862
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       KERBEROS_KEYTABS: om HTTP testuser
@@ -105,7 +106,7 @@ services:
     env_file:
       - ./docker-config
     environment:
-      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-lib-current-@project.version@.jar
+      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-hadoop3-@project.version@.jar
       KERBEROS_KEYTABS: rm HTTP hadoop
     command: ["yarn", "resourcemanager"]
   nm:
@@ -118,7 +119,7 @@ services:
     env_file:
       - ./docker-config
     environment:
-      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-lib-current-@project.version@.jar
+      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-hadoop3-@project.version@.jar
       WAIT_FOR: rm:8088
       KERBEROS_KEYTABS: nm HTTP
     command: ["yarn","nodemanager"]
@@ -136,7 +137,7 @@ services:
       - ./docker-config
     environment:
       KERBEROS_KEYTABS: jhs HTTP
-      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-lib-current-@project.version@.jar
+      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-hadoop3-@project.version@.jar
       WAIT_FOR: rm:8088
     command: ["yarn","timelineserver"]
 networks:

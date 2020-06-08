@@ -18,18 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.cli;
 
-import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.client.ScmClient;
-import picocli.CommandLine;
-
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DECOMMISSIONED;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DECOMMISSIONING;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -37,6 +25,21 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.TreeSet;
 import java.util.concurrent.Callable;
+
+import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.cli.container.WithScmClient;
+import org.apache.hadoop.hdds.scm.client.ScmClient;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DECOMMISSIONED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
+import picocli.CommandLine;
+import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.Spec;
 
 /**
  * Handler of printTopology command.
@@ -48,8 +51,11 @@ import java.util.concurrent.Callable;
     versionProvider = HddsVersionProvider.class)
 public class TopologySubcommand implements Callable<Void> {
 
+  @Spec
+  private CommandSpec spec;
+
   @CommandLine.ParentCommand
-  private SCMCLI parent;
+  private WithScmClient parent;
 
   private static List<HddsProtos.NodeState> stateArray = new ArrayList<>();
 
@@ -64,6 +70,10 @@ public class TopologySubcommand implements Callable<Void> {
   @CommandLine.Option(names = {"-o", "--order"},
       description = "Print Topology ordered by network location")
   private boolean order;
+
+  @CommandLine.Option(names = {"-f", "--full"},
+      description = "Print Topology with full node infos")
+  private boolean fullInfo;
 
   @Override
   public Void call() throws Exception {
@@ -110,12 +120,29 @@ public class TopologySubcommand implements Callable<Void> {
     });
   }
 
+  private String formatPortOutput(List<HddsProtos.Port> ports) {
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < ports.size(); i++) {
+      HddsProtos.Port port = ports.get(i);
+      sb.append(port.getName() + "=" + port.getValue());
+      if (i < ports.size() - 1) {
+        sb.append(",");
+      }
+    }
+    return sb.toString();
+  }
 
-  // Format "ipAddress(hostName)    networkLocation"
+  private String getAdditionNodeOutput(HddsProtos.Node node) {
+    return fullInfo ? node.getNodeID().getUuid() + "/" : "";
+  }
+
+  // Format "ipAddress(hostName):PortName1=PortValue1    networkLocation"
   private void printNodesWithLocation(Collection<HddsProtos.Node> nodes) {
     nodes.forEach(node -> {
-      System.out.print(" " + node.getNodeID().getIpAddress() + "(" +
-          node.getNodeID().getHostName() + ")");
+      System.out.print(" " + getAdditionNodeOutput(node) +
+          node.getNodeID().getIpAddress() + "(" +
+          node.getNodeID().getHostName() + ")" +
+          ":" + formatPortOutput(node.getNodeID().getPortsList()));
       System.out.println("    " +
           (node.getNodeID().getNetworkLocation() != null ?
               node.getNodeID().getNetworkLocation() : "NA"));

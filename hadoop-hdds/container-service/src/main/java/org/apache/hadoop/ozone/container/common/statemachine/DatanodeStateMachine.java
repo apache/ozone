@@ -21,35 +21,26 @@ import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.NodeReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
 import org.apache.hadoop.ozone.container.common.report.ReportManager;
-import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
-    .CloseContainerCommandHandler;
-import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
-    .ClosePipelineCommandHandler;
-import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
-    .CommandDispatcher;
-import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
-    .CreatePipelineCommandHandler;
-import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
-    .DeleteBlocksCommandHandler;
-import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
-    .DeleteContainerCommandHandler;
-import org.apache.hadoop.ozone.container.common.statemachine.commandhandler
-    .ReplicateContainerCommandHandler;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.CloseContainerCommandHandler;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ClosePipelineCommandHandler;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.CommandDispatcher;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.CreatePipelineCommandHandler;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteContainerCommandHandler;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReplicateContainerCommandHandler;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
@@ -74,7 +65,7 @@ public class DatanodeStateMachine implements Closeable {
   static final Logger LOG =
       LoggerFactory.getLogger(DatanodeStateMachine.class);
   private final ExecutorService executorService;
-  private final Configuration conf;
+  private final ConfigurationSource conf;
   private final SCMConnectionManager connectionManager;
   private StateContext context;
   private final OzoneContainer container;
@@ -90,6 +81,11 @@ public class DatanodeStateMachine implements Closeable {
   private JvmPauseMonitor jvmPauseMonitor;
   private CertificateClient dnCertClient;
   private final HddsDatanodeStopService hddsDatanodeStopService;
+  /**
+   * Used to synchronize to the OzoneContainer object created in the
+   * constructor in a non-thread-safe way - see HDDS-3116.
+   */
+  private final ReadWriteLock constructionLock = new ReentrantReadWriteLock();
 
   /**
    * Constructs a a datanode state machine.
@@ -99,11 +95,10 @@ public class DatanodeStateMachine implements Closeable {
    *                     enabled
    */
   public DatanodeStateMachine(DatanodeDetails datanodeDetails,
-      Configuration conf, CertificateClient certClient,
+      ConfigurationSource conf, CertificateClient certClient,
       HddsDatanodeStopService hddsDatanodeStopService) throws IOException {
-    OzoneConfiguration ozoneConf = new OzoneConfiguration(conf);
     DatanodeConfiguration dnConf =
-        ozoneConf.getObject(DatanodeConfiguration.class);
+        conf.getObject(DatanodeConfiguration.class);
 
     this.hddsDatanodeStopService = hddsDatanodeStopService;
     this.conf = conf;
@@ -113,8 +108,16 @@ public class DatanodeStateMachine implements Closeable {
             .setNameFormat("Datanode State Machine Thread - %d").build());
     connectionManager = new SCMConnectionManager(conf);
     context = new StateContext(this.conf, DatanodeStates.getInitState(), this);
-    container = new OzoneContainer(this.datanodeDetails,
-        ozoneConf, context, certClient);
+    // OzoneContainer instance is used in a non-thread safe way by the context
+    // past to its constructor, so we much synchronize its access. See
+    // HDDS-3116 for more details.
+    constructionLock.writeLock().lock();
+    try {
+      container = new OzoneContainer(this.datanodeDetails,
+          conf, context, certClient);
+    } finally {
+      constructionLock.writeLock().unlock();
+    }
     dnCertClient = certClient;
     nextHB = new AtomicLong(Time.monotonicNow());
 
@@ -173,7 +176,13 @@ public class DatanodeStateMachine implements Closeable {
   }
 
   public OzoneContainer getContainer() {
-    return this.container;
+    // See HDDS-3116 to explain the need for this lock
+    constructionLock.readLock().lock();
+    try {
+      return this.container;
+    } finally {
+      constructionLock.readLock().unlock();
+    }
   }
 
   /**
@@ -187,7 +196,8 @@ public class DatanodeStateMachine implements Closeable {
 
     // Start jvm monitor
     jvmPauseMonitor = new JvmPauseMonitor();
-    jvmPauseMonitor.init(conf);
+    jvmPauseMonitor
+        .init(LegacyHadoopConfigurationSource.asHadoopConfiguration(conf));
     jvmPauseMonitor.start();
 
     while (context.getState() != DatanodeStates.SHUTDOWN) {
@@ -354,6 +364,10 @@ public class DatanodeStateMachine implements Closeable {
       }
       return getLastState();
     }
+
+    public boolean isTransitionAllowedTo(DatanodeStates newState) {
+      return newState.getValue() > getValue();
+    }
   }
 
   /**
@@ -407,6 +421,7 @@ public class DatanodeStateMachine implements Closeable {
   public synchronized void stopDaemon() {
     try {
       supervisor.stop();
+      context.setShutdownGracefully();
       context.setState(DatanodeStates.SHUTDOWN);
       reportManager.shutdown();
       this.close();
@@ -434,7 +449,7 @@ public class DatanodeStateMachine implements Closeable {
    *
    * @param config
    */
-  private void initCommandHandlerThread(Configuration config) {
+  private void initCommandHandlerThread(ConfigurationSource config) {
 
     /**
      * Task that periodically checks if we have any outstanding commands.

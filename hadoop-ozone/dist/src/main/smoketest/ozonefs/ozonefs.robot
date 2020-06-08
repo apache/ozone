@@ -17,6 +17,7 @@
 Documentation       Ozonefs test
 Library             OperatingSystem
 Resource            ../commonlib.robot
+Test Timeout        5 minutes
 
 *** Variables ***
 
@@ -30,6 +31,10 @@ Create volume and bucket
     Execute             ozone sh bucket create o3://om/fstest2/bucket3
 
 Check volume from ozonefs
+    ${result} =         Execute               ozone sh volume list
+                        Should contain    ${result}         fstest
+                        Should contain    ${result}         fstest2
+                        Should Match Regexp  ${result}      "admin" : "(hadoop|testuser\/scm@EXAMPLE\.COM)"
     ${result} =         Execute               ozone fs -ls o3fs://bucket1.fstest/
 
 Run ozoneFS tests

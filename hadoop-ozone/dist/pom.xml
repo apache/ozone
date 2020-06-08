@@ -19,16 +19,16 @@
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-ozone</artifactId>
-    <version>0.5.0-SNAPSHOT</version>
+    <version>0.6.0-SNAPSHOT</version>
   </parent>
   <artifactId>hadoop-ozone-dist</artifactId>
   <name>Apache Hadoop Ozone Distribution</name>
-  <packaging>pom</packaging>
-  <version>0.5.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <version>0.6.0-SNAPSHOT</version>
   <properties>
     <file.encoding>UTF-8</file.encoding>
     <downloadSources>true</downloadSources>
-    <docker.ozone-runner.version>20191107-1</docker.ozone-runner.version>
+    <docker.ozone-runner.version>20200420-1</docker.ozone-runner.version>
   </properties>
 
   <build>
@@ -147,8 +147,7 @@
               <goal>copy-dependencies</goal>
             </goals>
             <configuration>
-              <outputDirectory>target/ozone-${ozone.version}/share/ozone/lib
-              </outputDirectory>
+              <outputDirectory>target/ozone-${ozone.version}/share/ozone/lib</outputDirectory>
               <includeScope>runtime</includeScope>
             </configuration>
           </execution>
@@ -165,12 +164,7 @@
                 <artifactItem>
                   <groupId>com.google.protobuf</groupId>
                   <artifactId>protobuf-java</artifactId>
-                  <version>3.5.1</version>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>com.google.guava</groupId>
-                  <artifactId>guava</artifactId>
-                  <version>26.0-android</version>
+                  <version>${protobuf-compile.version}</version>
                 </artifactItem>
               </artifactItems>
             </configuration>
@@ -179,7 +173,6 @@
       </plugin>
       <plugin>
         <artifactId>maven-resources-plugin</artifactId>
-        <version>3.1.0</version>
         <executions>
           <execution>
             <id>copy-compose-files</id>
@@ -331,11 +324,11 @@
       <dependencies>
         <dependency>
           <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-ozone-filesystem-lib-current</artifactId>
+          <artifactId>hadoop-ozone-filesystem-hadoop2</artifactId>
         </dependency>
         <dependency>
           <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-ozone-filesystem-lib-legacy</artifactId>
+          <artifactId>hadoop-ozone-filesystem-hadoop3</artifactId>
         </dependency>
       </dependencies>
     </profile>
@@ -434,7 +427,6 @@
           <plugin>
             <groupId>io.fabric8</groupId>
             <artifactId>docker-maven-plugin</artifactId>
-            <version>0.29.0</version>
             <executions>
               <execution>
                 <goals>
@@ -466,7 +458,6 @@
           <plugin>
             <groupId>io.fabric8</groupId>
             <artifactId>docker-maven-plugin</artifactId>
-            <version>0.29.0</version>
             <executions>
               <execution>
                 <goals>

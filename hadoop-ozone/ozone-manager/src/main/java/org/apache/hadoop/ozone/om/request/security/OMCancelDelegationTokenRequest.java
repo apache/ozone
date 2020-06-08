@@ -23,9 +23,9 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.security.OMCancelDelegationTokenResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelDelegationTokenResponseProto;
@@ -71,11 +71,8 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     OMClientResponse omClientResponse = null;
-    OMResponse.Builder omResponse =
-        OMResponse.newBuilder()
-            .setCmdType(OzoneManagerProtocolProtos.Type.CancelDelegationToken)
-            .setStatus(OzoneManagerProtocolProtos.Status.OK)
-            .setSuccess(true);
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
     OzoneTokenIdentifier ozoneTokenIdentifier = null;
     try {
       ozoneTokenIdentifier =

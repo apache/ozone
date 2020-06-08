@@ -22,6 +22,11 @@ RESULT_DIR=${RESULT_DIR:-"$COMPOSE_DIR/result"}
 RESULT_DIR_INSIDE="/tmp/smoketest/$(basename "$COMPOSE_ENV_NAME")/result"
 SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
 
+OM_HA_PARAM=""
+if [[ -n "${OM_SERVICE_ID}" ]]; then
+  OM_HA_PARAM="--om-service-id=${OM_SERVICE_ID}"
+fi
+
 ## @description create results directory, purging any prior data
 create_results_dir() {
   #delete previous results
@@ -49,7 +54,7 @@ wait_for_safemode_exit(){
 
 
      #This line checks the safemode status in scm
-     local command="ozone scmcli safemode status"
+     local command="ozone admin safemode status"
      if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
          status=$(docker-compose -f "${compose_file}" exec -T scm bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
      else
@@ -104,12 +109,15 @@ execute_robot_test(){
   OUTPUT_PATH="$RESULT_DIR_INSIDE/robot-$OUTPUT_NAME.xml"
   # shellcheck disable=SC2068
   docker-compose -f "$COMPOSE_FILE" exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
-    && docker-compose -f "$COMPOSE_FILE" exec -T -e  SECURITY_ENABLED="${SECURITY_ENABLED}" "$CONTAINER" python -m robot ${ARGUMENTS[@]} --log NONE -N "$TEST_NAME" --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" "$SMOKETEST_DIR_INSIDE/$TEST"
+    && docker-compose -f "$COMPOSE_FILE" exec -T -e SECURITY_ENABLED="${SECURITY_ENABLED}" -e OM_HA_PARAM="${OM_HA_PARAM}" -e OM_SERVICE_ID="${OM_SERVICE_ID}" "$CONTAINER" robot ${ARGUMENTS[@]} --log NONE -N "$TEST_NAME" --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" "$SMOKETEST_DIR_INSIDE/$TEST"
   local -i rc=$?
 
   export COLUMNS=500 #defaul width of docker-compose terminal output is too narrow(80)
   FULL_CONTAINER_NAME=$(docker-compose -f "$COMPOSE_FILE" ps | grep "_${CONTAINER}_" | head -n 1 | awk '{print $1}')
   docker cp "$FULL_CONTAINER_NAME:$OUTPUT_PATH" "$RESULT_DIR/"
+
+  copy_daemon_logs
+
   set -e
 
   if [[ ${rc} -gt 0 ]]; then
@@ -117,6 +125,16 @@ execute_robot_test(){
   fi
 
   return ${rc}
+}
+
+## @description Copy any 'out' files for daemon processes to the result dir
+copy_daemon_logs() {
+  local c f
+  for c in $(docker-compose -f "$COMPOSE_FILE" ps | grep "^${COMPOSE_ENV_NAME}_" | awk '{print $1}'); do
+    for f in $(docker exec "${c}" ls -1 /var/log/hadoop | grep -F '.out'); do
+      docker cp "${c}:/var/log/hadoop/${f}" "$RESULT_DIR/"
+    done
+  done
 }
 
 
@@ -130,12 +148,65 @@ execute_command_in_container(){
   set +e
 }
 
+## @description Stop a list of named containers
+## @param       List of container names, eg datanode_1 datanode_2
+stop_containers() {
+  set -e
+  docker-compose -f "$COMPOSE_FILE" --no-ansi stop $@
+  set +e
+}
+
+
+## @description Start a list of named containers
+## @param       List of container names, eg datanode_1 datanode_2
+start_containers() {
+  set -e
+  docker-compose -f "$COMPOSE_FILE" --no-ansi start $@
+  set +e
+}
+
+
+## @description wait until the port is available on the given host
+## @param The host to check for the port
+## @param The port to check for
+## @param The maximum time to wait in seconds
+wait_for_port(){
+  local host=$1
+  local port=$2
+  local timeout=$3
+
+  #Reset the timer
+  SECONDS=0
+
+  while [[ $SECONDS -lt $timeout ]]; do
+     set +e
+     docker-compose -f "${COMPOSE_FILE}" exec -T scm /bin/bash -c "nc -z $host $port"
+     status=$?
+     set -e
+     if [ $status -eq 0 ] ; then
+         echo "Port $port is available on $host"
+         return;
+     fi
+     echo "Port $port is not available on $host yet"
+     sleep 1
+   done
+   echo "Timed out waiting on $host $port to become available"
+   return 1
+}
+
 
 ## @description  Stops a docker-compose based test environment (with saving the logs)
 stop_docker_env(){
   docker-compose -f "$COMPOSE_FILE" --no-ansi logs > "$RESULT_DIR/docker-$OUTPUT_NAME.log"
   if [ "${KEEP_RUNNING:-false}" = false ]; then
      docker-compose -f "$COMPOSE_FILE" --no-ansi down
+  fi
+}
+
+## @description  Removes the given docker images if configured not to keep them (via KEEP_IMAGE=false)
+cleanup_docker_images() {
+  if [[ "${KEEP_IMAGE:-true}" == false ]]; then
+    docker image rm "$@"
   fi
 }
 

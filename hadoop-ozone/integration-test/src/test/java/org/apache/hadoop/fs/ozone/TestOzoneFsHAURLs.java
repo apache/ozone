@@ -49,8 +49,9 @@ import org.slf4j.LoggerFactory;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostPort;
 
@@ -58,6 +59,12 @@ import static org.apache.hadoop.hdds.HddsUtils.getHostPort;
  * Test client-side URI handling with Ozone Manager HA.
  */
 public class TestOzoneFsHAURLs {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   public static final Logger LOG = LoggerFactory.getLogger(
       TestOzoneFsHAURLs.class);
 
@@ -79,8 +86,6 @@ public class TestOzoneFsHAURLs {
   private final String o3fsImplValue =
       "org.apache.hadoop.fs.ozone.OzoneFileSystem";
 
-  private static final long LEADER_ELECTION_TIMEOUT = 500L;
-
   @Before
   public void init() throws Exception {
     conf = new OzoneConfiguration();
@@ -93,10 +98,6 @@ public class TestOzoneFsHAURLs {
     java.nio.file.Path metaDirPath = java.nio.file.Paths.get(path, "om-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:0");
-    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
-    conf.setTimeDuration(
-        OMConfigKeys.OZONE_OM_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
-        LEADER_ELECTION_TIMEOUT, TimeUnit.MILLISECONDS);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 3);
 
     OMStorage omStore = new OMStorage(conf);

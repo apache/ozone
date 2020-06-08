@@ -45,6 +45,10 @@ public class XceiverClientMetrics {
   private MetricsRegistry registry;
 
   public XceiverClientMetrics() {
+    init();
+  }
+
+  public void init() {
     int numEnumEntries = ContainerProtos.Type.values().length;
     this.registry = new MetricsRegistry(SOURCE_NAME);
 
@@ -92,7 +96,7 @@ public class XceiverClientMetrics {
     containerOpsLatency[type.ordinal()].add(latencyNanos);
   }
 
-  public long getContainerOpsMetrics(ContainerProtos.Type type) {
+  public long getPendingContainerOpCountMetrics(ContainerProtos.Type type) {
     return pendingOpsArray[type.ordinal()].value();
   }
 
@@ -104,6 +108,11 @@ public class XceiverClientMetrics {
   @VisibleForTesting
   public long getContainerOpCountMetrics(ContainerProtos.Type type) {
     return opsArray[type.ordinal()].value();
+  }
+
+  @VisibleForTesting
+  public void reset() {
+    init();
   }
 
   public void unRegister() {

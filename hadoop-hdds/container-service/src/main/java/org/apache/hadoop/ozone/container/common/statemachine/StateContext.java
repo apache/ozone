@@ -16,44 +16,16 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine;
 
-import com.google.common.base.Preconditions;
-import com.google.protobuf.GeneratedMessage;
-
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.PipelineAction;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerAction;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
-import org.apache.hadoop.ozone.container.common.states.DatanodeState;
-import org.apache.hadoop.ozone.container.common.states.datanode
-    .InitDatanodeState;
-import org.apache.hadoop.ozone.container.common.states.datanode
-    .RunningDatanodeState;
-import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
-import org.apache.hadoop.ozone.protocol.commands
-    .DeleteBlockCommandStatus.DeleteBlockCommandStatusBuilder;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-
-import static java.lang.Math.min;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
-import java.util.ArrayList;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -62,6 +34,26 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.ozone.container.common.states.DatanodeState;
+import org.apache.hadoop.ozone.container.common.states.datanode.InitDatanodeState;
+import org.apache.hadoop.ozone.container.common.states.datanode.RunningDatanodeState;
+import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
+import org.apache.hadoop.ozone.protocol.commands.DeleteBlockCommandStatus.DeleteBlockCommandStatusBuilder;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+
+import com.google.common.base.Preconditions;
+import com.google.protobuf.GeneratedMessage;
+import static java.lang.Math.min;
+import org.apache.commons.collections.CollectionUtils;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Current Context of State Machine.
@@ -74,13 +66,14 @@ public class StateContext {
   private final Lock lock;
   private final DatanodeStateMachine parent;
   private final AtomicLong stateExecutionCount;
-  private final Configuration conf;
-  private final Set<String> endpoints;
-  private final Map<String, List<GeneratedMessage>> reports;
-  private final Map<String, Queue<ContainerAction>> containerActions;
-  private final Map<String, Queue<PipelineAction>> pipelineActions;
+  private final ConfigurationSource conf;
+  private final Set<InetSocketAddress> endpoints;
+  private final Map<InetSocketAddress, List<GeneratedMessage>> reports;
+  private final Map<InetSocketAddress, Queue<ContainerAction>> containerActions;
+  private final Map<InetSocketAddress, Queue<PipelineAction>> pipelineActions;
   private DatanodeStateMachine.DatanodeStates state;
   private boolean shutdownOnError = false;
+  private boolean shutdownGracefully = false;
 
   /**
    * Starting with a 2 sec heartbeat frequency which will be updated to the
@@ -96,8 +89,9 @@ public class StateContext {
    * @param state  - State
    * @param parent Parent State Machine
    */
-  public StateContext(Configuration conf, DatanodeStateMachine.DatanodeStates
-      state, DatanodeStateMachine parent) {
+  public StateContext(ConfigurationSource conf,
+      DatanodeStateMachine.DatanodeStates
+          state, DatanodeStateMachine parent) {
     this.conf = conf;
     this.state = state;
     this.parent = parent;
@@ -158,16 +152,29 @@ public class StateContext {
    * @param state state.
    */
   public void setState(DatanodeStateMachine.DatanodeStates state) {
-    this.state = state;
+    if (this.state != state) {
+      if (this.state.isTransitionAllowedTo(state)) {
+        this.state = state;
+      } else {
+        LOG.warn("Ignore disallowed transition from {} to {}",
+            this.state, state);
+      }
+    }
   }
 
   /**
    * Sets the shutdownOnError. This method needs to be called when we
    * set DatanodeState to SHUTDOWN when executing a task of a DatanodeState.
-   * @param value
    */
-  private void setShutdownOnError(boolean value) {
-    this.shutdownOnError = value;
+  private void setShutdownOnError() {
+    this.shutdownOnError = true;
+  }
+
+  /**
+   * Indicate to the StateContext that StateMachine shutdown was called.
+   */
+  void setShutdownGracefully() {
+    this.shutdownGracefully = true;
   }
 
   /**
@@ -185,7 +192,7 @@ public class StateContext {
   public void addReport(GeneratedMessage report) {
     if (report != null) {
       synchronized (reports) {
-        for (String endpoint : endpoints) {
+        for (InetSocketAddress endpoint : endpoints) {
           reports.get(endpoint).add(report);
         }
       }
@@ -200,7 +207,7 @@ public class StateContext {
    *                         heartbeat.
    */
   public void putBackReports(List<GeneratedMessage> reportsToPutBack,
-                             String endpoint) {
+                             InetSocketAddress endpoint) {
     synchronized (reports) {
       if (reports.containsKey(endpoint)){
         reports.get(endpoint).addAll(0, reportsToPutBack);
@@ -214,7 +221,8 @@ public class StateContext {
    *
    * @return List of reports
    */
-  public List<GeneratedMessage> getAllAvailableReports(String endpoint) {
+  public List<GeneratedMessage> getAllAvailableReports(
+      InetSocketAddress endpoint) {
     return getReports(endpoint, Integer.MAX_VALUE);
   }
 
@@ -224,7 +232,8 @@ public class StateContext {
    *
    * @return List of reports
    */
-  public List<GeneratedMessage> getReports(String endpoint, int maxLimit) {
+  public List<GeneratedMessage> getReports(InetSocketAddress endpoint,
+                                           int maxLimit) {
     List<GeneratedMessage> reportsToReturn = new LinkedList<>();
     synchronized (reports) {
       List<GeneratedMessage> reportsForEndpoint = reports.get(endpoint);
@@ -246,7 +255,7 @@ public class StateContext {
    */
   public void addContainerAction(ContainerAction containerAction) {
     synchronized (containerActions) {
-      for (String endpoint : endpoints) {
+      for (InetSocketAddress endpoint : endpoints) {
         containerActions.get(endpoint).add(containerAction);
       }
     }
@@ -259,7 +268,7 @@ public class StateContext {
    */
   public void addContainerActionIfAbsent(ContainerAction containerAction) {
     synchronized (containerActions) {
-      for (String endpoint : endpoints) {
+      for (InetSocketAddress endpoint : endpoints) {
         if (!containerActions.get(endpoint).contains(containerAction)) {
           containerActions.get(endpoint).add(containerAction);
         }
@@ -273,7 +282,8 @@ public class StateContext {
    *
    * @return {@literal List<ContainerAction>}
    */
-  public List<ContainerAction> getAllPendingContainerActions(String endpoint) {
+  public List<ContainerAction> getAllPendingContainerActions(
+      InetSocketAddress endpoint) {
     return getPendingContainerAction(endpoint, Integer.MAX_VALUE);
   }
 
@@ -283,8 +293,9 @@ public class StateContext {
    *
    * @return {@literal List<ContainerAction>}
    */
-  public List<ContainerAction> getPendingContainerAction(String endpoint,
-                                                         int maxLimit) {
+  public List<ContainerAction> getPendingContainerAction(
+      InetSocketAddress endpoint,
+      int maxLimit) {
     List<ContainerAction> containerActionList = new ArrayList<>();
     synchronized (containerActions) {
       if (!containerActions.isEmpty() &&
@@ -319,7 +330,7 @@ public class StateContext {
        * action remains same on the given pipeline, it will end up adding it
        * multiple times here.
        */
-      for (String endpoint : endpoints) {
+      for (InetSocketAddress endpoint : endpoints) {
         Queue<PipelineAction> actionsForEndpoint =
             this.pipelineActions.get(endpoint);
         for (PipelineAction pipelineActionIter : actionsForEndpoint) {
@@ -342,8 +353,9 @@ public class StateContext {
    *
    * @return {@literal List<ContainerAction>}
    */
-  public List<PipelineAction> getPendingPipelineAction(String endpoint,
-                                                       int maxLimit) {
+  public List<PipelineAction> getPendingPipelineAction(
+      InetSocketAddress endpoint,
+      int maxLimit) {
     List<PipelineAction> pipelineActionList = new ArrayList<>();
     synchronized (pipelineActions) {
       if (!pipelineActions.isEmpty() &&
@@ -416,12 +428,13 @@ public class StateContext {
         this.setState(newState);
       }
 
-      if (this.state == DatanodeStateMachine.DatanodeStates.SHUTDOWN) {
+      if (!shutdownGracefully &&
+          this.state == DatanodeStateMachine.DatanodeStates.SHUTDOWN) {
         LOG.error("Critical error occurred in StateMachine, setting " +
             "shutDownMachine");
         // When some exception occurred, set shutdownStateMachine to true, so
         // that we can terminate the datanode.
-        setShutdownOnError(true);
+        setShutdownOnError();
       }
     }
   }
@@ -531,7 +544,7 @@ public class StateContext {
     return heartbeatFrequency.get();
   }
 
-  public void addEndpoint(String endpoint) {
+  public void addEndpoint(InetSocketAddress endpoint) {
     if (!endpoints.contains(endpoint)) {
       this.endpoints.add(endpoint);
       this.containerActions.put(endpoint, new LinkedList<>());

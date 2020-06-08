@@ -30,62 +30,56 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerDataProto.State;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerType;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .GetSmallFileRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .PutSmallFileRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.common.helpers
-    .StorageContainerException;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis
-    .DispatcherContext;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis
-    .DispatcherContext.WriteChunkStage;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume
-    .RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl;
-import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
+import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
+import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.util.AutoCloseableLock;
-import org.apache.hadoop.util.ReflectionUtils;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import static org.apache.hadoop.hdds.HddsConfigKeys
-    .HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.
-    Result.*;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CLOSED_CONTAINER_IO;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_UNHEALTHY;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DELETE_ON_OPEN_CONTAINER;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.GET_SMALL_FILE_ERROR;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_CONTAINER_STATE;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.PUT_SMALL_FILE_ERROR;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockDataResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockLengthResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getBlockResponseSuccess;
@@ -97,7 +91,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.putBlockResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
-
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -118,21 +112,21 @@ public class KeyValueHandler extends Handler {
 
   // A lock that is held during container creation.
   private final AutoCloseableLock containerCreationLock;
-  private final boolean doSyncWrite;
 
-  public KeyValueHandler(Configuration config, String datanodeId,
+  public KeyValueHandler(ConfigurationSource config, String datanodeId,
       ContainerSet contSet, VolumeSet volSet, ContainerMetrics metrics,
       Consumer<ContainerReplicaProto> icrSender) {
     super(config, datanodeId, contSet, volSet, metrics, icrSender);
     containerType = ContainerType.KeyValueContainer;
     blockManager = new BlockManagerImpl(config);
-    doSyncWrite =
-        conf.getBoolean(OzoneConfigKeys.DFS_CONTAINER_CHUNK_WRITE_SYNC_KEY,
-            OzoneConfigKeys.DFS_CONTAINER_CHUNK_WRITE_SYNC_DEFAULT);
-    chunkManager = ChunkManagerFactory.getChunkManager(config, doSyncWrite);
-    volumeChoosingPolicy = ReflectionUtils.newInstance(conf.getClass(
-        HDDS_DATANODE_VOLUME_CHOOSING_POLICY, RoundRobinVolumeChoosingPolicy
-            .class, VolumeChoosingPolicy.class), conf);
+    chunkManager = ChunkManagerFactory.createChunkManager(config);
+    try {
+      volumeChoosingPolicy = conf.getClass(
+          HDDS_DATANODE_VOLUME_CHOOSING_POLICY, RoundRobinVolumeChoosingPolicy
+              .class, VolumeChoosingPolicy.class).newInstance();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
     maxContainerSize = (long)config.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
             ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
@@ -157,45 +151,55 @@ public class KeyValueHandler extends Handler {
       ContainerCommandRequestProto request, Container container,
       DispatcherContext dispatcherContext) {
 
+    return KeyValueHandler
+        .dispatchRequest(this, request, (KeyValueContainer) container,
+            dispatcherContext);
+  }
+
+  @VisibleForTesting
+  static ContainerCommandResponseProto dispatchRequest(KeyValueHandler handler,
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer,
+      DispatcherContext dispatcherContext) {
     Type cmdType = request.getCmdType();
-    KeyValueContainer kvContainer = (KeyValueContainer) container;
+
     switch(cmdType) {
     case CreateContainer:
-      return handleCreateContainer(request, kvContainer);
+      return handler.handleCreateContainer(request, kvContainer);
     case ReadContainer:
-      return handleReadContainer(request, kvContainer);
+      return handler.handleReadContainer(request, kvContainer);
     case UpdateContainer:
-      return handleUpdateContainer(request, kvContainer);
+      return handler.handleUpdateContainer(request, kvContainer);
     case DeleteContainer:
-      return handleDeleteContainer(request, kvContainer);
+      return handler.handleDeleteContainer(request, kvContainer);
     case ListContainer:
-      return handleUnsupportedOp(request);
+      return handler.handleUnsupportedOp(request);
     case CloseContainer:
-      return handleCloseContainer(request, kvContainer);
+      return handler.handleCloseContainer(request, kvContainer);
     case PutBlock:
-      return handlePutBlock(request, kvContainer, dispatcherContext);
+      return handler.handlePutBlock(request, kvContainer, dispatcherContext);
     case GetBlock:
-      return handleGetBlock(request, kvContainer);
+      return handler.handleGetBlock(request, kvContainer);
     case DeleteBlock:
-      return handleDeleteBlock(request, kvContainer);
+      return handler.handleDeleteBlock(request, kvContainer);
     case ListBlock:
-      return handleUnsupportedOp(request);
+      return handler.handleUnsupportedOp(request);
     case ReadChunk:
-      return handleReadChunk(request, kvContainer, dispatcherContext);
+      return handler.handleReadChunk(request, kvContainer, dispatcherContext);
     case DeleteChunk:
-      return handleDeleteChunk(request, kvContainer);
+      return handler.handleDeleteChunk(request, kvContainer);
     case WriteChunk:
-      return handleWriteChunk(request, kvContainer, dispatcherContext);
+      return handler.handleWriteChunk(request, kvContainer, dispatcherContext);
     case ListChunk:
-      return handleUnsupportedOp(request);
+      return handler.handleUnsupportedOp(request);
     case CompactChunk:
-      return handleUnsupportedOp(request);
+      return handler.handleUnsupportedOp(request);
     case PutSmallFile:
-      return handlePutSmallFile(request, kvContainer, dispatcherContext);
+      return handler
+          .handlePutSmallFile(request, kvContainer, dispatcherContext);
     case GetSmallFile:
-      return handleGetSmallFile(request, kvContainer);
+      return handler.handleGetSmallFile(request, kvContainer);
     case GetCommittedBlockLength:
-      return handleGetCommittedBlockLength(request, kvContainer);
+      return handler.handleGetCommittedBlockLength(request, kvContainer);
     default:
       return null;
     }
@@ -230,8 +234,10 @@ public class KeyValueHandler extends Handler {
 
     long containerID = request.getContainerID();
 
+    ChunkLayOutVersion layoutVersion =
+        ChunkLayOutVersion.getConfiguredVersion(conf);
     KeyValueContainerData newContainerData = new KeyValueContainerData(
-        containerID, maxContainerSize, request.getPipelineID(),
+        containerID, layoutVersion, maxContainerSize, request.getPipelineID(),
         getDatanodeId());
     // TODO: Add support to add metadataList to ContainerData. Add metadata
     // to container during creation.
@@ -263,12 +269,12 @@ public class KeyValueHandler extends Handler {
     return getSuccessResponse(request);
   }
 
-  public void populateContainerPathFields(KeyValueContainer container,
-      long maxSize) throws IOException {
+  private void populateContainerPathFields(KeyValueContainer container)
+      throws IOException {
     volumeSet.readLock();
     try {
       HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(volumeSet
-          .getVolumesList(), maxSize);
+          .getVolumesList(), container.getContainerData().getMaxSize());
       String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
       container.populatePathFields(scmID, containerVolume, hddsVolumeDir);
     } finally {
@@ -410,9 +416,14 @@ public class KeyValueHandler extends Handler {
     try {
       checkContainerOpen(kvContainer);
 
-      BlockData blockData = BlockData.getFromProtoBuf(
-          request.getPutBlock().getBlockData());
+      ContainerProtos.BlockData data = request.getPutBlock().getBlockData();
+      BlockData blockData = BlockData.getFromProtoBuf(data);
       Preconditions.checkNotNull(blockData);
+
+      if (!request.getPutBlock().hasEof() || request.getPutBlock().getEof()) {
+        chunkManager.finishWriteChunks(kvContainer, blockData);
+      }
+
       long bcsId =
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
       blockData.setBlockCommitSequenceId(bcsId);
@@ -759,6 +770,7 @@ public class KeyValueHandler extends Handler {
       // here. There is no need to maintain this info in openContainerBlockMap.
       chunkManager
           .writeChunk(kvContainer, blockID, chunkInfo, data, dispatcherContext);
+      chunkManager.finishWriteChunks(kvContainer, blockData);
 
       List<ContainerProtos.ChunkInfo> chunks = new LinkedList<>();
       chunks.add(chunkInfoProto);
@@ -888,21 +900,18 @@ public class KeyValueHandler extends Handler {
   }
 
   @Override
-  public Container importContainer(final long containerID,
-      final long maxSize, final String originPipelineId,
-      final String originNodeId, final InputStream rawContainerStream,
+  public Container importContainer(ContainerData originalContainerData,
+      final InputStream rawContainerStream,
       final TarContainerPacker packer)
       throws IOException {
 
-    // TODO: Add layout version!
     KeyValueContainerData containerData =
-        new KeyValueContainerData(containerID,
-            maxSize, originPipelineId, originNodeId);
+        new KeyValueContainerData(originalContainerData);
 
     KeyValueContainer container = new KeyValueContainer(containerData,
         conf);
 
-    populateContainerPathFields(container, maxSize);
+    populateContainerPathFields(container);
     container.importContainerData(rawContainerStream, packer);
     sendICR(container);
     return container;
@@ -1025,6 +1034,18 @@ public class KeyValueHandler extends Handler {
     deleteInternal(container, force);
   }
 
+  @Override
+  public void deleteBlock(Container container, BlockData blockData)
+      throws IOException {
+    chunkManager.deleteChunks(container, blockData);
+    for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
+      ChunkInfo info = ChunkInfo.getFromProtoBuf(chunkInfo);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("block {} chunk {} deleted", blockData.getBlockID(), info);
+      }
+    }
+  }
+
   private void deleteInternal(Container container, boolean force)
       throws StorageContainerException {
     container.writeLock();
@@ -1045,5 +1066,7 @@ public class KeyValueHandler extends Handler {
     }
     // Avoid holding write locks for disk operations
     container.delete();
+    container.getContainerData().setState(State.DELETED);
+    sendICR(container);
   }
 }

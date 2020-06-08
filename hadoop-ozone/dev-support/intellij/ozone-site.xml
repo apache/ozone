@@ -24,8 +24,12 @@
     <value>localhost</value>
   </property>
   <property>
-    <name>ozone.scm.datanode.id</name>
-    <value>/tmp/datanode.id</value>
+    <name>ozone.csi.owner</name>
+    <value>hadoop</value>
+  </property>
+  <property>
+    <name>ozone.csi.socket</name>
+    <value>/tmp/csi.sock</value>
   </property>
   <property>
     <name>ozone.scm.client.address</name>
@@ -45,11 +49,7 @@
   </property>
   <property>
     <name>ozone.scm.container.size</name>
-    <value>10MB</value>
-  </property>
-  <property>
-    <name>ozone.scm.block.size</name>
-    <value>1MB</value>
+    <value>1G</value>
   </property>
   <property>
     <name>hdds.datanode.storage.utilization.critical.threshold</name>

@@ -34,19 +34,53 @@ public class RDBMetrics {
   private static final String SOURCE_NAME =
       RDBMetrics.class.getSimpleName();
 
+  private static RDBMetrics instance;
+
   public RDBMetrics() {
   }
 
-  public static RDBMetrics create() {
+  public static synchronized RDBMetrics create() {
+    if (instance != null) {
+      return instance;
+    }
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME,
+    instance = ms.register(SOURCE_NAME,
         "Rocks DB Metrics",
         new RDBMetrics());
+    return instance;
   }
 
   private @Metric MutableCounterLong numDBKeyMayExistChecks;
   private @Metric MutableCounterLong numDBKeyMayExistMisses;
 
+  private @Metric MutableCounterLong numDBKeyGetIfExistChecks;
+  private @Metric MutableCounterLong numDBKeyGetIfExistMisses;
+  private @Metric MutableCounterLong numDBKeyGetIfExistGets;
+
+
+  public long getNumDBKeyGetIfExistGets() {
+    return numDBKeyGetIfExistGets.value();
+  }
+
+  public void incNumDBKeyGetIfExistGets() {
+    this.numDBKeyGetIfExistGets.incr();
+  }
+
+  public long getNumDBKeyGetIfExistChecks() {
+    return numDBKeyGetIfExistChecks.value();
+  }
+
+  public void incNumDBKeyGetIfExistChecks() {
+    this.numDBKeyGetIfExistChecks.incr();
+  }
+
+  public long getNumDBKeyGetIfExistMisses() {
+    return numDBKeyGetIfExistMisses.value();
+  }
+
+  public void incNumDBKeyGetIfExistMisses() {
+    this.numDBKeyGetIfExistMisses.incr();
+  }
 
   public void incNumDBKeyMayExistChecks() {
     numDBKeyMayExistChecks.incr();
@@ -67,7 +101,8 @@ public class RDBMetrics {
     return numDBKeyMayExistMisses.value();
   }
 
-  public void unRegister() {
+  public static void unRegister() {
+    instance = null;
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }

@@ -19,26 +19,6 @@
 package org.apache.hadoop.ozone.container.common.volume;
 
 import javax.annotation.Nullable;
-
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
-import org.apache.hadoop.fs.StorageType;
-import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
-import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
-import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
-import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
-import org.apache.hadoop.ozone.container.common.DataNodeLayoutVersion;
-import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
-import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
-
-import org.apache.hadoop.util.DiskChecker;
-import org.apache.hadoop.util.Time;
-import org.apache.yetus.audience.InterfaceAudience;
-import org.apache.yetus.audience.InterfaceStability;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.Objects;
@@ -46,9 +26,28 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
+import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
+import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
+import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
+import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
+import org.apache.hadoop.ozone.container.common.DataNodeLayoutVersion;
+import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
+import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.util.DiskChecker;
+import org.apache.hadoop.util.Time;
+
+import com.google.common.base.Preconditions;
+import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.yetus.audience.InterfaceStability;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
- * HddsVolume represents volume in a datanode. {@link VolumeSet} maintains a
- * list of HddsVolumes, one for each volume in the Datanode.
+ * HddsVolume represents volume in a datanode. {@link MutableVolumeSet}
+ * maintains a list of HddsVolumes, one for each volume in the Datanode.
  * {@link VolumeInfo} in encompassed by this class.
  * <p>
  * The disk layout per volume is as follows:
@@ -109,7 +108,7 @@ public class HddsVolume
    */
   public static class Builder {
     private final String volumeRootStr;
-    private Configuration conf;
+    private ConfigurationSource conf;
     private StorageType storageType;
 
     private String datanodeUuid;
@@ -121,7 +120,7 @@ public class HddsVolume
       this.volumeRootStr = rootDirStr;
     }
 
-    public Builder conf(Configuration config) {
+    public Builder conf(ConfigurationSource config) {
       this.conf = config;
       return this;
     }
@@ -237,6 +236,9 @@ public class HddsVolume
     }
     if (!hddsRootDir.isDirectory()) {
       // Volume Root exists but is not a directory.
+      LOG.warn("Volume {} exists but is not a directory,"
+          + " current volume state: {}.",
+          hddsRootDir.getPath(), VolumeState.INCONSISTENT);
       return VolumeState.INCONSISTENT;
     }
     File[] files = hddsRootDir.listFiles();
@@ -246,6 +248,9 @@ public class HddsVolume
     }
     if (!getVersionFile().exists()) {
       // Volume Root is non empty but VERSION file does not exist.
+      LOG.warn("VERSION file does not exist in volume {},"
+          + " current volume state: {}.",
+          hddsRootDir.getPath(), VolumeState.INCONSISTENT);
       return VolumeState.INCONSISTENT;
     }
     // Volume Root and VERSION file exist.

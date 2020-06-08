@@ -18,7 +18,10 @@
 
 package org.hadoop.ozone.recon.schema;
 
+import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
+
 import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
 
@@ -29,9 +32,10 @@ import java.sql.SQLException;
 /**
  * Class used to create tables that are required for storing Ozone statistics.
  */
+@Singleton
 public class StatsSchemaDefinition implements ReconSchemaDefinition {
 
-  public static final String GLOBAL_STATS_TABLE_NAME = "global_stats";
+  public static final String GLOBAL_STATS_TABLE_NAME = "GLOBAL_STATS";
   private final DataSource dataSource;
 
   @Inject
@@ -42,7 +46,9 @@ public class StatsSchemaDefinition implements ReconSchemaDefinition {
   @Override
   public void initializeSchema() throws SQLException {
     Connection conn = dataSource.getConnection();
-    createGlobalStatsTable(conn);
+    if (!TABLE_EXISTS_CHECK.test(conn, GLOBAL_STATS_TABLE_NAME)) {
+      createGlobalStatsTable(conn);
+    }
   }
 
   /**

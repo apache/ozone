@@ -107,6 +107,7 @@ services:
          - ../..:/opt/hadoop
       ports:
          - 9874:9874
+         - 9862:9862
       environment:
          ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       env_file:
@@ -126,7 +127,7 @@ services:
           - ./docker-config
       environment:
           ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
-          OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-1}"
+          OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-6}"
       command: ["/opt/hadoop/bin/ozone","scm"]
       networks:
          net:

@@ -19,33 +19,24 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectReader;
-import com.fasterxml.jackson.databind.ObjectWriter;
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRoleInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .ServicePort;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.base.Preconditions;
 
 /**
  * ServiceInfo holds the config details of Ozone services.
  */
 public final class ServiceInfo {
 
-  private static final ObjectReader READER =
-      new ObjectMapper().readerFor(ServiceInfo.class);
-  private static final ObjectWriter WRITER =
-      new ObjectMapper().writerWithDefaultPrettyPrinter();
 
   /**
    * Type of node/service.
@@ -151,16 +142,18 @@ public final class ServiceInfo {
   public OzoneManagerProtocolProtos.ServiceInfo getProtobuf() {
     OzoneManagerProtocolProtos.ServiceInfo.Builder builder =
         OzoneManagerProtocolProtos.ServiceInfo.newBuilder();
+
+    List<ServicePort> servicePorts = new ArrayList<>();
+    for (Map.Entry<ServicePort.Type, Integer>
+        entry : ports.entrySet()) {
+      servicePorts.add(ServicePort.newBuilder()
+          .setType(entry.getKey())
+          .setValue(entry.getValue()).build());
+    }
+
     builder.setNodeType(nodeType)
         .setHostname(hostname)
-        .addAllServicePorts(
-            ports.entrySet().stream()
-                .map(
-                    entry ->
-                        ServicePort.newBuilder()
-                            .setType(entry.getKey())
-                            .setValue(entry.getValue()).build())
-                .collect(Collectors.toList()));
+        .addAllServicePorts(servicePorts);
     if (nodeType == NodeType.OM && omRoleInfo != null) {
       builder.setOmRole(omRoleInfo);
     }

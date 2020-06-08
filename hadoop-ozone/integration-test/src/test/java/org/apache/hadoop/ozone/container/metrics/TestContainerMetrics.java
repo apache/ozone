@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.replication.GrpcReplicationService;
 import org.apache.hadoop.ozone.container.replication.OnDemandContainerReplicationSource;
@@ -62,11 +63,19 @@ import org.mockito.Mockito;
 import java.io.File;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 
 /**
  * Test for metrics published by storage containers.
  */
 public class TestContainerMetrics {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private GrpcReplicationService createReplicationService(
       ContainerController controller) {
@@ -94,7 +103,7 @@ public class TestContainerMetrics {
 
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, path);
-      VolumeSet volumeSet = new VolumeSet(
+      VolumeSet volumeSet = new MutableVolumeSet(
           datanodeDetails.getUuidString(), conf);
       ContainerSet containerSet = new ContainerSet();
       DatanodeStateMachine stateMachine = Mockito.mock(

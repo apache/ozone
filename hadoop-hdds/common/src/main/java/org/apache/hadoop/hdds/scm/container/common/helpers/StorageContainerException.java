@@ -25,7 +25,7 @@ import java.io.IOException;
  * Exceptions thrown from the Storage Container.
  */
 public class StorageContainerException extends IOException {
-  private ContainerProtos.Result result;
+  private final ContainerProtos.Result result;
 
   /**
    * Constructs an {@code IOException} with {@code null}

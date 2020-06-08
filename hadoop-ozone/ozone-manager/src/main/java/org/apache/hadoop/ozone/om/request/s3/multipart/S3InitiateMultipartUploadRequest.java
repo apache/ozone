@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3InitiateMultipartUploadResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -59,12 +60,6 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(S3InitiateMultipartUploadRequest.class);
-
-  private enum Result {
-    SUCCESS,
-    REPLAY,
-    FAILURE
-  }
 
   public S3InitiateMultipartUploadRequest(OMRequest omRequest) {
     super(omRequest);
@@ -115,10 +110,8 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
     Result result = null;
     long objectID = OMFileRequest.getObjIDFromTxId(transactionLogIndex);
 
-    OMResponse.Builder omResponse = OMResponse.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.InitiateMultiPartUpload)
-        .setStatus(OzoneManagerProtocolProtos.Status.OK)
-        .setSuccess(true);
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
     OMClientResponse omClientResponse = null;
     try {
       // TODO to support S3 ACL later.

@@ -16,16 +16,18 @@
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-main-ozone</artifactId>
-    <version>0.5.0-SNAPSHOT</version>
+    <version>0.6.0-SNAPSHOT</version>
   </parent>
   <artifactId>hadoop-ozone</artifactId>
-  <version>0.5.0-SNAPSHOT</version>
+  <version>0.6.0-SNAPSHOT</version>
   <description>Apache Hadoop Ozone Project</description>
   <name>Apache Hadoop Ozone</name>
   <packaging>pom</packaging>
 
   <properties>
     <docker.image>apache/ozone:${project.version}</docker.image>
+    <spring.version>5.2.5.RELEASE</spring.version>
+    <jooq.version>3.11.10</jooq.version>
   </properties>
   <modules>
     <module>common</module>
@@ -33,6 +35,7 @@
     <module>ozone-manager</module>
     <module>tools</module>
     <module>integration-test</module>
+    <module>ozonefs-common</module>
     <module>ozonefs</module>
     <module>datanode</module>
     <module>s3gateway</module>
@@ -95,18 +98,55 @@
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-ozone-filesystem-lib-current</artifactId>
+        <artifactId>hadoop-ozone-filesystem-shaded</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-ozone-filesystem-lib-legacy</artifactId>
+        <artifactId>hadoop-ozone-filesystem-common</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-ozone-filesystem-hadoop3</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-ozone-filesystem-hadoop2</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-hdds-config</artifactId>
         <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-interface-client</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-test-utils</artifactId>
+        <version>${hdds.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-hadoop-dependency-client</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-hadoop-dependency-server</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-hadoop-dependency-test</artifactId>
+        <version>${hdds.version}</version>
+        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
@@ -183,34 +223,9 @@
         <version>${hdds.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.sun.xml.bind</groupId>
-        <artifactId>jaxb-impl</artifactId>
-        <version>2.3.0.1</version>
-      </dependency>
-      <dependency>
-        <groupId>com.sun.xml.bind</groupId>
-        <artifactId>jaxb-core</artifactId>
-        <version>2.3.0.1</version>
-      </dependency>
-      <dependency>
-        <groupId>javax.xml.bind</groupId>
-        <artifactId>jaxb-api</artifactId>
-        <version>2.3.0</version>
-      </dependency>
-      <dependency>
-        <groupId>javax.activation</groupId>
-        <artifactId>activation</artifactId>
-        <version>1.1.1</version>
-      </dependency>
-      <dependency>
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcprov-jdk15on</artifactId>
         <version>${bouncycastle.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>commons-lang</groupId>
-        <artifactId>commons-lang</artifactId>
-        <version>2.6</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -245,6 +260,7 @@
             <exclude>**/target/**</exclude>
             <exclude>.gitattributes</exclude>
             <exclude>.idea/**</exclude>
+            <exclude>**/.ssh/id_rsa*</exclude>
             <exclude>dev-support/*tests</exclude>
             <exclude>dev-support/checkstyle*</exclude>
             <exclude>dev-support/jdiff/**</exclude>
@@ -280,6 +296,7 @@
             <exclude>**/yarn.lock</exclude>
             <exclude>**/ozone-recon-web/build/**</exclude>
             <exclude>src/main/license/**</exclude>
+            <exclude>src/main/proto/proto.lock</exclude>
           </excludes>
         </configuration>
       </plugin>
@@ -359,8 +376,9 @@
         </property>
       </activation>
       <modules>
-        <module>ozonefs-lib-current</module>
-        <module>ozonefs-lib-legacy</module>
+        <module>ozonefs-shaded</module>
+        <module>ozonefs-hadoop2</module>
+        <module>ozonefs-hadoop3</module>
       </modules>
     </profile>
     <profile>

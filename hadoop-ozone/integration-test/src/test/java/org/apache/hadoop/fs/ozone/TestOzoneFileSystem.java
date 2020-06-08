@@ -19,11 +19,16 @@
 package org.apache.hadoop.fs.ozone;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -34,18 +39,25 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import org.apache.commons.io.IOUtils;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.After;
+import org.junit.Assert;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +65,12 @@ import org.slf4j.LoggerFactory;
  * Ozone file system tests that are not covered by contract tests.
  */
 public class TestOzoneFileSystem {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystem.class);
@@ -65,24 +83,81 @@ public class TestOzoneFileSystem {
   private int rootItemCount;
 
   @Test(timeout = 300_000)
+  public void testCreateFileShouldCheckExistenceOfDirWithSameName()
+          throws Exception {
+    /*
+     * Op 1. create file -> /d1/d2/d3/d4/key2
+     * Op 2. create dir -> /d1/d2/d3/d4/key2
+     *
+     * Reverse of the above steps
+     * Op 2. create dir -> /d1/d2/d3/d4/key3
+     * Op 1. create file -> /d1/d2/d3/d4/key3
+     *
+     * Op 3. create file -> /d1/d2/d3 (d3 as a file inside /d1/d2)
+     */
+    setupOzoneFileSystem();
+
+    Path parent = new Path("/d1/d2/d3/d4/");
+    Path file1 = new Path(parent, "key1");
+    try (FSDataOutputStream outputStream = fs.create(file1, false)) {
+      assertNotNull("Should be able to create file", outputStream);
+    }
+
+    Path dir1 = new Path("/d1/d2/d3/d4/key2");
+    fs.mkdirs(dir1);
+    try (FSDataOutputStream outputStream1 = fs.create(dir1, false)) {
+      fail("Should throw FileAlreadyExistsException");
+    } catch (FileAlreadyExistsException fae){
+      // ignore as its expected
+    }
+
+    Path file2 = new Path("/d1/d2/d3/d4/key3");
+    try (FSDataOutputStream outputStream2 = fs.create(file2, false)) {
+      assertNotNull("Should be able to create file", outputStream2);
+    }
+    try {
+      fs.mkdirs(file2);
+      fail("Should throw FileAlreadyExistsException");
+    } catch (FileAlreadyExistsException fae) {
+      // ignore as its expected
+    }
+
+    // Op 3. create file -> /d1/d2/d3 (d3 as a file inside /d1/d2)
+    Path file3 = new Path("/d1/d2/d3");
+    try (FSDataOutputStream outputStream2 = fs.create(file3, false)) {
+      fail("Should throw FileAlreadyExistsException");
+    } catch (FileAlreadyExistsException fae) {
+      // ignore as its expected
+    }
+  }
+
+  /**
+   * Make the given file and all non-existent parents into
+   * directories. Has roughly the semantics of Unix @{code mkdir -p}.
+   * {@link FileSystem#mkdirs(Path)}
+   */
+  @Test(timeout = 300_000)
+  public void testMakeDirsWithAnExistingDirectoryPath() throws Exception {
+    /*
+     * Op 1. create file -> /d1/d2/d3/d4/k1 (d3 is a sub-dir inside /d1/d2)
+     * Op 2. create dir -> /d1/d2
+     */
+    setupOzoneFileSystem();
+
+    Path parent = new Path("/d1/d2/d3/d4/");
+    Path file1 = new Path(parent, "key1");
+    try (FSDataOutputStream outputStream = fs.create(file1, false)) {
+      assertNotNull("Should be able to create file", outputStream);
+    }
+
+    Path subdir = new Path("/d1/d2/");
+    boolean status = fs.mkdirs(subdir);
+    assertTrue("Shouldn't send error if dir exists", status);
+  }
+
+  @Test(timeout = 300_000)
   public void testFileSystem() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
-        .build();
-    cluster.waitForClusterToBeReady();
-
-    // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
-    volumeName = bucket.getVolumeName();
-    bucketName = bucket.getName();
-
-    String rootPath = String.format("%s://%s.%s/",
-        OzoneConsts.OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
-
-    // Set the fs.defaultFS and start the filesystem
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
-    fs = FileSystem.get(conf);
+    setupOzoneFileSystem();
 
     testOzoneFsServiceLoader();
     o3fs = (OzoneFileSystem) fs;
@@ -109,6 +184,27 @@ public class TestOzoneFileSystem {
     if (cluster != null) {
       cluster.shutdown();
     }
+  }
+
+  private void setupOzoneFileSystem()
+          throws IOException, TimeoutException, InterruptedException {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    cluster = MiniOzoneCluster.newBuilder(conf)
+            .setNumDatanodes(3)
+            .build();
+    cluster.waitForClusterToBeReady();
+    // create a volume and a bucket to be used by OzoneFileSystem
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    volumeName = bucket.getVolumeName();
+    bucketName = bucket.getName();
+
+    String rootPath = String.format("%s://%s.%s/",
+            OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
+            bucket.getVolumeName());
+
+    // Set the fs.defaultFS and start the filesystem
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    fs = FileSystem.get(conf);
   }
 
   private void testOzoneFsServiceLoader() throws IOException {
@@ -188,6 +284,29 @@ public class TestOzoneFileSystem {
     fileStatuses = o3fs.listStatus(parent);
     assertEquals("FileStatus did not return all children of the directory",
         3, fileStatuses.length);
+  }
+
+  @Test
+  public void testListStatusWithIntermediateDir() throws Exception {
+    setupOzoneFileSystem();
+    String keyName = "object-dir/object-name";
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setAcls(Collections.emptyList())
+        .setLocationInfoList(new ArrayList<>())
+        .build();
+
+    OpenKeySession session = cluster.getOzoneManager().openKey(keyArgs);
+    cluster.getOzoneManager().commitKey(keyArgs, session.getId());
+
+    Path parent = new Path("/");
+    FileStatus[] fileStatuses = fs.listStatus(parent);
+
+    // the number of immediate children of root is 1
+    Assert.assertEquals(1, fileStatuses.length);
+    cluster.getOzoneManager().deleteKey(keyArgs);
   }
 
   /**

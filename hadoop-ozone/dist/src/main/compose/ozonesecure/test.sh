@@ -35,9 +35,11 @@ execute_robot_test scm ozonefs/ozonefs.robot
 
 execute_robot_test s3g s3
 
-execute_robot_test scm scmcli
+execute_robot_test scm admincli
 
 execute_robot_test scm recon
+
+execute_robot_test scm spnego
 
 stop_docker_env
 

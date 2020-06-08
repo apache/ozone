@@ -24,10 +24,11 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
-import org.apache.hadoop.conf.Configuration;
+
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -52,6 +53,7 @@ import java.util.function.Function;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.NO_REPLICA_FOUND;
 
 /**
  * XceiverClientManager is responsible for the lifecycle of XceiverClient
@@ -69,7 +71,7 @@ public class XceiverClientManager implements Closeable {
   private static final Logger LOG =
       LoggerFactory.getLogger(XceiverClientManager.class);
   //TODO : change this to SCM configuration class
-  private final Configuration conf;
+  private final ConfigurationSource conf;
   private final Cache<String, XceiverClientSpi> clientCache;
   private X509Certificate caCert;
 
@@ -83,12 +85,13 @@ public class XceiverClientManager implements Closeable {
    *
    * @param conf configuration
    */
-  public XceiverClientManager(Configuration conf) throws IOException {
+  public XceiverClientManager(ConfigurationSource conf) throws IOException {
     this(conf, OzoneConfiguration.of(conf).getObject(ScmClientConfig.class),
         null);
   }
 
-  public XceiverClientManager(Configuration conf, ScmClientConfig clientConf,
+  public XceiverClientManager(ConfigurationSource conf,
+      ScmClientConfig clientConf,
       String caCertPem) throws IOException {
     Preconditions.checkNotNull(clientConf);
     Preconditions.checkNotNull(conf);
@@ -166,7 +169,8 @@ public class XceiverClientManager implements Closeable {
       throws IOException {
     Preconditions.checkNotNull(pipeline);
     Preconditions.checkArgument(pipeline.getNodes() != null);
-    Preconditions.checkArgument(!pipeline.getNodes().isEmpty());
+    Preconditions.checkArgument(!pipeline.getNodes().isEmpty(),
+        NO_REPLICA_FOUND);
 
     synchronized (clientCache) {
       XceiverClientSpi info = getClient(pipeline, read);
@@ -289,6 +293,15 @@ public class XceiverClientManager implements Closeable {
     }
 
     return metrics;
+  }
+
+  /**
+   * Reset xceiver client metric.
+   */
+  public static synchronized void resetXceiverClientMetrics() {
+    if (metrics != null) {
+      metrics.reset();
+    }
   }
 
   /**

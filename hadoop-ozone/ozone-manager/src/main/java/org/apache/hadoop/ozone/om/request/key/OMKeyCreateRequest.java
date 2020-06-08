@@ -26,10 +26,10 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -55,8 +55,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -143,6 +141,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now());
     }
 
+    generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
     newCreateKeyRequest =
         createKeyRequest.toBuilder().setKeyArgs(newKeyArgs)
             .setClientID(UniqueId.next());
@@ -169,12 +168,11 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     OmKeyInfo omKeyInfo = null;
     final List< OmKeyLocationInfo > locations = new ArrayList<>();
-    Optional<FileEncryptionInfo> encryptionInfo = Optional.absent();
+
     boolean acquireLock = false;
     OMClientResponse omClientResponse = null;
-    OMResponse.Builder omResponse = OMResponse.newBuilder()
-        .setCmdType(Type.CreateKey)
-        .setStatus(Status.OK);
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
     IOException exception = null;
     Result result = null;
     try {
@@ -192,7 +190,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       // Check if Key already exists
       String dbKeyName = omMetadataManager.getOzoneKey(volumeName, bucketName,
           keyName);
-      OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable().get(dbKeyName);
+      OmKeyInfo dbKeyInfo =
+          omMetadataManager.getKeyTable().getIfExist(dbKeyName);
       if (dbKeyInfo != null) {
         // Check if this transaction is a replay of ratis logs.
         // We check only the KeyTable here and not the OpenKeyTable. In case
@@ -212,10 +211,9 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
       OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
           omMetadataManager.getBucketKey(volumeName, bucketName));
-      encryptionInfo = getFileEncryptionInfo(ozoneManager, bucketInfo);
 
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
-          keyArgs.getDataSize(), locations, encryptionInfo.orNull(),
+          keyArgs.getDataSize(), locations,  getFileEncryptionInfo(keyArgs),
           ozoneManager.getPrefixManager(), bucketInfo, trxnLogIndex,
           ozoneManager.isRatisEnabled());
 
@@ -243,7 +241,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           .setOpenVersion(openVersion).build())
           .setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponse(omResponse.build(),
-          omKeyInfo, clientID);
+          omKeyInfo, null, clientID);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

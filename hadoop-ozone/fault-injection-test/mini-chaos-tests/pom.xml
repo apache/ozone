@@ -20,9 +20,9 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <artifactId>hadoop-ozone-fault-injection-test</artifactId>
     <groupId>org.apache.hadoop</groupId>
-    <version>0.5.0-SNAPSHOT</version>
+    <version>0.6.0-SNAPSHOT</version>
   </parent>
-  <version>0.5.0-SNAPSHOT</version>
+  <version>0.6.0-SNAPSHOT</version>
   <description>Apache Hadoop Ozone Mini Ozone Chaos Tests</description>
   <name>Apache Hadoop Ozone Mini Ozone Chaos Tests</name>
 
@@ -31,6 +31,11 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdds-test-utils</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -45,9 +50,8 @@ http://maven.apache.org/xsd/maven-4.0.0.xsd">
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-common</artifactId>
+      <artifactId>hadoop-hdds-hadoop-dependency-test</artifactId>
       <scope>test</scope>
-      <type>test-jar</type>
     </dependency>
   </dependencies>
 </project>

@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart
     .S3MultipartUploadCommitPartResponse;
@@ -61,7 +62,6 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  * Handle Multipart upload commit upload part file.
  */
 public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
-
 
   private static final Logger LOG =
       LoggerFactory.getLogger(S3MultipartUploadCommitPartRequest.class);
@@ -102,10 +102,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
     IOException exception = null;
     String partName = null;
-    OMResponse.Builder omResponse = OMResponse.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.CommitMultiPartUpload)
-        .setStatus(OzoneManagerProtocolProtos.Status.OK)
-        .setSuccess(true);
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
     OMClientResponse omClientResponse = null;
     OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo = null;
     String openKey = null;
@@ -147,11 +145,6 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         throw new OMException("Failed to commit Multipart Upload key, as " +
             openKey + "entry is not found in the openKey table",
             KEY_NOT_FOUND);
-      } else {
-        // Check the OpenKeyTable if this transaction is a replay of ratis logs.
-        if (isReplay(ozoneManager, omKeyInfo, trxnLogIndex)) {
-          throw new OMReplayException();
-        }
       }
 
       // set the data size and location info list
@@ -177,48 +170,48 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         throw new OMException("No such Multipart upload is with specified " +
             "uploadId " + uploadID,
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
-      } else {
-        int partNumber = keyArgs.getMultipartNumber();
-        oldPartKeyInfo = multipartKeyInfo.getPartKeyInfo(partNumber);
-
-        // Build this multipart upload part info.
-        OzoneManagerProtocolProtos.PartKeyInfo.Builder partKeyInfo =
-            OzoneManagerProtocolProtos.PartKeyInfo.newBuilder();
-        partKeyInfo.setPartName(partName);
-        partKeyInfo.setPartNumber(partNumber);
-        partKeyInfo.setPartKeyInfo(omKeyInfo.getProtobuf());
-
-        // Add this part information in to multipartKeyInfo.
-        multipartKeyInfo.addPartKeyInfo(partNumber, partKeyInfo.build());
-
-        // Set the UpdateID to current transactionLogIndex
-        multipartKeyInfo.setUpdateID(trxnLogIndex,
-            ozoneManager.isRatisEnabled());
-
-        // OldPartKeyInfo will be deleted. Its updateID will be set in
-        // S3MultipartUplodaCommitPartResponse before being added to
-        // DeletedKeyTable.
-
-        // Add to cache.
-
-        // Delete from open key table and add it to multipart info table.
-        // No need to add cache entries to delete table, as no
-        // read/write requests that info for validation.
-        omMetadataManager.getMultipartInfoTable().addCacheEntry(
-            new CacheKey<>(multipartKey),
-            new CacheValue<>(Optional.of(multipartKeyInfo),
-                trxnLogIndex));
-
-        omMetadataManager.getOpenKeyTable().addCacheEntry(
-            new CacheKey<>(openKey),
-            new CacheValue<>(Optional.absent(), trxnLogIndex));
       }
+
+      int partNumber = keyArgs.getMultipartNumber();
+      oldPartKeyInfo = multipartKeyInfo.getPartKeyInfo(partNumber);
+
+      // Build this multipart upload part info.
+      OzoneManagerProtocolProtos.PartKeyInfo.Builder partKeyInfo =
+          OzoneManagerProtocolProtos.PartKeyInfo.newBuilder();
+      partKeyInfo.setPartName(partName);
+      partKeyInfo.setPartNumber(partNumber);
+      partKeyInfo.setPartKeyInfo(omKeyInfo.getProtobuf());
+
+      // Add this part information in to multipartKeyInfo.
+      multipartKeyInfo.addPartKeyInfo(partNumber, partKeyInfo.build());
+
+      // Set the UpdateID to current transactionLogIndex
+      multipartKeyInfo.setUpdateID(trxnLogIndex,
+          ozoneManager.isRatisEnabled());
+
+      // OldPartKeyInfo will be deleted. Its updateID will be set in
+      // S3MultipartUplodaCommitPartResponse before being added to
+      // DeletedKeyTable.
+
+      // Add to cache.
+
+      // Delete from open key table and add it to multipart info table.
+      // No need to add cache entries to delete table, as no
+      // read/write requests that info for validation.
+      omMetadataManager.getMultipartInfoTable().addCacheEntry(
+          new CacheKey<>(multipartKey),
+          new CacheValue<>(Optional.of(multipartKeyInfo),
+              trxnLogIndex));
+
+      omMetadataManager.getOpenKeyTable().addCacheEntry(
+          new CacheKey<>(openKey),
+          new CacheValue<>(Optional.absent(), trxnLogIndex));
 
       omResponse.setCommitMultiPartUploadResponse(
           MultipartCommitUploadPartResponse.newBuilder()
               .setPartName(partName));
       omClientResponse = new S3MultipartUploadCommitPartResponse(
-          omResponse.build(), multipartKey, openKey, omKeyInfo,
+          omResponse.build(), multipartKey, openKey,
           multipartKeyInfo, oldPartKeyInfo, ozoneManager.isRatisEnabled());
 
       result = Result.SUCCESS;
@@ -231,8 +224,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         result = Result.FAILURE;
         exception = ex;
         omClientResponse = new S3MultipartUploadCommitPartResponse(
-            createErrorOMResponse(omResponse, exception), multipartKey,
-            openKey, omKeyInfo, multipartKeyInfo, oldPartKeyInfo,
+            createErrorOMResponse(omResponse, exception), openKey, omKeyInfo,
             ozoneManager.isRatisEnabled());
       }
     } finally {

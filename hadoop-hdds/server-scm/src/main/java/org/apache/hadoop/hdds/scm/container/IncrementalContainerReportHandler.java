@@ -66,14 +66,17 @@ public class IncrementalContainerReportHandler extends
         final DatanodeDetails dd = report.getDatanodeDetails();
         final ContainerID id = ContainerID.valueof(
             replicaProto.getContainerID());
-        nodeManager.addContainer(dd, id);
+        if (!replicaProto.getState().equals(
+            ContainerReplicaProto.State.DELETED)) {
+          nodeManager.addContainer(dd, id);
+        }
         processContainerReplica(dd, replicaProto);
       } catch (ContainerNotFoundException e) {
         success = false;
         LOG.warn("Container {} not found!", replicaProto.getContainerID());
       } catch (NodeNotFoundException ex) {
         success = false;
-        LOG.error("Received ICR from unknown datanode {} {}",
+        LOG.error("Received ICR from unknown datanode {}",
             report.getDatanodeDetails(), ex);
       } catch (IOException e) {
         success = false;
@@ -82,12 +85,7 @@ public class IncrementalContainerReportHandler extends
       }
     }
 
-    if (success) {
-      getContainerManager().notifyContainerReportProcessing(false, true);
-    } else {
-      getContainerManager().notifyContainerReportProcessing(false, false);
-    }
-
+    getContainerManager().notifyContainerReportProcessing(false, success);
   }
 
   protected NodeManager getNodeManager() {

@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -353,8 +354,16 @@ public class TestKeyManagerUnit {
         .setNodes(Arrays.asList(dnFour, dnFive, dnSix))
         .build();
 
-    Mockito.when(containerClient.getContainerWithPipeline(1L))
-        .thenReturn(new ContainerWithPipeline(null, pipelineTwo));
+    List<Long> containerIDs = new ArrayList<>();
+    containerIDs.add(1L);
+
+    List<ContainerWithPipeline> cps = new ArrayList<>();
+    ContainerInfo ci = Mockito.mock(ContainerInfo.class);
+    Mockito.when(ci.getContainerID()).thenReturn(1L);
+    cps.add(new ContainerWithPipeline(ci, pipelineTwo));
+
+    Mockito.when(containerClient.getContainerWithPipelineBatch(containerIDs))
+        .thenReturn(cps);
 
     final OmVolumeArgs volumeArgs = OmVolumeArgs.newBuilder()
         .setVolume("volumeOne")

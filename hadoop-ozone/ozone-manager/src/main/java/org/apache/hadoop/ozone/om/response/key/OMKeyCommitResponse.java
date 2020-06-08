@@ -33,13 +33,29 @@ import javax.annotation.Nonnull;
 public class OMKeyCommitResponse extends OMClientResponse {
 
   private OmKeyInfo omKeyInfo;
-  private long openKeySessionID;
+  private String ozoneKeyName;
+  private String openKeyName;
 
   public OMKeyCommitResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo, long openKeySessionID) {
+      @Nonnull OmKeyInfo omKeyInfo, String ozoneKeyName, String openKeyName) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
-    this.openKeySessionID = openKeySessionID;
+    this.ozoneKeyName = ozoneKeyName;
+    this.openKeyName = openKeyName;
+  }
+
+  /**
+   * When the KeyCommit request is a replay but the openKey should be deleted
+   * from the OpenKey table.
+   * Note that this response will result in openKey deletion only. Key will
+   * not be added to Key table.
+   * @param openKeyName openKey to be deleted from OpenKey table
+   */
+  public OMKeyCommitResponse(@Nonnull OMResponse omResponse,
+      String openKeyName) {
+    super(omResponse);
+    this.omKeyInfo = null;
+    this.openKeyName = openKeyName;
   }
 
   /**
@@ -55,18 +71,15 @@ public class OMKeyCommitResponse extends OMClientResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    String volumeName = omKeyInfo.getVolumeName();
-    String bucketName = omKeyInfo.getBucketName();
-    String keyName = omKeyInfo.getKeyName();
-    String openKey = omMetadataManager.getOpenKey(volumeName,
-        bucketName, keyName, openKeySessionID);
-    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-        keyName);
-
-    // Delete from open key table and add entry to key table.
+    // Delete from OpenKey table
     omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
-        openKey);
-    omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKey,
-        omKeyInfo);
+        openKeyName);
+
+    // Add entry to Key table if omKeyInfo is available i.e. it is not a
+    // replayed transaction.
+    if (omKeyInfo != null) {
+      omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKeyName,
+          omKeyInfo);
+    }
   }
 }

@@ -23,13 +23,15 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.function.Consumer;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
@@ -43,7 +45,7 @@ import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 @SuppressWarnings("visibilitymodifier")
 public abstract class Handler {
 
-  protected final Configuration conf;
+  protected final ConfigurationSource conf;
   protected final ContainerSet containerSet;
   protected final VolumeSet volumeSet;
   protected String scmID;
@@ -51,7 +53,7 @@ public abstract class Handler {
   protected String datanodeId;
   private Consumer<ContainerReplicaProto> icrSender;
 
-  protected Handler(Configuration config, String datanodeId,
+  protected Handler(ConfigurationSource config, String datanodeId,
       ContainerSet contSet, VolumeSet volumeSet,
       ContainerMetrics containerMetrics,
       Consumer<ContainerReplicaProto> icrSender) {
@@ -64,7 +66,7 @@ public abstract class Handler {
   }
 
   public static Handler getHandlerForContainerType(
-      final ContainerType containerType, final Configuration config,
+      final ContainerType containerType, final ConfigurationSource config,
       final String datanodeId, final ContainerSet contSet,
       final VolumeSet volumeSet, final ContainerMetrics metrics,
       Consumer<ContainerReplicaProto> icrSender) {
@@ -108,11 +110,7 @@ public abstract class Handler {
    * Imports container from a raw input stream.
    */
   public abstract Container importContainer(
-      long containerID,
-      long maxSize,
-      String originPipelineId,
-      String originNodeId,
-      InputStream rawContainerStream,
+      ContainerData containerData, InputStream rawContainerStream,
       TarContainerPacker packer)
       throws IOException;
 
@@ -176,6 +174,16 @@ public abstract class Handler {
    * @throws IOException
    */
   public abstract void deleteContainer(Container container, boolean force)
+      throws IOException;
+
+  /**
+   * Deletes the given files associated with a block of the container.
+   *
+   * @param container container whose block is to be deleted
+   * @param blockData block to be deleted
+   * @throws IOException
+   */
+  public abstract void deleteBlock(Container container, BlockData blockData)
       throws IOException;
 
   public void setScmID(String scmId) {

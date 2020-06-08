@@ -30,7 +30,8 @@ import java.util.List;
  * Request for Complete Multipart Upload request.
  */
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlRootElement(name = "CompleteMultipartUpload")
+@XmlRootElement(name = "CompleteMultipartUpload", namespace =
+    "http://s3.amazonaws.com/doc/2006-03-01/")
 public class CompleteMultipartUploadRequest {
 
   @XmlElement(name = "Part")

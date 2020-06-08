@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -26,12 +26,14 @@ public class DatanodePipeline {
   private UUID pipelineID;
   private String replicationType;
   private int replicationFactor;
+  private String leaderNode;
 
   public DatanodePipeline(UUID pipelineID, String replicationType,
-                          int replicationFactor) {
+                          int replicationFactor, String leaderNode) {
     this.pipelineID = pipelineID;
     this.replicationType = replicationType;
     this.replicationFactor = replicationFactor;
+    this.leaderNode = leaderNode;
   }
 
   public UUID getPipelineID() {
@@ -44,5 +46,9 @@ public class DatanodePipeline {
 
   public int getReplicationFactor() {
     return replicationFactor;
+  }
+
+  public String getLeaderNode() {
+    return leaderNode;
   }
 }

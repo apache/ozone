@@ -26,7 +26,6 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -45,7 +44,7 @@ import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 
 import com.google.common.collect.Maps;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -83,7 +82,7 @@ public class BenchMarkDatanodeDispatcher {
   private List<Long> containers;
   private List<Long> keys;
   private List<String> chunks;
-  private VolumeSet volumeSet;
+  private MutableVolumeSet volumeSet;
 
   @Setup(Level.Trial)
   public void initialize() throws IOException {
@@ -92,7 +91,7 @@ public class BenchMarkDatanodeDispatcher {
     // 1 MB of data
     data = ByteString.copyFromUtf8(RandomStringUtils.randomAscii(CHUNK_SIZE));
     random = new Random();
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     baseDir = System.getProperty("java.io.tmpdir") + File.separator +
         datanodeUuid;
 
@@ -103,7 +102,7 @@ public class BenchMarkDatanodeDispatcher {
     conf.set("ozone.scm.container.size", "10MB");
 
     ContainerSet containerSet = new ContainerSet();
-    volumeSet = new VolumeSet(datanodeUuid, conf);
+    volumeSet = new MutableVolumeSet(datanodeUuid, conf);
     StateContext context = new StateContext(
         conf, DatanodeStates.RUNNING, null);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
@@ -131,7 +130,7 @@ public class BenchMarkDatanodeDispatcher {
 
     // Create containers
     for (int x = 0; x < INIT_CONTAINERS; x++) {
-      long containerID = HddsUtils.getUtcTime() + x;
+      long containerID = HddsUtils.getTime() + x;
       ContainerCommandRequestProto req = getCreateContainerCommand(containerID);
       dispatcher.dispatch(req, null);
       containers.add(containerID);
@@ -139,7 +138,7 @@ public class BenchMarkDatanodeDispatcher {
     }
 
     for (int x = 0; x < INIT_KEYS; x++) {
-      keys.add(HddsUtils.getUtcTime()+x);
+      keys.add(HddsUtils.getTime()+x);
     }
 
     for (int x = 0; x < INIT_CHUNKS; x++) {

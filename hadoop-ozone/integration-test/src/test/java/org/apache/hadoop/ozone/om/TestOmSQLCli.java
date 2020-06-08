@@ -48,7 +48,9 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import org.junit.Before;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
@@ -57,6 +59,12 @@ import org.junit.runners.Parameterized;
  */
 @RunWith(Parameterized.class)
 public class TestOmSQLCli {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   private MiniOzoneCluster cluster = null;
 
   private OzoneConfiguration conf;

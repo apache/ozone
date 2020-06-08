@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -22,14 +22,17 @@ import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
 
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -56,6 +59,7 @@ public class ReconServer extends GenericCli {
   private ContainerDBServiceProvider containerDBServiceProvider;
   private OzoneManagerServiceProvider ozoneManagerServiceProvider;
   private OzoneStorageContainerManager reconStorageContainerManager;
+  private OzoneConfiguration configuration;
 
   private volatile boolean isStarted = false;
 
@@ -65,8 +69,13 @@ public class ReconServer extends GenericCli {
 
   @Override
   public Void call() throws Exception {
-    OzoneConfiguration ozoneConfiguration = createOzoneConfiguration();
-    ConfigurationProvider.setConfiguration(ozoneConfiguration);
+    String[] originalArgs = getCmd().getParseResult().originalArgs()
+        .toArray(new String[0]);
+    StringUtils.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
+        ReconServer.class, originalArgs, LOG);
+
+    configuration = createOzoneConfiguration();
+    ConfigurationProvider.setConfiguration(configuration);
 
     injector =  Guice.createInjector(new
         ReconControllerModule(),
@@ -83,7 +92,7 @@ public class ReconServer extends GenericCli {
 
     LOG.info("Initializing Recon server...");
     try {
-      loginReconUserIfSecurityEnabled(ozoneConfiguration);
+      loginReconUserIfSecurityEnabled(configuration);
       this.containerDBServiceProvider =
           injector.getInstance(ContainerDBServiceProvider.class);
 
@@ -124,9 +133,17 @@ public class ReconServer extends GenericCli {
     if (!isStarted) {
       LOG.info("Starting Recon server");
       isStarted = true;
-      httpServer.start();
-      ozoneManagerServiceProvider.start();
-      reconStorageContainerManager.start();
+      // Initialize metrics for Recon
+      HddsServerUtil.initializeMetrics(configuration, "Recon");
+      if (httpServer != null) {
+        httpServer.start();
+      }
+      if (ozoneManagerServiceProvider != null) {
+        ozoneManagerServiceProvider.start();
+      }
+      if (reconStorageContainerManager != null) {
+        reconStorageContainerManager.start();
+      }
     }
   }
 
@@ -159,12 +176,15 @@ public class ReconServer extends GenericCli {
    * Logs in the Recon user if security is enabled in the configuration.
    *
    * @param conf OzoneConfiguration
-   * @throws IOException, AuthenticationException in case login fails.
    */
-  private static void loginReconUserIfSecurityEnabled(OzoneConfiguration  conf)
-      throws IOException, AuthenticationException {
-    if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-      loginReconUser(conf);
+  private static void loginReconUserIfSecurityEnabled(
+      OzoneConfiguration  conf) {
+    try {
+      if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
+        loginReconUser(conf);
+      }
+    } catch (Exception ex) {
+      LOG.error("Error login in as Recon service. ", ex);
     }
   }
 
@@ -211,5 +231,15 @@ public class ReconServer extends GenericCli {
   @VisibleForTesting
   public StorageContainerServiceProvider getStorageContainerServiceProvider() {
     return injector.getInstance(StorageContainerServiceProvider.class);
+  }
+
+  @VisibleForTesting
+  public ContainerDBServiceProvider getContainerDBServiceProvider() {
+    return containerDBServiceProvider;
+  }
+
+  @VisibleForTesting
+  ReconHttpServer getHttpServer() {
+    return httpServer;
   }
 }

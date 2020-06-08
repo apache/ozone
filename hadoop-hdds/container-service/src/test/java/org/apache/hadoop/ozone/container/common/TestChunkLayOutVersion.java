@@ -19,8 +19,11 @@
 package org.apache.hadoop.ozone.container.common;
 
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
-import org.junit.Assert;
 import org.junit.Test;
+
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
+import static org.junit.Assert.assertEquals;
 
 /**
  * This class tests ChunkLayOutVersion.
@@ -28,15 +31,19 @@ import org.junit.Test;
 public class TestChunkLayOutVersion {
 
   @Test
-  public void testChunkLayOutVersion() {
+  public void testVersionCount() {
+    assertEquals(2, ChunkLayOutVersion.getAllVersions().size());
+  }
 
-    // Check Latest Version and description
-    Assert.assertEquals(1, ChunkLayOutVersion.getLatestVersion().getVersion());
-    Assert.assertEquals("Data without checksums.", ChunkLayOutVersion
-        .getLatestVersion().getDescription());
+  @Test
+  public void testV1() {
+    assertEquals(1, FILE_PER_CHUNK.getVersion());
+  }
 
-    Assert.assertEquals(1, ChunkLayOutVersion.getAllVersions().length);
 
+  @Test
+  public void testV2() {
+    assertEquals(2, FILE_PER_BLOCK.getVersion());
   }
 
 }

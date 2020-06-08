@@ -18,44 +18,36 @@
 
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
-import org.apache.hadoop.conf.Configuration;
+import java.net.InetSocketAddress;
+import java.util.UUID;
+
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerAction;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.NodeReportProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
-import org.apache.hadoop.ozone.container.common.statemachine
-    .DatanodeStateMachine;
-import org.apache.hadoop.ozone.container.common.statemachine
-    .DatanodeStateMachine.DatanodeStates;
-import org.apache.hadoop.ozone.container.common.statemachine
-    .EndpointStateMachine;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
+import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.protocolPB
-    .StorageContainerDatanodeProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 
 import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
-import java.util.UUID;
-
 /**
  * This class tests the functionality of HeartbeatEndpointTask.
  */
 public class TestHeartbeatEndpointTask {
 
-  private static final String TEST_SCM_ENDPOINT = "test-scm-1:9861";
+  private static final InetSocketAddress TEST_SCM_ENDPOINT =
+      new InetSocketAddress("test-scm-1", 9861);
 
   @Test
   public void testheartbeatWithoutReports() throws Exception {
@@ -84,7 +76,7 @@ public class TestHeartbeatEndpointTask {
 
   @Test
   public void testheartbeatWithNodeReports() throws Exception {
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         Mockito.mock(DatanodeStateMachine.class));
 
@@ -116,7 +108,7 @@ public class TestHeartbeatEndpointTask {
 
   @Test
   public void testheartbeatWithContainerReports() throws Exception {
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         Mockito.mock(DatanodeStateMachine.class));
 
@@ -148,7 +140,7 @@ public class TestHeartbeatEndpointTask {
 
   @Test
   public void testheartbeatWithCommandStatusReports() throws Exception {
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         Mockito.mock(DatanodeStateMachine.class));
 
@@ -180,7 +172,7 @@ public class TestHeartbeatEndpointTask {
 
   @Test
   public void testheartbeatWithContainerActions() throws Exception {
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         Mockito.mock(DatanodeStateMachine.class));
 
@@ -212,7 +204,7 @@ public class TestHeartbeatEndpointTask {
 
   @Test
   public void testheartbeatWithAllReports() throws Exception {
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         Mockito.mock(DatanodeStateMachine.class));
 
@@ -254,7 +246,7 @@ public class TestHeartbeatEndpointTask {
    */
   private HeartbeatEndpointTask getHeartbeatEndpointTask(
       StorageContainerDatanodeProtocolClientSideTranslatorPB proxy) {
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         Mockito.mock(DatanodeStateMachine.class));
     return getHeartbeatEndpointTask(conf, context, proxy);
@@ -272,7 +264,7 @@ public class TestHeartbeatEndpointTask {
    * @return HeartbeatEndpointTask
    */
   private HeartbeatEndpointTask getHeartbeatEndpointTask(
-      Configuration conf,
+      ConfigurationSource conf,
       StateContext context,
       StorageContainerDatanodeProtocolClientSideTranslatorPB proxy) {
     DatanodeDetails datanodeDetails = DatanodeDetails.newBuilder()
@@ -283,7 +275,7 @@ public class TestHeartbeatEndpointTask {
     EndpointStateMachine endpointStateMachine = Mockito
         .mock(EndpointStateMachine.class);
     Mockito.when(endpointStateMachine.getEndPoint()).thenReturn(proxy);
-    Mockito.when(endpointStateMachine.getAddressString())
+    Mockito.when(endpointStateMachine.getAddress())
         .thenReturn(TEST_SCM_ENDPOINT);
     return HeartbeatEndpointTask.newBuilder()
         .setConfig(conf)

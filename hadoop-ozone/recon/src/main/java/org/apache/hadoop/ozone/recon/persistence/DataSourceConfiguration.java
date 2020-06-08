@@ -1,6 +1,4 @@
-package org.apache.hadoop.ozone.recon.persistence;
-
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,6 +15,7 @@ package org.apache.hadoop.ozone.recon.persistence;
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.ozone.recon.persistence;
 
 /**
  * Common configuration needed to instantiate {@link javax.sql.DataSource}.
@@ -67,12 +66,12 @@ public interface DataSourceConfiguration {
   /**
    * Sets the maximum connection age (in seconds).
    */
-  Integer getMaxConnectionAge();
+  long getMaxConnectionAge();
 
   /**
    * Sets the maximum idle connection age (in seconds).
    */
-  Integer getMaxIdleConnectionAge();
+  long getMaxIdleConnectionAge();
 
   /**
    * Statement specific to database, usually SELECT 1.
@@ -82,5 +81,5 @@ public interface DataSourceConfiguration {
   /**
    * How often to test idle connections for being active (in seconds).
    */
-  Integer getIdleConnectionTestPeriod();
+  long getIdleConnectionTestPeriod();
 }
