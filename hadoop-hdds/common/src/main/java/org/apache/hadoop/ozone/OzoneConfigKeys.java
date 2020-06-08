@@ -18,17 +18,17 @@
 
 package org.apache.hadoop.ozone;
 
+import java.util.concurrent.TimeUnit;
+
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-
 import org.apache.hadoop.http.HttpConfig;
+
 import org.apache.ratis.proto.RaftProtos.ReplicationLevel;
 import org.apache.ratis.util.TimeDuration;
-
-import java.util.concurrent.TimeUnit;
 
 /**
  * This class contains constants for configuration keys used in Ozone.
@@ -157,8 +157,8 @@ public final class OzoneConfigKeys {
    * */
   public static final String OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY =
       "ozone.client.stream.buffer.flush.delay";
-  public static final boolean OOZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY_DEFAULT =
-      false;
+  public static final boolean OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY_DEFAULT =
+      true;
 
   // This defines the overall connection limit for the connection pool used in
   // RestClient.
@@ -400,10 +400,6 @@ public final class OzoneConfigKeys {
   public static final String OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY =
       "ozone.s3.token.max.lifetime";
   public static final String OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY_DEFAULT = "3m";
-  //For technical reasons this is unused and hardcoded to the
-  // OzoneFileSystem.initialize.
-  public static final String OZONE_FS_ISOLATED_CLASSLOADER =
-      "ozone.fs.isolated-classloader";
 
   // Ozone Client Retry and Failover configurations
   public static final String OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY =

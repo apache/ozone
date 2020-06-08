@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -629,4 +630,8 @@ public interface ClientProtocol {
    * */
   List<OzoneAcl> getAcl(OzoneObj obj) throws IOException;
 
+  /**
+   * Getter for OzoneManagerClient.
+   */
+  OzoneManagerProtocol getOzoneManagerClient();
 }

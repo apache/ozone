@@ -21,10 +21,10 @@ package org.apache.hadoop.ozone.container.keyvalue;
 import com.google.common.primitives.Longs;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
@@ -263,7 +263,7 @@ import static org.junit.Assert.assertFalse;
 
         if (i >= normalBlocks) {
           // deleted key
-          metadataStore.getStore().put(DFSUtil.string2Bytes(
+          metadataStore.getStore().put(StringUtils.string2Bytes(
               OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID()),
               blockData.getProtoBufMessage().toByteArray());
         } else {

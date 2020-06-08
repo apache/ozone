@@ -34,12 +34,20 @@ import org.junit.Test;
 
 import java.util.concurrent.TimeUnit;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.*;
 
 /**
  * Tests Freon with Datanode restarts.
  */
 public class TestFreonWithDatanodeRestart {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
@@ -59,8 +67,6 @@ public class TestFreonWithDatanodeRestart {
     conf.setTimeDuration(HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL, 1,
         TimeUnit.SECONDS);
     conf.setTimeDuration(HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL, 1,
-        TimeUnit.SECONDS);
-    conf.setTimeDuration(OZONE_SCM_CONTAINER_CREATION_LEASE_TIMEOUT, 5,
         TimeUnit.SECONDS);
     conf.setTimeDuration(
             RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +

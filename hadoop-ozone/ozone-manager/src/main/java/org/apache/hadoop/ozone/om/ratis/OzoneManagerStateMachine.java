@@ -112,6 +112,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
         .enableRatis(true)
         .enableTracing(isTracingEnabled)
+        .setIndexToTerm(this::getTermForIndex)
         .build();
 
     this.handler = new OzoneManagerRequestHandler(ozoneManager,
@@ -561,4 +562,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   void addApplyTransactionTermIndex(long term, long index) {
     applyTransactionMap.put(index, term);
   }
+
+  /**
+   * Return term associated with transaction index.
+   * @param transactionIndex
+   * @return
+   */
+  public long getTermForIndex(long transactionIndex) {
+    return applyTransactionMap.get(transactionIndex);
+  }
+
 }

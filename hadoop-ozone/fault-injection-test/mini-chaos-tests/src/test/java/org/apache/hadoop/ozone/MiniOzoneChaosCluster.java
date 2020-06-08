@@ -218,9 +218,6 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
           TimeUnit.SECONDS);
       conf.setTimeDuration(HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL, 1,
           TimeUnit.SECONDS);
-      conf.setTimeDuration(
-          ScmConfigKeys.OZONE_SCM_CONTAINER_CREATION_LEASE_TIMEOUT, 5,
-          TimeUnit.SECONDS);
       conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
           1, TimeUnit.SECONDS);
       conf.setTimeDuration(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, 1,

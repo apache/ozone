@@ -390,11 +390,13 @@
   </property>
   <property>
     <name>ozone.client.stream.buffer.flush.delay</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, CLIENT</tag>
-    <description>If set true, when call flush() and determine whether the
-      data in the current buffer is greater than ozone.client.stream.buffer.size.
-      if greater than then send buffer to the datanode.
+    <description>
+      Default true, when call flush() and determine whether the data in the
+      current buffer is greater than ozone.client.stream.buffer.size, if
+      greater than then send buffer to the datanode. You can turn this off
+      by setting this configuration to false.
     </description>
   </property>
   <property>
@@ -1085,19 +1087,6 @@
     <description>
       Setting this flag to true dumps the HTTP request/ response in
       the logs. Very useful when debugging REST protocol.
-    </description>
-  </property>
-
-  <property>
-    <name>ozone.scm.container.creation.lease.timeout</name>
-    <value>60s</value>
-    <tag>OZONE, SCM</tag>
-    <description>
-      Container creation timeout in milliseconds to be used by SCM. When
-      BEGIN_CREATE event happens the container is moved from ALLOCATED to
-      CREATING state, SCM will now wait for the configured amount of time
-      to get COMPLETE_CREATE event if it doesn't receive it will move the
-      container to DELETING.
     </description>
   </property>
 
@@ -1968,21 +1957,7 @@
       not be renewed.
     </description>
   </property>
-
-  <property>
-    <name>ozone.fs.isolated-classloader</name>
-    <value></value>
-    <tag>OZONE, OZONEFS</tag>
-    <description>
-      Enable it for older hadoops to separate the classloading of all the
-      Ozone classes. With 'true' value, ozonefs can be used with older
-      hadoop versions as the hadoop3/ozone related classes are loaded by
-      an isolated classloader.
-
-      Default depends from the used jar. true for ozone-filesystem-lib-legacy
-      jar and false for the ozone-filesystem-lib-current.jar
-    </description>
-  </property>
+  
   <property>
     <name>ozone.manager.db.checkpoint.transfer.bandwidthPerSec</name>
     <value>0</value>

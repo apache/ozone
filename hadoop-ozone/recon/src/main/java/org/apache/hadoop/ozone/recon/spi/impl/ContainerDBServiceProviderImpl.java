@@ -50,7 +50,7 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
-import org.hadoop.ozone.recon.schema.tables.pojos.MissingContainers;
+import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -358,7 +358,7 @@ public class ContainerDBServiceProviderImpl
     return containers;
   }
 
-  public List<MissingContainers> getMissingContainers() {
+  public List<UnhealthyContainers> getMissingContainers() {
     return containerSchemaManager.getAllMissingContainers();
   }
 

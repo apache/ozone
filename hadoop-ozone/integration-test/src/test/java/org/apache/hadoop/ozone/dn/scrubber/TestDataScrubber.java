@@ -64,6 +64,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.io.File;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
 
@@ -71,6 +73,12 @@ import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
  * This class tests the data scrubber functionality.
  */
 public class TestDataScrubber {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration ozoneConfig;
   private static OzoneClient ozClient = null;

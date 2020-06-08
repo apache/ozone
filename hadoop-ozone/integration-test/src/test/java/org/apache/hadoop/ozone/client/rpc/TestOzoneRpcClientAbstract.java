@@ -47,7 +47,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -102,6 +101,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.StringUtils;
+
+import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
@@ -1608,8 +1609,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), 1, uploadID);
-    ozoneOutputStream.write(DFSUtil.string2Bytes(sampleData), 0,
-        sampleData.length());
+    ozoneOutputStream.write(string2Bytes(sampleData), 0, sampleData.length());
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo commitUploadPartInfo = ozoneOutputStream
@@ -1646,8 +1646,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), partNumber, uploadID);
-    ozoneOutputStream.write(DFSUtil.string2Bytes(sampleData), 0,
-        sampleData.length());
+    ozoneOutputStream.write(string2Bytes(sampleData), 0, sampleData.length());
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo commitUploadPartInfo = ozoneOutputStream
@@ -1661,8 +1660,7 @@ public abstract class TestOzoneRpcClientAbstract {
     sampleData = "sample Data Changed";
     ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), partNumber, uploadID);
-    ozoneOutputStream.write(DFSUtil.string2Bytes(sampleData), 0, "name"
-        .length());
+    ozoneOutputStream.write(string2Bytes(sampleData), 0, "name".length());
     ozoneOutputStream.close();
 
     commitUploadPartInfo = ozoneOutputStream
@@ -1702,8 +1700,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), partNumber, uploadID);
-    ozoneOutputStream.write(DFSUtil.string2Bytes(sampleData), 0,
-        sampleData.length());
+    ozoneOutputStream.write(string2Bytes(sampleData), 0, sampleData.length());
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo commitUploadPartInfo = ozoneOutputStream
@@ -1717,8 +1714,7 @@ public abstract class TestOzoneRpcClientAbstract {
     sampleData = "sample Data Changed";
     ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), partNumber, uploadID);
-    ozoneOutputStream.write(DFSUtil.string2Bytes(sampleData), 0, "name"
-        .length());
+    ozoneOutputStream.write(string2Bytes(sampleData), 0, "name".length());
     ozoneOutputStream.close();
 
     commitUploadPartInfo = ozoneOutputStream
