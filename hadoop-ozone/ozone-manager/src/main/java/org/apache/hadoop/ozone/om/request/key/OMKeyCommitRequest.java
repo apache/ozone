@@ -123,14 +123,14 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     try {
-      commitKeyArgs = ozoneManager.resolveBucketLink(commitKeyArgs, key ->
-        checkKeyAclsInOpenKeyTable(ozoneManager,
-            key.getVolumeName(), key.getBucketName(), key.getKeyName(),
-            IAccessAuthorizer.ACLType.WRITE,
-            commitKeyRequest.getClientID())
-      );
+      commitKeyArgs = ozoneManager.resolveBucketLink(commitKeyArgs);
       volumeName = commitKeyArgs.getVolumeName();
       bucketName = commitKeyArgs.getBucketName();
+
+      // check Acl
+      checkKeyAclsInOpenKeyTable(ozoneManager, volumeName, bucketName,
+          keyName, IAccessAuthorizer.ACLType.WRITE,
+          commitKeyRequest.getClientID());
 
       String dbOzoneKey =
           omMetadataManager.getOzoneKey(volumeName, bucketName,

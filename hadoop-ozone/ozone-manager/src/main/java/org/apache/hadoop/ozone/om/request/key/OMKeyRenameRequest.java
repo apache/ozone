@@ -130,17 +130,16 @@ public class OMKeyRenameRequest extends OMKeyRequest {
             OMException.ResultCodes.INVALID_KEY_NAME);
       }
 
-      keyArgs = ozoneManager.resolveBucketLink(keyArgs,
-          key -> {
-            checkKeyAcls(ozoneManager,
-                key.getVolumeName(), key.getBucketName(), key.getKeyName(),
-                IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
-            checkKeyAcls(ozoneManager,
-                key.getVolumeName(), key.getBucketName(), toKeyName,
-                IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
-      });
+      keyArgs = ozoneManager.resolveBucketLink(keyArgs);
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
+
+      // check Acls to see if user has access to perform delete operation on
+      // old key and create operation on new key
+      checkKeyAcls(ozoneManager, volumeName, bucketName, fromKeyName,
+          IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
+      checkKeyAcls(ozoneManager, volumeName, bucketName, toKeyName,
+          IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);

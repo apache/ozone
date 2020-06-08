@@ -2054,7 +2054,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public OpenKeySession openKey(OmKeyArgs args) throws IOException {
-    args = resolveBucketLink(args, this::checkAclForKeyCreate);
+    args = resolveBucketLink(args);
 
     if (isAclEnabled) {
       try {
@@ -2093,7 +2093,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public void commitKey(OmKeyArgs args, long clientID)
       throws IOException {
-    args = resolveBucketLink(args, this::checkAclForKeyCreate);
+    args = resolveBucketLink(args);
 
     if (isAclEnabled) {
       try {
@@ -2139,7 +2139,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public OmKeyLocationInfo allocateBlock(OmKeyArgs args, long clientID,
       ExcludeList excludeList) throws IOException {
-    args = resolveBucketLink(args, this::checkAclForKeyCreate);
+    args = resolveBucketLink(args);
 
     if (isAclEnabled) {
       try {
@@ -2187,7 +2187,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public OmKeyInfo lookupKey(OmKeyArgs args) throws IOException {
-    args = resolveBucketLink(args, this::checkAclForKeyRead);
+    args = resolveBucketLink(args);
 
     if (isAclEnabled) {
       checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
@@ -2216,7 +2216,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void renameKey(OmKeyArgs args, String toKeyName) throws IOException {
     Preconditions.checkNotNull(args);
 
-    args = resolveBucketLink(args, this::checkAclForKeyWrite);
+    args = resolveBucketLink(args);
 
     if (isAclEnabled) {
       checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.WRITE,
@@ -2248,7 +2248,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public void deleteKey(OmKeyArgs args) throws IOException {
     try {
-      args = resolveBucketLink(args, this::checkAclForKeyDelete);
+      args = resolveBucketLink(args);
 
       if (isAclEnabled) {
         checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.DELETE,
@@ -2273,14 +2273,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       String startKey, String keyPrefix, int maxKeys) throws IOException {
 
     Pair<String, String> resolvedVolumeAndBucket = resolveBucketLink(
-        Pair.of(volumeName, bucketName),
-        volumeAndBucket -> {
-          if(isAclEnabled) {
-            checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
-                volumeAndBucket.getLeft(), volumeAndBucket.getRight(),
-                keyPrefix);
-          }
-        }
+        Pair.of(volumeName, bucketName)
     );
     volumeName = resolvedVolumeAndBucket.getLeft();
     bucketName = resolvedVolumeAndBucket.getRight();
@@ -2605,7 +2598,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       IOException {
 
     Preconditions.checkNotNull(keyArgs);
-    keyArgs = resolveBucketLink(keyArgs, args -> {});
+    keyArgs = resolveBucketLink(keyArgs);
 
     OmMultipartInfo multipartInfo;
     metrics.incNumInitiateMultipartUploads();
@@ -2627,7 +2620,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       OmKeyArgs keyArgs, long clientID) throws IOException {
 
     Preconditions.checkNotNull(keyArgs);
-    keyArgs = resolveBucketLink(keyArgs, args -> {});
+    keyArgs = resolveBucketLink(keyArgs);
 
     boolean auditSuccess = false;
     OmMultipartCommitUploadPartInfo commitUploadPartInfo;
@@ -2656,7 +2649,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
 
     Preconditions.checkNotNull(omKeyArgs);
-    omKeyArgs = resolveBucketLink(omKeyArgs, args -> {});
+    omKeyArgs = resolveBucketLink(omKeyArgs);
 
     OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo;
     metrics.incNumCompleteMultipartUploads();
@@ -2682,7 +2675,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void abortMultipartUpload(OmKeyArgs omKeyArgs) throws IOException {
 
     Preconditions.checkNotNull(omKeyArgs);
-    omKeyArgs = resolveBucketLink(omKeyArgs, args -> {});
+    omKeyArgs = resolveBucketLink(omKeyArgs);
 
     Map<String, String> auditMap = omKeyArgs.toAuditMap();
     metrics.incNumAbortMultipartUploads();
@@ -2705,7 +2698,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       int maxParts)  throws IOException {
 
     Pair<String, String> resolvedVolumeAndBucket = resolveBucketLink(
-        Pair.of(volumeName, bucketName), args -> {});
+        Pair.of(volumeName, bucketName));
     volumeName = resolvedVolumeAndBucket.getLeft();
     bucketName = resolvedVolumeAndBucket.getRight();
 
@@ -2738,7 +2731,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       String bucketName, String prefix) throws IOException {
 
     Pair<String, String> resolvedVolumeAndBucket = resolveBucketLink(
-        Pair.of(volumeName, bucketName), args -> {});
+        Pair.of(volumeName, bucketName));
     volumeName = resolvedVolumeAndBucket.getLeft();
     bucketName = resolvedVolumeAndBucket.getRight();
 
@@ -2766,7 +2759,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public OzoneFileStatus getFileStatus(OmKeyArgs args) throws IOException {
-    args = resolveBucketLink(args, this::checkAclForRead);
+    args = resolveBucketLink(args);
 
     boolean auditSuccess = true;
     try {
@@ -2797,12 +2790,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public void createDirectory(OmKeyArgs args) throws IOException {
-    args = resolveBucketLink(args, key -> {
-      if (isAclEnabled) {
-        checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.WRITE,
-            key.getVolumeName(), key.getBucketName(), key.getKeyName());
-      }
-    });
+    args = resolveBucketLink(args);
 
     boolean auditSuccess = true;
     try {
@@ -2827,12 +2815,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public OpenKeySession createFile(OmKeyArgs args, boolean overWrite,
       boolean recursive) throws IOException {
-    args = resolveBucketLink(args, key -> {
-      if (isAclEnabled) {
-        checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.WRITE,
-            key.getVolumeName(), key.getBucketName(), null);
-      }
-    });
+    args = resolveBucketLink(args);
 
     boolean auditSuccess = true;
     try {
@@ -2854,7 +2837,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public OmKeyInfo lookupFile(OmKeyArgs args) throws IOException {
-    args = resolveBucketLink(args, this::checkAclForKeyRead);
+    args = resolveBucketLink(args);
 
     if (isAclEnabled) {
       checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
@@ -2883,7 +2866,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries) throws IOException {
 
-    args = resolveBucketLink(args, this::checkAclForRead);
+    args = resolveBucketLink(args);
 
     if (isAclEnabled) {
       checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
@@ -3397,10 +3380,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     jvmPauseMonitor.start();
   }
 
-  public KeyArgs resolveBucketLink(KeyArgs args,
-      CheckedConsumer<KeyArgs, IOException> aclCheck) throws IOException {
+  public KeyArgs resolveBucketLink(KeyArgs args) throws IOException {
 
-    return resolveBucketLink(args, aclCheck, new HashSet<>(),
+    return resolveBucketLink(args, new HashSet<>(),
         x -> Pair.of(x.getVolumeName(), x.getBucketName()),
         (x, volumeAndBucket) -> x.toBuilder()
                 .setVolumeName(volumeAndBucket.getLeft())
@@ -3409,10 +3391,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     );
   }
 
-  private OmKeyArgs resolveBucketLink(OmKeyArgs args,
-      CheckedConsumer<OmKeyArgs, IOException> aclCheck) throws IOException {
+  private OmKeyArgs resolveBucketLink(OmKeyArgs args) throws IOException {
 
-    return resolveBucketLink(args, aclCheck, new HashSet<>(),
+    return resolveBucketLink(args, new HashSet<>(),
         x -> Pair.of(x.getVolumeName(), x.getBucketName()),
         (x, volumeAndBucket) -> x.toBuilder()
             .setVolumeName(volumeAndBucket.getLeft())
@@ -3422,21 +3403,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   private Pair<String, String> resolveBucketLink(
-      Pair<String, String> volumeAndBucket,
-      CheckedConsumer<Pair<String, String>, IOException> aclCheck)
-      throws IOException {
+      Pair<String, String> volumeAndBucket) throws IOException {
 
-    return resolveBucketLink(volumeAndBucket, aclCheck, new HashSet<>(),
+    return resolveBucketLink(volumeAndBucket, new HashSet<>(),
         Function.identity(),
         (x, sourceVolumeAndBucket) -> sourceVolumeAndBucket
     );
   }
 
   /**
+   * Resolves the actual bucket to which {@code key} belongs, following any
+   * symlinks.  Read permission is required on the link bucket.
    *
-   * @param keyArgs information to describe a key, whose bucket should be
+   * @param key information to describe a key, whose bucket should be
    *   resolved
-   * @param aclCheck performs ACL check on instances of {@code T}
    * @param visited collects link buckets visited during the resolution to
    *   avoid infinite loops
    * @param extractor extracts volume and bucket name from {@code T}
@@ -3448,74 +3428,31 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @throws IOException (most likely OMException) if ACL check fails, bucket is
    *   not found, loop is detected in the links, etc.
    */
-  private <T> T resolveBucketLink(T keyArgs,
-      CheckedConsumer<T, IOException> aclCheck,
-      Set<T> visited,
+  private <T> T resolveBucketLink(T key, Set<T> visited,
       Function<T, Pair<String, String>> extractor,
       BiFunction<T, Pair<String, String>, T> updater) throws IOException {
 
-    aclCheck.accept(keyArgs);
-
-    Pair<String, String> volumeAndBucket = extractor.apply(keyArgs);
-    OmBucketInfo info = bucketManager.getBucketInfo(
-        volumeAndBucket.getLeft(), volumeAndBucket.getRight());
+    Pair<String, String> volumeAndBucket = extractor.apply(key);
+    String volumeName = volumeAndBucket.getLeft();
+    String bucketName = volumeAndBucket.getRight();
+    OmBucketInfo info = bucketManager.getBucketInfo(volumeName, bucketName);
     if (!info.isLink()) {
-      return keyArgs;
+      return key;
     }
 
-    if (!visited.add(keyArgs)) {
+    if (!visited.add(key)) {
       throw new OMException("Detected loop in bucket links", INTERNAL_ERROR);
     }
 
-    T updated = updater.apply(keyArgs,
+    if (isAclEnabled) {
+      checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.READ,
+          volumeName, bucketName, null);
+    }
+
+    T updated = updater.apply(key,
         Pair.of(info.getSourceVolume(), info.getSourceBucket()));
-    return resolveBucketLink(updated, aclCheck,
-        visited, extractor, updater);
+
+    return resolveBucketLink(updated, visited, extractor, updater);
   }
 
-  private void checkAclForRead(OmKeyArgs args) throws OMException {
-    if (isAclEnabled) {
-      checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
-          args.getVolumeName(), args.getBucketName(), args.getKeyName());
-    }
-  }
-
-  private void checkAclForKeyCreate(OmKeyArgs args) throws OMException {
-    if (isAclEnabled) {
-      try {
-        checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.WRITE,
-            args.getVolumeName(), args.getBucketName(), args.getKeyName());
-      } catch (OMException ex) {
-        // For new keys key checkAccess call will fail as key doesn't exist.
-        // Check user access for bucket.
-        if (ex.getResult().equals(KEY_NOT_FOUND)) {
-          checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.WRITE,
-              args.getVolumeName(), args.getBucketName(), args.getKeyName());
-        } else {
-          throw ex;
-        }
-      }
-    }
-  }
-
-  private void checkAclForKeyDelete(OmKeyArgs args) throws OMException {
-    if(isAclEnabled) {
-      checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.DELETE,
-          args.getVolumeName(), args.getBucketName(), args.getKeyName());
-    }
-  }
-
-  private void checkAclForKeyRead(OmKeyArgs args) throws OMException {
-    if(isAclEnabled) {
-      checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
-          args.getVolumeName(), args.getBucketName(), args.getKeyName());
-    }
-  }
-
-  private void checkAclForKeyWrite(OmKeyArgs args) throws OMException {
-    if(isAclEnabled) {
-      checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.WRITE,
-          args.getVolumeName(), args.getBucketName(), args.getKeyName());
-    }
-  }
 }

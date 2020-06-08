@@ -176,12 +176,13 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     IOException exception = null;
     Result result = null;
     try {
-      keyArgs = ozoneManager.resolveBucketLink(keyArgs,
-          key -> checkKeyAcls(ozoneManager,
-              key.getVolumeName(), key.getBucketName(), key.getKeyName(),
-              IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY));
+      keyArgs = ozoneManager.resolveBucketLink(keyArgs);
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
+
+      // check Acl
+      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
+          IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
       acquireLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);
