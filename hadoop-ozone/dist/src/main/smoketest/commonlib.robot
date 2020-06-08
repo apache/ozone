@@ -66,8 +66,13 @@ Kinit test user
     Set Suite Variable  ${TEST_USER}               ${user}/${hostname}@EXAMPLE.COM
     Wait Until Keyword Succeeds      2min       10sec      Execute            kinit -k ${user}/${hostname}@EXAMPLE.COM -t /etc/security/keytabs/${keytab}
 
-Compare key to local file
+Should Match Local File
     [arguments]    ${key}    ${file}
     Execute        ozone sh key get -f ${key} /tmp/tempkey
     Execute        diff -q ${file} /tmp/tempkey
     Execute        rm -f /tmp/tempkey
+
+Verify ACL
+    [arguments]         ${object_type}   ${object}    ${type}   ${name}    ${acls}
+    ${actual_acls} =    Execute          ozone sh ${object_type} getacl ${object} | jq -r '.[] | select(.type == "${type}") | select(.name == "${name}") | .aclList[]' | xargs
+                        Should Be Equal    ${acls}    ${actual_acls}
