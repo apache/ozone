@@ -43,7 +43,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-server-framework</artifactId>
+      <artifactId>hadoop-hdds-common-server</artifactId>
     </dependency>
     <dependency>
       <groupId>org.jboss.weld.servlet</groupId>
@@ -196,7 +196,7 @@
               <artifactItems>
                 <artifactItem>
                   <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-hdds-server-framework</artifactId>
+                  <artifactId>hadoop-hdds-common-server</artifactId>
                   <outputDirectory>${project.build.outputDirectory}
                   </outputDirectory>
                   <includes>webapps/static/**/*.*</includes>

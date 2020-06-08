@@ -65,7 +65,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdds-server-framework</artifactId>
+      <artifactId>hadoop-hdds-common-server</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

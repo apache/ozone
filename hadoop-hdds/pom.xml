@@ -38,7 +38,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <module>interface-server</module>
     <module>client</module>
     <module>common</module>
-    <module>framework</module>
+    <module>common-server</module>
     <module>container-service</module>
     <module>server-scm</module>
     <module>tools</module>
@@ -120,7 +120,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
       <dependency>
         <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-hdds-server-framework</artifactId>
+        <artifactId>hadoop-hdds-common-server</artifactId>
         <version>${hdds.version}</version>
       </dependency>
 
