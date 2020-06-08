@@ -61,9 +61,7 @@ public class RatisDropwizardExports extends DropwizardExports {
         registry.getDropWizardMetricRegistry());
     CollectorRegistry.defaultRegistry.register(rde);
     String name = registry.getMetricRegistryInfo().getName();
-    RatisDropwizardExports prev = ratisMetricsMap.putIfAbsent(name, rde);
-    Preconditions.assertTrue(prev == null,
-        "previous value already at " + name);
+    ratisMetricsMap.putIfAbsent(name, rde);
   }
 
   private static void deregisterDropwizard(RatisMetricRegistry registry,

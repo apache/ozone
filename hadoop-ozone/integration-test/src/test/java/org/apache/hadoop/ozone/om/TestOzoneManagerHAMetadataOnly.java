@@ -339,7 +339,8 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
         getCluster().getOzoneManager(0).getOmRatisServer();
     ObjectName oname = new ObjectName(RATIS_APPLICATION_NAME_METRICS, "name",
         RATIS_APPLICATION_NAME_METRICS + ".log_worker." +
-            ratisServer.getRaftPeerId().toString() + ".flushCount");
+            ratisServer.getRaftPeerId().toString() +
+            "@" + ratisServer.getRaftGroup().getGroupId() + ".flushCount");
     MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
     MBeanInfo mBeanInfo = mBeanServer.getMBeanInfo(oname);
     Assert.assertNotNull(mBeanInfo);
