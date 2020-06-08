@@ -171,7 +171,8 @@ public final class RatisHelper {
         ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT));
   }
 
-  public static RaftClient newRaftClient(RaftPeer leader, ConfigurationSource conf) {
+  public static RaftClient newRaftClient(RaftPeer leader,
+      ConfigurationSource conf) {
     return newRaftClient(getRpcType(conf), leader,
         RatisHelper.createRetryPolicy(conf), conf);
   }
@@ -287,7 +288,8 @@ public final class RatisHelper {
     MultipleLinearRandomRetry multipleLinearRandomRetry =
         MultipleLinearRandomRetry.parseCommaSeparated(conf.get(
             OzoneConfigKeys.DFS_RATIS_CLIENT_MULTILINEAR_RANDOM_RETRY_POLICY,
-            OzoneConfigKeys.DFS_RATIS_CLIENT_MULTILINEAR_RANDOM_RETRY_POLICY_DEFAULT));
+            OzoneConfigKeys.
+                DFS_RATIS_CLIENT_MULTILINEAR_RANDOM_RETRY_POLICY_DEFAULT));
 
     long writeTimeout = conf.getTimeDuration(
         OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_WRITE_TIMEOUT, OzoneConfigKeys.
