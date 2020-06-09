@@ -310,10 +310,10 @@ public class BasicRootedOzoneClientAdapterImpl
       throw new IOException("Cannot create file under root or volume.");
     }
     String key = ofsPath.getKeyName();
+    OzoneOutputStream ozoneOutputStream = null;
     try {
       // Hadoop CopyCommands class always sets recursive to true
       OzoneBucket bucket = getBucket(ofsPath, recursive);
-      OzoneOutputStream ozoneOutputStream = null;
       if (replication == ReplicationFactor.ONE.getValue()
           || replication == ReplicationFactor.THREE.getValue()) {
         ReplicationFactor clientReplication = ReplicationFactor
@@ -332,6 +332,10 @@ public class BasicRootedOzoneClientAdapterImpl
             ex.getResult().name() + ": " + ex.getMessage());
       } else {
         throw ex;
+      }
+    } finally {
+      if (ozoneOutputStream != null) {
+        ozoneOutputStream.close();
       }
     }
   }
