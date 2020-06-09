@@ -31,6 +31,7 @@ function hadoop_usage
   hadoop_add_option "--hosts filename" "list of hosts to use in worker mode"
   hadoop_add_option "--loglevel level" "set the log4j level for this command"
   hadoop_add_option "--workers" "turn on worker mode"
+  hadoop_add_option "--jvmargs arguments" "append JVM options to any existing options defined in the HADOOP_OPTS environment variable. Any defined in HADOOP_CLIENT_OPTS will be append after these jvmargs"
 
   hadoop_add_subcommand "auditparser" client "runs audit parser tool"
   hadoop_add_subcommand "classpath" client "prints the class path needed to get the hadoop jar and the required libraries"
