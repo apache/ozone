@@ -54,4 +54,18 @@ public interface ContainerPlacementStatus {
    */
   int misReplicationCount();
 
+  /**
+   * The number of locations (eg racks, node groups) the container should be
+   * placed on.
+   * @return The expected Placement Count
+   */
+  int expectedPlacementCount();
+
+  /**
+   * The actual placement count, eg how many racks the container is currently
+   * on.
+   * @return The actual placement count.
+   */
+  int actualPlacementCount();
+
 }

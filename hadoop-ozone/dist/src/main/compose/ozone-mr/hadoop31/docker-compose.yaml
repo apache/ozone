@@ -77,7 +77,7 @@ services:
       - ./docker-config
       - ../common-config
     environment:
-      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-lib-current-@project.version@.jar
+      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-hadoop3-@project.version@.jar
     command: ["yarn", "resourcemanager"]
   nm:
     image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
@@ -88,6 +88,6 @@ services:
       - ./docker-config
       - ../common-config
     environment:
-      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-lib-current-@project.version@.jar
+      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-hadoop3-@project.version@.jar
       WAIT_FOR: rm:8088
     command: ["yarn","nodemanager"]

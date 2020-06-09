@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.StringUtils;
@@ -41,6 +42,7 @@ import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.DBOptions;
 import org.rocksdb.FlushOptions;
+import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.TransactionLogIterator;
@@ -94,6 +96,18 @@ public class RDBStore implements DBStore {
     this.writeOptions = writeOptions;
 
     try {
+      // This logic has been added to support old column families that have
+      // been removed, or those that may have been created in a future version.
+      // TODO : Revisit this logic during upgrade implementation.
+      List<TableConfig> columnFamiliesInDb = getColumnFamiliesInExistingDb();
+      List<TableConfig> extraCf = columnFamiliesInDb.stream().filter(
+          cf -> !families.contains(cf)).collect(Collectors.toList());
+      if (!extraCf.isEmpty()) {
+        LOG.info("Found the following extra column families in existing DB : " +
+                "{}", extraCf);
+        extraCf.forEach(cf -> columnFamilyDescriptors.add(cf.getDescriptor()));
+      }
+
       db = RocksDB.open(dbOptions, dbLocation.getAbsolutePath(),
           columnFamilyDescriptors, columnFamilyHandles);
 
@@ -147,6 +161,26 @@ public class RDBStore implements DBStore {
       LOG.debug("[Option] createIfMissing = {}", options.createIfMissing());
       LOG.debug("[Option] maxOpenFiles= {}", options.maxOpenFiles());
     }
+  }
+
+  /**
+   * Read DB and return existing column families.
+   * @return List of column families
+   * @throws RocksDBException on Error.
+   */
+  private List<TableConfig> getColumnFamiliesInExistingDb()
+      throws RocksDBException {
+    List<byte[]> bytes = RocksDB.listColumnFamilies(new Options(),
+        dbLocation.getAbsolutePath());
+    List<TableConfig> columnFamiliesInDb = bytes.stream()
+        .map(cfbytes -> new TableConfig(StringUtils.bytes2String(cfbytes),
+            DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE.getColumnFamilyOptions()))
+        .collect(Collectors.toList());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Found column Families in DB : {}",
+          columnFamiliesInDb);
+    }
+    return columnFamiliesInDb;
   }
 
   public static IOException toIOException(String msg, RocksDBException e) {

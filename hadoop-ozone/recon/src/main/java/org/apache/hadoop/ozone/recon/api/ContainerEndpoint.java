@@ -245,7 +245,7 @@ public class ContainerEndpoint {
             containerSchemaManager.getLatestContainerHistory(
                 containerID, containerInfo.getReplicationFactor().getNumber());
         missingContainers.add(new MissingContainerMetadata(containerID,
-            container.getMissingSince(), keyCount, pipelineID, datanodes));
+            container.getInStateSince(), keyCount, pipelineID, datanodes));
       } catch (IOException ioEx) {
         throw new WebApplicationException(ioEx,
             Response.Status.INTERNAL_SERVER_ERROR);
