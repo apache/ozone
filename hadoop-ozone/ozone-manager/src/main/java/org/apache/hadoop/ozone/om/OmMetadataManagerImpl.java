@@ -171,6 +171,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       isRatisEnabled = conf.getBoolean(
           OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
           OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
+    } else {
+      lock = null;
+      this.openKeyExpireThresholdMS = 0L;
     }
     start(conf);
   }
