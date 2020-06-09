@@ -2027,7 +2027,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Allocate a key.
    *
    * @param args - attributes of the key.
-   * @return OmKeyInfo - the info about the allocated key.
+   * @return OpenKeySession - a handler to key that client uses to
+   * talk to container.
    * @throws IOException
    */
   @Override
