@@ -66,14 +66,12 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 /**
  * Tests delete key operation with a slow follower in the datanode
  * pipeline.
  */
-@Ignore("HDDS-3330")
 public class TestDeleteWithSlowFollower {
 
   private static MiniOzoneCluster cluster;
@@ -138,9 +136,13 @@ public class TestDeleteWithSlowFollower {
     conf.setTimeDuration(
             RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
                     "watch.request.timeout",
-            3, TimeUnit.SECONDS);
+            10, TimeUnit.SECONDS);
     conf.setTimeDuration(OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
         1, TimeUnit.SECONDS);
+    conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 3);
+    conf.setTimeDuration(
+            OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_KEY,
+            1, TimeUnit.SECONDS);
     conf.setQuietMode(false);
     int numOfDatanodes = 3;
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -221,7 +223,9 @@ public class TestDeleteWithSlowFollower {
     }
     Assert.assertNotNull(follower);
     Assert.assertNotNull(leader);
-    // shutdown the slow follower
+    //ensure that the chosen follower is still a follower
+    Assert.assertTrue(ContainerTestHelper.isRatisFollower(follower, pipeline));
+    // shutdown the  follower node
     cluster.shutdownHddsDatanode(follower.getDatanodeDetails());
     key.write(testData);
     key.close();
