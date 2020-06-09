@@ -3235,6 +3235,149 @@
           }
         ]
       }
+    },
+    {
+      "protopath": "Security.proto",
+      "def": {
+        "messages": [
+          {
+            "name": "TokenProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "identifier",
+                "type": "bytes"
+              },
+              {
+                "id": 2,
+                "name": "password",
+                "type": "bytes"
+              },
+              {
+                "id": 3,
+                "name": "kind",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "service",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "CredentialsKVProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "alias",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "token",
+                "type": "hadoop.common.TokenProto"
+              },
+              {
+                "id": 3,
+                "name": "secret",
+                "type": "bytes"
+              }
+            ]
+          },
+          {
+            "name": "CredentialsProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "tokens",
+                "type": "hadoop.common.CredentialsKVProto",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "secrets",
+                "type": "hadoop.common.CredentialsKVProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "GetDelegationTokenRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "renewer",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "GetDelegationTokenResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "token",
+                "type": "hadoop.common.TokenProto"
+              }
+            ]
+          },
+          {
+            "name": "RenewDelegationTokenRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "token",
+                "type": "hadoop.common.TokenProto"
+              }
+            ]
+          },
+          {
+            "name": "RenewDelegationTokenResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "newExpiryTime",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "CancelDelegationTokenRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "token",
+                "type": "hadoop.common.TokenProto"
+              }
+            ]
+          },
+          {
+            "name": "CancelDelegationTokenResponseProto"
+          }
+        ],
+        "package": {
+          "name": "hadoop.common"
+        },
+        "options": [
+          {
+            "name": "java_package",
+            "value": "org.apache.hadoop.security.proto"
+          },
+          {
+            "name": "java_outer_classname",
+            "value": "SecurityProtos"
+          },
+          {
+            "name": "java_generic_services",
+            "value": "true"
+          },
+          {
+            "name": "java_generate_equals_and_hash",
+            "value": "true"
+          }
+        ]
+      }
     }
   ]
 }

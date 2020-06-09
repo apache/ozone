@@ -100,12 +100,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
               <goal>test-compile</goal>
             </goals>
             <configuration>
-              <additionalProtoPathElements>
-                <param>
-                  ${basedir}/../../hadoop-hdds/common/src/main/proto/
-                </param>
-                <param>${basedir}/src/main/proto</param>
-              </additionalProtoPathElements>
+              <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
               <protocArtifact>
                 com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}
               </protocArtifact>

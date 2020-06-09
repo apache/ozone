@@ -18,14 +18,18 @@
 package org.apache.hadoop.ozone.recon.persistence;
 
 import static org.hadoop.ozone.recon.schema.tables.ContainerHistoryTable.CONTAINER_HISTORY;
+import static org.hadoop.ozone.recon.schema.tables.UnhealthyContainersTable.UNHEALTHY_CONTAINERS;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
+import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.daos.ContainerHistoryDao;
-import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
+import org.hadoop.ozone.recon.schema.tables.daos.UnhealthyContainersDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ContainerHistory;
-import org.hadoop.ozone.recon.schema.tables.pojos.MissingContainers;
+import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
+import org.hadoop.ozone.recon.schema.tables.records.UnhealthyContainersRecord;
+import org.jooq.Cursor;
 import org.jooq.DSLContext;
 import org.jooq.Record2;
 import java.util.List;
@@ -36,33 +40,33 @@ import java.util.List;
 @Singleton
 public class ContainerSchemaManager {
   private ContainerHistoryDao containerHistoryDao;
-  private MissingContainersDao missingContainersDao;
+  private UnhealthyContainersDao unhealthyContainersDao;
   private ContainerSchemaDefinition containerSchemaDefinition;
 
   @Inject
   public ContainerSchemaManager(ContainerHistoryDao containerHistoryDao,
-              ContainerSchemaDefinition containerSchemaDefinition,
-              MissingContainersDao missingContainersDao) {
+      ContainerSchemaDefinition containerSchemaDefinition,
+      UnhealthyContainersDao unhealthyContainersDao) {
     this.containerHistoryDao = containerHistoryDao;
-    this.missingContainersDao = missingContainersDao;
+    this.unhealthyContainersDao = unhealthyContainersDao;
     this.containerSchemaDefinition = containerSchemaDefinition;
   }
 
-  public void addMissingContainer(long containerID, long time) {
-    MissingContainers record = new MissingContainers(containerID, time);
-    missingContainersDao.insert(record);
+  public List<UnhealthyContainers> getAllMissingContainers() {
+    return unhealthyContainersDao
+        .fetchByContainerState(UnHealthyContainerStates.MISSING.toString());
   }
 
-  public List<MissingContainers> getAllMissingContainers() {
-    return missingContainersDao.findAll();
+  public Cursor<UnhealthyContainersRecord> getAllUnhealthyRecordsCursor() {
+    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
+    return dslContext
+        .selectFrom(UNHEALTHY_CONTAINERS)
+        .orderBy(UNHEALTHY_CONTAINERS.CONTAINER_ID.asc())
+        .fetchLazy();
   }
 
-  public boolean isMissingContainer(long containerID) {
-    return missingContainersDao.existsById(containerID);
-  }
-
-  public void deleteMissingContainer(long containerID) {
-    missingContainersDao.deleteById(containerID);
+  public void insertUnhealthyContainerRecords(List<UnhealthyContainers> recs) {
+    unhealthyContainersDao.insert(recs);
   }
 
   public void upsertContainerHistory(long containerID, String datanode,

@@ -23,15 +23,21 @@ Test Timeout        4 minute
 *** Variables ***
 ${volume}          volume1
 ${bucket}          bucket1
-${hadoop.version}  3.2.0
 
+*** Keywords ***
+Find example jar
+                    ${jar} =            Execute                 find /opt/hadoop/share/hadoop/mapreduce/ -name "*.jar" | grep mapreduce-examples | grep -v sources | grep -v test
+                    [return]            ${jar}
 
 *** Test cases ***
+
 Execute PI calculation
-                    ${output} =      Execute                 yarn jar ./share/hadoop/mapreduce/hadoop-mapreduce-examples-${hadoop.version}.jar pi 3 3
+                    ${exampleJar}    Find example jar
+                    ${output} =      Execute                 yarn jar ${exampleJar} pi 3 3
                     Should Contain   ${output}               completed successfully
 
 Execute WordCount
+                    ${exampleJar}    Find example jar
                     ${random}        Generate Random String  2   [NUMBERS]
-                    ${output} =      Execute                 yarn jar ./share/hadoop/mapreduce/hadoop-mapreduce-examples-${hadoop.version}.jar wordcount o3fs://bucket1.volume1/key1 o3fs://bucket1.volume1/key1-${random}.count
+                    ${output} =      Execute                 yarn jar ${exampleJar} wordcount o3fs://bucket1.volume1/key1 o3fs://bucket1.volume1/key1-${random}.count
                     Should Contain   ${output}               completed successfully

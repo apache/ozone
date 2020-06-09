@@ -364,6 +364,10 @@ public class DatanodeStateMachine implements Closeable {
       }
       return getLastState();
     }
+
+    public boolean isTransitionAllowedTo(DatanodeStates newState) {
+      return newState.getValue() > getValue();
+    }
   }
 
   /**
