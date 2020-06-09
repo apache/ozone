@@ -49,7 +49,12 @@ public final class NetUtils {
    * If <i>path</i>is empty or null, then {@link NetConstants#ROOT} is returned
    */
   public static String normalize(String path) {
-    if (path == null || path.length() == 0) {
+    if (path == null) {
+      return NetConstants.ROOT;
+    }
+
+    int len = path.length();
+    if (len == 0) {
       return NetConstants.ROOT;
     }
 
@@ -59,9 +64,12 @@ public final class NetUtils {
               + NetConstants.PATH_SEPARATOR_STR + ": " + path);
     }
 
+    if (len == 1 || path.charAt(len - 1) != NetConstants.PATH_SEPARATOR) {
+      return path;
+    }
+
     // Remove any trailing NetConstants.PATH_SEPARATOR
-    return path.length() == 1 ? path :
-        TRAILING_PATH_SEPARATOR.matcher(path).replaceAll("");
+    return TRAILING_PATH_SEPARATOR.matcher(path).replaceAll("");
   }
 
   /**
