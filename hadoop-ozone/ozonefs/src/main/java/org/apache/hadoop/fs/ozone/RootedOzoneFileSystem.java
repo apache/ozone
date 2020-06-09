@@ -31,11 +31,11 @@ import java.io.IOException;
 import java.net.URI;
 
 /**
- * The Rooted Ozone Filesystem implementation.
+ * The Rooted Ozone Filesystem (OFS) implementation.
  * <p>
  * This subclass is marked as private as code should not be creating it
  * directly; use {@link FileSystem#get(org.apache.hadoop.conf.Configuration)}
- * and variants to create one. If cast to {@link OzoneFileSystem}, extra
+ * and variants to create one. If cast to {@link RootedOzoneFileSystem}, extra
  * methods and features may be accessed. Consider those private and unstable.
  */
 @InterfaceAudience.Private
