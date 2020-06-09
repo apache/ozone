@@ -49,10 +49,12 @@ public interface VolumeManager extends IOzoneAcl {
    * Changes the Quota on a volume.
    *
    * @param volume - Name of the volume.
-   * @param quota - Quota in bytes.
+   * @param namespaceQuota - Quota in counts.
+   * @param storagespaceQuota - Quota in bytes.
    * @throws IOException
    */
-  void setQuota(String volume, long quota) throws IOException;
+  void setQuota(String volume, long namespaceQuota,
+                long storagespaceQuota) throws IOException;
 
   /**
    * Gets the volume information.

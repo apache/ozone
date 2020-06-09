@@ -257,6 +257,7 @@ public final class OzoneConsts {
   public static final String SRC_KEY = "srcKey";
   public static final String DST_KEY = "dstKey";
   public static final String QUOTA_IN_BYTES = "quotaInBytes";
+  public static final String QUOTA_IN_COUNTS = "quotaInCounts";
   public static final String OBJECT_ID = "objectID";
   public static final String UPDATE_ID = "updateID";
   public static final String CLIENT_ID = "clientID";
@@ -346,9 +347,13 @@ public final class OzoneConsts {
   public static final String GDPR_SECRET = "secret";
   public static final String GDPR_ALGORITHM = "algorithm";
 
-
   // Transaction Info
   public static final String TRANSACTION_INFO_KEY = "#TRANSACTIONINFO";
   public static final String TRANSACTION_INFO_SPLIT_KEY = "#";
 
+  // Quota value
+  public static final long QUOTA_COUNT_RESET = -1;
+
+  /** Quota Units.*/
+  public enum Units {TB, GB, MB, KB, BYTES}
 }

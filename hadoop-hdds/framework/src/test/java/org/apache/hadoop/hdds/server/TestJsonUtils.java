@@ -32,11 +32,11 @@ public class TestJsonUtils {
 
   @Test
   public void printObjectAsJson() throws IOException {
-    OzoneQuota quota = new OzoneQuota(123, OzoneQuota.Units.MB);
+    OzoneQuota quota = OzoneQuota.parseQuota("123MB", 1000L);
 
     String result = JsonUtils.toJsonStringWithDefaultPrettyPrinter(quota);
 
-    assertContains(result, "\"size\" : 123");
+    assertContains(result, "\"rawSize\" : 123");
     assertContains(result, "\"unit\" : \"MB\"");
   }
 

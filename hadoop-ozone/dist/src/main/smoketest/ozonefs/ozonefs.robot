@@ -24,8 +24,8 @@ Test Timeout        5 minutes
 
 *** Test Cases ***
 Create volume and bucket
-    Execute             ozone sh volume create o3://om/fstest --quota 100TB
-    Execute             ozone sh volume create o3://om/fstest2 --quota 100TB
+    Execute             ozone sh volume create o3://om/fstest -ssq 100TB
+    Execute             ozone sh volume create o3://om/fstest2 -ssq 100TB
     Execute             ozone sh bucket create o3://om/fstest/bucket1
     Execute             ozone sh bucket create o3://om/fstest/bucket2
     Execute             ozone sh bucket create o3://om/fstest2/bucket3

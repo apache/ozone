@@ -41,7 +41,7 @@ summary: 用卷命令管理卷的生命周期
 |  Uri                           | 卷名                                       |
 
 {{< highlight bash >}}
-ozone sh volume create --quota=1TB --user=bilbo /hive
+ozone sh volume create -ssq=1TB --user=bilbo /hive
 {{< /highlight >}}
 
 上述命令会在 ozone 集群中创建名为 _hive_ 的卷，卷的限额为 1TB，所有者为 _bilbo_ 。
@@ -102,7 +102,7 @@ ozone sh volume list --user hadoop
 |  Uri                           | 卷名                                        |
 
 {{< highlight bash >}}
-ozone sh volume update --quota=10TB /hive
+ozone sh volume update -ssq=10TB /hive
 {{< /highlight >}}
 
 上述命令将 hive 卷的限额更新为 10TB。

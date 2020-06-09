@@ -21,6 +21,7 @@ import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Locale;
 
 import org.apache.commons.lang3.SystemUtils;
 import org.apache.hadoop.hdds.utils.SignalLogger;
@@ -148,4 +149,8 @@ public final class StringUtils {
         "  java = " + System.getProperty("java.version"));
   }
 
+  /** The same as String.format(Locale.ENGLISH, format, objects). */
+  public static String format(final String format, final Object... objects) {
+    return String.format(Locale.ENGLISH, format, objects);
+  }
 }

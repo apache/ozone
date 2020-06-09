@@ -38,9 +38,10 @@ public class OzoneVolumeStub extends OzoneVolume {
   private Map<String, OzoneBucketStub> buckets = new HashMap<>();
 
   public OzoneVolumeStub(String name, String admin, String owner,
-      long quotaInBytes,
+      long quotaInBytes, long quotaInCounts,
       long creationTime, List<OzoneAcl> acls) {
-    super(name, admin, owner, quotaInBytes, creationTime, acls);
+    super(name, admin, owner,
+        quotaInBytes, quotaInCounts, creationTime, acls);
   }
 
   @Override

@@ -42,7 +42,7 @@ assign it to a user.
 |  Uri                           | The name of the volume.                                        |
 
 {{< highlight bash >}}
-ozone sh volume create --quota=1TB --user=bilbo /hive
+ozone sh volume create -ssq=1TB --user=bilbo /hive
 {{< /highlight >}}
 
 The above command will create a volume called _hive_ on the ozone cluster. This
@@ -108,7 +108,7 @@ The volume update command allows changing of owner and quota on a given volume.
 |  Uri                           | The name of the volume.                                        |
 
 {{< highlight bash >}}
-ozone sh volume update --quota=10TB /hive
+ozone sh volume update -ssq=10TB /hive
 {{< /highlight >}}
 
 The above command updates the volume quota to 10TB.

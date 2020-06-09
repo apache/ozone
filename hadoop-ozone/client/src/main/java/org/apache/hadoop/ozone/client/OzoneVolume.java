@@ -26,8 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.client.OzoneQuota;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -61,9 +61,13 @@ public class OzoneVolume extends WithMetadata {
    */
   private String owner;
   /**
-   * Quota allocated for the Volume.
+   * Bytes Quota allocated for the Volume.
    */
-  private long quotaInBytes;
+  private long storagespaceQuota;
+  /**
+   * Bucket Counts Quota allocated for the Volume.
+   * */
+  private long namespaceQuota;
   /**
    * Creation time of the volume.
    */
@@ -90,7 +94,7 @@ public class OzoneVolume extends WithMetadata {
   @SuppressWarnings("parameternumber")
   public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy,
       String name,
-      String admin, String owner, long quotaInBytes,
+      String admin, String owner, long quotaInBytes, long quotaInCounts,
       long creationTime, List<OzoneAcl> acls,
       Map<String, String> metadata) {
     Preconditions.checkNotNull(proxy, "Client proxy is not set.");
@@ -98,7 +102,8 @@ public class OzoneVolume extends WithMetadata {
     this.name = name;
     this.admin = admin;
     this.owner = owner;
-    this.quotaInBytes = quotaInBytes;
+    this.storagespaceQuota = quotaInBytes;
+    this.namespaceQuota = quotaInCounts;
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.acls = acls;
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
@@ -108,21 +113,23 @@ public class OzoneVolume extends WithMetadata {
   @SuppressWarnings("parameternumber")
   public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy,
       String name,
-      String admin, String owner, long quotaInBytes,
+      String admin, String owner, long quotaInBytes, long quotaInCounts,
       long creationTime, List<OzoneAcl> acls) {
-    this(conf, proxy, name, admin, owner, quotaInBytes, creationTime, acls,
-        new HashMap<>());
+    this(conf, proxy, name, admin, owner, quotaInBytes, quotaInCounts,
+        creationTime, acls, new HashMap<>());
   }
+
 
   @VisibleForTesting
   protected OzoneVolume(String name, String admin, String owner,
-      long quotaInBytes,
+      long quotaInBytes, long quotaInCounts,
       long creationTime, List<OzoneAcl> acls) {
     this.proxy = null;
     this.name = name;
     this.admin = admin;
     this.owner = owner;
-    this.quotaInBytes = quotaInBytes;
+    this.storagespaceQuota = quotaInBytes;
+    this.namespaceQuota = quotaInCounts;
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.acls = acls;
     this.metadata = new HashMap<>();
@@ -160,10 +167,18 @@ public class OzoneVolume extends WithMetadata {
    *
    * @return quotaInBytes
    */
-  public long getQuota() {
-    return quotaInBytes;
+  public long getStoragespaceQuota() {
+    return storagespaceQuota;
   }
 
+  /**
+   * Returns Bucket Quota count allocated for the Volume.
+   *
+   * @return quotaInCounts
+   */
+  public long getNamespaceQuota() {
+    return namespaceQuota;
+  }
   /**
    * Returns creation time of the volume.
    *
@@ -195,12 +210,14 @@ public class OzoneVolume extends WithMetadata {
 
   /**
    * Sets/Changes the quota of this Volume.
-   * @param quota new quota
-   * @throws IOException
+   *
+   * @param quota@throws IOException
    */
   public void setQuota(OzoneQuota quota) throws IOException {
-    proxy.setVolumeQuota(name, quota);
-    this.quotaInBytes = quota.sizeInBytes();
+    proxy.setVolumeQuota(name, quota.getNamespaceQuota(),
+        quota.getStoragespaceQuota());
+    this.storagespaceQuota = quota.getStoragespaceQuota();
+    this.namespaceQuota = quota.getNamespaceQuota();
   }
 
   /**
