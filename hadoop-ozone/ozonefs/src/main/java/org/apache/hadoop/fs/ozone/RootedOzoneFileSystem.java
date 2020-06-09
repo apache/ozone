@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderTokenIssuer;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.GlobalStorageStatistics;
 import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.security.token.DelegationTokenIssuer;
 
@@ -45,6 +44,10 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
     implements KeyProviderTokenIssuer {
 
   private OzoneFSStorageStatistics storageStatistics;
+
+  public RootedOzoneFileSystem() {
+    this.storageStatistics = new OzoneFSStorageStatistics();
+  }
 
   @Override
   public KeyProvider getKeyProvider() throws IOException {
@@ -85,19 +88,8 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
 
   @Override
   protected OzoneClientAdapter createAdapter(ConfigurationSource conf,
-      String omHost, int omPort, boolean isolatedClassloader)
-      throws IOException {
-
-    this.storageStatistics =
-        (OzoneFSStorageStatistics) GlobalStorageStatistics.INSTANCE
-            .put(OzoneFSStorageStatistics.NAME,
-                OzoneFSStorageStatistics::new);
-
-    if (isolatedClassloader) {
-      return OzoneClientAdapterFactory.createAdapter(storageStatistics);
-    } else {
-      return new RootedOzoneClientAdapterImpl(omHost, omPort, conf,
-          storageStatistics);
-    }
+      String omHost, int omPort) throws IOException {
+    return new RootedOzoneClientAdapterImpl(omHost, omPort, conf,
+        storageStatistics);
   }
 }
