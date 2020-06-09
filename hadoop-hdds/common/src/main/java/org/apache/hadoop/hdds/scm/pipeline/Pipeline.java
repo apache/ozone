@@ -292,8 +292,7 @@ public final class Pipeline {
     Preconditions.checkNotNull(pipeline, "Pipeline is null");
 
     List<DatanodeDetails> nodes = new ArrayList<>();
-    List<DatanodeDetailsProto> membersList = pipeline.getMembersList();
-    for (DatanodeDetailsProto member : membersList) {
+    for (DatanodeDetailsProto member : pipeline.getMembersList()) {
       nodes.add(DatanodeDetails.getFromProtoBuf(member));
     }
 

@@ -417,8 +417,7 @@ public final class OmKeyInfo extends WithObjectID {
     }
 
     List<OmKeyLocationInfoGroup> omKeyLocationInfos = new ArrayList<>();
-    List<KeyLocationList> keyLocationLists = keyInfo.getKeyLocationListList();
-    for (KeyLocationList keyLocationList : keyLocationLists) {
+    for (KeyLocationList keyLocationList : keyInfo.getKeyLocationListList()) {
       omKeyLocationInfos.add(
           OmKeyLocationInfoGroup.getFromProtobuf(keyLocationList));
     }

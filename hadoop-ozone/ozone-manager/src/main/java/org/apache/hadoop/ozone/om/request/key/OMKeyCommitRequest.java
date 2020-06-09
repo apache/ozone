@@ -135,10 +135,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           commitKeyRequest.getClientID());
 
       List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
-      List<KeyLocation> keyLocations = commitKeyArgs
-          .getKeyLocationsList();
-
-      for (KeyLocation keyLocation : keyLocations) {
+      for (KeyLocation keyLocation : commitKeyArgs.getKeyLocationsList()) {
         locationInfoList.add(OmKeyLocationInfo.getFromProtobuf(keyLocation));
       }
 
