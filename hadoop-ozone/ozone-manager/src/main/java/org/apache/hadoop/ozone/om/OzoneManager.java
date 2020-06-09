@@ -221,7 +221,6 @@ import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.FileUtils;
 import org.apache.ratis.util.LifeCycle;
-import org.apache.ratis.util.function.CheckedConsumer;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -2269,18 +2268,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public List<OmKeyInfo> listKeys(String volumeName, String bucketName,
+  public List<OmKeyInfo> listKeys(final String volumeName,
+      final String bucketName,
       String startKey, String keyPrefix, int maxKeys) throws IOException {
 
+    Pair<String, String> requestedVolumeAndBucket =
+        Pair.of(volumeName, bucketName);
     Pair<String, String> resolvedVolumeAndBucket = resolveBucketLink(
-        Pair.of(volumeName, bucketName)
+        requestedVolumeAndBucket
     );
-    volumeName = resolvedVolumeAndBucket.getLeft();
-    bucketName = resolvedVolumeAndBucket.getRight();
+    final String resolvedVolumeName = resolvedVolumeAndBucket.getLeft();
+    final String resolvedBucketName = resolvedVolumeAndBucket.getRight();
 
     if (isAclEnabled) {
-      checkAcls(ResourceType.BUCKET,
-          StoreType.OZONE, ACLType.LIST, volumeName, bucketName, keyPrefix);
+      checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
+          resolvedVolumeName, resolvedBucketName, keyPrefix);
     }
 
     boolean auditSuccess = true;
@@ -2289,9 +2291,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.START_KEY, startKey);
     auditMap.put(OzoneConsts.MAX_KEYS, String.valueOf(maxKeys));
     auditMap.put(OzoneConsts.KEY_PREFIX, keyPrefix);
+    if (!Objects.equals(requestedVolumeAndBucket, resolvedVolumeAndBucket)) {
+      auditMap.put(OzoneConsts.SOURCE_VOLUME, resolvedVolumeName);
+      auditMap.put(OzoneConsts.SOURCE_BUCKET, resolvedBucketName);
+    }
     try {
       metrics.incNumKeyLists();
-      return keyManager.listKeys(volumeName, bucketName,
+      return keyManager.listKeys(resolvedVolumeName, resolvedBucketName,
           startKey, keyPrefix, maxKeys);
     } catch (IOException ex) {
       metrics.incNumKeyListFails();

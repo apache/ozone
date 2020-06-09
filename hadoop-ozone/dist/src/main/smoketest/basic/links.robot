@@ -31,6 +31,41 @@ Create volumes
     Set Suite Variable  ${target}  ${random}-target
     Execute             ozone sh volume create ${source}
     Execute             ozone sh volume create ${target}
+    Run Keyword if      '${SECURITY_ENABLED}' == 'true'    Setup ACL tests
+
+Setup ACL tests
+    Execute             ozone sh bucket create ${source}/readable-bucket
+    Execute             ozone sh key put ${source}/readable-bucket/key-in-readable-bucket /etc/passwd
+    Execute             ozone sh bucket create ${source}/unreadable-bucket
+    Execute             ozone sh bucket link ${source}/readable-bucket ${target}/readable-link
+    Execute             ozone sh bucket link ${source}/readable-bucket ${target}/unreadable-link
+    Execute             ozone sh bucket link ${source}/unreadable-bucket ${target}/link-to-unreadable-bucket
+    Execute             ozone sh volume addacl --acl user:testuser2/scm@EXAMPLE.COM:r ${target}
+    Execute             ozone sh volume addacl --acl user:testuser2/scm@EXAMPLE.COM:rl ${source}
+    Execute             ozone sh bucket addacl --acl user:testuser2/scm@EXAMPLE.COM:rl ${source}/readable-bucket
+    Execute             ozone sh bucket addacl --acl user:testuser2/scm@EXAMPLE.COM:r ${target}/readable-link
+    Execute             ozone sh bucket addacl --acl user:testuser2/scm@EXAMPLE.COM:r ${target}/link-to-unreadable-bucket
+
+Can follow link with read access
+    Execute             kdestroy
+    Run Keyword         Kinit test user             testuser2         testuser2.keytab
+    ${result} =         Execute And Ignore Error    ozone sh key list ${target}/readable-link
+                        Should Contain              ${result}         key-in-readable-bucket
+
+Cannot follow link without read access
+    Execute             kdestroy
+    Run Keyword         Kinit test user             testuser2         testuser2.keytab
+    ${result} =         Execute And Ignore Error    ozone sh key list ${target}/unreadable-link
+                        Should Contain              ${result}         PERMISSION_DENIED
+
+ACL verified on source bucket
+    Execute             kdestroy
+    Run Keyword         Kinit test user             testuser2         testuser2.keytab
+    ${result} =         Execute                     ozone sh bucket info ${target}/link-to-unreadable-bucket
+                        Should Contain              ${result}         link-to-unreadable-bucket
+                        Should Not Contain          ${result}         PERMISSION_DENIED
+    ${result} =         Execute And Ignore Error    ozone sh key list ${target}/link-to-unreadable-bucket
+                        Should Contain              ${result}         PERMISSION_DENIED
 
 *** Test Cases ***
 Link to non-existent bucket
@@ -66,9 +101,6 @@ Bucket list contains links
                         Should Contain              ${result}         dangling-link
 
 Source and target have separate ACLs
-    Verify ACL    bucket    ${target}/link1      USER    hadoop    ALL
-    Verify ACL    bucket    ${source}/bucket1    USER    hadoop    ALL
-
     Execute       ozone sh bucket addacl --acl user:user1:rwxy ${target}/link1
     Verify ACL    bucket    ${target}/link1      USER    user1    READ WRITE READ_ACL WRITE_ACL
     Verify ACL    bucket    ${source}/bucket1    USER    user1    ${EMPTY}
@@ -85,6 +117,15 @@ Buckets and links share namespace
                         Execute                     ozone sh bucket create ${target}/bucket3
     ${result} =         Execute And Ignore Error    ozone sh bucket link ${source}/bucket1 ${target}/bucket3
                         Should Contain              ${result}    BUCKET_ALREADY_EXISTS
+
+Can follow link with read access
+    Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Can follow link with read access
+
+Cannot follow link without read access
+    Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Cannot follow link without read access
+
+ACL verified on source bucket
+    Run Keyword if    '${SECURITY_ENABLED}' == 'true'    ACL verified on source bucket
 
 Loop in link chain is detected
                         Execute                     ozone sh bucket link ${target}/loop1 ${target}/loop2
