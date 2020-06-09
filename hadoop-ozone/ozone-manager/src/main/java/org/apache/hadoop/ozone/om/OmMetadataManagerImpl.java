@@ -157,16 +157,21 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private boolean isRatisEnabled;
 
   public OmMetadataManagerImpl(OzoneConfiguration conf) throws IOException {
-    this.lock = new OzoneManagerLock(conf);
-    this.openKeyExpireThresholdMS = 1000L * conf.getInt(
-        OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS,
-        OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT);
-    // TODO: This is a temporary check. Once fully implemented, all OM state
-    //  change should go through Ratis - be it standalone (for non-HA) or
-    //  replicated (for HA).
-    isRatisEnabled = conf.getBoolean(
-        OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
-        OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
+
+    // This will be set only when we don't want to initialize tables, and
+    // just load DB.
+    if (!conf.getBoolean(OZONE_OM_SKIP_INITIALIZATION_TABLES, false)){
+      this.lock = new OzoneManagerLock(conf);
+      this.openKeyExpireThresholdMS = 1000L * conf.getInt(
+          OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS,
+          OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT);
+      // TODO: This is a temporary check. Once fully implemented, all OM state
+      //  change should go through Ratis - be it standalone (for non-HA) or
+      //  replicated (for HA).
+      isRatisEnabled = conf.getBoolean(
+          OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
+          OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
+    }
     start(conf);
   }
 
@@ -268,7 +273,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       this.store = addOMTablesAndCodecs(dbStoreBuilder).build();
 
       // This value will be used internally, not to be exposed to end users.
-      if (configuration.getBoolean(OZONE_OM_SKIP_INITIALIZATION_TABLES, true)) {
+      if (!configuration.getBoolean(OZONE_OM_SKIP_INITIALIZATION_TABLES,
+          false)) {
         initializeOmTables();
       }
     }

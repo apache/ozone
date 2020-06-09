@@ -233,7 +233,7 @@ public final class OzoneManagerRatisUtils {
    */
   public static OMTransactionInfo getTransactionInfoFromDownloadedSnapshot(
       OzoneConfiguration tempConfig) throws Exception {
-    tempConfig.setBoolean(OZONE_OM_SKIP_INITIALIZATION_TABLES, false);
+    tempConfig.setBoolean(OZONE_OM_SKIP_INITIALIZATION_TABLES, true);
     OMMetadataManager tempMetadataMgr = new OmMetadataManagerImpl(tempConfig);
 
     Table<String, OMTransactionInfo> transactionInfoTable =
