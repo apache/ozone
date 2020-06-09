@@ -2573,6 +2573,12 @@ function hadoop_parse_args
         shift
         ((HADOOP_PARSE_COUNTER=HADOOP_PARSE_COUNTER+1))
       ;;
+      --jvmargs)
+        shift
+        hadoop_add_param HADOOP_OPTS "$1" "$1"
+        shift
+        ((HADOOP_PARSE_COUNTER=HADOOP_PARSE_COUNTER+2))
+      ;;
       --config)
         shift
         confdir=$1
