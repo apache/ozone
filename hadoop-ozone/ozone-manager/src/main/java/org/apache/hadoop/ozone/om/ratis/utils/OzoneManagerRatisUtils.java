@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.ratis.utils;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -74,7 +75,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SKIP_INITIALIZATION_TABLES;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_TABLE;
 
 /**
@@ -232,17 +232,17 @@ public final class OzoneManagerRatisUtils {
    * @throws Exception
    */
   public static OMTransactionInfo getTransactionInfoFromDownloadedSnapshot(
-      OzoneConfiguration tempConfig) throws Exception {
-    tempConfig.setBoolean(OZONE_OM_SKIP_INITIALIZATION_TABLES, true);
-    OMMetadataManager tempMetadataMgr = new OmMetadataManagerImpl(tempConfig);
+      OzoneConfiguration tempConfig, Path dbDir) throws Exception {
+    DBStore dbStore =
+        OmMetadataManagerImpl.loadDB(tempConfig, dbDir.toFile());
 
     Table<String, OMTransactionInfo> transactionInfoTable =
-        tempMetadataMgr.getStore().getTable(TRANSACTION_INFO_TABLE,
+        dbStore.getTable(TRANSACTION_INFO_TABLE,
             String.class, OMTransactionInfo.class);
 
     OMTransactionInfo omTransactionInfo =
         transactionInfoTable.get(TRANSACTION_INFO_KEY);
-    tempMetadataMgr.stop();
+    dbStore.close();
     OzoneManager.LOG.info("Downloaded checkpoint with OMTransactionInfo {}",
         omTransactionInfo);
     return omTransactionInfo;

@@ -78,7 +78,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SKIP_INITIALIZATION_TABLES;
 
 import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
@@ -158,23 +157,16 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   public OmMetadataManagerImpl(OzoneConfiguration conf) throws IOException {
 
-    // This will be set only when we don't want to initialize tables, and
-    // just load DB.
-    if (!conf.getBoolean(OZONE_OM_SKIP_INITIALIZATION_TABLES, false)){
-      this.lock = new OzoneManagerLock(conf);
-      this.openKeyExpireThresholdMS = 1000L * conf.getInt(
-          OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS,
-          OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT);
-      // TODO: This is a temporary check. Once fully implemented, all OM state
-      //  change should go through Ratis - be it standalone (for non-HA) or
-      //  replicated (for HA).
-      isRatisEnabled = conf.getBoolean(
-          OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
-          OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
-    } else {
-      lock = null;
-      this.openKeyExpireThresholdMS = 0L;
-    }
+    this.lock = new OzoneManagerLock(conf);
+    this.openKeyExpireThresholdMS = 1000L * conf.getInt(
+        OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS,
+        OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT);
+    // TODO: This is a temporary check. Once fully implemented, all OM state
+    //  change should go through Ratis - be it standalone (for non-HA) or
+    //  replicated (for HA).
+    isRatisEnabled = conf.getBoolean(
+        OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
+        OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
     start(conf);
   }
 
@@ -273,17 +265,25 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
           rocksDBConfiguration).setName(OM_DB_NAME)
           .setPath(Paths.get(metaDir.getPath()));
 
-      this.store = addOMTablesAndCodecs(dbStoreBuilder).build();
+      this.store = loadDB(configuration, metaDir);
 
       // This value will be used internally, not to be exposed to end users.
-      if (!configuration.getBoolean(OZONE_OM_SKIP_INITIALIZATION_TABLES,
-          false)) {
-        initializeOmTables();
-      }
+      initializeOmTables();
     }
   }
 
-  protected DBStoreBuilder addOMTablesAndCodecs(DBStoreBuilder builder) {
+  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir)
+      throws IOException {
+    RocksDBConfiguration rocksDBConfiguration =
+        configuration.getObject(RocksDBConfiguration.class);
+    DBStoreBuilder dbStoreBuilder = DBStoreBuilder.newBuilder(configuration,
+        rocksDBConfiguration).setName(OM_DB_NAME)
+        .setPath(Paths.get(metaDir.getPath()));
+    DBStore dbStore = addOMTablesAndCodecs(dbStoreBuilder).build();
+    return dbStore;
+  }
+
+  protected static DBStoreBuilder addOMTablesAndCodecs(DBStoreBuilder builder) {
 
     return builder.addTable(USER_TABLE)
         .addTable(VOLUME_TABLE)

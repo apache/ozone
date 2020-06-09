@@ -234,8 +234,4 @@ public final class OMConfigKeys {
   // hadoop-policy.xml, "*" allows all users/groups to access.
   public static final String OZONE_OM_SECURITY_CLIENT_PROTOCOL_ACL =
       "ozone.om.security.client.protocol.acl";
-
-  // internally used in the code to just initialize OM DB.
-  public static final String OZONE_OM_SKIP_INITIALIZATION_TABLES = "ozone.om" +
-      ".skip.initialization.tables";
 }

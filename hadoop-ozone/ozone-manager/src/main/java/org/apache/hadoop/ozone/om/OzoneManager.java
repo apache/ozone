@@ -3040,7 +3040,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       omTransactionInfo =
           OzoneManagerRatisUtils.getTransactionInfoFromDownloadedSnapshot(
-              tempConfig);
+              tempConfig, dbDir);
     } catch (Exception ex) {
       LOG.error("Failed during opening downloaded snapshot from " +
           "{} to obtain transaction index", newDBlocation, ex);

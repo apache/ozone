@@ -61,6 +61,7 @@ public class TestOzoneManagerStateMachine {
         Mockito.mock(OMRatisSnapshotInfo.class));
     ozoneManagerStateMachine =
         new OzoneManagerStateMachine(ozoneManagerRatisServer, false);
+    ozoneManagerStateMachine.notifyIndexUpdate(0, 0);
   }
 
   @Test
