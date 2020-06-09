@@ -135,10 +135,11 @@ const COLUMNS = [
           {
             pipelines.map((pipeline, index) => (
               <div key={index} className='pipeline-container'>
-                <ReplicationIcon replicationFactor={pipeline.replicationFactor}
-                                 replicationType={pipeline.replicationType}
-                                 leaderNode={pipeline.leaderNode}
-                                 isLeader={pipeline.leaderNode === record.hostname}/>
+                <ReplicationIcon
+                  replicationFactor={pipeline.replicationFactor}
+                  replicationType={pipeline.replicationType}
+                  leaderNode={pipeline.leaderNode}
+                  isLeader={pipeline.leaderNode === record.hostname}/>
                 {pipeline.pipelineID}
               </div>
             ))
@@ -148,12 +149,13 @@ const COLUMNS = [
     }
   },
   {
-    title: <span>
-      Leader Count&nbsp;
-      <Tooltip title='The number of Ratis Pipelines in which the given datanode is elected as a leader.'>
-        <Icon type='info-circle'/>
-      </Tooltip>
-    </span>,
+    title:
+  <span>
+    Leader Count&nbsp;
+    <Tooltip title='The number of Ratis Pipelines in which the given datanode is elected as a leader.'>
+      <Icon type='info-circle'/>
+    </Tooltip>
+  </span>,
     dataIndex: 'leaderCount',
     key: 'leaderCount',
     sorter: (a: IDatanode, b: IDatanode) => a.leaderCount - b.leaderCount
