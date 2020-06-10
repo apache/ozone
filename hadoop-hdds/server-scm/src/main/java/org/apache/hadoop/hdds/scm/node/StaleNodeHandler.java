@@ -60,7 +60,7 @@ public class StaleNodeHandler implements EventHandler<DatanodeDetails> {
     for (PipelineID pipelineID : pipelineIds) {
       try {
         Pipeline pipeline = pipelineManager.getPipeline(pipelineID);
-        pipelineManager.finalizeAndDestroyPipeline(pipeline, true);
+        pipelineManager.closePipeline(pipeline, true);
       } catch (IOException e) {
         LOG.info("Could not finalize pipeline={} for dn={}", pipelineID,
             datanodeDetails);

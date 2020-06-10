@@ -62,13 +62,6 @@ public class ReconPipelineManager extends SCMPipelineManager {
     // Don't do anything in Recon.
   }
 
-  @Override
-  protected void destroyPipeline(Pipeline pipeline) throws IOException {
-    // remove the pipeline from the pipeline manager
-    removePipeline(pipeline.getId());
-  }
-
-
   /**
    * Bootstrap Recon's pipeline metadata with that from SCM.
    * @param pipelinesFromScm pipelines from SCM.
@@ -124,7 +117,7 @@ public class ReconPipelineManager extends SCMPipelineManager {
         }
         try {
           LOG.info("Removing invalid pipeline {} from Recon.", pipelineID);
-          finalizeAndDestroyPipeline(p, false);
+          closePipeline(p, false);
         } catch (IOException e) {
           LOG.warn("Unable to remove pipeline {}", pipelineID, e);
         }

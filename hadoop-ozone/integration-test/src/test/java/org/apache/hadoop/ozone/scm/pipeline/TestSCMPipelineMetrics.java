@@ -92,8 +92,7 @@ public class TestSCMPipelineMetrics {
     try {
       cluster.getStorageContainerManager()
           .getPipelineManager()
-          .finalizeAndDestroyPipeline(
-              pipeline.get(), false);
+          .closePipeline(pipeline.get(), false);
     } catch (IOException e) {
       e.printStackTrace();
       Assert.fail();

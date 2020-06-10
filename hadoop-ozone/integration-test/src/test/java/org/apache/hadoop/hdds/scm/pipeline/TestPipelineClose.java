@@ -137,7 +137,7 @@ public class TestPipelineClose {
     Assert.assertEquals(0, setClosed.size());
 
     pipelineManager
-        .finalizeAndDestroyPipeline(ratisContainer.getPipeline(), false);
+        .closePipeline(ratisContainer.getPipeline(), true);
     for (DatanodeDetails dn : ratisContainer.getPipeline().getNodes()) {
       // Assert that the pipeline has been removed from Node2PipelineMap as well
       Assert.assertFalse(scm.getScmNodeManager().getPipelines(dn)
@@ -153,7 +153,7 @@ public class TestPipelineClose {
     Assert.assertEquals(1, setOpen.size());
 
     pipelineManager
-        .finalizeAndDestroyPipeline(ratisContainer.getPipeline(), false);
+        .closePipeline(ratisContainer.getPipeline(), true);
     GenericTestUtils.waitFor(() -> {
       try {
         return containerManager

@@ -140,7 +140,7 @@ public class TestSCMPipelineManager {
 
     // clean up
     for (Pipeline pipeline : pipelines) {
-      pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
+      pipelineManager.closePipeline(pipeline, false);
     }
     pipelineManager.close();
   }
@@ -163,7 +163,7 @@ public class TestSCMPipelineManager {
     pipelineManager.openPipeline(pipeline.getId());
     pipelineManager
         .addContainerToPipeline(pipeline.getId(), ContainerID.valueof(1));
-    pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
+    pipelineManager.closePipeline(pipeline, false);
     pipelineManager.close();
 
     // new pipeline manager should not be able to load removed pipelines
@@ -228,7 +228,7 @@ public class TestSCMPipelineManager {
         .assertTrue(pipelineManager.getPipeline(pipeline.getId()).isOpen());
 
     // close the pipeline
-    pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
+    pipelineManager.closePipeline(pipeline, false);
 
     // pipeline report for destroyed pipeline should be ignored
     nodes.subList(0, 2).forEach(dn -> sendPipelineReport(dn, pipeline,

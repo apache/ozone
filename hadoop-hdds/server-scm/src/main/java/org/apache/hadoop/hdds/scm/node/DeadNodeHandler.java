@@ -98,8 +98,8 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
         .ifPresent(pipelines ->
             pipelines.forEach(id -> {
               try {
-                pipelineManager.finalizeAndDestroyPipeline(
-                    pipelineManager.getPipeline(id), false);
+                pipelineManager.closePipeline(
+                    pipelineManager.getPipeline(id), true);
               } catch (PipelineNotFoundException ignore) {
                 // Pipeline is not there in pipeline manager,
                 // should we care?

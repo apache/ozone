@@ -165,8 +165,7 @@ public final class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void finalizeAndDestroyPipeline(final Pipeline pipeline,
-                                         final boolean onTimeout)
+  public void closePipeline(final Pipeline pipeline, final boolean onTimeout)
       throws IOException {
     stateManager.finalizePipeline(pipeline.getId());
   }

@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
@@ -47,6 +48,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -68,6 +70,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   private Scheduler scheduler;
   private BackgroundPipelineCreator backgroundPipelineCreator;
   private final ConfigurationSource conf;
+  private final EventPublisher eventPublisher;
   // Pipeline Manager MXBean
   private ObjectName pmInfoBean;
   private final SCMPipelineMetrics metrics;
@@ -80,11 +83,13 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   private PipelineManagerV2Impl(ConfigurationSource conf,
                                NodeManager nodeManager,
                                StateManager pipelineStateManager,
-                               PipelineFactory pipelineFactory) {
+                               PipelineFactory pipelineFactory,
+                                EventPublisher eventPublisher) {
     this.lock = new ReentrantReadWriteLock();
     this.pipelineFactory = pipelineFactory;
     this.stateManager = pipelineStateManager;
     this.conf = conf;
+    this.eventPublisher = eventPublisher;
     this.pmInfoBean = MBeans.register("SCMPipelineManager",
         "SCMPipelineManagerInfo", this);
     this.metrics = SCMPipelineMetrics.create();
@@ -116,7 +121,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
         nodeManager, stateManager, conf, eventPublisher);
     // Create PipelineManager
     PipelineManagerV2Impl pipelineManager = new PipelineManagerV2Impl(conf,
-        nodeManager, stateManager, pipelineFactory);
+        nodeManager, stateManager, pipelineFactory, eventPublisher);
 
     // Create background thread.
     Scheduler scheduler = new Scheduler(
@@ -310,85 +315,18 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   }
 
   /**
-   * Finalizes pipeline in the SCM. Removes pipeline and makes rpc call to
-   * destroy pipeline on the datanodes immediately or after timeout based on the
-   * value of onTimeout parameter.
-   *
-   * @param pipeline        - Pipeline to be destroyed
-   * @param onTimeout       - if true pipeline is removed and destroyed on
-   *                        datanodes after timeout
-   * @throws IOException
-   */
-  @Override
-  public void finalizeAndDestroyPipeline(Pipeline pipeline, boolean onTimeout)
-      throws IOException {
-    LOG.info("Destroying pipeline:{}", pipeline);
-    finalizePipeline(pipeline.getId());
-    if (onTimeout) {
-      long pipelineDestroyTimeoutInMillis =
-          conf.getTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT,
-              ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT_DEFAULT,
-              TimeUnit.MILLISECONDS);
-      scheduler.schedule(() -> destroyPipeline(pipeline),
-          pipelineDestroyTimeoutInMillis, TimeUnit.MILLISECONDS, LOG,
-          String.format("Destroy pipeline failed for pipeline:%s", pipeline));
-    } else {
-      destroyPipeline(pipeline);
-    }
-  }
-
-  /**
-   * Moves the pipeline to CLOSED state and sends close container command for
-   * all the containers in the pipeline.
-   *
-   * @param pipelineId - ID of the pipeline to be moved to CLOSED state.
-   * @throws IOException
-   */
-  private void finalizePipeline(PipelineID pipelineId) throws IOException {
-    lock.writeLock().lock();
-    try {
-      Pipeline pipeline = stateManager.getPipeline(pipelineId);
-      if (!pipeline.isClosed()) {
-        stateManager.updatePipelineState(
-            pipelineId.getProtobuf(), HddsProtos.PipelineState.PIPELINE_CLOSED);
-        LOG.info("Pipeline {} moved to CLOSED state", pipeline);
-      }
-
-      // TODO fire events to datanodes for closing pipelines
-//      Set<ContainerID> containerIDs = stateManager.getContainers(pipelineId);
-//      for (ContainerID containerID : containerIDs) {
-//        eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
-//      }
-      metrics.removePipelineMetrics(pipelineId);
-    } finally {
-      lock.writeLock().unlock();
-    }
-  }
-
-  /**
-   * Removes pipeline from SCM. Sends ratis command to destroy pipeline on all
-   * the datanodes for ratis pipelines.
-   *
-   * @param pipeline        - Pipeline to be destroyed
-   * @throws IOException
-   */
-  protected void destroyPipeline(Pipeline pipeline) throws IOException {
-    pipelineFactory.close(pipeline.getType(), pipeline);
-    // remove the pipeline from the pipeline manager
-    removePipeline(pipeline.getId());
-    triggerPipelineCreation();
-  }
-
-  /**
    * Removes the pipeline from the db and pipeline state map.
    *
-   * @param pipelineId - ID of the pipeline to be removed
+   * @param pipeline - pipeline to be removed
    * @throws IOException
    */
-  protected void removePipeline(PipelineID pipelineId) throws IOException {
+  protected void removePipeline(Pipeline pipeline) throws IOException {
+    pipelineFactory.close(pipeline.getType(), pipeline);
+    PipelineID pipelineID = pipeline.getId();
     lock.writeLock().lock();
+    closeContainersForPipeline(pipelineID);
     try {
-      stateManager.removePipeline(pipelineId.getProtobuf());
+      stateManager.removePipeline(pipelineID.getProtobuf());
       metrics.incNumPipelineDestroyed();
     } catch (IOException ex) {
       metrics.incNumPipelineDestroyFailed();
@@ -398,14 +336,48 @@ public final class PipelineManagerV2Impl implements PipelineManager {
     }
   }
 
-  @Override
-  public void scrubPipeline(ReplicationType type, ReplicationFactor factor)
-      throws IOException{
-    if (type != ReplicationType.RATIS || factor != ReplicationFactor.THREE) {
-      // Only srub pipeline for RATIS THREE pipeline
-      return;
+  /**
+   * Fire events to close all containers related to the input pipeline.
+   * @param pipelineId - ID of the pipeline.
+   * @throws IOException
+   */
+  protected void closeContainersForPipeline(final PipelineID pipelineId)
+      throws IOException {
+    Set<ContainerID> containerIDs = stateManager.getContainers(pipelineId);
+    for (ContainerID containerID : containerIDs) {
+      eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
     }
-    Instant currentTime = Instant.now();
+  }
+
+  /**
+   * put pipeline in CLOSED state.
+   * @param pipeline - ID of the pipeline.
+   * @param onTimeout - whether to remove pipeline after some time.
+   * @throws IOException
+   */
+  @Override
+  public void closePipeline(Pipeline pipeline, boolean onTimeout)
+      throws IOException {
+    PipelineID pipelineID = pipeline.getId();
+    lock.writeLock().lock();
+    try {
+      if (!pipeline.isClosed()) {
+        stateManager.updatePipelineState(pipelineID.getProtobuf(),
+            HddsProtos.PipelineState.PIPELINE_CLOSED);
+        LOG.info("Pipeline {} moved to CLOSED state", pipeline);
+      }
+      metrics.removePipelineMetrics(pipelineID);
+    } finally {
+      lock.writeLock().unlock();
+    }
+    if (!onTimeout) {
+      removePipeline(pipeline);
+    }
+  }
+
+  private void scrubAllocatedPipeline(
+      ReplicationType type, ReplicationFactor factor, Instant currentTime)
+      throws IOException {
     Long pipelineScrubTimeoutInMills = conf.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT,
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT,
@@ -420,8 +392,48 @@ public final class PipelineManagerV2Impl implements PipelineManager {
           " since it stays at ALLOCATED stage for " +
           Duration.between(currentTime, p.getCreationTimestamp()).toMinutes() +
           " mins.");
-      finalizeAndDestroyPipeline(p, false);
+      closePipeline(p, false);
+      closeContainersForPipeline(p.getId());
     }
+  }
+
+  private void scrubClosedPipeline(
+      ReplicationType type, ReplicationFactor factor, Instant currentTime)
+      throws IOException {
+    long pipelineDestroyTimeoutInMillis =
+        conf.getTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT,
+            ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT_DEFAULT,
+            TimeUnit.MILLISECONDS);
+    List<Pipeline> closedPipelines = stateManager.getPipelines(type, factor,
+        Pipeline.PipelineState.CLOSED).stream()
+        .filter(p -> currentTime.toEpochMilli() - p.getCreationTimestamp()
+            .toEpochMilli() >= pipelineDestroyTimeoutInMillis)
+        .collect(Collectors.toList());
+    for (Pipeline p : closedPipelines) {
+      LOG.info("Scrubbing pipeline: id: " + p.getId().toString() +
+          " since it stays at CLOSED stage for " +
+          Duration.between(currentTime, p.getCreationTimestamp()).toMinutes() +
+          " mins.");
+      removePipeline(p);
+    }
+  }
+
+  /**
+   * Scrub pipelines.
+   * @param type Pipeline type
+   * @param factor Pipeline factor
+   * @throws IOException
+   */
+  @Override
+  public void scrubPipeline(ReplicationType type, ReplicationFactor factor)
+      throws IOException{
+    if (type != ReplicationType.RATIS || factor != ReplicationFactor.THREE) {
+      // Only srub pipeline for RATIS THREE pipeline
+      return;
+    }
+    Instant currentTime = Instant.now();
+    scrubAllocatedPipeline(type, factor, currentTime);
+    scrubClosedPipeline(type, factor, currentTime);
   }
 
   /**

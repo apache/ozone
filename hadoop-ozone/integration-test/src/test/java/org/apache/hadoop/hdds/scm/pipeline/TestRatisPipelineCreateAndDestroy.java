@@ -86,7 +86,7 @@ public class TestRatisPipelineCreateAndDestroy {
         .getPipelines(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN);
     for (Pipeline pipeline : pipelines) {
-      pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
+      pipelineManager.closePipeline(pipeline, false);
     }
     // make sure two pipelines are created
     waitForPipelines(2);
@@ -108,7 +108,7 @@ public class TestRatisPipelineCreateAndDestroy {
         .getPipelines(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN);
     for (Pipeline pipeline : pipelines) {
-      pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
+      pipelineManager.closePipeline(pipeline, false);
     }
 
     // make sure two pipelines are created
@@ -152,7 +152,7 @@ public class TestRatisPipelineCreateAndDestroy {
 
     // destroy the existing pipelines
     for (Pipeline pipeline : pipelines) {
-      pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
+      pipelineManager.closePipeline(pipeline, false);
     }
 
     if (cluster.getStorageContainerManager()

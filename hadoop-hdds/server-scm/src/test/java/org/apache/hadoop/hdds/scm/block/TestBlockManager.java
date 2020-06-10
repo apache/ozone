@@ -417,7 +417,7 @@ public class TestBlockManager {
   public void testBlockAllocationWithNoAvailablePipelines()
       throws IOException, TimeoutException, InterruptedException {
     for (Pipeline pipeline : pipelineManager.getPipelines()) {
-      pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
+      pipelineManager.closePipeline(pipeline, false);
     }
     Assert.assertEquals(0, pipelineManager.getPipelines(type, factor).size());
     Assert.assertNotNull(blockManager
