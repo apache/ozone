@@ -59,6 +59,7 @@ public final class Pipeline {
   private ThreadLocal<List<DatanodeDetails>> nodesInOrder = new ThreadLocal<>();
   // Current reported Leader for the pipeline
   private UUID leaderId;
+  private String strLeaderID = "";
   // Timestamp for pipeline upon creation
   private Instant creationTimestamp;
 
@@ -146,6 +147,9 @@ public final class Pipeline {
    */
   void setLeaderId(UUID leaderId) {
     this.leaderId = leaderId;
+    if (leaderId != null) {
+      this.strLeaderID = leaderId.toString();
+    }
   }
 
   /**
@@ -266,7 +270,7 @@ public final class Pipeline {
         .setType(type)
         .setFactor(factor)
         .setState(PipelineState.getProtobuf(state))
-        .setLeaderID(leaderId != null ? leaderId.toString() : "")
+        .setLeaderID(strLeaderID)
         .setCreationTimeStamp(creationTimestamp.toEpochMilli())
         .addAllMembers(members);
     // To save the message size on wire, only transfer the node order based on
@@ -344,7 +348,7 @@ public final class Pipeline {
     b.append(", Type:").append(getType());
     b.append(", Factor:").append(getFactor());
     b.append(", State:").append(getPipelineState());
-    b.append(", leaderId:").append(getLeaderId());
+    b.append(", leaderId:").append(strLeaderID);
     b.append(", CreationTimestamp").append(getCreationTimestamp());
     b.append("]");
     return b.toString();
