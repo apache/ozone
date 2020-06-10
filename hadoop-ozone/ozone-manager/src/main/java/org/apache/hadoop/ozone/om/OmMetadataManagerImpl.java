@@ -261,10 +261,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         rocksDBConfiguration.setSyncOption(true);
       }
 
-      DBStoreBuilder dbStoreBuilder = DBStoreBuilder.newBuilder(configuration,
-          rocksDBConfiguration).setName(OM_DB_NAME)
-          .setPath(Paths.get(metaDir.getPath()));
-
       this.store = loadDB(configuration, metaDir);
 
       // This value will be used internally, not to be exposed to end users.
