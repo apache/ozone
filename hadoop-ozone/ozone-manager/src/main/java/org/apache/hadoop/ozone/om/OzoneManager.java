@@ -3024,14 +3024,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     OMTransactionInfo omTransactionInfo = null;
 
-    // Set new DB location as DB path and verify downloaded DB transaction
-    // index.
-    OzoneConfiguration tempConfig = new OzoneConfiguration(configuration);
-
     Path dbDir = newDBlocation.getParent();
-    if (dbDir != null) {
-      tempConfig.set(OZONE_OM_DB_DIRS, dbDir.toString());
-    } else {
+    if (dbDir == null) {
       LOG.error("Incorrect DB location path {} received from checkpoint.",
           newDBlocation);
       return null;
@@ -3040,7 +3034,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       omTransactionInfo =
           OzoneManagerRatisUtils.getTransactionInfoFromDownloadedSnapshot(
-              tempConfig, dbDir);
+              configuration, dbDir);
     } catch (Exception ex) {
       LOG.error("Failed during opening downloaded snapshot from " +
           "{} to obtain transaction index", newDBlocation, ex);
