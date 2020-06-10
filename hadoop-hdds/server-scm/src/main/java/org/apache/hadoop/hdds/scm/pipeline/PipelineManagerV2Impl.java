@@ -299,8 +299,8 @@ public final class PipelineManagerV2Impl implements PipelineManager {
       }
       if (pipeline.getPipelineState() == Pipeline.PipelineState.ALLOCATED) {
         LOG.info("Pipeline {} moved to OPEN state", pipeline);
-        stateManager.updatePipelineState(pipelineId.getProtobuf(),
-            HddsProtos.PipelineState.PIPELINE_OPEN);
+        stateManager.updatePipelineState(
+            pipelineId.getProtobuf(), HddsProtos.PipelineState.PIPELINE_OPEN);
       }
       metrics.incNumPipelineCreated();
       metrics.createPerPipelineMetrics(pipeline);
@@ -349,8 +349,8 @@ public final class PipelineManagerV2Impl implements PipelineManager {
     try {
       Pipeline pipeline = stateManager.getPipeline(pipelineId);
       if (!pipeline.isClosed()) {
-        stateManager.updatePipelineState(pipelineId.getProtobuf(),
-            HddsProtos.PipelineState.PIPELINE_CLOSED);
+        stateManager.updatePipelineState(
+            pipelineId.getProtobuf(), HddsProtos.PipelineState.PIPELINE_CLOSED);
         LOG.info("Pipeline {} moved to CLOSED state", pipeline);
       }
 
