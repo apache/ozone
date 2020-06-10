@@ -256,6 +256,11 @@ public final class Pipeline {
 
   public HddsProtos.Pipeline getProtobufMessage()
       throws UnknownPipelineStateException {
+    List<HddsProtos.DatanodeDetailsProto> members = new ArrayList<>();
+    for (DatanodeDetails dn : nodeStatus.keySet()) {
+      members.add(dn.getProtoBufMessage());
+    }
+
     HddsProtos.Pipeline.Builder builder = HddsProtos.Pipeline.newBuilder()
         .setId(id.getProtobuf())
         .setType(type)
@@ -263,9 +268,7 @@ public final class Pipeline {
         .setState(PipelineState.getProtobuf(state))
         .setLeaderID(leaderId != null ? leaderId.toString() : "")
         .setCreationTimeStamp(creationTimestamp.toEpochMilli())
-        .addAllMembers(nodeStatus.keySet().stream()
-            .map(DatanodeDetails::getProtoBufMessage)
-            .collect(Collectors.toList()));
+        .addAllMembers(members);
     // To save the message size on wire, only transfer the node order based on
     // network topology
     List<DatanodeDetails> nodes = nodesInOrder.get();
