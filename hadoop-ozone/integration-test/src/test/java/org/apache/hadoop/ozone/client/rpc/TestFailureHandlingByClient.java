@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -96,10 +97,10 @@ public class TestFailureHandlingByClient {
     chunkSize = (int) OzoneConsts.MB;
     blockSize = 4 * chunkSize;
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 100, TimeUnit.SECONDS);
-    conf.setTimeDuration(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_WRITE_TIMEOUT,
-        30, TimeUnit.SECONDS);
-    conf.setTimeDuration(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_WATCH_TIMEOUT,
-        30, TimeUnit.SECONDS);
+    RatisClientConfig ratisClientConfig =
+        OzoneConfiguration.of(conf).getObject(RatisClientConfig.class);
+    ratisClientConfig.setWriteRequestTimeoutInMs(30000);
+    ratisClientConfig.setWatchRequestTimeoutInMs(30000);
     conf.setTimeDuration(
         OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
         1, TimeUnit.SECONDS);

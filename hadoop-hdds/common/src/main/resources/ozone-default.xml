@@ -247,49 +247,6 @@
     </description>
   </property>
   <property>
-    <name>dfs.ratis.client.request.write.timeout</name>
-    <value>5m</value>
-    <tag>OZONE, RATIS, MANAGEMENT</tag>
-    <description>Timeout for ratis client write request.
-    </description>
-  </property>
-  <property>
-    <name>dfs.ratis.client.request.watch.timeout</name>
-    <value>3m</value>
-    <tag>OZONE, RATIS, MANAGEMENT</tag>
-    <description>Timeout for ratis client watch request.
-    </description>
-  </property>
-  <property>
-    <name>dfs.ratis.client.multilinear.random.retry.policy</name>
-    <value>5s, 5, 10s, 5, 15s, 5, 20s, 5, 25s, 5, 60s, 10</value>
-    <tag>OZONE, RATIS, MANAGEMENT</tag>
-    <description>Specifies multilinear random retry policy to be used by ratis
-      client. e.g. given pairs of number of retries and sleep time (n0, t0),
-      (n1, t1), ..., for the first n0 retries sleep duration is t0 on average,
-      the following n1 retries sleep duration is t1 on average, and so on.
-    </description>
-  </property>
-  <property>
-    <name>dfs.ratis.client.exponential.backoff.base.sleep</name>
-    <value>4s</value>
-    <tag>OZONE, RATIS, MANAGEMENT</tag>
-    <description>Specifies base sleep for exponential backoff retry policy.
-      With the default base sleep of 4s, the sleep duration for ith retry is
-      min(4 * pow(2, i), max_sleep) * r, where r is random number in the range
-      [0.5, 1.5).
-    </description>
-  </property>
-  <property>
-    <name>dfs.ratis.client.exponential.backoff.max.sleep</name>
-    <value>40s</value>
-    <tag>OZONE, RATIS, MANAGEMENT</tag>
-    <description>The sleep duration obtained from exponential backoff
-      policy is limited by the configured max sleep. Refer
-      dfs.ratis.client.exponential.backoff.base.sleep for further details.
-    </description>
-  </property>
-  <property>
     <name>dfs.ratis.server.retry-cache.timeout.duration</name>
     <value>600000ms</value>
     <tag>OZONE, RATIS, MANAGEMENT</tag>

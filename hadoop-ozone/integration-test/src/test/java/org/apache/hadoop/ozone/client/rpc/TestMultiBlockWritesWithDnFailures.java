@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -105,10 +106,10 @@ public class TestMultiBlockWritesWithDnFailures {
             RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
                     "watch.request.timeout",
             3, TimeUnit.SECONDS);
-    conf.setTimeDuration(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_WRITE_TIMEOUT,
-        30, TimeUnit.SECONDS);
-    conf.setTimeDuration(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_WATCH_TIMEOUT,
-        30, TimeUnit.SECONDS);
+    RatisClientConfig ratisClientConfig =
+        OzoneConfiguration.of(conf).getObject(RatisClientConfig.class);
+    ratisClientConfig.setWriteRequestTimeoutInMs(30000);
+    ratisClientConfig.setWatchRequestTimeoutInMs(30000);
     conf.setTimeDuration(
         OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
         1, TimeUnit.SECONDS);

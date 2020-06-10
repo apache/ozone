@@ -20,5 +20,5 @@
  This package contains configuration related classes.
  */
 
-package org.apache.hadoop.hdds.conf;
+package org.apache.hadoop.hdds.ratis.conf;
 

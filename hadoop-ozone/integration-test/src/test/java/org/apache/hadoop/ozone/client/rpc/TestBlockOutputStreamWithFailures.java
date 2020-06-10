@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -120,10 +121,10 @@ public class TestBlockOutputStreamWithFailures {
                     "watch.request.timeout",
             3, TimeUnit.SECONDS);
     conf.setBoolean(OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY, false);
-    conf.setTimeDuration(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_WRITE_TIMEOUT,
-        60, TimeUnit.SECONDS);
-    conf.setTimeDuration(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_WATCH_TIMEOUT,
-        60, TimeUnit.SECONDS);
+    RatisClientConfig ratisClientConfig =
+        OzoneConfiguration.of(conf).getObject(RatisClientConfig.class);
+    ratisClientConfig.setWriteRequestTimeoutInMs(60000);
+    ratisClientConfig.setWatchRequestTimeoutInMs(60000);
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(7)
         .setTotalPipelineNumLimit(10).setBlockSize(blockSize)
         .setChunkSize(chunkSize).setStreamBufferFlushSize(flushSize)

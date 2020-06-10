@@ -30,12 +30,12 @@ import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -115,10 +115,10 @@ public class TestContainerStateMachineFailureOnRead {
         RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
             "watch.request.timeout",
         3, TimeUnit.SECONDS);
-    conf.setTimeDuration(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_WRITE_TIMEOUT,
-        30, TimeUnit.SECONDS);
-    conf.setTimeDuration(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_WATCH_TIMEOUT,
-        30, TimeUnit.SECONDS);
+    RatisClientConfig ratisClientConfig =
+        OzoneConfiguration.of(conf).getObject(RatisClientConfig.class);
+    ratisClientConfig.setWriteRequestTimeoutInMs(30000);
+    ratisClientConfig.setWatchRequestTimeoutInMs(30000);
 
     conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)

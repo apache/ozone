@@ -110,32 +110,6 @@ public final class ScmConfigKeys {
   public static final String
       DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT = "1GB";
 
-  public static final String DFS_RATIS_CLIENT_REQUEST_WRITE_TIMEOUT =
-      "dfs.ratis.client.request.write.timeout";
-  public static final TimeDuration
-      DFS_RATIS_CLIENT_REQUEST_WRITE_TIMEOUT_DEFAULT =
-      TimeDuration.valueOf(5, TimeUnit.MINUTES);
-  public static final String DFS_RATIS_CLIENT_REQUEST_WATCH_TIMEOUT =
-      "dfs.ratis.client.request.watch.timeout";
-  public static final TimeDuration
-      DFS_RATIS_CLIENT_REQUEST_WATCH_TIMEOUT_DEFAULT =
-      TimeDuration.valueOf(3, TimeUnit.MINUTES);
-  public static final String DFS_RATIS_CLIENT_MULTILINEAR_RANDOM_RETRY_POLICY =
-      "dfs.ratis.client.multilinear.random.retry.policy";
-  public static final String
-      DFS_RATIS_CLIENT_MULTILINEAR_RANDOM_RETRY_POLICY_DEFAULT =
-      "5s, 5, 10s, 5, 15s, 5, 20s, 5, 25s, 5, 60s, 10";
-  public static final String DFS_RATIS_CLIENT_EXPONENTIAL_BACKOFF_BASE_SLEEP =
-      "dfs.ratis.client.exponential.backoff.base.sleep";
-  public static final TimeDuration
-      DFS_RATIS_CLIENT_EXPONENTIAL_BACKOFF_BASE_SLEEP_DEFAULT =
-      TimeDuration.valueOf(4, TimeUnit.SECONDS);
-  public static final String DFS_RATIS_CLIENT_EXPONENTIAL_BACKOFF_MAX_SLEEP =
-      "dfs.ratis.client.exponential.backoff.max.sleep";
-  public static final TimeDuration
-      DFS_RATIS_CLIENT_EXPONENTIAL_BACKOFF_MAX_SLEEP_DEFAULT =
-      TimeDuration.valueOf(40, TimeUnit.SECONDS);
-
   public static final String DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY =
       "dfs.ratis.server.retry-cache.timeout.duration";
   public static final TimeDuration

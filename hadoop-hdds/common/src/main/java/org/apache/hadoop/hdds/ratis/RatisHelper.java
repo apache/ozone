@@ -29,11 +29,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.client.RaftClient;
@@ -48,6 +49,7 @@ import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.protocol.AlreadyClosedException;
 import org.apache.ratis.protocol.GroupMismatchException;
 import org.apache.ratis.protocol.StateMachineException;
 import org.apache.ratis.protocol.NotReplicatedException;
@@ -73,7 +75,7 @@ public final class RatisHelper {
   private static final Logger LOG = LoggerFactory.getLogger(RatisHelper.class);
 
   // Prefix for Ratis Server GRPC and Ratis client conf.
-  private static final String HDDS_DATANODE_RATIS_PREFIX_KEY = "hdds.ratis.";
+  public static final String HDDS_DATANODE_RATIS_PREFIX_KEY = "hdds.ratis.";
   private static final String RAFT_SERVER_PREFIX_KEY = "raft.server";
   public static final String HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY =
       HDDS_DATANODE_RATIS_PREFIX_KEY + RAFT_SERVER_PREFIX_KEY;
@@ -81,6 +83,10 @@ public final class RatisHelper {
       HDDS_DATANODE_RATIS_PREFIX_KEY + RaftClientConfigKeys.PREFIX;
   public static final String HDDS_DATANODE_RATIS_GRPC_PREFIX_KEY =
       HDDS_DATANODE_RATIS_PREFIX_KEY + GrpcConfigKeys.PREFIX;
+
+  private static final Class[] NO_RETRY_EXCEPTIONS =
+      new Class[] { NotReplicatedException.class, GroupMismatchException.class,
+          StateMachineException.class, AlreadyClosedException.class };
 
   /* TODO: use a dummy id for all groups for the moment.
    *       It should be changed to a unique id for each group.
@@ -282,23 +288,40 @@ public final class RatisHelper {
     return tlsConfig;
   }
 
+  /**
+   * Table mapping exception type to retry policy used for the exception in
+   * write and watch request.
+   * ---------------------------------------------------------------------------
+   * |        Exception            | RetryPolicy for     | RetryPolicy for     |
+   * |                             | Write request       | Watch request       |
+   * |-------------------------------------------------------------------------|
+   * | NotReplicatedException      | NO_RETRY            | NO_RETRY            |
+   * |-------------------------------------------------------------------------|
+   * | GroupMismatchException      | NO_RETRY            | NO_RETRY            |
+   * |-------------------------------------------------------------------------|
+   * | StateMachineException       | NO_RETRY            | NO_RETRY            |
+   * |-------------------------------------------------------------------------|
+   * | AlreadyClosedException      | NO_RETRY            | NO_RETRY            |
+   * |-------------------------------------------------------------------------|
+   * | TimeoutIOException          | EXPONENTIAL_BACKOFF | NO_RETRY            |
+   * |-------------------------------------------------------------------------|
+   * | ResourceUnavailableException| EXPONENTIAL_BACKOFF | EXPONENTIAL_BACKOFF |
+   * |-------------------------------------------------------------------------|
+   * | Others                      | MULTILINEAR_RANDOM  | MULTILINEAR_RANDOM  |
+   * |                             | _RETRY             | _RETRY               |
+   * ---------------------------------------------------------------------------
+   */
   public static RetryPolicy createRetryPolicy(ConfigurationSource conf) {
+    RatisClientConfig ratisClientConfig = OzoneConfiguration.of(conf)
+        .getObject(RatisClientConfig.class);
     ExponentialBackoffRetry exponentialBackoffRetry =
-        createExponentialBackoffPolicy(conf);
+        createExponentialBackoffPolicy(ratisClientConfig);
     MultipleLinearRandomRetry multipleLinearRandomRetry =
-        MultipleLinearRandomRetry.parseCommaSeparated(conf.get(
-            OzoneConfigKeys.DFS_RATIS_CLIENT_MULTILINEAR_RANDOM_RETRY_POLICY,
-            OzoneConfigKeys.
-                DFS_RATIS_CLIENT_MULTILINEAR_RANDOM_RETRY_POLICY_DEFAULT));
+        MultipleLinearRandomRetry
+            .parseCommaSeparated(ratisClientConfig.getMultilinearPolicy());
 
-    long writeTimeout = conf.getTimeDuration(
-        OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_WRITE_TIMEOUT, OzoneConfigKeys.
-            DFS_RATIS_CLIENT_REQUEST_WRITE_TIMEOUT_DEFAULT
-            .toIntExact(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
-    long watchTimeout = conf.getTimeDuration(
-        OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_WATCH_TIMEOUT, OzoneConfigKeys.
-            DFS_RATIS_CLIENT_REQUEST_WATCH_TIMEOUT_DEFAULT
-            .toIntExact(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
+    long writeTimeout = ratisClientConfig.getWriteRequestTimeoutInMs();
+    long watchTimeout = ratisClientConfig.getWatchRequestTimeoutInMs();
 
     return RequestTypeDependentRetryPolicy.newBuilder()
         .setRetryPolicy(RaftProtos.RaftClientRequestProto.TypeCase.WRITE,
@@ -315,16 +338,11 @@ public final class RatisHelper {
   }
 
   private static ExponentialBackoffRetry createExponentialBackoffPolicy(
-      ConfigurationSource conf) {
-    long exponentialBaseSleep = conf.getTimeDuration(
-        OzoneConfigKeys.DFS_RATIS_CLIENT_EXPONENTIAL_BACKOFF_BASE_SLEEP,
-        OzoneConfigKeys.DFS_RATIS_CLIENT_EXPONENTIAL_BACKOFF_BASE_SLEEP_DEFAULT
-            .toIntExact(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
-    long exponentialMaxSleep = conf.getTimeDuration(
-        OzoneConfigKeys.DFS_RATIS_CLIENT_EXPONENTIAL_BACKOFF_MAX_SLEEP,
-        OzoneConfigKeys.
-            DFS_RATIS_CLIENT_EXPONENTIAL_BACKOFF_MAX_SLEEP_DEFAULT
-            .toIntExact(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
+      RatisClientConfig ratisClientConfig) {
+    long exponentialBaseSleep =
+        ratisClientConfig.getExponentialPolicyBaseSleepInMs();
+    long exponentialMaxSleep =
+        ratisClientConfig.getExponentialPolicyMaxSleepInMs();
     return ExponentialBackoffRetry.newBuilder()
         .setBaseSleepTime(
             TimeDuration.valueOf(exponentialBaseSleep, TimeUnit.MILLISECONDS))
@@ -337,14 +355,12 @@ public final class RatisHelper {
       ExponentialBackoffRetry exponentialBackoffRetry,
       MultipleLinearRandomRetry multipleLinearRandomRetry,
       RetryPolicy timeoutPolicy) {
-    return ExceptionDependentRetry.newBuilder()
-        .setExceptionToPolicy(NotReplicatedException.class,
-            RetryPolicies.noRetry())
-        .setExceptionToPolicy(GroupMismatchException.class,
-            RetryPolicies.noRetry())
-        .setExceptionToPolicy(StateMachineException.class,
-            RetryPolicies.noRetry())
-        .setExceptionToPolicy(ResourceUnavailableException.class,
+    ExceptionDependentRetry.Builder builder =
+        ExceptionDependentRetry.newBuilder();
+    for (Class c : NO_RETRY_EXCEPTIONS) {
+      builder.setExceptionToPolicy(c, RetryPolicies.noRetry());
+    }
+    return builder.setExceptionToPolicy(ResourceUnavailableException.class,
             exponentialBackoffRetry)
         .setExceptionToPolicy(TimeoutIOException.class, timeoutPolicy)
         .setDefaultPolicy(multipleLinearRandomRetry)
