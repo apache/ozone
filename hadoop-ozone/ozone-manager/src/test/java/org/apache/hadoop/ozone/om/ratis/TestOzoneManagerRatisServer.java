@@ -130,7 +130,7 @@ public class TestOzoneManagerRatisServer {
   @Test
   public void testLoadSnapshotInfoOnStart() throws Exception {
     // Stop the Ratis server and manually update the snapshotInfo.
-    omRatisServer.getOmStateMachine().updateLastAppliedIndexWithSnaphsotIndex();
+    omRatisServer.getOmStateMachine().loadSnapshotInfoFromDB();
     omRatisServer.stop();
 
     SnapshotInfo snapshotInfo =
