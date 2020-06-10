@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.junit.After;
 import org.junit.Before;
@@ -118,7 +120,7 @@ public class TestOMKeyRequest {
     when(ozoneManager.isGrpcBlockTokenEnabled()).thenReturn(false);
     when(ozoneManager.getOMNodeId()).thenReturn(UUID.randomUUID().toString());
     when(ozoneManager.resolveBucketLink(any()))
-        .thenAnswer(i -> i.getArguments()[0]);
+        .thenReturn(new ResolvedBucket(Pair.of("", ""), Pair.of("", "")));
     when(scmClient.getBlockClient()).thenReturn(scmBlockLocationProtocol);
 
     Pipeline pipeline = Pipeline.newBuilder()

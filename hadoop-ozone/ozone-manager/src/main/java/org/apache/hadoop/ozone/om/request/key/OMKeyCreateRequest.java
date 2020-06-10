@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -176,7 +177,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     IOException exception = null;
     Result result = null;
     try {
-      keyArgs = ozoneManager.resolveBucketLink(keyArgs);
+      ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs);
+      keyArgs = bucket.update(keyArgs);
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
 
