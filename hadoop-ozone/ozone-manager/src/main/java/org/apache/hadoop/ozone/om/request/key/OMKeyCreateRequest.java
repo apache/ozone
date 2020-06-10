@@ -158,6 +158,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     CreateKeyRequest createKeyRequest = getOmRequest().getCreateKeyRequest();
 
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
+    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -179,6 +180,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     try {
       ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs);
       keyArgs = bucket.update(keyArgs);
+      bucket.audit(auditMap);
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
 
@@ -274,7 +276,6 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     // Audit Log outside the lock
     if (result != Result.REPLAY) {
-      Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
       auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
           OMAction.ALLOCATE_KEY, auditMap, exception,
           getOmRequest().getUserInfo()));

@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -48,6 +49,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
@@ -96,6 +98,8 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
     Preconditions.checkNotNull(keyArgs.getMultipartUploadID());
 
+    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
+
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
     String keyName = keyArgs.getKeyName();
@@ -114,6 +118,12 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
         getOmRequest());
     OMClientResponse omClientResponse = null;
     try {
+      ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs);
+      keyArgs = bucket.update(keyArgs);
+      bucket.audit(auditMap);
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+
       // TODO to support S3 ACL later.
       acquiredBucketLock =
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
@@ -208,7 +218,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
     // audit log
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
-        OMAction.INITIATE_MULTIPART_UPLOAD, buildKeyArgsAuditMap(keyArgs),
+        OMAction.INITIATE_MULTIPART_UPLOAD, auditMap,
         exception, getOmRequest().getUserInfo()));
 
     switch (result) {

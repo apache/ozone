@@ -3371,13 +3371,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         Pair.of(args.getVolumeName(), args.getBucketName()));
   }
 
-  private ResolvedBucket resolveBucketLink(OmKeyArgs args)
+  public ResolvedBucket resolveBucketLink(OmKeyArgs args)
       throws IOException {
     return resolveBucketLink(
         Pair.of(args.getVolumeName(), args.getBucketName()));
   }
 
-  private ResolvedBucket resolveBucketLink(Pair<String, String> requested)
+  public ResolvedBucket resolveBucketLink(Pair<String, String> requested)
       throws IOException {
     Pair<String, String> resolved =
         resolveBucketLink(requested, new HashSet<>());

@@ -104,6 +104,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     RenameKeyRequest renameKeyRequest = getOmRequest().getRenameKeyRequest();
     OzoneManagerProtocolProtos.KeyArgs keyArgs =
         renameKeyRequest.getKeyArgs();
+    Map<String, String> auditMap = buildAuditMap(keyArgs, renameKeyRequest);
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -133,6 +134,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
 
       ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs);
       keyArgs = bucket.update(keyArgs);
+      bucket.audit(auditMap);
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
 
@@ -252,7 +254,6 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     }
 
     if (result == Result.SUCCESS || result == Result.FAILURE) {
-      Map<String, String> auditMap = buildAuditMap(keyArgs, renameKeyRequest);
       auditLog(auditLogger, buildAuditMessage(OMAction.RENAME_KEY, auditMap,
           exception, getOmRequest().getUserInfo()));
     }

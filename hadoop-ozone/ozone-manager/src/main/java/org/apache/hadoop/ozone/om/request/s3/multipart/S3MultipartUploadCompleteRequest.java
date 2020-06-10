@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -104,6 +105,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
     List<OzoneManagerProtocolProtos.Part> partsList =
         multipartUploadCompleteRequest.getPartsListList();
+    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -125,6 +127,12 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     IOException exception = null;
     Result result = null;
     try {
+      ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs);
+      keyArgs = bucket.update(keyArgs);
+      bucket.audit(auditMap);
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+
       // TODO to support S3 ACL later.
 
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
@@ -355,7 +363,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     }
 
     if (result != Result.REPLAY && result != Result.DELETE_OPEN_KEY_ONLY) {
-      Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
       auditMap.put(OzoneConsts.MULTIPART_LIST, partsList.toString());
 
       // audit log

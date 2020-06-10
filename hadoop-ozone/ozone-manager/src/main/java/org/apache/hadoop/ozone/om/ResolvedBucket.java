@@ -99,8 +99,8 @@ public class ResolvedBucket {
    * @return the same map for convenience
    */
   public Map<String, String> audit(Map<String, String> auditMap) {
-    auditMap.put(OzoneConsts.VOLUME, requestedVolume());
-    auditMap.put(OzoneConsts.BUCKET, requestedBucket());
+    auditMap.putIfAbsent(OzoneConsts.VOLUME, requestedVolume());
+    auditMap.putIfAbsent(OzoneConsts.BUCKET, requestedBucket());
     if (isLink()) {
       auditMap.put(OzoneConsts.SOURCE_VOLUME, realVolume());
       auditMap.put(OzoneConsts.SOURCE_BUCKET, realBucket());

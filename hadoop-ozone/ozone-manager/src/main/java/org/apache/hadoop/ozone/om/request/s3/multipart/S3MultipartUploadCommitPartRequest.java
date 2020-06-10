@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -90,6 +91,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         getOmRequest().getCommitMultiPartUploadRequest();
 
     KeyArgs keyArgs = multipartCommitUploadPartRequest.getKeyArgs();
+    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -112,6 +114,12 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     OmMultipartKeyInfo multipartKeyInfo = null;
     Result result = null;
     try {
+      ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs);
+      keyArgs = bucket.update(keyArgs);
+      bucket.audit(auditMap);
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+
       // TODO to support S3 ACL later.
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);
@@ -237,9 +245,13 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     }
 
     // audit log
+    // Add MPU related information.
+    auditMap.put(OzoneConsts.MULTIPART_UPLOAD_PART_NUMBER,
+        String.valueOf(keyArgs.getMultipartNumber()));
+    auditMap.put(OzoneConsts.MULTIPART_UPLOAD_PART_NAME, partName);
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.COMMIT_MULTIPART_UPLOAD_PARTKEY,
-        buildAuditMap(keyArgs, partName), exception,
+        auditMap, exception,
         getOmRequest().getUserInfo()));
 
     switch (result) {
@@ -264,15 +276,5 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
-  private Map<String, String> buildAuditMap(KeyArgs keyArgs, String partName) {
-    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
-
-    // Add MPU related information.
-    auditMap.put(OzoneConsts.MULTIPART_UPLOAD_PART_NUMBER,
-        String.valueOf(keyArgs.getMultipartNumber()));
-    auditMap.put(OzoneConsts.MULTIPART_UPLOAD_PART_NAME, partName);
-
-    return auditMap;
-  }
 }
 

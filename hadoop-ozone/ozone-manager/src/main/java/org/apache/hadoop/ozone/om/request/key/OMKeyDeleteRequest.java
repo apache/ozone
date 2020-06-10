@@ -92,6 +92,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
     OzoneManagerProtocolProtos.KeyArgs keyArgs =
         deleteKeyRequest.getKeyArgs();
+    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -113,6 +114,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     try {
       ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs);
       keyArgs = bucket.update(keyArgs);
+      bucket.audit(auditMap);
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
 
@@ -183,7 +185,6 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
     // Performing audit logging outside of the lock.
     if (result != Result.REPLAY) {
-      Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
       auditLog(auditLogger, buildAuditMessage(OMAction.DELETE_KEY, auditMap,
           exception, userInfo));
     }

@@ -19,8 +19,10 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import java.io.IOException;
+import java.util.Map;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
@@ -85,6 +87,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
         .getAbortMultiPartUploadRequest();
     OzoneManagerProtocolProtos.KeyArgs keyArgs = multipartUploadAbortRequest
         .getKeyArgs();
+    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -101,6 +104,12 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
     Result result = null;
     try {
+      ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs);
+      keyArgs = bucket.update(keyArgs);
+      bucket.audit(auditMap);
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+
       // TODO to support S3 ACL later.
       acquiredLock =
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
@@ -179,7 +188,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
 
     // audit log
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
-        OMAction.ABORT_MULTIPART_UPLOAD, buildKeyArgsAuditMap(keyArgs),
+        OMAction.ABORT_MULTIPART_UPLOAD, auditMap,
         exception, getOmRequest().getUserInfo()));
 
     switch (result) {
