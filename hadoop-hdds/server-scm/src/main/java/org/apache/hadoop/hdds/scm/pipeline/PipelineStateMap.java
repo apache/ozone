@@ -32,7 +32,6 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.Predicate;
 
 /**
  * Holds the data structures which maintain the information about pipeline and
@@ -253,8 +252,8 @@ class PipelineStateMap {
    * replication factor and pipeline state
    */
   List<Pipeline> getPipelines(ReplicationType type, ReplicationFactor factor,
-      PipelineState state, Collection<DatanodeDetails> excludeDns,
-      Collection<PipelineID> excludePipelines) {
+      PipelineState state, Set<DatanodeDetails> excludeDns,
+      Set<PipelineID> excludePipelines) {
     Preconditions.checkNotNull(type, "Replication type cannot be null");
     Preconditions.checkNotNull(factor, "Replication factor cannot be null");
     Preconditions.checkNotNull(state, "Pipeline state cannot be null");
@@ -263,43 +262,35 @@ class PipelineStateMap {
     Preconditions
         .checkNotNull(excludeDns, "Pipeline exclude list cannot be null");
 
-    List<Pipeline> pipelines = getPipelines(type, factor, state);
+    List<Pipeline> pipelines = null;
+    if (state == PipelineState.OPEN) {
+      pipelines = new ArrayList<>(query2OpenPipelines.getOrDefault(
+          new PipelineQuery(type, factor), Collections.EMPTY_LIST));
+    } else {
+      pipelines = new ArrayList<>(pipelineMap.values());
+    }
+
     Iterator<Pipeline> iter = pipelines.iterator();
     while (iter.hasNext()) {
       Pipeline pipeline = iter.next();
-      if (discardPipeline(pipeline, excludePipelines) ||
-          discardDatanode(pipeline, excludeDns)) {
+      if (pipeline.getType() != type ||
+          pipeline.getPipelineState() != state ||
+          pipeline.getFactor() != factor ||
+          excludePipelines.contains(pipeline.getId())) {
         iter.remove();
+      } else {
+        for (DatanodeDetails dn : pipeline.getNodes()) {
+          if (excludeDns.contains(dn)) {
+            iter.remove();
+            break;
+          }
+        }
       }
     }
 
     return pipelines;
   }
 
-  private boolean discardPipeline(Pipeline pipeline,
-      Collection<PipelineID> excludePipelines) {
-    if (excludePipelines.isEmpty()) {
-      return false;
-    }
-    Predicate<PipelineID> predicate = p -> p.equals(pipeline.getId());
-    return excludePipelines.parallelStream().anyMatch(predicate);
-  }
-
-  private boolean discardDatanode(Pipeline pipeline,
-      Collection<DatanodeDetails> excludeDns) {
-    if (excludeDns.isEmpty()) {
-      return false;
-    }
-    boolean discard = false;
-    for (DatanodeDetails dn : pipeline.getNodes()) {
-      Predicate<DatanodeDetails> predicate = p -> p.equals(dn);
-      discard = excludeDns.parallelStream().anyMatch(predicate);
-      if (discard) {
-        break;
-      }
-    }
-    return discard;
-  }
   /**
    * Get set of containerIDs corresponding to a pipeline.
    *
