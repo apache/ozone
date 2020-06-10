@@ -253,7 +253,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     Builder builder = toBuilder();
 
     if (bekInfo != null) {
-      builder.setBucketEncryptionKey(new BucketEncryptionKeyInfo(bekInfo.getVersion(), bekInfo.getSuite(), bekInfo.getKeyName()));
+      builder.setBucketEncryptionKey(bekInfo.copy());
     }
 
     builder.acls.clear();

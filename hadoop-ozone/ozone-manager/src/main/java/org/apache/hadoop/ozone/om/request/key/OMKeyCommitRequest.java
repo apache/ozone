@@ -156,25 +156,24 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           // Check if OzoneKey already exists in DB
           OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable()
               .getIfExist(dbOzoneKey);
-          if (dbKeyInfo != null) {
-            // Check if this transaction is a replay of ratis logs
-            if (isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
-              // During KeyCreate, we do not check the OpenKey Table for replay.
-              // This is so as to avoid an extra DB read during KeyCreate.
-              // If KeyCommit is a replay, the KeyCreate request could also have
-              // been replayed. And since we do not check for replay in KeyCreate,
-              // we should scrub the key from OpenKey table now, is it exists.
+          // Check if this transaction is a replay of ratis logs
+          if (dbKeyInfo != null &&
+              isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
+            // During KeyCreate, we do not check the OpenKey Table for replay.
+            // This is so as to avoid an extra DB read during KeyCreate.
+            // If KeyCommit is a replay, the KeyCreate request could also have
+            // been replayed. And since we do not check for replay in KeyCreate,
+            // we should scrub the key from OpenKey table now, is it exists.
 
-              omKeyInfo = omMetadataManager.getOpenKeyTable().get(dbOpenKey);
-              if (omKeyInfo != null) {
-                omMetadataManager.getOpenKeyTable().addCacheEntry(
-                    new CacheKey<>(dbOpenKey),
-                    new CacheValue<>(Optional.absent(), trxnLogIndex));
+            omKeyInfo = omMetadataManager.getOpenKeyTable().get(dbOpenKey);
+            if (omKeyInfo != null) {
+              omMetadataManager.getOpenKeyTable().addCacheEntry(
+                  new CacheKey<>(dbOpenKey),
+                  new CacheValue<>(Optional.absent(), trxnLogIndex));
 
-                throw new OMReplayException(true);
-              }
-              throw new OMReplayException();
+              throw new OMReplayException(true);
             }
+            throw new OMReplayException();
           }
         }
 
