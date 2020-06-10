@@ -117,6 +117,8 @@ public class TestOMKeyRequest {
     when(ozoneManager.getPreallocateBlocksMax()).thenReturn(2);
     when(ozoneManager.isGrpcBlockTokenEnabled()).thenReturn(false);
     when(ozoneManager.getOMNodeId()).thenReturn(UUID.randomUUID().toString());
+    when(ozoneManager.resolveBucketLink(any()))
+        .thenAnswer(i -> i.getArguments()[0]);
     when(scmClient.getBlockClient()).thenReturn(scmBlockLocationProtocol);
 
     Pipeline pipeline = Pipeline.newBuilder()
