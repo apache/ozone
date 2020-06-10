@@ -36,6 +36,7 @@ import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.slf4j.Logger;
@@ -296,14 +297,19 @@ public final class Pipeline {
   public static Pipeline getFromProtobuf(HddsProtos.Pipeline pipeline)
       throws UnknownPipelineStateException {
     Preconditions.checkNotNull(pipeline, "Pipeline is null");
+
+    List<DatanodeDetails> nodes = new ArrayList<>();
+    for (DatanodeDetailsProto member : pipeline.getMembersList()) {
+      nodes.add(DatanodeDetails.getFromProtoBuf(member));
+    }
+
     return new Builder().setId(PipelineID.getFromProtobuf(pipeline.getId()))
         .setFactor(pipeline.getFactor())
         .setType(pipeline.getType())
         .setState(PipelineState.fromProtobuf(pipeline.getState()))
         .setLeaderId(StringUtils.isNotEmpty(pipeline.getLeaderID()) ?
             UUID.fromString(pipeline.getLeaderID()) : null)
-        .setNodes(pipeline.getMembersList().stream()
-            .map(DatanodeDetails::getFromProtoBuf).collect(Collectors.toList()))
+        .setNodes(nodes)
         .setNodesInOrder(pipeline.getMemberOrdersList())
         .setCreateTimestamp(pipeline.getCreationTimeStamp())
         .build();
