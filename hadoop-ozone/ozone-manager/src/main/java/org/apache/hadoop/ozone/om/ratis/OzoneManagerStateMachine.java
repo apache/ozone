@@ -105,7 +105,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     this.ozoneManager = omRatisServer.getOzoneManager();
 
     this.snapshotInfo = ozoneManager.getSnapshotInfo();
-    updateLastAppliedIndexWithSnaphsotIndex();
+    loadSnapshotInfoFromDB();
 
     this.ozoneManagerDoubleBuffer = new OzoneManagerDoubleBuffer.Builder()
         .setOmMetadataManager(ozoneManager.getMetadataManager())
@@ -139,16 +139,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   @Override
   public void reinitialize() throws IOException {
-    OMTransactionInfo omTransactionInfo =
-        OMTransactionInfo.readTransactionInfo(
-            ozoneManager.getMetadataManager());
-    if (omTransactionInfo != null) {
-      setLastAppliedTermIndex(TermIndex.newTermIndex(
-          omTransactionInfo.getCurrentTerm(),
-          omTransactionInfo.getTransactionIndex()));
-      snapshotInfo.updateTermIndex(omTransactionInfo.getCurrentTerm(),
-          omTransactionInfo.getTransactionIndex());
-    }
+    loadSnapshotInfoFromDB();
   }
 
   @Override
@@ -363,6 +354,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   public long takeSnapshot() throws IOException {
     LOG.info("Current Snapshot Index {}", getLastAppliedTermIndex());
     long lastAppliedIndex = getLastAppliedTermIndex().getIndex();
+    snapshotInfo.updateTermIndex(getLastAppliedTermIndex().getTerm(),
+        lastAppliedIndex);
     ozoneManager.getMetadataManager().getStore().flush();
     return lastAppliedIndex;
   }
@@ -528,11 +521,20 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     }
   }
 
-  public void updateLastAppliedIndexWithSnaphsotIndex() throws IOException {
+  public void loadSnapshotInfoFromDB() throws IOException {
     // This is done, as we have a check in Ratis for not throwing
     // LeaderNotReadyException, it checks stateMachineIndex >= raftLog
     // nextIndex (placeHolderIndex).
-    reinitialize();
+    OMTransactionInfo omTransactionInfo =
+        OMTransactionInfo.readTransactionInfo(
+            ozoneManager.getMetadataManager());
+    if (omTransactionInfo != null) {
+      setLastAppliedTermIndex(TermIndex.newTermIndex(
+          omTransactionInfo.getCurrentTerm(),
+          omTransactionInfo.getTransactionIndex()));
+      snapshotInfo.updateTermIndex(omTransactionInfo.getCurrentTerm(),
+          omTransactionInfo.getTransactionIndex());
+    }
     LOG.info("LastAppliedIndex is set from TransactionInfo from OM DB as {}",
         getLastAppliedTermIndex());
   }

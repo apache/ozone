@@ -3014,8 +3014,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     LOG.info("Downloaded checkpoint from Leader {}, in to the location {}",
         leaderId, newDBlocation);
 
-    long lastAppliedIndex = omRatisServer.getLastAppliedTermIndex().getIndex();
-
     // Check if current ratis log index is smaller than the downloaded
     // checkpoint transaction index. If yes, proceed by stopping the ratis
     // server so that the OM state can be re-initialized. If no, then do not
@@ -3040,6 +3038,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return null;
     }
 
+    // Pause the State Machine so that no new transactions can be applied.
+    // This action also clears the OM Double Buffer so that if there are any
+    // pending transactions in the buffer, they are discarded.
+    // TODO: The Ratis server should also be paused here. This is required
+    //  because a leader election might happen while the snapshot
+    //  installation is in progress and the new leader might start sending
+    //  append log entries to the ratis server.
+    omRatisServer.getOmStateMachine().pause();
+
+    //TODO: un-pause SM if any failures and retry?
+
+    long lastAppliedIndex = omRatisServer.getLastAppliedTermIndex().getIndex();
+
     boolean canProceed =
         OzoneManagerRatisUtils.verifyTransactionInfo(omTransactionInfo,
         lastAppliedIndex, leaderId, newDBlocation);
@@ -3052,14 +3063,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     long leaderIndex = omTransactionInfo.getTransactionIndex();
     long leaderTerm = omTransactionInfo.getCurrentTerm();
 
-    // Pause the State Machine so that no new transactions can be applied.
-    // This action also clears the OM Double Buffer so that if there are any
-    // pending transactions in the buffer, they are discarded.
-    // TODO: The Ratis server should also be paused here. This is required
-    //  because a leader election might happen while the snapshot
-    //  installation is in progress and the new leader might start sending
-    //  append log entries to the ratis server.
-    omRatisServer.getOmStateMachine().pause();
 
     File dbBackup;
     try {
@@ -3159,7 +3162,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * All the classes which use/ store MetadataManager should also be updated
    * with the new MetadataManager instance.
    */
-  void reloadOMState(long newSnapshotIndex, long newSnapShotTermIndex)
+  void reloadOMState(long newSnapshotIndex, long newSnapshotTermIndex)
       throws IOException {
 
     instantiateServices();
@@ -3183,7 +3186,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // Update OM snapshot index with the new snapshot index (from the new OM
     // DB state).
-    omRatisSnapshotInfo.updateTermIndex(newSnapShotTermIndex, newSnapshotIndex);
+    omRatisSnapshotInfo.updateTermIndex(newSnapshotTermIndex, newSnapshotIndex);
   }
 
   public static Logger getLogger() {

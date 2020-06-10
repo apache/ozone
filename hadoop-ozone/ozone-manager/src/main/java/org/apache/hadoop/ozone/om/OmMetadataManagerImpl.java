@@ -263,7 +263,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
       this.store = loadDB(configuration, metaDir);
 
-      // This value will be used internally, not to be exposed to end users.
       initializeOmTables();
     }
   }

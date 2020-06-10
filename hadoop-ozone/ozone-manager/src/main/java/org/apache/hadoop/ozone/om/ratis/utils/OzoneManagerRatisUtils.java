@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketDeleteRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketSetPropertyRequest;
@@ -259,7 +260,8 @@ public final class OzoneManagerRatisUtils {
    * @return boolean
    */
   public static boolean verifyTransactionInfo(
-      OMTransactionInfo omTransactionInfo, long lastAppliedIndex,
+      OMTransactionInfo omTransactionInfo,
+      long lastAppliedIndex,
       String leaderId, Path newDBlocation) {
     if (omTransactionInfo.getTransactionIndex() <= lastAppliedIndex) {
       OzoneManager.LOG.error("Failed to install checkpoint from OM leader: {}" +
