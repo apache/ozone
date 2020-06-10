@@ -254,6 +254,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
         .addAllMetadata(KeyValueUtil.getFromProtobuf(keyArgs.getMetadataList()))
         .setObjectID(objectID)
         .setUpdateID(transactionLogIndex)
+        .setFileHandleInfo(objectID)
         .build();
   }
 

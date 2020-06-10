@@ -371,7 +371,8 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         .setReplicationType(HddsProtos.ReplicationType.RATIS)
         .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
         .setObjectID(objectId)
-        .setUpdateID(objectId);
+        .setUpdateID(objectId)
+        .setFileHandleInfo(objectId);
   }
 
 }

@@ -104,6 +104,16 @@ public interface OMMetadataManager {
   String getOzoneKey(String volume, String bucket, String key);
 
   /**
+   * Given fileHandleInfo, return the corresponding DB key.
+   *
+   * @param fileHandleInfo - unique keyId that is used by NFS to create a
+   *                       fileHandle.
+   * @return DB key as String.
+   */
+
+  String getOzoneKeyIdTableKey(long fileHandleInfo);
+
+  /**
    * Given a volume, bucket and a key, return the corresponding DB directory
    * key.
    *
@@ -278,6 +288,13 @@ public interface OMMetadataManager {
    * @return KeyTable.
    */
   Table<String, OmKeyInfo> getKeyTable();
+
+  /**
+   * Returns the KeyIdTable.
+   * KeyIdTable maps KeyId to current KeyName.
+   * @return KeyTable.
+   */
+  Table<String, String> getKeyIdTable();
 
   /**
    * Get Deleted Table.

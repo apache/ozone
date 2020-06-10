@@ -80,6 +80,12 @@ public class OMKeyCommitResponse extends OMClientResponse {
     if (omKeyInfo != null) {
       omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKeyName,
           omKeyInfo);
+      // We can also persist the fileHandle to KeyIdTable.
+      if (omKeyInfo.getFileHandleInfo() != 0) {
+        omMetadataManager.getKeyIdTable().putWithBatch(batchOperation,
+            omMetadataManager.getOzoneKeyIdTableKey(
+                omKeyInfo.getFileHandleInfo()), ozoneKeyName);
+      }
     }
   }
 }
