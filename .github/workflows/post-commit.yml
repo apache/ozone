@@ -247,6 +247,12 @@ jobs:
          env:
            SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+       - name: Upload coverage to Codecov
+         uses: codecov/codecov-action@v1
+         with:
+           file: ./target/coverage/all.xml
+           name: codecov-umbrella
+           fail_ci_if_error: true
        - uses: actions/upload-artifact@master
          with:
            name: coverage
