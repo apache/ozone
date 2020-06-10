@@ -239,7 +239,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
 
   private void addDatanodetoReply(UUID address, XceiverClientReply reply) {
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
-    builder.setUuid(address.toString());
+    builder.setUuid(address);
     reply.addDatanode(builder.build());
   }
 

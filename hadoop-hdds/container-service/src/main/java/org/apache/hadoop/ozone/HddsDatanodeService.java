@@ -394,8 +394,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     } else {
       // There is no datanode.id file, this might be the first time datanode
       // is started.
-      String datanodeUuid = UUID.randomUUID().toString();
-      return DatanodeDetails.newBuilder().setUuid(datanodeUuid).build();
+      return DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
     }
   }
 

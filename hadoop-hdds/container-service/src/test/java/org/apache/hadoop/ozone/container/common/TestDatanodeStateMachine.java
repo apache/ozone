@@ -427,7 +427,7 @@ public class TestDatanodeStateMachine {
     DatanodeDetails.Port restPort = DatanodeDetails.newPort(
         DatanodeDetails.Port.Name.REST, 0);
     return DatanodeDetails.newBuilder()
-        .setUuid(UUID.randomUUID().toString())
+        .setUuid(UUID.randomUUID())
         .setHostName("localhost")
         .setIpAddress("127.0.0.1")
         .addPort(containerPort)
