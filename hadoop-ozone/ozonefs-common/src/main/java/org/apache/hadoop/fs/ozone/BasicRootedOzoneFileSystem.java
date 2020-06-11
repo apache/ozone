@@ -66,7 +66,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCK
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_EMPTY;
 
 /**
- * The minimal Ozone Filesystem implementation.
+ * The minimal Rooted Ozone Filesystem implementation.
  * <p>
  * This is a basic version which doesn't extend
  * KeyProviderTokenIssuer and doesn't include statistics. It can be used
