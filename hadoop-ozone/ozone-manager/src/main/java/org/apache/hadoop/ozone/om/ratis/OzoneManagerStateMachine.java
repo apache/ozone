@@ -353,8 +353,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public long takeSnapshot() throws IOException {
     LOG.info("Current Snapshot Index {}", getLastAppliedTermIndex());
-    long lastAppliedIndex = getLastAppliedTermIndex().getIndex();
-    snapshotInfo.updateTermIndex(getLastAppliedTermIndex().getTerm(),
+    TermIndex lastTermIndex = getLastAppliedTermIndex();
+    long lastAppliedIndex = lastTermIndex.getIndex();
+    snapshotInfo.updateTermIndex(lastTermIndex.getTerm(),
         lastAppliedIndex);
     ozoneManager.getMetadataManager().getStore().flush();
     return lastAppliedIndex;
