@@ -105,13 +105,13 @@ jobs:
     steps:
         - uses: actions/checkout@master
         - uses: actions/cache@v2
-            with:
-              path: |
-                ~/.pnpm-store
-                **/node_modules
-              key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
-              restore-keys: |
-                ${{ runner.os }}-pnpm-
+          with:
+            path: |
+              ~/.pnpm-store
+              **/node_modules
+            key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+            restore-keys: |
+              ${{ runner.os }}-pnpm-
         - uses: ./.github/buildenv
           with:
             args: ./hadoop-ozone/dev-support/checks/build.sh
