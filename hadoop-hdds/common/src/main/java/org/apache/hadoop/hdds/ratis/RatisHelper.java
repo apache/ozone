@@ -85,8 +85,8 @@ public final class RatisHelper {
       HDDS_DATANODE_RATIS_PREFIX_KEY + GrpcConfigKeys.PREFIX;
 
   private static final Class[] NO_RETRY_EXCEPTIONS =
-      new Class[] { NotReplicatedException.class, GroupMismatchException.class,
-          StateMachineException.class, AlreadyClosedException.class };
+      new Class[] {NotReplicatedException.class, GroupMismatchException.class,
+          StateMachineException.class};
 
   /* TODO: use a dummy id for all groups for the moment.
    *       It should be changed to a unique id for each group.
@@ -303,8 +303,6 @@ public final class RatisHelper {
    * | GroupMismatchException      | NO_RETRY            | NO_RETRY            |
    * |-------------------------------------------------------------------------|
    * | StateMachineException       | NO_RETRY            | NO_RETRY            |
-   * |-------------------------------------------------------------------------|
-   * | AlreadyClosedException      | NO_RETRY            | NO_RETRY            |
    * |-------------------------------------------------------------------------|
    * | TimeoutIOException          | EXPONENTIAL_BACKOFF | NO_RETRY            |
    * |-------------------------------------------------------------------------|

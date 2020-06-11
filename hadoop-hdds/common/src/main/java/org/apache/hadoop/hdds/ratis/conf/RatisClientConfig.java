@@ -28,12 +28,16 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
 
 /**
- * Configuration for Ratis Client. This is the config used in creating
+ * Configuration related to Ratis Client. This is the config used in creating
  * RaftClient creation.
  */
 @ConfigGroup(prefix = RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY)
 public class RatisClientConfig {
 
+  /**
+   * Configurations which will be set in RaftProperties. RaftProperties is a
+   * configuration object for Ratis client.
+   */
   @ConfigGroup(prefix = RaftClientConfigKeys.PREFIX)
   public static class RaftConfig {
     @Config(key = "async.outstanding-requests.max",
