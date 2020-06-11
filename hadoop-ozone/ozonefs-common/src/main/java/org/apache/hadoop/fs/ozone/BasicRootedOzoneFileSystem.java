@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.fs.ozone;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -66,7 +65,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCK
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_EMPTY;
 
 /**
- * The minimal Ozone Filesystem implementation.
+ * The minimal Rooted Ozone Filesystem implementation.
  * <p>
  * This is a basic version which doesn't extend
  * KeyProviderTokenIssuer and doesn't include statistics. It can be used
@@ -132,27 +131,13 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           .build();
       LOG.trace("Ozone URI for OFS initialization is " + uri);
 
-      //isolated is the default for ozonefs-lib-legacy which includes the
-      // /ozonefs.txt, otherwise the default is false. It could be overridden.
-      boolean defaultValue =
-          BasicRootedOzoneFileSystem.class.getClassLoader()
-              .getResource("ozonefs.txt") != null;
-
-      //Use string here instead of the constant as constant may not be available
-      //on the classpath of a hadoop 2.7
-      boolean isolatedClassloader =
-          conf.getBoolean("ozone.fs.isolated-classloader", defaultValue);
-
       ConfigurationSource source;
       if (conf instanceof OzoneConfiguration) {
         source = (ConfigurationSource) conf;
       } else {
         source = new LegacyHadoopConfigurationSource(conf);
       }
-      this.adapter =
-          createAdapter(source,
-              omHostOrServiceId, omPort,
-              isolatedClassloader);
+      this.adapter = createAdapter(source, omHostOrServiceId, omPort);
       this.adapterImpl = (BasicRootedOzoneClientAdapterImpl) this.adapter;
 
       try {
@@ -171,14 +156,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   }
 
   protected OzoneClientAdapter createAdapter(ConfigurationSource conf,
-      String omHost, int omPort, boolean isolatedClassloader)
-      throws IOException {
-
-    if (isolatedClassloader) {
-      return OzoneClientAdapterFactory.createAdapter();
-    } else {
-      return new BasicRootedOzoneClientAdapterImpl(omHost, omPort, conf);
-    }
+      String omHost, int omPort) throws IOException {
+    return new BasicRootedOzoneClientAdapterImpl(omHost, omPort, conf);
   }
 
   @Override
@@ -871,7 +850,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return true;
   }
 
-  @VisibleForTesting
   FileStatus convertFileStatus(FileStatusAdapter fileStatusAdapter) {
     Path symLink = null;
     try {

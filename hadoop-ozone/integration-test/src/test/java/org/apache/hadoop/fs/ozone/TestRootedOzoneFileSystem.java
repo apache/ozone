@@ -614,10 +614,8 @@ public class TestRootedOzoneFileSystem {
       Assert.assertEquals(statusFromAdapter.getLen(), statusFromFS.getLen());
       Assert.assertEquals(statusFromAdapter.isDirectory(),
           statusFromFS.isDirectory());
-      // TODO: When HDDS-3054 is in, uncomment the lines below.
-      //  As of now the modification time almost certainly won't match.
-//      Assert.assertEquals(statusFromAdapter.getModificationTime(),
-//          statusFromFS.getModificationTime());
+      Assert.assertEquals(statusFromAdapter.getModificationTime(),
+          statusFromFS.getModificationTime());
     }
   }
 

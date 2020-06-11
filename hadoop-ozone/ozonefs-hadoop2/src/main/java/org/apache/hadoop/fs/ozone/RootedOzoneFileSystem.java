@@ -17,17 +17,9 @@
  */
 package org.apache.hadoop.fs.ozone;
 
-import java.io.IOException;
-
 /**
- * Lightweight adapter to separate hadoop/ozone classes.
- * <p>
- * This class contains only the bare minimum Ozone classes in the signature.
- * It could be loaded by a different classloader because only the objects in
- * the method signatures should be shared between the classloader.
+ * Minimal Rooted Ozone File System compatible with Hadoop 2.x.
  */
-public interface RootedOzoneClientAdapter extends OzoneClientAdapter {
+public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem {
 
-  // renameKey is not supported in OFS, user should use rename instead.
-  void rename(String pathStr, String newPath) throws IOException;
 }

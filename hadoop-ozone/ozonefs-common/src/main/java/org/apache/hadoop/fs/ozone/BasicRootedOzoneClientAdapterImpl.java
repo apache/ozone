@@ -77,14 +77,14 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_NOT_FOUND;
 
 /**
- * Basic Implementation of the OzoneFileSystem calls.
+ * Basic Implementation of the RootedOzoneFileSystem calls.
  * <p>
  * This is the minimal version which doesn't include any statistics.
  * <p>
- * For full featured version use OzoneClientAdapterImpl.
+ * For full featured version use RootedOzoneClientAdapterImpl.
  */
 public class BasicRootedOzoneClientAdapterImpl
-    implements RootedOzoneClientAdapter {
+    implements OzoneClientAdapter {
 
   static final Logger LOG =
       LoggerFactory.getLogger(BasicRootedOzoneClientAdapterImpl.class);
@@ -341,6 +341,17 @@ public class BasicRootedOzoneClientAdapterImpl
     throw new IOException("OFS doesn't support renameKey, use rename instead.");
   }
 
+  /**
+   * Rename a path into another.
+   *
+   * In OFS, the parameters for rename are no longer key path, but effectively
+   * full path containing volume and bucket. Therefore, the method name
+   * renameKey becomes misleading if continued to be used.
+   *
+   * @param path Source path
+   * @param newPath Target path
+   * @throws IOException
+   */
   @Override
   public void rename(String path, String newPath) throws IOException {
     incrementCounter(Statistic.OBJECTS_RENAMED);
@@ -351,7 +362,7 @@ public class BasicRootedOzoneClientAdapterImpl
     // This should have been checked in BasicRootedOzoneFileSystem#rename
     // already via regular call path unless bypassed.
     if (!ofsPath.isInSameBucketAs(ofsNewPath)) {
-      throw new IOException("Cannot rename a key to a different bucket");
+      throw new IOException("Can't rename a key to a different bucket.");
     }
 
     OzoneBucket bucket = getBucket(ofsPath, false);
