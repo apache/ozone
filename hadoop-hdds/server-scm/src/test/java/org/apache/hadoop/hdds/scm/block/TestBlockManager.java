@@ -18,11 +18,15 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -237,40 +241,42 @@ public class TestBlockManager {
 
   @Test
   public void testBlockDistribution() throws Exception {
-    int threadCount = numContainerPerOwnerInPipeline * numContainerPerOwnerInPipeline;
+    int threadCount = numContainerPerOwnerInPipeline *
+            numContainerPerOwnerInPipeline;
     List<ExecutorService> executors = new ArrayList<>(threadCount);
     for (int i = 0; i < threadCount; i++) {
       executors.add(Executors.newSingleThreadExecutor());
     }
     pipelineManager.createPipeline(type, factor);
     TestUtils.openAllRatisPipelines(pipelineManager);
-    Map<Long, List<AllocatedBlock>> allocatedBlockMap = new ConcurrentHashMap<>();
+    Map<Long, List<AllocatedBlock>> allocatedBlockMap =
+            new ConcurrentHashMap<>();
     List<CompletableFuture<AllocatedBlock>> futureList =
             new ArrayList<>(threadCount);
     for (int i = 0; i < threadCount; i++) {
       final CompletableFuture<AllocatedBlock> future =
               new CompletableFuture<>();
-     CompletableFuture.supplyAsync(() -> {
-       try {
+      CompletableFuture.supplyAsync(() -> {
+        try {
           List<AllocatedBlock> blockList;
           AllocatedBlock block = blockManager
-                    .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor,
-                            OzoneConsts.OZONE,
-                            new ExcludeList());
-            long containerId = block.getBlockID().getContainerID();
-            if (!allocatedBlockMap.containsKey(containerId)) {
-              blockList = new ArrayList<>();
-            } else {
-              blockList = allocatedBlockMap.get(containerId);
-            }
-            blockList.add(block);
-            allocatedBlockMap.put(containerId, blockList);
-            future.complete(block);
+                  .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor,
+                          OzoneConsts.OZONE,
+                          new ExcludeList());
+          long containerId = block.getBlockID().getContainerID();
+          if (!allocatedBlockMap.containsKey(containerId)) {
+            blockList = new ArrayList<>();
+          } else {
+            blockList = allocatedBlockMap.get(containerId);
+          }
+          blockList.add(block);
+          allocatedBlockMap.put(containerId, blockList);
+          future.complete(block);
         } catch (IOException e) {
           future.completeExceptionally(e);
         }
         return future;
-     }, executors.get(i));
+      }, executors.get(i));
       futureList.add(future);
     }
     try {

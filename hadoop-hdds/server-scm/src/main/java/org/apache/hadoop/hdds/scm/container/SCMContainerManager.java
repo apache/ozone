@@ -422,7 +422,9 @@ public class SCMContainerManager implements ContainerManager {
 
   @SuppressWarnings("squid:S2445")
   public ContainerInfo getMatchingContainer(final long sizeRequired,
-                                            String owner, Pipeline pipeline, List<ContainerID> excludedContainers) {
+                                            String owner, Pipeline pipeline,
+                                            List<ContainerID>
+                                                      excludedContainers) {
     NavigableSet<ContainerID> containerIDs;
     ContainerInfo containerInfo;
     try {
@@ -431,15 +433,15 @@ public class SCMContainerManager implements ContainerManager {
 
         if (containerIDs.size() < numContainerPerOwnerInPipeline) {
           containerInfo =
-                  containerStateManager.allocateContainer(pipelineManager, owner,
-                          pipeline);
+                  containerStateManager.allocateContainer(
+                          pipelineManager, owner, pipeline);
           // Add to DB
           addContainerToDB(containerInfo);
         } else {
           containerIDs.removeAll(excludedContainers);
           containerInfo =
-                  containerStateManager.getMatchingContainer(sizeRequired, owner,
-                          pipeline.getId(), containerIDs);
+                  containerStateManager.getMatchingContainer(
+                          sizeRequired, owner, pipeline.getId(), containerIDs);
           if (containerInfo == null) {
             containerInfo =
                     containerStateManager.allocateContainer(pipelineManager, owner,
