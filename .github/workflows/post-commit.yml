@@ -224,6 +224,7 @@ jobs:
     name: coverage
     runs-on: ubuntu-18.04
     needs:
+       - build
        - it-ozone
        - it-hdds-om
        - it-client
@@ -231,6 +232,9 @@ jobs:
        - it-filesystem
        - it-freon
        - unit
+    if: |
+      !cancelled() &&
+      needs.build.result == 'success'
     steps:
        - uses: actions/checkout@v2
        - uses: ./.github/buildenv
