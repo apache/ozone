@@ -86,37 +86,37 @@
       <plugin>
         <groupId>com.github.eirslett</groupId>
         <artifactId>frontend-maven-plugin</artifactId>
+        <version>1.10.0</version>
         <configuration>
           <installDirectory>target</installDirectory>
           <workingDirectory>${basedir}/src/main/resources/webapps/recon/ozone-recon-web</workingDirectory>
         </configuration>
         <executions>
           <execution>
-            <id>Install node and yarn locally to the project</id>
+            <id>Install node and npm locally to the project</id>
             <goals>
-              <goal>install-node-and-yarn</goal>
+              <goal>install-node-and-npm</goal>
             </goals>
             <configuration>
               <nodeVersion>v12.14.1</nodeVersion>
-              <yarnVersion>v1.22.4</yarnVersion>
             </configuration>
           </execution>
           <execution>
-            <id>yarn install</id>
+            <id>install frontend dependencies</id>
             <goals>
-              <goal>yarn</goal>
+              <goal>npx</goal>
             </goals>
             <configuration>
-              <arguments>install</arguments>
+              <arguments>pnpm install</arguments>
             </configuration>
           </execution>
           <execution>
             <id>Build frontend</id>
             <goals>
-              <goal>yarn</goal>
+              <goal>npx</goal>
             </goals>
             <configuration>
-              <arguments>run build</arguments>
+              <arguments>pnpm run build</arguments>
             </configuration>
           </execution>
         </executions>
