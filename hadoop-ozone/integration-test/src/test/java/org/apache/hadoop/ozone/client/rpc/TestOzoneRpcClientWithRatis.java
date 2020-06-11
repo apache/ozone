@@ -50,7 +50,6 @@ import static org.junit.Assert.fail;
  * This class is to test all the public facing APIs of Ozone Client with an
  * active OM Ratis server.
  */
-@Ignore
 public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
   private static OzoneConfiguration conf;
   /**
