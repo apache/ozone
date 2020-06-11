@@ -24,7 +24,9 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PowerMockIgnore;
@@ -45,6 +47,10 @@ import static org.mockito.Mockito.when;
 @PrepareForTest({ OzoneClientFactory.class, UserGroupInformation.class })
 @PowerMockIgnore("javax.management.*")
 public class TestRootedOzoneFileSystemWithMocks {
+
+  // Mock tests should finish in seconds.
+  @Rule
+  public Timeout timeout = new Timeout(45_000);
 
   @Test
   public void testFSUriWithHostPortOverrides() throws Exception {
