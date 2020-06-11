@@ -39,7 +39,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Ozone File system tests that are light weight and use mocks.
+ * Rooted Ozone File system tests that are light weight and use mocks.
  */
 @RunWith(PowerMockRunner.class)
 @PrepareForTest({ OzoneClientFactory.class, UserGroupInformation.class })
@@ -68,11 +68,9 @@ public class TestRootedOzoneFileSystemWithMocks {
     conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
 
     URI uri = new URI("ofs://local.host:5899");
-
     FileSystem fileSystem = FileSystem.get(uri, conf);
-    RootedOzoneFileSystem ofs = (RootedOzoneFileSystem) fileSystem;
 
-    assertEquals(ofs.getUri().getAuthority(), "local.host:5899");
+    assertEquals(fileSystem.getUri().getAuthority(), "local.host:5899");
     PowerMockito.verifyStatic();
     OzoneClientFactory.getRpcClient("local.host", 5899, conf);
   }
@@ -101,13 +99,11 @@ public class TestRootedOzoneFileSystemWithMocks {
     conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
 
     URI uri = new URI("ofs://local.host");
-
     FileSystem fileSystem = FileSystem.get(uri, conf);
-    RootedOzoneFileSystem ofs = (RootedOzoneFileSystem) fileSystem;
 
-    assertEquals(ofs.getUri().getHost(), "local.host");
+    assertEquals(fileSystem.getUri().getHost(), "local.host");
     // The URI doesn't contain a port number, expect -1 from getPort()
-    assertEquals(ofs.getUri().getPort(), -1);
+    assertEquals(fileSystem.getUri().getPort(), -1);
     PowerMockito.verifyStatic();
     // Check the actual port number in use
     OzoneClientFactory.getRpcClient("local.host", omPort, conf);

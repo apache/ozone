@@ -77,11 +77,11 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
     .BUCKET_NOT_FOUND;
 
 /**
- * Basic Implementation of the OzoneFileSystem calls.
+ * Basic Implementation of the RootedOzoneFileSystem calls.
  * <p>
  * This is the minimal version which doesn't include any statistics.
  * <p>
- * For full featured version use OzoneClientAdapterImpl.
+ * For full featured version use RootedOzoneClientAdapterImpl.
  */
 public class BasicRootedOzoneClientAdapterImpl
     implements OzoneClientAdapter {

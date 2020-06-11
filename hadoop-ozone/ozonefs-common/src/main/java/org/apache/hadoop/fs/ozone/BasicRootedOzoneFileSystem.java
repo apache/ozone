@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.fs.ozone;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -851,7 +850,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return true;
   }
 
-  @VisibleForTesting
   FileStatus convertFileStatus(FileStatusAdapter fileStatusAdapter) {
     Path symLink = null;
     try {
