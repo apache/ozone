@@ -220,3 +220,33 @@ jobs:
           with:
             name: it-ozone
             path: mnt/ozone/target/integration
+  coverage:
+    name: coverage
+    runs-on: ubuntu-18.04
+    needs:
+      - it-hdds-om
+      - it-ozone
+      - it-client
+      - it-filesystem-contract
+      - it-filesystem
+      - it-freon
+      - unit
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ./.github/buildenv
+        with:
+          args: ./hadoop-ozone/dev-support/checks/build.sh
+      - uses: actions/download-artifact@v2
+        with:
+          path: target/artifacts
+      - run: ./.github/coverage-report.sh
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v1
+        with:
+          file: ./target/coverage/all.xml
+          name: codecov-umbrella
+          fail_ci_if_error: true
+      - uses: actions/upload-artifact@master
+        with:
+          name: coverage
+          path: target/coverage
