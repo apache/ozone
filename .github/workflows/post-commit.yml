@@ -23,16 +23,12 @@ jobs:
       - uses: actions/checkout@master
       - uses: actions/cache@v2
         with:
-          path: ~/.pnpm-store
+          path: |
+            ~/.pnpm-store
+            **/node_modules
           key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-
-      - uses: actions/cache@v2
-          with:
-            path: ./hadoop-ozone/recon/src/main/resources/webapps/recon/ozone-recon-web/node_modules
-            key: ${{ runner.os }}-node-modules-${{ hashFiles('**/pnpm-lock.yaml') }}
-            restore-keys: |
-              ${{ runner.os }}-node-modules-
       - uses: ./.github/buildenv
         with:
           args: ./hadoop-ozone/dev-support/checks/build.sh
@@ -108,6 +104,14 @@ jobs:
       - build
     steps:
         - uses: actions/checkout@master
+        - uses: actions/cache@v2
+            with:
+              path: |
+                ~/.pnpm-store
+                **/node_modules
+              key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+              restore-keys: |
+                ${{ runner.os }}-pnpm-
         - uses: ./.github/buildenv
           with:
             args: ./hadoop-ozone/dev-support/checks/build.sh
