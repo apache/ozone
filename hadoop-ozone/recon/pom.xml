@@ -102,6 +102,15 @@
             </configuration>
           </execution>
           <execution>
+            <id>set pnpm store path</id>
+            <goals>
+              <goal>npx</goal>
+            </goals>
+            <configuration>
+              <arguments>pnpm config set store-dir ~/.pnpm-store</arguments>
+            </configuration>
+          </execution>
+          <execution>
             <id>install frontend dependencies</id>
             <goals>
               <goal>npx</goal>
