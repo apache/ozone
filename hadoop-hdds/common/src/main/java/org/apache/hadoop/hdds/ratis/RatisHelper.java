@@ -241,15 +241,18 @@ public final class RatisHelper {
     Map<String, String> ratisClientConf =
         ozoneConf.getPropsWithPrefix(HDDS_DATANODE_RATIS_PREFIX_KEY);
     ratisClientConf.forEach((key, val) -> {
-      if (!(key.startsWith(RAFT_SERVER_PREFIX_KEY) ||
-          key.startsWith(GrpcConfigKeys.TLS.PREFIX) ||
-          key.startsWith(GrpcConfigKeys.Server.PREFIX))) {
+      if (key.startsWith(RaftClientConfigKeys.PREFIX) || isGrpcClientConfig(
+          key)) {
         raftProperties.set(key, val);
       }
     });
   }
 
-
+  private static boolean isGrpcClientConfig(String key) {
+    return key.startsWith(GrpcConfigKeys.PREFIX) && !key
+        .startsWith(GrpcConfigKeys.TLS.PREFIX) && !key
+        .startsWith(GrpcConfigKeys.Server.PREFIX);
+  }
   /**
    * Set all the properties matching with prefix
    * {@link RatisHelper#HDDS_DATANODE_RATIS_PREFIX_KEY} in

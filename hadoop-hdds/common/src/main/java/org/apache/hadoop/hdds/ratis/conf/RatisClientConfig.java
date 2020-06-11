@@ -35,7 +35,7 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
 public class RatisClientConfig {
 
   @ConfigGroup(prefix = RaftClientConfigKeys.PREFIX)
-  public class RaftConfig {
+  public static class RaftConfig {
     @Config(key = "async.outstanding-requests.max",
         defaultValue = "32",
         type = ConfigType.INT,
