@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.ozone;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
+import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
@@ -58,7 +59,7 @@ public class Hadoop27RpcTransport implements OmTransport {
         socket, UserGroupInformation.getCurrentUser(),
         ozoneConfiguration,
         NetUtils.getDefaultSocketFactory(ozoneConfiguration),
-        RPC.getRpcTimeout(ozoneConfiguration), null).getProxy();
+        getRpcTimeout(ozoneConfiguration), null).getProxy();
   }
 
   @Override
@@ -79,4 +80,8 @@ public class Hadoop27RpcTransport implements OmTransport {
   public void close() throws IOException {
   }
 
+  private int getRpcTimeout(OzoneConfiguration conf) {
+    return conf.getInt(CommonConfigurationKeys.IPC_CLIENT_RPC_TIMEOUT_KEY,
+        CommonConfigurationKeys.IPC_CLIENT_RPC_TIMEOUT_DEFAULT);
+  }
 }
