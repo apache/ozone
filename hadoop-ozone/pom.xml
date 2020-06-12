@@ -294,6 +294,7 @@
             <exclude>**/dependency-reduced-pom.xml</exclude>
             <exclude>**/node_modules/**</exclude>
             <exclude>**/yarn.lock</exclude>
+            <exclude>**/pnpm-lock.yaml</exclude>
             <exclude>**/ozone-recon-web/build/**</exclude>
             <exclude>src/main/license/**</exclude>
             <exclude>src/main/proto/proto.lock</exclude>
