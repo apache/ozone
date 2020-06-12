@@ -281,11 +281,13 @@ public class TestBlockManager {
     }
     try {
       CompletableFuture
-              .allOf(futureList.toArray(new CompletableFuture[futureList.size()]))
-              .get();
+              .allOf(futureList.toArray(
+                      new CompletableFuture[futureList.size()])).get();
       Assert.assertTrue(pipelineManager.getPipelines(type).size() == 1);
-      Assert.assertTrue(allocatedBlockMap.size() == numContainerPerOwnerInPipeline);
-      Assert.assertTrue(allocatedBlockMap.values().size() == numContainerPerOwnerInPipeline);
+      Assert.assertTrue(
+              allocatedBlockMap.size() == numContainerPerOwnerInPipeline);
+      Assert.assertTrue(allocatedBlockMap.
+              values().size() == numContainerPerOwnerInPipeline);
       allocatedBlockMap.values().stream().forEach(v -> {
         Assert.assertTrue(v.size() == numContainerPerOwnerInPipeline);
       });

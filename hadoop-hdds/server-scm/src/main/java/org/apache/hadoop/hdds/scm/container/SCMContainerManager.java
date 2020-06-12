@@ -444,8 +444,9 @@ public class SCMContainerManager implements ContainerManager {
                           sizeRequired, owner, pipeline.getId(), containerIDs);
           if (containerInfo == null) {
             containerInfo =
-                    containerStateManager.allocateContainer(pipelineManager, owner,
-                            pipeline);
+                    containerStateManager.
+                            allocateContainer(pipelineManager, owner,
+                                    pipeline);
             // Add to DB
             addContainerToDB(containerInfo);
           }
