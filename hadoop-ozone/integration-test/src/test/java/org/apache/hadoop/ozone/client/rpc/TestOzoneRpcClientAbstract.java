@@ -2673,6 +2673,7 @@ public abstract class TestOzoneRpcClientAbstract {
    * GDPR encryption details (flag, secret, algorithm).
    * @throws Exception
    */
+  @Ignore
   @Test
   public void testDeletedKeyForGDPR() throws Exception {
     //Step 1
