@@ -62,7 +62,8 @@ public class DatanodeClientInsight extends BaseInsightPoint
             result
                 .add(new LoggerSource(dn,
                     HddsDispatcher.class.getCanonicalName(),
-                    defaultLevel(verbose)));
+                    defaultLevel(verbose),
+                    false));
             return null;
           });
     } catch (IOException e) {
