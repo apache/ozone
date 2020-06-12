@@ -1,7 +1,7 @@
 {
   "definitions": [
     {
-      "protopath": "OzoneManagerProtocol.proto",
+      "protopath": "OmClientProtocol.proto",
       "def": {
         "enums": [
           {
