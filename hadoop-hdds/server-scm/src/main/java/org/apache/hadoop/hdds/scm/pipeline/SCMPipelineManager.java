@@ -32,7 +32,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -420,48 +419,6 @@ public class SCMPipelineManager implements PipelineManager {
     }
   }
 
-  private void scrubAllocatedPipeline(
-      ReplicationType type, ReplicationFactor factor, Instant currentTime)
-      throws IOException {
-    Long pipelineScrubTimeoutInMills = conf.getTimeDuration(
-        ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT,
-        ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT,
-        TimeUnit.MILLISECONDS);
-    List<Pipeline> needToSrubPipelines = stateManager.getPipelines(type, factor,
-        Pipeline.PipelineState.ALLOCATED).stream()
-        .filter(p -> currentTime.toEpochMilli() - p.getCreationTimestamp()
-            .toEpochMilli() >= pipelineScrubTimeoutInMills)
-        .collect(Collectors.toList());
-    for (Pipeline p : needToSrubPipelines) {
-      LOG.info("Scrubbing pipeline: id: " + p.getId().toString() +
-          " since it stays at ALLOCATED stage for " +
-          Duration.between(currentTime, p.getCreationTimestamp()).toMinutes() +
-          " mins.");
-      closePipeline(p, false);
-    }
-  }
-
-  private void scrubClosedPipeline(
-      ReplicationType type, ReplicationFactor factor, Instant currentTime)
-      throws IOException {
-    long pipelineDestroyTimeoutInMillis =
-        conf.getTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT,
-            ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT_DEFAULT,
-            TimeUnit.MILLISECONDS);
-    List<Pipeline> closedPipelines = stateManager.getPipelines(type, factor,
-        Pipeline.PipelineState.CLOSED).stream()
-        .filter(p -> currentTime.toEpochMilli() - p.getCreationTimestamp()
-            .toEpochMilli() >= pipelineDestroyTimeoutInMillis)
-        .collect(Collectors.toList());
-    for (Pipeline p : closedPipelines) {
-      LOG.info("Scrubbing pipeline: id: " + p.getId().toString() +
-          " since it stays at CLOSED stage for " +
-          Duration.between(currentTime, p.getCreationTimestamp()).toMinutes() +
-          " mins.");
-      removePipeline(p);
-    }
-  }
-
   /**
    * Scrub pipelines.
    * @param type Pipeline type
@@ -476,8 +433,40 @@ public class SCMPipelineManager implements PipelineManager {
       return;
     }
     Instant currentTime = Instant.now();
-    scrubAllocatedPipeline(type, factor, currentTime);
-    scrubClosedPipeline(type, factor, currentTime);
+    Long pipelineScrubTimeoutInMills = conf.getTimeDuration(
+        ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT,
+        ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    Long pipelineRemoveTimeoutInMillis =
+        conf.getTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT,
+            ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT_DEFAULT,
+            TimeUnit.MILLISECONDS);
+
+    List<Pipeline> candidates = stateManager.getPipelines(type, factor);
+
+    for (Pipeline p : candidates) {
+      // scrub pipelines who stay ALLOCATED for too long.
+      if (p.getPipelineState() == Pipeline.PipelineState.ALLOCATED &&
+          (currentTime.toEpochMilli() - p.getCreationTimestamp()
+              .toEpochMilli() >= pipelineScrubTimeoutInMills)) {
+        LOG.info("Scrubbing pipeline: id: " + p.getId().toString() +
+            " since it stays at ALLOCATED stage for " +
+            Duration.between(currentTime, p.getCreationTimestamp())
+                .toMinutes() + " mins.");
+        closePipeline(p, false);
+      }
+      // scrub pipelines who stay CLOSED for too long.
+      if (p.getPipelineState() == Pipeline.PipelineState.CLOSED &&
+          (currentTime.toEpochMilli() - p.getCreationTimestamp()
+              .toEpochMilli() >= pipelineRemoveTimeoutInMillis)) {
+        LOG.info("Scrubbing pipeline: id: " + p.getId().toString() +
+            " since it stays at CLOSED stage for " +
+            Duration.between(currentTime, p.getCreationTimestamp())
+                .toMinutes() + " mins.");
+        removePipeline(p);
+      }
+    }
+    return;
   }
 
   @Override
@@ -581,9 +570,9 @@ public class SCMPipelineManager implements PipelineManager {
   protected void removePipeline(Pipeline pipeline) throws IOException {
     pipelineFactory.close(pipeline.getType(), pipeline);
     PipelineID pipelineID = pipeline.getId();
-    closeContainersForPipeline(pipelineID);
     lock.writeLock().lock();
     try {
+      closeContainersForPipeline(pipelineID);
       if (pipelineStore != null) {
         pipelineStore.delete(pipelineID);
         Pipeline pipelineRemoved = stateManager.removePipeline(pipelineID);

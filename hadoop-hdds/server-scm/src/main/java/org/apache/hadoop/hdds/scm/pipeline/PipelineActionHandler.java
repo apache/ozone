@@ -80,7 +80,7 @@ public class PipelineActionHandler
 
       if (action == PipelineAction.Action.CLOSE) {
         pipelineManager.closePipeline(
-            pipelineManager.getPipeline(pid), true);
+            pipelineManager.getPipeline(pid), false);
       } else {
         LOG.error("unknown pipeline action:{}", action);
       }
