@@ -241,7 +241,6 @@ public final class RatisHelper {
     Map<String, String> ratisClientConf = ozoneConf.getPropsWithPrefix(
         StringUtils.appendIfNotPresent(HDDS_DATANODE_RATIS_PREFIX_KEY, '.'));
     ratisClientConf.forEach((key, val) -> {
-      LOG.info("LOKI "+key);
       if (key.startsWith(RaftClientConfigKeys.PREFIX) || isGrpcClientConfig(
           key)) {
         raftProperties.set(key, val);
