@@ -91,4 +91,9 @@ public class TableConfig {
         .append(getName())
         .toHashCode();
   }
+
+  @Override
+  public String toString() {
+    return getName();
+  }
 }

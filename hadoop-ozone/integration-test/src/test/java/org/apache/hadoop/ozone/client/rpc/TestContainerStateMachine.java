@@ -156,12 +156,12 @@ public class TestContainerStateMachine {
 
     key.close();
     // Make sure the container is marked unhealthy
-    Assert.assertTrue(
+    Assert.assertEquals(
+        ContainerProtos.ContainerDataProto.State.UNHEALTHY,
         cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
             .getContainer().getContainerSet()
             .getContainer(omKeyLocationInfo.getContainerID())
-            .getContainerState()
-            == ContainerProtos.ContainerDataProto.State.UNHEALTHY);
+            .getContainerState());
   }
 
   @Test

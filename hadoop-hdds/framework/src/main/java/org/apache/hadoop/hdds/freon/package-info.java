@@ -14,15 +14,11 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ * <p>
+ * Freon related helper classes used for load testing.
  */
-
-package org.apache.hadoop.ozone.om.protocol;
 
 /**
- * This will be used in the OzoneManager Server, as few of the methods in
- * OzoneManagerHAProtocol need not be exposed to Om clients. This interface
- * extends both OzoneManagerHAProtocol and OzoneManagerProtocol.
+ * Freon related helper classes used for load testing.
  */
-public interface OzoneManagerServerProtocol extends OzoneManagerProtocol,
-    OzoneManagerHAProtocol {
-}
+package org.apache.hadoop.hdds.freon;

@@ -31,9 +31,11 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -111,23 +113,41 @@ public class TestOzoneManagerSnapshotProvider {
         .getFailoverProxyProvider(objectStore.getClientProxy())
         .getCurrentProxyOMNodeId();
 
-    OzoneManager ozoneManager = cluster.getOzoneManager(leaderOMNodeId);
+    OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
 
     // Get a follower OM
-    String followerNodeId = ozoneManager.getPeerNodes().get(0).getOMNodeId();
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getOMNodeId();
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
 
     // Download latest checkpoint from leader OM to follower OM
     DBCheckpoint omSnapshot = followerOM.getOmSnapshotProvider()
         .getOzoneManagerDBSnapshot(leaderOMNodeId);
 
-    long leaderSnapshotIndex = ozoneManager.getRatisSnapshotIndex();
-    long downloadedSnapshotIndex = omSnapshot.getRatisSnapshotIndex();
+    long leaderSnapshotIndex = leaderOM.getRatisSnapshotIndex();
+    long downloadedSnapshotIndex = getDownloadSnapshotIndex(omSnapshot);
 
     // The snapshot index downloaded from leader OM should match the ratis
     // snapshot index on the leader OM
     Assert.assertEquals("The snapshot index downloaded from leader OM does " +
         "not match its ratis snapshot index",
         leaderSnapshotIndex, downloadedSnapshotIndex);
+  }
+
+  private long getDownloadSnapshotIndex(DBCheckpoint dbCheckpoint)
+      throws Exception {
+
+    OzoneConfiguration configuration = new OzoneConfiguration(conf);
+    configuration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
+        dbCheckpoint.getCheckpointLocation().getParent().toString());
+
+    OmMetadataManagerImpl omMetadataManager =
+        new OmMetadataManagerImpl(configuration);
+
+    long transactionIndex =
+        OMTransactionInfo.readTransactionInfo(omMetadataManager)
+        .getTransactionIndex();
+    omMetadataManager.stop();
+    return transactionIndex;
+
   }
 }

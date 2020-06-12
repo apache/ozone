@@ -49,7 +49,6 @@ public class OmKeyLocationInfoGroup {
     this.locationVersionList.putIfAbsent(version, new ArrayList<>());
   }
 
-
   /**
    * Return only the blocks that are created in the most recent version.
    *

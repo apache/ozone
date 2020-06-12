@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,7 +18,9 @@
 
 package org.apache.hadoop.ozone.container.common.statemachine;
 
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction.Action.CLOSE;
+import static org.apache.hadoop.test.GenericTestUtils.waitFor;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -26,11 +28,17 @@ import static org.mockito.Mockito.mock;
 
 import java.net.InetSocketAddress;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
+import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.junit.Test;
 
 import com.google.protobuf.GeneratedMessage;
@@ -113,6 +121,65 @@ public class TestStateContext {
 
     containerActions = stateContext.getPendingContainerAction(scm2, 10);
     assertEquals(1, containerActions.size());
+  }
+
+  /**
+   * Verifies that {@code StateContext} does not allow going back to running
+   * state after shutdown.  It creates a task that just waits until the state
+   * context is set to shutdown, after which it returns "RUNNING" as next state.
+   * This task is executed in a separate thread.  The test thread sets state
+   * to shutdown, and waits until the task is completed.  It then verifies
+   * that state is still shutdown.
+   */
+  @Test
+  public void doesNotRestartAfterShutdown() throws Exception {
+    final AtomicBoolean taskExecuted = new AtomicBoolean();
+
+    StateContext subject = new StateContext(new OzoneConfiguration(),
+        DatanodeStates.getInitState(), mock(DatanodeStateMachine.class)) {
+      @Override
+      public DatanodeState<DatanodeStates> getTask() {
+        // this task waits until {@code subject} is shutdown
+        return new DatanodeState<DatanodeStates>() {
+          @Override
+          public void onEnter() {
+            // no-op
+          }
+
+          @Override
+          public void onExit() {
+            // no-op
+          }
+
+          @Override
+          public void execute(ExecutorService executor) {
+            // no-op
+          }
+
+          @Override
+          public DatanodeStates await(long time, TimeUnit timeUnit)
+              throws InterruptedException, TimeoutException {
+            waitFor(() -> DatanodeStates.SHUTDOWN.equals(getState()), 100,
+                10000);
+            return DatanodeStates.RUNNING;
+          }
+        };
+      }
+    };
+
+    new ThreadFactoryBuilder().setDaemon(true).build().newThread(
+        () -> {
+          try {
+            subject.execute(newDirectExecutorService(), 10, TimeUnit.SECONDS);
+            taskExecuted.set(true);
+          } catch (Exception ignored) {
+          }
+        }
+    ).start();
+    subject.setState(DatanodeStates.SHUTDOWN);
+    waitFor(taskExecuted::get, 100, 10000);
+
+    assertEquals(DatanodeStates.SHUTDOWN, subject.getState());
   }
 
 }

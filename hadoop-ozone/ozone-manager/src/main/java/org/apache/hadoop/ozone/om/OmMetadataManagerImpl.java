@@ -78,6 +78,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+
 import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -155,6 +156,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private boolean isRatisEnabled;
 
   public OmMetadataManagerImpl(OzoneConfiguration conf) throws IOException {
+
     this.lock = new OzoneManagerLock(conf);
     this.openKeyExpireThresholdMS = 1000L * conf.getInt(
         OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS,
@@ -259,16 +261,24 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         rocksDBConfiguration.setSyncOption(true);
       }
 
-      DBStoreBuilder dbStoreBuilder = DBStoreBuilder.newBuilder(configuration,
-          rocksDBConfiguration).setName(OM_DB_NAME)
-          .setPath(Paths.get(metaDir.getPath()));
+      this.store = loadDB(configuration, metaDir);
 
-      this.store = addOMTablesAndCodecs(dbStoreBuilder).build();
       initializeOmTables();
     }
   }
 
-  protected DBStoreBuilder addOMTablesAndCodecs(DBStoreBuilder builder) {
+  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir)
+      throws IOException {
+    RocksDBConfiguration rocksDBConfiguration =
+        configuration.getObject(RocksDBConfiguration.class);
+    DBStoreBuilder dbStoreBuilder = DBStoreBuilder.newBuilder(configuration,
+        rocksDBConfiguration).setName(OM_DB_NAME)
+        .setPath(Paths.get(metaDir.getPath()));
+    DBStore dbStore = addOMTablesAndCodecs(dbStoreBuilder).build();
+    return dbStore;
+  }
+
+  protected static DBStoreBuilder addOMTablesAndCodecs(DBStoreBuilder builder) {
 
     return builder.addTable(USER_TABLE)
         .addTable(VOLUME_TABLE)

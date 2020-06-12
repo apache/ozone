@@ -16,9 +16,6 @@
 -->
 <FindBugsFilter>
   <Match>
-    <Package name="org.apache.hadoop.hdds.protocol.proto"/>
-  </Match>
-  <Match>
     <Class name="org.apache.hadoop.ozone.container.common.volume.AbstractFuture" />
     <Bug pattern="DLS_DEAD_STORE_OF_CLASS_LITERAL" />
   </Match>

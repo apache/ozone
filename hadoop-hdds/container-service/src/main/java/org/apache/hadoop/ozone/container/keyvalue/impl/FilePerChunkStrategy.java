@@ -216,12 +216,18 @@ public class FilePerChunkStrategy implements ChunkManager {
     }
 
     long len = info.getLen();
-    long offset = 0; // ignore offset in chunk info
     ByteBuffer data = ByteBuffer.allocate((int) len);
 
-    for (File chunkFile : possibleFiles) {
+    for (File file : possibleFiles) {
       try {
-        ChunkUtils.readData(chunkFile, data, offset, len, volumeIOStats);
+        // use offset only if file written by old datanode
+        long offset;
+        if (file.exists() && file.length() == info.getOffset() + len) {
+          offset = info.getOffset();
+        } else {
+          offset = 0;
+        }
+        ChunkUtils.readData(file, data, offset, len, volumeIOStats);
         return ChunkBuffer.wrap(data);
       } catch (StorageContainerException ex) {
         //UNABLE TO FIND chunk is not a problem as we will try with the
@@ -261,17 +267,25 @@ public class FilePerChunkStrategy implements ChunkManager {
     // The call might be because of reapply of transactions on datanode
     // restart.
     if (!chunkFile.exists()) {
-      LOG.warn("Chunk file doe not exist. chunk info :" + info.toString());
+      LOG.warn("Chunk file not found for chunk {}", info);
       return;
     }
-    if (info.getLen() == chunkFile.length()) {
+
+    long chunkFileSize = chunkFile.length();
+    boolean allowed = info.getLen() == chunkFileSize
+        // chunk written by new client to old datanode, expected
+        // file length is offset + real chunk length; see HDDS-3644
+        || info.getLen() + info.getOffset() == chunkFileSize;
+    if (allowed) {
       FileUtil.fullyDelete(chunkFile);
+      LOG.info("Deleted chunk file {} (size {}) for chunk {}",
+          chunkFile, chunkFileSize, info);
     } else {
       LOG.error("Not Supported Operation. Trying to delete a " +
-          "chunk that is in shared file. chunk info : {}", info.toString());
+          "chunk that is in shared file. chunk info : {}", info);
       throw new StorageContainerException("Not Supported Operation. " +
           "Trying to delete a chunk that is in shared file. chunk info : "
-          + info.toString(), UNSUPPORTED_REQUEST);
+          + info, UNSUPPORTED_REQUEST);
     }
   }
 

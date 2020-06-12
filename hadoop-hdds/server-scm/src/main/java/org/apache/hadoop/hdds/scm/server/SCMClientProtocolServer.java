@@ -27,8 +27,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -287,10 +285,13 @@ public class SCMClientProtocolServer implements
 
     List<ContainerWithPipeline> cpList = new ArrayList<>();
 
+    StringBuilder strContainerIDs = new StringBuilder();
     for (Long containerID : containerIDs) {
       try {
         ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
         cpList.add(cp);
+        strContainerIDs.append(ContainerID.valueof(containerID).toString());
+        strContainerIDs.append(",");
       } catch (IOException ex) {
         AUDIT.logReadFailure(buildAuditMessageForFailure(
             SCMAction.GET_CONTAINER_WITH_PIPELINE_BATCH,
@@ -300,11 +301,10 @@ public class SCMClientProtocolServer implements
       }
     }
 
+
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.GET_CONTAINER_WITH_PIPELINE_BATCH,
-        Collections.singletonMap("containerIDs",
-        containerIDs.stream().map(id -> ContainerID.valueof(id).toString())
-            .collect(Collectors.joining(",")))));
+        Collections.singletonMap("containerIDs", strContainerIDs.toString())));
 
     return cpList;
   }
@@ -569,7 +569,7 @@ public class SCMClientProtocolServer implements
    */
   public List<DatanodeDetails> queryNode(HddsProtos.NodeState state) {
     Preconditions.checkNotNull(state, "Node Query set cannot be null");
-    return new ArrayList<>(queryNodeState(state));
+    return queryNodeState(state);
   }
 
   @VisibleForTesting
@@ -589,15 +589,10 @@ public class SCMClientProtocolServer implements
    * Query the System for Nodes.
    *
    * @param nodeState - NodeState that we are interested in matching.
-   * @return Set of Datanodes that match the NodeState.
+   * @return List of Datanodes that match the NodeState.
    */
-  private Set<DatanodeDetails> queryNodeState(HddsProtos.NodeState nodeState) {
-    Set<DatanodeDetails> returnSet = new TreeSet<>();
-    List<DatanodeDetails> tmp = scm.getScmNodeManager().getNodes(nodeState);
-    if ((tmp != null) && (tmp.size() > 0)) {
-      returnSet.addAll(tmp);
-    }
-    return returnSet;
+  private List<DatanodeDetails> queryNodeState(HddsProtos.NodeState nodeState) {
+    return scm.getScmNodeManager().getNodes(nodeState);
   }
 
   @Override

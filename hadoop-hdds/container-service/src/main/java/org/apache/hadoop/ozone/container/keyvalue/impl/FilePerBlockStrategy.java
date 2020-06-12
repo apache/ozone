@@ -55,6 +55,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage.COMMIT_DATA;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.validateChunkForOverwrite;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.verifyChunkFileExists;
 
 /**
  * This class is for performing chunk related operations.
@@ -163,10 +164,11 @@ public class FilePerBlockStrategy implements ChunkManager {
   }
 
   @Override
-  public void finishWriteChunk(KeyValueContainer container, BlockID blockID,
-      ChunkInfo info) throws IOException {
-    File chunkFile = getChunkFile(container, blockID, info);
+  public void finishWriteChunks(KeyValueContainer container,
+      BlockData blockData) throws IOException {
+    File chunkFile = getChunkFile(container, blockData.getBlockID(), null);
     files.close(chunkFile);
+    verifyChunkFileExists(chunkFile);
   }
 
   private void deleteChunk(Container container, BlockID blockID,
@@ -227,7 +229,7 @@ public class FilePerBlockStrategy implements ChunkManager {
     public FileChannel getChannel(File file, boolean sync)
         throws StorageContainerException {
       try {
-        return files.get(file.getAbsolutePath(),
+        return files.get(file.getPath(),
             () -> open(file, sync)).getChannel();
       } catch (ExecutionException e) {
         if (e.getCause() instanceof IOException) {
@@ -248,7 +250,7 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     public void close(File file) {
       if (file != null) {
-        files.invalidate(file.getAbsolutePath());
+        files.invalidate(file.getPath());
       }
     }
 

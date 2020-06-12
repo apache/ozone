@@ -18,7 +18,13 @@
 package org.apache.hadoop.ozone.om.ratis.utils;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketDeleteRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketSetPropertyRequest;
@@ -61,9 +67,14 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.ratis.util.FileUtils;
 import org.rocksdb.RocksDBException;
 
 import java.io.IOException;
+import java.nio.file.Path;
+
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_TABLE;
 
 /**
  * Utility class used by OzoneManager HA.
@@ -211,5 +222,61 @@ public final class OzoneManagerRatisUtils {
         return Status.INTERNAL_ERROR;
       }
     }
+  }
+
+  /**
+   * Obtain Transaction info from downloaded snapshot DB.
+   * @param tempConfig
+   * @return OMTransactionInfo
+   * @throws Exception
+   */
+  public static OMTransactionInfo getTransactionInfoFromDownloadedSnapshot(
+      OzoneConfiguration tempConfig, Path dbDir) throws Exception {
+    DBStore dbStore =
+        OmMetadataManagerImpl.loadDB(tempConfig, dbDir.toFile());
+
+    Table<String, OMTransactionInfo> transactionInfoTable =
+        dbStore.getTable(TRANSACTION_INFO_TABLE,
+            String.class, OMTransactionInfo.class);
+
+    OMTransactionInfo omTransactionInfo =
+        transactionInfoTable.get(TRANSACTION_INFO_KEY);
+    dbStore.close();
+    OzoneManager.LOG.info("Downloaded checkpoint with OMTransactionInfo {}",
+        omTransactionInfo);
+    return omTransactionInfo;
+  }
+
+  /**
+   * Verify transaction info with provided lastAppliedIndex.
+   *
+   * If transaction info transaction Index is less than or equal to
+   * lastAppliedIndex, return false, else return true.
+   * @param omTransactionInfo
+   * @param lastAppliedIndex
+   * @param leaderId
+   * @param newDBlocation
+   * @return boolean
+   */
+  public static boolean verifyTransactionInfo(
+      OMTransactionInfo omTransactionInfo,
+      long lastAppliedIndex,
+      String leaderId, Path newDBlocation) {
+    if (omTransactionInfo.getTransactionIndex() <= lastAppliedIndex) {
+      OzoneManager.LOG.error("Failed to install checkpoint from OM leader: {}" +
+              ". The last applied index: {} is greater than or equal to the " +
+              "checkpoint's applied index: {}. Deleting the downloaded " +
+              "checkpoint {}", leaderId, lastAppliedIndex,
+          omTransactionInfo.getTransactionIndex(), newDBlocation);
+      try {
+        FileUtils.deleteFully(newDBlocation);
+      } catch (IOException e) {
+        OzoneManager.LOG.error("Failed to fully delete the downloaded DB " +
+            "checkpoint {} from OM leader {}.", newDBlocation, leaderId, e);
+      }
+      return false;
+    }
+
+    return true;
   }
 }
