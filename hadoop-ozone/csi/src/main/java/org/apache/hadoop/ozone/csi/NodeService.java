@@ -47,11 +47,12 @@ public class NodeService extends NodeImplBase {
 
   private static final Logger LOG = LoggerFactory.getLogger(NodeService.class);
 
+  private final String mountCommand;
   private String s3Endpoint;
 
   public NodeService(CsiConfig configuration) {
     this.s3Endpoint = configuration.getS3gAddress();
-
+    this.mountCommand = configuration.getMountCommand();
   }
 
   @Override
@@ -60,14 +61,14 @@ public class NodeService extends NodeImplBase {
 
     try {
       Files.createDirectories(Paths.get(request.getTargetPath()));
-      String mountCommand =
-          String.format("goofys --endpoint %s %s %s",
+      String command =
+          String.format(mountCommand,
               s3Endpoint,
               request.getVolumeId(),
               request.getTargetPath());
-      LOG.info("Executing {}", mountCommand);
+      LOG.info("Executing {}", command);
 
-      executeCommand(mountCommand);
+      executeCommand(command);
 
       responseObserver.onNext(NodePublishVolumeResponse.newBuilder()
           .build());
