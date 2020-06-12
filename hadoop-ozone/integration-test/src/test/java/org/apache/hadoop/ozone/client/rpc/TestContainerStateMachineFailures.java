@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -130,10 +130,10 @@ public class TestContainerStateMachineFailures {
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 10,
         TimeUnit.SECONDS);
-    RatisClientConfig ratisClientConfig =
-        OzoneConfiguration.of(conf).getObject(RatisClientConfig.class);
-    ratisClientConfig.setWriteRequestTimeoutInMs(30000);
-    ratisClientConfig.setWatchRequestTimeoutInMs(30000);
+    conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
+        + ".client.request.write.timeout", 30, TimeUnit.SECONDS);
+    conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
+        + ".client.request.watch.timeout", 30, TimeUnit.SECONDS);
     conf.setLong(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
     conf.setQuietMode(false);
     cluster =

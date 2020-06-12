@@ -148,4 +148,7 @@ public final class StringUtils {
         "  java = " + System.getProperty("java.version"));
   }
 
+  public static String appendIfNotPresent(String str, char c) {
+    return str.charAt(str.length() - 1) == c ? str : str + c;
+  }
 }

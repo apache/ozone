@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
-import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
@@ -115,10 +114,10 @@ public class TestContainerStateMachineFailureOnRead {
         RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
             "watch.request.timeout",
         3, TimeUnit.SECONDS);
-    RatisClientConfig ratisClientConfig =
-        OzoneConfiguration.of(conf).getObject(RatisClientConfig.class);
-    ratisClientConfig.setWriteRequestTimeoutInMs(30000);
-    ratisClientConfig.setWatchRequestTimeoutInMs(30000);
+    conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
+        + ".client.request.write.timeout", 30, TimeUnit.SECONDS);
+    conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
+        + ".client.request.watch.timeout", 30, TimeUnit.SECONDS);
 
     conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)

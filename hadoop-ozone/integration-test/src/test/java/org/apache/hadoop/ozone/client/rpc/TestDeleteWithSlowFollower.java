@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
-import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -140,10 +139,10 @@ public class TestDeleteWithSlowFollower {
             10, TimeUnit.SECONDS);
     conf.setTimeDuration(OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
         1, TimeUnit.SECONDS);
-    RatisClientConfig ratisClientConfig =
-        OzoneConfiguration.of(conf).getObject(RatisClientConfig.class);
-    ratisClientConfig.setWriteRequestTimeoutInMs(30000);
-    ratisClientConfig.setWatchRequestTimeoutInMs(30000);
+    conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
+        + ".client.request.write.timeout", 30, TimeUnit.SECONDS);
+    conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
+        + ".client.request.watch.timeout", 30, TimeUnit.SECONDS);
     conf.setQuietMode(false);
     int numOfDatanodes = 3;
     cluster = MiniOzoneCluster.newBuilder(conf)
