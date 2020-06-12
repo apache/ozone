@@ -86,7 +86,7 @@
       <plugin>
         <groupId>com.github.eirslett</groupId>
         <artifactId>frontend-maven-plugin</artifactId>
-        <version>1.10.0</version>
+        <version>${frontend-maven-plugin.version}</version>
         <configuration>
           <installDirectory>target</installDirectory>
           <workingDirectory>${basedir}/src/main/resources/webapps/recon/ozone-recon-web</workingDirectory>
