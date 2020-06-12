@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.SystemUtils;
 import org.apache.hadoop.hdds.utils.SignalLogger;
 import org.apache.hadoop.hdds.utils.VersionInfo;
@@ -149,6 +150,7 @@ public final class StringUtils {
   }
 
   public static String appendIfNotPresent(String str, char c) {
-    return str.charAt(str.length() - 1) == c ? str : str + c;
+    Preconditions.checkNotNull(str, "Input string is null");
+    return str.isEmpty() || str.charAt(str.length() - 1) != c ? str + c: str;
   }
 }

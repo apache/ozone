@@ -241,6 +241,7 @@ public final class RatisHelper {
     Map<String, String> ratisClientConf = ozoneConf.getPropsWithPrefix(
         StringUtils.appendIfNotPresent(HDDS_DATANODE_RATIS_PREFIX_KEY, '.'));
     ratisClientConf.forEach((key, val) -> {
+      LOG.info("LOKI "+key);
       if (key.startsWith(RaftClientConfigKeys.PREFIX) || isGrpcClientConfig(
           key)) {
         raftProperties.set(key, val);
@@ -276,7 +277,8 @@ public final class RatisHelper {
 
   private static Map<String, String> getDatanodeRatisPrefixProps(
       ConfigurationSource configuration) {
-    return configuration.getPropsWithPrefix(HDDS_DATANODE_RATIS_PREFIX_KEY);
+    return configuration.getPropsWithPrefix(
+        StringUtils.appendIfNotPresent(HDDS_DATANODE_RATIS_PREFIX_KEY, '.'));
   }
 
   // For External gRPC client to server with gRPC TLS.
