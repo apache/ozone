@@ -23,7 +23,7 @@ REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/unit"}
 mkdir -p "$REPORT_DIR"
 
 export MAVEN_OPTS="-Xmx4096m"
-mvn -B -DskipShade -Dskip.yarn -fae test -pl \!:hadoop-ozone-integration-test,\!:mini-chaos-tests "$@" \
+mvn -B -DskipShade -Dskip.npx -Dskip.installnpx -fae test -pl \!:hadoop-ozone-integration-test,\!:mini-chaos-tests "$@" \
   | tee "${REPORT_DIR}/output.log"
 rc=$?
 
