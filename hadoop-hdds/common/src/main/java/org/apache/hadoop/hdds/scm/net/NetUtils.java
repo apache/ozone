@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.net;
 
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,12 +65,9 @@ public final class NetUtils {
               + NetConstants.PATH_SEPARATOR_STR + ": " + path);
     }
 
-    if (len == 1 || path.charAt(len - 1) != NetConstants.PATH_SEPARATOR) {
-      return path;
-    }
-
     // Remove any trailing NetConstants.PATH_SEPARATOR
-    return TRAILING_PATH_SEPARATOR.matcher(path).replaceAll("");
+    return len == 1 ? path : StringUtils.removeEnd(path,
+        NetConstants.PATH_SEPARATOR_STR);
   }
 
   /**
