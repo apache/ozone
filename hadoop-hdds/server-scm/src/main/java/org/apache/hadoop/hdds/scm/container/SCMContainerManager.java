@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.container;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -417,7 +416,8 @@ public class SCMContainerManager implements ContainerManager {
    */
   public ContainerInfo getMatchingContainer(final long sizeRequired,
       String owner, Pipeline pipeline) {
-    return getMatchingContainer(sizeRequired, owner, pipeline, new HashSet<>());
+    return getMatchingContainer(sizeRequired, owner, pipeline,
+        Collections.emptySet());
   }
 
   @SuppressWarnings("squid:S2445")
