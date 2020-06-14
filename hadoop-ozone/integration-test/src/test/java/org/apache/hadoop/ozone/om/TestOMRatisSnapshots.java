@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -172,10 +173,12 @@ public class TestOMRatisSnapshots {
         followerOMLastAppliedIndex < leaderOMSnaphsotIndex);
 
     // Install leader OM's db checkpoint on the lagging OM.
+    File oldDbLocation = followerOM.getMetadataManager().getStore()
+        .getDbLocation();
     followerOM.getOmRatisServer().getOmStateMachine().pause();
     followerOM.getMetadataManager().getStore().close();
-    followerOM.replaceOMDBWithCheckpoint(
-        leaderOMSnaphsotIndex, leaderDbCheckpoint.getCheckpointLocation());
+    followerOM.replaceOMDBWithCheckpoint(leaderOMSnaphsotIndex, oldDbLocation,
+        leaderDbCheckpoint.getCheckpointLocation());
 
     // Reload the follower OM with new DB checkpoint from the leader OM.
     followerOM.reloadOMState(leaderOMSnaphsotIndex, leaderOMSnapshotTermIndex);
