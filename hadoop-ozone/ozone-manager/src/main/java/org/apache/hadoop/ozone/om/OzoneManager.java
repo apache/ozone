@@ -78,7 +78,6 @@ import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.utils.RetriableTask;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBUpdatesWrapper;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
 import org.apache.hadoop.io.Text;
@@ -3038,14 +3037,20 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return null;
     }
 
-    // Pause the State Machine so that no new transactions can be applied.
-    // This action also clears the OM Double Buffer so that if there are any
-    // pending transactions in the buffer, they are discarded.
-    // TODO: The Ratis server should also be paused here. This is required
-    //  because a leader election might happen while the snapshot
-    //  installation is in progress and the new leader might start sending
-    //  append log entries to the ratis server.
-    omRatisServer.getOmStateMachine().pause();
+    File oldDBLocation = metadataManager.getStore().getDbLocation();
+    try {
+      // Stop Background services
+      stopServices();
+
+      // Pause the State Machine so that no new transactions can be applied.
+      // This action also clears the OM Double Buffer so that if there are any
+      // pending transactions in the buffer, they are discarded.
+      omRatisServer.getOmStateMachine().pause();
+    } catch (Exception e) {
+      LOG.error("Failed to stop/ pause the services. Cannot proceed with " +
+          "installing the new checkpoint.", e);
+      return null;
+    }
 
     //TODO: un-pause SM if any failures and retry?
 
@@ -3066,7 +3071,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     File dbBackup;
     try {
-      dbBackup = replaceOMDBWithCheckpoint(lastAppliedIndex, newDBlocation);
+      dbBackup = replaceOMDBWithCheckpoint(lastAppliedIndex, oldDBLocation,
+          newDBlocation);
     } catch (Exception e) {
       LOG.error("OM DB checkpoint replacement with new downloaded checkpoint " +
           "failed.", e);
@@ -3116,6 +3122,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return null;
   }
 
+  void stopServices() throws Exception {
+    keyManager.stop();
+    stopSecretManager();
+    metadataManager.stop();
+  }
+
   /**
    * Replace the current OM DB with the new DB checkpoint.
    *
@@ -3124,20 +3136,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @return location of the backup of the original DB
    * @throws Exception
    */
-  File replaceOMDBWithCheckpoint(long lastAppliedIndex, Path checkpointPath)
-      throws Exception {
-    // Stop the DB first
-    DBStore store = metadataManager.getStore();
-    store.close();
+  File replaceOMDBWithCheckpoint(long lastAppliedIndex, File oldDB,
+      Path checkpointPath) throws Exception {
 
     // Take a backup of the current DB
-    File db = store.getDbLocation();
     String dbBackupName = OzoneConsts.OM_DB_BACKUP_PREFIX +
         lastAppliedIndex + "_" + System.currentTimeMillis();
-    File dbBackup = new File(db.getParentFile(), dbBackupName);
+    File dbBackup = new File(oldDB.getParentFile(), dbBackupName);
 
     try {
-      Files.move(db.toPath(), dbBackup.toPath());
+      Files.move(oldDB.toPath(), dbBackup.toPath());
     } catch (IOException e) {
       LOG.error("Failed to create a backup of the current DB. Aborting " +
           "snapshot installation.");
@@ -3146,12 +3154,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // Move the new DB checkpoint into the om metadata dir
     try {
-      Files.move(checkpointPath, db.toPath());
+      Files.move(checkpointPath, oldDB.toPath());
     } catch (IOException e) {
       LOG.error("Failed to move downloaded DB checkpoint {} to metadata " +
               "directory {}. Resetting to original DB.", checkpointPath,
-          db.toPath());
-      Files.move(dbBackup.toPath(), db.toPath());
+          oldDB.toPath());
+      Files.move(dbBackup.toPath(), oldDB.toPath());
       throw e;
     }
     return dbBackup;
