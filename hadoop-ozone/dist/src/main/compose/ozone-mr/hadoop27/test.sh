@@ -27,8 +27,8 @@ execute_robot_test scm createmrenv.robot
 
 
 #rm is the container name (resource manager) and not the rm command
-execute_command_in_container rm sudo -E apk add --update py-pip
-execute_command_in_container rm sudo -E pip install robotframework
+execute_command_in_container rm sudo -E yum install -y python3-pip
+execute_command_in_container rm sudo -E pip3 install robotframework
 
 # reinitialize the directories to use
 export OZONE_DIR=/opt/ozone
@@ -37,7 +37,7 @@ source "$COMPOSE_DIR/../../testlib.sh"
 
 execute_robot_test rm ozonefs/hadoopo3fs.robot
 
-execute_robot_test rm -v hadoop.version:2.7.7 mapreduce.robot
+execute_robot_test rm -v hadoop.version:2.7.3 mapreduce.robot
 
 stop_docker_env
 
