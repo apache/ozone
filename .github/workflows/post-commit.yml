@@ -130,11 +130,21 @@ jobs:
           with:
             name: acceptance
             path: /mnt/ozone/compose/result
-  it-freon:
-    name: it-freon
+  integration:
+    name: integration
     runs-on: ubuntu-18.04
     needs:
         - build
+    strategy:
+      matrix:
+        profile:
+          - client
+          - filesystem
+          - filesystem-contract
+          - freon
+          - hdds-om
+          - ozone
+      fail-fast: false
     steps:
         - run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
         - uses: actions/checkout@master
@@ -142,112 +152,17 @@ jobs:
             path: mnt/ozone
         - uses: ./mnt/ozone/.github/buildenv
           with:
-             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -Pfreon
+             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
         - uses: actions/upload-artifact@master
           if: always()
           with:
-            name: it-freon
-            path: mnt/ozone/target/integration
-  it-filesystem:
-    name: it-filesystem
-    runs-on: ubuntu-18.04
-    needs:
-        - build
-    steps:
-        - run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
-        - uses: actions/checkout@master
-          with:
-            path: mnt/ozone
-        - uses: ./mnt/ozone/.github/buildenv
-          with:
-             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -Pfilesystem
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: it-filesystem
-            path: mnt/ozone/target/integration
-  it-filesystem-contract:
-    name: it-filesystem-contract
-    runs-on: ubuntu-18.04
-    needs:
-        - build
-    steps:
-        - run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
-        - uses: actions/checkout@master
-          with:
-            path: mnt/ozone
-        - uses: ./mnt/ozone/.github/buildenv
-          with:
-             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -Pfilesystem-contract
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: it-filesystem-contract
-            path: mnt/ozone/target/integration
-  it-client:
-    name: it-client
-    runs-on: ubuntu-18.04
-    needs:
-        - build
-    steps:
-        - run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
-        - uses: actions/checkout@master
-          with:
-            path: mnt/ozone
-        - uses: ./mnt/ozone/.github/buildenv
-          with:
-             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -Pclient
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: it-client
-            path: mnt/ozone/target/integration
-  it-hdds-om:
-    name: it-hdds-om
-    runs-on: ubuntu-18.04
-    needs:
-        - build
-    steps:
-        - run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
-        - uses: actions/checkout@master
-          with:
-            path: mnt/ozone
-        - uses: ./mnt/ozone/.github/buildenv
-          with:
-             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -Phdds-om
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: it-hdds-om
-            path: mnt/ozone/target/integration
-  it-ozone:
-    name: it-ozone
-    runs-on: ubuntu-18.04
-    needs:
-        - build
-    steps:
-        - run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
-        - uses: actions/checkout@master
-          with:
-            path: mnt/ozone
-        - uses: ./mnt/ozone/.github/buildenv
-          with:
-             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -Pozone
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: it-ozone
+            name: it-${{ matrix.profile }}
             path: mnt/ozone/target/integration
   coverage:
     name: coverage
     runs-on: ubuntu-18.04
     needs:
-       - it-ozone
-       - it-hdds-om
-       - it-client
-       - it-filesystem-contract
-       - it-filesystem
-       - it-freon
+       - integration
        - unit
     steps:
        - uses: actions/checkout@v2
