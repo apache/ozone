@@ -22,6 +22,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -73,7 +74,9 @@ public interface OzoneManagerProtocol
    * @param args - Arguments to create Volume.
    * @throws IOException
    */
-  void createVolume(OmVolumeArgs args) throws IOException;
+  default void createVolume(OmVolumeArgs args) throws IOException {
+    throw new NotImplementedException("createVolume is not implemented");
+  }
 
   /**
    * Changes the owner of a volume.
@@ -83,7 +86,9 @@ public interface OzoneManagerProtocol
    *         already the owner.
    * @throws IOException
    */
-  boolean setOwner(String volume, String owner) throws IOException;
+  default boolean setOwner(String volume, String owner) throws IOException {
+    throw new NotImplementedException("setOwner is not implemented");
+  }
 
   /**
    * Changes the Quota on a volume.
@@ -91,7 +96,9 @@ public interface OzoneManagerProtocol
    * @param quota - Quota in bytes.
    * @throws IOException
    */
-  void setQuota(String volume, long quota) throws IOException;
+  default void setQuota(String volume, long quota) throws IOException {
+    throw new NotImplementedException("setQuota is not implemented");
+  }
 
   /**
    * Checks if the specified user can access this volume.
@@ -117,7 +124,9 @@ public interface OzoneManagerProtocol
    * @param volume - Name of the volume.
    * @throws IOException
    */
-  void deleteVolume(String volume) throws IOException;
+  default void deleteVolume(String volume) throws IOException {
+    throw new NotImplementedException("deleteVolume is not implemented");
+  }
 
   /**
    * Lists volumes accessible by a specific user.
