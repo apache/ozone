@@ -83,85 +83,6 @@ public class TestOmMetrics {
     }
   }
 
-
-
-  @Test
-  public void testVolumeOps() throws IOException {
-    VolumeManager volumeManager =
-        (VolumeManager) HddsWhiteboxTestUtils.getInternalState(
-            ozoneManager, "volumeManager");
-    VolumeManager mockVm = Mockito.spy(volumeManager);
-
-    Mockito.doNothing().when(mockVm).createVolume(null);
-    Mockito.doNothing().when(mockVm).deleteVolume(null);
-    Mockito.doReturn(null).when(mockVm).getVolumeInfo(null);
-    Mockito.doReturn(true).when(mockVm).checkVolumeAccess(null, null);
-    Mockito.doNothing().when(mockVm).setOwner(null, null);
-    Mockito.doReturn(null).when(mockVm).listVolumes(null, null, null, 0);
-
-    HddsWhiteboxTestUtils.setInternalState(
-        ozoneManager, "volumeManager", mockVm);
-    doVolumeOps();
-
-    MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumVolumeOps", 6L, omMetrics);
-    assertCounter("NumVolumeCreates", 1L, omMetrics);
-    assertCounter("NumVolumeUpdates", 1L, omMetrics);
-    assertCounter("NumVolumeInfos", 1L, omMetrics);
-    assertCounter("NumVolumeCheckAccesses", 1L, omMetrics);
-    assertCounter("NumVolumeDeletes", 1L, omMetrics);
-    assertCounter("NumVolumeLists", 1L, omMetrics);
-    assertCounter("NumVolumes", 1L, omMetrics);
-
-    ozoneManager.createVolume(null);
-    ozoneManager.createVolume(null);
-    ozoneManager.createVolume(null);
-    ozoneManager.deleteVolume(null);
-
-    omMetrics = getMetrics("OMMetrics");
-
-    // Accounting 's3v' volume which is created by default.
-    assertCounter("NumVolumes", 3L, omMetrics);
-
-
-    // inject exception to test for Failure Metrics
-    Mockito.doThrow(exception).when(mockVm).createVolume(null);
-    Mockito.doThrow(exception).when(mockVm).deleteVolume(null);
-    Mockito.doThrow(exception).when(mockVm).getVolumeInfo(null);
-    Mockito.doThrow(exception).when(mockVm).checkVolumeAccess(null, null);
-    Mockito.doThrow(exception).when(mockVm).setOwner(null, null);
-    Mockito.doThrow(exception).when(mockVm).listVolumes(null, null, null, 0);
-
-    HddsWhiteboxTestUtils.setInternalState(ozoneManager,
-        "volumeManager", mockVm);
-    doVolumeOps();
-
-    omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumVolumeOps", 16L, omMetrics);
-    assertCounter("NumVolumeCreates", 5L, omMetrics);
-    assertCounter("NumVolumeUpdates", 2L, omMetrics);
-    assertCounter("NumVolumeInfos", 2L, omMetrics);
-    assertCounter("NumVolumeCheckAccesses", 2L, omMetrics);
-    assertCounter("NumVolumeDeletes", 3L, omMetrics);
-    assertCounter("NumVolumeLists", 2L, omMetrics);
-
-    assertCounter("NumVolumeCreateFails", 1L, omMetrics);
-    assertCounter("NumVolumeUpdateFails", 1L, omMetrics);
-    assertCounter("NumVolumeInfoFails", 1L, omMetrics);
-    assertCounter("NumVolumeCheckAccessFails", 1L, omMetrics);
-    assertCounter("NumVolumeDeleteFails", 1L, omMetrics);
-    assertCounter("NumVolumeListFails", 1L, omMetrics);
-
-    // As last call for volumesOps does not increment numVolumes as those are
-    // failed.
-    assertCounter("NumVolumes", 3L, omMetrics);
-
-    cluster.restartOzoneManager();
-    assertCounter("NumVolumes", 3L, omMetrics);
-
-
-  }
-
   @Test
   public void testBucketOps() throws IOException {
     BucketManager bucketManager =
@@ -316,41 +237,6 @@ public class TestOmMetrics {
     cluster.restartOzoneManager();
     assertCounter("NumKeys", 2L, omMetrics);
 
-  }
-
-  /**
-   * Test volume operations with ignoring thrown exception.
-   */
-  private void doVolumeOps() {
-    try {
-      ozoneManager.createVolume(null);
-    } catch (IOException ignored) {
-    }
-
-    try {
-      ozoneManager.deleteVolume(null);
-    } catch (IOException ignored) {
-    }
-
-    try {
-      ozoneManager.getVolumeInfo(null);
-    } catch (IOException ignored) {
-    }
-
-    try {
-      ozoneManager.checkVolumeAccess(null, null);
-    } catch (IOException ignored) {
-    }
-
-    try {
-      ozoneManager.setOwner(null, null);
-    } catch (IOException ignored) {
-    }
-
-    try {
-      ozoneManager.listAllVolumes(null, null, 0);
-    } catch (IOException ignored) {
-    }
   }
 
   /**
