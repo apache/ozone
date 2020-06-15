@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -86,7 +87,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   private String userName;
   private Path workingDir;
   private OzoneClientAdapter adapter;
-  private BasicRootedOzoneClientAdapterImpl adapterImpl;
 
   private static final String URI_EXCEPTION_TEXT =
       "URL should be one of the following formats: " +
@@ -138,7 +138,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         source = new LegacyHadoopConfigurationSource(conf);
       }
       this.adapter = createAdapter(source, omHostOrServiceId, omPort);
-      this.adapterImpl = (BasicRootedOzoneClientAdapterImpl) this.adapter;
 
       try {
         this.userName =
@@ -461,13 +460,14 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         return false;
       }
 
+      ClientProtocol proxy = adapter.getClientProtocol();
+
       // Handle delete volume
       if (ofsPath.isVolume()) {
         String volumeName = ofsPath.getVolumeName();
         if (recursive) {
           // Delete all buckets first
-          OzoneVolume volume =
-              adapterImpl.getObjectStore().getVolume(volumeName);
+          OzoneVolume volume = proxy.getVolumeDetails(volumeName);
           Iterator<? extends OzoneBucket> it = volume.listBuckets("");
           String prefixVolumePathStr = addTrailingSlashIfNeeded(f.toString());
           while (it.hasNext()) {
@@ -477,7 +477,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           }
         }
         try {
-          adapterImpl.getObjectStore().deleteVolume(volumeName);
+          proxy.deleteVolume(volumeName);
           return true;
         } catch (OMException ex) {
           // volume is not empty
@@ -493,8 +493,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
       // Handle delete bucket
       if (ofsPath.isBucket()) {
-        OzoneVolume volume =
-            adapterImpl.getObjectStore().getVolume(ofsPath.getVolumeName());
+        OzoneVolume volume = proxy.getVolumeDetails(ofsPath.getVolumeName());
         try {
           volume.deleteBucket(ofsPath.getBucketName());
           return result;
