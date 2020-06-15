@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -334,6 +335,11 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       }
       throw e;
     }
+  }
+
+  @Override
+  public ClientProtocol getClientProtocol() {
+    return objectStore.getClientProxy();
   }
 
   @Override

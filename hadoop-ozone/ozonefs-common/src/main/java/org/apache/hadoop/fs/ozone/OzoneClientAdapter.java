@@ -25,6 +25,7 @@ import java.util.List;
 
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
@@ -60,6 +61,8 @@ public interface OzoneClientAdapter {
   List<FileStatusAdapter> listStatus(String keyName, boolean recursive,
       String startKey, long numEntries, URI uri,
       Path workingDir, String username) throws IOException;
+
+  ClientProtocol getClientProtocol();
 
   Token<OzoneTokenIdentifier> getDelegationToken(String renewer)
       throws IOException;
