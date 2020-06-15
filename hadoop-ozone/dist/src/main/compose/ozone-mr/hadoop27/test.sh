@@ -25,11 +25,6 @@ start_docker_env
 
 execute_robot_test scm createmrenv.robot
 
-
-#rm is the container name (resource manager) and not the rm command
-execute_command_in_container rm sudo -E yum install -y python3-pip
-execute_command_in_container rm sudo -E pip3 install robotframework
-
 # reinitialize the directories to use
 export OZONE_DIR=/opt/ozone
 # shellcheck source=/dev/null
