@@ -48,6 +48,7 @@ services:
       - docker-config
     environment:
       KERBEROS_KEYTABS: dn HTTP
+      HADOOP_OPTS: ${HADOOP_OPTS}
     networks:
       ozone_net:
         ipv4_address: 172.25.0.102
@@ -62,6 +63,7 @@ services:
       - docker-config
     environment:
       KERBEROS_KEYTABS: dn HTTP
+      HADOOP_OPTS: ${HADOOP_OPTS}
     networks:
       ozone_net:
         ipv4_address: 172.25.0.103
@@ -76,6 +78,7 @@ services:
       - docker-config
     environment:
       KERBEROS_KEYTABS: dn HTTP
+      HADOOP_OPTS: ${HADOOP_OPTS}
     networks:
       ozone_net:
         ipv4_address: 172.25.0.104
@@ -91,7 +94,7 @@ services:
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       KERBEROS_KEYTABS: om HTTP
-      #HADOOP_OPTS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:18001"
+      HADOOP_OPTS: ${HADOOP_OPTS}
     env_file:
       - ./docker-config
     command: ["/opt/hadoop/bin/ozone","om"]
@@ -110,7 +113,7 @@ services:
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       KERBEROS_KEYTABS: om HTTP
-      #HADOOP_OPTS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:18002"
+      HADOOP_OPTS: ${HADOOP_OPTS}
     env_file:
       - ./docker-config
     command: ["/opt/hadoop/bin/ozone","om"]
@@ -129,7 +132,7 @@ services:
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       KERBEROS_KEYTABS: om HTTP
-      #HADOOP_OPTS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:18003"
+      HADOOP_OPTS: ${HADOOP_OPTS}
     env_file:
       - ./docker-config
     command: ["/opt/hadoop/bin/ozone","om"]
@@ -148,6 +151,7 @@ services:
     command: ["/opt/hadoop/bin/ozone","s3g"]
     environment:
       KERBEROS_KEYTABS: s3g HTTP testuser
+      HADOOP_OPTS: ${HADOOP_OPTS}
     networks:
       ozone_net:
         ipv4_address: 172.25.0.114
@@ -163,7 +167,7 @@ services:
       - ./docker-config
     environment:
       KERBEROS_KEYTABS: recon HTTP
-      #HADOOP_OPTS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:18000"
+      HADOOP_OPTS: ${HADOOP_OPTS}
     command: ["/opt/hadoop/bin/ozone","recon"]
     extra_hosts:
       - "om1: 172.25.0.111"
@@ -185,6 +189,7 @@ services:
       KERBEROS_KEYTABS: scm HTTP testuser testuser2
       ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-3}"
+      HADOOP_OPTS: ${HADOOP_OPTS}
     command: ["/opt/hadoop/bin/ozone","scm"]
     extra_hosts:
       - "om1: 172.25.0.111"

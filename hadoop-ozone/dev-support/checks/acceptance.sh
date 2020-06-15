@@ -17,19 +17,32 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/acceptance"}
-mkdir -p "$REPORT_DIR"
 
 OZONE_VERSION=$(grep "<ozone.version>" "pom.xml" | sed 's/<[^>]*>//g'|  sed 's/^[ \t]*//')
 DIST_DIR="$DIR/../../dist/target/ozone-$OZONE_VERSION"
 
 if [ ! -d "$DIST_DIR" ]; then
     echo "Distribution dir is missing. Doing a full build"
-    "$DIR/build.sh"
+    "$DIR/build.sh" -Pcoverage -Dskip.npx
 fi
+
+mkdir -p "$REPORT_DIR"
+
+export HADOOP_OPTS='-javaagent:/opt/hadoop/share/jacoco/jacoco-agent.jar=destfile=/tmp/jacoco.exec,includes=org.apache.hadoop.ozone.*:org.apache.hadoop.hdds'
 
 cd "$DIST_DIR/compose" || exit 1
 ./test-all.sh
 RES=$?
 cp result/* "$REPORT_DIR/"
 cp "$REPORT_DIR/log.html" "$REPORT_DIR/summary.html"
+
+EXEC_FILES=$(find "$REPORT_DIR" -name "*.jacoco.exec" | wc -l)
+if [[ $EXEC_FILES -gt 1 ]]; then
+  java -jar "$DIST_DIR/share/jacoco/jacoco-cli.jar" merge $(find "$REPORT_DIR" -name "*.jacoco.exec") --destfile "$REPORT_DIR/jacoco-combined.exec"
+fi
+
+if [[ $EXEC_FILES == 1 ]]; then
+  cp "$REPORT_DIR"/*.jacoco.exec "$REPORT_DIR/jacoco-combined.exec"
+fi
+
 exit $RES
