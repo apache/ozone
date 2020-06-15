@@ -89,8 +89,8 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
         .getKeyArgs();
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
 
-    String volumeName = keyArgs.getVolumeName();
-    String bucketName = keyArgs.getBucketName();
+    final String requestedVolume = keyArgs.getVolumeName();
+    final String requestedBucket = keyArgs.getBucketName();
     String keyName = keyArgs.getKeyName();
 
     ozoneManager.getMetrics().incNumAbortMultipartUploads();
@@ -107,18 +107,18 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs);
       keyArgs = bucket.update(keyArgs);
       bucket.audit(auditMap);
-      volumeName = keyArgs.getVolumeName();
-      bucketName = keyArgs.getBucketName();
 
       // TODO to support S3 ACL later.
       acquiredLock =
-          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
-              bucketName);
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
+              keyArgs.getVolumeName(), keyArgs.getBucketName());
 
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager,
+          bucket.realVolume(), bucket.realBucket());
 
-      multipartKey = omMetadataManager.getMultipartKey(volumeName,
-          bucketName, keyName, keyArgs.getMultipartUploadID());
+      multipartKey = omMetadataManager.getMultipartKey(
+          bucket.requestedVolume(), bucket.requestedBucket(),
+          keyName, keyArgs.getMultipartUploadID());
 
       OmKeyInfo omKeyInfo =
           omMetadataManager.getOpenKeyTable().get(multipartKey);
@@ -127,7 +127,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       // upload initiated for this key.
       if (omKeyInfo == null) {
         throw new OMException("Abort Multipart Upload Failed: volume: " +
-            volumeName + "bucket: " + bucketName + "key: " + keyName,
+            requestedVolume + "bucket: " + requestedBucket + "key: " + keyName,
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       }
 
@@ -181,8 +181,8 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
+            keyArgs.getVolumeName(), keyArgs.getBucketName());
       }
     }
 
@@ -194,14 +194,16 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     switch (result) {
     case SUCCESS:
       LOG.debug("Abort Multipart request is successfully completed for " +
-              "KeyName {} in VolumeName/Bucket {}/{}", keyName, volumeName,
-          bucketName);
+              "KeyName {} in VolumeName/Bucket {}/{}", keyName, requestedVolume,
+          requestedBucket);
       break;
     case FAILURE:
       ozoneManager.getMetrics().incNumAbortMultipartUploadFails();
       LOG.error("Abort Multipart request is failed for KeyName {} in " +
-              "VolumeName/Bucket {}/{}", keyName, volumeName, bucketName,
+              "VolumeName/Bucket {}/{}", keyName, requestedVolume,
+          requestedBucket,
           exception);
+      break;
     default:
       LOG.error("Unrecognized Result for S3MultipartUploadAbortRequest: {}",
           multipartUploadAbortRequest);

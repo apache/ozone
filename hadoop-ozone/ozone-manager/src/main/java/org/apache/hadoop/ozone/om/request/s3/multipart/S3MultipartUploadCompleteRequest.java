@@ -107,18 +107,16 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         multipartUploadCompleteRequest.getPartsListList();
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
 
-    String volumeName = keyArgs.getVolumeName();
-    String bucketName = keyArgs.getBucketName();
+    final String requestedVolume = keyArgs.getVolumeName();
+    final String requestedBucket = keyArgs.getBucketName();
     String keyName = keyArgs.getKeyName();
     String uploadID = keyArgs.getMultipartUploadID();
 
     ozoneManager.getMetrics().incNumCompleteMultipartUploads();
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    String multipartKey = omMetadataManager.getMultipartKey(volumeName,
-        bucketName, keyName, uploadID);
-    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-        keyName);
+    String multipartKey = omMetadataManager.getMultipartKey(
+        requestedVolume, requestedBucket, keyName, uploadID);
 
     boolean acquiredLock = false;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
@@ -130,15 +128,17 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs);
       keyArgs = bucket.update(keyArgs);
       bucket.audit(auditMap);
-      volumeName = keyArgs.getVolumeName();
-      bucketName = keyArgs.getBucketName();
 
       // TODO to support S3 ACL later.
 
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
+          keyArgs.getVolumeName(), keyArgs.getBucketName());
 
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager,
+          bucket.realVolume(), bucket.realBucket());
+
+      String ozoneKey = omMetadataManager.getOzoneKey(
+          bucket.realVolume(), bucket.realBucket(), keyName);
 
       OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
 
@@ -175,7 +175,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
       if (multipartKeyInfo == null) {
         throw new OMException("Complete Multipart Upload Failed: volume: " +
-            volumeName + "bucket: " + bucketName + "key: " + keyName,
+            requestedVolume + "bucket: " + requestedBucket + "key: " + keyName,
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       }
       TreeMap<Integer, PartKeyInfo> partKeyInfoMap =
@@ -187,7 +187,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
                   " no parts in OM, parts given to upload are {}", ozoneKey,
               partsList);
           throw new OMException("Complete Multipart Upload Failed: volume: " +
-              volumeName + "bucket: " + bucketName + "key: " + keyName,
+              requestedVolume + "bucket: " + requestedBucket + "key: " + keyName,
               OMException.ResultCodes.INVALID_PART);
         }
 
@@ -204,7 +204,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
                     "{}", i, currentPartNumber, i - 1, prevPartNumber,
                 ozoneKey);
             throw new OMException("Complete Multipart Upload Failed: volume: " +
-                volumeName + "bucket: " + bucketName + "key: " + keyName +
+                requestedVolume + "bucket: " + requestedBucket + "key: " + keyName +
                 "because parts are in Invalid order.",
                 OMException.ResultCodes.INVALID_PART_ORDER);
           }
@@ -229,7 +229,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
             String omPartName = partKeyInfo == null ? null :
                 partKeyInfo.getPartName();
             throw new OMException("Complete Multipart Upload Failed: volume: " +
-                volumeName + "bucket: " + bucketName + "key: " + keyName +
+                requestedVolume + "bucket: " + requestedBucket + "key: " + keyName +
                 ". Provided Part info is { " + partName + ", " + partNumber +
                 "}, where as OM has partName " + omPartName,
                 OMException.ResultCodes.INVALID_PART);
@@ -247,8 +247,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
                       currentPartKeyInfo.getDataSize(),
                       OzoneConsts.OM_MULTIPART_MIN_SIZE);
               throw new OMException("Complete Multipart Upload Failed: " +
-                  "Entity too small: volume: " + volumeName + "bucket: " +
-                  bucketName + "key: " + keyName,
+                  "Entity too small: volume: " + requestedVolume + "bucket: " +
+                  requestedBucket + "key: " + keyName,
                   OMException.ResultCodes.ENTITY_TOO_SMALL);
             }
           }
@@ -278,8 +278,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
           // A newly created key, this is the first version.
           OmKeyInfo.Builder builder =
-              new OmKeyInfo.Builder().setVolumeName(volumeName)
-              .setBucketName(bucketName).setKeyName(keyName)
+              new OmKeyInfo.Builder().setVolumeName(bucket.realVolume())
+              .setBucketName(bucket.realBucket()).setKeyName(keyName)
               .setReplicationFactor(factor).setReplicationType(type)
               .setCreationTime(keyArgs.getModificationTime())
               .setModificationTime(keyArgs.getModificationTime())
@@ -320,8 +320,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
         omResponse.setCompleteMultiPartUploadResponse(
             MultipartUploadCompleteResponse.newBuilder()
-                .setVolume(volumeName)
-                .setBucket(bucketName)
+                .setVolume(requestedVolume)
+                .setBucket(requestedBucket)
                 .setKey(keyName)
                 .setHash(DigestUtils.sha256Hex(keyName)));
 
@@ -331,7 +331,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         result = Result.SUCCESS;
       } else {
         throw new OMException("Complete Multipart Upload Failed: volume: " +
-            volumeName + "bucket: " + bucketName + "key: " + keyName +
+            requestedVolume + "bucket: " + requestedBucket + "key: " + keyName +
             "because of empty part list",
             OMException.ResultCodes.INVALID_REQUEST);
       }
@@ -357,8 +357,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
+            keyArgs.getVolumeName(), keyArgs.getBucketName());
       }
     }
 
@@ -374,7 +374,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     switch (result) {
     case SUCCESS:
       LOG.debug("MultipartUpload Complete request is successfull for Key: {} " +
-          "in Volume/Bucket {}/{}", keyName, volumeName, bucketName);
+          "in Volume/Bucket {}/{}", keyName, requestedVolume, requestedBucket);
       break;
     case REPLAY:
       LOG.debug("Replayed Transaction {} ignored. Request: {}",
@@ -388,7 +388,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     case FAILURE:
       ozoneManager.getMetrics().incNumCompleteMultipartUploadFails();
       LOG.error("MultipartUpload Complete request failed for Key: {} " +
-          "in Volume/Bucket {}/{}", keyName, volumeName, bucketName, exception);
+          "in Volume/Bucket {}/{}", keyName, requestedVolume, requestedBucket, exception);
     default:
       LOG.error("Unrecognized Result for S3MultipartUploadCommitRequest: {}",
           multipartUploadCompleteRequest);

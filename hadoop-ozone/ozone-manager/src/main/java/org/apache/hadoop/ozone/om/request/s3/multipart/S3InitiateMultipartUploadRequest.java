@@ -100,8 +100,8 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
 
-    String volumeName = keyArgs.getVolumeName();
-    String bucketName = keyArgs.getBucketName();
+    final String volumeName = keyArgs.getVolumeName();
+    final String bucketName = keyArgs.getBucketName();
     String keyName = keyArgs.getKeyName();
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
@@ -121,15 +121,14 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs);
       keyArgs = bucket.update(keyArgs);
       bucket.audit(auditMap);
-      volumeName = keyArgs.getVolumeName();
-      bucketName = keyArgs.getBucketName();
 
       // TODO to support S3 ACL later.
       acquiredBucketLock =
-          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
-              bucketName);
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
+              keyArgs.getVolumeName(), keyArgs.getBucketName());
 
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataManager,
+          bucket.realVolume(), bucket.realBucket());
 
       // We do not check if this transaction is a replay here to avoid extra
       // DB reads. Even if this transaction is replayed, in
@@ -151,8 +150,9 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       // multipart upload request is received, it returns multipart upload id
       // for the key.
 
-      String multipartKey = omMetadataManager.getMultipartKey(volumeName,
-          bucketName, keyName, keyArgs.getMultipartUploadID());
+      String multipartKey = omMetadataManager.getMultipartKey(
+          bucket.requestedVolume(), bucket.requestedBucket(), keyName,
+          keyArgs.getMultipartUploadID());
 
       // Even if this key already exists in the KeyTable, it would be taken
       // care of in the final complete multipart upload. AWS S3 behavior is
@@ -169,8 +169,8 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .build();
 
       omKeyInfo = new OmKeyInfo.Builder()
-          .setVolumeName(keyArgs.getVolumeName())
-          .setBucketName(keyArgs.getBucketName())
+          .setVolumeName(bucket.realVolume())
+          .setBucketName(bucket.realBucket())
           .setKeyName(keyArgs.getKeyName())
           .setCreationTime(keyArgs.getModificationTime())
           .setModificationTime(keyArgs.getModificationTime())
@@ -195,8 +195,8 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           new S3InitiateMultipartUploadResponse(
               omResponse.setInitiateMultiPartUploadResponse(
                   MultipartInfoInitiateResponse.newBuilder()
-                      .setVolumeName(volumeName)
-                      .setBucketName(bucketName)
+                      .setVolumeName(bucket.requestedVolume())
+                      .setBucketName(bucket.requestedBucket())
                       .setKeyName(keyName)
                       .setMultipartUploadID(keyArgs.getMultipartUploadID()))
                   .build(), multipartKeyInfo, omKeyInfo);
@@ -211,8 +211,8 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
+            keyArgs.getVolumeName(), keyArgs.getBucketName());
       }
     }
 
@@ -232,6 +232,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       LOG.error("S3 InitiateMultipart Upload request for Key {} in " +
               "Volume/Bucket {}/{} is failed", keyName, volumeName, bucketName,
           exception);
+      break;
     default:
       LOG.error("Unrecognized Result for S3InitiateMultipartUploadRequest: {}",
           multipartInfoInitiateRequest);
