@@ -26,48 +26,79 @@ Suite Setup         Setup s3 tests
 ${ENDPOINT_URL}       http://s3g:9878
 ${BUCKET}             generated
 
-*** Test Cases ***
+*** Keywords ***
 Delete file with s3api
-                        Execute                    date > /tmp/testfile
-    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key deletetestapi/f1 --body /tmp/testfile
-    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix deletetestapi/
-                        Should contain             ${result}         f1
-    ${result} =         Execute AWSS3APICli        delete-object --bucket ${BUCKET} --key deletetestapi/f1
-    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix deletetestapi/
-                        Should not contain         ${result}         f1
+    [Arguments]         ${bucket}
+
+    ${prefix} =         Set Variable               deletes3api/key
+    ${key} =            Put new object             ${bucket}    ${prefix}
+    ${result} =         Execute AWSS3APICli        delete-object --bucket ${bucket} --key ${key}
+    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${bucket} --prefix ${prefix}
+                        Should not contain         ${result}         ${key}
 #In case of HTTP 500, the error code is printed out to the console.
                         Should not contain         ${result}         500
 
 Delete file with s3api, file doesn't exist
-    ${result} =         Execute AWSS3Cli           ls s3://${BUCKET}/
+    [Arguments]         ${bucket}
+
+    ${result} =         Execute AWSS3Cli           ls s3://${bucket}/
                         Should not contain         ${result}         thereisnosuchfile
-    ${result} =         Execute AWSS3APICli        delete-object --bucket ${BUCKET} --key thereisnosuchfile
-    ${result} =         Execute AWSS3Cli           ls s3://${BUCKET}/
+    ${result} =         Execute AWSS3APICli        delete-object --bucket ${bucket} --key thereisnosuchfile
+    ${result} =         Execute AWSS3Cli           ls s3://${bucket}/
                         Should not contain         ${result}         thereisnosuchfile
 
 Delete dir with s3api
-                        Execute                    date > /tmp/testfile
-    ${result} =         Execute AWSS3Cli           cp /tmp/testfile s3://${BUCKET}/deletetestapidir/f1
-    ${result} =         Execute AWSS3Cli           ls s3://${BUCKET}/deletetestapidir/
-                        Should contain             ${result}         f1
-    ${result} =         Execute AWSS3APICli        delete-object --bucket ${BUCKET} --key deletetestapidir/
-    ${result} =         Execute AWSS3Cli           ls s3://${BUCKET}/deletetestapidir/
-                        Should contain             ${result}         f1
-    ${result} =         Execute AWSS3APICli        delete-object --bucket ${BUCKET} --key deletetestapidir/f1
+    [Arguments]         ${bucket}
+
+    ${dir} =            Set Variable               deletes3apidir
+    ${key} =            Put new object             ${bucket}    ${dir}/key
+    ${filename} =       Remove String              ${key}       ${dir}/
+    ${result} =         Execute AWSS3Cli           ls s3://${bucket}/${dir}/
+                        Should contain             ${result}         ${filename}
+    ${result} =         Execute AWSS3APICli        delete-object --bucket ${bucket} --key ${dir}/
+    ${result} =         Execute AWSS3Cli           ls s3://${bucket}/${dir}/
+                        Should contain             ${result}         ${filename}
+    ${result} =         Execute AWSS3APICli        delete-object --bucket ${bucket} --key ${key}
 
 
 Delete file with s3api, file doesn't exist, prefix of a real file
-                        Execute                    date > /tmp/testfile
-    ${result} =         Execute AWSS3Cli           cp /tmp/testfile s3://${BUCKET}/deletetestapiprefix/filefile
-    ${result} =         Execute AWSS3Cli           ls s3://${BUCKET}/deletetestapiprefix/
-                        Should contain             ${result}         filefile
-    ${result} =         Execute AWSS3APICli        delete-object --bucket ${BUCKET} --key deletetestapiprefix/file
-    ${result} =         Execute AWSS3Cli           ls s3://${BUCKET}/deletetestapiprefix/
-                        Should contain             ${result}         filefile
-    ${result} =         Execute AWSS3APICli        delete-object --bucket ${BUCKET} --key deletetestapiprefix/filefile
+    [Arguments]         ${bucket}
+
+    ${dir} =            Set Variable               deletes3apiprefix
+    ${prefix} =         Set Variable               ${dir}/file
+    ${key} =            Put new object             ${bucket}    ${prefix}
+    ${filename} =       Remove String              ${key}       ${dir}/
+    ${result} =         Execute AWSS3Cli           ls s3://${bucket}/${dir}/
+                        Should contain             ${result}         ${filename}
+    ${result} =         Execute AWSS3APICli        delete-object --bucket ${bucket} --key ${prefix}
+    ${result} =         Execute AWSS3Cli           ls s3://${bucket}/${dir}/
+                        Should contain             ${result}         ${filename}
+    ${result} =         Execute AWSS3APICli        delete-object --bucket ${bucket} --key ${key}
 
 
+*** Test Cases ***
+
+Delete file with s3api
+    [Template]    Delete file with s3api
+    ${BUCKET}
+    ${BUCKET_LINK}
+
+Delete file with s3api, file doesn't exist
+    [Template]    Delete file with s3api, file doesn't exist
+    ${BUCKET}
+    ${BUCKET_LINK}
+
+Delete dir with s3api
+    [Template]    Delete dir with s3api
+    ${BUCKET}
+    ${BUCKET_LINK}
+
+Delete file with s3api, file doesn't exist, prefix of a real file
+    [Template]    Delete file with s3api, file doesn't exist, prefix of a real file
+    ${BUCKET}
+    ${BUCKET_LINK}
 
 Delete file with s3api, bucket doesn't exist
-    ${result} =         Execute AWSS3APICli and checkrc   delete-object --bucket ${BUCKET}-nosuchbucket --key f1      255
+    ${result} =         Execute AWSS3APICli and checkrc   delete-object --bucket deletes3api-nosuchbucket --key any      255
                         Should contain                    ${result}         NoSuchBucket
+

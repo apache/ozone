@@ -26,24 +26,34 @@ Suite Setup         Setup s3 tests
 ${ENDPOINT_URL}       http://s3g:9878
 ${BUCKET}             generated
 
-*** Test Cases ***
+*** Keywords ***
 
 Delete file with multi delete
+    [Arguments]         ${bucket}
+
                         Execute                    date > /tmp/testfile
-    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key multidelete/f1 --body /tmp/testfile
-    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key multidelete/f2 --body /tmp/testfile
-    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key multidelete/f3 --body /tmp/testfile
-    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix multidelete/
+    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${bucket} --key multidelete/f1 --body /tmp/testfile
+    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${bucket} --key multidelete/f2 --body /tmp/testfile
+    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${bucket} --key multidelete/f3 --body /tmp/testfile
+    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${bucket} --prefix multidelete/
                         Should contain             ${result}         multidelete/f1
                         Should contain             ${result}         multidelete/f2
                         Should contain             ${result}         multidelete/f3
                         Should contain             ${result}         STANDARD
                         Should not contain         ${result}         REDUCED_REDUNDANCY
-    ${result} =         Execute AWSS3APICli        delete-objects --bucket ${BUCKET} --delete 'Objects=[{Key=multidelete/f1},{Key=multidelete/f2},{Key=multidelete/f4}]'
+    ${result} =         Execute AWSS3APICli        delete-objects --bucket ${bucket} --delete 'Objects=[{Key=multidelete/f1},{Key=multidelete/f2},{Key=multidelete/f4}]'
                         Should not contain         ${result}         Error
-    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix multidelete/
+    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${bucket} --prefix multidelete/
                         Should not contain         ${result}         multidelete/f1
                         Should not contain         ${result}         multidelete/f2
                         Should contain             ${result}         multidelete/f3
                         Should contain             ${result}         STANDARD
                         Should not contain         ${result}         REDUCED_REDUNDANCY
+
+*** Test Cases ***
+
+Delete file with multi delete
+    [Template]    Delete file with multi delete
+    ${BUCKET}
+    ${BUCKET_LINK}
+

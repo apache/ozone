@@ -31,3 +31,4 @@ ${BUCKET}             generated
 List buckets
     ${result} =         Execute AWSS3APICli     list-buckets | jq -r '.Buckets[].Name'
                         Should contain          ${result}    ${BUCKET}
+                        Should contain          ${result}    ${BUCKET_LINK}

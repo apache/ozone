@@ -26,11 +26,18 @@ Suite Setup         Setup s3 tests
 ${ENDPOINT_URL}       http://s3g:9878
 ${BUCKET}             generated
 
-*** Test Cases ***
+*** Keywords ***
 
 Delete existing bucket
-# Bucket already is created in Test Setup.
-                   Execute AWSS3APICli                delete-bucket --bucket ${BUCKET}
+    [Arguments]           ${bucket}
+    Execute AWSS3APICli   delete-bucket --bucket ${bucket}
+
+*** Test Cases ***
+
+Delete existing bucket # created in Suite Setup
+    [Template]    Delete existing bucket
+    ${BUCKET}
+    ${BUCKET_LINK}
 
 Delete non-existent bucket
     ${result} =    Execute AWSS3APICli and checkrc    delete-bucket --bucket nosuchbucket    255

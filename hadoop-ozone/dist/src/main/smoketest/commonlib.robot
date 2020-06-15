@@ -76,3 +76,33 @@ Verify ACL
     [arguments]         ${object_type}   ${object}    ${type}   ${name}    ${acls}
     ${actual_acls} =    Execute          ozone sh ${object_type} getacl ${object} | jq -r '.[] | select(.type == "${type}") | select(.name == "${name}") | .aclList[]' | xargs
                         Should Be Equal    ${acls}    ${actual_acls}
+
+Create volume via shell
+    [Arguments]         ${volume}
+    ${result} =         Execute And Ignore Error      ozone sh volume create o3://${OM_SERVICE_ID}/${volume}
+                        Should not contain            ${result}          Failed
+
+Create bucket via shell
+    [Arguments]         ${volume}    ${bucket}
+    ${result} =         Execute And Ignore Error      ozone sh bucket create o3://${OM_SERVICE_ID}/${volume}/${bucket}
+                        Should not contain            ${result}          Failed
+
+Link bucket via shell
+    [Arguments]         ${source_volume}    ${source_bucket}    ${target_volume}    ${target_bucket}
+    ${result} =         Execute And Ignore Error      ozone sh bucket link o3://${OM_SERVICE_ID}/${source_volume}/${source_bucket} o3://${OM_SERVICE_ID}/${target_volume}/${target_bucket}
+                        Should not contain            ${result}          Failed
+
+Generate random name
+    [Arguments]         ${prefix}
+    ${postfix} =        Generate Random String  5            [NUMBERS]
+    [Return]            ${prefix}${postfix}
+
+Put key via shell
+    [Arguments]         ${volume}    ${bucket}    ${key}    ${file}
+    Execute             ozone sh key put o3://${OM_SERVICE_ID}/${volume}/${bucket}/${key} ${file}
+
+Create test key
+    [Arguments]          ${volume}    ${bucket}    ${prefix}    ${file}
+    ${key} =             Generate random name      ${prefix}
+    Put key via shell    ${volume}    ${bucket}    ${key}    ${file}
+    [Return]             ${key}
