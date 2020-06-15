@@ -80,9 +80,9 @@ public class NodeService extends NodeImplBase {
 
   }
 
-  private void executeCommand(String mountCommand)
+  private void executeCommand(String command)
       throws IOException, InterruptedException {
-    Process exec = Runtime.getRuntime().exec(mountCommand);
+    Process exec = Runtime.getRuntime().exec(command);
     exec.waitFor(10, TimeUnit.SECONDS);
 
     LOG.info("Command is executed with  stdout: {}, stderr: {}",
@@ -90,7 +90,7 @@ public class NodeService extends NodeImplBase {
         IOUtils.toString(exec.getErrorStream(), "UTF-8"));
     if (exec.exitValue() != 0) {
       throw new RuntimeException(String
-          .format("Return code of the command %s was %d", mountCommand,
+          .format("Return code of the command %s was %d", command,
               exec.exitValue()));
     }
   }
