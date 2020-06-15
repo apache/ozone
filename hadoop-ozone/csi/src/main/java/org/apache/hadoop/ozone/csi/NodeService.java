@@ -47,11 +47,12 @@ public class NodeService extends NodeImplBase {
 
   private static final Logger LOG = LoggerFactory.getLogger(NodeService.class);
 
+  private final String mountCommand;
   private String s3Endpoint;
 
   public NodeService(CsiConfig configuration) {
     this.s3Endpoint = configuration.getS3gAddress();
-
+    this.mountCommand = configuration.getMountCommand();
   }
 
   @Override
@@ -60,14 +61,14 @@ public class NodeService extends NodeImplBase {
 
     try {
       Files.createDirectories(Paths.get(request.getTargetPath()));
-      String mountCommand =
-          String.format("goofys --endpoint %s %s %s",
+      String command =
+          String.format(mountCommand,
               s3Endpoint,
               request.getVolumeId(),
               request.getTargetPath());
-      LOG.info("Executing {}", mountCommand);
+      LOG.info("Executing {}", command);
 
-      executeCommand(mountCommand);
+      executeCommand(command);
 
       responseObserver.onNext(NodePublishVolumeResponse.newBuilder()
           .build());
@@ -79,9 +80,9 @@ public class NodeService extends NodeImplBase {
 
   }
 
-  private void executeCommand(String mountCommand)
+  private void executeCommand(String command)
       throws IOException, InterruptedException {
-    Process exec = Runtime.getRuntime().exec(mountCommand);
+    Process exec = Runtime.getRuntime().exec(command);
     exec.waitFor(10, TimeUnit.SECONDS);
 
     LOG.info("Command is executed with  stdout: {}, stderr: {}",
@@ -89,7 +90,7 @@ public class NodeService extends NodeImplBase {
         IOUtils.toString(exec.getErrorStream(), "UTF-8"));
     if (exec.exitValue() != 0) {
       throw new RuntimeException(String
-          .format("Return code of the command %s was %d", mountCommand,
+          .format("Return code of the command %s was %d", command,
               exec.exitValue()));
     }
   }
