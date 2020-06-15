@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.rocksdb.*;
 import picocli.CommandLine;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
