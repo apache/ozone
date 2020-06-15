@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -44,7 +45,10 @@ public final class OmKeyInfo extends WithObjectID {
   private final String volumeName;
   private final String bucketName;
   // name of key client specified
-  private String keyName;
+  private String keyName; // TODO: full path name kept temporarily
+  private String leafNodeName; // TODO: need to make it mandatory
+  private long parentObjectID; // pointer to parent directory
+
   private long dataSize;
   private List<OmKeyLocationInfoGroup> keyLocationVersions;
   private final long creationTime;
@@ -94,6 +98,23 @@ public final class OmKeyInfo extends WithObjectID {
     this.updateID = updateID;
   }
 
+  @SuppressWarnings("parameternumber")
+  OmKeyInfo(String volumeName, String bucketName, String keyName,
+            String leafNodeName, List<OmKeyLocationInfoGroup> versions,
+            long dataSize,
+            long creationTime, long modificationTime,
+            HddsProtos.ReplicationType type,
+            HddsProtos.ReplicationFactor factor,
+            Map<String, String> metadata,
+            FileEncryptionInfo encInfo, List<OzoneAcl> acls,
+            long parentObjectID, long objectID, long updateID) {
+    this(volumeName, bucketName, keyName, versions, dataSize,
+            creationTime, modificationTime, type, factor, metadata, encInfo, acls,
+            objectID, updateID);
+    this.leafNodeName = leafNodeName;
+    this.parentObjectID = parentObjectID;
+  }
+
   public String getVolumeName() {
     return volumeName;
   }
@@ -124,6 +145,22 @@ public final class OmKeyInfo extends WithObjectID {
 
   public void setDataSize(long size) {
     this.dataSize = size;
+  }
+
+  public void setLeafNodeName(String leafNodeName) {
+    this.leafNodeName = leafNodeName;
+  }
+
+  public String getLeafNodeName() {
+    return leafNodeName;
+  }
+
+  public void setParentObjectID(long parentObjectID) {
+    this.parentObjectID = parentObjectID;
+  }
+
+  public long getParentObjectID() {
+    return parentObjectID;
   }
 
   public synchronized OmKeyLocationInfoGroup getLatestVersionLocations() {
@@ -271,6 +308,8 @@ public final class OmKeyInfo extends WithObjectID {
     private List<OzoneAcl> acls;
     private long objectID;
     private long updateID;
+    private String leafNodeName;
+    private long parentObjectID;
 
     public Builder() {
       this.metadata = new HashMap<>();
@@ -373,11 +412,21 @@ public final class OmKeyInfo extends WithObjectID {
       return this;
     }
 
+    public Builder setLeafNodeName(String leafNodeName) {
+      this.leafNodeName = leafNodeName;
+      return this;
+    }
+
+    public Builder setParentObjectID(long parentObjectID) {
+      this.parentObjectID = parentObjectID;
+      return this;
+    }
+
     public OmKeyInfo build() {
       return new OmKeyInfo(
-          volumeName, bucketName, keyName, omKeyLocationInfoGroups,
+          volumeName, bucketName, keyName, leafNodeName, omKeyLocationInfoGroups,
           dataSize, creationTime, modificationTime, type, factor, metadata,
-          encInfo, acls, objectID, updateID);
+          encInfo, acls, parentObjectID, objectID, updateID);
     }
   }
 
@@ -400,7 +449,11 @@ public final class OmKeyInfo extends WithObjectID {
         .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
         .addAllAcls(OzoneAclUtil.toProtobuf(acls))
         .setObjectID(objectID)
-        .setUpdateID(updateID);
+        .setUpdateID(updateID)
+        .setParentObjectID(parentObjectID);
+    if (leafNodeName != null) {
+      kb.setLeafNodeName(leafNodeName);
+    }
     if (encInfo != null) {
       kb.setFileEncryptionInfo(OMPBHelper.convert(encInfo));
     }
@@ -412,6 +465,7 @@ public final class OmKeyInfo extends WithObjectID {
         .setVolumeName(keyInfo.getVolumeName())
         .setBucketName(keyInfo.getBucketName())
         .setKeyName(keyInfo.getKeyName())
+        .setLeafNodeName(keyInfo.getLeafNodeName())
         .setOmKeyLocationInfos(keyInfo.getKeyLocationListList().stream()
             .map(OmKeyLocationInfoGroup::getFromProtobuf)
             .collect(Collectors.toList()))
@@ -430,6 +484,9 @@ public final class OmKeyInfo extends WithObjectID {
     if (keyInfo.hasUpdateID()) {
       builder.setUpdateID(keyInfo.getUpdateID());
     }
+    if (keyInfo.hasParentObjectID()) {
+      builder.setParentObjectID(keyInfo.getParentObjectID());
+    }
     return builder.build();
   }
 
@@ -439,6 +496,7 @@ public final class OmKeyInfo extends WithObjectID {
         "volume='" + volumeName + '\'' +
         ", bucket='" + bucketName + '\'' +
         ", key='" + keyName + '\'' +
+        ", parentObjectID='" + parentObjectID + '\'' +
         ", dataSize='" + dataSize + '\'' +
         ", creationTime='" + creationTime + '\'' +
         ", type='" + type + '\'' +
@@ -468,12 +526,13 @@ public final class OmKeyInfo extends WithObjectID {
         Objects.equals(metadata, omKeyInfo.metadata) &&
         Objects.equals(acls, omKeyInfo.acls) &&
         objectID == omKeyInfo.objectID &&
-        updateID == omKeyInfo.updateID;
+        updateID == omKeyInfo.updateID &&
+        parentObjectID == omKeyInfo.parentObjectID;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(volumeName, bucketName, keyName);
+    return Objects.hash(volumeName, bucketName, keyName, parentObjectID);
   }
 
   /**
@@ -490,8 +549,9 @@ public final class OmKeyInfo extends WithObjectID {
         .setReplicationType(type)
         .setReplicationFactor(factor)
         .setFileEncryptionInfo(encInfo)
-        .setObjectID(objectID).setUpdateID(updateID);
-
+        .setObjectID(objectID).setUpdateID(updateID)
+        .setLeafNodeName(leafNodeName)
+        .setParentObjectID(parentObjectID);
 
     keyLocationVersions.forEach(keyLocationVersion -> {
       List<OmKeyLocationInfo> keyLocationInfos = new ArrayList<>();

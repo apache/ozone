@@ -26,6 +26,7 @@ public class OmDirectoryInfo extends WithObjectID {
   private final String dirSeparator = "/";
 
   private long parentObjectID; // pointer to parent directory
+  private short index; // position of this directory in the path
 
   private String name;
   private String volumeName;
@@ -43,6 +44,7 @@ public class OmDirectoryInfo extends WithObjectID {
     this.objectID = builder.objectID;
     this.updateID = builder.updateID;
     this.parentObjectID = builder.parentObjectID;
+    this.index = builder.index;
     this.volumeName = builder.volumeName;
     this.bucketName = builder.bucketName;
     this.creationTime = builder.creationTime;
@@ -52,7 +54,7 @@ public class OmDirectoryInfo extends WithObjectID {
   // TODO: its work around and need to remove the dependency with OMKeyInfo
   public static OmDirectoryInfo createDirectoryInfo(OmKeyInfo omKeyInfo,
                                              long parentObjectID) {
-    String dirName = OzoneFSUtils.getDirName(omKeyInfo.getKeyName());
+    String dirName = OzoneFSUtils.getFileName(omKeyInfo.getKeyName());
     return new Builder().setName(dirName)
             .setParentObjectID(parentObjectID)
             .setObjectID(omKeyInfo.getObjectID())
@@ -66,6 +68,11 @@ public class OmDirectoryInfo extends WithObjectID {
             .build();
   }
 
+  // TODO: move to builder and check the necessity of persisting it
+  public void setIndex(short index) {
+    this.index = index;
+  }
+
   /**
    * Returns new builder class that builds a OmPrefixInfo.
    *
@@ -77,6 +84,7 @@ public class OmDirectoryInfo extends WithObjectID {
 
   public static class Builder {
     private long parentObjectID; // pointer to parent directory
+    private short index; // position of this directory in the path
 
     private long objectID;
     private long updateID;
@@ -110,6 +118,11 @@ public class OmDirectoryInfo extends WithObjectID {
 
     public Builder setUpdateID(long updateID) {
       this.updateID = updateID;
+      return this;
+    }
+
+    public Builder setIndex(short index) {
+      this.index = index;
       return this;
     }
 
@@ -193,6 +206,8 @@ public class OmDirectoryInfo extends WithObjectID {
     return getParentObjectID() + dirSeparator + getName();
   }
 
+  public int getIndex() { return index; }
+
   public String getName() { return name; }
 
   public long getCreationTime() {
@@ -211,7 +226,15 @@ public class OmDirectoryInfo extends WithObjectID {
   public OzoneManagerProtocolProtos.DirectoryInfo getProtobuf() {
     OzoneManagerProtocolProtos.DirectoryInfo.Builder pib =
             OzoneManagerProtocolProtos.DirectoryInfo.newBuilder().setName(name)
-                    .addAllMetadata(KeyValueUtil.toProtobuf(metadata));
+                    .setVolumeName(volumeName)
+                    .setBucketName(bucketName)
+                    .setCreationTime(creationTime)
+                    .setModificationTime(modificationTime)
+                    .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
+                    .addAllAcls(OzoneAclUtil.toProtobuf(acls))
+                    .setObjectID(objectID)
+                    .setUpdateID(updateID)
+                    .setParentID(parentObjectID);
     if (acls != null) {
       pib.addAllAcls(OzoneAclUtil.toProtobuf(acls));
     }
@@ -240,7 +263,7 @@ public class OmDirectoryInfo extends WithObjectID {
       opib.setObjectID(dirInfo.getObjectID());
     }
     if (dirInfo.hasParentID()) {
-      opib.setUpdateID(dirInfo.getParentID());
+      opib.setParentObjectID(dirInfo.getParentID());
     }
     if (dirInfo.hasUpdateID()) {
       opib.setUpdateID(dirInfo.getUpdateID());
@@ -286,6 +309,7 @@ public class OmDirectoryInfo extends WithObjectID {
             .setModificationTime(modificationTime)
             .setParentObjectID(parentObjectID)
             .setObjectID(objectID)
+            .setIndex(index)
             .setUpdateID(updateID);
 
     acls.forEach(acl -> builder.addAcl(new OzoneAcl(acl.getType(),

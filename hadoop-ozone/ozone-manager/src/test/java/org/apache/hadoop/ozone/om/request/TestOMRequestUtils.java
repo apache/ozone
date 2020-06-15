@@ -30,11 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .MultipartUploadAbortRequest;
@@ -227,6 +223,24 @@ public final class TestOMRequestUtils {
         .setObjectID(objectID)
         .setUpdateID(objectID)
         .build();
+  }
+
+
+  /**
+   * Create OmKeyInfo.
+   */
+  public static OmDirectoryInfo createOmDirInfo(String volumeName,
+       String bucketName, String keyName, long objectID, long parentObjID) {
+    return new OmDirectoryInfo.Builder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setName(keyName)
+            .setCreationTime(Time.now())
+            .setModificationTime(Time.now())
+            .setObjectID(objectID)
+            .setParentObjectID(parentObjID)
+            .setUpdateID(objectID)
+            .build();
   }
 
   /**

@@ -19,12 +19,17 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -121,11 +126,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     Result result = null;
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    String dbOzoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-        keyName);
-    String dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName,
-        keyName, commitKeyRequest.getClientID());
-
+    String dbOpenLeafNodeID = null;
     try {
       // check Acl
       checkKeyAclsInOpenKeyTable(ozoneManager, volumeName, bucketName,
@@ -142,12 +143,21 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
+      String leafNodeName = OzoneFSUtils.getFileName(keyName);
+      OmDirectoryInfo parentInfo = getParentInfo(volumeName, bucketName, keyName, leafNodeName, omMetadataManager);
+      if (parentInfo == null) {
+        throw new OMException("Failed to commit key, as parent directory of " + keyName +
+                " entry is not found in Directory table", KEY_NOT_FOUND);
+      }
+      String dbLeafNodeID = omMetadataManager.getOzoneLeafNodeKey(parentInfo.getObjectID(),leafNodeName);
+      dbOpenLeafNodeID = omMetadataManager.getOpenLeafNodeKey(parentInfo.getObjectID(),
+              leafNodeName, commitKeyRequest.getClientID());
       // Revisit this logic to see how we can skip this check when ratis is
       // enabled.
       if (ozoneManager.isRatisEnabled()) {
         // Check if OzoneKey already exists in DB
         OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable()
-            .getIfExist(dbOzoneKey);
+            .getIfExist(dbLeafNodeID);
         if (dbKeyInfo != null) {
           // Check if this transaction is a replay of ratis logs
           if (isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
@@ -157,10 +167,10 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             // been replayed. And since we do not check for replay in KeyCreate,
             // we should scrub the key from OpenKey table now, is it exists.
 
-            omKeyInfo = omMetadataManager.getOpenKeyTable().get(dbOpenKey);
+            omKeyInfo = omMetadataManager.getOpenKeyTable().get(dbOpenLeafNodeID);
             if (omKeyInfo != null) {
               omMetadataManager.getOpenKeyTable().addCacheEntry(
-                  new CacheKey<>(dbOpenKey),
+                  new CacheKey<>(dbOpenLeafNodeID),
                   new CacheValue<>(Optional.absent(), trxnLogIndex));
 
               throw new OMReplayException(true);
@@ -170,9 +180,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         }
       }
 
-      omKeyInfo = omMetadataManager.getOpenKeyTable().get(dbOpenKey);
+      omKeyInfo = omMetadataManager.getOpenKeyTable().get(dbOpenLeafNodeID);
       if (omKeyInfo == null) {
-        throw new OMException("Failed to commit key, as " + dbOpenKey +
+        throw new OMException("Failed to commit key, as " + dbOpenLeafNodeID +
             "entry is not found in the OpenKey table", KEY_NOT_FOUND);
       }
       omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
@@ -187,15 +197,15 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       // Add to cache of open key table and key table.
       omMetadataManager.getOpenKeyTable().addCacheEntry(
-          new CacheKey<>(dbOpenKey),
+          new CacheKey<>(dbOpenLeafNodeID),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
 
       omMetadataManager.getKeyTable().addCacheEntry(
-          new CacheKey<>(dbOzoneKey),
+          new CacheKey<>(dbLeafNodeID),
           new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
 
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
-          omKeyInfo, dbOzoneKey, dbOpenKey);
+          omKeyInfo, dbLeafNodeID, dbOpenLeafNodeID);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -203,7 +213,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         if (((OMReplayException) ex).isDBOperationNeeded()) {
           result = Result.DELETE_OPEN_KEY_ONLY;
           omClientResponse = new OMKeyCommitResponse(omResponse.build(),
-              dbOpenKey);
+              dbOpenLeafNodeID);
         } else {
           result = Result.REPLAY;
           omClientResponse = new OMKeyCommitResponse(createReplayOMResponse(
@@ -250,8 +260,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           commitKeyRequest);
       break;
     case DELETE_OPEN_KEY_ONLY:
-      LOG.debug("Replayed Transaction {}. Deleting old key {} from OpenKey " +
-          "table. Request: {}", trxnLogIndex, dbOpenKey, commitKeyRequest);
+      LOG.debug("Replayed Transaction {}. Deleting old key id {}, name {} from OpenKey " +
+          "table. Request: {}", trxnLogIndex, dbOpenLeafNodeID, keyName, commitKeyRequest);
       break;
     case FAILURE:
       LOG.error("Key commit failed. Volume:{}, Bucket:{}, Key:{}. Exception:{}",
@@ -264,5 +274,32 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     }
 
     return omClientResponse;
+  }
+
+  private OmDirectoryInfo getParentInfo(String volumeName, String bucketName, String keyName,
+                                        String leafNodeName, OMMetadataManager omMetadataManager) throws IOException {
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    long bucketId =
+            omMetadataManager.getBucketTable().get(bucketKey).getObjectID();
+
+    Iterator<Path> elements = Paths.get(keyName).iterator();
+    long lastKnownParentId = bucketId;
+    OmDirectoryInfo omDirectoryInfo = null;
+    while (elements.hasNext()) {
+      String fileName = elements.next().toString();
+      if (leafNodeName.equals(fileName)) {
+        return omDirectoryInfo;
+      }
+      String dbNodeName = lastKnownParentId + "/" + fileName;
+      omDirectoryInfo = omMetadataManager.
+              getDirectoryTable().get(dbNodeName);
+      if (omDirectoryInfo != null) {
+        lastKnownParentId = omDirectoryInfo.getObjectID();
+      } else {
+        return null;
+      }
+    }
+    return null;
   }
 }

@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
@@ -64,9 +65,9 @@ public class TestOMDirectoryCreateResponse {
     String keyName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
-        bucketName, OzoneFSUtils.addTrailingSlashIfNeeded(keyName),
-        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE);
+    long parentID = 100;
+    OmDirectoryInfo omDirInfo = TestOMRequestUtils.createOmDirInfo(volumeName,
+        bucketName, keyName, 500, parentID);
 
     OMResponse omResponse = OMResponse.newBuilder().setCreateDirectoryResponse(
         OzoneManagerProtocolProtos.CreateDirectoryResponse.getDefaultInstance())
@@ -75,14 +76,15 @@ public class TestOMDirectoryCreateResponse {
             .build();
 
     OMDirectoryCreateResponse omDirectoryCreateResponse =
-        new OMDirectoryCreateResponse(omResponse, omKeyInfo, null);
+        new OMDirectoryCreateResponse(omResponse, omDirInfo, null);
 
     omDirectoryCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertNotNull(omMetadataManager.getKeyTable().get(
-        omMetadataManager.getOzoneDirKey(volumeName, bucketName, keyName)));
+    Assert.assertNotNull(omMetadataManager.getDirectoryTable().get(
+        omMetadataManager.getOzoneLeafNodeKey(
+                parentID , keyName)));
   }
 }

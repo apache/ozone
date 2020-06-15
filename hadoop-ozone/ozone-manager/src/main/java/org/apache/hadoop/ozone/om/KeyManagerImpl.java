@@ -71,27 +71,8 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
-import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
-import org.apache.hadoop.ozone.om.helpers.OmPartInfo;
-import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
-import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
-import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.*;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -1694,6 +1675,7 @@ public class KeyManagerImpl implements KeyManager {
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
+    int totalDirsCount = OzoneFSUtils.getFileCount(keyName);
 
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
@@ -1704,24 +1686,29 @@ public class KeyManagerImpl implements KeyManager {
         return new OzoneFileStatus(OZONE_URI_DELIMITER);
       }
 
-      // Check if the key is a file.
-      String fileKeyBytes = metadataManager.getOzoneKey(
-          volumeName, bucketName, keyName);
-      OmKeyInfo fileKeyInfo = metadataManager.getKeyTable().get(fileKeyBytes);
-      if (fileKeyInfo != null) {
-        if (args.getRefreshPipeline()) {
-          refreshPipeline(fileKeyInfo);
-        }
-        // this is a file
-        return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
+      // Check if the key is a dir.
+      OmDirectoryInfo dirInfo =
+              OMFileRequest.getLastKnownPrefixIfExists(volumeName, bucketName,
+              keyName, metadataManager);
+      if(dirInfo.getIndex() == totalDirsCount - 1){
+        OmKeyInfo fileKeyInfo = OMFileRequest.getKeyInfo(dirInfo, keyName);
+        return new OzoneFileStatus(fileKeyInfo, scmBlockSize, true);
       }
 
-      String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
-      String dirKeyBytes = metadataManager.getOzoneKey(
-          volumeName, bucketName, dirKey);
-      OmKeyInfo dirKeyInfo = metadataManager.getKeyTable().get(dirKeyBytes);
-      if (dirKeyInfo != null) {
-        return new OzoneFileStatus(dirKeyInfo, scmBlockSize, true);
+      // check if the key is a file
+      // check if the immediate parent exists
+      if (dirInfo.getIndex() == totalDirsCount - 2) {
+        String fileName = OzoneFSUtils.getFileName(keyName);
+        String dbNodeName = metadataManager.getOzonePrefixKey(dirInfo.getObjectID(),
+                fileName);
+        OmKeyInfo fileKeyInfo = metadataManager.getKeyTable().get(dbNodeName);
+        if (fileKeyInfo != null) {
+          if (args.getRefreshPipeline()) {
+            refreshPipeline(fileKeyInfo);
+          }
+          // this is a file
+          return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
+        }
       }
 
       if (LOG.isDebugEnabled()) {
@@ -1901,6 +1888,45 @@ public class KeyManagerImpl implements KeyManager {
         ResultCodes.NOT_A_FILE);
   }
 
+
+  /**
+   * Helper function for listStatus to find key in TableCache.
+   */
+  private void listStatusFindKeyInTableCache1(
+          Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> cacheIter,
+          String keyArgs, String startCacheKey, boolean recursive,
+          TreeMap<String, OzoneFileStatus> cacheKeyMap, Set<String> deletedKeySet) {
+
+    while (cacheIter.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry =
+              cacheIter.next();
+      String cacheKey = entry.getKey().getCacheKey();
+      if (cacheKey.equals(keyArgs)) {
+        continue;
+      }
+      OmKeyInfo cacheOmKeyInfo = entry.getValue().getCacheValue();
+      // cacheOmKeyInfo is null if an entry is deleted in cache
+      if (cacheOmKeyInfo != null) {
+        if (cacheKey.startsWith(startCacheKey) &&
+                cacheKey.compareTo(startCacheKey) >= 0) {
+          if (!recursive) {
+            String remainingKey = StringUtils.stripEnd(cacheKey.substring(
+                    startCacheKey.length()), OZONE_URI_DELIMITER);
+            // For non-recursive, the remaining part of key can't have '/'
+            if (remainingKey.contains(OZONE_URI_DELIMITER)) {
+              continue;
+            }
+          }
+          OzoneFileStatus fileStatus = new OzoneFileStatus(
+                  cacheOmKeyInfo, scmBlockSize, !OzoneFSUtils.isFile(cacheKey));
+          cacheKeyMap.put(cacheKey, fileStatus);
+        }
+      } else {
+        deletedKeySet.add(cacheKey);
+      }
+    }
+  }
+
   /**
    * Helper function for listStatus to find key in TableCache.
    */
@@ -1990,7 +2016,7 @@ public class KeyManagerImpl implements KeyManager {
           metadataManager.getOzoneKey(volumeName, bucketName, keyName));
 
       // First, find key in TableCache
-      listStatusFindKeyInTableCache(cacheIter, keyArgs, startCacheKey,
+      listStatusFindKeyInTableCache1(cacheIter, keyArgs, startCacheKey,
           recursive, cacheKeyMap, deletedKeySet);
       // Then, find key in DB
       String seekKeyInDb =

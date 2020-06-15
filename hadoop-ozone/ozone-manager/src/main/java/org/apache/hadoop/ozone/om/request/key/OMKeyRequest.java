@@ -256,6 +256,41 @@ public abstract class OMKeyRequest extends OMClientRequest {
         .setUpdateID(transactionLogIndex)
         .build();
   }
+  /**
+   * Create OmKeyInfo object.
+   * @return OmKeyInfo
+   */
+  @SuppressWarnings("parameterNumber")
+  protected OmKeyInfo createLeafNodeInfo(@Nonnull KeyArgs keyArgs,
+      @Nonnull List<OmKeyLocationInfo> locations,
+      @Nonnull HddsProtos.ReplicationFactor factor,
+      @Nonnull HddsProtos.ReplicationType type, long size,
+      @Nullable FileEncryptionInfo encInfo,
+      @Nonnull PrefixManager prefixManager,
+      @Nullable OmBucketInfo omBucketInfo,
+      OMFileRequest.OMPathInfo omPathInfo,
+        long transactionLogIndex) {
+
+    return new OmKeyInfo.Builder()
+        .setVolumeName(keyArgs.getVolumeName())
+        .setBucketName(keyArgs.getBucketName())
+        .setKeyName(keyArgs.getKeyName())
+        .setLeafNodeName(omPathInfo.getLeafNodeName())
+        .setOmKeyLocationInfos(Collections.singletonList(
+            new OmKeyLocationInfoGroup(0, locations)))
+        .setCreationTime(keyArgs.getModificationTime())
+        .setModificationTime(keyArgs.getModificationTime())
+        .setDataSize(size)
+        .setReplicationType(type)
+        .setReplicationFactor(factor)
+        .setFileEncryptionInfo(encInfo)
+        .setAcls(getAclsForKey(keyArgs, omBucketInfo, prefixManager))
+        .addAllMetadata(KeyValueUtil.getFromProtobuf(keyArgs.getMetadataList()))
+        .setObjectID(omPathInfo.getLeafNodeObjectId())
+        .setParentObjectID(omPathInfo.getLastKnownParentId())
+        .setUpdateID(transactionLogIndex)
+        .build();
+  }
 
   private List< OzoneAcl > getAclsForKey(KeyArgs keyArgs,
       OmBucketInfo bucketInfo, PrefixManager prefixManager) {
@@ -336,6 +371,51 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return createKeyInfo(keyArgs, locations, keyArgs.getFactor(),
         keyArgs.getType(), keyArgs.getDataSize(), encInfo, prefixManager,
         omBucketInfo, transactionLogIndex);
+  }
+
+
+  /**
+   * Prepare OmKeyInfo which will be persisted to openKeyTable.
+   * @return OmKeyInfo
+   * @throws IOException
+   */
+  @SuppressWarnings("parameternumber")
+  protected OmKeyInfo prepareLeafNodeInfo(
+          @Nonnull OMMetadataManager omMetadataManager,
+          @Nonnull KeyArgs keyArgs, OmKeyInfo dbKeyInfo, long size,
+          @Nonnull List<OmKeyLocationInfo> locations,
+          @Nullable FileEncryptionInfo encInfo,
+          @Nonnull PrefixManager prefixManager,
+          @Nullable OmBucketInfo omBucketInfo,
+          OMFileRequest.OMPathInfo omPathInfo,
+          long transactionLogIndex, boolean isRatisEnabled)
+          throws IOException {
+    if (keyArgs.getIsMultipartKey()) {
+      return prepareMultipartKeyInfo(omMetadataManager, keyArgs,
+              size, locations, encInfo, prefixManager, omBucketInfo,
+              transactionLogIndex);
+      //TODO args.getMetadata
+    }
+    if (dbKeyInfo != null) {
+      // TODO: Need to be fixed, as when key already exists, we are
+      //  appending new blocks to existing key.
+      // The key already exist, the new blocks will be added as new version
+      // when locations.size = 0, the new version will have identical blocks
+      // as its previous version
+      dbKeyInfo.addNewVersion(locations, false);
+      dbKeyInfo.setDataSize(size + dbKeyInfo.getDataSize());
+      // The modification time is set in preExecute. Use the same
+      // modification time.
+      dbKeyInfo.setModificationTime(keyArgs.getModificationTime());
+      dbKeyInfo.setUpdateID(transactionLogIndex, isRatisEnabled);
+      return dbKeyInfo;
+    }
+
+    // the key does not exist, create a new object.
+    // Blocks will be appended as version 0.
+    return createLeafNodeInfo(keyArgs, locations, keyArgs.getFactor(),
+            keyArgs.getType(), keyArgs.getDataSize(), encInfo, prefixManager,
+            omBucketInfo, omPathInfo, transactionLogIndex);
   }
 
   /**

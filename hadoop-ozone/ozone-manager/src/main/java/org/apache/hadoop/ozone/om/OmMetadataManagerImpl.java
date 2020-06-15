@@ -341,8 +341,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         OmPrefixInfo.class);
     checkTableStatus(prefixTable, PREFIX_TABLE);
 
-    dirTable = this.store.getTable(DIRECTORY_TABLE, OmDirectoryInfo.class,
-        OmPrefixInfo.class);
+    dirTable = this.store.getTable(DIRECTORY_TABLE, String.class,
+            OmDirectoryInfo.class);
     checkTableStatus(dirTable, DIRECTORY_TABLE);
   }
 
@@ -424,6 +424,31 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public String getOzoneDirKey(String volume, String bucket, String key) {
     key = OzoneFSUtils.addTrailingSlashIfNeeded(key);
     return getOzoneKey(volume, bucket, key);
+  }
+
+  @Override
+  public String getOzoneLeafNodeKey(long parentObjectId, String leafNodeName) {
+    StringBuilder builder = new StringBuilder();
+    builder.append(parentObjectId);
+    builder.append(OM_KEY_PREFIX).append(leafNodeName);
+    return builder.toString();
+  }
+
+  @Override
+  public String getOzonePrefixKey(long parentObjectId, String prefixName) {
+    StringBuilder builder = new StringBuilder();
+    builder.append(parentObjectId);
+    builder.append(OM_KEY_PREFIX).append(prefixName);
+    return builder.toString();
+  }
+
+  @Override
+  public String getOpenLeafNodeKey(long parentObjectId, String leafNodeName, long id) {
+    StringBuilder openKey = new StringBuilder();
+    openKey.append(parentObjectId);
+    openKey.append(OM_KEY_PREFIX).append(leafNodeName);
+    openKey.append(OM_KEY_PREFIX).append(id);
+    return openKey.toString();
   }
 
   @Override

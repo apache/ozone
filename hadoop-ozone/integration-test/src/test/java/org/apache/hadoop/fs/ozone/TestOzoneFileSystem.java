@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Set;
 import java.util.TreeSet;
@@ -115,6 +116,36 @@ public class TestOzoneFileSystem {
     } catch (FileAlreadyExistsException fae) {
       // ignore as its expected
     }
+
+    // Directory
+    FileStatus fileStatus = fs.getFileStatus(parent);
+    assertEquals("FileStatus did not return the directory",
+            "/d1/d2/d3/d4", fileStatus.getPath().toUri().getPath());
+    assertTrue("FileStatus did not return the directory",
+            fileStatus.isDirectory());
+
+    // Directory
+    fileStatus = fs.getFileStatus(new Path("/d1/d2/d3/"));
+    assertEquals("FileStatus did not return the directory",
+            "/d1/d2/d3", fileStatus.getPath().toUri().getPath());
+    assertTrue("FileStatus did not return the directory",
+            fileStatus.isDirectory());
+
+    // File
+    FileStatus fileStatus1 = fs.getFileStatus(file2);
+    assertEquals("FileStatus did not return the file",
+            file2.toString(), fileStatus1.getPath().toUri().getPath());
+    assertFalse("FileStatus did not return the file",
+            fileStatus1.isDirectory());
+
+    // invalid
+   try{
+     fs.getFileStatus(new Path("/d1/d2/d3/d4/key3" +
+             "/invalid"));
+     fail("Should throw FileNotFoundException");
+   } catch (FileNotFoundException fnfe) {
+     // ignore as its expected
+   }
   }
 
   /**

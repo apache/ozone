@@ -19,8 +19,10 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -32,6 +34,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -171,13 +174,14 @@ public class OMFileCreateRequest extends OMKeyRequest {
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumCreateFile();
 
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    OMMetadataManager omMetadataMgr = ozoneManager.getMetadataManager();
 
     boolean acquiredLock = false;
 
     OmKeyInfo omKeyInfo = null;
     final List<OmKeyLocationInfo> locations = new ArrayList<>();
     List<OmKeyInfo> missingParentInfos;
+    List<OmDirectoryInfo> missingParentDirInfos;
 
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
@@ -190,83 +194,45 @@ public class OMFileCreateRequest extends OMKeyRequest {
           IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
 
       // acquire lock
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
+      acquiredLock = omMetadataMgr.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);
 
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      validateBucketAndVolume(omMetadataMgr, volumeName, bucketName);
 
       if (keyName.length() == 0) {
         // Check if this is the root of the filesystem.
         throw new OMException("Can not write to directory: " + keyName,
             OMException.ResultCodes.NOT_A_FILE);
       }
+      OmKeyInfo dbKeyInfo = getOmKeyInfo(ozoneManager, trxnLogIndex,
+              volumeName, bucketName, keyName, omMetadataMgr);
 
-      // Check if Key already exists in KeyTable and this transaction is a
-      // replay.
-      String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-          keyName);
-      OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable()
-          .getIfExist(ozoneKey);
-      if (dbKeyInfo != null) {
-        // Check if this transaction is a replay of ratis logs.
-        // We check only the KeyTable here and not the OpenKeyTable. In case
-        // this transaction is a replay but the transaction was not committed
-        // to the KeyTable, then we recreate the key in OpenKey table. This is
-        // okay as all the subsequent transactions would also be replayed and
-        // the openKey table would eventually reach the same state.
-        // The reason we do not check the OpenKey table is to avoid a DB read
-        // in regular non-replay scenario.
-        if (isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
-          // Replay implies the response has already been returned to
-          // the client. So take no further action and return a dummy response.
-          throw new OMReplayException();
-        }
-      }
-
-      OMFileRequest.OMPathInfo pathInfo =
-          OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
-              bucketName, keyName, Paths.get(keyName));
-      OMFileRequest.OMDirectoryResult omDirectoryResult =
-          pathInfo.getDirectoryResult();
-      List<OzoneAcl> inheritAcls = pathInfo.getAcls();
-
-      // Check if a file or directory exists with same key name.
-      if (omDirectoryResult == FILE_EXISTS) {
-        if (!isOverWrite) {
-          throw new OMException("File " + keyName + " already exists",
-              OMException.ResultCodes.FILE_ALREADY_EXISTS);
-        }
-      } else if (omDirectoryResult == DIRECTORY_EXISTS) {
-        throw new OMException("Can not write to directory: " + keyName,
-            OMException.ResultCodes.NOT_A_FILE);
-      } else if (omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
-        throw new OMException(
-            "Can not create file: " + keyName + " as there " +
-                "is already file in the given path",
-            OMException.ResultCodes.NOT_A_FILE);
-      }
+      //1. Verify the path against directory table
+      //2. Verify the leaf node against key table
+      OMFileRequest.OMPathInfo omPathInfo =
+              OMFileRequest.verifyDirectoryKeysInPath(omMetadataMgr, volumeName,
+                      bucketName, keyName, Paths.get(keyName));
+      checkPathAlreadyExists(keyName, isOverWrite, omPathInfo);
 
       if (!isRecursive) {
-        checkAllParentsExist(ozoneManager, keyArgs, pathInfo);
+        checkAllParentsExist(ozoneManager, keyArgs, omPathInfo);
       }
 
-      // do open key
-      OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
-          omMetadataManager.getBucketKey(volumeName, bucketName));
+      // add all missing parents to dir table
+      missingParentDirInfos = OMDirectoryCreateRequest.getAllParentDirInfo(
+              ozoneManager, keyArgs, omPathInfo, trxnLogIndex);
 
-      omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
+      // do open key
+      OmBucketInfo bucketInfo = omMetadataMgr.getBucketTable().get(
+          omMetadataMgr.getBucketKey(volumeName, bucketName));
+
+      omKeyInfo = prepareLeafNodeInfo(omMetadataMgr, keyArgs, dbKeyInfo,
           keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),
-          ozoneManager.getPrefixManager(), bucketInfo, trxnLogIndex,
-          ozoneManager.isRatisEnabled());
+          ozoneManager.getPrefixManager(), bucketInfo, omPathInfo,
+          trxnLogIndex, ozoneManager.isRatisEnabled());
 
       long openVersion = omKeyInfo.getLatestVersionLocations().getVersion();
       long clientID = createFileRequest.getClientID();
-      String dbOpenKeyName = omMetadataManager.getOpenKey(volumeName,
-          bucketName, keyName, clientID);
-
-      missingParentInfos = OMDirectoryCreateRequest
-          .getAllParentInfo(ozoneManager, keyArgs,
-              pathInfo.getMissingParents(), inheritAcls, trxnLogIndex);
 
       // Append new blocks
       omKeyInfo.appendNewBlocks(keyArgs.getKeyLocationsList().stream()
@@ -276,32 +242,20 @@ public class OMFileCreateRequest extends OMKeyRequest {
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
-      omMetadataManager.getOpenKeyTable().addCacheEntry(
-          new CacheKey<>(dbOpenKeyName),
+      String dbOpenLeafNodeName = omMetadataMgr.getOpenLeafNodeKey(
+              omPathInfo.getLastKnownParentId(),
+              omPathInfo.getLeafNodeName(), clientID);
+      omMetadataMgr.getOpenKeyTable().addCacheEntry(
+          new CacheKey<>(dbOpenLeafNodeName),
           new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
 
       // Add cache entries for the prefix directories.
       // Skip adding for the file key itself, until Key Commit.
-      OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
-          bucketName, Optional.absent(), Optional.of(missingParentInfos),
-          trxnLogIndex);
-
       // Add Directory Table entry
-      // TODO: dummy parent Id. Need to get the parent id from the dirTable
-      OmDirectoryInfo dirInfo = OmDirectoryInfo.createDirectoryInfo(omKeyInfo
-              , omKeyInfo.getObjectID());
-      List<OmDirectoryInfo> missingDirs =
-              new ArrayList<>(missingParentInfos.size());
-      for (OmKeyInfo parentInfo : missingParentInfos) {
-        // TODO: dummy parent Id. Need to get the parent id from the dirTable
-        long parentObjectID = parentInfo.getObjectID();
-        missingDirs.add(OmDirectoryInfo.createDirectoryInfo(parentInfo,
-                parentObjectID));
-      }
-      OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
+      OMFileRequest.addDirectoryTableCacheEntries(omMetadataMgr,
               volumeName,
-              bucketName, Optional.of(dirInfo),
-              Optional.of(missingDirs), trxnLogIndex);
+              bucketName, Optional.absent(),
+              Optional.of(missingParentDirInfos), trxnLogIndex);
 
       // Prepare response
       omResponse.setCreateFileResponse(CreateFileResponse.newBuilder()
@@ -310,7 +264,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
           .setOpenVersion(openVersion).build())
           .setCmdType(Type.CreateFile);
       omClientResponse = new OMFileCreateResponse(omResponse.build(),
-          omKeyInfo, missingParentInfos, clientID);
+          omKeyInfo, missingParentDirInfos, clientID);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -330,7 +284,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
+        omMetadataMgr.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
             bucketName);
       }
     }
@@ -362,6 +316,58 @@ public class OMFileCreateRequest extends OMKeyRequest {
     }
 
     return omClientResponse;
+  }
+
+  private void checkPathAlreadyExists(String keyName, boolean isOverWrite,
+                                      OMFileRequest.OMPathInfo omPathInfo)
+          throws OMException {
+    OMFileRequest.OMDirectoryResult omPathResult =
+            omPathInfo.getDirectoryResult();
+
+    if (omPathResult == DIRECTORY_EXISTS) {
+      throw new OMException("Can not write to directory: " + keyName,
+              OMException.ResultCodes.NOT_A_FILE);
+    }
+
+    // Check if a file or directory exists with same key name.
+    if (omPathResult == FILE_EXISTS) {
+      if (!isOverWrite) {
+        throw new OMException("File " + keyName + " already exists",
+            OMException.ResultCodes.FILE_ALREADY_EXISTS);
+      }
+    } else if (omPathResult == FILE_EXISTS_IN_GIVENPATH) {
+      throw new OMException(
+          "Can not create file: " + keyName + " as there " +
+              "is already file in the given path",
+          OMException.ResultCodes.NOT_A_FILE);
+    }
+  }
+
+  @Nullable
+  private OmKeyInfo getOmKeyInfo(OzoneManager ozoneManager, long trxnLogIndex,
+                                 String volumeName, String bucketName,
+                                 String keyName, OMMetadataManager omMetaMgr)
+          throws IOException {
+    // Check if Key already exists in KeyTable and this transaction is a
+    // replay.
+    OmKeyInfo dbKeyInfo = OMFileRequest.getKeyIfExists(volumeName, bucketName
+            , keyName, omMetaMgr);
+    if (dbKeyInfo != null) {
+      // Check if this transaction is a replay of ratis logs.
+      // We check only the KeyTable here and not the OpenKeyTable. In case
+      // this transaction is a replay but the transaction was not committed
+      // to the KeyTable, then we recreate the key in OpenKey table. This is
+      // okay as all the subsequent transactions would also be replayed and
+      // the openKey table would eventually reach the same state.
+      // The reason we do not check the OpenKey table is to avoid a DB read
+      // in regular non-replay scenario.
+      if (isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
+        // Replay implies the response has already been returned to
+        // the client. So take no further action and return a dummy response.
+        throw new OMReplayException();
+      }
+    }
+    return dbKeyInfo;
   }
 
   private void checkAllParentsExist(OzoneManager ozoneManager,
