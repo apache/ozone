@@ -191,8 +191,11 @@ public final class OzoneAclUtil {
    * @return list of OzoneAcl.
    */
   public static List<OzoneAcl> fromProtobuf(List<OzoneAclInfo> protoAcls) {
-    return protoAcls.stream().map(acl->OzoneAcl.fromProtobuf(acl))
-        .collect(Collectors.toList());
+    List<OzoneAcl> ozoneAcls = new ArrayList<>();
+    for (OzoneAclInfo aclInfo : protoAcls) {
+      ozoneAcls.add(OzoneAcl.fromProtobuf(aclInfo));
+    }
+    return ozoneAcls;
   }
 
   /**
@@ -201,8 +204,11 @@ public final class OzoneAclUtil {
    * @return list of OzoneAclInfo.
    */
   public static List<OzoneAclInfo> toProtobuf(List<OzoneAcl> protoAcls) {
-    return protoAcls.stream().map(acl->OzoneAcl.toProtobuf(acl))
-        .collect(Collectors.toList());
+    List<OzoneAclInfo> ozoneAclInfos = new ArrayList<>();
+    for (OzoneAcl acl : protoAcls) {
+      ozoneAclInfos.add(OzoneAcl.toProtobuf(acl));
+    }
+    return ozoneAclInfos;
   }
 
   /**

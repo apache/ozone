@@ -19,9 +19,9 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
@@ -47,6 +47,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .CommitKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -142,10 +144,10 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           keyName, commitKeyRequest.getClientID());
 
       try {
-        List<OmKeyLocationInfo> locationInfoList = commitKeyArgs
-            .getKeyLocationsList().stream()
-            .map(OmKeyLocationInfo::getFromProtobuf)
-            .collect(Collectors.toList());
+        List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+        for (KeyLocation keyLocation : commitKeyArgs.getKeyLocationsList()) {
+          locationInfoList.add(OmKeyLocationInfo.getFromProtobuf(keyLocation));
+        }
 
         bucketLockAcquired =
             omMetadataManager.getLock().acquireLock(BUCKET_LOCK,
@@ -159,6 +161,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           // Check if OzoneKey already exists in DB
           OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable()
               .getIfExist(dbOzoneKey);
+
           // Check if this transaction is a replay of ratis logs
           if (dbKeyInfo != null &&
               isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
