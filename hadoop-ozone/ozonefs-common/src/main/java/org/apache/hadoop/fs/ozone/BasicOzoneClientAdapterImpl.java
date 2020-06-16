@@ -228,6 +228,11 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     bucket.renameKey(key, newKeyName);
   }
 
+  @Override
+  public void rename(String pathStr, String newPath) throws IOException {
+    throw new IOException("Please use renameKey instead for o3fs.");
+  }
+
   /**
    * Helper method to create an directory specified by key name in bucket.
    *
