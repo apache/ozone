@@ -71,7 +71,7 @@ public final class JacocoServer {
             e.printStackTrace();
           }
         }
-      }).run();
+      }).start();
     }
 
   }
