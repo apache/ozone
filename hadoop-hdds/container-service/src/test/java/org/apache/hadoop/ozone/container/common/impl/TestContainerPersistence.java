@@ -407,7 +407,8 @@ public class TestContainerPersistence {
     List<ChunkInfo> chunks = new ArrayList<>(chunkCount);
     BlockData blockData = new BlockData(blockID);
     for (int x = 0; x < chunkCount; x++) {
-      ChunkInfo info = getChunk(blockID.getLocalID(), x + 1, x * datalen, datalen);
+      ChunkInfo info =
+          getChunk(blockID.getLocalID(), x + 1, x * datalen, datalen);
       ChunkBuffer data = getData(datalen);
       setDataChecksum(info, data);
       chunkManager.writeChunk(container, blockID, info, data,

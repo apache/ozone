@@ -81,7 +81,7 @@ public class TestKeyInputStream {
     });
   }
 
-  public TestKeyInputStream (ChunkLayoutTestInfo layout) {
+  public TestKeyInputStream(ChunkLayoutTestInfo layout) {
     this.chunkLayout = layout;
   }
   /**
