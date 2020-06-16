@@ -89,6 +89,8 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean,
 
   void incNumBlocksAllocatedMetric(PipelineID id);
 
+  int getNumHealthyVolumes(Pipeline pipeline);
+
   /**
    * Activates a dormant pipeline.
    *

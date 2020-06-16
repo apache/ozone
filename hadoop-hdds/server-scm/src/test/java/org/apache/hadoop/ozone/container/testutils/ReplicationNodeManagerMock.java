@@ -343,4 +343,9 @@ public class ReplicationNodeManagerMock implements NodeManager {
   public NetworkTopology getClusterNetworkTopologyMap() {
     return null;
   }
+
+  @Override
+  public int getNumHealthyVolumes(List<DatanodeDetails> dnList) {
+    return 0;
+  }
 }

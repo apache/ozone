@@ -92,6 +92,7 @@ public class MockNodeManager implements NodeManager {
   private final Node2ContainerMap node2ContainerMap;
   private NetworkTopology clusterMap;
   private ConcurrentMap<String, Set<String>> dnsToUuidMap;
+  private int numHealthyDisksPerDatanode;
 
   public MockNodeManager(NetworkTopologyImpl clusterMap,
                          List<DatanodeDetails> nodes,
@@ -121,6 +122,7 @@ public class MockNodeManager implements NodeManager {
     }
     safemode = false;
     this.commandMap = new HashMap<>();
+    numHealthyDisksPerDatanode = 1;
   }
 
   public MockNodeManager(boolean initializeFakeNodes, int nodeCount) {
@@ -569,6 +571,15 @@ public class MockNodeManager implements NodeManager {
     this.clusterMap = topology;
   }
 
+  @Override
+  public int getNumHealthyVolumes(List<DatanodeDetails> dnList) {
+    return numHealthyDisksPerDatanode;
+  }
+
+  public void setNumHealthyVolumes(int value) {
+    numHealthyDisksPerDatanode = value;
+  }
+
   /**
    * A class to declare some values for the nodes so that our tests
    * won't fail.
@@ -600,6 +611,12 @@ public class MockNodeManager implements NodeManager {
      * @param currentState - Healthy, Stale and DEAD nodes.
      */
     NodeData(long capacity, long used, long currentState) {
+      this.capacity = capacity;
+      this.used = used;
+      this.currentState = currentState;
+    }
+
+    NodeData(long capacity, long used, long currentState, long healthyVolumes) {
       this.capacity = capacity;
       this.used = used;
       this.currentState = currentState;
