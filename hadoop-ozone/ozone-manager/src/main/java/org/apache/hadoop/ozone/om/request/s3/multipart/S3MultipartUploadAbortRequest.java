@@ -117,7 +117,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
           bucket.realVolume(), bucket.realBucket());
 
       multipartKey = omMetadataManager.getMultipartKey(
-          bucket.requestedVolume(), bucket.requestedBucket(),
+          bucket.realVolume(), bucket.realBucket(),
           keyName, keyArgs.getMultipartUploadID());
 
       OmKeyInfo omKeyInfo =

@@ -151,7 +151,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       // for the key.
 
       String multipartKey = omMetadataManager.getMultipartKey(
-          bucket.requestedVolume(), bucket.requestedBucket(), keyName,
+          bucket.realVolume(), bucket.realBucket(), keyName,
           keyArgs.getMultipartUploadID());
 
       // Even if this key already exists in the KeyTable, it would be taken

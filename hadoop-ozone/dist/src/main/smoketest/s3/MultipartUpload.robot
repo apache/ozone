@@ -83,13 +83,12 @@ Test Multipart Upload Complete
 
 #complete multipart upload
     ${result} =         Execute AWSS3APICli     complete-multipart-upload --upload-id ${uploadID} --bucket ${bucket} --key multipartKey1 --multipart-upload 'Parts=[{ETag=${eTag1},PartNumber=1},{ETag=${eTag2},PartNumber=2}]'
-                        Should contain          ${result}    ${bucket}
                         Should contain          ${result}    multipartKey1
                         Should contain          ${result}    ETag
 
 #read file and check the key
     ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${bucket} --key multipartKey1 /tmp/multipartKey1.result
-                                Execute                    cat /tmp/part1 /tmp/part2 >> /tmp/multipartKey1
+                                Execute                    cat /tmp/part1 /tmp/part2 > /tmp/multipartKey1
     Compare files               /tmp/multipartKey1         /tmp/multipartKey1.result
 
 Test Multipart Upload Complete Entity too small
@@ -161,7 +160,7 @@ Test Multipart Upload Complete Invalid part errors and complete mpu with few par
                         Should contain          ${result}    ETag
 
     ${result} =         Execute AWSS3ApiCli        get-object --bucket ${bucket} --key multipartKey3 /tmp/multipartKey3.result
-                        Execute                    cat /tmp/part1 /tmp/part3 >> /tmp/multipartKey3
+                        Execute                    cat /tmp/part1 /tmp/part3 > /tmp/multipartKey3
     Compare files       /tmp/multipartKey3         /tmp/multipartKey3.result
 
 Test abort Multipart upload
@@ -181,8 +180,10 @@ Test abort Multipart upload with invalid uploadId
     ${result} =         Execute AWSS3APICli and checkrc    abort-multipart-upload --bucket ${bucket} --key multipartKey5 --upload-id "random"    255
 
 Upload part with Incorrect uploadID
+    [Arguments]         ${bucket}
+
                         Execute                 echo "Multipart upload" > /tmp/testfile
-        ${result} =     Execute AWSS3APICli and checkrc     upload-part --bucket ${bucket} --key multipartKey --part-number 1 --body /tmp/testfile --upload-id "random"  255
+    ${result} =         Execute AWSS3APICli and checkrc     upload-part --bucket ${bucket} --key multipartKey --part-number 1 --body /tmp/testfile --upload-id "random"  255
                         Should contain          ${result}    NoSuchUpload
 
 Test list parts
@@ -252,7 +253,6 @@ Test Multipart Upload Put With Copy
                         Should contain           ${result}    UploadId
 
     ${result} =         Execute AWSS3APICli      upload-part-copy --bucket ${bucket} --key copytest/destination --upload-id ${uploadID} --part-number 1 --copy-source ${bucket}/copytest/source
-                        Should contain           ${result}    ${bucket}
                         Should contain           ${result}    ETag
                         Should contain           ${result}    LastModified
     ${eTag1} =          Execute and checkrc      echo '${result}' | jq -r '.CopyPartResult.ETag'   0
@@ -277,13 +277,11 @@ Test Multipart Upload Put With Copy and range
                         Should contain           ${result}    UploadId
 
     ${result} =         Execute AWSS3APICli      upload-part-copy --bucket ${bucket} --key copyrange/destination --upload-id ${uploadID} --part-number 1 --copy-source ${bucket}/copyrange/source --copy-source-range bytes=0-10485758
-                        Should contain           ${result}    ${bucket}
                         Should contain           ${result}    ETag
                         Should contain           ${result}    LastModified
     ${eTag1} =          Execute and checkrc      echo '${result}' | jq -r '.CopyPartResult.ETag'   0
 
     ${result} =         Execute AWSS3APICli      upload-part-copy --bucket ${bucket} --key copyrange/destination --upload-id ${uploadID} --part-number 2 --copy-source ${bucket}/copyrange/source --copy-source-range bytes=10485758-10485760
-                        Should contain           ${result}    ${bucket}
                         Should contain           ${result}    ETag
                         Should contain           ${result}    LastModified
     ${eTag2} =          Execute and checkrc      echo '${result}' | jq -r '.CopyPartResult.ETag'   0

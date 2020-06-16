@@ -83,7 +83,12 @@ public class TestS3MultipartRequest {
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
     when(ozoneManager.resolveBucketLink(any(KeyArgs.class)))
-        .thenReturn(new ResolvedBucket(Pair.of("", ""), Pair.of("", "")));
+        .thenAnswer(inv -> {
+          KeyArgs args = (KeyArgs) inv.getArguments()[0];
+          return new ResolvedBucket(
+              Pair.of(args.getVolumeName(), args.getBucketName()),
+              Pair.of(args.getVolumeName(), args.getBucketName()));
+        });
   }
 
 

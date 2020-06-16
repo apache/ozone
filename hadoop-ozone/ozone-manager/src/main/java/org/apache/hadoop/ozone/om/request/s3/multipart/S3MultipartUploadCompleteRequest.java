@@ -111,12 +111,11 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     final String requestedBucket = keyArgs.getBucketName();
     String keyName = keyArgs.getKeyName();
     String uploadID = keyArgs.getMultipartUploadID();
+    String multipartKey = null;
 
     ozoneManager.getMetrics().incNumCompleteMultipartUploads();
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    String multipartKey = omMetadataManager.getMultipartKey(
-        requestedVolume, requestedBucket, keyName, uploadID);
 
     boolean acquiredLock = false;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
@@ -128,6 +127,9 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs);
       keyArgs = bucket.update(keyArgs);
       bucket.audit(auditMap);
+
+      multipartKey = omMetadataManager.getMultipartKey(bucket.realVolume(),
+          bucket.realBucket(), keyName, uploadID);
 
       // TODO to support S3 ACL later.
 

@@ -127,7 +127,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
       String uploadID = keyArgs.getMultipartUploadID();
       multipartKey = omMetadataManager.getMultipartKey(
-          requestedVolume, requestedBucket,
+          bucket.realVolume(), bucket.realBucket(),
           keyName, uploadID);
 
       multipartKeyInfo = omMetadataManager.getMultipartInfoTable()
