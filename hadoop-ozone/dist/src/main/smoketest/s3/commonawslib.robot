@@ -15,15 +15,12 @@
 
 *** Settings ***
 Resource            ../commonlib.robot
+Resource            ../commonlib.robot
 
 *** Variables ***
 ${OZONE_S3_HEADER_VERSION}     v4
 ${OZONE_S3_SET_CREDENTIALS}    true
 ${BUCKET}                      bucket-999
-${BUCKET_LINK}                 link
-${VOLUME}                      s3v
-${LINKED_VOLUME}               legacy
-${LINKED_BUCKET}               source
 
 *** Keywords ***
 Execute AWSS3APICli
@@ -74,21 +71,11 @@ Setup dummy credentials for S3
                         Execute                    aws configure set aws_secret_access_key dlfknslnfslf
                         Execute                    aws configure set region us-west-1
 
-Create buckets
-    ${postfix} =               Generate Random String  5  [NUMBERS]
-    Create volume via shell    ${VOLUME}
-    Set Suite Variable         ${BUCKET}         bucket-${postfix}
-    Create bucket via shell    ${VOLUME}         ${BUCKET}
-    Set Suite Variable         ${BUCKET_LINK}    link-${postfix}
-    Set Suite Variable         ${LINKED_BUCKET}  source-${postfix}
-    Create volume via shell    ${LINKED_VOLUME}
-    Create bucket via shell    ${LINKED_VOLUME}  ${LINKED_BUCKET}
-    Link bucket via shell      ${LINKED_VOLUME}  ${LINKED_BUCKET}    ${VOLUME}   ${BUCKET_LINK}
-
 Create bucket
     ${postfix} =         Generate Random String  5  [NUMBERS]
-    Set Suite Variable   ${BUCKET}                  bucket-${postfix}
-                         Create bucket with name    ${BUCKET}
+    ${bucket} =          Set Variable               bucket-${postfix}
+                         Create bucket with name    ${bucket}
+    [Return]             ${bucket}
 
 Create bucket with name
     [Arguments]          ${bucket}
@@ -99,18 +86,8 @@ Create bucket with name
 Setup s3 tests
     Run Keyword        Install aws cli
     Run Keyword if    '${OZONE_S3_SET_CREDENTIALS}' == 'true'    Setup v4 headers
-    Run Keyword if    '${BUCKET}' == 'generated'                 Create buckets
-
-
-Put new object
-    [Arguments]         ${bucket}    ${key_prefix}
-
-    ${postfix} =        Generate Random String    5  [NUMBERS]
-    ${key} =            Set Variable              ${key_prefix}${postfix}
-
-                        Execute                   date > /tmp/copyfile
-    ${result} =         Execute AWSS3ApiCli       put-object --bucket ${bucket} --key ${key} --body /tmp/copyfile
-    ${result} =         Execute AWSS3ApiCli       list-objects --bucket ${bucket} --prefix ${key_prefix}
-                        Should contain            ${result}         ${key}
-
-    [Return]            ${key}
+    ${result} =        Execute And Ignore Error                  ozone sh volume create o3://${OM_SERVICE_ID}/s3v
+                       Should not contain                        ${result}          Failed
+    ${BUCKET} =        Run Keyword if                            '${BUCKET}' == 'generated'                 Create bucket
+    ...                ELSE                                      Set Variable    ${BUCKET}
+                       Set Suite Variable                        ${BUCKET}

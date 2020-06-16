@@ -26,21 +26,13 @@ Suite Setup         Setup s3 tests
 ${ENDPOINT_URL}       http://s3g:9878
 ${BUCKET}             generated
 
-*** Keywords ***
-
-Create bucket which already exists
-    [Arguments]    ${bucket}
-    Create bucket with name     ${bucket}
-
 *** Test Cases ***
 
 Create new bucket
     Create bucket
 
 Create bucket which already exists
-    [Template]     Create bucket which already exists
-    ${BUCKET}
-    ${BUCKET_LINK}
+    Create bucket with name     ${BUCKET}
 
 Create bucket with invalid bucket name
     ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket bucket_1   255
