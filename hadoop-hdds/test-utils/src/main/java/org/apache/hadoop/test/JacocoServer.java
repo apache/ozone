@@ -35,6 +35,9 @@ public final class JacocoServer {
 
   private static String destinationFile = "/tmp/jacoco-exec.combined";
 
+  private JacocoServer() {
+  }
+
   public static void main(String[] args) throws IOException {
     ExecutionDataWriter destination =
         new ExecutionDataWriter(new FileOutputStream(destinationFile));
@@ -59,7 +62,7 @@ public final class JacocoServer {
           reader.setSessionInfoVisitor(destination::visitSessionInfo);
           reader.setExecutionDataVisitor(destination::visitClassExecution);
           while (reader.read()) {
-
+            //read until the end of the stream.
           }
           destination.flush();
         } catch (Exception ex) {
