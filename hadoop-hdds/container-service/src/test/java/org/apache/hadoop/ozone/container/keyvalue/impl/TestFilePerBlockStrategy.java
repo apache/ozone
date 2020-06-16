@@ -53,7 +53,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
       BlockID blockID = getBlockID();
       chunkManager.writeChunk(container, blockID,
           getChunkInfo(), getData(), getDispatcherContext());
-      ChunkInfo chunkInfo = new ChunkInfo(String.format("%d.data.%d",
+      ChunkInfo chunkInfo = new ChunkInfo(String.format(getfileNamePattern(),
           blockID.getLocalID(), 0), 123, getChunkInfo().getLen());
 
       // WHEN

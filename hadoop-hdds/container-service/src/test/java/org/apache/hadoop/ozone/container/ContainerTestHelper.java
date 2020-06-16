@@ -85,7 +85,7 @@ public final class ContainerTestHelper {
    */
   public static ChunkInfo getChunk(long keyID, int seqNo, long offset,
       long len) {
-    return new ChunkInfo(String.format("%d.data.%d", keyID,
+    return new ChunkInfo(String.format("%d_data_%d", keyID,
         seqNo), offset, len);
   }
 

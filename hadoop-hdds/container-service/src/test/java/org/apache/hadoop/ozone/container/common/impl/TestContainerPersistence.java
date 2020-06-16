@@ -140,7 +140,7 @@ public class TestContainerPersistence {
     containerSet = new ContainerSet();
     volumeSet = new MutableVolumeSet(DATANODE_UUID, conf);
     blockManager = new BlockManagerImpl(conf);
-    chunkManager = ChunkManagerFactory.createChunkManager(conf);
+    chunkManager = ChunkManagerFactory.createChunkManager(conf, blockManager);
 
     for (String dir : conf.getStrings(ScmConfigKeys.HDDS_DATANODE_DIR_KEY)) {
       StorageLocation location = StorageLocation.parse(dir);
@@ -405,14 +405,17 @@ public class TestContainerPersistence {
 
     BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
     List<ChunkInfo> chunks = new ArrayList<>(chunkCount);
+    BlockData blockData = new BlockData(blockID);
     for (int x = 0; x < chunkCount; x++) {
-      ChunkInfo info = getChunk(blockID.getLocalID(), x, x * datalen, datalen);
+      ChunkInfo info = getChunk(blockID.getLocalID(), x + 1, x * datalen, datalen);
       ChunkBuffer data = getData(datalen);
       setDataChecksum(info, data);
       chunkManager.writeChunk(container, blockID, info, data,
           getDispatcherContext());
       chunks.add(info);
+      blockData.addChunk(info.getProtoBufMessage());
     }
+    blockManager.putBlock(container, blockData);
 
     KeyValueContainerData cNewData =
         (KeyValueContainerData) container.getContainerData();
@@ -484,7 +487,7 @@ public class TestContainerPersistence {
 
     BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
     ChunkInfo info = getChunk(
-        blockID.getLocalID(), 0, 0, datalen);
+        blockID.getLocalID(), 1, 0, datalen);
     ChunkBuffer data = getData(datalen);
     setDataChecksum(info, data);
     chunkManager.writeChunk(container, blockID, info, data,
