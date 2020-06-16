@@ -106,7 +106,7 @@ function ozonecmd_case
       # Corresponding Ratis issue https://issues.apache.org/jira/browse/RATIS-534.
       # TODO: Fix the problem related to netty resource leak detector throwing
       # exception as mentioned in HDDS-3812
-      HDDS_DN_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false -Dio.netty.noResourceLeakDetection=false -Dlog4j.configurationFile=${HADOOP_CONF_DIR}/dn-audit-log4j2.properties ${HDDS_DN_OPTS}"
+      HDDS_DN_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false -Dorg.apache.ratis.thirdparty.io.netty.leakDetection.level=disabled -Dlog4j.configurationFile=${HADOOP_CONF_DIR}/dn-audit-log4j2.properties ${HDDS_DN_OPTS}"
       HADOOP_OPTS="${HADOOP_OPTS} ${HDDS_DN_OPTS}"
       HADOOP_CLASSNAME=org.apache.hadoop.ozone.HddsDatanodeService
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-datanode"
