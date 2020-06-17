@@ -45,7 +45,7 @@ execute_robot_test scm s3
 execute_command_in_container scm ozone sh volume create /legacy
 execute_command_in_container scm ozone sh bucket create /legacy/source-bucket
 execute_command_in_container scm ozone sh bucket link /legacy/source-bucket /s3v/link
-execute_robot_test scm s3 -v BUCKET=link
+execute_robot_test scm -v BUCKET=link s3
 
 execute_robot_test scm recon
 
