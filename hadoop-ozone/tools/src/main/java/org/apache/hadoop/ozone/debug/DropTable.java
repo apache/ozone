@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.debug;
 
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
 import picocli.CommandLine;
 
@@ -35,39 +34,34 @@ import java.util.concurrent.Callable;
  */
 @CommandLine.Command(
         name = "drop_column_family",
-        aliases = "drop",
         description = "drop column family in db."
 )
 public class DropTable implements Callable<Void> {
 
+  @CommandLine.Option(names = {"--column_family"},
+      description = "Table name")
+  private String tableName;
+
   @CommandLine.ParentCommand
   private RDBParser parent;
 
-  @CommandLine.Option(names = {"-n", "--name"},
-      description = "column family name.")
-  private String name;
-
   @Override
   public Void call() throws Exception {
-    List<ColumnFamilyDescriptor> cfs = new ArrayList<>();
+    List<ColumnFamilyDescriptor> cfs =
+        RocksDBUtils.getColumnFamilyDescriptors(parent.getDbPath());
     final List<ColumnFamilyHandle> columnFamilyHandleList =
         new ArrayList<>();
-    List<byte[]> cfList = RocksDB.listColumnFamilies(new Options(),
-        parent.getDbPath());
-    byte[] nameByte = name.getBytes(StandardCharsets.UTF_8);
-    int deleteIndex = -1;
-    if (cfList != null) {
-      for (byte[] b : cfList) {
-        cfs.add(new ColumnFamilyDescriptor(b));
-        if (Arrays.equals(b, nameByte)) {
-          deleteIndex = cfs.size() - 1;
-        }
-      }
-    }
     try (RocksDB rocksDB = RocksDB.open(
         parent.getDbPath(), cfs, columnFamilyHandleList)) {
-      rocksDB.dropColumnFamily(
-          columnFamilyHandleList.get(deleteIndex));
+      byte[] nameBytes = tableName.getBytes(StandardCharsets.UTF_8);
+      ColumnFamilyHandle toBeDeletedCf = null;
+      for (ColumnFamilyHandle cf : columnFamilyHandleList) {
+        if (Arrays.equals(cf.getName(), nameBytes)) {
+          toBeDeletedCf = cf;
+          break;
+        }
+      }
+      rocksDB.dropColumnFamily(toBeDeletedCf);
     }
     return null;
   }

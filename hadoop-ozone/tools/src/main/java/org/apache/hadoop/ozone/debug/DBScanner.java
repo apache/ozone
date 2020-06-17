@@ -97,19 +97,12 @@ public class DBScanner implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    List<ColumnFamilyDescriptor> cfs = new ArrayList<>();
+    List<ColumnFamilyDescriptor> cfs =
+        RocksDBUtils.getColumnFamilyDescriptors(parent.getDbPath());
+
     final List<ColumnFamilyHandle> columnFamilyHandleList =
-            new ArrayList<>();
-    List<byte[]> cfList = null;
-    cfList = RocksDB.listColumnFamilies(new Options(),
-            parent.getDbPath());
-    if (cfList != null) {
-      for (byte[] b : cfList) {
-        cfs.add(new ColumnFamilyDescriptor(b));
-      }
-    }
-    RocksDB rocksDB = null;
-    rocksDB = RocksDB.openReadOnly(parent.getDbPath(),
+        new ArrayList<>();
+    RocksDB rocksDB = RocksDB.openReadOnly(parent.getDbPath(),
             cfs, columnFamilyHandleList);
     this.printAppropriateTable(columnFamilyHandleList,
            rocksDB, parent.getDbPath());
