@@ -142,6 +142,7 @@ public class TestXceiverClientGrpc {
         }
       };
       invokeXceiverClientGetBlock(client);
+      invokeXceiverClientGetBlock(client);
       invokeXceiverClientReadChunk(client);
       invokeXceiverClientReadSmallFile(client);
       Assert.assertEquals(1, seenDNs.size());
