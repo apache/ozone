@@ -266,7 +266,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     case FAILURE:
       ozoneManager.getMetrics().incNumCommitMultipartUploadPartFails();
       LOG.error("MultipartUpload Commit is failed for Key:{} in " +
-          "Volume/Bucket {}/{}", keyName, requestedVolume, requestedBucket, exception);
+          "Volume/Bucket {}/{}", keyName, requestedVolume, requestedBucket,
+          exception);
       break;
     default:
       LOG.error("Unrecognized Result for S3MultipartUploadCommitPartRequest: " +
