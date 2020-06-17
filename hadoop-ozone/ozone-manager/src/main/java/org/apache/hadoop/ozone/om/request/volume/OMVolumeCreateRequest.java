@@ -147,11 +147,12 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
 
       String dbVolumeKey = omMetadataManager.getVolumeKey(volume);
 
-      OmVolumeArgs dbVolumeArgs =
-          omMetadataManager.getVolumeTable().get(dbVolumeKey);
-
       UserVolumeInfo volumeList = null;
-      if (dbVolumeArgs == null) {
+      if (omMetadataManager.getVolumeTable().isExist(dbVolumeKey)) {
+        LOG.debug("volume:{} already exists", omVolumeArgs.getVolume());
+        throw new OMException("Volume already exists",
+            OMException.ResultCodes.VOLUME_ALREADY_EXISTS);
+      } else {
         String dbUserKey = omMetadataManager.getUserKey(owner);
         volumeList = omMetadataManager.getUserTable().get(dbUserKey);
         volumeList = addVolumeToOwnerList(volumeList, volume, owner,
@@ -164,20 +165,6 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
         omClientResponse = new OMVolumeCreateResponse(omResponse.build(),
             omVolumeArgs, volumeList);
         LOG.debug("volume:{} successfully created", omVolumeArgs.getVolume());
-      } else {
-        // Check if this transaction is a replay of ratis logs.
-        if (isReplay(ozoneManager, dbVolumeArgs, transactionLogIndex)) {
-          // Replay implies the response has already been returned to
-          // the client. So take no further action and return a dummy
-          // OMClientResponse.
-          LOG.debug("Replayed Transaction {} ignored. Request: {}",
-              transactionLogIndex, createVolumeRequest);
-          return new OMVolumeCreateResponse(createReplayOMResponse(omResponse));
-        } else {
-          LOG.debug("volume:{} already exists", omVolumeArgs.getVolume());
-          throw new OMException("Volume already exists",
-              OMException.ResultCodes.VOLUME_ALREADY_EXISTS);
-        }
       }
 
     } catch (IOException ex) {

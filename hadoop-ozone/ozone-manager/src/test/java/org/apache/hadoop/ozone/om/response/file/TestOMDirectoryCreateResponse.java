@@ -36,6 +36,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import java.util.ArrayList;
 import java.util.UUID;
 
 /**
@@ -75,7 +76,7 @@ public class TestOMDirectoryCreateResponse {
             .build();
 
     OMDirectoryCreateResponse omDirectoryCreateResponse =
-        new OMDirectoryCreateResponse(omResponse, omKeyInfo, null);
+        new OMDirectoryCreateResponse(omResponse, omKeyInfo, new ArrayList<>());
 
     omDirectoryCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
 

@@ -48,17 +48,15 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
   private List<OmKeyInfo> parentKeyInfos;
 
   public OMDirectoryCreateResponse(@Nonnull OMResponse omResponse,
-      @Nullable OmKeyInfo dirKeyInfo,
-      @Nullable List<OmKeyInfo> parentKeyInfos) {
-
+      @Nonnull OmKeyInfo dirKeyInfo,
+      @Nonnull List<OmKeyInfo> parentKeyInfos) {
     super(omResponse);
     this.dirKeyInfo = dirKeyInfo;
     this.parentKeyInfos = parentKeyInfos;
   }
 
   /**
-   * For when the request is not successful or it is a replay transaction or
-   * the directory already exists.
+   * For when the request is not successful or the directory already exists.
    */
   public OMDirectoryCreateResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
@@ -68,29 +66,20 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
   protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    if (dirKeyInfo != null) {
-      if (parentKeyInfos != null) {
-        for (OmKeyInfo parentKeyInfo : parentKeyInfos) {
-          String parentKey = omMetadataManager
-              .getOzoneDirKey(parentKeyInfo.getVolumeName(),
-                  parentKeyInfo.getBucketName(), parentKeyInfo.getKeyName());
-          LOG.debug("putWithBatch parent : key {} info : {}", parentKey,
-              parentKeyInfo);
-          omMetadataManager.getKeyTable()
-              .putWithBatch(batchOperation, parentKey, parentKeyInfo);
-        }
-      }
-
-      String dirKey = omMetadataManager.getOzoneKey(dirKeyInfo.getVolumeName(),
-          dirKeyInfo.getBucketName(), dirKeyInfo.getKeyName());
-      omMetadataManager.getKeyTable().putWithBatch(batchOperation, dirKey,
-          dirKeyInfo);
-
-    } else {
-      // When directory already exists, we don't add it to cache. And it is
-      // not an error, in this case dirKeyInfo will be null.
-      LOG.debug("Response Status is OK, dirKeyInfo is null in " +
-          "OMDirectoryCreateResponse");
+    // Add all parent keys to batch.
+    for (OmKeyInfo parentKeyInfo : parentKeyInfos) {
+      String parentKey = omMetadataManager
+          .getOzoneDirKey(parentKeyInfo.getVolumeName(),
+              parentKeyInfo.getBucketName(), parentKeyInfo.getKeyName());
+      LOG.debug("putWithBatch parent : key {} info : {}", parentKey,
+          parentKeyInfo);
+      omMetadataManager.getKeyTable()
+          .putWithBatch(batchOperation, parentKey, parentKeyInfo);
     }
+
+    String dirKey = omMetadataManager.getOzoneKey(dirKeyInfo.getVolumeName(),
+          dirKeyInfo.getBucketName(), dirKeyInfo.getKeyName());
+    omMetadataManager.getKeyTable().putWithBatch(batchOperation, dirKey,
+        dirKeyInfo);
   }
 }

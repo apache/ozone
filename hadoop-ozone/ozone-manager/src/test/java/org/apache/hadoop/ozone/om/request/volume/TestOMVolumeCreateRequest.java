@@ -244,30 +244,4 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     Assert.assertNotEquals(original.getModificationTime(),
         updated.getModificationTime());
   }
-
-  @Test
-  public void testReplayRequest() throws Exception {
-
-    String volumeName = UUID.randomUUID().toString();
-    String adminName = "user1";
-    String ownerName = "user1";
-    OMRequest originalRequest = createVolumeRequest(volumeName, adminName,
-        ownerName);
-    OMVolumeCreateRequest omVolumeCreateRequest =
-        new OMVolumeCreateRequest(originalRequest);
-
-    // Execute the original request
-    omVolumeCreateRequest.preExecute(ozoneManager);
-    omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-        ozoneManagerDoubleBufferHelper);
-
-    // Replay the transaction - Execute the same request again
-    OMClientResponse omClientResponse =
-        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
-
-    // Replay should result in Replay response
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
-        omClientResponse.getOMResponse().getStatus());
-  }
 }
