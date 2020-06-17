@@ -315,7 +315,7 @@ public class TestRDBStore {
       for (int i = 0; i < 50; i++) {
         Assert.assertFalse(db.keyMayExist(
             org.apache.commons.codec.binary.StringUtils
-                .getBytesUtf16("key" + i), new StringBuilder()));
+                .getBytesUtf16("key" + i), null));
       }
       end = System.nanoTime();
       long keyMayExistLatency = end - start;
