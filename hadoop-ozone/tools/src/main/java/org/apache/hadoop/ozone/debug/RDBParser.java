@@ -29,7 +29,8 @@ import picocli.CommandLine;
         description = "Parse rocksdb file content",
         subcommands = {
                 DBScanner.class,
-                ListTables.class
+                ListTables.class,
+                DropTable.class
         })
 public class RDBParser extends GenericCli {
 
