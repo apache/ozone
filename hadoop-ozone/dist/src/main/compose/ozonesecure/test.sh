@@ -35,6 +35,12 @@ execute_robot_test scm ozonefs/ozonefs.robot
 
 execute_robot_test s3g s3
 
+execute_command_in_container scm ozone sh volume create /legacy
+execute_command_in_container scm ozone sh bucket create /legacy/source-bucket
+# /s3v is already created in 's3' tests above
+execute_command_in_container scm ozone sh bucket link /legacy/source-bucket /s3v/link
+execute_robot_test s3g -v BUCKET=link s3
+
 execute_robot_test scm admincli
 
 execute_robot_test scm recon
