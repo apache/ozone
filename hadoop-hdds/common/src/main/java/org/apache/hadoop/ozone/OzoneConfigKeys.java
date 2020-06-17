@@ -281,15 +281,7 @@ public final class OzoneConfigKeys {
 
   public static final String DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR =
       "dfs.container.ratis.datanode.storage.dir";
-  public static final String DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY =
-      ScmConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY;
-  public static final int DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_DEFAULT =
-      ScmConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_DEFAULT;
-  public static final String DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_KEY =
-      ScmConfigKeys.DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_KEY;
-  public static final TimeDuration
-      DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_DEFAULT =
-      ScmConfigKeys.DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_DEFAULT;
+
   public static final String DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY =
       ScmConfigKeys.DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY;
   public static final TimeDuration
