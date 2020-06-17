@@ -19,7 +19,6 @@
 #
 # Test executor to test all the compose/*/test.sh test scripts.
 #
-set -x
 SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
 ALL_RESULT_DIR="$SCRIPT_DIR/result"
 PROJECT_DIR="$SCRIPT_DIR/.."
