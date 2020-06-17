@@ -424,7 +424,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     if (!isStarted) {
       LOG.info("Starting {} {} at port {}", getClass().getSimpleName(),
           server.getId(), getIPCPort());
-      LOG.info(" Ratis log dir is {}", HddsServerUtil.getOzoneDatanodeRatisDirectory(conf));
       for (ThreadPoolExecutor executor : chunkExecutors) {
         executor.prestartAllCoreThreads();
       }
@@ -455,7 +454,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       try {
         // shutdown server before the executors as while shutting down,
         // some of the tasks would be executed using the executors.
-        LOG.info(" Ratis log dir is {}", HddsServerUtil.getOzoneDatanodeRatisDirectory(conf));
         server.close();
         for (ExecutorService executor : chunkExecutors) {
           executor.shutdown();
