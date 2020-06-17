@@ -194,20 +194,20 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
             bucketName, Optional.of(dirKeyInfo),
             Optional.of(missingParentInfos), trxnLogIndex);
-
-        omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
-            dirKeyInfo, missingParentInfos);
         result = Result.SUCCESS;
+        omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
+            dirKeyInfo, missingParentInfos, result);
       } else {
         // omDirectoryResult == DIRECTORY_EXITS
         result = Result.DIRECTORY_ALREADY_EXISTS;
         omResponse.setStatus(Status.DIRECTORY_ALREADY_EXISTS);
-        omClientResponse = new OMDirectoryCreateResponse(omResponse.build());
+        omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
+            result);
       }
     } catch (IOException ex) {
       exception = ex;
       omClientResponse = new OMDirectoryCreateResponse(
-          createErrorOMResponse(omResponse, exception));
+          createErrorOMResponse(omResponse, exception), result);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
