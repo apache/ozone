@@ -146,7 +146,6 @@ public class TestOzoneManagerListVolumes {
   private void checkUser(MiniOzoneCluster cluster, UserGroupInformation user,
       List<String> expectVol, boolean expectListAllSuccess) throws IOException {
 
-    UserGroupInformation.setLoginUser(user);
     OzoneClient client = cluster.getClient();
     ObjectStore objectStore = client.getObjectStore();
 
