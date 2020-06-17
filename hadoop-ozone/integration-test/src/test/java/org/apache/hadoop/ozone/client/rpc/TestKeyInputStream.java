@@ -93,8 +93,8 @@ public class TestKeyInputStream {
    */
   @Before
   public void init() throws Exception {
-    chunkSize = 1024 * 1024 * 4;
-    flushSize = 4 * chunkSize;
+    chunkSize = 256 * 1024 * 2;
+    flushSize = 2 * chunkSize;
     maxFlushSize = 2 * flushSize;
     blockSize = 2 * maxFlushSize;
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
@@ -103,6 +103,8 @@ public class TestKeyInputStream {
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 64,
         StorageUnit.MB);
     conf.set(ScmConfigKeys.OZONE_SCM_CHUNK_LAYOUT_KEY, chunkLayout.name());
+    conf.setStorageSize(
+        OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM, 256, StorageUnit.KB);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .setTotalPipelineNumLimit(5)
@@ -359,7 +361,7 @@ public class TestKeyInputStream {
         ReplicationType.RATIS, 0, objectStore, volumeName, bucketName);
 
     // write data spanning multiple chunks
-    int dataLength = (2 * chunkSize) + (chunkSize / 2);
+    int dataLength = 2 * blockSize + (blockSize / 2);
     byte[] originData = new byte[dataLength];
     Random r = new Random();
     r.nextBytes(originData);
@@ -386,7 +388,8 @@ public class TestKeyInputStream {
             Arrays.copyOfRange(originData, totalRead, totalRead + numBytesRead);
         byte[] tmp2 =
             Arrays.copyOfRange(data, 0, numBytesRead);
-        Arrays.equals(tmp1, tmp2);
+        Assert.assertArrayEquals(tmp1, tmp2);
+        totalRead += numBytesRead;
       }
       keyInputStream.seek(0);
     }

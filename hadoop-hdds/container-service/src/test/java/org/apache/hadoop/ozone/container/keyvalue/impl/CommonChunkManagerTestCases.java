@@ -48,7 +48,7 @@ public abstract class CommonChunkManagerTestCases
       long randomLength = 200L;
       BlockID blockID = getBlockID();
       ChunkInfo chunkInfo = new ChunkInfo(
-          String.format(getfileNamePattern(), blockID.getLocalID(), 0),
+          String.format("%d.data.%d", blockID.getLocalID(), 0),
           0, randomLength);
 
       chunkManager.writeChunk(getKeyValueContainer(), blockID, chunkInfo,
@@ -136,8 +136,8 @@ public abstract class CommonChunkManagerTestCases
           getChunkInfo(), getData(),
           getDispatcherContext());
       long randomLength = 200L;
-      ChunkInfo chunkInfo = new ChunkInfo(String.format(getfileNamePattern(),
-          getBlockID().getLocalID(), 1), 0, randomLength);
+      ChunkInfo chunkInfo = new ChunkInfo(String.format("%d.data.%d",
+          getBlockID().getLocalID(), 0), 0, randomLength);
 
       // WHEN
       chunkManager.deleteChunk(getKeyValueContainer(), getBlockID(),
@@ -182,8 +182,8 @@ public abstract class CommonChunkManagerTestCases
     BlockData blockData = new BlockData(blockID);
     // WHEN
     for (int i = 0; i< count; i++) {
-      ChunkInfo info = new ChunkInfo(
-          String.format(getfileNamePattern(), localID, i + 1), i * len, len);
+      ChunkInfo info = new ChunkInfo(String.format("%d.data.%d", localID, i),
+          i * len, len);
       chunkManager.writeChunk(container, blockID, info, data, context);
       rewindBufferToDataStart();
       blockData.addChunk(info.getProtoBufMessage());
@@ -196,8 +196,8 @@ public abstract class CommonChunkManagerTestCases
 
     // WHEN
     for (int i = 0; i< count; i++) {
-      ChunkInfo info = new ChunkInfo(
-          String.format(getfileNamePattern(), localID, i + 1), i * len, len);
+      ChunkInfo info = new ChunkInfo(String.format("%d.data.%d", localID, i),
+          i * len, len);
       chunkManager.readChunk(container, blockID, info, context);
     }
 

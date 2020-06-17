@@ -64,7 +64,6 @@ public abstract class AbstractTestChunkManager {
   private ByteBuffer data;
   private byte[] header;
   private BlockManager blockManager;
-  private final String chunkFileNamePattern = "%d_data_%d";
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -110,8 +109,8 @@ public abstract class AbstractTestChunkManager {
 
     // Creating BlockData
     blockID = new BlockID(1L, 1L);
-    chunkInfo = new ChunkInfo(String.format(chunkFileNamePattern, blockID
-        .getLocalID(), 1), 0, bytes.length);
+    chunkInfo = new ChunkInfo(String.format("%d.data.%d", blockID
+        .getLocalID(), 0), 0, bytes.length);
   }
 
   protected DispatcherContext getDispatcherContext() {
@@ -173,9 +172,5 @@ public abstract class AbstractTestChunkManager {
 
   protected BlockManager getBlockManager() {
     return blockManager;
-  }
-
-  protected String getfileNamePattern() {
-    return chunkFileNamePattern;
   }
 }
