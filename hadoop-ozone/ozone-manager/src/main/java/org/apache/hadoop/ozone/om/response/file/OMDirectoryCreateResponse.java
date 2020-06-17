@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.response.file;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest.Result;
 
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
