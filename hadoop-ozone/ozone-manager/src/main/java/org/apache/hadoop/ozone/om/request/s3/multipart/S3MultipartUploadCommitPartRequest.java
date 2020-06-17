@@ -202,7 +202,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
               .setPartName(partName));
       omClientResponse = new S3MultipartUploadCommitPartResponse(
           omResponse.build(), multipartKey, openKey,
-          multipartKeyInfo, oldPartKeyInfo, ozoneManager.isRatisEnabled());
+          multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
+          ozoneManager.isRatisEnabled());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -210,7 +211,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       exception = ex;
       omClientResponse = new S3MultipartUploadCommitPartResponse(
           createErrorOMResponse(omResponse, exception), multipartKey, openKey,
-          multipartKeyInfo, oldPartKeyInfo, ozoneManager.isRatisEnabled());
+          multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
+          ozoneManager.isRatisEnabled());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);

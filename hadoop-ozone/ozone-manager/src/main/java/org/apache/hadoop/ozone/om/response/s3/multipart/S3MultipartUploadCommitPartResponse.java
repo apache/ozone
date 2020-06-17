@@ -41,6 +41,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .Status.OK;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Response for S3MultipartUploadCommitPart request.
@@ -69,14 +70,16 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
    */
   public S3MultipartUploadCommitPartResponse(@Nonnull OMResponse omResponse,
       String multipartKey, String openKey,
-      @Nonnull OmMultipartKeyInfo omMultipartKeyInfo,
-      @Nonnull OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo,
+      @Nullable OmMultipartKeyInfo omMultipartKeyInfo,
+      @Nullable OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo,
+      @Nullable OmKeyInfo openPartKeyInfoToBeDeleted,
       boolean isRatisEnabled) {
     super(omResponse);
     this.multipartKey = multipartKey;
     this.openKey = openKey;
     this.omMultipartKeyInfo = omMultipartKeyInfo;
     this.oldPartKeyInfo = oldPartKeyInfo;
+    this.openPartKeyInfoToBeDeleted = openPartKeyInfoToBeDeleted;
     this.isRatisEnabled = isRatisEnabled;
   }
 
@@ -87,12 +90,12 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
     if (getOMResponse().getStatus() == NO_SUCH_MULTIPART_UPLOAD_ERROR) {
       // Means by the time we try to commit part, some one has aborted this
       // multipart upload. So, delete this part information.
+
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           omMetadataManager.getDeletedTable().get(openKey);
 
-      repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-          openPartKeyInfoToBeDeleted, repeatedOmKeyInfo,
-          openPartKeyInfoToBeDeleted.getUpdateID(), isRatisEnabled);
+      OmUtils.prepareKeyForDelete(openPartKeyInfoToBeDeleted,
+          repeatedOmKeyInfo, omMultipartKeyInfo.getUpdateID(), isRatisEnabled);
 
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
           openKey, repeatedOmKeyInfo);
