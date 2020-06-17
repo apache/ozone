@@ -38,6 +38,7 @@ public final class JacocoServer {
   private JacocoServer() {
   }
 
+  @SuppressWarnings("checkstyle:EmptyStatement")
   public static void main(String[] args) throws IOException {
     ExecutionDataWriter destination =
         new ExecutionDataWriter(new FileOutputStream(destinationFile));
@@ -62,7 +63,7 @@ public final class JacocoServer {
           reader.setSessionInfoVisitor(destination::visitSessionInfo);
           reader.setExecutionDataVisitor(destination::visitClassExecution);
           while (reader.read()) {
-            //read until the end of the stream.
+            ;//read until the end of the stream.
           }
           destination.flush();
         } catch (Exception ex) {
