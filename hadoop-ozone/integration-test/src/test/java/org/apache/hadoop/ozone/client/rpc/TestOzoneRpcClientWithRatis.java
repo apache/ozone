@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
@@ -50,7 +49,6 @@ import static org.junit.Assert.fail;
  * This class is to test all the public facing APIs of Ozone Client with an
  * active OM Ratis server.
  */
-@Ignore
 public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
   private static OzoneConfiguration conf;
   /**
