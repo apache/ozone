@@ -80,34 +80,6 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
     this.isRatisEnabled = isRatisEnabled;
   }
 
-  /**
-   * For the case when Multipart Upload does not exist (could have been
-   * aborted).
-   * 1. Put the partKeyInfo from openKeyTable into DeletedTable
-   * 2. Deleted openKey from OpenKeyTable
-   * @param omResponse
-   * @param openKey
-   * @param openPartKeyInfoToBeDeleted
-   */
-  public S3MultipartUploadCommitPartResponse(@Nonnull OMResponse omResponse,
-      String openKey, @Nonnull OmKeyInfo openPartKeyInfoToBeDeleted,
-      boolean isRatisEnabled) {
-    super(omResponse);
-    checkStatusNotOK();
-    this.openKey = openKey;
-    this.openPartKeyInfoToBeDeleted = openPartKeyInfoToBeDeleted;
-    this.isRatisEnabled = isRatisEnabled;
-  }
-
-  /**
-   * For when the request is not successful.
-   * For a successful request, the other constructor should be used.
-   */
-  public S3MultipartUploadCommitPartResponse(@Nonnull OMResponse omResponse) {
-    super(omResponse);
-    checkStatusNotOK();
-  }
-
   @Override
   public void checkAndUpdateDB(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {

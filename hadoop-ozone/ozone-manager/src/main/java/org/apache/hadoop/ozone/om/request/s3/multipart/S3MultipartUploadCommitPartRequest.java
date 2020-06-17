@@ -209,8 +209,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new S3MultipartUploadCommitPartResponse(
-          createErrorOMResponse(omResponse, exception), openKey, omKeyInfo,
-            ozoneManager.isRatisEnabled());
+          createErrorOMResponse(omResponse, exception), multipartKey, openKey,
+          multipartKeyInfo, oldPartKeyInfo, ozoneManager.isRatisEnabled());
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
