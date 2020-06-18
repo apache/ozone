@@ -15,6 +15,7 @@
 # limitations under the License.
 
 CORE-SITE.XML_fs.defaultFS=ofs://id1
+
 OZONE-SITE.XML_ozone.om.service.ids=id1
 OZONE-SITE.XML_ozone.om.nodes.id1=om1,om2,om3
 OZONE-SITE.XML_ozone.om.address.id1.om1=om1
