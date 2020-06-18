@@ -143,9 +143,7 @@ public class TestRootedOzoneFileSystem {
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
-    // Note: FileSystem#loadFileSystems won't load OFS class due to META-INF
-    //  hence this workaround.
-    conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
+    // fs.ofs.impl would be loaded from META-INF, no need to manually set it
     fs = FileSystem.get(conf);
     trash = new Trash(conf);
     ofs = (RootedOzoneFileSystem) fs;
@@ -163,10 +161,7 @@ public class TestRootedOzoneFileSystem {
   @Test
   public void testOzoneFsServiceLoader() throws IOException {
     OzoneConfiguration confTestLoader = new OzoneConfiguration();
-    // Note: FileSystem#loadFileSystems won't load OFS class due to META-INF
-    //  hence this workaround.
-    confTestLoader.set("fs.ofs.impl",
-        "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
+    // fs.ofs.impl should be loaded from META-INF, no need to explicitly set it
     Assert.assertEquals(FileSystem.getFileSystemClass(
         OzoneConsts.OZONE_OFS_URI_SCHEME, confTestLoader),
         RootedOzoneFileSystem.class);

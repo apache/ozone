@@ -99,12 +99,7 @@ class RootedOzoneContract extends AbstractFSContract {
         OzoneConsts.OZONE_OFS_URI_SCHEME,
         cluster.getOzoneManager().getRpcPort());
     getConf().set("fs.defaultFS", uri);
-
-    // Note: FileSystem#loadFileSystems doesn't load OFS class because
-    //  META-INF points to org.apache.hadoop.fs.ozone.OzoneFileSystem
-    getConf().set("fs.ofs.impl",
-        "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
-
+    // fs.ofs.impl should be loaded from META-INF, no need to explicitly set it
     copyClusterConfigs(OMConfigKeys.OZONE_OM_ADDRESS_KEY);
     copyClusterConfigs(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
     return FileSystem.get(getConf());
