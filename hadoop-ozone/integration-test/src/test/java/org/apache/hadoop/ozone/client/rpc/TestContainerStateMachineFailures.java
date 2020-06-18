@@ -261,7 +261,6 @@ public class TestContainerStateMachineFailures {
       // the cluster
       key.close();
     } catch(IOException ioe) {
-      Assert.assertTrue(ioe instanceof OMException);
     }
 
     long containerID = omKeyLocationInfo.getContainerID();
