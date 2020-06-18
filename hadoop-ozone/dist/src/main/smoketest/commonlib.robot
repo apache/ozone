@@ -19,9 +19,9 @@ Library             String
 Library             BuiltIn
 
 *** Variables ***
-${SECURITY_ENABLED}                 %{SECURITY_ENABLED}
-${OM_HA_PARAM}                      %{OM_HA_PARAM}
-${OM_SERVICE_ID}                    %{OM_SERVICE_ID}
+${SECURITY_ENABLED}  false
+${OM_HA_PARAM}       ${EMPTY}
+${OM_SERVICE_ID}     om
 
 *** Keywords ***
 Execute
