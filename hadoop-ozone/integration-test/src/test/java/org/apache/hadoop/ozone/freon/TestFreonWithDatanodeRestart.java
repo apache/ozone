@@ -85,6 +85,7 @@ public class TestFreonWithDatanodeRestart {
             RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
                     "watch.request.timeout",
             3, TimeUnit.SECONDS);
+    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 5);
     cluster = MiniOzoneCluster.newBuilder(conf)
       .setHbProcessorInterval(1000)
       .setHbInterval(1000)

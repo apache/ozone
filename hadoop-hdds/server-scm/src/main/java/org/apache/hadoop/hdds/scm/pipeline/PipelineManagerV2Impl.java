@@ -399,10 +399,6 @@ public final class PipelineManagerV2Impl implements PipelineManager {
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT,
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
-    Long pipelineRemoveTimeoutInMillis =
-        conf.getTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT,
-            ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT_DEFAULT,
-            TimeUnit.MILLISECONDS);
 
     List<Pipeline> candidates = stateManager.getPipelines(type, factor);
 
@@ -418,13 +414,9 @@ public final class PipelineManagerV2Impl implements PipelineManager {
         closePipeline(p, false);
       }
       // scrub pipelines who stay CLOSED for too long.
-      if (p.getPipelineState() == Pipeline.PipelineState.CLOSED &&
-          (currentTime.toEpochMilli() - p.getCreationTimestamp()
-              .toEpochMilli() >= pipelineRemoveTimeoutInMillis)) {
+      if (p.getPipelineState() == Pipeline.PipelineState.CLOSED) {
         LOG.info("Scrubbing pipeline: id: " + p.getId().toString() +
-            " since it stays at CLOSED stage for " +
-            Duration.between(currentTime, p.getCreationTimestamp())
-                .toMinutes() + " mins.");
+            " since it stays at CLOSED stage.");
         removePipeline(p);
       }
     }
