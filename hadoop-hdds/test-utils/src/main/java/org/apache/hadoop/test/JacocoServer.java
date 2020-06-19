@@ -33,7 +33,7 @@ public final class JacocoServer {
 
   private static int port = 6300;
 
-  private static String destinationFile = "/tmp/jacoco-exec.combined";
+  private static String destinationFile = "/tmp/jacoco-combined.exec";
 
   private JacocoServer() {
   }
