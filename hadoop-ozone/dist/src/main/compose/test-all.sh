@@ -46,13 +46,13 @@ for test in $(find "$SCRIPT_DIR" -name test.sh | grep "${OZONE_TEST_SELECTOR:-""
       echo "ERROR: Test execution of $(dirname "$test") is FAILED!!!!"
   fi
   RESULT_DIR="$(dirname "$test")/result"
-  cp "$RESULT_DIR"/robot-*.xml "$RESULT_DIR"/docker-*.log "$RESULT_DIR"/*.out* "$RESULT_DIR"/*.exec "$ALL_RESULT_DIR"/
+  cp "$RESULT_DIR"/robot-*.xml "$RESULT_DIR"/docker-*.log "$RESULT_DIR"/*.out* "$ALL_RESULT_DIR"/
 done
 
 rebot -N "smoketests" -d "$SCRIPT_DIR/result" "$SCRIPT_DIR/result/robot-*.xml"
 if [ "$OZONE_WITH_COVERAGE" ]; then
-  cp /tmp/jacoco-combined.exec "$SCRIPT_DIR/result/"
   pkill -f JacocoServer
+  cp /tmp/jacoco-combined.exec "$SCRIPT_DIR"/result
 fi
 
 exit $RESULT
