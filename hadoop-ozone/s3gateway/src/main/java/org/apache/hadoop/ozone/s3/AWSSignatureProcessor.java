@@ -358,6 +358,11 @@ public class AWSSignatureProcessor implements SignatureProcessor {
     this.v4Header = v4Header;
   }
 
+  @VisibleForTesting
+  public void setV2Header(AuthorizationHeaderV2 v2Header) {
+    this.v2Header = v2Header;
+  }
+
   /**
    * A simple map which forces lower case key usage.
    */
