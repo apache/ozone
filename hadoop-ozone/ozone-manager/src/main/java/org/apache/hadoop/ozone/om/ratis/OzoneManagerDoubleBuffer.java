@@ -240,8 +240,6 @@ public final class OzoneManagerDoubleBuffer {
       try {
         if (canFlush()) {
           Map<String, List<Long>> cleanupEpochs = new HashMap<>();
-          omMetadataManager.listTableNames().forEach(tableName ->
-              cleanupEpochs.put(tableName, new ArrayList<>()));
 
           setReadyBuffer();
           List<Long> flushedEpochs = null;
@@ -401,14 +399,14 @@ public final class OzoneManagerDoubleBuffer {
 
   private void addCleanupEntry(DoubleBufferEntry entry, Map<String,
       List<Long>> cleanupEpochs) {
-    Class<? extends OMClientResponse > responseClass =
+    Class<? extends OMClientResponse> responseClass =
         entry.getResponse().getClass();
     CleanupTableInfo cleanupTableInfo =
         responseClass.getAnnotation(CleanupTableInfo.class);
     if (cleanupTableInfo != null) {
       String[] cleanupTables = cleanupTableInfo.cleanupTables();
       for (String table : cleanupTables) {
-        cleanupEpochs.get(table)
+        cleanupEpochs.computeIfAbsent(table, list -> new ArrayList<>())
             .add(entry.getTrxLogIndex());
       }
     } else {
@@ -423,10 +421,8 @@ public final class OzoneManagerDoubleBuffer {
 
   private void cleanupCache(Map<String, List<Long>> cleanupEpochs) {
     cleanupEpochs.forEach((tableName, epochs) -> {
-      if (!epochs.isEmpty()) {
         Collections.sort(epochs);
         omMetadataManager.getTable(tableName).cleanupCache(epochs);
-      }
     });
   }
 
