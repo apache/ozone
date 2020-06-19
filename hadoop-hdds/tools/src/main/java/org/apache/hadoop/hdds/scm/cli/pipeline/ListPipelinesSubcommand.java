@@ -21,9 +21,11 @@ package org.apache.hadoop.hdds.scm.cli.pipeline;
 import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import picocli.CommandLine;
 
 import java.util.concurrent.Callable;
+import java.util.stream.Stream;
 
 /**
  * Handler of list pipelines command.
