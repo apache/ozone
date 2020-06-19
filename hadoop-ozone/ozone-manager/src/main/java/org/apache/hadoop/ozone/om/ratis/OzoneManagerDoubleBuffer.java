@@ -421,8 +421,8 @@ public final class OzoneManagerDoubleBuffer {
 
   private void cleanupCache(Map<String, List<Long>> cleanupEpochs) {
     cleanupEpochs.forEach((tableName, epochs) -> {
-        Collections.sort(epochs);
-        omMetadataManager.getTable(tableName).cleanupCache(epochs);
+      Collections.sort(epochs);
+      omMetadataManager.getTable(tableName).cleanupCache(epochs);
     });
   }
 
