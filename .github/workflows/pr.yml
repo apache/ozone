@@ -172,7 +172,7 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           path: target/artifacts
-      - run: ./.github/coverage-report.sh
+      - run: ./hadoop-ozone/dev-support/checks/coverage.sh
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v1
         with:
