@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -30,8 +31,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
 import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
 
@@ -41,10 +40,8 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 /**
  * Response for DeleteKey request.
  */
+@CleanupTableInfo(cleanupTables = {KEY_TABLE, DELETED_TABLE})
 public class OMKeyDeleteResponse extends OMClientResponse {
-
-  private static final List<String> OPERATED_TABLES =
-      Arrays.asList(KEY_TABLE, DELETED_TABLE);
 
   private OmKeyInfo omKeyInfo;
   private boolean isRatisEnabled;
@@ -117,10 +114,5 @@ public class OMKeyDeleteResponse extends OMClientResponse {
       }
     }
     return true;
-  }
-
-  @Override
-  public List<String> operatedTables() {
-    return OPERATED_TABLES;
   }
 }

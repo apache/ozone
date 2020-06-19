@@ -19,11 +19,10 @@
 package org.apache.hadoop.ozone.om.response.volume;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -40,10 +39,8 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 /**
  * Response for set owner request.
  */
+@CleanupTableInfo(cleanupTables = {VOLUME_TABLE})
 public class OMVolumeSetOwnerResponse extends OMClientResponse {
-
-  private static final List<String> OPERATED_TABLES =
-      Arrays.asList(VOLUME_TABLE);
   private String oldOwner;
   private UserVolumeInfo oldOwnerVolumeList;
   private UserVolumeInfo newOwnerVolumeList;
@@ -106,10 +103,5 @@ public class OMVolumeSetOwnerResponse extends OMClientResponse {
         omMetadataManager.getVolumeKey(newOwnerVolumeArgs.getVolume());
     omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
         dbVolumeKey, newOwnerVolumeArgs);
-  }
-
-  @Override
-  public List<String> operatedTables() {
-    return OPERATED_TABLES;
   }
 }

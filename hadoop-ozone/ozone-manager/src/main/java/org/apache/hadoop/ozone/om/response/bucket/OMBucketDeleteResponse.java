@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
@@ -35,6 +36,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 /**
  * Response for DeleteBucket request.
  */
+@CleanupTableInfo(cleanupTables = {BUCKET_TABLE})
 public final class OMBucketDeleteResponse extends OMClientResponse {
 
   private static final List<String> OPERATED_TABLES =
@@ -75,11 +77,6 @@ public final class OMBucketDeleteResponse extends OMClientResponse {
 
   public String getBucketName() {
     return bucketName;
-  }
-
-  @Override
-  public List<String> operatedTables() {
-    return OPERATED_TABLES;
   }
 
 }

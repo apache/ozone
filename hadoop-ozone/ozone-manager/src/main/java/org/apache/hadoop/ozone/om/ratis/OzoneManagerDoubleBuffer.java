@@ -37,6 +37,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -390,16 +391,35 @@ public final class OzoneManagerDoubleBuffer {
         opName.toLowerCase().contains(BUCKET)) {
       if (DeleteBucket.name().equals(opName)
           || DeleteVolume.name().equals(opName)) {
-        entry.getResponse().operatedTables().forEach(
-            table -> cleanupEpochs.get(table)
-                .add(entry.getTrxLogIndex()));
+        addCleanupEntry(entry, cleanupEpochs);
       }
     } else {
-      entry.getResponse().operatedTables().forEach(
-          table -> cleanupEpochs.get(table)
-              .add(entry.getTrxLogIndex()));
+      addCleanupEntry(entry, cleanupEpochs);
     }
   }
+
+
+  private void addCleanupEntry(DoubleBufferEntry entry, Map<String,
+      List<Long>> cleanupEpochs) {
+    Class<? extends OMClientResponse > responseClass =
+        entry.getResponse().getClass();
+    CleanupTableInfo cleanupTableInfo =
+        responseClass.getAnnotation(CleanupTableInfo.class);
+    if (cleanupTableInfo != null) {
+      String[] cleanupTables = cleanupTableInfo.cleanupTables();
+      for (String table : cleanupTables) {
+        cleanupEpochs.get(table)
+            .add(entry.getTrxLogIndex());
+      }
+    } else {
+      // This is to catch early errors, when an new response class missed to
+      // add CleanupTableInfo annotation.
+      throw new RuntimeException("CleanupTableInfo Annotation is missing " +
+          "for" + responseClass);
+    }
+  }
+
+
 
   private void cleanupCache(Map<String, List<Long>> cleanupEpochs) {
     cleanupEpochs.forEach((tableName, epochs) -> {

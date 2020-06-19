@@ -21,24 +21,21 @@ package org.apache.hadoop.ozone.om.response.volume;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 
 /**
  * Response for om volume acl operation request.
  */
+@CleanupTableInfo(cleanupTables = {VOLUME_TABLE})
 public class OMVolumeAclOpResponse extends OMClientResponse {
-
-  private static final List<String> OPERATED_TABLES =
-      Arrays.asList(VOLUME_TABLE);
 
   private OmVolumeArgs omVolumeArgs;
 
@@ -69,11 +66,6 @@ public class OMVolumeAclOpResponse extends OMClientResponse {
   @VisibleForTesting
   public OmVolumeArgs getOmVolumeArgs() {
     return omVolumeArgs;
-  }
-
-  @Override
-  public List<String> operatedTables() {
-    return OPERATED_TABLES;
   }
 }
 

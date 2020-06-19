@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.file;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
@@ -30,7 +31,6 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
@@ -38,12 +38,12 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 /**
  * Response for create directory request.
  */
+@CleanupTableInfo(cleanupTables = {KEY_TABLE})
 public class OMDirectoryCreateResponse extends OMClientResponse {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(OMDirectoryCreateResponse.class);
 
-  private static final List<String> OPERATED_TABLES = Arrays.asList(KEY_TABLE);
   private OmKeyInfo dirKeyInfo;
   private List<OmKeyInfo> parentKeyInfos;
 
@@ -92,10 +92,5 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
       LOG.debug("Response Status is OK, dirKeyInfo is null in " +
           "OMDirectoryCreateResponse");
     }
-  }
-
-  @Override
-  public List<String> operatedTables() {
-    return OPERATED_TABLES;
   }
 }

@@ -91,12 +91,5 @@ public abstract class OMClientResponse {
     return flushFuture;
   }
 
-  /**
-   * List of tables affected by this operation. This information will be used
-   * during cleanup table cache.
-   * @return list of table names.
-   */
-  public abstract List<String> operatedTables();
-
 }
 

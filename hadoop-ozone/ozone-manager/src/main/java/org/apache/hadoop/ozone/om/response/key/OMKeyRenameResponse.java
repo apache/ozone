@@ -21,14 +21,13 @@ package org.apache.hadoop.ozone.om.response.key;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
 import javax.annotation.Nonnull;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
@@ -36,10 +35,8 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 /**
  * Response for RenameKey request.
  */
+@CleanupTableInfo(cleanupTables = {KEY_TABLE})
 public class OMKeyRenameResponse extends OMClientResponse {
-
-  private static final List<String> OPERATED_TABLES =
-      Arrays.asList(KEY_TABLE);
 
   private String fromKeyName;
   private String toKeyName;
@@ -111,10 +108,5 @@ public class OMKeyRenameResponse extends OMClientResponse {
   @VisibleForTesting
   public boolean createToKeyAndDeleteFromKey() {
     return toKeyName != null && !toKeyName.equals(fromKeyName);
-  }
-
-  @Override
-  public List<String> operatedTables() {
-    return OPERATED_TABLES;
   }
 }

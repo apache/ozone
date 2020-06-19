@@ -19,13 +19,12 @@
 package org.apache.hadoop.ozone.om.response.key.acl;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
 
 import javax.annotation.Nonnull;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
@@ -36,10 +35,8 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 /**
  * Response for Bucket acl request.
  */
+@CleanupTableInfo(cleanupTables = KEY_TABLE)
 public class OMKeyAclResponse extends OMClientResponse {
-
-  private static final List<String> OPERATED_TABLES =
-      Arrays.asList(KEY_TABLE);
 
   private OmKeyInfo omKeyInfo;
 
@@ -65,11 +62,6 @@ public class OMKeyAclResponse extends OMClientResponse {
         omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
     omMetadataManager.getKeyTable().putWithBatch(batchOperation, dbKey,
         omKeyInfo);
-  }
-
-  @Override
-  public List<String> operatedTables() {
-    return OPERATED_TABLES;
   }
 
 }

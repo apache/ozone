@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -30,8 +31,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.MULTIPARTINFO_TABLE;
@@ -46,10 +45,9 @@ import javax.annotation.Nonnull;
 /**
  * Response for S3MultipartUploadCommitPart request.
  */
+@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, DELETED_TABLE,
+    MULTIPARTINFO_TABLE})
 public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
-
-  private static final List<String> OPERATED_TABLES =
-      Arrays.asList(OPEN_KEY_TABLE, DELETED_TABLE, MULTIPARTINFO_TABLE);
 
   private String multipartKey;
   private String openKey;
@@ -169,11 +167,5 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
     omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
         openKey);
   }
-
-  @Override
-  public List<String> operatedTables() {
-    return OPERATED_TABLES;
-  }
-
 }
 

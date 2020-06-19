@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.response.security;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -29,18 +30,14 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELEGATION_TOKEN_TABLE;
 
 /**
  * Handle response for RenewDelegationToken request.
  */
+@CleanupTableInfo(cleanupTables = {DELEGATION_TOKEN_TABLE})
 public class OMRenewDelegationTokenResponse extends OMClientResponse {
-
-  private static final List<String> OPERATED_TABLES =
-      Arrays.asList(DELEGATION_TOKEN_TABLE);
   private OzoneTokenIdentifier ozoneTokenIdentifier;
   private long renewTime = -1L;
 
@@ -59,11 +56,6 @@ public class OMRenewDelegationTokenResponse extends OMClientResponse {
     if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
       table.putWithBatch(batchOperation, ozoneTokenIdentifier, renewTime);
     }
-  }
-
-  @Override
-  public List<String> operatedTables() {
-    return OPERATED_TABLES;
   }
 
 }

@@ -23,6 +23,7 @@ import java.util.List;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
@@ -35,6 +36,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 /**
  * Response for SetBucketProperty request.
  */
+@CleanupTableInfo(cleanupTables = {BUCKET_TABLE})
 public class OMBucketSetPropertyResponse extends OMClientResponse {
   private OmBucketInfo omBucketInfo;
 
@@ -65,11 +67,6 @@ public class OMBucketSetPropertyResponse extends OMClientResponse {
             omBucketInfo.getBucketName());
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
         dbBucketKey, omBucketInfo);
-  }
-
-  @Override
-  public List<String> operatedTables() {
-    return OPERATED_TABLES;
   }
 
 }

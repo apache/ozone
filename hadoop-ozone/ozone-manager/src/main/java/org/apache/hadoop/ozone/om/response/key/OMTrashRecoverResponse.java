@@ -22,6 +22,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
@@ -38,10 +39,8 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 /**
  * Response for RecoverTrash request.
  */
+@CleanupTableInfo(cleanupTables = {KEY_TABLE})
 public class OMTrashRecoverResponse extends OMClientResponse {
-
-  private static final List<String> OPERATED_TABLES =
-      Arrays.asList(KEY_TABLE);
 
   private OmKeyInfo omKeyInfo;
 
@@ -67,11 +66,6 @@ public class OMTrashRecoverResponse extends OMClientResponse {
     /* TODO: trashKey should be updated to destinationBucket. */
     omMetadataManager.getKeyTable()
         .putWithBatch(batchOperation, trashKey, omKeyInfo);
-  }
-
-  @Override
-  public List<String> operatedTables() {
-    return OPERATED_TABLES;
   }
 
 }

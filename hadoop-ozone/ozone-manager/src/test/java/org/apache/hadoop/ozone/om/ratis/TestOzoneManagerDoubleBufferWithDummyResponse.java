@@ -19,8 +19,6 @@
 package org.apache.hadoop.ozone.om.ratis;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -183,11 +181,6 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
               omBucketInfo.getBucketName());
       omMetadataManager.getBucketTable().putWithBatch(batchOperation,
           dbBucketKey, omBucketInfo);
-    }
-
-    @Override
-    public List<String> operatedTables() {
-      return Arrays.asList(BUCKET_TABLE);
     }
   }
 }
