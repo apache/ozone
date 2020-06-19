@@ -101,6 +101,10 @@ Bucket list contains links
                         Should Contain              ${result}         link1
                         Should Contain              ${result}         dangling-link
 
+Bucket info shows source
+    ${result} =         Execute                     ozone sh bucket info ${target}/link1 | jq -r '.sourceVolume, .sourceBucket' | xargs
+                        Should Be Equal             ${result}    ${source} bucket1
+
 Source and target have separate ACLs
     Execute       ozone sh bucket addacl --acl user:user1:rwxy ${target}/link1
     Verify ACL    bucket    ${target}/link1      USER    user1    READ WRITE READ_ACL WRITE_ACL

@@ -608,7 +608,10 @@ public class RpcClient implements ClientProtocol {
         bucketInfo.getCreationTime(),
         bucketInfo.getMetadata(),
         bucketInfo.getEncryptionKeyInfo() != null ? bucketInfo
-            .getEncryptionKeyInfo().getKeyName() : null);
+            .getEncryptionKeyInfo().getKeyName() : null,
+        bucketInfo.getSourceVolume(),
+        bucketInfo.getSourceBucket()
+    );
   }
 
   @Override
@@ -628,7 +631,9 @@ public class RpcClient implements ClientProtocol {
         bucket.getCreationTime(),
         bucket.getMetadata(),
         bucket.getEncryptionKeyInfo() != null ? bucket
-            .getEncryptionKeyInfo().getKeyName() : null))
+            .getEncryptionKeyInfo().getKeyName() : null,
+        bucket.getSourceVolume(),
+        bucket.getSourceBucket()))
         .collect(Collectors.toList());
   }
 
