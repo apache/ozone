@@ -54,12 +54,16 @@ public class ListPipelinesSubcommand implements Callable<Void> {
   @Override
   public Void call() throws Exception {
     try (ScmClient scmClient = parent.getParent().createScmClient()) {
-      scmClient.listPipelines().stream()
-          .filter(p -> ((Strings.isNullOrEmpty(factor)
-              || (p.getFactor().toString().compareToIgnoreCase(factor) == 0))
-              && (Strings.isNullOrEmpty(state) || (p.getPipelineState()
-                  .toString().compareToIgnoreCase(state) == 0))))
-          .forEach(System.out::println);
+      Stream<Pipeline> stream = scmClient.listPipelines().stream();
+      if (!Strings.isNullOrEmpty(factor)) {
+        stream = stream.filter(
+            p -> p.getFactor().toString().compareToIgnoreCase(factor) == 0);
+      }
+      if (!Strings.isNullOrEmpty(state)) {
+        stream = stream.filter(p -> p.getPipelineState().toString()
+            .compareToIgnoreCase(state) == 0);
+      }
+      stream.forEach(System.out::println);
       return null;
     }
   }
