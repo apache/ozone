@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -164,6 +165,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
   /**
    * DummyCreatedBucket Response class used in testing.
    */
+  @CleanupTableInfo(cleanupTables = {BUCKET_TABLE})
   private static class OMDummyCreateBucketResponse extends OMClientResponse {
     private final OmBucketInfo omBucketInfo;
 

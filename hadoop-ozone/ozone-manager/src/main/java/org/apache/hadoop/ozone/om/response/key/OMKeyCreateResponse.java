@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
 import javax.annotation.Nonnull;
 

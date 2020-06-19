@@ -29,8 +29,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
 import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
 

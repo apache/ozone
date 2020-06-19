@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.response;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.common.base.Preconditions;

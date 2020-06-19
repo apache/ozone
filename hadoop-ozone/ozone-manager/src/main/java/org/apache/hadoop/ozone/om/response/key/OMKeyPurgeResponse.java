@@ -24,10 +24,8 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.checkerframework.checker.units.qual.C;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
 import javax.annotation.Nonnull;
 
