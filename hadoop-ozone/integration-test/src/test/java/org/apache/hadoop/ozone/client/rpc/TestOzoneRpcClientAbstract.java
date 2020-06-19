@@ -2731,7 +2731,8 @@ public abstract class TestOzoneRpcClientAbstract {
       Map<String, String> deletedKeyMetadata =
           deletedKeys.getOmKeyInfoList().get(0).getMetadata();
       Assert.assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_FLAG));
-      Assert.assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_SECRET));
+      Assert.assertFalse(
+          deletedKeyMetadata.containsKey(OzoneConsts.GDPR_SECRET));
       Assert.assertFalse(
           deletedKeyMetadata.containsKey(OzoneConsts.GDPR_ALGORITHM));
     }
