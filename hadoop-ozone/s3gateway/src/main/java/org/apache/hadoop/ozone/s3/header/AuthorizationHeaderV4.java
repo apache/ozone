@@ -35,8 +35,8 @@ import static java.time.temporal.ChronoUnit.DAYS;
 import static org.apache.commons.lang3.StringUtils.isEmpty;
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
-import static org.apache.hadoop.ozone.s3.AWSV4SignatureProcessor.AWS4_SIGNING_ALGORITHM;
-import static org.apache.hadoop.ozone.s3.AWSV4SignatureProcessor.DATE_FORMATTER;
+import static org.apache.hadoop.ozone.s3.AWSSignatureProcessor.AWS4_SIGNING_ALGORITHM;
+import static org.apache.hadoop.ozone.s3.AWSSignatureProcessor.DATE_FORMATTER;
 
 /**
  * S3 Authorization header.

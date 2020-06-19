@@ -26,7 +26,7 @@ import org.junit.Test;
 import java.time.LocalDate;
 
 import static java.time.temporal.ChronoUnit.DAYS;
-import static org.apache.hadoop.ozone.s3.AWSV4SignatureProcessor.DATE_FORMATTER;
+import static org.apache.hadoop.ozone.s3.AWSSignatureProcessor.DATE_FORMATTER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 

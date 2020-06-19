@@ -30,7 +30,7 @@ import org.apache.hadoop.ozone.s3.SignatureProcessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
-import static org.apache.hadoop.ozone.s3.AWSV4SignatureProcessor.DATE_FORMATTER;
+import static org.apache.hadoop.ozone.s3.AWSSignatureProcessor.DATE_FORMATTER;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;

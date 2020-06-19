@@ -76,7 +76,7 @@ public class TestAWSV4SignatureProcessor {
     Mockito.when(mock.getMethod()).thenReturn("GET");
     Mockito.when(mock.getUriInfo()).thenReturn(uriInfo);
 
-    AWSV4SignatureProcessor parser = new AWSV4SignatureProcessor() {
+    AWSSignatureProcessor parser = new AWSSignatureProcessor() {
       @Override
       void validateSignedHeader(String header, String headerValue)
           throws OS3Exception {
