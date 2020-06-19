@@ -31,16 +31,15 @@ execute_robot_test scm basic
 
 execute_robot_test scm security
 
-execute_robot_test scm -v SCHEME:ofs ozonefs/ozonefs.robot
-execute_robot_test scm -v SCHEME:o3fs ozonefs/ozonefs.robot
+for scheme in ofs o3fs; do
+  for bucket in link bucket; do
+    execute_robot_test scm -v SCHEME:${scheme} -v BUCKET_TYPE:${bucket} ozonefs/ozonefs.robot
+  done
+done
 
-execute_robot_test s3g s3
-
-execute_command_in_container scm ozone sh volume create /legacy
-execute_command_in_container scm ozone sh bucket create /legacy/source-bucket
-# /s3v is already created in 's3' tests above
-execute_command_in_container scm ozone sh bucket link /legacy/source-bucket /s3v/link
-execute_robot_test s3g -v BUCKET=link s3
+for bucket in link generated; do
+  execute_robot_test s3g -v BUCKET=${bucket} s3
+done
 
 execute_robot_test scm admincli
 

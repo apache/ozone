@@ -15,7 +15,6 @@
 
 *** Settings ***
 Resource            ../commonlib.robot
-Resource            ../commonlib.robot
 
 *** Variables ***
 ${OZONE_S3_HEADER_VERSION}     v4
@@ -37,6 +36,12 @@ Execute AWSS3Cli
     [Arguments]       ${command}
     ${output} =       Execute                     aws s3 --endpoint-url ${ENDPOINT_URL} ${command}
     [return]          ${output}
+
+Install aws cli
+    ${rc}              ${output} =                 Run And Return Rc And Output           which apt-get
+    Run Keyword if     '${rc}' == '0'              Install aws cli s3 debian
+    ${rc}              ${output} =                 Run And Return Rc And Output           yum --help
+    Run Keyword if     '${rc}' == '0'              Install aws cli s3 centos
 
 Install aws cli s3 centos
     Execute            sudo -E yum install -y awscli
@@ -88,6 +93,14 @@ Setup s3 tests
     Run Keyword if    '${OZONE_S3_SET_CREDENTIALS}' == 'true'    Setup v4 headers
     ${result} =        Execute And Ignore Error                  ozone sh volume create o3://${OM_SERVICE_ID}/s3v
                        Should not contain                        ${result}          Failed
-    ${BUCKET} =        Run Keyword if                            '${BUCKET}' == 'generated'                 Create bucket
+    ${BUCKET} =        Run Keyword if                            '${BUCKET}' == 'generated'            Create bucket
     ...                ELSE                                      Set Variable    ${BUCKET}
                        Set Suite Variable                        ${BUCKET}
+                       Run Keyword if                            '${BUCKET}' == 'link'                 Setup links for S3 tests
+
+Setup links for S3 tests
+    Return From Keyword If    Bucket Exists    o3://${OM_SERVICE_ID}/s3v/link
+    Execute            ozone sh volume create o3://${OM_SERVICE_ID}/legacy
+    Execute            ozone sh volume create o3://${OM_SERVICE_ID}/s3v
+    Execute            ozone sh bucket create o3://${OM_SERVICE_ID}/legacy/source-bucket
+    Execute            ozone sh bucket link o3://${OM_SERVICE_ID}/legacy/source-bucket o3://${OM_SERVICE_ID}/s3v/link

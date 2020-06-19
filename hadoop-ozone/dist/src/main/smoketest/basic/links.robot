@@ -17,6 +17,7 @@
 Documentation       Test bucket links via Ozone CLI
 Library             OperatingSystem
 Resource            ../commonlib.robot
+Resource            ../ozone-lib/shell.robot
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 Test Timeout        2 minute
 Suite Setup         Create volumes
@@ -77,11 +78,11 @@ Key create passthrough
                         Execute                     ozone sh bucket link ${source}/bucket1 ${target}/link1
                         Execute                     ozone sh bucket create ${source}/bucket1
                         Execute                     ozone sh key put ${target}/link1/key1 /etc/passwd
-                        Should Match Local File     ${target}/link1/key1    /etc/passwd
+                        Key Should Match Local File     ${target}/link1/key1    /etc/passwd
 
 Key read passthrough
                         Execute                     ozone sh key put ${source}/bucket1/key2 /opt/hadoop/NOTICE.txt
-                        Should Match Local File     ${source}/bucket1/key2    /opt/hadoop/NOTICE.txt
+                        Key Should Match Local File     ${source}/bucket1/key2    /opt/hadoop/NOTICE.txt
 
 Key list passthrough
     ${target_list} =    Execute                     ozone sh key list ${target}/link1 | jq -r '.name'
@@ -135,9 +136,9 @@ Loop in link chain is detected
                         Should Contain              ${result}    INTERNAL_ERROR
 
 Multiple links to same bucket are allowed
-                        Execute                     ozone sh bucket link ${source}/bucket1 ${target}/link3
-                        Execute                     ozone sh key put ${target}/link3/key3 /etc/group
-                        Should Match Local File     ${target}/link1/key3    /etc/group
+    Execute                         ozone sh bucket link ${source}/bucket1 ${target}/link3
+    Execute                         ozone sh key put ${target}/link3/key3 /etc/group
+    Key Should Match Local File     ${target}/link1/key3    /etc/group
 
 Source bucket not affected by deleting link
                         Execute                     ozone sh bucket delete ${target}/link1
