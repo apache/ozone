@@ -103,6 +103,10 @@
               {
                 "name": "GetContainerWithPipelineBatch",
                 "integer": 20
+              },
+              {
+                "name": "GetSafeModeRuleStatuses",
+                "integer": 21
               }
             ]
           },
@@ -250,6 +254,11 @@
                 "id": 25,
                 "name": "getContainerWithPipelineBatchRequest",
                 "type": "GetContainerWithPipelineBatchRequestProto"
+              },
+              {
+                "id": 26,
+                "name": "getSafeModeRuleStatusesRequest",
+                "type": "GetSafeModeRuleStatusesRequestProto"
               }
             ]
           },
@@ -386,6 +395,11 @@
                 "id": 25,
                 "name": "getContainerWithPipelineBatchResponse",
                 "type": "GetContainerWithPipelineBatchResponseProto"
+              },
+              {
+                "id": 26,
+                "name": "getSafeModeRuleStatusesResponse",
+                "type": "GetSafeModeRuleStatusesResponseProto"
               }
             ]
           },
@@ -497,6 +511,40 @@
                 "id": 2,
                 "name": "traceID",
                 "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "GetSafeModeRuleStatusesRequestProto"
+          },
+          {
+            "name": "SafeModeRuleStatusProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "ruleName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "validate",
+                "type": "bool"
+              },
+              {
+                "id": 3,
+                "name": "statusText",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "GetSafeModeRuleStatusesResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "safeModeRuleStatusesProto",
+                "type": "SafeModeRuleStatusProto",
+                "is_repeated": true
               }
             ]
           },
