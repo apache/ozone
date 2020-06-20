@@ -617,14 +617,12 @@ public final class HttpServer2 implements FilterContainer {
       conf.set(BIND_ADDRESS, hostName);
       org.apache.hadoop.conf.Configuration hadoopConf =
           LegacyHadoopConfigurationSource.asHadoopConfiguration(conf);
+      Map<String, String> filterConfig = getFilterConfigMap(hadoopConf,
+          authFilterConfigPrefix);
       for (FilterInitializer c : initializers) {
-        if (c instanceof AuthenticationFilterInitializer) {
-          if (securityEnabled) {
-            Map < String, String > filterConfig = getFilterConfigMap(
-                hadoopConf, authFilterConfigPrefix);
-            addFilter("authentication",
-                AuthenticationFilter.class.getName(), filterConfig);
-          }
+        if ((c instanceof AuthenticationFilterInitializer) && securityEnabled) {
+          addFilter("authentication",
+              AuthenticationFilter.class.getName(), filterConfig);
         } else {
           c.initFilter(this, hadoopConf);
         }
