@@ -2727,11 +2727,14 @@ public abstract class TestOzoneRpcClientAbstract {
         keyName);
     RepeatedOmKeyInfo deletedKeys =
         omMetadataManager.getDeletedTable().get(objectKey);
-    Map<String, String> deletedKeyMetadata =
-        deletedKeys.getOmKeyInfoList().get(0).getMetadata();
-    Assert.assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_FLAG));
-    Assert.assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_SECRET));
-    Assert.assertFalse(
-        deletedKeyMetadata.containsKey(OzoneConsts.GDPR_ALGORITHM));
+    if (deletedKeys != null) {
+      Map<String, String> deletedKeyMetadata =
+          deletedKeys.getOmKeyInfoList().get(0).getMetadata();
+      Assert.assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_FLAG));
+      Assert.assertFalse(
+          deletedKeyMetadata.containsKey(OzoneConsts.GDPR_SECRET));
+      Assert.assertFalse(
+          deletedKeyMetadata.containsKey(OzoneConsts.GDPR_ALGORITHM));
+    }
   }
 }
