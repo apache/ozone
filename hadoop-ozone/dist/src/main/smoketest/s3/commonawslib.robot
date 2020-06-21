@@ -15,6 +15,7 @@
 
 *** Settings ***
 Resource            ../commonlib.robot
+Resource            ../ozone-lib/shell.robot
 
 *** Variables ***
 ${OZONE_S3_HEADER_VERSION}     v4
@@ -99,8 +100,8 @@ Setup s3 tests
                        Run Keyword if                            '${BUCKET}' == 'link'                 Setup links for S3 tests
 
 Setup links for S3 tests
-    Return From Keyword If    Bucket Exists    o3://${OM_SERVICE_ID}/s3v/link
+    ${exists} =        Bucket Exists    o3://${OM_SERVICE_ID}/s3v/link
+    Return From Keyword If    ${exists}
     Execute            ozone sh volume create o3://${OM_SERVICE_ID}/legacy
-    Execute            ozone sh volume create o3://${OM_SERVICE_ID}/s3v
     Execute            ozone sh bucket create o3://${OM_SERVICE_ID}/legacy/source-bucket
     Execute            ozone sh bucket link o3://${OM_SERVICE_ID}/legacy/source-bucket o3://${OM_SERVICE_ID}/s3v/link
