@@ -246,14 +246,14 @@ class PipelineStateMap {
    *
    * @param type - ReplicationType
    * @param state - Required PipelineState
-   * @param excludeDns list of dns to exclude
+   * @param excludeDns dns to exclude
    * @param excludePipelines pipelines to exclude
    * @return List of pipelines with specified replication type,
    * replication factor and pipeline state
    */
   List<Pipeline> getPipelines(ReplicationType type, ReplicationFactor factor,
-      PipelineState state, Set<DatanodeDetails> excludeDns,
-      Set<PipelineID> excludePipelines) {
+      PipelineState state, Collection<DatanodeDetails> excludeDns,
+      Collection<PipelineID> excludePipelines) {
     Preconditions.checkNotNull(type, "Replication type cannot be null");
     Preconditions.checkNotNull(factor, "Replication factor cannot be null");
     Preconditions.checkNotNull(state, "Pipeline state cannot be null");

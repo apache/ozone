@@ -20,9 +20,9 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
-import java.util.Set;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -61,8 +61,8 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean,
       ReplicationFactor factor, Pipeline.PipelineState state);
 
   List<Pipeline> getPipelines(ReplicationType type, ReplicationFactor factor,
-      Pipeline.PipelineState state, Set<DatanodeDetails> excludeDns,
-      Set<PipelineID> excludePipelines);
+      Pipeline.PipelineState state, Collection<DatanodeDetails> excludeDns,
+      Collection<PipelineID> excludePipelines);
 
   void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID)
       throws IOException;

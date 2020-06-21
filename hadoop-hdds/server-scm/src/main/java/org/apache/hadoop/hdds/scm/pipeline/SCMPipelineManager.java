@@ -22,6 +22,7 @@ import javax.management.ObjectName;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -319,8 +320,8 @@ public class SCMPipelineManager implements PipelineManager {
   @Override
   public List<Pipeline> getPipelines(ReplicationType type,
       ReplicationFactor factor, Pipeline.PipelineState state,
-      Set<DatanodeDetails> excludeDns,
-      Set<PipelineID> excludePipelines) {
+      Collection<DatanodeDetails> excludeDns,
+      Collection<PipelineID> excludePipelines) {
     lock.readLock().lock();
     try {
       return stateManager

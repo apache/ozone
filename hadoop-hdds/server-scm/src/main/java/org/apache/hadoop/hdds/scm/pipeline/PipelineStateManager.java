@@ -27,9 +27,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
-import java.util.Set;
 
 /**
  * Manages the state of pipelines in SCM. All write operations like pipeline
@@ -81,8 +81,8 @@ public class PipelineStateManager {
   }
 
   List<Pipeline> getPipelines(ReplicationType type, ReplicationFactor factor,
-      PipelineState state, Set<DatanodeDetails> excludeDns,
-      Set<PipelineID> excludePipelines) {
+      PipelineState state, Collection<DatanodeDetails> excludeDns,
+      Collection<PipelineID> excludePipelines) {
     return pipelineStateMap
         .getPipelines(type, factor, state, excludeDns, excludePipelines);
   }
