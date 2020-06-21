@@ -42,7 +42,7 @@ done
 execute_robot_test scm security/ozone-secure-token.robot
 
 for bucket in link generated; do
-  execute_robot_test scm -v BUCKET=${bucket} s3
+  execute_robot_test scm -v BUCKET:${bucket} s3
 done
 
 execute_robot_test scm recon

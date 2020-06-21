@@ -38,7 +38,7 @@ for scheme in ofs o3fs; do
 done
 
 for bucket in link generated; do
-  execute_robot_test s3g -v BUCKET=${bucket} s3
+  execute_robot_test s3g -v BUCKET:${bucket} s3
 done
 
 execute_robot_test scm admincli
