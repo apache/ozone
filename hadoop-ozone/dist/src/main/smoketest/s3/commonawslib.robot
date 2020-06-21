@@ -18,9 +18,10 @@ Resource            ../commonlib.robot
 Resource            ../ozone-lib/shell.robot
 
 *** Variables ***
+${ENDPOINT_URL}                http://s3g:9878
 ${OZONE_S3_HEADER_VERSION}     v4
 ${OZONE_S3_SET_CREDENTIALS}    true
-${BUCKET}                      bucket-999
+${BUCKET}                      generated
 
 *** Keywords ***
 Execute AWSS3APICli
