@@ -177,6 +177,7 @@ jobs:
     name: coverage
     runs-on: ubuntu-18.04
     needs:
+       - acceptance
        - integration
        - unit
     steps:
