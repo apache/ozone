@@ -60,15 +60,26 @@ public class ConfigurationSubCommand extends BaseInsightSubCommand
     return null;
   }
 
-  private void showConfig(Class clazz, Type type) {
+  protected void showConfig(Class clazz, Type type) {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.addResource(getHost(conf, new Component(type)) + "/conf");
+    printConfig(clazz, conf);
+  }
+
+  /**
+   * Print all the configuration annotated on the class or any superclass.
+   */
+  protected void printConfig(Class clazz, OzoneConfiguration conf) {
     ConfigGroup configGroup =
         (ConfigGroup) clazz.getAnnotation(ConfigGroup.class);
     if (configGroup == null) {
       return;
     }
+    printConfig(configGroup, clazz, conf);
+  }
 
+  private void printConfig(ConfigGroup configGroup, Class clazz,
+      OzoneConfiguration conf) {
     String prefix = configGroup.prefix();
 
     for (Field field : clazz.getDeclaredFields()) {
@@ -82,10 +93,12 @@ public class ConfigurationSubCommand extends BaseInsightSubCommand
         System.out.println(config.description());
         System.out.println();
         System.out.println();
-
+      }
+      final Class superclass = clazz.getSuperclass();
+      if (superclass != Object.class) {
+        printConfig(configGroup, superclass, conf);
       }
     }
-
   }
 
 }
