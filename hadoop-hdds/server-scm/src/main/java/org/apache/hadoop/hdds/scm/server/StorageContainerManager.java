@@ -1113,7 +1113,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Get the safe mode statuses of each rules.
+   * Get the safe mode status of all rules.
    *
    * @return map of rule statuses.
    */
