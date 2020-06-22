@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.utils;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.TimeUnit;
@@ -344,15 +346,16 @@ public final class HddsServerUtil {
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
   }
 
-  public static String getOzoneDatanodeRatisDirectory(
+  public static Collection<String> getOzoneDatanodeRatisDirectory(
       ConfigurationSource conf) {
-    String storageDir = conf.get(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR);
+    Collection<String> rawLocations = conf.getTrimmedStringCollection(
+            OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR);
 
-    if (Strings.isNullOrEmpty(storageDir)) {
-      storageDir = ServerUtils.getDefaultRatisDirectory(conf);
+    if (rawLocations.isEmpty()) {
+      rawLocations = new ArrayList<>(1);
+      rawLocations.add(ServerUtils.getDefaultRatisDirectory(conf));
     }
-    return storageDir;
+    return rawLocations;
   }
 
   /**

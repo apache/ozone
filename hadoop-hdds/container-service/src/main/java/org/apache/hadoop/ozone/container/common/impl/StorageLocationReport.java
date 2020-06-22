@@ -88,33 +88,37 @@ public final class StorageLocationReport implements
     return storageType;
   }
 
-
   private StorageTypeProto getStorageTypeProto() throws
-      IOException {
+          IOException {
+    return getStorageTypeProto(getStorageType());
+  }
+
+  public static StorageTypeProto getStorageTypeProto
+          (StorageType type) throws IOException {
     StorageTypeProto storageTypeProto;
-    switch (getStorageType()) {
-    case SSD:
-      storageTypeProto = StorageTypeProto.SSD;
-      break;
-    case DISK:
-      storageTypeProto = StorageTypeProto.DISK;
-      break;
-    case ARCHIVE:
-      storageTypeProto = StorageTypeProto.ARCHIVE;
-      break;
-    case PROVIDED:
-      storageTypeProto = StorageTypeProto.PROVIDED;
-      break;
-    case RAM_DISK:
-      storageTypeProto = StorageTypeProto.RAM_DISK;
-      break;
-    default:
-      throw new IOException("Illegal Storage Type specified");
+    switch (type) {
+      case SSD:
+        storageTypeProto = StorageTypeProto.SSD;
+        break;
+      case DISK:
+        storageTypeProto = StorageTypeProto.DISK;
+        break;
+      case ARCHIVE:
+        storageTypeProto = StorageTypeProto.ARCHIVE;
+        break;
+      case PROVIDED:
+        storageTypeProto = StorageTypeProto.PROVIDED;
+        break;
+      case RAM_DISK:
+        storageTypeProto = StorageTypeProto.RAM_DISK;
+        break;
+      default:
+        throw new IOException("Illegal Storage Type specified");
     }
     return storageTypeProto;
   }
 
-  private static StorageType getStorageType(StorageTypeProto proto) throws
+  public static StorageType getStorageType(StorageTypeProto proto) throws
       IOException {
     StorageType storageType;
     switch (proto) {

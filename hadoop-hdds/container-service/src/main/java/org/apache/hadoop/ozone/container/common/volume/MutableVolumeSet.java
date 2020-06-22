@@ -487,7 +487,7 @@ public class MutableVolumeSet implements VolumeSet {
     return ImmutableMap.copyOf(volumeStateMap);
   }
 
-  public StorageContainerDatanodeProtocolProtos.NodeReportProto getNodeReport()
+  public StorageLocationReport[] getStorageReport()
       throws IOException {
     boolean failed;
     this.readLock();
@@ -540,11 +540,7 @@ public class MutableVolumeSet implements VolumeSet {
         StorageLocationReport r = builder.build();
         reports[counter++] = r;
       }
-      NodeReportProto.Builder nrb = NodeReportProto.newBuilder();
-      for (int i = 0; i < reports.length; i++) {
-        nrb.addStorageReport(reports[i].getProtoBufMessage());
-      }
-      return nrb.build();
+      return reports;
     } finally {
       this.readUnlock();
     }
