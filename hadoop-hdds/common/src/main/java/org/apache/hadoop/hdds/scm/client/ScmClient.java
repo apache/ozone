@@ -213,7 +213,7 @@ public interface ScmClient extends Closeable {
   boolean inSafeMode() throws IOException;
 
   /**
-   * Get the safe mode statuses of each rules.
+   * Get the safe mode status of all rules.
    *
    * @return map of rule statuses.
    * @throws IOException
