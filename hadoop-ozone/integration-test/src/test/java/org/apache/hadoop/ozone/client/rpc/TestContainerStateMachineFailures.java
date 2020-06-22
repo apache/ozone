@@ -106,10 +106,6 @@ public class TestContainerStateMachineFailures {
   @Before
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    //path = GenericTestUtils
-    //    .getTempPath(TestContainerStateMachineFailures.class.getSimpleName());
-    // File baseDir = new File(path);
-    // baseDir.mkdirs();
     conf.setBoolean(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY, false);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
@@ -190,8 +186,8 @@ public class TestContainerStateMachineFailures {
     FileUtil.fullyDelete(new File(
             cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
                     .getContainer().getContainerSet()
-                    .getContainer(omKeyLocationInfo.getContainerID()).getContainerData()
-                    .getContainerPath()));
+                    .getContainer(omKeyLocationInfo.getContainerID()).
+                    getContainerData().getContainerPath()));
     try {
       // there is only 1 datanode in the pipeline, the pipeline will be closed
       // and allocation to new pipeline will fail as there is no other dn in
@@ -216,15 +212,15 @@ public class TestContainerStateMachineFailures {
 
     // restart the hdds datanode, container should not in the regular set
     OzoneConfiguration config = cluster.getHddsDatanodes().get(0).getConf();
-    final String dir = config.get
-            (OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR)
+    final String dir = config.get(OzoneConfigKeys.
+            DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR)
             + UUID.randomUUID();
     config.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
     cluster.restartHddsDatanode(0, true);
     ozoneContainer = cluster.getHddsDatanodes().get(0)
             .getDatanodeStateMachine().getContainer();
-    Assert
-            .assertNull(ozoneContainer.getContainerSet().getContainer(containerID));
+    Assert.assertNull(ozoneContainer.getContainerSet().
+                    getContainer(containerID));
   }
 
   @Test
@@ -277,8 +273,8 @@ public class TestContainerStateMachineFailures {
     assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
 
     OzoneConfiguration config = cluster.getHddsDatanodes().get(0).getConf();
-    final String dir = config.get
-            (OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR)
+    final String dir = config.get(OzoneConfigKeys.
+            DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR)
             + UUID.randomUUID();
     config.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
     // restart the hdds datanode and see if the container is listed in the
@@ -300,7 +296,8 @@ public class TestContainerStateMachineFailures {
     request.setCloseContainer(
             ContainerProtos.CloseContainerRequestProto.getDefaultInstance());
     request.setDatanodeUuid(
-            cluster.getHddsDatanodes().get(0).getDatanodeDetails().getUuidString());
+            cluster.getHddsDatanodes().get(0).getDatanodeDetails()
+                    .getUuidString());
     Assert.assertEquals(ContainerProtos.Result.CONTAINER_UNHEALTHY,
             dispatcher.dispatch(request.build(), null).getResult());
   }
@@ -499,7 +496,8 @@ public class TestContainerStateMachineFailures {
         request.setCmdType(ContainerProtos.Type.CloseContainer);
         request.setContainerID(containerID);
         request.setCloseContainer(
-                ContainerProtos.CloseContainerRequestProto.getDefaultInstance());
+                ContainerProtos.CloseContainerRequestProto.
+                        getDefaultInstance());
         xceiverClient.sendCommand(request.build());
       } catch (IOException e) {
         failCount.incrementAndGet();
@@ -592,11 +590,11 @@ public class TestContainerStateMachineFailures {
             cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
                     .getContainer();
     // make sure the missing containerSet is not empty
-    HddsDispatcher dispatcher = (HddsDispatcher) ozoneContainer.getDispatcher();
+    HddsDispatcher dispatcher = (HddsDispatcher)ozoneContainer.getDispatcher();
     Assert.assertTrue(!dispatcher.getMissingContainerSet().isEmpty());
     Assert
-            .assertTrue(dispatcher.getMissingContainerSet().contains(containerID));
-
+            .assertTrue(dispatcher.getMissingContainerSet()
+                    .contains(containerID));
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 60000);
     // write a new key
     key = objectStore.getVolume(volumeName).getBucket(bucketName)
@@ -613,13 +611,15 @@ public class TestContainerStateMachineFailures {
     containerID = omKeyLocationInfo.getContainerID();
     containerData = cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
             .getContainer().getContainerSet()
-            .getContainer(omKeyLocationInfo.getContainerID()).getContainerData();
+            .getContainer(omKeyLocationInfo.getContainerID())
+            .getContainerData();
     Assert.assertTrue(containerData instanceof KeyValueContainerData);
     keyValueContainerData = (KeyValueContainerData) containerData;
     ReferenceCountedDB db = BlockUtils.
             getDB(keyValueContainerData, conf);
     byte[] blockCommitSequenceIdKey =
-            StringUtils.string2Bytes(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
+            StringUtils.
+                    string2Bytes(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
 
     // modify the bcsid for the container in the ROCKS DB thereby inducing
     // corruption
