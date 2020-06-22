@@ -279,8 +279,7 @@ public class SCMSafeModeManager implements SafeModeManager {
    * @return map of rule statuses.
    */
   public Map<String, Pair<Boolean, String>> getRuleStatus() {
-    Map<String, Pair<Boolean, String>> map =
-        new HashMap<>();
+    Map<String, Pair<Boolean, String>> map = new HashMap<>();
     for (SafeModeExitRule exitRule : exitRules.values()) {
       map.put(exitRule.getRuleName(),
           Pair.of(exitRule.validate(), exitRule.getStatusText()));
