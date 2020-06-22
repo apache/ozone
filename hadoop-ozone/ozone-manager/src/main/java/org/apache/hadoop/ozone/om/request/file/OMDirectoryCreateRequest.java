@@ -244,61 +244,6 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
   }
 
   /**
-   * Construct OmKeyInfo for every parent directory in missing list.
-   * @param ozoneManager
-   * @param keyArgs
-   * @param pathInfo list of parent directories to be created and its ACLs
-   * @param trxnLogIndex
-   * @return
-   * @throws IOException
-   */
-  public static List<OmKeyInfo> getAllParentInfo(OzoneManager ozoneManager,
-      KeyArgs keyArgs, OMFileRequest.OMPathInfo pathInfo, long trxnLogIndex)
-          throws IOException {
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    List<OmKeyInfo> missingParentInfos = new ArrayList<>();
-
-    ImmutablePair<Long, Long> objIdRange = OMFileRequest
-        .getObjIdRangeFromTxId(trxnLogIndex);
-    long baseObjId = objIdRange.getLeft();
-    long maxObjId = objIdRange.getRight();
-    long maxLevels = maxObjId - baseObjId;
-    long objectCount = 1; // baseObjID is used by the leaf directory
-
-    String volumeName = keyArgs.getVolumeName();
-    String bucketName = keyArgs.getBucketName();
-    String keyName = keyArgs.getKeyName();
-
-    List<String> missingParents = pathInfo.getMissingParents();
-    List<OzoneAcl> inheritAcls = pathInfo.getAcls();
-    for (String missingKey : missingParents) {
-      long nextObjId = baseObjId + objectCount;
-      if (nextObjId > maxObjId) {
-        throw new OMException("Too many directories in path. Exceeds limit of "
-            + maxLevels + ". Unable to create directory: " + keyName
-            + " in volume/bucket: " + volumeName + "/" + bucketName,
-            INVALID_KEY_NAME);
-      }
-
-      LOG.debug("missing parent {} getting added to KeyTable", missingKey);
-      // what about keyArgs for parent directories? TODO
-      OmKeyInfo parentKeyInfo = createDirectoryKeyInfoWithACL(
-          missingKey, keyArgs, nextObjId, inheritAcls, trxnLogIndex);
-      objectCount++;
-
-      missingParentInfos.add(parentKeyInfo);
-      omMetadataManager.getKeyTable().addCacheEntry(
-          new CacheKey<>(omMetadataManager.getOzoneKey(volumeName,
-              bucketName, parentKeyInfo.getKeyName())),
-          new CacheValue<>(Optional.of(parentKeyInfo),
-              trxnLogIndex));
-    }
-
-    return missingParentInfos;
-  }
-
-
-  /**
    * Construct OmDirectoryInfo for every parent directory in missing list.
    * @param ozoneManager
    * @param keyArgs
@@ -397,43 +342,6 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       LOG.error("Unrecognized Result for OMDirectoryCreateRequest: {}",
           createDirectoryRequest);
     }
-  }
-
-  /**
-   * fill in a KeyInfo for a new directory entry in OM database.
-   * without initializing ACLs from the KeyArgs - used for intermediate
-   * directories which get created internally/recursively during file
-   * and directory create.
-   * @param keyName
-   * @param keyArgs
-   * @param objectId
-   * @param transactionIndex
-   * @return the OmKeyInfo structure
-   */
-  public static OmKeyInfo createDirectoryKeyInfoWithACL(
-      String keyName, KeyArgs keyArgs, long objectId,
-      List<OzoneAcl> inheritAcls, long transactionIndex) {
-    return dirKeyInfoBuilderNoACL(keyName, keyArgs, objectId)
-        .setAcls(inheritAcls).setUpdateID(transactionIndex).build();
-  }
-
-  private static OmKeyInfo.Builder dirKeyInfoBuilderNoACL(String keyName,
-      KeyArgs keyArgs, long objectId) {
-    String dirName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
-
-    return new OmKeyInfo.Builder()
-        .setVolumeName(keyArgs.getVolumeName())
-        .setBucketName(keyArgs.getBucketName())
-        .setKeyName(dirName)
-        .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-        .setCreationTime(keyArgs.getModificationTime())
-        .setModificationTime(keyArgs.getModificationTime())
-        .setDataSize(0)
-        .setReplicationType(HddsProtos.ReplicationType.RATIS)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
-        .setObjectID(objectId)
-        .setUpdateID(objectId);
   }
 
   /**

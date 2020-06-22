@@ -144,13 +144,16 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       String leafNodeName = OzoneFSUtils.getFileName(keyName);
-      OmDirectoryInfo parentInfo = getParentInfo(volumeName, bucketName, keyName, leafNodeName, omMetadataManager);
+      OmDirectoryInfo parentInfo = getParentInfo(volumeName, bucketName,
+              keyName, leafNodeName, omMetadataManager);
       if (parentInfo == null) {
         throw new OMException("Failed to commit key, as parent directory of " + keyName +
                 " entry is not found in Directory table", KEY_NOT_FOUND);
       }
-      String dbLeafNodeID = omMetadataManager.getOzoneLeafNodeKey(parentInfo.getObjectID(),leafNodeName);
-      dbOpenLeafNodeID = omMetadataManager.getOpenLeafNodeKey(parentInfo.getObjectID(),
+      String dbLeafNodeID = omMetadataManager.getOzoneLeafNodeKey(
+              parentInfo.getObjectID(),leafNodeName);
+      dbOpenLeafNodeID = omMetadataManager.getOpenLeafNodeKey(
+              parentInfo.getObjectID(),
               leafNodeName, commitKeyRequest.getClientID());
       // Revisit this logic to see how we can skip this check when ratis is
       // enabled.
@@ -282,7 +285,10 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     long bucketId =
             omMetadataManager.getBucketTable().get(bucketKey).getObjectID();
-
+    int totalDirsCount = OzoneFSUtils.getFileCount(keyName);
+    if (totalDirsCount == 1) { // creating key directly under a bucket
+      return OmDirectoryInfo.createDirectoryInfo(bucketId);
+    }
     Iterator<Path> elements = Paths.get(keyName).iterator();
     long lastKnownParentId = bucketId;
     OmDirectoryInfo omDirectoryInfo = null;

@@ -20,17 +20,12 @@ package org.apache.hadoop.fs.ozone;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileAlreadyExistsException;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -124,28 +119,202 @@ public class TestOzoneFileSystem {
     assertTrue("FileStatus did not return the directory",
             fileStatus.isDirectory());
 
-    // Directory
-    fileStatus = fs.getFileStatus(new Path("/d1/d2/d3/"));
-    assertEquals("FileStatus did not return the directory",
-            "/d1/d2/d3", fileStatus.getPath().toUri().getPath());
-    assertTrue("FileStatus did not return the directory",
-            fileStatus.isDirectory());
-
-    // File
-    FileStatus fileStatus1 = fs.getFileStatus(file2);
-    assertEquals("FileStatus did not return the file",
-            file2.toString(), fileStatus1.getPath().toUri().getPath());
-    assertFalse("FileStatus did not return the file",
-            fileStatus1.isDirectory());
-
     // invalid
-   try{
-     fs.getFileStatus(new Path("/d1/d2/d3/d4/key3" +
-             "/invalid"));
-     fail("Should throw FileNotFoundException");
-   } catch (FileNotFoundException fnfe) {
-     // ignore as its expected
-   }
+    try{
+      fs.getFileStatus(new Path("/d1/d2/d3/d4/key3" +
+              "/invalid"));
+      fail("Should throw FileNotFoundException");
+    } catch (FileNotFoundException fnfe) {
+      // ignore as its expected
+    }
+  }
+
+  @Test
+  public void testListStatusWithoutRecursiveSearch() throws Exception {
+    /*
+     * Op 1. create file -> /key1
+     * Op 2. create dir -> /d1/d2
+     * Op 3. create dir -> /d1/d3
+     * Op 4. create dir -> /d1/d4
+     * Op 5. create file -> /d1/key1
+     * Op 6. create file -> /d2/key1
+     * Op 7. create file -> /d1/d2/key1
+     */
+    setupOzoneFileSystem();
+
+    Path key1 = new Path("/key1");
+    try (FSDataOutputStream outputStream = fs.create(key1, false)) {
+      assertNotNull("Should be able to create file: key1",
+              outputStream);
+    }
+    Path d1 = new Path("/d1");
+    Path d1_key1 = new Path(d1, "key1");
+    try (FSDataOutputStream outputStream = fs.create(d1_key1, false)) {
+      assertNotNull("Should be able to create file: " + d1_key1,
+              outputStream);
+    }
+    Path d2 = new Path("/d2");
+    Path d2_key1 = new Path(d2, "key1");
+    try (FSDataOutputStream outputStream = fs.create(d2_key1, false)) {
+      assertNotNull("Should be able to create file: " + d2_key1,
+              outputStream);
+    }
+    Path d1_d2 = new Path("/d1/d2/");
+    Path d1_d2_key1 = new Path(d1_d2, "key1");
+    try (FSDataOutputStream outputStream = fs.create(d1_d2_key1, false)) {
+      assertNotNull("Should be able to create file: " + d1_d2_key1,
+              outputStream);
+    }
+    Path d1_key2 = new Path(d1, "key2");
+    try (FSDataOutputStream outputStream = fs.create(d1_key2, false)) {
+      assertNotNull("Should be able to create file: " + d1_key2,
+              outputStream);
+    }
+
+    Path d1_d3 = new Path("/d1/d3/");
+    Path d1_d4 = new Path("/d1/d4/");
+
+    fs.mkdirs(d1_d3);
+    fs.mkdirs(d1_d4);
+
+    // Root Directory
+    FileStatus[] fileStatusList = fs.listStatus(new Path("/"));
+    assertEquals("FileStatus should return files and directories",
+            3, fileStatusList.length);
+    ArrayList<String> expectedPaths = new ArrayList<>();
+    expectedPaths.add("o3fs://" + bucketName + "." + volumeName + "/d1");
+    expectedPaths.add("o3fs://" + bucketName + "." + volumeName + "/d2");
+    expectedPaths.add("o3fs://" + bucketName + "." + volumeName + "/key1");
+    for (FileStatus fileStatus : fileStatusList) {
+      expectedPaths.remove(fileStatus.getPath().toString());
+    }
+    assertEquals("Failed to return the filestatus[]" + expectedPaths,
+            0, expectedPaths.size());
+
+    // level-1 sub-dirs
+    fileStatusList = fs.listStatus(new Path("/d1"));
+    assertEquals("FileStatus should return files and directories",
+            5, fileStatusList.length);
+    expectedPaths = new ArrayList<>();
+    expectedPaths.add("o3fs://" + bucketName + "." + volumeName + "/d1/d2");
+    expectedPaths.add("o3fs://" + bucketName + "." + volumeName + "/d1/d3");
+    expectedPaths.add("o3fs://" + bucketName + "." + volumeName + "/d1/d4");
+    expectedPaths.add("o3fs://" + bucketName + "." + volumeName + "/d1/key1");
+    expectedPaths.add("o3fs://" + bucketName + "." + volumeName + "/d1/key2");
+    for (FileStatus fileStatus : fileStatusList) {
+      expectedPaths.remove(fileStatus.getPath().toString());
+    }
+    assertEquals("Failed to return the filestatus[]" + expectedPaths,
+            0, expectedPaths.size());
+
+    // level-2 sub-dirs
+    fileStatusList = fs.listStatus(new Path("/d1/d2"));
+    assertEquals("FileStatus should return files and directories",
+            1, fileStatusList.length);
+    expectedPaths = new ArrayList<>();
+    expectedPaths.add("o3fs://" + bucketName + "." + volumeName + "/d1/d2/" +
+            "key1");
+    for (FileStatus fileStatus : fileStatusList) {
+      expectedPaths.remove(fileStatus.getPath().toString());
+    }
+    assertEquals("Failed to return the filestatus[]" + expectedPaths,
+            0, expectedPaths.size());
+
+    // level-2 key2
+    fileStatusList = fs.listStatus(new Path("/d1/d2/key1"));
+    assertEquals("FileStatus should return files and directories",
+            1, fileStatusList.length);
+    expectedPaths = new ArrayList<>();
+    expectedPaths.add("o3fs://" + bucketName + "." + volumeName + "/d1/d2/" +
+            "key1");
+    for (FileStatus fileStatus : fileStatusList) {
+      expectedPaths.remove(fileStatus.getPath().toString());
+    }
+    assertEquals("Failed to return the filestatus[]" + expectedPaths,
+            0, expectedPaths.size());
+
+    // invalid root key
+    try {
+      fileStatusList = fs.listStatus(new Path("/key2"));
+      fail("Should throw FileNotFoundException");
+    } catch (FileNotFoundException fnfe) {
+      // ignore as its expected
+    }
+    try {
+      fileStatusList = fs.listStatus(new Path("/d1/d2/key2"));
+      fail("Should throw FileNotFoundException");
+    } catch (FileNotFoundException fnfe) {
+      // ignore as its expected
+    }
+  }
+
+
+  @Test
+  public void testListFilesRecursive() throws Exception {
+    /*
+     * Op 1. create file -> /d1/d1/d2/key1
+     * Op 2. create dir -> /key1
+     * Op 3. create dir -> /key2
+     * Op 4. create dir -> /d1/d2/d1/d2/key1
+     */
+    setupOzoneFileSystem();
+
+    Path d1_d1_d2_key1 = new Path("/d1/d1/d2/key1");
+    try (FSDataOutputStream outputStream = fs.create(d1_d1_d2_key1, false)) {
+      assertNotNull("Should be able to create file: " + d1_d1_d2_key1,
+              outputStream);
+    }
+    Path key1 = new Path("/key1");
+    try (FSDataOutputStream outputStream = fs.create(key1, false)) {
+      assertNotNull("Should be able to create file: " + key1,
+              outputStream);
+    }
+    Path key2 = new Path("/key2");
+    try (FSDataOutputStream outputStream = fs.create(key2, false)) {
+      assertNotNull("Should be able to create file: key2",
+              outputStream);
+    }
+    Path d1_d2_d1_d2_key1 = new Path("/d1/d2/d1/d2/key1");
+    try (FSDataOutputStream outputStream = fs.create(d1_d2_d1_d2_key1, false)) {
+      assertNotNull("Should be able to create file: " + d1_d2_d1_d2_key1,
+              outputStream);
+    }
+    RemoteIterator<LocatedFileStatus> fileStatusItr = fs.listFiles(new Path(
+            "/"), true);
+    String uriPrefix = "o3fs://" + bucketName + "." + volumeName;
+    ArrayList<String> expectedPaths = new ArrayList<>();
+    expectedPaths.add(uriPrefix + d1_d1_d2_key1.toString());
+    expectedPaths.add(uriPrefix + key1.toString());
+    expectedPaths.add(uriPrefix + key2.toString());
+    expectedPaths.add(uriPrefix + d1_d2_d1_d2_key1.toString());
+    int expectedFilesCount = expectedPaths.size();
+    int actualCount = 0;
+    while (fileStatusItr.hasNext()) {
+      LocatedFileStatus status = fileStatusItr.next();
+      expectedPaths.remove(status.getPath().toString());
+      actualCount++;
+    }
+    assertEquals("Failed to get all the files: " + expectedPaths,
+            expectedFilesCount, actualCount);
+    assertEquals("Failed to get all the files: " + expectedPaths, 0,
+            expectedPaths.size());
+
+    // Recursive=false
+    fileStatusItr = fs.listFiles(new Path("/"), false);
+    expectedPaths.clear();
+    expectedPaths.add(uriPrefix + "/key1");
+    expectedPaths.add(uriPrefix + "/key2");
+    expectedFilesCount = expectedPaths.size();
+    actualCount = 0;
+    while (fileStatusItr.hasNext()) {
+      LocatedFileStatus status = fileStatusItr.next();
+      expectedPaths.remove(status.getPath().toString());
+      actualCount++;
+    }
+    assertEquals("Failed to get all the files: " + expectedPaths, 0,
+            expectedPaths.size());
+    assertEquals("Failed to get all the files: " + expectedPaths,
+            expectedFilesCount, actualCount);
   }
 
   /**

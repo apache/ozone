@@ -51,20 +51,13 @@ public class OmDirectoryInfo extends WithObjectID {
     this.modificationTime = builder.modificationTime;
   }
 
-  // TODO: its work around and need to remove the dependency with OMKeyInfo
-  public static OmDirectoryInfo createDirectoryInfo(OmKeyInfo omKeyInfo,
-                                             long parentObjectID) {
-    String dirName = OzoneFSUtils.getFileName(omKeyInfo.getKeyName());
-    return new Builder().setName(dirName)
-            .setParentObjectID(parentObjectID)
-            .setObjectID(omKeyInfo.getObjectID())
-            .setUpdateID(omKeyInfo.getUpdateID())
-            .setBucketName(omKeyInfo.getBucketName())
-            .setVolumeName(omKeyInfo.getVolumeName())
-            .setCreationTime(omKeyInfo.getCreationTime())
-            .setModificationTime(omKeyInfo.getModificationTime())
-            .setAcls(omKeyInfo.getAcls())
-            .setMetadata(omKeyInfo.getMetadata())
+  // TODO: its work around to represent root directory, which is the bucket.
+  public static OmDirectoryInfo createDirectoryInfo(long bucketId) {
+    // both parent and id pointing are same to
+    // represents root node.
+    return new Builder().setIndex((short) -1)
+            .setParentObjectID(bucketId)
+            .setObjectID(bucketId)
             .build();
   }
 

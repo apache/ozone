@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -28,11 +27,13 @@ import java.util.List;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -312,7 +313,7 @@ public final class OMFileRequest {
 
     Iterator<Path> elements = Paths.get(keyName).iterator();
     long lastKnownParentId = bucketId;
-    OmDirectoryInfo omDirectoryInfo = null;
+    OmDirectoryInfo omDirectoryInfo = OmDirectoryInfo.createDirectoryInfo(bucketId);
     short index = 0;
     while (elements.hasNext()) {
       String fileName = elements.next().toString();
@@ -348,6 +349,13 @@ public final class OMFileRequest {
     builder.setReplicationType(HddsProtos.ReplicationType.RATIS);
     builder.setReplicationFactor(HddsProtos.ReplicationFactor.ONE);
     return builder.build();
+  }
+
+  public static String getAbsoluteDirName(String prefixName, String keyName) {
+    if (Strings.isNullOrEmpty(prefixName)) {
+      return keyName;
+    }
+    return prefixName.concat(OzoneConsts.OZONE_URI_DELIMITER).concat(keyName);
   }
 
   /**
