@@ -18,7 +18,12 @@
 package org.apache.hadoop.ozone.shell;
 
 import com.google.common.base.Strings;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.ozone.OFSPath;
+import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -27,6 +32,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.util.ToolRunner;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -46,11 +52,15 @@ import picocli.CommandLine.RunLast;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
+import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.junit.Assert.fail;
 
 /**
@@ -438,6 +448,85 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
     Assert.assertEquals(0, out.size());
     Assert.assertEquals(0, getNumOfBuckets("bucket"));
+  }
+
+  /**
+   * Helper function to retrieve Ozone client configuration for trash testing.
+   * @param hostPrefix Scheme + Authority. e.g. ofs://om-service-test1
+   * @param configuration Server config to generate client config from.
+   * @return Config added with fs.ofs.impl, fs.defaultFS and fs.trash.interval.
+   */
+  private OzoneConfiguration getClientConfForOFS(
+      String hostPrefix, OzoneConfiguration configuration) {
+
+    OzoneConfiguration clientConf = new OzoneConfiguration(configuration);
+    clientConf.set("fs.ofs.impl",
+        "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
+    clientConf.set(FS_DEFAULT_NAME_KEY, hostPrefix);
+    clientConf.setInt(FS_TRASH_INTERVAL_KEY, 60);
+    return clientConf;
+  }
+
+  @Test
+  public void testDeleteToTrashOrSkipTrash() throws Exception {
+    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
+    OzoneConfiguration clientConf = getClientConfForOFS(hostPrefix, conf);
+    OzoneFsShell shell = new OzoneFsShell(clientConf);
+    FileSystem fs = FileSystem.get(clientConf);
+    final String strDir1 = hostPrefix + "/volumed2t/bucket1/dir1";
+    // Note: CURRENT is also privately defined in TrashPolicyDefault
+    final Path trashCurrent = new Path("Current");
+
+    final String strKey1 = strDir1 + "/key1";
+    final Path pathKey1 = new Path(strKey1);
+    final Path trashPathKey1 = Path.mergePaths(new Path(
+        new OFSPath(strKey1).getTrashRoot(), trashCurrent), pathKey1);
+
+    final String strKey2 = strDir1 + "/key2";
+    final Path pathKey2 = new Path(strKey2);
+    final Path trashPathKey2 = Path.mergePaths(new Path(
+        new OFSPath(strKey2).getTrashRoot(), trashCurrent), pathKey2);
+
+    int res;
+    try {
+      res = ToolRunner.run(shell, new String[]{"-mkdir", "-p", strDir1});
+      Assert.assertEquals(0, res);
+
+      // Check delete to trash behavior
+      res = ToolRunner.run(shell, new String[]{"-touch", strKey1});
+      Assert.assertEquals(0, res);
+      // Verify key1 creation
+      FileStatus statusPathKey1 = fs.getFileStatus(pathKey1);
+      Assert.assertEquals(strKey1, statusPathKey1.getPath().toString());
+      // rm without -skipTrash. since trash interval > 0, should moved to trash
+      res = ToolRunner.run(shell, new String[]{"-rm", strKey1});
+      Assert.assertEquals(0, res);
+      // Verify that the file is moved to the correct trash location
+      FileStatus statusTrashPathKey1 = fs.getFileStatus(trashPathKey1);
+      // It'd be more meaningful if we actually write some content to the file
+      Assert.assertEquals(
+          statusPathKey1.getLen(), statusTrashPathKey1.getLen());
+      Assert.assertEquals(
+          fs.getFileChecksum(pathKey1), fs.getFileChecksum(trashPathKey1));
+
+      // Check delete skip trash behavior
+      res = ToolRunner.run(shell, new String[]{"-touch", strKey2});
+      Assert.assertEquals(0, res);
+      // Verify key2 creation
+      FileStatus statusPathKey2 = fs.getFileStatus(pathKey2);
+      Assert.assertEquals(strKey2, statusPathKey2.getPath().toString());
+      // rm with -skipTrash
+      res = ToolRunner.run(shell, new String[]{"-rm", "-skipTrash", strKey2});
+      Assert.assertEquals(0, res);
+      // Verify that the file is NOT moved to the trash location
+      try {
+        fs.getFileStatus(trashPathKey2);
+        Assert.fail("getFileStatus on non-existent should throw.");
+      } catch (FileNotFoundException ignored) {
+      }
+    } finally {
+      shell.close();
+    }
   }
 
 }

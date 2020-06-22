@@ -14,7 +14,9 @@
 # limitations under the License.
 name: build-branch
 on:
-  - push
+  push:
+  schedule:
+    - cron: 30 0,12 * * *
 jobs:
   build:
     name: compile
@@ -186,7 +188,7 @@ jobs:
        - uses: actions/download-artifact@v2
          with:
             path: target/artifacts
-       - run: ./.github/coverage-report.sh
+       - run: ./hadoop-ozone/dev-support/checks/coverage.sh
        - uses: ./.github/buildenv
          if: github.repository == 'apache/hadoop-ozone'
          with:

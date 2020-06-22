@@ -46,6 +46,9 @@ public interface OzoneClientAdapter {
 
   void renameKey(String key, String newKeyName) throws IOException;
 
+  // Users should use rename instead of renameKey in OFS.
+  void rename(String pathStr, String newPath) throws IOException;
+
   boolean createDirectory(String keyName) throws IOException;
 
   boolean deleteObject(String keyName);
