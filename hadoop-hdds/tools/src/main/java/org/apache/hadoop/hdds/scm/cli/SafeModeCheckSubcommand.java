@@ -47,7 +47,7 @@ public class SafeModeCheckSubcommand implements Callable<Void> {
   private SafeModeCommands parent;
 
   @CommandLine.Option(names = {"--verbose"},
-      description = "More verbose output. Show the status of rules.")
+      description = "Show detailed status of rules.")
   private boolean verbose;
 
   @Override
