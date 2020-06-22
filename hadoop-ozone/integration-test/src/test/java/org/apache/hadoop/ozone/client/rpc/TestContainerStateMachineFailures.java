@@ -106,7 +106,8 @@ public class TestContainerStateMachineFailures {
   @Before
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    conf.setBoolean(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY, false);
+    conf.setBoolean(OzoneConfigKeys.
+            OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY, false);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 200,
