@@ -61,7 +61,7 @@ public final class ContainerCommandRequestMessage implements Message {
   public static ContainerCommandRequestProto toProto(
       ByteString bytes, RaftGroupId groupId)
       throws InvalidProtocolBufferException {
-    final int i = 4 + bytes.substring(0, Integer.BYTES)
+    final int i = Integer.BYTES + bytes.substring(0, Integer.BYTES)
         .asReadOnlyByteBuffer().getInt();
     final ContainerCommandRequestProto header
         = ContainerCommandRequestProto
