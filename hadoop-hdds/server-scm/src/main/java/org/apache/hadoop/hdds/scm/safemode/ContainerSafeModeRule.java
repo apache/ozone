@@ -129,6 +129,6 @@ public class ContainerSafeModeRule extends
   @Override
   public String getStatusText() {
     return "currentContainerThreshold " + getCurrentContainerThreshold()
-        + " should >= safeModeCutoff " + this.safeModeCutoff;
+        + " >= safeModeCutoff " + this.safeModeCutoff;
   }
 }
