@@ -1937,6 +1937,14 @@
   </property>
   
   <property>
+    <name>ozone.fs.iterate.batch-size</name>
+    <value>100</value>
+    <tag>OZONE, OZONEFS</tag>
+    <description>
+      Iterate batch size of delete when use BasicOzoneFileSystem.
+    </description>
+  </property>
+  <property>
     <name>ozone.manager.db.checkpoint.transfer.bandwidthPerSec</name>
     <value>0</value>
     <tag>OZONE</tag>
