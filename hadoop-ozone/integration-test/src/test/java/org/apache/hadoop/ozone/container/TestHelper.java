@@ -22,8 +22,6 @@ import java.io.IOException;
 import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
-
-import javassist.bytecode.stackmap.BasicBlock;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
@@ -231,7 +229,8 @@ public final class TestHelper {
     for (DatanodeDetails dn : pipeline.getNodes()) {
       XceiverServerSpi server =
               cluster.getHddsDatanodes().get(cluster.getHddsDatanodeIndex(dn))
-                      .getDatanodeStateMachine().getContainer().getWriteChannel();
+                      .getDatanodeStateMachine().getContainer()
+                      .getWriteChannel();
       Assert.assertTrue(server instanceof XceiverServerRatis);
       try {
         server.addGroup(pipeline.getId().getProtobuf(), Collections.

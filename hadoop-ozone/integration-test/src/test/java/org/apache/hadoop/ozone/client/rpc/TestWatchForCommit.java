@@ -42,7 +42,6 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.ratis.protocol.GroupMismatchException;
-import org.apache.ratis.protocol.RaftRetryFailureException;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.After;
