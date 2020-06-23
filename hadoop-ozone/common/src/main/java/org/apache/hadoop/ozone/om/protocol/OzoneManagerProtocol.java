@@ -225,6 +225,16 @@ public interface OzoneManagerProtocol
   void deleteKey(OmKeyArgs args) throws IOException;
 
   /**
+   * Deletes existing key/keys. This interface supports delete
+   * multiple keys and a single key. Used by deleting files
+   * through OzoneFileSystem.
+   *
+   * @param args the list args of the key.
+   * @throws IOException
+   */
+  void deleteKeys(List<OmKeyArgs> args) throws IOException;
+
+  /**
    * Deletes an existing empty bucket from volume.
    * @param volume - Name of the volume.
    * @param bucket - Name of the bucket.

@@ -2217,6 +2217,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
+  /**
+   * Deletes an existing key.
+   *
+   * @param args - List attributes of the key.
+   * @throws IOException
+   */
+  @Override
+  public void deleteKeys(List<OmKeyArgs> args) throws IOException {
+    if (args != null) {
+      for (OmKeyArgs keyArgs : args) {
+        deleteKey(keyArgs);
+      }
+    }
+  }
+
   @Override
   public List<OmKeyInfo> listKeys(String volumeName, String bucketName,
       String startKey, String keyPrefix, int maxKeys) throws IOException {
