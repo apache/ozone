@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
@@ -32,6 +33,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -54,15 +56,20 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ratis.protocol.StateMachineException;
 import org.apache.ratis.server.storage.FileInfo;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
-import org.junit.After;
+
+import org.junit.AfterClass;
 import org.junit.Assert;
-import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -103,8 +110,8 @@ public class TestContainerStateMachineFailures {
    *
    * @throws IOException
    */
-  @Before
-  public void init() throws Exception {
+  @BeforeClass
+  public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(OzoneConfigKeys.
             OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY, false);
@@ -142,7 +149,7 @@ public class TestContainerStateMachineFailures {
     conf.setLong(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
     conf.setQuietMode(false);
     cluster =
-        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).setHbInterval(200)
+        MiniOzoneCluster.newBuilder(conf).setNumDatanodes(10).setHbInterval(200)
             .build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 60000);
@@ -159,8 +166,8 @@ public class TestContainerStateMachineFailures {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
-  public void shutdown() {
+  @AfterClass
+  public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -183,9 +190,9 @@ public class TestContainerStateMachineFailures {
             groupOutputStream.getLocationInfoList();
     Assert.assertEquals(1, locationInfoList.size());
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
+    HddsDatanodeService dn = getDatanodeService(omKeyLocationInfo);
     // delete the container dir
-    FileUtil.fullyDelete(new File(
-            cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
+    FileUtil.fullyDelete(new File(dn.getDatanodeStateMachine()
                     .getContainer().getContainerSet()
                     .getContainer(omKeyLocationInfo.getContainerID()).
                     getContainerData().getContainerPath()));
@@ -200,28 +207,40 @@ public class TestContainerStateMachineFailures {
 
     // Make sure the container is marked unhealthy
     Assert.assertTrue(
-            cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
+            dn.getDatanodeStateMachine()
                     .getContainer().getContainerSet()
                     .getContainer(containerID)
                     .getContainerState()
                     == ContainerProtos.ContainerDataProto.State.UNHEALTHY);
-    OzoneContainer ozoneContainer = cluster.getHddsDatanodes().get(0)
+    OzoneContainer ozoneContainer = dn
             .getDatanodeStateMachine().getContainer();
     // make sure the missing containerSet is empty
     HddsDispatcher dispatcher = (HddsDispatcher) ozoneContainer.getDispatcher();
     Assert.assertTrue(dispatcher.getMissingContainerSet().isEmpty());
 
     // restart the hdds datanode, container should not in the regular set
-    OzoneConfiguration config = cluster.getHddsDatanodes().get(0).getConf();
+    OzoneConfiguration config = dn.getConf();
     final String dir = config.get(OzoneConfigKeys.
             DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR)
             + UUID.randomUUID();
     config.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
-    cluster.restartHddsDatanode(0, true);
-    ozoneContainer = cluster.getHddsDatanodes().get(0)
+    cluster.restartHddsDatanode(dn.getDatanodeDetails(), true);
+    ozoneContainer = getDatanodeService(omKeyLocationInfo)
             .getDatanodeStateMachine().getContainer();
     Assert.assertNull(ozoneContainer.getContainerSet().
                     getContainer(containerID));
+  }
+
+  private HddsDatanodeService getDatanodeService(OmKeyLocationInfo info)
+          throws IOException {
+    DatanodeDetails dnDetails =  info.getPipeline().
+            getFirstNode();
+    for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
+      if (dn.getDatanodeDetails().equals(dnDetails)) {
+        return dn;
+      }
+    }
+    return null;
   }
 
   @Test
@@ -234,13 +253,15 @@ public class TestContainerStateMachineFailures {
     key.write("ratis".getBytes());
     key.flush();
     key.write("ratis".getBytes());
-    KeyOutputStream groupOutputStream = (KeyOutputStream) key.getOutputStream();
+    KeyOutputStream groupOutputStream = (KeyOutputStream) key
+            .getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
             groupOutputStream.getLocationInfoList();
     Assert.assertEquals(1, locationInfoList.size());
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
+    HddsDatanodeService dn = getDatanodeService(omKeyLocationInfo);
     ContainerData containerData =
-            cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
+            dn.getDatanodeStateMachine()
                     .getContainer().getContainerSet()
                     .getContainer(omKeyLocationInfo.getContainerID())
                     .getContainerData();
@@ -261,7 +282,7 @@ public class TestContainerStateMachineFailures {
 
     // Make sure the container is marked unhealthy
     Assert.assertTrue(
-            cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
+            dn.getDatanodeStateMachine()
                     .getContainer().getContainerSet().getContainer(containerID)
                     .getContainerState()
                     == ContainerProtos.ContainerDataProto.State.UNHEALTHY);
@@ -273,34 +294,35 @@ public class TestContainerStateMachineFailures {
             .readContainerFile(containerFile);
     assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
 
-    OzoneConfiguration config = cluster.getHddsDatanodes().get(0).getConf();
+    OzoneConfiguration config = dn.getConf();
     final String dir = config.get(OzoneConfigKeys.
             DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR)
             + UUID.randomUUID();
     config.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
     // restart the hdds datanode and see if the container is listed in the
     // in the missing container set and not in the regular set
-    cluster.restartHddsDatanode(0, true);
+    cluster.restartHddsDatanode(dn.getDatanodeDetails(), true);
     // make sure the container state is still marked unhealthy after restart
     keyValueContainerData = (KeyValueContainerData) ContainerDataYaml
             .readContainerFile(containerFile);
     assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
 
     OzoneContainer ozoneContainer;
-    ozoneContainer = cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
-            .getContainer();
-    HddsDispatcher dispatcher = (HddsDispatcher) ozoneContainer.getDispatcher();
+    ozoneContainer = getDatanodeService(omKeyLocationInfo)
+            .getDatanodeStateMachine().getContainer();
+    HddsDispatcher dispatcher = (HddsDispatcher) ozoneContainer
+            .getDispatcher();
     ContainerProtos.ContainerCommandRequestProto.Builder request =
             ContainerProtos.ContainerCommandRequestProto.newBuilder();
     request.setCmdType(ContainerProtos.Type.CloseContainer);
     request.setContainerID(containerID);
     request.setCloseContainer(
             ContainerProtos.CloseContainerRequestProto.getDefaultInstance());
-    request.setDatanodeUuid(
-            cluster.getHddsDatanodes().get(0).getDatanodeDetails()
-                    .getUuidString());
+    request.setDatanodeUuid(getDatanodeService(omKeyLocationInfo)
+            .getDatanodeDetails().getUuidString());
     Assert.assertEquals(ContainerProtos.Result.CONTAINER_UNHEALTHY,
-            dispatcher.dispatch(request.build(), null).getResult());
+            dispatcher.dispatch(request.build(), null)
+                    .getResult());
   }
 
   @Test
@@ -313,13 +335,14 @@ public class TestContainerStateMachineFailures {
     key.write("ratis".getBytes());
     key.flush();
     key.write("ratis".getBytes());
-    KeyOutputStream groupOutputStream = (KeyOutputStream) key.getOutputStream();
+    KeyOutputStream groupOutputStream = (KeyOutputStream) key.
+            getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
             groupOutputStream.getLocationInfoList();
     Assert.assertEquals(1, locationInfoList.size());
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
-    ContainerData containerData =
-            cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
+    HddsDatanodeService dn = getDatanodeService(omKeyLocationInfo);
+    ContainerData containerData = dn.getDatanodeStateMachine()
                     .getContainer().getContainerSet()
                     .getContainer(omKeyLocationInfo.getContainerID())
                     .getContainerData();
@@ -361,8 +384,7 @@ public class TestContainerStateMachineFailures {
       // Exception should be thrown
     }
     // Make sure the container is marked unhealthy
-    Assert.assertTrue(
-            cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
+    Assert.assertTrue(dn.getDatanodeStateMachine()
                     .getContainer().getContainerSet().getContainer(containerID)
                     .getContainerState()
                     == ContainerProtos.ContainerDataProto.State.UNHEALTHY);
@@ -393,15 +415,16 @@ public class TestContainerStateMachineFailures {
             groupOutputStream.getLocationInfoList();
     Assert.assertEquals(1, locationInfoList.size());
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
-    ContainerData containerData =
-            cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
+    HddsDatanodeService dn = getDatanodeService(omKeyLocationInfo);
+    ContainerData containerData = dn.getDatanodeStateMachine()
                     .getContainer().getContainerSet()
                     .getContainer(omKeyLocationInfo.getContainerID())
                     .getContainerData();
     Assert.assertTrue(containerData instanceof KeyValueContainerData);
     key.close();
     ContainerStateMachine stateMachine =
-            (ContainerStateMachine) TestHelper.getStateMachine(cluster);
+            (ContainerStateMachine) TestHelper.getStateMachine(dn,
+                    omKeyLocationInfo.getPipeline());
     SimpleStateMachineStorage storage =
             (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
     Path parentPath = storage.findLatestSnapshot().getFile().getPath();
@@ -428,7 +451,7 @@ public class TestContainerStateMachineFailures {
       Assert.fail("Exception should not be thrown");
     }
     Assert.assertTrue(
-            cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
+            getDatanodeService(omKeyLocationInfo).getDatanodeStateMachine()
                     .getContainer().getContainerSet().getContainer(containerID)
                     .getContainerState()
                     == ContainerProtos.ContainerDataProto.State.CLOSED);
@@ -459,20 +482,23 @@ public class TestContainerStateMachineFailures {
     key.write("ratis".getBytes());
     key.flush();
     key.write("ratis".getBytes());
-    KeyOutputStream groupOutputStream = (KeyOutputStream) key.getOutputStream();
+    KeyOutputStream groupOutputStream = (KeyOutputStream) key
+            .getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
             groupOutputStream.getLocationInfoList();
     Assert.assertEquals(1, locationInfoList.size());
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
+    HddsDatanodeService dn = getDatanodeService(omKeyLocationInfo);
     ContainerData containerData =
-            cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
+            dn.getDatanodeStateMachine()
                     .getContainer().getContainerSet()
                     .getContainer(omKeyLocationInfo.getContainerID())
                     .getContainerData();
     Assert.assertTrue(containerData instanceof KeyValueContainerData);
     key.close();
     ContainerStateMachine stateMachine =
-            (ContainerStateMachine) TestHelper.getStateMachine(cluster);
+            (ContainerStateMachine) TestHelper.getStateMachine(dn,
+                    omKeyLocationInfo.getPipeline());
     SimpleStateMachineStorage storage =
             (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
     Path parentPath = storage.findLatestSnapshot().getFile().getPath();
@@ -540,7 +566,7 @@ public class TestContainerStateMachineFailures {
       fail("testWriteStateMachineDataIdempotencyWithClosedContainer failed");
     }
     Assert.assertTrue(
-            cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
+            getDatanodeService(omKeyLocationInfo).getDatanodeStateMachine()
                     .getContainer().getContainerSet().getContainer(containerID)
                     .getContainerState()
                     == ContainerProtos.ContainerDataProto.State.CLOSED);
@@ -570,8 +596,9 @@ public class TestContainerStateMachineFailures {
             groupOutputStream.getLocationInfoList();
     Assert.assertEquals(1, locationInfoList.size());
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
+    HddsDatanodeService dn = getDatanodeService(omKeyLocationInfo);
     ContainerData containerData =
-            cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
+            getDatanodeService(omKeyLocationInfo).getDatanodeStateMachine()
                     .getContainer().getContainerSet()
                     .getContainer(omKeyLocationInfo.getContainerID())
                     .getContainerData();
@@ -581,14 +608,13 @@ public class TestContainerStateMachineFailures {
     key.close();
 
     long containerID = omKeyLocationInfo.getContainerID();
-    cluster.shutdownHddsDatanode(
-            cluster.getHddsDatanodes().get(0).getDatanodeDetails());
+    cluster.shutdownHddsDatanode(dn.getDatanodeDetails());
     // delete the container db file
     FileUtil.fullyDelete(new File(keyValueContainerData.getContainerPath()));
     cluster.restartHddsDatanode(
-            cluster.getHddsDatanodes().get(0).getDatanodeDetails(), true);
+            dn.getDatanodeDetails(), true);
     OzoneContainer ozoneContainer =
-            cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
+            getDatanodeService(omKeyLocationInfo).getDatanodeStateMachine()
                     .getContainer();
     // make sure the missing containerSet is not empty
     HddsDispatcher dispatcher = (HddsDispatcher)ozoneContainer.getDispatcher();
@@ -610,7 +636,8 @@ public class TestContainerStateMachineFailures {
     omKeyLocationInfo = locationInfoList.get(0);
     key.close();
     containerID = omKeyLocationInfo.getContainerID();
-    containerData = cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
+    dn = getDatanodeService(omKeyLocationInfo);
+    containerData = dn.getDatanodeStateMachine()
             .getContainer().getContainerSet()
             .getContainer(omKeyLocationInfo.getContainerID())
             .getContainerData();
@@ -629,11 +656,10 @@ public class TestContainerStateMachineFailures {
     // after the restart, there will be a mismatch in BCSID of what is recorded
     // in the and what is there in RockSDB and hence the container would be
     // marked unhealthy
-    cluster.restartHddsDatanode(
-            cluster.getHddsDatanodes().get(0).getDatanodeDetails(), true);
+    cluster.restartHddsDatanode(dn.getDatanodeDetails(), true);
     // Make sure the container is marked unhealthy
     Assert.assertTrue(
-            cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
+            getDatanodeService(omKeyLocationInfo).getDatanodeStateMachine()
                     .getContainer().getContainerSet().getContainer(containerID)
                     .getContainerState()
                     == ContainerProtos.ContainerDataProto.State.UNHEALTHY);
