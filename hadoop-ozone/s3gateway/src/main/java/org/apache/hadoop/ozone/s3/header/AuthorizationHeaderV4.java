@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.s3.header;
 
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -65,7 +64,9 @@ public class AuthorizationHeaderV4 {
    * @param header
    */
   public AuthorizationHeaderV4(String header) throws OS3Exception {
-    Preconditions.checkNotNull(header);
+    if (header == null) {
+      throw MALFORMED_HEADER;
+    }
     this.authHeader = header;
     parseAuthHeader();
   }
