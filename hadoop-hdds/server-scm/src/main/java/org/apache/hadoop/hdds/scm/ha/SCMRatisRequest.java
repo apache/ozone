@@ -106,6 +106,7 @@ public final class SCMRatisRequest {
       args.add(argBuilder.build());
     }
     methodBuilder.addAllArgs(args);
+    requestProtoBuilder.setMethod(methodBuilder.build());
     return Message.valueOf(
         org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(
             requestProtoBuilder.build().toByteArray()));
