@@ -150,11 +150,10 @@ public class OzoneBucket extends WithMetadata {
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.metadata = metadata;
     this.encryptionKeyName = encryptionKeyName;
-    long modifiedTime = Time.now();
-    if (modifiedTime < creationTime) {
-      this.modificationTime = Instant.ofEpochMilli(creationTime);
-    } else {
-      this.modificationTime = Instant.ofEpochMilli(modifiedTime);
+    modificationTime = Instant.now();
+    if (modificationTime.isBefore(this.creationTime)) {
+      modificationTime = Instant.ofEpochSecond(
+          this.creationTime.getEpochSecond(), this.creationTime.getNano());
     }
   }
 
@@ -188,11 +187,10 @@ public class OzoneBucket extends WithMetadata {
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.metadata = metadata;
-    long modifiedTime = Time.now();
-    if (modifiedTime < creationTime) {
-      this.modificationTime = Instant.ofEpochMilli(creationTime);
-    } else {
-      this.modificationTime = Instant.ofEpochMilli(modifiedTime);
+    modificationTime = Instant.now();
+    if (modificationTime.isBefore(this.creationTime)) {
+      modificationTime = Instant.ofEpochSecond(
+          this.creationTime.getEpochSecond(), this.creationTime.getNano());
     }
   }
 

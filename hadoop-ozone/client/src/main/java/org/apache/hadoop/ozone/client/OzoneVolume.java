@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.util.Time;
 
 /**
  * A class that encapsulates OzoneVolume.
@@ -106,11 +105,10 @@ public class OzoneVolume extends WithMetadata {
     this.acls = acls;
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
     this.metadata = metadata;
-    long modifiedTime = Time.now();
-    if (modifiedTime < creationTime) {
-      this.modificationTime = Instant.ofEpochMilli(creationTime);
-    } else {
-      this.modificationTime = Instant.ofEpochMilli(modifiedTime);
+    modificationTime = Instant.now();
+    if (modificationTime.isBefore(this.creationTime)) {
+      modificationTime = Instant.ofEpochSecond(
+          this.creationTime.getEpochSecond(), this.creationTime.getNano());
     }
   }
 
@@ -133,11 +131,10 @@ public class OzoneVolume extends WithMetadata {
       long creationTime, List<OzoneAcl> acls) {
     this(conf, proxy, name, admin, owner, quotaInBytes, creationTime, acls,
         new HashMap<>());
-    long modifiedTime = Time.now();
-    if (modifiedTime < creationTime) {
-      this.modificationTime = Instant.ofEpochMilli(creationTime);
-    } else {
-      this.modificationTime = Instant.ofEpochMilli(modifiedTime);
+    modificationTime = Instant.now();
+    if (modificationTime.isBefore(this.creationTime)) {
+      modificationTime = Instant.ofEpochSecond(
+          this.creationTime.getEpochSecond(), this.creationTime.getNano());
     }
   }
 
@@ -160,11 +157,10 @@ public class OzoneVolume extends WithMetadata {
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.acls = acls;
     this.metadata = new HashMap<>();
-    long modifiedTime = Time.now();
-    if (modifiedTime < creationTime) {
-      this.modificationTime = Instant.ofEpochMilli(creationTime);
-    } else {
-      this.modificationTime = Instant.ofEpochMilli(modifiedTime);
+    modificationTime = Instant.now();
+    if (modificationTime.isBefore(this.creationTime)) {
+      modificationTime = Instant.ofEpochSecond(
+          this.creationTime.getEpochSecond(), this.creationTime.getNano());
     }
   }
 
