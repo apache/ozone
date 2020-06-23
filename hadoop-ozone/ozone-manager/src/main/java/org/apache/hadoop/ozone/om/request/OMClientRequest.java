@@ -43,7 +43,7 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .UnDeletedKeysResponse;
+    .DeleteKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -237,13 +237,10 @@ public abstract class OMClientRequest implements RequestAuditor {
       @Nonnull IOException ex, @Nonnull Set<OmKeyInfo> unDeletedKeys) {
     omResponse.setSuccess(false);
     StringBuffer errorMsg = new StringBuffer();
-    errorMsg.append(exceptionErrorMessage(ex) + "\n The Keys not deleted: ");
-    UnDeletedKeysResponse.Builder resp =
-        UnDeletedKeysResponse.newBuilder();
+    DeleteKeysResponse.Builder resp = DeleteKeysResponse.newBuilder();
     for (OmKeyInfo key : unDeletedKeys) {
       if(key != null) {
-        resp.addKeyInfo(key.getProtobuf());
-        errorMsg.append(key.getObjectInfo() + "\n");
+        resp.addUnDeletedKeys(key.getProtobuf());
       }
     }
     if (errorMsg != null) {
@@ -252,7 +249,7 @@ public abstract class OMClientRequest implements RequestAuditor {
     // TODO: Currently all delete operations in OzoneBucket.java are void. Here
     //  we put the List of unDeletedKeys into Response. These KeyInfo can be
     //  used to continue deletion if client support delete retry.
-    omResponse.setUnDeletedKeysResponse(resp.build());
+    omResponse.setDeleteKeysResponse(resp.build());
     omResponse.setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(ex));
     return omResponse.build();
   }

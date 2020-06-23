@@ -189,8 +189,6 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     } catch (OMException ex) {
       // The expected exception KEY_NOT_FOUND.
       Assert.assertEquals(KEY_NOT_FOUND, ex.getResult());
-      // Keys that are not deleted are included in the ERROR Message.
-      Assert.assertTrue(ex.getMessage().contains("dir/file4"));
     }
   }
 
