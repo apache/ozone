@@ -41,7 +41,7 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
                 name: config
