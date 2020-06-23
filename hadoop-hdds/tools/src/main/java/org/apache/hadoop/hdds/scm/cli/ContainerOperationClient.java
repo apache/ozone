@@ -21,7 +21,9 @@ import javax.net.SocketFactory;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.List;
+import java.util.Map;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -474,6 +476,11 @@ public class ContainerOperationClient implements ScmClient {
    */
   public boolean inSafeMode() throws IOException {
     return storageContainerLocationClient.inSafeMode();
+  }
+
+  public Map<String, Pair<Boolean, String>> getSafeModeRuleStatuses()
+      throws IOException {
+    return storageContainerLocationClient.getSafeModeRuleStatuses();
   }
 
   /**

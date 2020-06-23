@@ -79,4 +79,10 @@ public class DataNodeSafeModeRule extends
   protected void cleanup() {
     registeredDnSet.clear();
   }
+
+  @Override
+  public String getStatusText() {
+    return "registeredDns " + this.registeredDns + " >= requiredDns "
+        + this.requiredDns;
+  }
 }
