@@ -714,6 +714,24 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public void deleteKeys(
+          String volumeName, String bucketName, List<String> keyNameList)
+          throws IOException {
+    HddsClientUtils.verifyResourceName(volumeName, bucketName);
+    Preconditions.checkNotNull(keyNameList);
+    List<OmKeyArgs> keyArgsList = new ArrayList<>();
+    for (String keyName: keyNameList) {
+      OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+          .setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .setKeyName(keyName)
+          .build();
+      keyArgsList.add(keyArgs);
+    }
+    ozoneManagerClient.deleteKeys(keyArgsList);
+  }
+
+  @Override
   public void renameKey(String volumeName, String bucketName,
       String fromKeyName, String toKeyName) throws IOException {
     verifyVolumeName(volumeName);
