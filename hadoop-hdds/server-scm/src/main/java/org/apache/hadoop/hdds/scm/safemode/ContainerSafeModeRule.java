@@ -125,4 +125,10 @@ public class ContainerSafeModeRule extends
   protected void cleanup() {
     containerMap.clear();
   }
+
+  @Override
+  public String getStatusText() {
+    return "currentContainerThreshold " + getCurrentContainerThreshold()
+        + " >= safeModeCutoff " + this.safeModeCutoff;
+  }
 }
