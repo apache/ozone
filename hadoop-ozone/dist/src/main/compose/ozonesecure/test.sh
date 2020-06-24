@@ -31,7 +31,8 @@ execute_robot_test scm basic
 
 execute_robot_test scm security
 
-execute_robot_test scm ozonefs/ozonefs.robot
+execute_robot_test scm -v SCHEME:ofs ozonefs/ozonefs.robot
+execute_robot_test scm -v SCHEME:o3fs ozonefs/ozonefs.robot
 
 execute_robot_test s3g s3
 

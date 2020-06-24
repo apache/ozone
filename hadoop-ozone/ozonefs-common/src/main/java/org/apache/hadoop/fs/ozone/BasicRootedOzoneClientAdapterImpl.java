@@ -454,6 +454,19 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   /**
+   * Helper method to delete an object specified by key name in bucket.
+   *
+   * @param pathList key name list to be deleted
+   * @return true if the key is deleted, false otherwise
+   */
+  @Override
+  public boolean deleteObjects(List<String> pathList) {
+    // TODO: we will support deleteObjects in ofs.
+    LOG.error("ofs currently does not support deleteObjects");
+    return false;
+  }
+
+  /**
    * Package-private helper function to reduce calls to getBucket().
    * @param bucket Bucket to operate in.
    * @param path Path to delete.
