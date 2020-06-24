@@ -43,6 +43,7 @@ import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -77,7 +78,6 @@ import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.utils.RetriableTask;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBUpdatesWrapper;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
 import org.apache.hadoop.io.Text;
@@ -124,10 +124,12 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerServerProtocol;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OMRatisSnapshotInfo;
+import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.OzoneManagerSnapshotProvider;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
@@ -168,7 +170,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
-import io.prometheus.client.CollectorRegistry;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
@@ -208,8 +209,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService.newReflectiveBlockingService;
-import org.apache.ratis.metrics.MetricRegistries;
-import org.apache.ratis.metrics.MetricsReporting;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.FileUtils;
@@ -223,7 +222,7 @@ import org.slf4j.LoggerFactory;
  */
 @InterfaceAudience.LimitedPrivate({"HDFS", "CBLOCK", "OZONE", "HBASE"})
 public final class OzoneManager extends ServiceRuntimeInfoImpl
-    implements OzoneManagerServerProtocol, OMMXBean, Auditor {
+    implements OzoneManagerProtocol, OMMXBean, Auditor {
   public static final Logger LOG =
       LoggerFactory.getLogger(OzoneManager.class);
 
@@ -282,6 +281,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private List<OMNodeDetails> peerNodes;
   private File omRatisSnapshotDir;
   private final OMRatisSnapshotInfo omRatisSnapshotInfo;
+  private final Map<String, RatisDropwizardExports> ratisMetricsMap =
+      new ConcurrentHashMap<>();
 
   private KeyProviderCryptoExtension kmsProvider = null;
   private static String keyProviderUriKeyName =
@@ -411,8 +412,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     instantiateServices();
-    this.omRatisSnapshotInfo = new OMRatisSnapshotInfo(
-        omStorage.getCurrentDir());
+    this.omRatisSnapshotInfo = new OMRatisSnapshotInfo();
     initializeRatisServer();
     if (isRatisEnabled) {
       // Create Ratis storage dir
@@ -449,20 +449,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     ShutdownHookManager.get().addShutdownHook(shutdownHook,
         SHUTDOWN_HOOK_PRIORITY);
     omState = State.INITIALIZED;
-  }
-
-  /**
-   * Register Ratis metrics reporters.
-   */
-  private void registerRatisMetricReporters() {
-    // All the Ratis metrics (registered from now) will be published via JMX
-    // and via the prometheus exporter (used by the /prom servlet
-    MetricRegistries.global()
-        .addReporterRegistration(MetricsReporting.jmxReporter());
-    MetricRegistries.global().addReporterRegistration(
-        registry -> CollectorRegistry.defaultRegistry.register(
-            new RatisDropwizardExports(
-                registry.getDropWizardMetricRegistry())));
   }
 
   /**
@@ -1232,7 +1218,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (isRatisEnabled) {
       if (omRatisServer == null) {
         // This needs to be done before initializing Ratis.
-        registerRatisMetricReporters();
+        RatisDropwizardExports.
+            registerRatisMetricReporters(ratisMetricsMap);
         omRatisServer = OzoneManagerRatisServer.newOMRatisServer(
             configuration, this, omNodeDetails, peerNodes);
       }
@@ -1248,20 +1235,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @VisibleForTesting
-  public long getRatisSnapshotIndex() {
-    return omRatisSnapshotInfo.getIndex();
-  }
-
-  @Override
-  public TermIndex saveRatisSnapshot() throws IOException {
-    TermIndex snapshotIndex = omRatisServer.getLastAppliedTermIndex();
-
-    // Flush the OM state to disk
-    metadataManager.getStore().flush();
-
-    omRatisSnapshotInfo.saveRatisSnapshotToDisk(snapshotIndex);
-
-    return snapshotIndex;
+  public long getRatisSnapshotIndex() throws IOException {
+    return OMTransactionInfo.readTransactionInfo(metadataManager)
+        .getTransactionIndex();
   }
 
   /**
@@ -2040,7 +2016,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Allocate a key.
    *
    * @param args - attributes of the key.
-   * @return OmKeyInfo - the info about the allocated key.
+   * @return OpenKeySession - a handler to key that client uses to
+   * talk to container.
    * @throws IOException
    */
   @Override
@@ -3033,44 +3010,69 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     DBCheckpoint omDBcheckpoint = getDBCheckpointFromLeader(leaderId);
     Path newDBlocation = omDBcheckpoint.getCheckpointLocation();
 
+    LOG.info("Downloaded checkpoint from Leader {}, in to the location {}",
+        leaderId, newDBlocation);
+
     // Check if current ratis log index is smaller than the downloaded
-    // snapshot index. If yes, proceed by stopping the ratis server so that
-    // the OM state can be re-initialized. If no, then do not proceed with
-    // installSnapshot.
-    long lastAppliedIndex = omRatisServer.getLastAppliedTermIndex().getIndex();
-    long checkpointSnapshotIndex = omDBcheckpoint.getRatisSnapshotIndex();
-    long checkpointSnapshotTermIndex =
-        omDBcheckpoint.getRatisSnapshotTerm();
-    if (checkpointSnapshotIndex <= lastAppliedIndex) {
-      LOG.error("Failed to install checkpoint from OM leader: {}. The last " +
-              "applied index: {} is greater than or equal to the checkpoint's"
-              + " " +
-              "snapshot index: {}. Deleting the downloaded checkpoint {}",
-          leaderId,
-          lastAppliedIndex, checkpointSnapshotIndex,
+    // checkpoint transaction index. If yes, proceed by stopping the ratis
+    // server so that the OM state can be re-initialized. If no, then do not
+    // proceed with installSnapshot.
+
+    OMTransactionInfo omTransactionInfo = null;
+
+    Path dbDir = newDBlocation.getParent();
+    if (dbDir == null) {
+      LOG.error("Incorrect DB location path {} received from checkpoint.",
           newDBlocation);
-      try {
-        FileUtils.deleteFully(newDBlocation);
-      } catch (IOException e) {
-        LOG.error("Failed to fully delete the downloaded DB checkpoint {} " +
-                "from OM leader {}.", newDBlocation,
-            leaderId, e);
-      }
       return null;
     }
 
-    // Pause the State Machine so that no new transactions can be applied.
-    // This action also clears the OM Double Buffer so that if there are any
-    // pending transactions in the buffer, they are discarded.
-    // TODO: The Ratis server should also be paused here. This is required
-    //  because a leader election might happen while the snapshot
-    //  installation is in progress and the new leader might start sending
-    //  append log entries to the ratis server.
-    omRatisServer.getOmStateMachine().pause();
+    try {
+      omTransactionInfo =
+          OzoneManagerRatisUtils.getTransactionInfoFromDownloadedSnapshot(
+              configuration, dbDir);
+    } catch (Exception ex) {
+      LOG.error("Failed during opening downloaded snapshot from " +
+          "{} to obtain transaction index", newDBlocation, ex);
+      return null;
+    }
+
+    File oldDBLocation = metadataManager.getStore().getDbLocation();
+    try {
+      // Stop Background services
+      stopServices();
+
+      // Pause the State Machine so that no new transactions can be applied.
+      // This action also clears the OM Double Buffer so that if there are any
+      // pending transactions in the buffer, they are discarded.
+      omRatisServer.getOmStateMachine().pause();
+    } catch (Exception e) {
+      LOG.error("Failed to stop/ pause the services. Cannot proceed with " +
+          "installing the new checkpoint.", e);
+      return null;
+    }
+
+    //TODO: un-pause SM if any failures and retry?
+
+    long lastAppliedIndex = omRatisServer.getLastAppliedTermIndex().getIndex();
+
+    boolean canProceed =
+        OzoneManagerRatisUtils.verifyTransactionInfo(omTransactionInfo,
+        lastAppliedIndex, leaderId, newDBlocation);
+
+    // If downloaded DB has transaction info less than current one, return.
+    if (!canProceed) {
+      return null;
+    }
+
+    long leaderIndex = omTransactionInfo.getTransactionIndex();
+    long leaderTerm = omTransactionInfo.getCurrentTerm();
+
 
     File dbBackup;
     try {
-      dbBackup = replaceOMDBWithCheckpoint(lastAppliedIndex, newDBlocation);
+      dbBackup = replaceOMDBWithCheckpoint(lastAppliedIndex, oldDBLocation,
+          newDBlocation);
     } catch (Exception e) {
       LOG.error("OM DB checkpoint replacement with new downloaded checkpoint " +
           "failed.", e);
@@ -3081,9 +3083,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Restart (unpause) the state machine and update its last applied index
     // to the installed checkpoint's snapshot index.
     try {
-      reloadOMState(checkpointSnapshotIndex, checkpointSnapshotTermIndex);
-      omRatisServer.getOmStateMachine().unpause(checkpointSnapshotIndex,
-          checkpointSnapshotTermIndex);
+      reloadOMState(leaderIndex, leaderTerm);
+      omRatisServer.getOmStateMachine().unpause(leaderIndex, leaderTerm);
     } catch (IOException e) {
       LOG.error("Failed to reload OM state with new DB checkpoint.", e);
       return null;
@@ -3098,11 +3099,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // TODO: We should only return the snpashotIndex to the leader.
     //  Should be fixed after RATIS-586
-    TermIndex newTermIndex = TermIndex.newTermIndex(checkpointSnapshotTermIndex,
-        checkpointSnapshotIndex);
-
+    TermIndex newTermIndex = TermIndex.newTermIndex(leaderTerm, leaderIndex);
     return newTermIndex;
   }
+
 
   /**
    * Download the latest OM DB checkpoint from the leader OM.
@@ -3122,6 +3122,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return null;
   }
 
+  void stopServices() throws Exception {
+    keyManager.stop();
+    stopSecretManager();
+    metadataManager.stop();
+  }
+
   /**
    * Replace the current OM DB with the new DB checkpoint.
    *
@@ -3130,20 +3136,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @return location of the backup of the original DB
    * @throws Exception
    */
-  File replaceOMDBWithCheckpoint(long lastAppliedIndex, Path checkpointPath)
-      throws Exception {
-    // Stop the DB first
-    DBStore store = metadataManager.getStore();
-    store.close();
+  File replaceOMDBWithCheckpoint(long lastAppliedIndex, File oldDB,
+      Path checkpointPath) throws Exception {
 
     // Take a backup of the current DB
-    File db = store.getDbLocation();
     String dbBackupName = OzoneConsts.OM_DB_BACKUP_PREFIX +
         lastAppliedIndex + "_" + System.currentTimeMillis();
-    File dbBackup = new File(db.getParentFile(), dbBackupName);
+    File dbBackup = new File(oldDB.getParentFile(), dbBackupName);
 
     try {
-      Files.move(db.toPath(), dbBackup.toPath());
+      Files.move(oldDB.toPath(), dbBackup.toPath());
     } catch (IOException e) {
       LOG.error("Failed to create a backup of the current DB. Aborting " +
           "snapshot installation.");
@@ -3152,12 +3154,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // Move the new DB checkpoint into the om metadata dir
     try {
-      Files.move(checkpointPath, db.toPath());
+      Files.move(checkpointPath, oldDB.toPath());
     } catch (IOException e) {
       LOG.error("Failed to move downloaded DB checkpoint {} to metadata " +
               "directory {}. Resetting to original DB.", checkpointPath,
-          db.toPath());
-      Files.move(dbBackup.toPath(), db.toPath());
+          oldDB.toPath());
+      Files.move(dbBackup.toPath(), oldDB.toPath());
       throw e;
     }
     return dbBackup;
@@ -3168,8 +3170,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * All the classes which use/ store MetadataManager should also be updated
    * with the new MetadataManager instance.
    */
-  void reloadOMState(long newSnapshotIndex,
-      long newSnapShotTermIndex) throws IOException {
+  void reloadOMState(long newSnapshotIndex, long newSnapshotTermIndex)
+      throws IOException {
 
     instantiateServices();
 
@@ -3191,9 +3193,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     saveOmMetrics();
 
     // Update OM snapshot index with the new snapshot index (from the new OM
-    // DB state) and save the snapshot index to disk
-    omRatisSnapshotInfo.saveRatisSnapshotToDisk(
-        TermIndex.newTermIndex(newSnapShotTermIndex, newSnapshotIndex));
+    // DB state).
+    omRatisSnapshotInfo.updateTermIndex(newSnapshotTermIndex, newSnapshotIndex);
   }
 
   public static Logger getLogger() {

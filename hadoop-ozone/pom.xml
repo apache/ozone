@@ -30,6 +30,7 @@
     <jooq.version>3.11.10</jooq.version>
   </properties>
   <modules>
+    <module>interface-client</module>
     <module>common</module>
     <module>client</module>
     <module>ozone-manager</module>
@@ -64,6 +65,11 @@
       <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-ozone-client</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-ozone-interface-client</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
@@ -119,6 +125,11 @@
       <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-hdds-config</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-interface-client</artifactId>
         <version>${hdds.version}</version>
       </dependency>
       <dependency>
@@ -289,6 +300,7 @@
             <exclude>**/dependency-reduced-pom.xml</exclude>
             <exclude>**/node_modules/**</exclude>
             <exclude>**/yarn.lock</exclude>
+            <exclude>**/pnpm-lock.yaml</exclude>
             <exclude>**/ozone-recon-web/build/**</exclude>
             <exclude>src/main/license/**</exclude>
             <exclude>src/main/proto/proto.lock</exclude>

@@ -85,6 +85,7 @@ public final class OzoneConsts {
 
   // Ozone File System scheme
   public static final String OZONE_URI_SCHEME = "o3fs";
+  public static final String OZONE_OFS_URI_SCHEME = "ofs";
 
   public static final String OZONE_RPC_SCHEME = "o3";
   public static final String OZONE_HTTP_SCHEME = "http";
@@ -319,16 +320,6 @@ public final class OzoneConsts {
 
   // Dummy OMNodeID for OM Clients to use for a non-HA OM setup
   public static final String OM_NODE_ID_DUMMY = "omNodeIdDummy";
-
-  // OM Ratis snapshot file to store the last applied index
-  public static final String OM_RATIS_SNAPSHOT_INDEX = "ratisSnapshotIndex";
-
-  public static final String OM_RATIS_SNAPSHOT_TERM = "ratisSnapshotTerm";
-
-  // OM Http request parameter to be used while downloading DB checkpoint
-  // from OM leader to follower
-  public static final String OM_RATIS_SNAPSHOT_BEFORE_DB_CHECKPOINT =
-      "snapshotBeforeCheckpoint";
 
   public static final String JAVA_TMP_DIR = "java.io.tmpdir";
   public static final String LOCALHOST = "localhost";

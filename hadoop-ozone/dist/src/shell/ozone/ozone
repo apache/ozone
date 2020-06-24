@@ -31,6 +31,7 @@ function hadoop_usage
   hadoop_add_option "--hosts filename" "list of hosts to use in worker mode"
   hadoop_add_option "--loglevel level" "set the log4j level for this command"
   hadoop_add_option "--workers" "turn on worker mode"
+  hadoop_add_option "--jvmargs arguments" "append JVM options to any existing options defined in the HADOOP_OPTS environment variable. Any defined in HADOOP_CLIENT_OPTS will be append after these jvmargs"
 
   hadoop_add_subcommand "auditparser" client "runs audit parser tool"
   hadoop_add_subcommand "classpath" client "prints the class path needed to get the hadoop jar and the required libraries"
@@ -103,7 +104,9 @@ function ozonecmd_case
       # for disabling netty PooledByteBufAllocator thread caches for non-netty threads.
       # This parameter significantly reduces GC pressure for Datanode.
       # Corresponding Ratis issue https://issues.apache.org/jira/browse/RATIS-534.
-      HDDS_DN_OPTS="${HDDS_DN_OPTS} -Dlog4j.configurationFile=${HADOOP_CONF_DIR}/dn-audit-log4j2.properties -Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false"
+      # TODO: Fix the problem related to netty resource leak detector throwing
+      # exception as mentioned in HDDS-3812
+      HDDS_DN_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false -Dorg.apache.ratis.thirdparty.io.netty.leakDetection.level=disabled -Dlog4j.configurationFile=${HADOOP_CONF_DIR}/dn-audit-log4j2.properties ${HDDS_DN_OPTS}"
       HADOOP_OPTS="${HADOOP_OPTS} ${HDDS_DN_OPTS}"
       HADOOP_CLASSNAME=org.apache.hadoop.ozone.HddsDatanodeService
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-datanode"

@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.junit.Before;
 import org.junit.Rule;
@@ -62,6 +63,7 @@ public abstract class AbstractTestChunkManager {
   private ChunkInfo chunkInfo;
   private ByteBuffer data;
   private byte[] header;
+  private BlockManager blockManager;
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -69,7 +71,8 @@ public abstract class AbstractTestChunkManager {
   protected abstract ChunkLayoutTestInfo getStrategy();
 
   protected ChunkManager createTestSubject() {
-    return getStrategy().createChunkManager(true);
+    blockManager = new BlockManagerImpl(new OzoneConfiguration());
+    return getStrategy().createChunkManager(true, blockManager);
   }
 
   @Before
@@ -167,4 +170,7 @@ public abstract class AbstractTestChunkManager {
     return data;
   }
 
+  protected BlockManager getBlockManager() {
+    return blockManager;
+  }
 }

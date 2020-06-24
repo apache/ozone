@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +40,15 @@ public final class ChunkManagerFactory {
   private ChunkManagerFactory() {
   }
 
-  public static ChunkManager createChunkManager(ConfigurationSource conf) {
+  /**
+   * Create a chunk manager.
+   * @param conf     Configuration
+   * @param manager  This parameter will be used only for read data of
+   *                 FILE_PER_CHUNK layout file. Can be null for other cases.
+   * @return
+   */
+  public static ChunkManager createChunkManager(ConfigurationSource conf,
+      BlockManager manager) {
     boolean sync =
         conf.getBoolean(OzoneConfigKeys.DFS_CONTAINER_CHUNK_WRITE_SYNC_KEY,
             OzoneConfigKeys.DFS_CONTAINER_CHUNK_WRITE_SYNC_DEFAULT);
@@ -67,6 +76,6 @@ public final class ChunkManagerFactory {
       return new ChunkManagerDummyImpl();
     }
 
-    return new ChunkManagerDispatcher(sync);
+    return new ChunkManagerDispatcher(sync, manager);
   }
 }

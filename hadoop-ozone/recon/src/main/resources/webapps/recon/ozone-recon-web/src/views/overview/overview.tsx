@@ -20,14 +20,16 @@ import React from 'react';
 import {Row, Col, Icon, Tooltip} from 'antd';
 import OverviewCard from 'components/overviewCard/overviewCard';
 import axios from 'axios';
-import prettyBytes from 'pretty-bytes';
-import './overview.less';
 import {IStorageReport} from 'types/datanode.types';
 import {IMissingContainersResponse} from '../missingContainers/missingContainers';
 import moment from 'moment';
 import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
 import {showDataFetchError} from 'utils/common';
 import {AutoReloadHelper} from 'utils/autoReloadHelper';
+import filesize from 'filesize';
+import './overview.less';
+
+const size = filesize.partial({round: 1});
 
 interface IClusterStateResponse {
   totalDatanodes: number;
@@ -137,7 +139,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       </span>
     ) :
       containers.toString();
-    const clusterCapacity = `${prettyBytes(storageReport.capacity - storageReport.remaining)}/${prettyBytes(storageReport.capacity)}`;
+    const clusterCapacity = `${size(storageReport.capacity - storageReport.remaining)}/${size(storageReport.capacity)}`;
     return (
       <div className='overview-content'>
         <div className='page-header'>

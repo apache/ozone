@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -143,16 +142,18 @@ public final class ServiceInfo {
   public OzoneManagerProtocolProtos.ServiceInfo getProtobuf() {
     OzoneManagerProtocolProtos.ServiceInfo.Builder builder =
         OzoneManagerProtocolProtos.ServiceInfo.newBuilder();
+
+    List<ServicePort> servicePorts = new ArrayList<>();
+    for (Map.Entry<ServicePort.Type, Integer>
+        entry : ports.entrySet()) {
+      servicePorts.add(ServicePort.newBuilder()
+          .setType(entry.getKey())
+          .setValue(entry.getValue()).build());
+    }
+
     builder.setNodeType(nodeType)
         .setHostname(hostname)
-        .addAllServicePorts(
-            ports.entrySet().stream()
-                .map(
-                    entry ->
-                        ServicePort.newBuilder()
-                            .setType(entry.getKey())
-                            .setValue(entry.getValue()).build())
-                .collect(Collectors.toList()));
+        .addAllServicePorts(servicePorts);
     if (nodeType == NodeType.OM && omRoleInfo != null) {
       builder.setOmRole(omRoleInfo);
     }
