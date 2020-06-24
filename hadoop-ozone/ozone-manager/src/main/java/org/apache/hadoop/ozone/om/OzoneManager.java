@@ -1581,11 +1581,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    *
    * @return true if permission granted, false if permission denied.
    */
-  private boolean hasAcls(ResourceType resType, StoreType store,
-      ACLType acl, String vol, String bucket, String key) {
+  private boolean hasAcls(String userName, ResourceType resType,
+      StoreType store, ACLType acl, String vol, String bucket, String key) {
     try {
       return checkAcls(resType, store, acl, vol, bucket, key,
-          ProtobufRpcEngine.Server.getRemoteUser(),
+          UserGroupInformation.createRemoteUser(userName),
           ProtobufRpcEngine.Server.getRemoteIp(),
           ProtobufRpcEngine.Server.getRemoteIp().getHostName(),
           false);
@@ -1847,8 +1847,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         List<OmVolumeArgs> result = new ArrayList<>();
         // Filter all volumes by LIST ACL
         for (OmVolumeArgs volumeArgs : listAllVolumes) {
-          if (hasAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.LIST,
-              volumeArgs.getVolume(), null, null)) {
+          if (hasAcls(userName, ResourceType.VOLUME, StoreType.OZONE,
+              ACLType.LIST, volumeArgs.getVolume(), null, null)) {
             result.add(volumeArgs);
           }
         }
