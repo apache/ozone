@@ -115,9 +115,11 @@ public abstract class BaseHttpServer {
       if (isSecurityEnabled) {
         String httpAuthType = conf.get(getHttpAuthType(), "simple");
         LOG.info("HttpAuthType: {} = {}", getHttpAuthType(), httpAuthType);
+        // Ozone config prefix must be set to avoid AuthenticationFilter
+        // fall back to default one form hadoop.http.authentication.
+        builder.authFilterConfigurationPrefix(getHttpAuthConfigPrefix());
         if (httpAuthType.equals("kerberos")) {
           builder.setSecurityEnabled(true);
-          builder.authFilterConfigurationPrefix(getHttpAuthConfigPrefix());
           builder.setUsernameConfKey(getSpnegoPrincipal());
           builder.setKeytabConfKey(getKeytabFile());
         }
