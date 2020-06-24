@@ -14,6 +14,7 @@
 # limitations under the License.
 name: build-branch
 on:
+  pull_request:
   push:
   schedule:
     - cron: 30 0,12 * * *
@@ -176,7 +177,7 @@ jobs:
             path: target/artifacts
        - run: ./hadoop-ozone/dev-support/checks/coverage.sh
        - uses: ./.github/buildenv
-         if: github.repository == 'apache/hadoop-ozone'
+         if: github.repository == 'apache/hadoop-ozone' && github.event_name != 'pull_request'
          with:
            args: ./hadoop-ozone/dev-support/checks/sonar.sh
          env:

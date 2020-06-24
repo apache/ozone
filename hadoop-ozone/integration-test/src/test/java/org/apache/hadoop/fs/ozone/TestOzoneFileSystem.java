@@ -45,6 +45,7 @@ import org.apache.hadoop.test.GenericTestUtils;
 
 import org.apache.commons.io.IOUtils;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -171,6 +172,7 @@ public class TestOzoneFileSystem {
 
     testCreateDoesNotAddParentDirKeys();
     testDeleteCreatesFakeParentDir();
+    testFileDelete();
     testNonExplicitlyCreatedPathExistsAfterItsLeafsWereRemoved();
 
     testRenameDir();
@@ -204,6 +206,8 @@ public class TestOzoneFileSystem {
 
     // Set the fs.defaultFS and start the filesystem
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    // Set the number of keys to be processed during batch operate.
+    conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
     fs = FileSystem.get(conf);
   }
 
@@ -260,6 +264,44 @@ public class TestOzoneFileSystem {
     String parentKey = o3fs.pathToKey(parent) + "/";
     OzoneKeyDetails parentKeyInfo = getKey(parent, true);
     assertEquals(parentKey, parentKeyInfo.getName());
+  }
+
+  private void testFileDelete() throws Exception {
+    Path grandparent = new Path("/testBatchDelete");
+    Path parent = new Path(grandparent, "parent");
+    Path childFolder = new Path(parent, "childFolder");
+    // BatchSize is 5, so we're going to set a number that's not a
+    // multiple of 5. In order to test the final number of keys less than
+    // batchSize can also be deleted.
+    for (int i = 0; i < 8; i++) {
+      Path childFile = new Path(parent, "child" + i);
+      Path childFolderFile = new Path(childFolder, "child" + i);
+      ContractTestUtils.touch(fs, childFile);
+      ContractTestUtils.touch(fs, childFolderFile);
+    }
+
+    assertTrue(fs.listStatus(grandparent).length == 1);
+    assertTrue(fs.listStatus(parent).length == 9);
+    assertTrue(fs.listStatus(childFolder).length == 8);
+
+    Boolean successResult = fs.delete(grandparent, true);
+    assertTrue(successResult);
+    assertTrue(!o3fs.exists(grandparent));
+    for (int i = 0; i < 8; i++) {
+      Path childFile = new Path(parent, "child" + i);
+      // Make sure all keys under testBatchDelete/parent should be deleted
+      assertTrue(!o3fs.exists(childFile));
+
+      // Test to recursively delete child folder, make sure all keys under
+      // testBatchDelete/parent/childFolder should be deleted.
+      Path childFolderFile = new Path(childFolder, "child" + i);
+      assertTrue(!o3fs.exists(childFolderFile));
+    }
+    // Will get: WARN  ozone.BasicOzoneFileSystem delete: Path does not exist.
+    // This will return false.
+    Boolean falseResult = fs.delete(parent, true);
+    assertFalse(falseResult);
+
   }
 
   private void testListStatus() throws Exception {
