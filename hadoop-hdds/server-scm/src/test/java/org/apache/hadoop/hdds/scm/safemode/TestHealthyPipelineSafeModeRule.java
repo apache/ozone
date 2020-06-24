@@ -52,7 +52,6 @@ public class TestHealthyPipelineSafeModeRule {
   @Test
   public void testHealthyPipelineSafeModeRuleWithNoPipelines()
       throws Exception {
-    //DBStore store = null;
     EventQueue eventQueue = new EventQueue();
     List<ContainerInfo> containers =
             new ArrayList<>(HddsTestUtils.getContainerInfo(1));
