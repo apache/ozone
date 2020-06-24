@@ -20,12 +20,8 @@ package org.apache.hadoop.ozone.container;
 
 import java.io.IOException;
 import java.security.MessageDigest;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.TimeoutException;
-
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
@@ -220,10 +216,27 @@ public final class TestHelper {
             cluster.getHddsDatanodes().get(cluster.getHddsDatanodeIndex(dn))
                 .getDatanodeStateMachine().getContainer().getWriteChannel();
         Assert.assertTrue(server instanceof XceiverServerRatis);
-        XceiverServerRatis raftServer = (XceiverServerRatis) server;
-        GenericTestUtils.waitFor(
-            () -> (!raftServer.getPipelineIds().contains(pipeline.getId())),
-            500, 100 * 1000);
+        server.removeGroup(pipeline.getId().getProtobuf());
+      }
+    }
+  }
+
+  public static void createPipelineOnDatanode(Pipeline pipeline,
+                                              MiniOzoneCluster cluster)
+          throws IOException {
+
+    // wait for the pipeline to get destroyed in the datanodes
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      XceiverServerSpi server =
+              cluster.getHddsDatanodes().get(cluster.getHddsDatanodeIndex(dn))
+                      .getDatanodeStateMachine().getContainer()
+                      .getWriteChannel();
+      Assert.assertTrue(server instanceof XceiverServerRatis);
+      try {
+        server.addGroup(pipeline.getId().getProtobuf(), Collections.
+                unmodifiableList(pipeline.getNodes()));
+      } catch (Exception e) {
+        //ignore exception
       }
     }
   }
