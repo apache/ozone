@@ -26,6 +26,7 @@ import java.util.NoSuchElementException;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.crypto.key.KeyProvider;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
@@ -40,8 +41,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import org.apache.hadoop.security.token.Token;
-
-import static org.apache.hadoop.ozone.OzoneConsts.S3_VOLUME_NAME;
 
 /**
  * ObjectStore class is responsible for the client operations that can be
@@ -61,6 +60,8 @@ public class ObjectStore {
    */
   private int listCacheSize;
 
+  private String s3VolumeName;
+
   /**
    * Creates an instance of ObjectStore.
    * @param conf Configuration object.
@@ -69,10 +70,14 @@ public class ObjectStore {
   public ObjectStore(ConfigurationSource conf, ClientProtocol proxy) {
     this.proxy = TracingUtil.createProxy(proxy, ClientProtocol.class, conf);
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
+    this.s3VolumeName = HddsClientUtils.getS3VolumeName(conf);
   }
 
   @VisibleForTesting
   protected ObjectStore() {
+    // For the unit test
+    OzoneConfiguration conf = new OzoneConfiguration();
+    this.s3VolumeName = HddsClientUtils.getS3VolumeName(conf);
     proxy = null;
   }
 
@@ -109,12 +114,12 @@ public class ObjectStore {
    */
   public void createS3Bucket(String bucketName) throws
       IOException {
-    OzoneVolume volume = getVolume(S3_VOLUME_NAME);
+    OzoneVolume volume = getVolume(s3VolumeName);
     volume.createBucket(bucketName);
   }
 
   public OzoneBucket getS3Bucket(String bucketName) throws IOException {
-    return getVolume(S3_VOLUME_NAME).getBucket(bucketName);
+    return getVolume(s3VolumeName).getBucket(bucketName);
   }
 
   /**
@@ -124,7 +129,7 @@ public class ObjectStore {
    */
   public void deleteS3Bucket(String bucketName) throws IOException {
     try {
-      OzoneVolume volume = getVolume(S3_VOLUME_NAME);
+      OzoneVolume volume = getVolume(s3VolumeName);
       volume.deleteBucket(bucketName);
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.VOLUME_NOT_FOUND) {

@@ -152,7 +152,14 @@ public class StateContext {
    * @param state state.
    */
   public void setState(DatanodeStateMachine.DatanodeStates state) {
-    this.state = state;
+    if (this.state != state) {
+      if (this.state.isTransitionAllowedTo(state)) {
+        this.state = state;
+      } else {
+        LOG.warn("Ignore disallowed transition from {} to {}",
+            this.state, state);
+      }
+    }
   }
 
   /**

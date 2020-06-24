@@ -38,6 +38,8 @@ import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .ReplicationType.RATIS;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .ReplicationFactor.THREE;
 
@@ -45,6 +47,12 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos
  * Test for the Node2Pipeline map.
  */
 public class TestNode2PipelineMap {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;

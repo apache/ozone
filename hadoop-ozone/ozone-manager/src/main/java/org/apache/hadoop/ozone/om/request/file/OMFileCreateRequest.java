@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,8 +61,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -196,9 +195,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
     List<OmKeyInfo> missingParentInfos;
 
     OMClientResponse omClientResponse = null;
-    OMResponse.Builder omResponse = OMResponse.newBuilder()
-        .setCmdType(Type.CreateFile)
-        .setStatus(Status.OK);
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
     IOException exception = null;
     Result result = null;
     try {

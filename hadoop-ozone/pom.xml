@@ -30,11 +30,13 @@
     <jooq.version>3.11.10</jooq.version>
   </properties>
   <modules>
+    <module>interface-client</module>
     <module>common</module>
     <module>client</module>
     <module>ozone-manager</module>
     <module>tools</module>
     <module>integration-test</module>
+    <module>ozonefs-common</module>
     <module>ozonefs</module>
     <module>datanode</module>
     <module>s3gateway</module>
@@ -63,6 +65,11 @@
       <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-ozone-client</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-ozone-interface-client</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
@@ -97,17 +104,32 @@
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-ozone-filesystem-lib-current</artifactId>
+        <artifactId>hadoop-ozone-filesystem-shaded</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-ozone-filesystem-lib-legacy</artifactId>
+        <artifactId>hadoop-ozone-filesystem-common</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-ozone-filesystem-hadoop3</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-ozone-filesystem-hadoop2</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-hdds-config</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-interface-client</artifactId>
         <version>${hdds.version}</version>
       </dependency>
       <dependency>
@@ -278,8 +300,10 @@
             <exclude>**/dependency-reduced-pom.xml</exclude>
             <exclude>**/node_modules/**</exclude>
             <exclude>**/yarn.lock</exclude>
+            <exclude>**/pnpm-lock.yaml</exclude>
             <exclude>**/ozone-recon-web/build/**</exclude>
             <exclude>src/main/license/**</exclude>
+            <exclude>src/main/proto/proto.lock</exclude>
           </excludes>
         </configuration>
       </plugin>
@@ -359,8 +383,9 @@
         </property>
       </activation>
       <modules>
-        <module>ozonefs-lib-current</module>
-        <module>ozonefs-lib-legacy</module>
+        <module>ozonefs-shaded</module>
+        <module>ozonefs-hadoop2</module>
+        <module>ozonefs-hadoop3</module>
       </modules>
     </profile>
     <profile>

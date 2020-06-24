@@ -18,8 +18,15 @@
 package org.apache.hadoop.hdds.server.http;
 
 import com.codahale.metrics.MetricRegistry;
+import io.prometheus.client.Collector;
+import io.prometheus.client.CollectorRegistry;
 import io.prometheus.client.dropwizard.DropwizardExports;
 import io.prometheus.client.dropwizard.samplebuilder.DefaultSampleBuilder;
+import org.apache.ratis.metrics.MetricRegistries;
+import org.apache.ratis.metrics.MetricsReporting;
+import org.apache.ratis.metrics.RatisMetricRegistry;
+
+import java.util.Map;
 
 /**
  * Collect Dropwizard metrics, but rename ratis specific metrics.
@@ -35,4 +42,33 @@ public class RatisDropwizardExports extends DropwizardExports {
     super(registry, new RatisNameRewriteSampleBuilder());
   }
 
+  public static void registerRatisMetricReporters(
+      Map<String, RatisDropwizardExports> ratisMetricsMap) {
+    //All the Ratis metrics (registered from now) will be published via JMX and
+    //via the prometheus exporter (used by the /prom servlet
+    MetricRegistries.global()
+        .addReporterRegistration(MetricsReporting.jmxReporter(),
+            MetricsReporting.stopJmxReporter());
+    MetricRegistries.global().addReporterRegistration(
+        r1 -> registerDropwizard(r1, ratisMetricsMap),
+        r2 -> deregisterDropwizard(r2, ratisMetricsMap));
+  }
+
+  private static void registerDropwizard(RatisMetricRegistry registry,
+      Map<String, RatisDropwizardExports> ratisMetricsMap) {
+    RatisDropwizardExports rde = new RatisDropwizardExports(
+        registry.getDropWizardMetricRegistry());
+    CollectorRegistry.defaultRegistry.register(rde);
+    String name = registry.getMetricRegistryInfo().getName();
+    ratisMetricsMap.putIfAbsent(name, rde);
+  }
+
+  private static void deregisterDropwizard(RatisMetricRegistry registry,
+      Map<String, RatisDropwizardExports> ratisMetricsMap) {
+    String name = registry.getMetricRegistryInfo().getName();
+    Collector c = ratisMetricsMap.remove(name);
+    if (c != null) {
+      CollectorRegistry.defaultRegistry.unregister(c);
+    }
+  }
 }

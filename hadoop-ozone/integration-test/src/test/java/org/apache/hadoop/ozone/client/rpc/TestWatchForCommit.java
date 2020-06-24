@@ -93,9 +93,6 @@ public class TestWatchForCommit {
     blockSize = 2 * maxFlushSize;
 
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(
-        OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_KEY,
-        1, TimeUnit.SECONDS);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 5);
 
     conf.setQuietMode(false);
@@ -141,7 +138,6 @@ public class TestWatchForCommit {
     // and will be captured in keyOutputStream and the failover will happen
     // to a different block
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 20);
     conf.setTimeDuration(
         OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
         1, TimeUnit.SECONDS);
@@ -152,9 +148,9 @@ public class TestWatchForCommit {
         ContainerProtos.Type.WriteChunk);
     long putBlockCount = metrics.getContainerOpCountMetrics(
         ContainerProtos.Type.PutBlock);
-    long pendingWriteChunkCount =  metrics.getContainerOpsMetrics(
+    long pendingWriteChunkCount =  metrics.getPendingContainerOpCountMetrics(
         ContainerProtos.Type.WriteChunk);
-    long pendingPutBlockCount = metrics.getContainerOpsMetrics(
+    long pendingPutBlockCount = metrics.getPendingContainerOpCountMetrics(
         ContainerProtos.Type.PutBlock);
     long totalOpCount = metrics.getTotalOpCount();
     String keyName = getKeyName();
@@ -167,11 +163,11 @@ public class TestWatchForCommit {
     key.write(data1);
     // since its hitting the full bufferCondition, it will call watchForCommit
     // and completes atleast putBlock for first flushSize worth of data
+    Assert.assertTrue(metrics
+        .getPendingContainerOpCountMetrics(ContainerProtos.Type.WriteChunk)
+        <= pendingWriteChunkCount + 2);
     Assert.assertTrue(
-        metrics.getContainerOpsMetrics(ContainerProtos.Type.WriteChunk)
-            <= pendingWriteChunkCount + 2);
-    Assert.assertTrue(
-        metrics.getContainerOpsMetrics(ContainerProtos.Type.PutBlock)
+        metrics.getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock)
             <= pendingPutBlockCount + 1);
     Assert.assertEquals(writeChunkCount + 4,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
@@ -205,10 +201,10 @@ public class TestWatchForCommit {
     // Now do a flush. This will flush the data and update the flush length and
     // the map.
     key.flush();
-    Assert.assertEquals(pendingWriteChunkCount,
-        metrics.getContainerOpsMetrics(ContainerProtos.Type.WriteChunk));
-    Assert.assertEquals(pendingPutBlockCount,
-        metrics.getContainerOpsMetrics(ContainerProtos.Type.PutBlock));
+    Assert.assertEquals(pendingWriteChunkCount, metrics
+        .getPendingContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
+    Assert.assertEquals(pendingPutBlockCount, metrics
+        .getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
     Assert.assertEquals(writeChunkCount + 5,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
     Assert.assertEquals(putBlockCount + 3,
@@ -253,10 +249,10 @@ public class TestWatchForCommit {
         .assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
     Assert.assertNull(blockOutputStream.getCommitIndex2flushedDataMap());
     Assert.assertEquals(0, keyOutputStream.getStreamEntries().size());
-    Assert.assertEquals(pendingWriteChunkCount,
-        metrics.getContainerOpsMetrics(ContainerProtos.Type.WriteChunk));
-    Assert.assertEquals(pendingPutBlockCount,
-        metrics.getContainerOpsMetrics(ContainerProtos.Type.PutBlock));
+    Assert.assertEquals(pendingWriteChunkCount, metrics
+        .getPendingContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
+    Assert.assertEquals(pendingPutBlockCount, metrics
+        .getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
     Assert.assertEquals(writeChunkCount + 14,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
     Assert.assertEquals(putBlockCount + 8,
@@ -276,7 +272,6 @@ public class TestWatchForCommit {
   @Test
   public void testWatchForCommitForRetryfailure() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 10);
     startCluster(conf);
     XceiverClientManager clientManager = new XceiverClientManager(conf);
     ContainerWithPipeline container1 = storageContainerLocationClient
@@ -319,7 +314,6 @@ public class TestWatchForCommit {
   @Test
   public void test2WayCommitForTimeoutException() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 20);
     conf.set("raft.client.watch.request.timeout", "3s");
     startCluster(conf);
     GenericTestUtils.LogCapturer logCapturer =
@@ -363,7 +357,6 @@ public class TestWatchForCommit {
   @Test
   public void testWatchForCommitForGroupMismatchException() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 20);
 
     // mark the node stale early so that pipleline gets destroyed quickly
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);

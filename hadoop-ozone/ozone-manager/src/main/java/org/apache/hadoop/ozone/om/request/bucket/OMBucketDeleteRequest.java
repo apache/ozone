@@ -23,6 +23,7 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,10 +81,8 @@ public class OMBucketDeleteRequest extends OMClientRequest {
     String bucketName = deleteBucketRequest.getBucketName();
 
     // Generate end user response
-    OMResponse.Builder omResponse = OMResponse.newBuilder()
-        .setStatus(OzoneManagerProtocolProtos.Status.OK)
-        .setCmdType(omRequest.getCmdType());
-
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     Map<String, String> auditMap = buildVolumeAuditMap(volumeName);
@@ -116,7 +115,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       //Check if bucket exists
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
       OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable()
-          .get(bucketKey);
+          .getReadCopy(bucketKey);
       if (omBucketInfo == null) {
         LOG.debug("bucket: {} not found ", bucketName);
         throw new OMException("Bucket doesn't exist",

@@ -54,6 +54,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   private final PipelineStateManager stateManager;
   private final ConfigurationSource conf;
   private final int heavyNodeCriteria;
+  private static final int REQUIRED_RACKS = 2;
 
   /**
    * Constructs a pipeline placement with considering network topology,
@@ -387,6 +388,11 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       return true;
     }
     return (topology.getNumOfNodes(topology.getMaxLevel() - 1) == 1);
+  }
+
+  @Override
+  protected int getRequiredRackCount() {
+    return REQUIRED_RACKS;
   }
 
   private static class DnWithPipelines {

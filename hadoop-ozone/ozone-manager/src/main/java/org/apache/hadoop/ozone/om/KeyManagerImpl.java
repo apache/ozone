@@ -38,8 +38,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
@@ -107,6 +105,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
@@ -1614,8 +1614,15 @@ public class KeyManagerImpl implements KeyManager {
           OzoneFileStatus fileStatus = getFileStatus(args);
           keyInfo = fileStatus.getKeyInfo();
         } catch (IOException e) {
-          throw new OMException("Key not found, checkAccess failed. Key:" +
-              objectKey, KEY_NOT_FOUND);
+          // OzoneFS will check whether the key exists when write a new key.
+          // For Acl Type "READ", when the key is not exist return true.
+          // To Avoid KEY_NOT_FOUND Exception.
+          if (context.getAclRights() == IAccessAuthorizer.ACLType.READ) {
+            return true;
+          } else {
+            throw new OMException("Key not found, checkAccess failed. Key:" +
+                objectKey, KEY_NOT_FOUND);
+          }
         }
       }
 
@@ -1694,7 +1701,7 @@ public class KeyManagerImpl implements KeyManager {
       // Check if this is the root of the filesystem.
       if (keyName.length() == 0) {
         validateBucket(volumeName, bucketName);
-        return new OzoneFileStatus(OZONE_URI_DELIMITER);
+        return new OzoneFileStatus();
       }
 
       // Check if the key is a file.
@@ -1758,7 +1765,7 @@ public class KeyManagerImpl implements KeyManager {
       Path keyPath = Paths.get(keyName);
       OzoneFileStatus status =
           verifyNoFilesInPath(volumeName, bucketName, keyPath, false);
-      if (status != null && OzoneFSUtils.pathToKey(status.getPath())
+      if (status != null && status.getTrimmedName()
           .equals(keyName)) {
         // if directory already exists
         return;
@@ -2030,8 +2037,13 @@ public class KeyManagerImpl implements KeyManager {
                 // if entry is a directory
                 if (!deletedKeySet.contains(entryInDb)) {
                   if (!entryKeyName.equals(immediateChild)) {
+                    OmKeyInfo fakeDirEntry = createDirectoryKey(
+                        omKeyInfo.getVolumeName(),
+                        omKeyInfo.getBucketName(),
+                        immediateChild,
+                        omKeyInfo.getAcls());
                     cacheKeyMap.put(entryInDb,
-                        new OzoneFileStatus(immediateChild));
+                        new OzoneFileStatus(fakeDirEntry, scmBlockSize, true));
                   } else {
                     // If entryKeyName matches dir name, we have the info
                     cacheKeyMap.put(entryInDb,

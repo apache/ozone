@@ -81,6 +81,16 @@ public class TestBaseHttpServer {
       protected String getEnabledKey() {
         return "enabled";
       }
+
+      @Override
+      protected String getHttpAuthType() {
+        return "simple";
+      }
+
+      @Override
+      protected String getHttpAuthConfigPrefix() {
+        return null;
+      }
     };
 
     conf.set("addresskey", "0.0.0.0:1234");

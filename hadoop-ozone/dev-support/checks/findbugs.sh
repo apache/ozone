@@ -16,7 +16,7 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
-MAVEN_OPTIONS='-B -fae -Dskip.yarn -Dskip.installyarn'
+MAVEN_OPTIONS='-B -fae -Dskip.npx -Dskip.installnpx'
 
 if ! type unionBugs >/dev/null 2>&1 || ! type convertXmlToText >/dev/null 2>&1; then
   #shellcheck disable=SC2086

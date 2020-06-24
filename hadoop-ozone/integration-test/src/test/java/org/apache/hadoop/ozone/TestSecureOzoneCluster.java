@@ -24,7 +24,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyPair;
-import java.security.PrivilegedExceptionAction;
 import java.security.cert.X509Certificate;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -34,11 +33,9 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -49,6 +46,7 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.RPC;
@@ -56,7 +54,6 @@ import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.minikdc.MiniKdc;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.om.OMStorage;
@@ -64,6 +61,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -78,6 +76,7 @@ import org.apache.hadoop.test.LambdaTestUtils;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY;
@@ -101,12 +100,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEY
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
-
 import org.apache.ratis.protocol.ClientId;
 import org.bouncycastle.asn1.x500.RDN;
 import org.bouncycastle.asn1.x500.X500Name;
@@ -119,7 +114,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -135,9 +129,7 @@ import static org.slf4j.event.Level.INFO;
 @InterfaceAudience.Private
 public final class TestSecureOzoneCluster {
 
-  private static final String TEST_USER = "testUgiUser@EXAMPLE.COM";
   private static final String COMPONENT = "test";
-  private static final int CLIENT_TIMEOUT = 2_000;
   private static final String OM_CERT_SERIAL_ID = "9879877970576";
   private static final Logger LOG = LoggerFactory
       .getLogger(TestSecureOzoneCluster.class);
@@ -433,8 +425,9 @@ public final class TestSecureOzoneCluster {
             testUserPrincipal, testUserKeytab.getCanonicalPath());
     ugi.setAuthenticationMethod(KERBEROS);
     OzoneManagerProtocolClientSideTranslatorPB secureClient =
-        new OzoneManagerProtocolClientSideTranslatorPB(conf,
-            ClientId.randomId().toString(), null, ugi);
+        new OzoneManagerProtocolClientSideTranslatorPB(
+            OmTransportFactory.create(conf, ugi, null),
+            ClientId.randomId().toString());
     try {
       secureClient.createVolume(
           new OmVolumeArgs.Builder().setVolume("vol1")
@@ -446,10 +439,12 @@ public final class TestSecureOzoneCluster {
     }
 
     ugi = UserGroupInformation.createUserForTesting(
-        "testuser1", new String[]{"test"});
+        "testuser1", new String[] {"test"});
+
     OzoneManagerProtocolClientSideTranslatorPB unsecureClient =
-        new OzoneManagerProtocolClientSideTranslatorPB(conf,
-            ClientId.randomId().toString(), null, ugi);
+        new OzoneManagerProtocolClientSideTranslatorPB(
+            OmTransportFactory.create(conf, ugi, null),
+            ClientId.randomId().toString());
     String exMessage = "org.apache.hadoop.security.AccessControlException: " +
         "Client cannot authenticate via:[TOKEN, KERBEROS]";
     logs = LogCapturer.captureLogs(Client.LOG);
@@ -457,134 +452,6 @@ public final class TestSecureOzoneCluster {
         () -> unsecureClient.listAllVolumes(null, null, 0));
     assertEquals("There should be no retry on AccessControlException", 1,
         StringUtils.countMatches(logs.getOutput(), exMessage));
-  }
-
-  /**
-   * Performs following tests for delegation token.
-   * 1. Get valid delegation token
-   * 2. Test successful token renewal.
-   * 3. Client can authenticate using token.
-   * 4. Delegation token renewal without Kerberos auth fails.
-   * 5. Test success of token cancellation.
-   * 5. Test failure of token cancellation.
-   */
-  @Test
-  public void testDelegationToken() throws Exception {
-
-    // Capture logs for assertions
-    LogCapturer logs = LogCapturer.captureLogs(Server.AUDITLOG);
-    LogCapturer omLogs = LogCapturer.captureLogs(OzoneManager.getLogger());
-    GenericTestUtils
-        .setLogLevel(LoggerFactory.getLogger(Server.class.getName()), INFO);
-
-    // Setup secure OM for start
-    setupOm(conf);
-    long omVersion =
-        RPC.getProtocolVersion(OzoneManagerProtocolPB.class);
-    try {
-      // Start OM
-      om.setCertClient(new CertificateClientTestImpl(conf));
-      om.start();
-      UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
-      String username = ugi.getUserName();
-
-      // Get first OM client which will authenticate via Kerberos
-      omClient = new OzoneManagerProtocolClientSideTranslatorPB(
-          RPC.getProxy(OzoneManagerProtocolPB.class, omVersion,
-              OmUtils.getOmAddress(conf), ugi, conf,
-              NetUtils.getDefaultSocketFactory(conf),
-              CLIENT_TIMEOUT), RandomStringUtils.randomAscii(5));
-
-      // Assert if auth was successful via Kerberos
-      assertFalse(logs.getOutput().contains(
-          "Auth successful for " + username + " (auth:KERBEROS)"));
-
-      // Case 1: Test successful delegation token.
-      Token<OzoneTokenIdentifier> token = omClient
-          .getDelegationToken(new Text("om"));
-
-      // Case 2: Test successful token renewal.
-      long renewalTime = omClient.renewDelegationToken(token);
-      assertTrue(renewalTime > 0);
-
-      // Check if token is of right kind and renewer is running om instance
-      assertNotNull(token);
-      assertEquals("OzoneToken", token.getKind().toString());
-      assertEquals(OmUtils.getOmRpcAddress(conf),
-          token.getService().toString());
-      omClient.close();
-
-      // Create a remote ugi and set its authentication method to Token
-      UserGroupInformation testUser = UserGroupInformation
-          .createRemoteUser(TEST_USER);
-      testUser.addToken(token);
-      testUser.setAuthenticationMethod(AuthMethod.TOKEN);
-      UserGroupInformation.setLoginUser(testUser);
-
-      // Get Om client, this time authentication should happen via Token
-      testUser.doAs((PrivilegedExceptionAction<Void>) () -> {
-        omClient = new OzoneManagerProtocolClientSideTranslatorPB(
-            RPC.getProxy(OzoneManagerProtocolPB.class, omVersion,
-                OmUtils.getOmAddress(conf), testUser, conf,
-                NetUtils.getDefaultSocketFactory(conf), CLIENT_TIMEOUT),
-            RandomStringUtils.randomAscii(5));
-        return null;
-      });
-
-      // Case 3: Test Client can authenticate using token.
-      assertFalse(logs.getOutput().contains(
-          "Auth successful for " + username + " (auth:TOKEN)"));
-      OzoneTestUtils.expectOmException(VOLUME_NOT_FOUND,
-          () -> omClient.deleteVolume("vol1"));
-      assertTrue(logs.getOutput().contains("Auth successful for "
-          + username + " (auth:TOKEN)"));
-
-      // Case 4: Test failure of token renewal.
-      // Call to renewDelegationToken will fail but it will confirm that
-      // initial connection via DT succeeded
-      omLogs.clearOutput();
-
-      OMException ex = LambdaTestUtils.intercept(OMException.class,
-          "INVALID_AUTH_METHOD",
-          () -> omClient.renewDelegationToken(token));
-      assertEquals(INVALID_AUTH_METHOD, ex.getResult());
-      assertTrue(logs.getOutput().contains(
-          "Auth successful for " + username + " (auth:TOKEN)"));
-      omLogs.clearOutput();
-      //testUser.setAuthenticationMethod(AuthMethod.KERBEROS);
-      UserGroupInformation.setLoginUser(ugi);
-      omClient = new OzoneManagerProtocolClientSideTranslatorPB(
-          RPC.getProxy(OzoneManagerProtocolPB.class, omVersion,
-              OmUtils.getOmAddress(conf), ugi, conf,
-              NetUtils.getDefaultSocketFactory(conf),
-              Client.getRpcTimeout(conf)), RandomStringUtils.randomAscii(5));
-
-      // Case 5: Test success of token cancellation.
-      omClient.cancelDelegationToken(token);
-      omClient.close();
-
-      // Wait for client to timeout
-      Thread.sleep(CLIENT_TIMEOUT);
-
-      assertFalse(logs.getOutput().contains("Auth failed for"));
-
-      // Case 6: Test failure of token cancellation.
-      // Get Om client, this time authentication using Token will fail as
-      // token is not in cache anymore.
-      omClient = new OzoneManagerProtocolClientSideTranslatorPB(
-          RPC.getProxy(OzoneManagerProtocolPB.class, omVersion,
-              OmUtils.getOmAddress(conf), testUser, conf,
-              NetUtils.getDefaultSocketFactory(conf),
-              Client.getRpcTimeout(conf)), RandomStringUtils.randomAscii(5));
-      ex = LambdaTestUtils.intercept(OMException.class,
-          "Cancel delegation token failed",
-          () -> omClient.cancelDelegationToken(token));
-      assertEquals(TOKEN_ERROR_OTHER, ex.getResult());
-      assertTrue(logs.getOutput().contains("Auth failed for"));
-    } finally {
-      om.stop();
-      om.join();
-    }
   }
 
   private void generateKeyPair() throws Exception {
@@ -605,7 +472,7 @@ public final class TestSecureOzoneCluster {
 
     // Setup secure OM for start.
     OzoneConfiguration newConf = new OzoneConfiguration(conf);
-    int tokenMaxLifetime = 500;
+    int tokenMaxLifetime = 1000;
     newConf.setLong(DELEGATION_TOKEN_MAX_LIFETIME_KEY, tokenMaxLifetime);
     setupOm(newConf);
     long omVersion =
@@ -620,10 +487,9 @@ public final class TestSecureOzoneCluster {
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
 
       // Get first OM client which will authenticate via Kerberos
-      omClient = new OzoneManagerProtocolClientSideTranslatorPB(RPC.getProxy(
-          OzoneManagerProtocolPB.class, omVersion, OmUtils.getOmAddress(conf),
-          ugi, conf, NetUtils.getDefaultSocketFactory(conf),
-          CLIENT_TIMEOUT), RandomStringUtils.randomAscii(5));
+      omClient = new OzoneManagerProtocolClientSideTranslatorPB(
+          OmTransportFactory.create(conf, ugi, null),
+          RandomStringUtils.randomAscii(5));
 
       // Since client is already connected get a delegation token
       Token<OzoneTokenIdentifier> token = omClient.getDelegationToken(
@@ -709,10 +575,8 @@ public final class TestSecureOzoneCluster {
 
       // Get first OM client which will authenticate via Kerberos
       omClient = new OzoneManagerProtocolClientSideTranslatorPB(
-          RPC.getProxy(OzoneManagerProtocolPB.class, omVersion,
-              OmUtils.getOmAddress(conf), ugi, conf,
-              NetUtils.getDefaultSocketFactory(conf),
-              CLIENT_TIMEOUT), RandomStringUtils.randomAscii(5));
+          OmTransportFactory.create(conf, ugi, null),
+          RandomStringUtils.randomAscii(5));
 
       //Creates a secret since it does not exist
       S3SecretValue attempt1 = omClient.getS3Secret(username);

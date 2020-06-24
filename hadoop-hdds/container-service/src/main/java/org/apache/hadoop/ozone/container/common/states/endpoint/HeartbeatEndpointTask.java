@@ -148,9 +148,8 @@ public class HeartbeatEndpointTask
       rpcEndpoint.zeroMissedCount();
     } catch (IOException ex) {
       // put back the reports which failed to be sent
-      if (requestBuilder != null) {
-        putBackReports(requestBuilder);
-      }
+      putBackReports(requestBuilder);
+
       rpcEndpoint.logIfNeeded(ex);
     } finally {
       rpcEndpoint.unlock();

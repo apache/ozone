@@ -63,7 +63,9 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import org.junit.Before;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
@@ -76,6 +78,12 @@ import org.junit.runners.Parameterized.Parameters;
  */
 @RunWith(Parameterized.class)
 public class TestOzoneFileInterfaces {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private String rootPath;
   private String userName;
@@ -405,9 +413,10 @@ public class TestOzoneFileInterfaces {
     // For directories, the time returned is the current time when the dir key
     // doesn't actually exist on server; if it exists, it will be a fixed value.
     // In this case, the dir key exists.
-    assertEquals(0, omStatus.getLen());
-    assertTrue(omStatus.getModificationTime() <= currentTime);
-    assertEquals(omStatus.getPath().getName(), o3fs.pathToKey(path));
+    assertEquals(0, omStatus.getKeyInfo().getDataSize());
+    assertTrue(omStatus.getKeyInfo().getModificationTime() <= currentTime);
+    assertEquals(new Path(omStatus.getPath()).getName(),
+        o3fs.pathToKey(path));
   }
 
   @Test
@@ -440,7 +449,7 @@ public class TestOzoneFileInterfaces {
         OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT,
         StorageUnit.BYTES
     );
-    String data = RandomStringUtils.randomAlphanumeric(2*blockSize+837);
+    String data = RandomStringUtils.randomAlphanumeric(2 * blockSize + 837);
     String filePath = RandomStringUtils.randomAlphanumeric(5);
     Path path = createPath("/" + filePath);
     try (FSDataOutputStream stream = fs.create(path)) {

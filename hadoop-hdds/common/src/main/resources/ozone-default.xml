@@ -247,19 +247,6 @@
     </description>
   </property>
   <property>
-    <name>dfs.ratis.client.request.max.retries</name>
-    <value>180</value>
-    <tag>OZONE, RATIS, MANAGEMENT</tag>
-    <description>Number of retries for ratis client request.</description>
-  </property>
-  <property>
-    <name>dfs.ratis.client.request.retry.interval</name>
-    <value>1000ms</value>
-    <tag>OZONE, RATIS, MANAGEMENT</tag>
-    <description>Interval between successive retries for a ratis client request.
-    </description>
-  </property>
-  <property>
     <name>dfs.ratis.server.retry-cache.timeout.duration</name>
     <value>600000ms</value>
     <tag>OZONE, RATIS, MANAGEMENT</tag>
@@ -390,11 +377,13 @@
   </property>
   <property>
     <name>ozone.client.stream.buffer.flush.delay</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, CLIENT</tag>
-    <description>If set true, when call flush() and determine whether the
-      data in the current buffer is greater than ozone.client.stream.buffer.size.
-      if greater than then send buffer to the datanode.
+    <description>
+      Default true, when call flush() and determine whether the data in the
+      current buffer is greater than ozone.client.stream.buffer.size, if
+      greater than then send buffer to the datanode. You can turn this off
+      by setting this configuration to false.
     </description>
   </property>
   <property>
@@ -1089,19 +1078,6 @@
   </property>
 
   <property>
-    <name>ozone.scm.container.creation.lease.timeout</name>
-    <value>60s</value>
-    <tag>OZONE, SCM</tag>
-    <description>
-      Container creation timeout in milliseconds to be used by SCM. When
-      BEGIN_CREATE event happens the container is moved from ALLOCATED to
-      CREATING state, SCM will now wait for the configured amount of time
-      to get COMPLETE_CREATE event if it doesn't receive it will move the
-      container to DELETING.
-    </description>
-  </property>
-
-  <property>
     <name>ozone.key.preallocation.max.blocks</name>
     <value>64</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
@@ -1435,15 +1411,13 @@
   </property>
 
   <property>
-    <name>ozone.s3g.authentication.kerberos.principal</name>
-    <value/>
+    <name>ozone.s3g.volume.name</name>
+    <value>s3v</value>
     <tag>OZONE, S3GATEWAY</tag>
-    <description>The server principal used by Ozone S3Gateway server. This is
-      typically set to
-      HTTP/_HOST@REALM.TLD The SPNEGO server principal begins with the prefix
-      HTTP/ by convention.</description>
+    <description>
+      The volume name to access through the s3gateway.
+    </description>
   </property>
-
   <property>
     <name>ozone.s3g.domain.name</name>
     <value/>
@@ -1500,7 +1474,17 @@
   </property>
 
   <property>
-    <name>ozone.s3g.keytab.file</name>
+    <name>ozone.s3g.http.auth.kerberos.principal</name>
+    <value/>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>The server principal used by Ozone S3Gateway server. This is
+      typically set to
+      HTTP/_HOST@REALM.TLD The SPNEGO server principal begins with the prefix
+      HTTP/ by convention.</description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.http.auth.kerberos.keytab</name>
     <value/>
     <tag>OZONE, S3GATEWAY</tag>
     <description>The keytab file used by the S3Gateway server to login as its
@@ -1561,6 +1545,15 @@
     <tag>OZONE, CLIENT, MANAGEMENT</tag>
     <description>
       Ozone client to verify checksum of the checksum blocksize data.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.read.timeout</name>
+    <value>30s</value>
+    <tag>OZONE, CLIENT, MANAGEMENT</tag>
+    <description>
+      Timeout for ozone grpc client during read.
     </description>
   </property>
 
@@ -1653,15 +1646,6 @@
     <tag>OZONE, OM, RATIS</tag>
     <description>The minimum gap between log indices for Raft server to purge
       its log segments after taking snapshot.
-    </description>
-  </property>
-
-  <property>
-    <name>ozone.om.ratis.snapshot.auto.trigger.threshold</name>
-    <value>400000</value>
-    <tag>OZONE, DEBUG, OM, RATIS</tag>
-    <description>The log index threshold after ratis will auto trigger
-      snapshot on the OM state machine.
     </description>
   </property>
 
@@ -1785,14 +1769,14 @@
     <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM</description>
   </property>
   <property>
-    <name>ozone.om.http.kerberos.principal</name>
+    <name>ozone.om.http.auth.kerberos.principal</name>
     <value>HTTP/_HOST@EXAMPLE.COM</value>
     <description>
       OzoneManager http server kerberos principal.
     </description>
   </property>
   <property>
-    <name>ozone.om.http.kerberos.keytab</name>
+    <name>ozone.om.http.auth.kerberos.keytab</name>
     <value>/etc/security/keytabs/HTTP.keytab</value>
     <description>
       OzoneManager http server kerberos keytab.
@@ -1951,21 +1935,7 @@
       not be renewed.
     </description>
   </property>
-
-  <property>
-    <name>ozone.fs.isolated-classloader</name>
-    <value></value>
-    <tag>OZONE, OZONEFS</tag>
-    <description>
-      Enable it for older hadoops to separate the classloading of all the
-      Ozone classes. With 'true' value, ozonefs can be used with older
-      hadoop versions as the hadoop3/ozone related classes are loaded by
-      an isolated classloader.
-
-      Default depends from the used jar. true for ozone-filesystem-lib-legacy
-      jar and false for the ozone-filesystem-lib-current.jar
-    </description>
-  </property>
+  
   <property>
     <name>ozone.manager.db.checkpoint.transfer.bandwidthPerSec</name>
     <value>0</value>
@@ -2024,7 +1994,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.freon.http.kerberos.principal</name>
+    <name>ozone.freon.http.auth.kerberos.principal</name>
     <value>HTTP/_HOST@EXAMPLE.COM</value>
     <tag>SECURITY</tag>
     <description>
@@ -2032,7 +2002,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.freon.http.kerberos.keytab</name>
+    <name>ozone.freon.http.auth.kerberos.keytab</name>
     <value>/etc/security/keytabs/HTTP.keytab</value>
     <tag>SECURITY</tag>
     <description>
@@ -2086,7 +2056,7 @@
   </property>
 
   <property>
-    <name>hdds.datanode.http.kerberos.principal</name>
+    <name>hdds.datanode.http.auth.kerberos.principal</name>
     <value>HTTP/_HOST@EXAMPLE.COM</value>
     <tag>HDDS, SECURITY, MANAGEMENT</tag>
     <description>
@@ -2094,7 +2064,7 @@
     </description>
   </property>
   <property>
-    <name>hdds.datanode.http.kerberos.keytab</name>
+    <name>hdds.datanode.http.auth.kerberos.keytab</name>
     <value>/etc/security/keytabs/HTTP.keytab</value>
     <tag>HDDS, SECURITY, MANAGEMENT</tag>
     <description>
@@ -2220,16 +2190,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.recon.keytab.file</name>
-    <value/>
-    <tag>RECON, SECURITY</tag>
-    <description>
-      DEPRECATED. Use "ozone.recon.http.kerberos.keytab.file" instead.
-      The keytab file for HTTP Kerberos authentication in Recon.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.http.kerberos.keytab.file</name>
+    <name>ozone.recon.http.auth.kerberos.keytab</name>
     <value/>
     <tag>RECON, SECURITY</tag>
     <description>
@@ -2237,12 +2198,52 @@
     </description>
   </property>
   <property>
-    <name>ozone.recon.authentication.kerberos.principal</name>
+    <name>ozone.recon.http.auth.kerberos.principal</name>
     <value/>
     <tag>RECON</tag>
     <description>The server principal used by Ozone Recon server. This is
       typically set to HTTP/_HOST@REALM.TLD The SPNEGO server principal
       begins with the prefix HTTP/ by convention.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.http.auth.type </name>
+    <value>simple</value>
+    <tag>DATANODE, SECURITY</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
+  </property>
+  <property>
+    <name>ozone.freon.http.auth.type </name>
+    <value>simple</value>
+    <tag>FREON, SECURITY</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.http.auth.type </name>
+    <value>simple</value>
+    <tag>OM, SECURITY</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.http.auth.type </name>
+    <value>simple</value>
+    <tag>RECON, SECURITY</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.http.auth.type </name>
+    <value>simple</value>
+    <tag>S3G, SECURITY</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
     </description>
   </property>
   <property>

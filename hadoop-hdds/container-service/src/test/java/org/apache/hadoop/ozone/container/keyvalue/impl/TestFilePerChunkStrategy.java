@@ -20,16 +20,20 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
 import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.junit.Test;
 
 import java.io.File;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -89,4 +93,38 @@ public class TestFilePerChunkStrategy extends CommonChunkManagerTestCases {
     assertTrue(chunkFile.exists());
     assertFalse(tempChunkFile.exists());
   }
+
+  /**
+   * Tests that "new datanode" can delete chunks written to "old
+   * datanode" by "new client" (ie. where chunk file accidentally created with
+   * {@code size = chunk offset + chunk length}, instead of only chunk length).
+   */
+  @Test
+  public void deletesChunkFileWithLengthIncludingOffset() throws Exception {
+    // GIVEN
+    ChunkManager chunkManager = createTestSubject();
+    KeyValueContainer container = getKeyValueContainer();
+    BlockID blockID = getBlockID();
+    ChunkInfo chunkInfo = getChunkInfo();
+    long offset = 1024;
+
+    ChunkInfo oldDatanodeChunkInfo = new ChunkInfo(chunkInfo.getChunkName(),
+        offset, chunkInfo.getLen());
+    File file = ChunkLayOutVersion.FILE_PER_CHUNK.getChunkFile(
+        container.getContainerData(), blockID, chunkInfo);
+    ChunkUtils.writeData(file,
+        ChunkBuffer.wrap(getData()), offset, chunkInfo.getLen(),
+        new VolumeIOStats(), true);
+    checkChunkFileCount(1);
+    assertTrue(file.exists());
+    assertEquals(offset + chunkInfo.getLen(), file.length());
+
+    // WHEN
+    chunkManager.deleteChunk(container, blockID, oldDatanodeChunkInfo);
+
+    // THEN
+    checkChunkFileCount(0);
+    assertFalse(file.exists());
+  }
+
 }

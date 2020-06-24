@@ -87,4 +87,14 @@ public class S3GatewayHttpServer extends BaseHttpServer {
     return S3GatewayConfigKeys.OZONE_S3G_HTTP_ENABLED_KEY;
   }
 
+  @Override
+  protected String getHttpAuthType() {
+    return S3GatewayConfigKeys.OZONE_S3G_HTTP_AUTH_TYPE;
+  }
+
+  @Override
+  protected String getHttpAuthConfigPrefix() {
+    return S3GatewayConfigKeys.OZONE_S3G_HTTP_AUTH_CONFIG_PREFIX;
+  }
+
 }

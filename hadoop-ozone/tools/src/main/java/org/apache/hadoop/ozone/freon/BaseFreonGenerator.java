@@ -45,6 +45,8 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
+import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -308,8 +310,8 @@ public class BaseFreonGenerator {
     RPC.setProtocolEngine(conf, OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
     String clientId = ClientId.randomId().toString();
-    return new OzoneManagerProtocolClientSideTranslatorPB(conf, clientId,
-        omServiceID, ugi);
+    OmTransport transport = OmTransportFactory.create(conf, ugi, omServiceID);
+    return new OzoneManagerProtocolClientSideTranslatorPB(transport, clientId);
   }
 
   public StorageContainerLocationProtocol createStorageContainerLocationClient(

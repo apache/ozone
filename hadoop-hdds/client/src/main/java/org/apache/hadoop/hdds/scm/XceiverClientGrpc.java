@@ -31,8 +31,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.function.SupplierWithIOException;
@@ -53,7 +51,7 @@ import org.apache.hadoop.hdds.tracing.GrpcClientInterceptor;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.util.Time;
+import java.util.concurrent.TimeoutException;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -81,6 +79,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   private Map<UUID, ManagedChannel> channels;
   private final Semaphore semaphore;
   private boolean closed = false;
+  private final long timeout;
   private SecurityConfig secConfig;
   private final boolean topologyAwareRead;
   private X509Certificate caCert;
@@ -101,6 +100,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     super();
     Preconditions.checkNotNull(pipeline);
     Preconditions.checkNotNull(config);
+    timeout = config.getTimeDuration(OzoneConfigKeys.
+        OZONE_CLIENT_READ_TIMEOUT, OzoneConfigKeys
+        .OZONE_CLIENT_READ_TIMEOUT_DEFAULT, TimeUnit.SECONDS);
     this.pipeline = pipeline;
     this.config = config;
     this.secConfig = new SecurityConfig(config);
@@ -296,7 +298,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     List<DatanodeDetails> datanodeList = null;
 
     DatanodeBlockID blockID = null;
-    if (request.getCmdType() == ContainerProtos.Type.ReadChunk) {
+    if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
+      blockID = request.getGetBlock().getBlockID();
+    } else if  (request.getCmdType() == ContainerProtos.Type.ReadChunk) {
       blockID = request.getReadChunk().getBlockID();
     } else if (request.getCmdType() == ContainerProtos.Type.GetSmallFile) {
       blockID = request.getGetSmallFile().getBlock().getBlockID();
@@ -312,15 +316,17 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           // Pull the Cached DN to the top of the DN list
           Collections.swap(datanodeList, 0, getBlockDNCacheIndex);
         }
-      } else if (topologyAwareRead) {
-        datanodeList = pipeline.getNodesInOrder();
       }
     }
     if (datanodeList == null) {
-      datanodeList = pipeline.getNodes();
-      // Shuffle datanode list so that clients do not read in the same order
-      // every time.
-      Collections.shuffle(datanodeList);
+      if (topologyAwareRead) {
+        datanodeList = pipeline.getNodesInOrder();
+      } else {
+        datanodeList = pipeline.getNodes();
+        // Shuffle datanode list so that clients do not read in the same order
+        // every time.
+        Collections.shuffle(datanodeList);
+      }
     }
 
     for (DatanodeDetails dn : datanodeList) {
@@ -419,7 +425,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     }
   }
 
-  private XceiverClientReply sendCommandAsync(
+  @VisibleForTesting
+  public XceiverClientReply sendCommandAsync(
       ContainerCommandRequestProto request, DatanodeDetails dn)
       throws IOException, InterruptedException {
     checkOpen(dn, request.getEncodedToken());
@@ -431,20 +438,22 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     final CompletableFuture<ContainerCommandResponseProto> replyFuture =
         new CompletableFuture<>();
     semaphore.acquire();
-    long requestTime = Time.monotonicNowNanos();
+    long requestTime = System.nanoTime();
     metrics.incrPendingContainerOpsMetrics(request.getCmdType());
     // create a new grpc stream for each non-async call.
 
     // TODO: for async calls, we should reuse StreamObserver resources.
+    // set the grpc dealine here so as if the response is not received
+    // in the configured time, the rpc will fail with DEADLINE_EXCEEDED here
     final StreamObserver<ContainerCommandRequestProto> requestObserver =
-        asyncStubs.get(dnId)
+        asyncStubs.get(dnId).withDeadlineAfter(timeout, TimeUnit.SECONDS)
             .send(new StreamObserver<ContainerCommandResponseProto>() {
               @Override
               public void onNext(ContainerCommandResponseProto value) {
                 replyFuture.complete(value);
                 metrics.decrPendingContainerOpsMetrics(request.getCmdType());
                 metrics.addContainerOpsLatency(request.getCmdType(),
-                    Time.monotonicNowNanos() - requestTime);
+                    System.nanoTime() - requestTime);
                 semaphore.release();
               }
 
@@ -453,7 +462,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
                 replyFuture.completeExceptionally(t);
                 metrics.decrPendingContainerOpsMetrics(request.getCmdType());
                 metrics.addContainerOpsLatency(request.getCmdType(),
-                    Time.monotonicNowNanos() - requestTime);
+                    System.nanoTime() - requestTime);
                 semaphore.release();
               }
 

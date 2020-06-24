@@ -28,6 +28,7 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,8 +57,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -181,9 +180,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     boolean acquireLock = false;
     OMClientResponse omClientResponse = null;
-    OMResponse.Builder omResponse = OMResponse.newBuilder()
-        .setCmdType(Type.CreateKey)
-        .setStatus(Status.OK);
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
     IOException exception = null;
     Result result = null;
     try {

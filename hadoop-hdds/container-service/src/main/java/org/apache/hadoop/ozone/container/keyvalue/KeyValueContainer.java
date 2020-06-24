@@ -492,7 +492,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       containerData.setState(originalContainerData.getState());
       containerData
           .setContainerDBType(originalContainerData.getContainerDBType());
-      containerData.setBytesUsed(originalContainerData.getBytesUsed());
 
       //rewriting the yaml file with new checksum calculation.
       update(originalContainerData.getMetadata(), true);
@@ -672,6 +671,9 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       break;
     case UNHEALTHY:
       state = ContainerReplicaProto.State.UNHEALTHY;
+      break;
+    case DELETED:
+      state = ContainerReplicaProto.State.DELETED;
       break;
     default:
       throw new StorageContainerException("Invalid Container state found: " +

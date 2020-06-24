@@ -33,7 +33,10 @@ import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -42,6 +45,7 @@ import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
@@ -69,12 +73,13 @@ import org.junit.After;
 import org.junit.Assert;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.mockito.Mockito;
 
 /**
  * Test the SCM Node Manager class.
@@ -834,8 +839,6 @@ public class TestSCMNodeManager {
    * @throws TimeoutException
    */
   @Test
-  @Ignore
-  // TODO: Enable this after we implement NodeReportEvent handler.
   public void testScmStatsFromNodeReport()
       throws IOException, InterruptedException, AuthenticationException {
     OzoneConfiguration conf = getConf();
@@ -847,18 +850,20 @@ public class TestSCMNodeManager {
     final long remaining = capacity - used;
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      EventQueue eventQueue = (EventQueue) scm.getEventQueue();
       for (int x = 0; x < nodeCount; x++) {
-        DatanodeDetails datanodeDetails = TestUtils
-            .createRandomDatanodeAndRegister(nodeManager);
-        UUID dnId = datanodeDetails.getUuid();
+        DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+        UUID dnId = dn.getUuid();
         long free = capacity - used;
         String storagePath = testDir.getAbsolutePath() + "/" + dnId;
         StorageReportProto report = TestUtils
             .createStorageReport(dnId, storagePath, capacity, used, free, null);
-        nodeManager.processHeartbeat(datanodeDetails);
+        nodeManager.register(dn, TestUtils.createNodeReport(report), null);
+        nodeManager.processHeartbeat(dn);
       }
-      //TODO: wait for heartbeat to be processed
-      Thread.sleep(4 * 1000);
+      //TODO: wait for EventQueue to be processed
+      eventQueue.processAll(8000L);
+
       assertEquals(nodeCount, nodeManager.getNodeCount(HEALTHY));
       assertEquals(capacity * nodeCount, (long) nodeManager.getStats()
           .getCapacity().get());
@@ -877,8 +882,6 @@ public class TestSCMNodeManager {
    * @throws TimeoutException
    */
   @Test
-  @Ignore
-  // TODO: Enable this after we implement NodeReportEvent handler.
   public void testScmNodeReportUpdate()
       throws IOException, InterruptedException, TimeoutException,
       AuthenticationException {
@@ -896,6 +899,8 @@ public class TestSCMNodeManager {
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       DatanodeDetails datanodeDetails =
           TestUtils.createRandomDatanodeAndRegister(nodeManager);
+      NodeReportHandler nodeReportHandler = new NodeReportHandler(nodeManager);
+      EventPublisher publisher = Mockito.mock(EventPublisher.class);
       final long capacity = 2000;
       final long usedPerHeartbeat = 100;
       UUID dnId = datanodeDetails.getUuid();
@@ -906,7 +911,10 @@ public class TestSCMNodeManager {
         StorageReportProto report = TestUtils
             .createStorageReport(dnId, storagePath, capacity, scmUsed,
                 remaining, null);
-
+        NodeReportProto nodeReportProto = TestUtils.createNodeReport(report);
+        nodeReportHandler.onMessage(
+                new NodeReportFromDatanode(datanodeDetails, nodeReportProto),
+                publisher);
         nodeManager.processHeartbeat(datanodeDetails);
         Thread.sleep(100);
       }
@@ -944,7 +952,7 @@ public class TestSCMNodeManager {
       // Compare the result from
       // NodeManager#getNodeStats and NodeManager#getNodeStat
       SCMNodeStat stat1 = nodeManager.getNodeStats().
-          get(datanodeDetails.getUuid());
+          get(datanodeDetails);
       SCMNodeStat stat2 = nodeManager.getNodeStat(datanodeDetails).get();
       assertEquals(stat1, stat2);
 

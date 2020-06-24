@@ -19,9 +19,9 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,15 +46,16 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .CommitKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .CommitKeyResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .KeyLocation;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .OMResponse;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -124,11 +126,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
     Map<String, String> auditMap = buildKeyArgsAuditMap(commitKeyArgs);
 
-    OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
-        OzoneManagerProtocolProtos.OMResponse.newBuilder().setCmdType(
-            OzoneManagerProtocolProtos.Type.CommitKey).setStatus(
-            OzoneManagerProtocolProtos.Status.OK).setSuccess(true)
-            .setCommitKeyResponse(CommitKeyResponse.newBuilder());
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
 
     IOException exception = null;
     OmKeyInfo omKeyInfo = null;
@@ -148,10 +147,10 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           keyName, IAccessAuthorizer.ACLType.WRITE,
           commitKeyRequest.getClientID());
 
-      List<OmKeyLocationInfo> locationInfoList = commitKeyArgs
-          .getKeyLocationsList().stream()
-          .map(OmKeyLocationInfo::getFromProtobuf)
-          .collect(Collectors.toList());
+      List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+      for (KeyLocation keyLocation : commitKeyArgs.getKeyLocationsList()) {
+        locationInfoList.add(OmKeyLocationInfo.getFromProtobuf(keyLocation));
+      }
 
       bucketLockAcquired = omMetadataManager.getLock().acquireLock(BUCKET_LOCK,
           volumeName, bucketName);

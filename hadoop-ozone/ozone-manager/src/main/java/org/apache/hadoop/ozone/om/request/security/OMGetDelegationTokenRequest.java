@@ -24,9 +24,9 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.security.OMGetDelegationTokenResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetDelegationTokenResponseProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -117,14 +117,9 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
     UpdateGetDelegationTokenRequest updateGetDelegationTokenRequest =
         getOmRequest().getUpdateGetDelegationTokenRequest();
 
-    OMResponse.Builder omResponse =
-        OMResponse.newBuilder()
-            .setCmdType(OzoneManagerProtocolProtos.Type.GetDelegationToken)
-            .setStatus(OzoneManagerProtocolProtos.Status.OK)
-            .setSuccess(true);
-
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
     OMClientResponse omClientResponse = null;
-
 
     // If security is not enabled and token request is received, leader
     // returns token null. So, check here if updatedGetDelegationTokenResponse

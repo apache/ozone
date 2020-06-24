@@ -39,17 +39,14 @@ public final class ReconServerConfigKeys {
       "ozone.recon.http-address";
   public static final String OZONE_RECON_HTTPS_ADDRESS_KEY =
       "ozone.recon.https-address";
-  // Deprecated config
-  public static final String OZONE_RECON_HTTP_KEYTAB_FILE_OLD =
-      "ozone.recon.keytab.file";
   public static final String OZONE_RECON_HTTP_KEYTAB_FILE =
-      "ozone.recon.http.kerberos.keytab.file";
+      "ozone.recon.http.auth.kerberos.keytab";
   public static final String OZONE_RECON_HTTP_BIND_HOST_DEFAULT =
       "0.0.0.0";
   public static final int OZONE_RECON_HTTP_BIND_PORT_DEFAULT = 9888;
   public static final int OZONE_RECON_HTTPS_BIND_PORT_DEFAULT = 9889;
   public static final String OZONE_RECON_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL =
-      "ozone.recon.authentication.kerberos.principal";
+      "ozone.recon.http.auth.kerberos.principal";
 
   public static final String OZONE_RECON_CONTAINER_DB_CACHE_SIZE_MB =
       "ozone.recon.container.db.cache.size.mb";
@@ -99,6 +96,14 @@ public final class ReconServerConfigKeys {
   public static final String OZONE_RECON_TASK_THREAD_COUNT_KEY =
       "ozone.recon.task.thread.count";
   public static final int OZONE_RECON_TASK_THREAD_COUNT_DEFAULT = 5;
+
+  public static final String OZONE_RECON_HTTP_AUTH_CONFIG_PREFIX =
+      "ozone.recon.http.auth.";
+
+  public static final String OZONE_RECON_HTTP_AUTH_TYPE =
+      OZONE_RECON_HTTP_AUTH_CONFIG_PREFIX + "type";
+
+
 
   /**
    * Private constructor for utility class.

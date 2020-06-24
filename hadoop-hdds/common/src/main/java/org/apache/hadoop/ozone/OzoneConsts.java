@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone;
 
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.thirdparty.io.grpc.Context;
@@ -86,10 +87,13 @@ public final class OzoneConsts {
 
   // Ozone File System scheme
   public static final String OZONE_URI_SCHEME = "o3fs";
+  public static final String OZONE_OFS_URI_SCHEME = "ofs";
 
   public static final String OZONE_RPC_SCHEME = "o3";
   public static final String OZONE_HTTP_SCHEME = "http";
   public static final String OZONE_URI_DELIMITER = "/";
+  public static final String OZONE_ROOT = OZONE_URI_DELIMITER;
+
 
   public static final String CONTAINER_EXTENSION = ".container";
   public static final String CONTAINER_META = ".meta";
@@ -123,7 +127,6 @@ public final class OzoneConsts {
   public static final String STORAGE_DIR_CHUNKS = "chunks";
   public static final String OZONE_DB_CHECKPOINT_REQUEST_FLUSH =
       "flushBeforeCheckpoint";
-  public static final String S3_VOLUME_NAME = "s3v";
 
   /**
    * Supports Bucket Versioning.
@@ -140,6 +143,25 @@ public final class OzoneConsts {
   public static final String DELETED_KEY_PREFIX = "#deleted#";
   public static final String DELETE_TRANSACTION_KEY_PREFIX = "#delTX#";
   public static final String BLOCK_COMMIT_SEQUENCE_ID_PREFIX = "#BCSID";
+
+  public static final String BLOCK_COUNT = "#BLOCKCOUNT";
+  public static final String CONTAINER_BYTES_USED = "#BYTESUSED";
+  public static final String PENDING_DELETE_BLOCK_COUNT =
+      "#PENDINGDELETEBLOCKCOUNT";
+
+
+  public static final byte[] DB_BLOCK_COUNT_KEY =
+      StringUtils.string2Bytes(OzoneConsts.BLOCK_COUNT);
+  public static final byte[] DB_CONTAINER_BYTES_USED_KEY =
+      StringUtils.string2Bytes(OzoneConsts.CONTAINER_BYTES_USED);
+  public static final byte[] DB_PENDING_DELETE_BLOCK_COUNT_KEY =
+      StringUtils.string2Bytes(PENDING_DELETE_BLOCK_COUNT);
+  public static final byte[] DB_CONTAINER_DELETE_TRANSACTION_KEY =
+      StringUtils.string2Bytes(DELETE_TRANSACTION_KEY_PREFIX);
+  public static final byte[] DB_BLOCK_COMMIT_SEQUENCE_ID_KEY =
+      StringUtils.string2Bytes(BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
+
+
 
   /**
    * OM LevelDB prefixes.
@@ -301,16 +323,6 @@ public final class OzoneConsts {
   // Dummy OMNodeID for OM Clients to use for a non-HA OM setup
   public static final String OM_NODE_ID_DUMMY = "omNodeIdDummy";
 
-  // OM Ratis snapshot file to store the last applied index
-  public static final String OM_RATIS_SNAPSHOT_INDEX = "ratisSnapshotIndex";
-
-  public static final String OM_RATIS_SNAPSHOT_TERM = "ratisSnapshotTerm";
-
-  // OM Http request parameter to be used while downloading DB checkpoint
-  // from OM leader to follower
-  public static final String OM_RATIS_SNAPSHOT_BEFORE_DB_CHECKPOINT =
-      "snapshotBeforeCheckpoint";
-
   public static final String JAVA_TMP_DIR = "java.io.tmpdir";
   public static final String LOCALHOST = "localhost";
 
@@ -342,4 +354,9 @@ public final class OzoneConsts {
           Pattern.compile("^[^^{}<>^?%~#`\\[\\]\\|\\\\(\\x80-\\xff)]+$");
 
   public static final String FS_FILE_COPYING_TEMP_SUFFIX= "._COPYING_";
+
+  // Transaction Info
+  public static final String TRANSACTION_INFO_KEY = "#TRANSACTIONINFO";
+  public static final String TRANSACTION_INFO_SPLIT_KEY = "#";
+
 }
