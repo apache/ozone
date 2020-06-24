@@ -64,7 +64,6 @@ public class TestContainerPlacement {
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
-  //private DBStore dbStore;
   private SCMMetadataStore scmMetadataStore;
 
   @Before

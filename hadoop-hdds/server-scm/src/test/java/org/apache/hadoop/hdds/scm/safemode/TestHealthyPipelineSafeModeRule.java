@@ -67,7 +67,6 @@ public class TestHealthyPipelineSafeModeRule {
             HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
     config.setBoolean(
             HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
-    //store = DBStoreBuilder.createDBStore(config, new SCMDBDefinition());
     SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(config);
 
     try {
