@@ -552,6 +552,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       msg = datanode + " is in candidate state for " +
           roleInfoProto.getCandidateInfo().getLastLeaderElapsedTimeMs() + "ms";
       break;
+    case FOLLOWER:
+      msg = datanode + " is in follower state for " +
+          roleInfoProto.getRoleElapsedTimeMs() + "ms";
+      break;
     case LEADER:
       StringBuilder sb = new StringBuilder();
       sb.append(datanode).append(" has not seen follower/s");
