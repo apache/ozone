@@ -54,7 +54,6 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -175,7 +174,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForBlockClients;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
@@ -2495,28 +2493,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .setType(ServicePort.Type.RPC)
             .setValue(scmAddr.getPort()).build());
     services.add(scmServiceInfoBuilder.build());
-
-    List<HddsProtos.Node> nodes = scmContainerClient.queryNode(HEALTHY,
-        HddsProtos.QueryScope.CLUSTER, "");
-
-    for (HddsProtos.Node node : nodes) {
-      HddsProtos.DatanodeDetailsProto datanode = node.getNodeID();
-
-      ServiceInfo.Builder dnServiceInfoBuilder = ServiceInfo.newBuilder()
-          .setNodeType(HddsProtos.NodeType.DATANODE)
-          .setHostname(datanode.getHostName());
-
-      if (DatanodeDetails.getFromProtoBuf(datanode)
-          .getPort(DatanodeDetails.Port.Name.REST) != null) {
-        dnServiceInfoBuilder.addServicePort(ServicePort.newBuilder()
-            .setType(ServicePort.Type.HTTP)
-            .setValue(DatanodeDetails.getFromProtoBuf(datanode)
-                .getPort(DatanodeDetails.Port.Name.REST).getValue())
-            .build());
-      }
-
-      services.add(dnServiceInfoBuilder.build());
-    }
 
     metrics.incNumGetServiceLists();
     // For now there is no exception that can can happen in this call,
