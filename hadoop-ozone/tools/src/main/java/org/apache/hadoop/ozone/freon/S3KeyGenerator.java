@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.freon;
 
 import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -37,6 +38,7 @@ import com.amazonaws.services.s3.model.UploadPartRequest;
 import com.amazonaws.services.s3.model.UploadPartResult;
 import com.codahale.metrics.Timer;
 import org.apache.commons.lang3.RandomStringUtils;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_MULTIPART_MIN_SIZE;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -94,6 +96,10 @@ public class S3KeyGenerator extends BaseFreonGenerator
   @Override
   public Void call() throws Exception {
 
+    if (multiPart && fileSize < OM_MULTIPART_MIN_SIZE) {
+      throw new IllegalArgumentException(
+          "Size of multipart upload parts should be at least 5MB (5242880)");
+    }
     init();
 
     AmazonS3ClientBuilder amazonS3ClientBuilder =
@@ -144,7 +150,8 @@ public class S3KeyGenerator extends BaseFreonGenerator
               .withLastPart(i == numberOfParts)
               .withUploadId(uploadId)
               .withPartSize(fileSize)
-              .withInputStream(new ByteArrayInputStream(content.getBytes()));
+              .withInputStream(new ByteArrayInputStream(content.getBytes(
+                  StandardCharsets.UTF_8)));
 
           final UploadPartResult uploadPartResult =
               s3.uploadPart(uploadPartRequest);
