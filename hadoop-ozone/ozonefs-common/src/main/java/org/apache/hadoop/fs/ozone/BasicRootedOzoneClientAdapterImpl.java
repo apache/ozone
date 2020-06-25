@@ -133,12 +133,12 @@ public class BasicRootedOzoneClientAdapterImpl
             conf.getTrimmedStrings(OZONE_OM_SERVICE_IDS_KEY);
 
         // When host is not specified
-        if (omServiceIds.length != 1) {
+        if (omServiceIds.length > 1) {
           throw new IllegalArgumentException("Service ID or host name must not"
               + " be omitted when multiple ozone.om.service.ids is defined.");
+        } else if (omServiceIds.length == 1) {
+          omHost = omServiceIds[0];
         }
-
-        omHost = omServiceIds[0];
       }
 
       if (omPort != -1) {
