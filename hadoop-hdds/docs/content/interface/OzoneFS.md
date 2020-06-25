@@ -25,7 +25,7 @@ The Hadoop compatible file system interface allows storage backends like Ozone
 to be easily integrated into Hadoop eco-system.  Ozone file system is an
 Hadoop compatible file system.
 
-## Setting up the Ozone file system
+## Setting up the Ozone file system (o3fs)
 
 To create an ozone file system, we have to choose a bucket where the file system would live. This bucket will be used as the backend store for OzoneFileSystem. All the files and directories will be stored as keys in this bucket.
 
@@ -42,10 +42,6 @@ Please add the following entry to the core-site.xml.
 
 {{< highlight xml >}}
 <property>
-  <name>fs.o3fs.impl</name>
-  <value>org.apache.hadoop.fs.ozone.OzoneFileSystem</value>
-</property>
-<property>
   <name>fs.AbstractFileSystem.o3fs.impl</name>
   <value>org.apache.hadoop.fs.ozone.OzFs</value>
 </property>
@@ -57,11 +53,13 @@ Please add the following entry to the core-site.xml.
 
 This will make this bucket to be the default file system for HDFS dfs commands and register the o3fs file system type.
 
-You also need to add the ozone-filesystem.jar file to the classpath:
+You also need to add the ozone-filesystem-hadoop3.jar file to the classpath:
 
 {{< highlight bash >}}
-export HADOOP_CLASSPATH=/opt/ozone/share/ozonefs/lib/hadoop-ozone-filesystem-lib-current*.jar:$HADOOP_CLASSPATH
+export HADOOP_CLASSPATH=/opt/ozone/share/ozonefs/lib/hadoop-ozone-filesystem-hadoop3-*.jar:$HADOOP_CLASSPATH
 {{< /highlight >}}
+
+(Note: with Hadoop 2.x, use the `hadoop-ozone-filesystem-hadoop2-*.jar`)
 
 Once the default Filesystem has been setup, users can run commands like ls, put, mkdir, etc.
 For example,
@@ -81,6 +79,7 @@ Or put command etc. In other words, all programs like Hive, Spark, and Distcp wi
 Please note that any keys created/deleted in the bucket using methods apart from OzoneFileSystem will show up as directories and files in the Ozone File System.
 
 Note: Bucket and volume names are not allowed to have a period in them.
+
 Moreover, the filesystem URI can take a fully qualified form with the OM host and an optional port as a part of the path following the volume name.
 For example, you can specify both host and port:
 
@@ -114,43 +113,3 @@ hdfs dfs -ls o3fs://bucket.volume.om-host.example.com:6789/key
 Note: Only port number from the config is used in this case, 
 whereas the host name in the config `ozone.om.address` is ignored.
 
-
-## Supporting older Hadoop version (Legacy jar, BasicOzoneFilesystem)
-
-There are two ozonefs files, both of them include all the dependencies:
-
- * share/ozone/lib/hadoop-ozone-filesystem-lib-current-VERSION.jar
- * share/ozone/lib/hadoop-ozone-filesystem-lib-legacy-VERSION.jar
-
-The first one contains all the required dependency to use ozonefs with a
- compatible hadoop version (hadoop 3.2).
-
-The second one contains all the dependency in an internal, separated directory,
- and a special class loader is used to load all the classes from the location.
-
-With this method the hadoop-ozone-filesystem-lib-legacy.jar can be used from
- any older hadoop version (eg. hadoop 3.1, hadoop 2.7 or spark+hadoop 2.7)
-
-Similar to the dependency jar, there are two OzoneFileSystem implementation.
-
-For hadoop 3.0 and newer, you can use `org.apache.hadoop.fs.ozone.OzoneFileSystem`
- which is a full implementation of the Hadoop compatible File System API.
-
-For Hadoop 2.x you should use the Basic version: `org.apache.hadoop.fs.ozone.BasicOzoneFileSystem`.
-
-This is the same implementation but doesn't include the features/dependencies which are added with
- Hadoop 3.0. (eg. FS statistics, encryption zones).
-
-### Summary
-
-The following table summarize which jar files and implementation should be used:
-
-Hadoop version | Required jar            | FileSystem implementation | AbstractFileSystem implementation
----------------|-------------------------|-------------------------------------------------|-------------------------------------
-3.2            | filesystem-lib-current  | org.apache.hadoop.fs.ozone.OzoneFileSystem      | org.apache.hadoop.fs.ozone.OzFs
-3.1            | filesystem-lib-legacy   | org.apache.hadoop.fs.ozone.OzoneFileSystem      | org.apache.hadoop.fs.ozone.OzFs
-2.9            | filesystem-lib-legacy   | org.apache.hadoop.fs.ozone.BasicOzoneFileSystem | org.apache.hadoop.fs.ozone.BasicOzFs
-2.7            | filesystem-lib-legacy   | org.apache.hadoop.fs.ozone.BasicOzoneFileSystem | org.apache.hadoop.fs.ozone.BasicOzFs
-
-With this method the hadoop-ozone-filesystem-lib-legacy.jar can be used from
- any older hadoop version (eg. hadoop 2.7 or spark+hadoop 2.7)
