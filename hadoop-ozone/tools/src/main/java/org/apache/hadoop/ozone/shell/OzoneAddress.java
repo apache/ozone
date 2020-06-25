@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Collection;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
@@ -116,12 +117,17 @@ public class OzoneAddress {
               .getRpcClient(ozoneURI.getHost(), ozoneURI.getPort(), conf);
         }
       } else {
+
+        Collection<String> omServiceIds = conf.getTrimmedStringCollection(
+            OZONE_OM_SERVICE_IDS_KEY);
+
         // When host is not specified
-        if (OmUtils.isServiceIdsDefined(conf)) {
+        if (omServiceIds.size() != 1) {
           throw new OzoneClientException("Service ID or host name must not"
-              + " be omitted when ozone.om.service.ids is defined.");
+              + " be omitted when multiple ozone.om.service.ids is defined.");
         }
-        client = OzoneClientFactory.getRpcClient(conf);
+        client = OzoneClientFactory
+            .getRpcClient(omServiceIds.iterator().next(), conf);
       }
     } else {
       throw new OzoneClientException(
