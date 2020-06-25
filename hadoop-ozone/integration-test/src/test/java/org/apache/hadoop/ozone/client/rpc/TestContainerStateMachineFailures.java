@@ -336,8 +336,8 @@ public class TestContainerStateMachineFailures {
             (KeyValueContainerData) containerData;
     key.close();
     ContainerStateMachine stateMachine =
-            (ContainerStateMachine) TestHelper.getStateMachine(cluster.
-                    getHddsDatanodes().get(index), omKeyLocationInfo.getPipeline());
+        (ContainerStateMachine) TestHelper.getStateMachine(cluster.
+            getHddsDatanodes().get(index), omKeyLocationInfo.getPipeline());
     SimpleStateMachineStorage storage =
             (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
     stateMachine.takeSnapshot();
