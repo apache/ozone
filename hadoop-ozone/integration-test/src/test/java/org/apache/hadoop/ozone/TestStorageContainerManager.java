@@ -109,7 +109,6 @@ import com.google.common.collect.Maps;
 /**
  * Test class that exercises the StorageContainerManager.
  */
-@Ignore
 public class TestStorageContainerManager {
   private static XceiverClientManager xceiverClientManager;
   private static final Logger LOG = LoggerFactory.getLogger(
