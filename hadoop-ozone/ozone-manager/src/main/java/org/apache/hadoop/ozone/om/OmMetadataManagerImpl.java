@@ -953,7 +953,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
            * This way would keep this <String, RepeatedOmKeyInfo>
            * from deleting by DB.
            */
-          if (shouldPendDeleting(lastKeyInfo)) {
+          if (shouldDelete(lastKeyInfo)) {
             // Get block keys as a list.
             for (OmKeyInfo info : infoList.getOmKeyInfoList()) {
               OmKeyLocationInfoGroup latest = info.getLatestVersionLocations();
@@ -980,7 +980,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    *  it should be deleted.
    * @return true If key should be deleted.
    */
-  private boolean shouldPendDeleting(OmKeyInfo keyInfo) throws IOException {
+  private boolean shouldDelete(OmKeyInfo keyInfo) throws IOException {
     String bucketKey =
         getBucketKey(keyInfo.getVolumeName(), keyInfo.getBucketName());
     long recoverWindow = getBucketTable().get(bucketKey).getRecoverWindow();
