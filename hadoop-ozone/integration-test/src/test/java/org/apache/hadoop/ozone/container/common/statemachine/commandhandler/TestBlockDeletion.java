@@ -52,7 +52,6 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.protocol.commands.RetriableDatanodeEventWatcher;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.GenericTestUtils.LogCapturer;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
@@ -73,14 +72,12 @@ import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import static java.lang.Math.max;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds
     .HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone
     .OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 
@@ -117,8 +114,6 @@ public class TestBlockDeletion {
     conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL,
-        3, TimeUnit.SECONDS);
     conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
@@ -188,12 +183,18 @@ public class TestBlockDeletion {
     }
 
     // close the containers which hold the blocks for the key
-    OzoneTestUtils.closeContainers(omKeyLocationInfoGroupList, scm);
-
-    waitForDatanodeCommandRetry();
+    OzoneTestUtils.triggerCloseContainerEvent(omKeyLocationInfoGroupList, scm);
 
     // make sure the containers are closed on the dn
-    closeDatanodeContainers(omKeyLocationInfoGroupList);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        verifyClosedContainersInDatanode(omKeyLocationInfoGroupList);
+        return true;
+      } catch (Throwable t) {
+        LOG.warn("Container closing failed", t);
+        return false;
+      }
+    }, 500, 30000);
 
     // The blocks should be deleted in the DN.
     GenericTestUtils.waitFor(() -> {
@@ -213,28 +214,22 @@ public class TestBlockDeletion {
     // Containers in the DN and SCM should have same delete transactionIds
     // after DN restart. The assertion is just to verify that the state of
     // containerInfos in dn and scm is consistent after dn restart.
-    cluster.restartHddsDatanode(0, true);
+    cluster.restartHddsDatanode(0, false);
     matchContainerTransactionIds();
 
     // verify PENDING_DELETE_STATUS event is fired
     verifyPendingDeleteEvent();
 
-    // Verify transactions committed
-    verifyTransactionsCommitted();
-  }
-
-  /**
-   * Waits for datanode command to be retried when datanode is dead.
-   */
-  private void waitForDatanodeCommandRetry()
-      throws TimeoutException, InterruptedException {
-    LogCapturer logCapturer =
-        LogCapturer.captureLogs(RetriableDatanodeEventWatcher.LOG);
-    cluster.shutdownHddsDatanode(0);
-    GenericTestUtils.waitFor(() -> logCapturer.getOutput()
-            .contains("RetriableDatanodeCommand type=deleteBlocksCommand"),
-        500, 5000);
-    cluster.restartHddsDatanode(0, true);
+    // make sure the transactions are committed in SCM
+    GenericTestUtils.waitFor(() -> {
+      try {
+        verifyTransactionsCommitted();
+        return true;
+      } catch (Throwable t) {
+        LOG.warn("Container closing failed", t);
+        return false;
+      }
+    }, 500, 30000);
   }
 
   private void verifyTransactionsCommitted() throws IOException {
@@ -270,7 +265,7 @@ public class TestBlockDeletion {
         new SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode(
             cluster.getHddsDatanodes().get(0).getDatanodeDetails(),
             dummyReport), scm.getEventQueue());
-    ((EventQueue)scm.getEventQueue()).processAll(5000);
+    ((EventQueue)scm.getEventQueue()).processAll(10000);
 
     String output = logCapturer.getOutput();
     for (ContainerReplicaProto containerInfo : dummyReport.getReportsList()) {
@@ -288,26 +283,27 @@ public class TestBlockDeletion {
   }
 
   private void matchContainerTransactionIds() throws IOException {
-    ContainerSet dnContainerSet =
-        cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
-            .getContainer().getContainerSet();
-    List<ContainerData> containerDataList = new ArrayList<>();
-    dnContainerSet.listContainer(0, 10000, containerDataList);
-    for (ContainerData containerData : containerDataList) {
-      long containerId = containerData.getContainerID();
-      if (containerIdsWithDeletedBlocks.contains(containerId)) {
-        Assert.assertTrue(
-            scm.getContainerInfo(containerId).getDeleteTransactionId() > 0);
-        maxTransactionId = max(maxTransactionId,
-            scm.getContainerInfo(containerId).getDeleteTransactionId());
-      } else {
+    for (HddsDatanodeService datanode : cluster.getHddsDatanodes()) {
+      ContainerSet dnContainerSet =
+          datanode.getDatanodeStateMachine().getContainer().getContainerSet();
+      List<ContainerData> containerDataList = new ArrayList<>();
+      dnContainerSet.listContainer(0, 10000, containerDataList);
+      for (ContainerData containerData : containerDataList) {
+        long containerId = containerData.getContainerID();
+        if (containerIdsWithDeletedBlocks.contains(containerId)) {
+          Assert.assertTrue(
+              scm.getContainerInfo(containerId).getDeleteTransactionId() > 0);
+          maxTransactionId = max(maxTransactionId,
+              scm.getContainerInfo(containerId).getDeleteTransactionId());
+        } else {
+          Assert.assertEquals(
+              scm.getContainerInfo(containerId).getDeleteTransactionId(), 0);
+        }
         Assert.assertEquals(
-            scm.getContainerInfo(containerId).getDeleteTransactionId(), 0);
+            ((KeyValueContainerData) dnContainerSet.getContainer(containerId)
+                .getContainerData()).getDeleteTransactionId(),
+            scm.getContainerInfo(containerId).getDeleteTransactionId());
       }
-      Assert.assertEquals(((KeyValueContainerData)dnContainerSet
-              .getContainer(containerId).getContainerData())
-              .getDeleteTransactionId(),
-          scm.getContainerInfo(containerId).getDeleteTransactionId());
     }
   }
 
@@ -348,16 +344,15 @@ public class TestBlockDeletion {
     }
   }
 
-  private void closeDatanodeContainers(
+  private void verifyClosedContainersInDatanode(
       List<OmKeyLocationInfoGroup> omKeyLocationInfoGroup) throws Exception {
     for (HddsDatanodeService datanode : cluster.getHddsDatanodes()) {
       ContainerSet dnContainerSet = datanode.getDatanodeStateMachine()
           .getContainer().getContainerSet();
-      OzoneTestUtils.performOperationOnKeyContainers(
-          blockID -> dnContainerSet.getContainer(blockID.getContainerID())
-              .getContainerData()
-              .setState(ContainerProtos.ContainerDataProto.State.CLOSED),
-          omKeyLocationInfoGroup);
+      OzoneTestUtils.performOperationOnKeyContainers(blockID -> Assert
+          .assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
+              dnContainerSet.getContainer(blockID.getContainerID())
+                  .getContainerData().getState()), omKeyLocationInfoGroup);
     }
   }
 }
