@@ -15,14 +15,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package org.apache.hadoop.ozone.om.protocol;
+package org.apache.hadoop.fs.ozone;
 
 /**
- * This will be used in the OzoneManager Server, as few of the methods in
- * OzoneManagerHAProtocol need not be exposed to Om clients. This interface
- * extends both OzoneManagerHAProtocol and OzoneManagerProtocol.
+ * Minimal Rooted Ozone File System compatible with Hadoop 2.x.
  */
-public interface OzoneManagerServerProtocol extends OzoneManagerProtocol,
-    OzoneManagerHAProtocol {
+public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem {
+
 }

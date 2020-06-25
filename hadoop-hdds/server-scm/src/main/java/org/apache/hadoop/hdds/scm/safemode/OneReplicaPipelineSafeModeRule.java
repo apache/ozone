@@ -134,4 +134,11 @@ public class OneReplicaPipelineSafeModeRule extends
   public int getCurrentReportedPipelineCount() {
     return currentReportedPipelineCount;
   }
+
+  @Override
+  public String getStatusText() {
+    return "currentReportedPipelineCount "
+        + this.currentReportedPipelineCount + " >= thresholdCount "
+        + this.thresholdCount;
+  }
 }

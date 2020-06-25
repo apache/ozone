@@ -247,19 +247,6 @@
     </description>
   </property>
   <property>
-    <name>dfs.ratis.client.request.max.retries</name>
-    <value>180</value>
-    <tag>OZONE, RATIS, MANAGEMENT</tag>
-    <description>Number of retries for ratis client request.</description>
-  </property>
-  <property>
-    <name>dfs.ratis.client.request.retry.interval</name>
-    <value>1000ms</value>
-    <tag>OZONE, RATIS, MANAGEMENT</tag>
-    <description>Interval between successive retries for a ratis client request.
-    </description>
-  </property>
-  <property>
     <name>dfs.ratis.server.retry-cache.timeout.duration</name>
     <value>600000ms</value>
     <tag>OZONE, RATIS, MANAGEMENT</tag>
@@ -1663,15 +1650,6 @@
   </property>
 
   <property>
-    <name>ozone.om.ratis.snapshot.auto.trigger.threshold</name>
-    <value>400000</value>
-    <tag>OZONE, DEBUG, OM, RATIS</tag>
-    <description>The log index threshold after ratis will auto trigger
-      snapshot on the OM state machine.
-    </description>
-  </property>
-
-  <property>
     <name>ozone.om.ratis.server.request.timeout</name>
     <value>3s</value>
     <tag>OZONE, OM, RATIS, MANAGEMENT</tag>
@@ -1958,6 +1936,14 @@
     </description>
   </property>
   
+  <property>
+    <name>ozone.fs.iterate.batch-size</name>
+    <value>100</value>
+    <tag>OZONE, OZONEFS</tag>
+    <description>
+      Iterate batch size of delete when use BasicOzoneFileSystem.
+    </description>
+  </property>
   <property>
     <name>ozone.manager.db.checkpoint.transfer.bandwidthPerSec</name>
     <value>0</value>

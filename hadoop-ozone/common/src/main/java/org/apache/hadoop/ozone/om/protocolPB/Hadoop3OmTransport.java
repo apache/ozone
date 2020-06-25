@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.om.protocolPB;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -61,6 +63,7 @@ public class Hadoop3OmTransport implements OmTransport {
   private final OMFailoverProxyProvider omFailoverProxyProvider;
 
   private final OzoneManagerProtocolPB rpcProxy;
+  private List<String> retryExceptions = new ArrayList<>();
 
   public Hadoop3OmTransport(ConfigurationSource conf,
       UserGroupInformation ugi, String omServiceId) throws IOException {
@@ -131,10 +134,11 @@ public class Hadoop3OmTransport implements OmTransport {
         if (exception instanceof ServiceException) {
           OMNotLeaderException notLeaderException =
               getNotLeaderException(exception);
-          if (notLeaderException != null &&
-              notLeaderException.getSuggestedLeaderNodeId() != null) {
-            LOG.info("RetryProxy: {}",
-                notLeaderException.getMessage());
+          if (notLeaderException != null) {
+            retryExceptions.add(getExceptionMsg(notLeaderException, failovers));
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("RetryProxy: {}", notLeaderException.getMessage());
+            }
 
             // TODO: NotLeaderException should include the host
             //  address of the suggested leader along with the nodeID.
@@ -153,10 +157,13 @@ public class Hadoop3OmTransport implements OmTransport {
           // does not perform any failover.
           // So Just retry with same OM node.
           if (leaderNotReadyException != null) {
-            LOG.info("RetryProxy: {}",
-                leaderNotReadyException.getMessage());
+            retryExceptions.add(getExceptionMsg(leaderNotReadyException,
+                failovers));
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("RetryProxy: {}", leaderNotReadyException.getMessage());
+            }
             // HDDS-3465. OM index will not change, but LastOmID will be
-            // updated to currentOMId, so that wiatTime calculation will
+            // updated to currentOMId, so that waitTime calculation will
             // know lastOmID and currentID are same and need to increment
             // wait time in between.
             omFailoverProxyProvider.performFailoverIfRequired(
@@ -169,13 +176,11 @@ public class Hadoop3OmTransport implements OmTransport {
         // NotLeaderException fail over manually to the next OM Node proxy.
         // OMFailoverProxyProvider#performFailover() is a dummy call and
         // does not perform any failover.
-        String exceptionMsg;
-        if (exception.getCause() != null) {
-          exceptionMsg = exception.getCause().getMessage();
-        } else {
-          exceptionMsg = exception.getMessage();
+        retryExceptions.add(getExceptionMsg(exception, failovers));
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("RetryProxy: {}", exception.getCause() != null ?
+              exception.getCause().getMessage() : exception.getMessage());
         }
-        LOG.info("RetryProxy: {}", exceptionMsg);
         omFailoverProxyProvider.performFailoverToNextProxy();
         return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
       }
@@ -186,9 +191,14 @@ public class Hadoop3OmTransport implements OmTransport {
           return new RetryAction(fallbackAction,
               omFailoverProxyProvider.getWaitTime());
         } else {
-          LOG.error("Failed to connect to OMs: {}. " +
-                  "Attempted {} failovers.",
-              omFailoverProxyProvider.getOMProxyInfos(), maxFailovers);
+          StringBuilder allRetryExceptions = new StringBuilder();
+          allRetryExceptions.append("\n");
+          retryExceptions.stream().forEach(e -> allRetryExceptions.append(e));
+          LOG.error("Failed to connect to OMs: {}. Attempted {} failovers. " +
+                  "Got following exceptions during retries: {}",
+              omFailoverProxyProvider.getOMProxyInfos(), maxFailovers,
+              allRetryExceptions.toString());
+          retryExceptions.clear();
           return RetryAction.FAIL;
         }
       }
@@ -199,6 +209,22 @@ public class Hadoop3OmTransport implements OmTransport {
     return proxy;
   }
 
+  private String getExceptionMsg(Exception e, int retryAttempt) {
+    StringBuilder exceptionMsg = new StringBuilder()
+        .append("Retry Attempt ")
+        .append(retryAttempt)
+        .append(" Exception - ");
+    if (e.getCause() == null) {
+      exceptionMsg.append(e.getClass().getCanonicalName())
+          .append(": ")
+          .append(e.getMessage());
+    } else {
+      exceptionMsg.append(e.getCause().getClass().getCanonicalName())
+          .append(": ")
+          .append(e.getCause().getMessage());
+    }
+    return exceptionMsg.toString();
+  }
 
   /**
    * Check if exception is OMLeaderNotReadyException.
