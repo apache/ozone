@@ -27,6 +27,8 @@ import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory;
+import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -88,8 +90,10 @@ public class OMAdmin extends GenericCli {
         ProtobufRpcEngine.class);
     String clientId = ClientId.randomId().toString();
     if (OmUtils.isOmHAServiceId(conf, omServiceID)) {
-      return new OzoneManagerProtocolClientSideTranslatorPB(conf, clientId,
-          omServiceID, ugi);
+      OmTransport omTransport = new Hadoop3OmTransportFactory()
+          .createOmTransport(conf, ugi, omServiceID);
+      return new OzoneManagerProtocolClientSideTranslatorPB(omTransport,
+          clientId);
     } else {
       throw new OzoneClientException("This command works only on OzoneManager" +
           " HA cluster. Service ID specified does not match" +
