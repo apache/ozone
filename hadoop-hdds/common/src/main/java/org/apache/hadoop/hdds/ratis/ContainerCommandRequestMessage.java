@@ -17,19 +17,20 @@
  */
 package org.apache.hadoop.hdds.ratis;
 
+import java.util.Objects;
+import java.util.function.Supplier;
+
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.ozone.common.Checksum;
+
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.util.JavaUtils;
-
-import java.util.Objects;
-import java.util.function.Supplier;
 
 /**
  * Implementing the {@link Message} interface
@@ -60,9 +61,11 @@ public final class ContainerCommandRequestMessage implements Message {
   public static ContainerCommandRequestProto toProto(
       ByteString bytes, RaftGroupId groupId)
       throws InvalidProtocolBufferException {
-    final int i = 4 + bytes.asReadOnlyByteBuffer().getInt();
+    final int i = Integer.BYTES + bytes.substring(0, Integer.BYTES)
+        .asReadOnlyByteBuffer().getInt();
     final ContainerCommandRequestProto header
-        = ContainerCommandRequestProto.parseFrom(bytes.substring(4, i));
+        = ContainerCommandRequestProto
+        .parseFrom(bytes.substring(Integer.BYTES, i));
     // TODO: setting pipeline id can be avoided if the client is sending it.
     //       In such case, just have to validate the pipeline id.
     final ContainerCommandRequestProto.Builder b = header.toBuilder();

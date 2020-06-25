@@ -62,7 +62,6 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.ANONYMOUS;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
@@ -102,14 +101,13 @@ public class TestOzoneNativeAuthorizer {
   private static PrefixManager prefixManager;
   private static OMMetadataManager metadataManager;
   private static OzoneNativeAuthorizer nativeAuthorizer;
-
-  private static UserGroupInformation ugi;
+  private static UserGroupInformation adminUgi;
+  private static UserGroupInformation testUgi;
 
   private static OzoneObj volObj;
   private static OzoneObj buckObj;
   private static OzoneObj keyObj;
   private static OzoneObj prefixObj;
-  private static long keySessionId;
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
@@ -149,7 +147,7 @@ public class TestOzoneNativeAuthorizer {
         OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     File dir = GenericTestUtils.getRandomizedTestDir();
     ozConfig.set(OZONE_METADATA_DIRS, dir.toString());
-    ozConfig.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
+    ozConfig.set(OZONE_ADMINISTRATORS, "om");
 
     metadataManager = new OmMetadataManagerImpl(ozConfig);
     volumeManager = new VolumeManagerImpl(metadataManager, ozConfig);
@@ -160,9 +158,12 @@ public class TestOzoneNativeAuthorizer {
         metadataManager, ozConfig, "om1", null);
 
     nativeAuthorizer = new OzoneNativeAuthorizer(volumeManager, bucketManager,
-        keyManager, prefixManager);
-    //keySession.
-    ugi = UserGroupInformation.getCurrentUser();
+        keyManager, prefixManager,
+        Collections.singletonList("om"));
+    adminUgi = UserGroupInformation.createUserForTesting("om",
+        new String[]{"ozone"});
+    testUgi = UserGroupInformation.createUserForTesting("testuser",
+        new String[]{"test"});
   }
 
   private void createKey(String volume,
@@ -174,8 +175,8 @@ public class TestOzoneNativeAuthorizer {
         .setFactor(HddsProtos.ReplicationFactor.ONE)
         .setDataSize(0)
         .setType(HddsProtos.ReplicationType.STAND_ALONE)
-        .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroups(),
-            ALL, ALL))
+        .setAcls(OzoneAclUtil.getAclList(testUgi.getUserName(),
+            testUgi.getGroupNames(), ALL, ALL))
         .build();
 
     if (keyName.split(OZONE_URI_DELIMITER).length > 1) {
@@ -187,7 +188,6 @@ public class TestOzoneNativeAuthorizer {
           keySession.getKeyInfo().getLatestVersionLocations()
               .getLocationList());
       keyManager.commitKey(keyArgs, keySession.getId());
-      keySessionId = keySession.getId();
     }
 
     keyObj = new OzoneObjInfo.Builder()
@@ -217,8 +217,8 @@ public class TestOzoneNativeAuthorizer {
   private void createVolume(String volumeName) throws IOException {
     OmVolumeArgs volumeArgs = OmVolumeArgs.newBuilder()
         .setVolume(volumeName)
-        .setAdminName("bilbo")
-        .setOwnerName("bilbo")
+        .setAdminName(adminUgi.getUserName())
+        .setOwnerName(testUgi.getUserName())
         .build();
     TestOMRequestUtils.addVolumeToOM(metadataManager, volumeArgs);
     volObj = new OzoneObjInfo.Builder()
@@ -240,10 +240,10 @@ public class TestOzoneNativeAuthorizer {
   @Test
   public void testCheckAccessForBucket() throws Exception {
 
-    OzoneAcl userAcl = new OzoneAcl(USER, ugi.getUserName(), parentDirUserAcl,
-        ACCESS);
-    OzoneAcl groupAcl = new OzoneAcl(GROUP, ugi.getGroups().size() > 0 ?
-        ugi.getGroups().get(0) : "", parentDirGroupAcl, ACCESS);
+    OzoneAcl userAcl = new OzoneAcl(USER, testUgi.getUserName(),
+        parentDirUserAcl, ACCESS);
+    OzoneAcl groupAcl = new OzoneAcl(GROUP, testUgi.getGroups().size() > 0 ?
+        testUgi.getGroups().get(0) : "", parentDirGroupAcl, ACCESS);
     // Set access for volume.
     // We should directly add to table because old API's update to DB.
 
@@ -258,10 +258,10 @@ public class TestOzoneNativeAuthorizer {
 
   @Test
   public void testCheckAccessForKey() throws Exception {
-    OzoneAcl userAcl = new OzoneAcl(USER, ugi.getUserName(), parentDirUserAcl,
-        ACCESS);
-    OzoneAcl groupAcl = new OzoneAcl(GROUP, ugi.getGroups().size() > 0 ?
-        ugi.getGroups().get(0) : "", parentDirGroupAcl, ACCESS);
+    OzoneAcl userAcl = new OzoneAcl(USER, testUgi.getUserName(),
+        parentDirUserAcl, ACCESS);
+    OzoneAcl groupAcl = new OzoneAcl(GROUP, testUgi.getGroups().size() > 0 ?
+        testUgi.getGroups().get(0) : "", parentDirGroupAcl, ACCESS);
     // Set access for volume & bucket. We should directly add to table
     // because old API's update to DB.
 
@@ -284,10 +284,10 @@ public class TestOzoneNativeAuthorizer {
         .setStoreType(OZONE)
         .build();
 
-    OzoneAcl userAcl = new OzoneAcl(USER, ugi.getUserName(), parentDirUserAcl,
-        ACCESS);
-    OzoneAcl groupAcl = new OzoneAcl(GROUP, ugi.getGroups().size() > 0 ?
-        ugi.getGroups().get(0) : "", parentDirGroupAcl, ACCESS);
+    OzoneAcl userAcl = new OzoneAcl(USER, testUgi.getUserName(),
+        parentDirUserAcl, ACCESS);
+    OzoneAcl groupAcl = new OzoneAcl(GROUP, testUgi.getGroups().size() > 0 ?
+        testUgi.getGroups().get(0) : "", parentDirGroupAcl, ACCESS);
     // Set access for volume & bucket. We should directly add to table
     // because old API's update to DB.
 
@@ -348,18 +348,13 @@ public class TestOzoneNativeAuthorizer {
   private void resetAclsAndValidateAccess(OzoneObj obj,
       ACLIdentityType accessType, IOzoneAcl aclImplementor)
       throws IOException {
-
     List<OzoneAcl> acls;
-    String user = "";
-    String group = "";
-
-    user = ugi.getUserName();
-    if (ugi.getGroups().size() > 0) {
-      group = ugi.getGroups().get(0);
-    }
+    String user = testUgi.getUserName();
+    String group = (testUgi.getGroups().size() > 0) ?
+        testUgi.getGroups().get(0): "";
 
     RequestContext.Builder builder = new RequestContext.Builder()
-        .setClientUgi(ugi)
+        .setClientUgi(testUgi)
         .setAclType(accessType);
 
     // Get all acls.
@@ -402,11 +397,16 @@ public class TestOzoneNativeAuthorizer {
         validateNone(obj, builder);
         continue;
       }
-      assertEquals("Acl to check:" + a1 + " accessType:" +
-              accessType + " path:" + obj.getPath(),
-          expectedAclResult, nativeAuthorizer.checkAccess(obj,
-              builder.setAclRights(a1).build()));
-
+      String msg = "Acl to check:" + a1 + " accessType:" +
+          accessType + " path:" + obj.getPath();
+      if (a1.equals(CREATE) && obj.getResourceType().equals(VOLUME)) {
+        assertEquals(msg, nativeAuthorizer.getOzoneAdmins().contains(user),
+            nativeAuthorizer.checkAccess(obj,
+                builder.setAclRights(a1).build()));
+      } else {
+        assertEquals(msg, expectedAclResult, nativeAuthorizer.checkAccess(obj,
+            builder.setAclRights(a1).build()));
+      }
       List<ACLType> aclsToBeValidated =
           Arrays.stream(ACLType.values()).collect(Collectors.toList());
       List<ACLType> aclsToBeAdded =
@@ -499,10 +499,10 @@ public class TestOzoneNativeAuthorizer {
   private String getAclName(ACLIdentityType identityType) {
     switch (identityType) {
     case USER:
-      return ugi.getUserName();
+      return testUgi.getUserName();
     case GROUP:
-      if (ugi.getGroups().size() > 0) {
-        return ugi.getGroups().get(0);
+      if (testUgi.getGroups().size() > 0) {
+        return testUgi.getGroups().get(0);
       }
     default:
       return "";
@@ -519,10 +519,15 @@ public class TestOzoneNativeAuthorizer {
     List<ACLType> allAcls = new ArrayList<>(Arrays.asList(ACLType.values()));
     allAcls.remove(ALL);
     allAcls.remove(NONE);
+    RequestContext ctx = builder.build();
+    boolean expectedResult = expectedAclResult;
+    if (nativeAuthorizer.getOzoneAdmins().contains(
+        ctx.getClientUgi().getUserName())) {
+      expectedResult = true;
+    }
     for (ACLType a : allAcls) {
-      assertEquals("User should have right " + a + ".", 
-          nativeAuthorizer.checkAccess(obj,
-          builder.setAclRights(a).build()), expectedAclResult);
+      assertEquals("User should have right " + a + ".",
+          expectedResult, nativeAuthorizer.checkAccess(obj, ctx));
     }
   }
 

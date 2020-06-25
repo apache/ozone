@@ -26,7 +26,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -72,7 +72,7 @@ public class OzoneContainer {
 
   private final HddsDispatcher hddsDispatcher;
   private final Map<ContainerType, Handler> handlers;
-  private final OzoneConfiguration config;
+  private final ConfigurationSource config;
   private final MutableVolumeSet volumeSet;
   private final ContainerSet containerSet;
   private final XceiverServerSpi writeChannel;
@@ -90,7 +90,7 @@ public class OzoneContainer {
    * @throws DiskOutOfSpaceException
    * @throws IOException
    */
-  public OzoneContainer(DatanodeDetails datanodeDetails, OzoneConfiguration
+  public OzoneContainer(DatanodeDetails datanodeDetails, ConfigurationSource
       conf, StateContext context, CertificateClient certClient)
       throws IOException {
     config = conf;
@@ -178,7 +178,8 @@ public class OzoneContainer {
         volumeThreads.get(i).join();
       }
     } catch (InterruptedException ex) {
-      LOG.info("Volume Threads Interrupted exception", ex);
+      LOG.error("Volume Threads Interrupted exception", ex);
+      Thread.currentThread().interrupt();
     }
 
   }

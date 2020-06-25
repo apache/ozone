@@ -32,12 +32,13 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
 import java.util.Optional;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
@@ -45,8 +46,13 @@ import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 /**
  * Test cases to verify the metrics exposed by SCMPipelineManager.
  */
-@Ignore
 public class TestSCMPipelineMetrics {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private MiniOzoneCluster cluster;
 
@@ -83,16 +89,15 @@ public class TestSCMPipelineMetrics {
     Optional<Pipeline> pipeline = pipelineManager
         .getPipelines().stream().findFirst();
     Assert.assertTrue(pipeline.isPresent());
-    pipeline.ifPresent(pipeline1 -> {
-      try {
-        cluster.getStorageContainerManager()
-            .getClientProtocolServer().closePipeline(
-                pipeline.get().getId().getProtobuf());
-      } catch (IOException e) {
-        e.printStackTrace();
-        Assert.fail();
-      }
-    });
+    try {
+      cluster.getStorageContainerManager()
+          .getPipelineManager()
+          .finalizeAndDestroyPipeline(
+              pipeline.get(), false);
+    } catch (IOException e) {
+      e.printStackTrace();
+      Assert.fail();
+    }
     MetricsRecordBuilder metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
     assertCounter("NumPipelineDestroyed", 1L, metrics);

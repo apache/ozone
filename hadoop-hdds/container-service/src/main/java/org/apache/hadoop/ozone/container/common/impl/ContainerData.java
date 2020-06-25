@@ -24,6 +24,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.
     ContainerType;
@@ -71,6 +72,9 @@ public abstract class ContainerData {
   // Metadata of the container will be a key value pair.
   // This can hold information like volume name, owner etc.,
   private final Map<String, String> metadata;
+
+  // Path to Physical file system where chunks are stored.
+  private String chunksPath;
 
   // State of the Container
   private ContainerDataProto.State state;
@@ -225,6 +229,22 @@ public abstract class ContainerData {
    */
   public ChunkLayOutVersion getLayOutVersion() {
     return ChunkLayOutVersion.getChunkLayOutVersion(layOutVersion);
+  }
+
+  /**
+   * Get chunks path.
+   * @return - Path where chunks are stored
+   */
+  public String getChunksPath() {
+    return chunksPath;
+  }
+
+  /**
+   * Set chunks Path.
+   * @param chunkPath - File path.
+   */
+  public void setChunksPath(String chunkPath) {
+    this.chunksPath = chunkPath;
   }
 
   /**
@@ -482,6 +502,15 @@ public abstract class ContainerData {
    */
   public void decrKeyCount() {
     this.keyCount.decrementAndGet();
+  }
+
+  /**
+   * Decrease the count of keys in the container.
+   *
+   * @param deletedKeyCount
+   */
+  public void decrKeyCount(long deletedKeyCount) {
+    this.keyCount.addAndGet(-1 * deletedKeyCount);
   }
 
   /**

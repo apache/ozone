@@ -17,10 +17,12 @@
  */
 package org.apache.hadoop.ozone.recon;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configuration.DeprecationDelta;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Provider;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 /**
  * Ozone Configuration Provider.
@@ -38,9 +40,15 @@ public class ConfigurationProvider implements
   private static OzoneConfiguration configuration;
 
   private static void addDeprecations() {
-    Configuration.addDeprecation(
-        ReconServerConfigKeys.OZONE_RECON_HTTP_KEYTAB_FILE_OLD,
-        ReconServerConfigKeys.OZONE_RECON_HTTP_KEYTAB_FILE);
+    Configuration.addDeprecations(new DeprecationDelta[]{
+        new DeprecationDelta("ozone.recon.keytab.file",
+            ReconServerConfigKeys.OZONE_RECON_HTTP_KEYTAB_FILE),
+        new DeprecationDelta(("ozone.recon.http.kerberos.keytab.file"),
+            ReconServerConfigKeys.OZONE_RECON_HTTP_KEYTAB_FILE),
+        new DeprecationDelta("ozone.recon.authentication.kerberos.principal",
+            ReconServerConfigKeys.
+                OZONE_RECON_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL)
+    });
   }
 
   @VisibleForTesting

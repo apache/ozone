@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
@@ -39,6 +40,7 @@ import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -48,6 +50,8 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,6 +68,7 @@ import static org.junit.Assert.assertEquals;
 /**
  * This class is used to test OzoneContainer.
  */
+@RunWith(Parameterized.class)
 public class TestOzoneContainer {
 
   private static final Logger LOG =
@@ -81,6 +86,17 @@ public class TestOzoneContainer {
   private final DatanodeDetails datanodeDetails = createDatanodeDetails();
   private HashMap<String, Long> commitSpaceMap; //RootDir -> committed space
   private final int numTestContainers = 10;
+
+  private final ChunkLayOutVersion layout;
+
+  public TestOzoneContainer(ChunkLayOutVersion layout) {
+    this.layout = layout;
+  }
+
+  @Parameterized.Parameters
+  public static Iterable<Object[]> parameters() {
+    return ChunkLayoutTestInfo.chunkLayoutParameters();
+  }
 
   @Before
   public void setUp() throws Exception {
@@ -119,7 +135,7 @@ public class TestOzoneContainer {
       HddsVolume myVolume;
 
       keyValueContainerData = new KeyValueContainerData(i,
-          ChunkLayOutVersion.FILE_PER_CHUNK,
+          layout,
           maxCap, UUID.randomUUID().toString(),
           datanodeDetails.getUuidString());
       keyValueContainer = new KeyValueContainer(
@@ -167,7 +183,7 @@ public class TestOzoneContainer {
       volume.incCommittedBytes(10);
     }
     keyValueContainerData = new KeyValueContainerData(99,
-        ChunkLayOutVersion.FILE_PER_CHUNK, containerSize,
+        layout, containerSize,
         UUID.randomUUID().toString(), datanodeDetails.getUuidString());
     keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
 
@@ -223,6 +239,12 @@ public class TestOzoneContainer {
       db.getStore().put(Longs.toByteArray(blockID.getLocalID()),
           blockData.getProtoBufMessage().toByteArray());
     }
+
+    // Set Block count and used bytes.
+    db.getStore().put(OzoneConsts.DB_BLOCK_COUNT_KEY,
+        Longs.toByteArray(blocks));
+    db.getStore().put(OzoneConsts.DB_CONTAINER_BYTES_USED_KEY,
+        Longs.toByteArray(usedBytes));
 
     // remaining available capacity of the container
     return (freeBytes - usedBytes);

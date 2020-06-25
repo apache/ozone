@@ -85,6 +85,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final OMRatisSnapshotInfo snapshotInfo;
   private final ExecutorService executorService;
   private final ExecutorService installSnapshotExecutor;
+  private final boolean isTracingEnabled;
 
   // Map which contains index and term for the ratis transactions which are
   // stateMachine entries which are recived through applyTransaction.
@@ -97,16 +98,22 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       new ConcurrentSkipListMap<>();
 
 
-  public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer) {
+  public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer,
+      boolean isTracingEnabled) throws IOException {
     this.omRatisServer = ratisServer;
+    this.isTracingEnabled = isTracingEnabled;
     this.ozoneManager = omRatisServer.getOzoneManager();
 
     this.snapshotInfo = ozoneManager.getSnapshotInfo();
-    updateLastAppliedIndexWithSnaphsotIndex();
+    loadSnapshotInfoFromDB();
 
-    this.ozoneManagerDoubleBuffer =
-        new OzoneManagerDoubleBuffer(ozoneManager.getMetadataManager(),
-            this::updateLastAppliedIndex);
+    this.ozoneManagerDoubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+        .setOmMetadataManager(ozoneManager.getMetadataManager())
+        .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
+        .enableRatis(true)
+        .enableTracing(isTracingEnabled)
+        .setIndexToTerm(this::getTermForIndex)
+        .build();
 
     this.handler = new OzoneManagerRequestHandler(ozoneManager,
         ozoneManagerDoubleBuffer);
@@ -123,7 +130,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @Override
   public void initialize(RaftServer server, RaftGroupId id,
       RaftStorage raftStorage) throws IOException {
-    lifeCycle.startAndTransition(() -> {
+    getLifeCycle().startAndTransition(() -> {
       super.initialize(server, id, raftStorage);
       this.raftGroupId = id;
       storage.init(raftStorage);
@@ -131,7 +138,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @Override
+  public void reinitialize() throws IOException {
+    loadSnapshotInfoFromDB();
+  }
+
+  @Override
   public SnapshotInfo getLatestSnapshot() {
+    LOG.info("Latest Snapshot Info {}", snapshotInfo);
     return snapshotInfo;
   }
 
@@ -157,7 +170,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     // with some information like its peers and termIndex). So, calling
     // updateLastApplied updates lastAppliedTermIndex.
     computeAndUpdateLastAppliedIndex(index, currentTerm, null, false);
-    snapshotInfo.updateTerm(currentTerm);
   }
 
   /**
@@ -304,8 +316,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   @Override
   public void pause() {
-    lifeCycle.transition(LifeCycle.State.PAUSING);
-    lifeCycle.transition(LifeCycle.State.PAUSED);
+    getLifeCycle().transition(LifeCycle.State.PAUSING);
+    getLifeCycle().transition(LifeCycle.State.PAUSED);
     ozoneManagerDoubleBuffer.stop();
   }
 
@@ -316,10 +328,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   public void unpause(long newLastAppliedSnaphsotIndex,
       long newLastAppliedSnapShotTermIndex) {
-    lifeCycle.startAndTransition(() -> {
+    getLifeCycle().startAndTransition(() -> {
       this.ozoneManagerDoubleBuffer =
-          new OzoneManagerDoubleBuffer(ozoneManager.getMetadataManager(),
-              this::updateLastAppliedIndex);
+          new OzoneManagerDoubleBuffer.Builder()
+              .setOmMetadataManager(ozoneManager.getMetadataManager())
+              .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
+              .enableRatis(true)
+              .enableTracing(isTracingEnabled)
+              .build();
       handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
       this.setLastAppliedTermIndex(TermIndex.newTermIndex(
           newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
@@ -327,20 +343,22 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   /**
-   * Take OM Ratis snapshot. Write the snapshot index to file. Snapshot index
-   * is the log index corresponding to the last applied transaction on the OM
-   * State Machine.
+   * Take OM Ratis snapshot is a dummy operation as when double buffer
+   * flushes the lastAppliedIndex is flushed to DB and that is used as
+   * snapshot index.
    *
    * @return the last applied index on the state machine which has been
    * stored in the snapshot file.
    */
   @Override
   public long takeSnapshot() throws IOException {
-    LOG.info("Saving Ratis snapshot on the OM.");
-    if (ozoneManager != null) {
-      return ozoneManager.saveRatisSnapshot().getIndex();
-    }
-    return 0;
+    LOG.info("Current Snapshot Index {}", getLastAppliedTermIndex());
+    TermIndex lastTermIndex = getLastAppliedTermIndex();
+    long lastAppliedIndex = lastTermIndex.getIndex();
+    snapshotInfo.updateTermIndex(lastTermIndex.getTerm(),
+        lastAppliedIndex);
+    ozoneManager.getMetadataManager().getStore().flush();
+    return lastAppliedIndex;
   }
 
   /**
@@ -504,13 +522,21 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     }
   }
 
-  public void updateLastAppliedIndexWithSnaphsotIndex() {
+  public void loadSnapshotInfoFromDB() throws IOException {
     // This is done, as we have a check in Ratis for not throwing
     // LeaderNotReadyException, it checks stateMachineIndex >= raftLog
     // nextIndex (placeHolderIndex).
-    setLastAppliedTermIndex(TermIndex.newTermIndex(snapshotInfo.getTerm(),
-        snapshotInfo.getIndex()));
-    LOG.info("LastAppliedIndex set from SnapShotInfo {}",
+    OMTransactionInfo omTransactionInfo =
+        OMTransactionInfo.readTransactionInfo(
+            ozoneManager.getMetadataManager());
+    if (omTransactionInfo != null) {
+      setLastAppliedTermIndex(TermIndex.newTermIndex(
+          omTransactionInfo.getCurrentTerm(),
+          omTransactionInfo.getTransactionIndex()));
+      snapshotInfo.updateTermIndex(omTransactionInfo.getCurrentTerm(),
+          omTransactionInfo.getTransactionIndex());
+    }
+    LOG.info("LastAppliedIndex is set from TransactionInfo from OM DB as {}",
         getLastAppliedTermIndex());
   }
 
@@ -551,4 +577,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   void addApplyTransactionTermIndex(long term, long index) {
     applyTransactionMap.put(index, term);
   }
+
+  /**
+   * Return term associated with transaction index.
+   * @param transactionIndex
+   * @return
+   */
+  public long getTermForIndex(long transactionIndex) {
+    return applyTransactionMap.get(transactionIndex);
+  }
+
 }

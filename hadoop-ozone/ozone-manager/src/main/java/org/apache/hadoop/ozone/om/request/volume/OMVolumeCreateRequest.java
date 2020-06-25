@@ -19,19 +19,22 @@
 package org.apache.hadoop.ozone.om.request.volume;
 
 import java.io.IOException;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
 import com.google.common.base.Preconditions;
+
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeCreateResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -51,7 +54,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserVolumeInfo;
 import org.apache.hadoop.util.Time;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
 
@@ -71,17 +73,17 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
 
     VolumeInfo volumeInfo  =
         getOmRequest().getCreateVolumeRequest().getVolumeInfo();
+    // Verify resource name
+    OmUtils.validateVolumeName(volumeInfo.getVolume());
 
     // Set creation time
     VolumeInfo updatedVolumeInfo =
         volumeInfo.toBuilder().setCreationTime(Time.now()).build();
 
-
     return getOmRequest().toBuilder().setCreateVolumeRequest(
         CreateVolumeRequest.newBuilder().setVolumeInfo(updatedVolumeInfo))
         .setUserInfo(getUserInfo())
         .build();
-
   }
 
   @Override
@@ -100,9 +102,8 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
     String volume = volumeInfo.getVolume();
     String owner = volumeInfo.getOwnerName();
 
-    OMResponse.Builder omResponse = OMResponse.newBuilder().setCmdType(
-        OzoneManagerProtocolProtos.Type.CreateVolume).setStatus(
-        OzoneManagerProtocolProtos.Status.OK).setSuccess(true);
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
@@ -113,7 +114,6 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
     OMClientResponse omClientResponse = null;
     OmVolumeArgs omVolumeArgs = null;
     Map<String, String> auditMap = new HashMap<>();
-    Collection<String> ozAdmins = ozoneManager.getOzoneAdmins();
     try {
       omVolumeArgs = OmVolumeArgs.getFromProtobuf(volumeInfo);
       // when you create a volume, we set both Object ID and update ID.
@@ -127,14 +127,11 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
 
       auditMap = omVolumeArgs.toAuditMap();
 
-      // check Acl
+      // check acl
       if (ozoneManager.getAclsEnabled()) {
-        if (!ozAdmins.contains(OZONE_ADMINISTRATORS_WILDCARD) &&
-            !ozAdmins.contains(getUserInfo().getUserName())) {
-          throw new OMException("Only admin users are authorized to create " +
-              "Ozone volumes. User: " + getUserInfo().getUserName(),
-              OMException.ResultCodes.PERMISSION_DENIED);
-        }
+        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE, volume,
+            null, null);
       }
 
       // acquire lock.

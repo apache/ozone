@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -78,6 +79,8 @@ public class TestHddsVolumeChecker {
   public static final Logger LOG = LoggerFactory.getLogger(
       TestHddsVolumeChecker.class);
 
+  private static final int NUM_VOLUMES = 2;
+
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
 
@@ -88,6 +91,19 @@ public class TestHddsVolumeChecker {
   public Timeout globalTimeout = new Timeout(30_000);
 
   private OzoneConfiguration conf = new OzoneConfiguration();
+
+  /**
+   * When null, the check call should throw an exception.
+   */
+  private final VolumeCheckResult expectedVolumeHealth;
+
+  private final ChunkLayOutVersion layout;
+
+  public TestHddsVolumeChecker(VolumeCheckResult result,
+      ChunkLayOutVersion layout) {
+    this.expectedVolumeHealth = result;
+    this.layout = layout;
+  }
 
   @Before
   public void setup() throws IOException {
@@ -106,28 +122,19 @@ public class TestHddsVolumeChecker {
   /**
    * Run each test case for each possible value of {@link VolumeCheckResult}.
    * Including "null" for 'throw exception'.
-   * @return
    */
-  @Parameters(name="{0}")
+  @Parameters
   public static Collection<Object[]> data() {
     List<Object[]> values = new ArrayList<>();
-    for (VolumeCheckResult result : VolumeCheckResult.values()) {
-      values.add(new Object[] {result});
+    for (ChunkLayOutVersion layout : ChunkLayOutVersion.values()) {
+      for (VolumeCheckResult result : VolumeCheckResult.values()) {
+        values.add(new Object[]{result, layout});
+      }
+      values.add(new Object[]{null, layout});
     }
-    values.add(new Object[] {null});
     return values;
   }
 
-  /**
-   * When null, the check call should throw an exception.
-   */
-  private final VolumeCheckResult expectedVolumeHealth;
-  private static final int NUM_VOLUMES = 2;
-
-
-  public TestHddsVolumeChecker(VolumeCheckResult expectedVolumeHealth) {
-    this.expectedVolumeHealth = expectedVolumeHealth;
-  }
 
   /**
    * Test {@link HddsVolumeChecker#checkVolume} propagates the
@@ -233,7 +240,8 @@ public class TestHddsVolumeChecker {
     for (ContainerDataProto.State state : ContainerDataProto.State.values()) {
       if (!state.equals(ContainerDataProto.State.INVALID)) {
         // add containers to the created volume
-        Container container = ContainerTestUtils.getContainer(++i, state);
+        Container container = ContainerTestUtils.getContainer(++i, layout,
+            state);
         container.getContainerData()
             .setVolume(volumeSet.getVolumeMap().get(volRootDir.getPath()));
         ((KeyValueContainerData) container.getContainerData())

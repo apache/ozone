@@ -1,0 +1,68 @@
+//                                                                             
+// Licensed to the Apache Software Foundation (ASF) under one or more           
+// contributor license agreements.  See the NOTICE file distributed with this   
+// work for additional information regarding copyright ownership.  The ASF      
+// licenses this file to you under the Apache License, Version 2.0 (the         
+// "License"); you may not use this file except in compliance with the License. 
+// You may obtain a copy of the License at                                      
+// <p>                                                                          
+// http://www.apache.org/licenses/LICENSE-2.0                                   
+// <p>                                                                          
+// Unless required by applicable law or agreed to in writing, software          
+// distributed under the License is distributed on an "AS IS" BASIS,WITHOUT     
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the     
+// License for the specific language governing permissions and limitations under
+// the License.                                                                 
+//                  
+
+syntax = "proto2";
+
+package NoiseInjector;
+
+// The failure injection service definition.
+service FailureInjectorSvc {
+  // Get Service Status
+  rpc GetStatus (GetStatusRequest) returns (GetStatusReply) {
+  }
+
+  // Inject Failure
+  rpc InjectFailure (InjectFailureRequest) returns (InjectFailureReply) {
+  }
+
+  // Reset Failure
+  rpc ResetFailure (ResetFailureRequest) returns (ResetFailureReply) {
+  }
+}
+
+// The request message containing the user's name.
+message GetStatusRequest {
+  optional string name = 1;
+}
+
+// The response message containing the greetings
+message GetStatusReply {
+  optional string message = 1;
+}
+
+message InjectFailureRequest {
+    required string path = 1;
+    required string op_name = 2;
+    enum ActionCode {
+        DELAY = 0;
+        FAIL = 1;
+        CORRUPT = 2;
+    };
+    required ActionCode action_code = 3;
+    optional int64 action_param = 4;
+};
+
+message InjectFailureReply {
+}
+
+message ResetFailureRequest {
+    optional string path = 1;
+    optional string op_name = 2;
+};
+
+message ResetFailureReply {
+}

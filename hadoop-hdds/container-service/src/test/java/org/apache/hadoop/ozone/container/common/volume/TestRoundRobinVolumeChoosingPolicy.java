@@ -18,24 +18,24 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
-import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
-import org.apache.hadoop.hdds.fs.SpaceUsageSource;
-import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
-import org.apache.hadoop.hdds.fs.MockSpaceUsageSource;
-import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
+import org.apache.hadoop.hdds.fs.MockSpaceUsageSource;
+import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
+import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
+import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
+
 import static org.apache.hadoop.test.GenericTestUtils.getTestDir;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * Tests {@link RoundRobinVolumeChoosingPolicy}.
@@ -45,7 +45,7 @@ public class TestRoundRobinVolumeChoosingPolicy {
   private RoundRobinVolumeChoosingPolicy policy;
   private final List<HddsVolume> volumes = new ArrayList<>();
 
-  private static final Configuration CONF = new Configuration();
+  private static final OzoneConfiguration CONF = new OzoneConfiguration();
   private static final String BASE_DIR =
       getTestDir(TestRoundRobinVolumeChoosingPolicy.class.getSimpleName())
           .getAbsolutePath();

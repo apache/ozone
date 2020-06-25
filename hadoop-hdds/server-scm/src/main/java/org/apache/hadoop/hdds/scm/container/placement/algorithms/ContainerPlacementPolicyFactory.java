@@ -16,20 +16,21 @@
  * limitations under the License.
  */
 package org.apache.hadoop.hdds.scm.container.placement.algorithms;
-import org.apache.hadoop.conf.Configuration;
+import java.lang.reflect.Constructor;
+
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.lang.reflect.Constructor;
-
 /**
  * A factory to create container placement instance based on configuration
- * property ozone.scm.container.placement.classname.
+ * property {@link ScmConfigKeys#OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY}.
  */
 public final class ContainerPlacementPolicyFactory {
   private static final Logger LOG =
@@ -44,7 +45,7 @@ public final class ContainerPlacementPolicyFactory {
 
 
   public static PlacementPolicy getPolicy(
-      Configuration conf, final NodeManager nodeManager,
+      ConfigurationSource conf, final NodeManager nodeManager,
       NetworkTopology clusterMap, final boolean fallback,
       SCMContainerPlacementMetrics metrics) throws SCMException{
     final Class<? extends PlacementPolicy> placementClass = conf
@@ -54,7 +55,7 @@ public final class ContainerPlacementPolicyFactory {
     Constructor<? extends PlacementPolicy> constructor;
     try {
       constructor = placementClass.getDeclaredConstructor(NodeManager.class,
-          Configuration.class, NetworkTopology.class, boolean.class,
+          ConfigurationSource.class, NetworkTopology.class, boolean.class,
           SCMContainerPlacementMetrics.class);
       LOG.info("Create container placement policy of type {}",
               placementClass.getCanonicalName());

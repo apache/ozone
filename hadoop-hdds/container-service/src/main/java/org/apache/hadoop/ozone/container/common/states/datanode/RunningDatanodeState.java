@@ -16,7 +16,7 @@
  */
 package org.apache.hadoop.ozone.container.common.states.datanode;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointStates;
@@ -51,14 +51,14 @@ public class RunningDatanodeState implements DatanodeState {
   static final Logger
       LOG = LoggerFactory.getLogger(RunningDatanodeState.class);
   private final SCMConnectionManager connectionManager;
-  private final Configuration conf;
+  private final ConfigurationSource conf;
   private final StateContext context;
   private CompletionService<EndPointStates> ecs;
   /** Cache the end point task per end point per end point state. */
   private Map<EndpointStateMachine, Map<EndPointStates,
       Callable<EndPointStates>>> endpointTasks;
 
-  public RunningDatanodeState(Configuration conf,
+  public RunningDatanodeState(ConfigurationSource conf,
       SCMConnectionManager connectionManager,
       StateContext context) {
     this.connectionManager = connectionManager;
@@ -72,8 +72,7 @@ public class RunningDatanodeState implements DatanodeState {
    * each end point state.
    */
   private void initEndPointTask() {
-    endpointTasks = new HashMap<EndpointStateMachine, Map<EndPointStates,
-        Callable<EndPointStates>>>();
+    endpointTasks = new HashMap<>();
     for (EndpointStateMachine endpoint : connectionManager.getValues()) {
       EnumMap<EndPointStates, Callable<EndPointStates>> endpointTaskForState =
           new EnumMap<>(EndPointStates.class);
@@ -182,7 +181,10 @@ public class RunningDatanodeState implements DatanodeState {
           // if any endpoint tells us to shutdown we move to shutdown state.
           return DatanodeStateMachine.DatanodeStates.SHUTDOWN;
         }
-      } catch (InterruptedException | ExecutionException e) {
+      } catch (InterruptedException e) {
+        LOG.error("Error in executing end point task.", e);
+        Thread.currentThread().interrupt();
+      } catch (ExecutionException e) {
         LOG.error("Error in executing end point task.", e);
       }
     }

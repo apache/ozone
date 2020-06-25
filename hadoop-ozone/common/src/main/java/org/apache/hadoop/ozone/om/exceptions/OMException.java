@@ -145,10 +145,6 @@ public class OMException extends IOException {
 
     SCM_VERSION_MISMATCH_ERROR,
 
-    S3_BUCKET_NOT_FOUND,
-
-    S3_BUCKET_ALREADY_EXISTS,
-
     INITIATE_MULTIPART_UPLOAD_ERROR,
 
     MULTIPART_UPLOAD_PARTFILE_ERROR,
@@ -203,8 +199,6 @@ public class OMException extends IOException {
 
     PREFIX_NOT_FOUND,
 
-    S3_BUCKET_INVALID_LENGTH,
-
     RATIS_ERROR, // Error in Ratis server
 
     INVALID_PATH_IN_ACL_REQUEST, // Error code when path name is invalid during
@@ -226,6 +220,8 @@ public class OMException extends IOException {
     CANNOT_CREATE_DIRECTORY_AT_ROOT,
 
     DIRECTORY_ALREADY_EXISTS,
+
+    INVALID_VOLUME_NAME,
 
     REPLAY // When ratis logs are replayed.
   }

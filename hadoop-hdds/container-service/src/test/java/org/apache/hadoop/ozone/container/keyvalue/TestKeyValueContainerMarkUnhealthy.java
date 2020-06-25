@@ -35,6 +35,8 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +57,7 @@ import static org.mockito.Mockito.mock;
  * Tests unhealthy container functionality in the {@link KeyValueContainer}
  * class.
  */
+@RunWith(Parameterized.class)
 public class TestKeyValueContainerMarkUnhealthy {
   public static final Logger LOG = LoggerFactory.getLogger(
       TestKeyValueContainerMarkUnhealthy.class);
@@ -76,6 +79,17 @@ public class TestKeyValueContainerMarkUnhealthy {
   private KeyValueContainer keyValueContainer;
   private UUID datanodeId;
 
+  private final ChunkLayOutVersion layout;
+
+  public TestKeyValueContainerMarkUnhealthy(ChunkLayOutVersion layout) {
+    this.layout = layout;
+  }
+
+  @Parameterized.Parameters
+  public static Iterable<Object[]> parameters() {
+    return ChunkLayoutTestInfo.chunkLayoutParameters();
+  }
+
   @Before
   public void setUp() throws Exception {
     conf = new OzoneConfiguration();
@@ -90,7 +104,7 @@ public class TestKeyValueContainerMarkUnhealthy {
         .thenReturn(hddsVolume);
 
     keyValueContainerData = new KeyValueContainerData(1L,
-        ChunkLayOutVersion.FILE_PER_CHUNK,
+        layout,
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
     final File metaDir = GenericTestUtils.getRandomizedTestDir();

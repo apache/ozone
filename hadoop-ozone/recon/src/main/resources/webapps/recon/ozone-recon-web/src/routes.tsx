@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,32 +16,37 @@
  * limitations under the License.
  */
 
-import {Overview} from './views/Overview/Overview';
-import {Datanodes} from './views/Datanodes/Datanodes';
-import {Pipelines} from "./views/Pipelines/Pipelines";
-import {NotFound} from './views/NotFound/NotFound';
-import {IRoute} from "./types/routes.types";
-import {MissingContainers} from "./views/MissingContainers/MissingContainers";
+import {Overview} from './views/overview/overview';
+import {Datanodes} from './views/datanodes/datanodes';
+import {Pipelines} from './views/pipelines/pipelines';
+import {NotFound} from './views/notFound/notFound';
+import {IRoute} from './types/routes.types';
+import {MissingContainers} from './views/missingContainers/missingContainers';
+import {Insights} from './views/insights/insights';
 
 export const routes: IRoute[] = [
   {
-    path: "/Overview",
+    path: '/Overview',
     component: Overview
   },
   {
-    path: "/Datanodes",
+    path: '/Datanodes',
     component: Datanodes
   },
   {
-    path: "/Pipelines",
+    path: '/Pipelines',
     component: Pipelines
   },
   {
-    path: "/MissingContainers",
+    path: '/Insights',
+    component: Insights
+  },
+  {
+    path: '/MissingContainers',
     component: MissingContainers
   },
   {
-    path: "/:NotFound",
-    component: NotFound,
+    path: '/:NotFound',
+    component: NotFound
   }
 ];

@@ -111,8 +111,11 @@ public class BufferPool {
   }
 
   public long computeBufferData() {
-    return bufferList.stream().mapToInt(ChunkBuffer::position)
-        .sum();
+    long totalBufferSize = 0;
+    for (ChunkBuffer buf : bufferList) {
+      totalBufferSize += buf.position();
+    }
+    return totalBufferSize;
   }
 
   public int getSize() {

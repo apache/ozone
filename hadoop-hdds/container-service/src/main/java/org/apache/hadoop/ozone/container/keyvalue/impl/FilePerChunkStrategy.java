@@ -29,15 +29,18 @@ import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
+import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_CHUNK;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,9 +64,11 @@ public class FilePerChunkStrategy implements ChunkManager {
       LoggerFactory.getLogger(FilePerChunkStrategy.class);
 
   private final boolean doSyncWrite;
+  private final BlockManager blockManager;
 
-  public FilePerChunkStrategy(boolean sync) {
+  public FilePerChunkStrategy(boolean sync, BlockManager manager) {
     doSyncWrite = sync;
+    blockManager = manager;
   }
 
   private static void checkLayoutVersion(Container container) {
@@ -91,13 +96,12 @@ public class FilePerChunkStrategy implements ChunkManager {
     Preconditions.checkNotNull(dispatcherContext);
     DispatcherContext.WriteChunkStage stage = dispatcherContext.getStage();
     try {
-
-      KeyValueContainerData containerData = (KeyValueContainerData) container
-          .getContainerData();
+      KeyValueContainer kvContainer = (KeyValueContainer) container;
+      KeyValueContainerData containerData = kvContainer.getContainerData();
       HddsVolume volume = containerData.getVolume();
       VolumeIOStats volumeIOStats = volume.getVolumeIOStats();
 
-      File chunkFile = ChunkUtils.getChunkFile(containerData, info);
+      File chunkFile = getChunkFile(kvContainer, blockID, info);
 
       boolean isOverwrite = ChunkUtils.validateChunkForOverwrite(
           chunkFile, info);
@@ -198,15 +202,15 @@ public class FilePerChunkStrategy implements ChunkManager {
 
     checkLayoutVersion(container);
 
-    KeyValueContainerData containerData = (KeyValueContainerData) container
-        .getContainerData();
+    KeyValueContainer kvContainer = (KeyValueContainer) container;
+    KeyValueContainerData containerData = kvContainer.getContainerData();
 
     HddsVolume volume = containerData.getVolume();
     VolumeIOStats volumeIOStats = volume.getVolumeIOStats();
 
     // In version1, we verify checksum if it is available and return data
     // of the chunk file.
-    File finalChunkFile = ChunkUtils.getChunkFile(containerData, info);
+    File finalChunkFile = getChunkFile(kvContainer, blockID, info);
 
     List<File> possibleFiles = new ArrayList<>();
     possibleFiles.add(finalChunkFile);
@@ -216,13 +220,42 @@ public class FilePerChunkStrategy implements ChunkManager {
     }
 
     long len = info.getLen();
-    long offset = 0; // ignore offset in chunk info
     ByteBuffer data = ByteBuffer.allocate((int) len);
 
-    for (File chunkFile : possibleFiles) {
+    long chunkFileOffset = 0;
+    if (info.getOffset() != 0) {
       try {
-        ChunkUtils.readData(chunkFile, data, offset, len, volumeIOStats);
-        return ChunkBuffer.wrap(data);
+        BlockData blockData = blockManager.getBlock(kvContainer, blockID);
+        List<ContainerProtos.ChunkInfo> chunks = blockData.getChunks();
+        String chunkName = info.getChunkName();
+        boolean found = false;
+        for (ContainerProtos.ChunkInfo chunk : chunks) {
+          if (chunk.getChunkName().equals(chunkName)) {
+            chunkFileOffset = chunk.getOffset();
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          throw new StorageContainerException(
+              "Cannot find chunk " + chunkName + " in block " +
+                  blockID.toString(), UNABLE_TO_FIND_CHUNK);
+        }
+      } catch (IOException e) {
+        throw new StorageContainerException(
+            "Cannot find block " + blockID.toString() + " for chunk " +
+                info.getChunkName(), UNABLE_TO_FIND_CHUNK);
+      }
+    }
+
+    for (File file : possibleFiles) {
+      try {
+        if (file.exists()) {
+          long offset = info.getOffset() - chunkFileOffset;
+          Preconditions.checkState(offset >= 0);
+          ChunkUtils.readData(file, data, offset, len, volumeIOStats);
+          return ChunkBuffer.wrap(data);
+        }
       } catch (StorageContainerException ex) {
         //UNABLE TO FIND chunk is not a problem as we will try with the
         //next possible location
@@ -252,27 +285,34 @@ public class FilePerChunkStrategy implements ChunkManager {
     checkLayoutVersion(container);
 
     Preconditions.checkNotNull(blockID, "Block ID cannot be null.");
-    KeyValueContainerData containerData = (KeyValueContainerData) container
-        .getContainerData();
+    KeyValueContainer kvContainer = (KeyValueContainer) container;
 
     // In version1, we have only chunk file.
-    File chunkFile = ChunkUtils.getChunkFile(containerData, info);
+    File chunkFile = getChunkFile(kvContainer, blockID, info);
 
     // if the chunk file does not exist, it might have already been deleted.
     // The call might be because of reapply of transactions on datanode
     // restart.
     if (!chunkFile.exists()) {
-      LOG.warn("Chunk file doe not exist. chunk info :" + info.toString());
+      LOG.warn("Chunk file not found for chunk {}", info);
       return;
     }
-    if (info.getLen() == chunkFile.length()) {
+
+    long chunkFileSize = chunkFile.length();
+    boolean allowed = info.getLen() == chunkFileSize
+        // chunk written by new client to old datanode, expected
+        // file length is offset + real chunk length; see HDDS-3644
+        || info.getLen() + info.getOffset() == chunkFileSize;
+    if (allowed) {
       FileUtil.fullyDelete(chunkFile);
+      LOG.info("Deleted chunk file {} (size {}) for chunk {}",
+          chunkFile, chunkFileSize, info);
     } else {
       LOG.error("Not Supported Operation. Trying to delete a " +
-          "chunk that is in shared file. chunk info : {}", info.toString());
+          "chunk that is in shared file. chunk info : {}", info);
       throw new StorageContainerException("Not Supported Operation. " +
           "Trying to delete a chunk that is in shared file. chunk info : "
-          + info.toString(), UNSUPPORTED_REQUEST);
+          + info, UNSUPPORTED_REQUEST);
     }
   }
 
@@ -288,6 +328,12 @@ public class FilePerChunkStrategy implements ChunkManager {
             e, ContainerProtos.Result.INVALID_ARGUMENT);
       }
     }
+  }
+
+  private static File getChunkFile(KeyValueContainer container, BlockID blockID,
+      ChunkInfo info) throws StorageContainerException {
+    return FILE_PER_CHUNK.getChunkFile(container.getContainerData(), blockID,
+        info);
   }
 
   /**

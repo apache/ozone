@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.junit.Assert;
 import org.junit.Before;
@@ -35,6 +36,7 @@ import org.junit.rules.TemporaryFolder;
 import java.util.List;
 import java.util.TreeSet;
 
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 
 /**
@@ -55,6 +57,29 @@ public class TestOmMetadataManager {
     ozoneConfiguration.set(OZONE_OM_DB_DIRS,
         folder.getRoot().getAbsolutePath());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
+  }
+
+  @Test
+  public void testTransactionTable() throws Exception {
+    omMetadataManager.getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
+        new OMTransactionInfo.Builder().setCurrentTerm(1)
+            .setTransactionIndex(100).build());
+
+    omMetadataManager.getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
+        new OMTransactionInfo.Builder().setCurrentTerm(2)
+            .setTransactionIndex(200).build());
+
+    omMetadataManager.getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
+        new OMTransactionInfo.Builder().setCurrentTerm(3)
+            .setTransactionIndex(250).build());
+
+    OMTransactionInfo omTransactionInfo =
+        omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
+
+    Assert.assertEquals(3, omTransactionInfo.getCurrentTerm());
+    Assert.assertEquals(250, omTransactionInfo.getTransactionIndex());
+
+
   }
 
   @Test
@@ -149,8 +174,12 @@ public class TestOmMetadataManager {
 
     TreeSet<String> volumeABucketsPrefixWithOzoneOwner = new TreeSet<>();
     TreeSet<String> volumeABucketsPrefixWithHadoopOwner = new TreeSet<>();
-    for (int i=1; i<= 100; i++) {
-      if (i % 2 == 0) {
+
+    // Add exact name in prefixBucketNameWithOzoneOwner without postfix.
+    volumeABucketsPrefixWithOzoneOwner.add(prefixBucketNameWithOzoneOwner);
+    addBucketsToCache(volumeName1, prefixBucketNameWithOzoneOwner);
+    for (int i = 1; i < 100; i++) {
+      if (i % 2 == 0) { // This part adds 49 buckets.
         volumeABucketsPrefixWithOzoneOwner.add(
             prefixBucketNameWithOzoneOwner + i);
         addBucketsToCache(volumeName1, prefixBucketNameWithOzoneOwner + i);
@@ -165,8 +194,12 @@ public class TestOmMetadataManager {
     TreeSet<String> volumeBBucketsPrefixWithOzoneOwner = new TreeSet<>();
     TreeSet<String> volumeBBucketsPrefixWithHadoopOwner = new TreeSet<>();
     TestOMRequestUtils.addVolumeToDB(volumeName2, omMetadataManager);
-    for (int i=1; i<= 100; i++) {
-      if (i % 2 == 0) {
+
+    // Add exact name in prefixBucketNameWithOzoneOwner without postfix.
+    volumeBBucketsPrefixWithOzoneOwner.add(prefixBucketNameWithOzoneOwner);
+    addBucketsToCache(volumeName2, prefixBucketNameWithOzoneOwner);
+    for (int i = 1; i < 100; i++) {
+      if (i % 2 == 0) { // This part adds 49 buckets.
         volumeBBucketsPrefixWithOzoneOwner.add(
             prefixBucketNameWithOzoneOwner + i);
         addBucketsToCache(volumeName2, prefixBucketNameWithOzoneOwner + i);
@@ -182,7 +215,10 @@ public class TestOmMetadataManager {
         omMetadataManager.listBuckets(volumeName1,
             null, prefixBucketNameWithOzoneOwner, 100);
 
-    Assert.assertEquals(omBucketInfoList.size(),  50);
+    // Cause adding a exact name in prefixBucketNameWithOzoneOwner
+    // and another 49 buckets, so if we list buckets with --prefix
+    // prefixBucketNameWithOzoneOwner, we should get 50 buckets.
+    Assert.assertEquals(omBucketInfoList.size(), 50);
 
     for (OmBucketInfo omBucketInfo : omBucketInfoList) {
       Assert.assertTrue(omBucketInfo.getBucketName().startsWith(
@@ -220,7 +256,10 @@ public class TestOmMetadataManager {
     omBucketInfoList = omMetadataManager.listBuckets(volumeName2,
         null, prefixBucketNameWithHadoopOwner, 100);
 
-    Assert.assertEquals(omBucketInfoList.size(),  50);
+    // Cause adding a exact name in prefixBucketNameWithOzoneOwner
+    // and another 49 buckets, so if we list buckets with --prefix
+    // prefixBucketNameWithOzoneOwner, we should get 50 buckets.
+    Assert.assertEquals(omBucketInfoList.size(), 50);
 
     for (OmBucketInfo omBucketInfo : omBucketInfoList) {
       Assert.assertTrue(omBucketInfo.getBucketName().startsWith(

@@ -20,13 +20,18 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+
+import java.io.IOException;
 import java.util.Collections;
 
+import com.google.common.primitives.Longs;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto;
+import org.apache.hadoop.hdds.utils.BatchOperation;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.yaml.snakeyaml.nodes.Tag;
 
 
@@ -36,9 +41,12 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.lang.Math.max;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_BLOCK_COUNT_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.CHUNKS_PATH;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_CONTAINER_BYTES_USED_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE;
 import static org.apache.hadoop.ozone.OzoneConsts.METADATA_PATH;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_PENDING_DELETE_BLOCK_COUNT_KEY;
 
 /**
  * This class represents the KeyValueContainer metadata, which is the
@@ -55,9 +63,6 @@ public class KeyValueContainerData extends ContainerData {
 
   // Path to Container metadata Level DB/RocksDB Store and .container file.
   private String metadataPath;
-
-  // Path to Physical file system where chunks are stored.
-  private String chunksPath;
 
   //Type of DB used to store key to chunks mapping
   private String containerDBType;
@@ -144,9 +149,6 @@ public class KeyValueContainerData extends ContainerData {
    * @return Path to base dir
    */
   public String getContainerPath() {
-    if (metadataPath == null) {
-      return null;
-    }
     return new File(metadataPath).getParent();
   }
 
@@ -162,22 +164,6 @@ public class KeyValueContainerData extends ContainerData {
    */
   public void updateBlockCommitSequenceId(long id) {
     this.blockCommitSequenceId = id;
-  }
-
-  /**
-   * Get chunks path.
-   * @return - Path where chunks are stored
-   */
-  public String getChunksPath() {
-    return chunksPath;
-  }
-
-  /**
-   * Set chunks Path.
-   * @param chunkPath - File path.
-   */
-  public void setChunksPath(String chunkPath) {
-    this.chunksPath = chunkPath;
   }
 
   /**
@@ -245,7 +231,7 @@ public class KeyValueContainerData extends ContainerData {
   public ContainerDataProto getProtoBufMessage() {
     ContainerDataProto.Builder builder = ContainerDataProto.newBuilder();
     builder.setContainerID(this.getContainerID());
-    builder.setContainerPath(this.getMetadataPath());
+    builder.setContainerPath(this.getContainerPath());
     builder.setState(this.getState());
 
     for (Map.Entry<String, String> entry : getMetadata().entrySet()) {
@@ -269,5 +255,26 @@ public class KeyValueContainerData extends ContainerData {
   public static List<String> getYamlFields() {
     return Collections.unmodifiableList(KV_YAML_FIELDS);
   }
+
+  /**
+   * Update DB counters related to block metadata.
+   * @param db - Reference to container DB.
+   * @param batchOperation - Batch Operation to batch DB operations.
+   * @param deletedBlockCount - Number of blocks deleted.
+   * @throws IOException
+   */
+  public void updateAndCommitDBCounters(
+      ReferenceCountedDB db, BatchOperation batchOperation,
+      int deletedBlockCount) throws IOException {
+    // Set Bytes used and block count key.
+    batchOperation.put(DB_CONTAINER_BYTES_USED_KEY,
+        Longs.toByteArray(getBytesUsed()));
+    batchOperation.put(DB_BLOCK_COUNT_KEY, Longs.toByteArray(
+        getKeyCount() - deletedBlockCount));
+    batchOperation.put(DB_PENDING_DELETE_BLOCK_COUNT_KEY, Longs.toByteArray(
+        getNumPendingDeletionBlocks() - deletedBlockCount));
+    db.getStore().writeBatch(batchOperation);
+  }
+
 
 }

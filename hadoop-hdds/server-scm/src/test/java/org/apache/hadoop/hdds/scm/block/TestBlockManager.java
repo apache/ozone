@@ -18,19 +18,20 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
@@ -40,9 +41,11 @@ import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreRDBImpl;
+import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
-import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
@@ -55,6 +58,9 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.test.GenericTestUtils;
+
+import static org.apache.hadoop.ozone.OzoneConsts.GB;
+import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -62,10 +68,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
-
-import static org.apache.hadoop.ozone.OzoneConsts.GB;
-import static org.apache.hadoop.ozone.OzoneConsts.MB;
-
 
 /**
  * Tests for SCM Block Manager.
@@ -88,6 +90,7 @@ public class TestBlockManager {
 
   @Rule
   public TemporaryFolder folder= new TemporaryFolder();
+  private SCMMetadataStore scmMetadataStore;
 
   @Before
   public void setUp() throws Exception {
@@ -105,15 +108,25 @@ public class TestBlockManager {
     // Override the default Node Manager in SCM with this Mock Node Manager.
     nodeManager = new MockNodeManager(true, 10);
     eventQueue = new EventQueue();
+
+    scmMetadataStore = new SCMMetadataStoreRDBImpl(conf);
+    scmMetadataStore.start(conf);
     pipelineManager =
-        new SCMPipelineManager(conf, nodeManager, eventQueue);
+        new SCMPipelineManager(conf, nodeManager,
+            scmMetadataStore.getPipelineTable(),
+            eventQueue);
+    pipelineManager.allowPipelineCreation();
+
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf, eventQueue);
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
     SCMContainerManager containerManager =
-        new SCMContainerManager(conf, pipelineManager);
+        new SCMContainerManager(conf,
+            scmMetadataStore.getContainerTable(),
+            scmMetadataStore.getStore(),
+            pipelineManager);
     SCMSafeModeManager safeModeManager = new SCMSafeModeManager(conf,
         containerManager.getContainers(), pipelineManager, eventQueue) {
       @Override
@@ -126,6 +139,7 @@ public class TestBlockManager {
     configurator.setPipelineManager(pipelineManager);
     configurator.setContainerManager(containerManager);
     configurator.setScmSafeModeManager(safeModeManager);
+    configurator.setMetadataStore(scmMetadataStore);
     scm = TestUtils.getScm(conf, configurator);
 
     // Initialize these fields so that the tests can pass.
@@ -139,15 +153,17 @@ public class TestBlockManager {
     factor = HddsProtos.ReplicationFactor.THREE;
     type = HddsProtos.ReplicationType.RATIS;
 
-    blockManager.handleSafeModeTransition(
-        new SCMSafeModeManager.SafeModeStatus(false));
+
+    blockManager.onMessage(
+        new SCMSafeModeManager.SafeModeStatus(false, false), null);
   }
 
   @After
-  public void cleanup() {
+  public void cleanup() throws Exception {
     scm.stop();
     scm.join();
     eventQueue.close();
+    scmMetadataStore.stop();
   }
 
   @Test
@@ -224,6 +240,63 @@ public class TestBlockManager {
   }
 
   @Test
+  public void testBlockDistribution() throws Exception {
+    int threadCount = numContainerPerOwnerInPipeline *
+            numContainerPerOwnerInPipeline;
+    List<ExecutorService> executors = new ArrayList<>(threadCount);
+    for (int i = 0; i < threadCount; i++) {
+      executors.add(Executors.newSingleThreadExecutor());
+    }
+    pipelineManager.createPipeline(type, factor);
+    TestUtils.openAllRatisPipelines(pipelineManager);
+    Map<Long, List<AllocatedBlock>> allocatedBlockMap =
+            new ConcurrentHashMap<>();
+    List<CompletableFuture<AllocatedBlock>> futureList =
+            new ArrayList<>(threadCount);
+    for (int i = 0; i < threadCount; i++) {
+      final CompletableFuture<AllocatedBlock> future =
+              new CompletableFuture<>();
+      CompletableFuture.supplyAsync(() -> {
+        try {
+          List<AllocatedBlock> blockList;
+          AllocatedBlock block = blockManager
+                  .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor,
+                          OzoneConsts.OZONE,
+                          new ExcludeList());
+          long containerId = block.getBlockID().getContainerID();
+          if (!allocatedBlockMap.containsKey(containerId)) {
+            blockList = new ArrayList<>();
+          } else {
+            blockList = allocatedBlockMap.get(containerId);
+          }
+          blockList.add(block);
+          allocatedBlockMap.put(containerId, blockList);
+          future.complete(block);
+        } catch (IOException e) {
+          future.completeExceptionally(e);
+        }
+        return future;
+      }, executors.get(i));
+      futureList.add(future);
+    }
+    try {
+      CompletableFuture
+              .allOf(futureList.toArray(
+                      new CompletableFuture[futureList.size()])).get();
+      Assert.assertTrue(pipelineManager.getPipelines(type).size() == 1);
+      Assert.assertTrue(
+              allocatedBlockMap.size() == numContainerPerOwnerInPipeline);
+      Assert.assertTrue(allocatedBlockMap.
+              values().size() == numContainerPerOwnerInPipeline);
+      allocatedBlockMap.values().stream().forEach(v -> {
+        Assert.assertTrue(v.size() == numContainerPerOwnerInPipeline);
+      });
+    } catch (Exception e) {
+      Assert.fail("testAllocateBlockInParallel failed");
+    }
+  }
+
+  @Test
   public void testAllocateOversizedBlock() throws Exception {
     long size = 6 * GB;
     thrown.expectMessage("Unsupported block size");
@@ -234,8 +307,8 @@ public class TestBlockManager {
 
   @Test
   public void testAllocateBlockFailureInSafeMode() throws Exception {
-    blockManager.handleSafeModeTransition(
-        new SCMSafeModeManager.SafeModeStatus(true));
+    blockManager.onMessage(
+        new SCMSafeModeManager.SafeModeStatus(true, true), null);
     // Test1: In safe mode expect an SCMException.
     thrown.expectMessage("SafeModePrecheck failed for "
         + "allocateBlock");

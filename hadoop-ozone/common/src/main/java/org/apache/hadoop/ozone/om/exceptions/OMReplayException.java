@@ -27,12 +27,24 @@ import java.io.IOException;
  */
 public class OMReplayException extends IOException {
 
+  private final boolean needsDBOperations;
+
   public OMReplayException() {
-    // Dummy message. This exception is not thrown to client.
-    super("Replayed transaction");
+    this(false);
   }
 
-  public OMReplayException(String message) {
-    super(message);
+  /**
+   * When the transaction is a replay but still needs some DB operations to
+   * be performed (such as cleanup of old keys).
+   * @param needsDBOperations
+   */
+  public OMReplayException(boolean needsDBOperations) {
+    // Dummy message. This exception is not thrown to client.
+    super("Replayed transaction");
+    this.needsDBOperations = needsDBOperations;
+  }
+
+  public boolean isDBOperationNeeded() {
+    return needsDBOperations;
   }
 }

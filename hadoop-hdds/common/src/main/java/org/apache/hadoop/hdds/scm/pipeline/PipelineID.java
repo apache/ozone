@@ -28,9 +28,11 @@ import java.util.UUID;
 public final class PipelineID {
 
   private UUID id;
+  private String strID;
 
   private PipelineID(UUID id) {
     this.id = id;
+    this.strID = id.toString();
   }
 
   public static PipelineID randomId() {
@@ -46,7 +48,7 @@ public final class PipelineID {
   }
 
   public HddsProtos.PipelineID getProtobuf() {
-    return HddsProtos.PipelineID.newBuilder().setId(id.toString()).build();
+    return HddsProtos.PipelineID.newBuilder().setId(strID).build();
   }
 
   public static PipelineID getFromProtobuf(HddsProtos.PipelineID protos) {
@@ -55,7 +57,7 @@ public final class PipelineID {
 
   @Override
   public String toString() {
-    return "PipelineID=" + id;
+    return "PipelineID=" + strID;
   }
 
   @Override

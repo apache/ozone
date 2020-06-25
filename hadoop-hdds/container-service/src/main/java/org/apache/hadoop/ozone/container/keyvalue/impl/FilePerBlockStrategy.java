@@ -55,6 +55,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage.COMMIT_DATA;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.validateChunkForOverwrite;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.verifyChunkFileExists;
 
 /**
  * This class is for performing chunk related operations.
@@ -103,7 +104,7 @@ public class FilePerBlockStrategy implements ChunkManager {
     KeyValueContainerData containerData = (KeyValueContainerData) container
         .getContainerData();
 
-    File chunkFile = getChunkFile(containerData, blockID);
+    File chunkFile = getChunkFile(container, blockID, info);
     boolean overwrite = validateChunkForOverwrite(chunkFile, info);
     long len = info.getLen();
     long offset = info.getOffset();
@@ -140,7 +141,7 @@ public class FilePerBlockStrategy implements ChunkManager {
     HddsVolume volume = containerData.getVolume();
     VolumeIOStats volumeIOStats = volume.getVolumeIOStats();
 
-    File chunkFile = getChunkFile(containerData, blockID);
+    File chunkFile = getChunkFile(container, blockID, info);
 
     long len = info.getLen();
     long offset = info.getOffset();
@@ -163,10 +164,11 @@ public class FilePerBlockStrategy implements ChunkManager {
   }
 
   @Override
-  public void finishWriteChunk(KeyValueContainer container, BlockID blockID,
-      ChunkInfo info) throws IOException {
-    File chunkFile = getChunkFile(container.getContainerData(), blockID);
+  public void finishWriteChunks(KeyValueContainer container,
+      BlockData blockData) throws IOException {
+    File chunkFile = getChunkFile(container, blockData.getBlockID(), null);
     files.close(chunkFile);
+    verifyChunkFileExists(chunkFile);
   }
 
   private void deleteChunk(Container container, BlockID blockID,
@@ -175,10 +177,8 @@ public class FilePerBlockStrategy implements ChunkManager {
     checkLayoutVersion(container);
 
     Preconditions.checkNotNull(blockID, "Block ID cannot be null.");
-    KeyValueContainerData containerData = (KeyValueContainerData) container
-        .getContainerData();
 
-    File file = getChunkFile(containerData, blockID);
+    File file = getChunkFile(container, blockID, info);
 
     // if the chunk file does not exist, it might have already been deleted.
     // The call might be because of reapply of transactions on datanode
@@ -198,6 +198,12 @@ public class FilePerBlockStrategy implements ChunkManager {
     LOG.info("Deleted block file: {}", file);
   }
 
+  private File getChunkFile(Container container, BlockID blockID,
+      ChunkInfo info) throws StorageContainerException {
+    return FILE_PER_BLOCK.getChunkFile(container.getContainerData(), blockID,
+        info);
+  }
+
   private static void checkFullDelete(ChunkInfo info, File chunkFile)
       throws StorageContainerException {
     long fileLength = chunkFile.length();
@@ -208,13 +214,6 @@ public class FilePerBlockStrategy implements ChunkManager {
       LOG.error(msg);
       throw new StorageContainerException(msg, UNSUPPORTED_REQUEST);
     }
-  }
-
-  private static File getChunkFile(
-      KeyValueContainerData containerData, BlockID blockID)
-      throws StorageContainerException {
-    File chunkDir = ChunkUtils.verifyChunkDirExists(containerData);
-    return new File(chunkDir, blockID.getLocalID() + ".block");
   }
 
   private static final class OpenFiles {
@@ -230,7 +229,7 @@ public class FilePerBlockStrategy implements ChunkManager {
     public FileChannel getChannel(File file, boolean sync)
         throws StorageContainerException {
       try {
-        return files.get(file.getAbsolutePath(),
+        return files.get(file.getPath(),
             () -> open(file, sync)).getChannel();
       } catch (ExecutionException e) {
         if (e.getCause() instanceof IOException) {
@@ -251,7 +250,7 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     public void close(File file) {
       if (file != null) {
-        files.invalidate(file.getAbsolutePath());
+        files.invalidate(file.getPath());
       }
     }
 

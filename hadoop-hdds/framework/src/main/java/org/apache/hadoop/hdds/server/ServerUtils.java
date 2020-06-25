@@ -21,8 +21,8 @@ import java.io.File;
 import java.net.InetSocketAddress;
 import java.util.Collection;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ipc.RPC;
@@ -138,7 +138,7 @@ public final class ServerUtils {
    * @param conf
    * @return
    */
-  public static File getScmDbDir(Configuration conf) {
+  public static File getScmDbDir(ConfigurationSource conf) {
     File metadataDir = getDirectoryFromConfig(conf,
         ScmConfigKeys.OZONE_SCM_DB_DIRS, "SCM");
     if (metadataDir != null) {
@@ -159,7 +159,7 @@ public final class ServerUtils {
    * @param componentName Which component's key is this
    * @return File created from the value of the key in conf.
    */
-  public static File getDirectoryFromConfig(Configuration conf,
+  public static File getDirectoryFromConfig(ConfigurationSource conf,
                                             String key,
                                             String componentName) {
     final Collection<String> metadirs = conf.getTrimmedStringCollection(key);
@@ -191,7 +191,7 @@ public final class ServerUtils {
    * @return File MetaDir
    * @throws IllegalArgumentException if the configuration setting is not set
    */
-  public static File getOzoneMetaDirPath(Configuration conf) {
+  public static File getOzoneMetaDirPath(ConfigurationSource conf) {
     File dirPath = getDirectoryFromConfig(conf,
         HddsConfigKeys.OZONE_METADATA_DIRS, "Ozone");
     if (dirPath == null) {
@@ -215,7 +215,7 @@ public final class ServerUtils {
    * @param key The configuration key which specify the directory.
    * @return The path of the directory.
    */
-  public static File getDBPath(Configuration conf, String key) {
+  public static File getDBPath(ConfigurationSource conf, String key) {
     final File dbDirPath =
         getDirectoryFromConfig(conf, key, "OM");
     if (dbDirPath != null) {
@@ -233,7 +233,7 @@ public final class ServerUtils {
     return remoteUser != null ? remoteUser.getUserName() : null;
   }
 
-  public static String getDefaultRatisDirectory(Configuration conf) {
+  public static String getDefaultRatisDirectory(ConfigurationSource conf) {
     LOG.warn("Storage directory for Ratis is not configured. It is a good " +
             "idea to map this to an SSD disk. Falling back to {}",
         HddsConfigKeys.OZONE_METADATA_DIRS);

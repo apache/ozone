@@ -47,7 +47,7 @@ public final class ScmConfigKeys {
   public static final String DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY
       = "dfs.container.ratis.num.write.chunk.threads";
   public static final int DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT
-      = 60;
+      = 10;
   public static final String DFS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY
       = "dfs.container.ratis.replication.level";
   public static final ReplicationLevel
@@ -109,15 +109,7 @@ public final class ScmConfigKeys {
       "dfs.container.ratis.leader.pending.bytes.limit";
   public static final String
       DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT = "1GB";
-  
-  public static final String DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY =
-      "dfs.ratis.client.request.max.retries";
-  public static final int DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_DEFAULT = 180;
-  public static final String DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_KEY =
-      "dfs.ratis.client.request.retry.interval";
-  public static final TimeDuration
-      DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_DEFAULT =
-      TimeDuration.valueOf(1000, TimeUnit.MILLISECONDS);
+
   public static final String DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY =
       "dfs.ratis.server.retry-cache.timeout.duration";
   public static final TimeDuration
@@ -221,7 +213,7 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_SCM_HANDLER_COUNT_KEY =
       "ozone.scm.handler.count.key";
-  public static final int OZONE_SCM_HANDLER_COUNT_DEFAULT = 10;
+  public static final int OZONE_SCM_HANDLER_COUNT_DEFAULT = 100;
 
   public static final String OZONE_SCM_SECURITY_HANDLER_COUNT_KEY =
       "ozone.scm.security.handler.count.key";
@@ -320,12 +312,6 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT =
       "5m";
 
-  public static final String OZONE_SCM_CONTAINER_CREATION_LEASE_TIMEOUT =
-      "ozone.scm.container.creation.lease.timeout";
-
-  public static final String
-      OZONE_SCM_CONTAINER_CREATION_LEASE_TIMEOUT_DEFAULT = "60s";
-
   public static final String OZONE_SCM_PIPELINE_DESTROY_TIMEOUT =
       "ozone.scm.pipeline.destroy.timeout";
 
@@ -361,7 +347,7 @@ public final class ScmConfigKeys {
       "network-topology-default.xml";
 
   public static final String HDDS_TRACING_ENABLED = "hdds.tracing.enabled";
-  public static final boolean HDDS_TRACING_ENABLED_DEFAULT = true;
+  public static final boolean HDDS_TRACING_ENABLED_DEFAULT = false;
 
   /**
    * Never constructed.

@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 
 import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.ServiceException;
-import io.opentracing.Scope;
+import io.opentracing.Span;
 import org.slf4j.Logger;
 
 /**
@@ -38,12 +38,14 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE> {
 
   private String serviceName;
 
-  private final ProtocolMessageMetrics protocolMessageMetrics;
+  private final ProtocolMessageMetrics<ProtocolMessageEnum>
+      protocolMessageMetrics;
 
   private Logger logger;
 
   public OzoneProtocolMessageDispatcher(String serviceName,
-      ProtocolMessageMetrics protocolMessageMetrics, Logger logger) {
+      ProtocolMessageMetrics<ProtocolMessageEnum> protocolMessageMetrics,
+      Logger logger) {
     this.serviceName = serviceName;
     this.protocolMessageMetrics = protocolMessageMetrics;
     this.logger = logger;
@@ -54,8 +56,7 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE> {
       FunctionWithServiceException<REQUEST, RESPONSE> methodCall,
       ProtocolMessageEnum type,
       String traceId) throws ServiceException {
-    Scope scope = TracingUtil
-        .importAndCreateScope(type.toString(), traceId);
+    Span span = TracingUtil.importAndCreateSpan(type.toString(), traceId);
     try {
       if (logger.isTraceEnabled()) {
         logger.trace(
@@ -67,9 +68,12 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE> {
         logger.debug("{} {} request is received",
             serviceName, type.toString());
       }
-      protocolMessageMetrics.increment(type);
+
+      long startTime = System.nanoTime();
 
       RESPONSE response = methodCall.apply(request);
+
+      protocolMessageMetrics.increment(type, System.nanoTime() - startTime);
 
       if (logger.isTraceEnabled()) {
         logger.trace(
@@ -82,7 +86,7 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE> {
       return response;
 
     } finally {
-      scope.close();
+      span.finish();
     }
   }
 }

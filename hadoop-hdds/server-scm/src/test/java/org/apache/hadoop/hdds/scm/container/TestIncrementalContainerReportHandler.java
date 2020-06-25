@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -55,7 +55,7 @@ public class TestIncrementalContainerReportHandler {
 
   @Before
   public void setup() throws IOException {
-    final Configuration conf = new OzoneConfiguration();
+    final ConfigurationSource conf = new OzoneConfiguration();
     this.containerManager = Mockito.mock(ContainerManager.class);
     this.nodeManager = Mockito.mock(NodeManager.class);
     this.containerStateManager = new ContainerStateManager(conf);
@@ -70,6 +70,15 @@ public class TestIncrementalContainerReportHandler {
         Mockito.any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager
             .getContainerReplicas((ContainerID)invocation.getArguments()[0]));
+
+    Mockito.doAnswer(invocation -> {
+      containerStateManager
+          .removeContainerReplica((ContainerID)invocation.getArguments()[0],
+              (ContainerReplica)invocation.getArguments()[1]);
+      return null;
+    }).when(containerManager).removeContainerReplica(
+        Mockito.any(ContainerID.class),
+        Mockito.any(ContainerReplica.class));
 
     Mockito.doAnswer(invocation -> {
       containerStateManager
@@ -193,6 +202,42 @@ public class TestIncrementalContainerReportHandler {
             datanodeOne, containerReport);
     reportHandler.onMessage(icr, publisher);
     Assert.assertEquals(LifeCycleState.CLOSED, container.getState());
+  }
+
+  @Test
+  public void testDeleteContainer() throws IOException {
+    final IncrementalContainerReportHandler reportHandler =
+        new IncrementalContainerReportHandler(nodeManager, containerManager);
+    final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
+    final DatanodeDetails datanodeOne = randomDatanodeDetails();
+    final DatanodeDetails datanodeTwo = randomDatanodeDetails();
+    final DatanodeDetails datanodeThree = randomDatanodeDetails();
+    final Set<ContainerReplica> containerReplicas = getReplicas(
+        container.containerID(),
+        ContainerReplicaProto.State.CLOSED,
+        datanodeOne, datanodeTwo, datanodeThree);
+
+    containerStateManager.loadContainer(container);
+    containerReplicas.forEach(r -> {
+      try {
+        containerStateManager.updateContainerReplica(
+            container.containerID(), r);
+      } catch (ContainerNotFoundException ignored) {
+
+      }
+    });
+    Assert.assertEquals(3, containerStateManager
+        .getContainerReplicas(container.containerID()).size());
+    final IncrementalContainerReportProto containerReport =
+        getIncrementalContainerReportProto(container.containerID(),
+            ContainerReplicaProto.State.DELETED,
+            datanodeThree.getUuidString());
+    final IncrementalContainerReportFromDatanode icr =
+        new IncrementalContainerReportFromDatanode(
+            datanodeOne, containerReport);
+    reportHandler.onMessage(icr, publisher);
+    Assert.assertEquals(2, containerStateManager
+        .getContainerReplicas(container.containerID()).size());
   }
 
   private static IncrementalContainerReportProto

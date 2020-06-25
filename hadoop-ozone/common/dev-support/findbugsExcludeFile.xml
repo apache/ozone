@@ -16,7 +16,4 @@
    limitations under the License.
 -->
 <FindBugsFilter>
-  <Match>
-    <Package name="org.apache.hadoop.ozone.protocol.proto"/>
-  </Match>
 </FindBugsFilter>

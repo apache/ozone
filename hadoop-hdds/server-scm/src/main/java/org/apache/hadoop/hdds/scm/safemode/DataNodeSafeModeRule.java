@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.scm.safemode;
 import java.util.HashSet;
 import java.util.UUID;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
@@ -42,7 +42,7 @@ public class DataNodeSafeModeRule extends
   private HashSet<UUID> registeredDnSet;
 
   public DataNodeSafeModeRule(String ruleName, EventQueue eventQueue,
-      Configuration conf,
+      ConfigurationSource conf,
       SCMSafeModeManager manager) {
     super(manager, ruleName, eventQueue);
     requiredDns = conf.getInt(
@@ -78,5 +78,11 @@ public class DataNodeSafeModeRule extends
   @Override
   protected void cleanup() {
     registeredDnSet.clear();
+  }
+
+  @Override
+  public String getStatusText() {
+    return "registeredDns " + this.registeredDns + " >= requiredDns "
+        + this.requiredDns;
   }
 }

@@ -55,7 +55,7 @@ Storage Container Manager (SCM). In most cases, the container location will be
 cached by Ozone Manager and will be returned along with the Ozone blocks.
 
 
-Once the client is able to locate the contianer, that is, understand which
+Once the client is able to locate the container, that is, understand which
 data nodes contain this container, the client will connect to the datanode
 and read the data stream specified by _Container ID:Local ID_. In other
 words, the local ID serves as index into the container which describes what
@@ -71,5 +71,5 @@ thousand containers. Compare that with HDFS block count of million and half
 blocks that get reported. That is a 40x reduction in the block reports.
 
 This extra indirection helps tremendously with scaling Ozone. SCM has far
-less block data to process and the name node is a different service are
-critical to scaling Ozone.
+less block data to process and the namespace service (Ozone Manager) as a
+different service are critical to scaling Ozone.

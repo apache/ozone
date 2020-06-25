@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
@@ -43,6 +42,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
 import static org.apache.hadoop.ozone.OmUtils.getOmAddressForClients;
 
@@ -50,6 +51,12 @@ import static org.apache.hadoop.ozone.OmUtils.getOmAddressForClients;
  * This class is to test the REST interface exposed by OzoneManager.
  */
 public class TestOzoneManagerRestInterface {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
@@ -106,30 +113,6 @@ public class TestOzoneManagerRestInterface {
     Assert.assertEquals(scmAddress.getHostName(), scmInfo.getHostname());
     Assert.assertEquals(scmAddress.getPort(),
         scmInfo.getPort(ServicePort.Type.RPC));
-
-    ServiceInfo datanodeInfo = serviceMap.get(HddsProtos.NodeType.DATANODE);
-    DatanodeDetails datanodeDetails = cluster.getHddsDatanodes().get(0)
-        .getDatanodeDetails();
-    Assert.assertEquals(datanodeDetails.getHostName(),
-        datanodeInfo.getHostname());
-
-    Map<ServicePort.Type, Integer> ports = datanodeInfo.getPorts();
-    for(ServicePort.Type type : ports.keySet()) {
-      switch (type) {
-      case HTTP:
-      case HTTPS:
-        Assert.assertEquals(
-            datanodeDetails.getPort(DatanodeDetails.Port.Name.REST).getValue(),
-            ports.get(type));
-        break;
-      default:
-        // OM only sends Datanode's info port details
-        // i.e. HTTP or HTTPS
-        // Other ports are not expected as of now.
-        Assert.fail();
-        break;
-      }
-    }
   }
 
 }

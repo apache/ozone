@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.security;
 
 import java.io.IOException;
 
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,7 +31,6 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.security.OMRenewDelegationTokenResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenewDelegationTokenResponseProto;
@@ -116,11 +116,8 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     OMClientResponse omClientResponse = null;
-    OMResponse.Builder omResponse =
-        OMResponse.newBuilder()
-            .setCmdType(OzoneManagerProtocolProtos.Type.RenewDelegationToken)
-            .setStatus(OzoneManagerProtocolProtos.Status.OK)
-            .setSuccess(true);
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
     try {
 
       OzoneTokenIdentifier ozoneTokenIdentifier = OzoneTokenIdentifier.

@@ -25,6 +25,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,9 +90,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     String volumeName = bucketArgs.getVolumeName();
     String bucketName = bucketArgs.getBucketName();
 
-    OMResponse.Builder omResponse = OMResponse.newBuilder().setCmdType(
-        OzoneManagerProtocolProtos.Type.CreateBucket).setStatus(
-        OzoneManagerProtocolProtos.Status.OK);
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
     OmBucketInfo omBucketInfo = null;
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();

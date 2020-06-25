@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.segmentparser.OMRatisLogParser;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -34,12 +35,20 @@ import java.io.File;
 import java.io.PrintStream;
 import java.util.UUID;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 
 /**
  * Test Datanode Ratis log parser.
  */
 public class TestOMRatisLogParser {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static MiniOzoneHAClusterImpl cluster = null;
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -83,7 +92,7 @@ public class TestOMRatisLogParser {
   }
 
   @Test
-  public void testRatisLogParsing() {
+  public void testRatisLogParsing() throws Exception {
     OzoneConfiguration ozoneConfiguration =
         cluster.getOMLeader().getConfiguration();
 
@@ -94,22 +103,24 @@ public class TestOMRatisLogParser {
     Assert.assertTrue(omMetaDir.isDirectory());
 
     String[] ratisDirs = omMetaDir.list();
-    File groupDir = null;
-
+    Assert.assertNotNull(ratisDirs);
     Assert.assertEquals(2, ratisDirs.length);
 
+    File groupDir = null;
     for (int i=0; i< ratisDirs.length; i++) {
       if (ratisDirs[i].equals("snapshot")) {
         continue;
       }
-      groupDir = new File(omMetaDir, omMetaDir.list()[1]);
+      groupDir = new File(omMetaDir, ratisDirs[i]);
     }
 
     Assert.assertNotNull(groupDir);
+    Assert.assertFalse(groupDir.toString(),
+        groupDir.getName().contains("snapshot"));
     Assert.assertTrue(groupDir.isDirectory());
     File currentDir = new File(groupDir, "current");
     File logFile = new File(currentDir, "log_inprogress_0");
-    Assert.assertTrue(logFile.exists());
+    GenericTestUtils.waitFor(logFile::exists, 100, 15000);
     Assert.assertTrue(logFile.isFile());
 
     OMRatisLogParser omRatisLogParser = new OMRatisLogParser();
