@@ -350,7 +350,7 @@ public final class TestOMRequestUtils {
       String newOwner) {
     SetVolumePropertyRequest setVolumePropertyRequest =
         SetVolumePropertyRequest.newBuilder().setVolumeName(volumeName)
-            .setOwnerName(newOwner).build();
+            .setOwnerName(newOwner).setModificationTime(Time.now()).build();
 
     return OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
         .setCmdType(OzoneManagerProtocolProtos.Type.SetVolumeProperty)
@@ -368,7 +368,7 @@ public final class TestOMRequestUtils {
       long quota) {
     SetVolumePropertyRequest setVolumePropertyRequest =
         SetVolumePropertyRequest.newBuilder().setVolumeName(volumeName)
-            .setQuotaInBytes(quota).build();
+            .setQuotaInBytes(quota).setModificationTime(Time.now()).build();
 
     return OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
         .setCmdType(OzoneManagerProtocolProtos.Type.SetVolumeProperty)
