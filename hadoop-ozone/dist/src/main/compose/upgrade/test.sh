@@ -18,15 +18,12 @@
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
+: "${OZONE_REPLICATION_FACTOR:=3}"
 : "${OZONE_UPGRADE_FROM:="0.5.0"}"
 : "${OZONE_UPGRADE_TO:="0.6.0"}"
+: "${OZONE_VOLUME:="${COMPOSE_DIR}/data"}"
 
-export SECURITY_ENABLED=false
-export OZONE_REPLICATION_FACTOR=3
-
-export OZONE_VOLUME=/tmp/ozone-data
-rm -fr ${OZONE_VOLUME}
-mkdir -p ${OZONE_VOLUME}
+export OZONE_VOLUME
 
 # define version-specifics
 export OZONE_DIR=/opt/ozone

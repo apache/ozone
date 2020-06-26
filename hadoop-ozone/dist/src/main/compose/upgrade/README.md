@@ -17,9 +17,9 @@
 This directory contains a sample cluster definition and script for
 testing upgrade from previous version to the current one.
 
-Data for each container is persisted in mounted volume
-(`/tmp/ozone-data` by default, but can be overridden via `OZONE_VOLUME`
-environment variable).
+Data for each container is persisted in mounted volume (by default it's
+`data` under the `compose/upgrade` directory, but can be overridden via
+`OZONE_VOLUME` environment variable).
 
 Prior version is run using an official `apache/ozone` image, while the
 current version is run with the `ozone-runner` image using locally built
