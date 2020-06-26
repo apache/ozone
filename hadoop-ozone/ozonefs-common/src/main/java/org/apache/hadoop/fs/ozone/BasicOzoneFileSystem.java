@@ -607,6 +607,19 @@ public class BasicOzoneFileSystem extends FileSystem {
   }
 
   /**
+   * Get the root directory of Trash for a path.
+   * Returns /.Trash/<username>
+   * Caller appends either Current or checkpoint timestamp for trash destination
+   * @param path the trash root of the path to be determined.
+   * @return trash root
+   */
+  @Override
+  public Path getTrashRoot(Path path) {
+    final Path pathToTrash = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
+    return new Path(pathToTrash, System.getProperty("user.name"));
+  }
+
+  /**
    * Creates a directory. Directory is represented using a key with no value.
    *
    * @param path directory path to be created
