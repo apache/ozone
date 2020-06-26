@@ -54,7 +54,7 @@ public interface StorageContainerNodeProtocol {
    * @param datanodeDetails DatanodeDetails
    * @param nodeReport NodeReportProto
    * @param pipelineReport PipelineReportsProto
-   * @return  SCMHeartbeatResponseProto
+   * @return  SCMRegisteredResponseProto
    */
   RegisteredCommand register(DatanodeDetails datanodeDetails,
                              NodeReportProto nodeReport,

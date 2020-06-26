@@ -31,7 +31,8 @@ import picocli.CommandLine;
         versionProvider = HddsVersionProvider.class,
         subcommands = {
                 ChunkKeyHandler.class,
-                RatisLogParser.class
+                RatisLogParser.class,
+                RDBParser.class
         },
         mixinStandardHelpOptions = true)
 public class OzoneDebug extends GenericCli {

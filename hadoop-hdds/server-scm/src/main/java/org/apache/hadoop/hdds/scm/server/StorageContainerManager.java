@@ -482,7 +482,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           containerManager,
           containerPlacementPolicy,
           eventQueue,
-          new LockManager<>(conf));
+          new LockManager<>(conf),
+          scmNodeManager);
     }
     if(configurator.getScmSafeModeManager() != null) {
       scmSafeModeManager = configurator.getScmSafeModeManager();

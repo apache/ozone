@@ -285,10 +285,13 @@ public class SCMClientProtocolServer implements
 
     List<ContainerWithPipeline> cpList = new ArrayList<>();
 
+    StringBuilder strContainerIDs = new StringBuilder();
     for (Long containerID : containerIDs) {
       try {
         ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
         cpList.add(cp);
+        strContainerIDs.append(ContainerID.valueof(containerID).toString());
+        strContainerIDs.append(",");
       } catch (IOException ex) {
         AUDIT.logReadFailure(buildAuditMessageForFailure(
             SCMAction.GET_CONTAINER_WITH_PIPELINE_BATCH,
@@ -298,11 +301,10 @@ public class SCMClientProtocolServer implements
       }
     }
 
+
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.GET_CONTAINER_WITH_PIPELINE_BATCH,
-        Collections.singletonMap("containerIDs",
-        containerIDs.stream().map(id -> ContainerID.valueof(id).toString())
-            .collect(Collectors.joining(",")))));
+        Collections.singletonMap("containerIDs", strContainerIDs.toString())));
 
     return cpList;
   }
