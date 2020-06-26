@@ -62,14 +62,12 @@ import org.apache.ratis.util.function.CheckedBiConsumer;
 import java.util.Map;
 import java.util.function.BiConsumer;
 
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.Assert;
 
 /**
  * This class tests the metrics of ContainerStateMachine.
  */
-@Ignore
 public class TestCSMMetrics {
   static final String TEST_DIR =
       GenericTestUtils.getTestDir("dfs").getAbsolutePath()
