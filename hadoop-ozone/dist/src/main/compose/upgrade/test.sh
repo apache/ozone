@@ -26,6 +26,7 @@ export OZONE_REPLICATION_FACTOR=3
 
 export OZONE_VOLUME=/tmp/ozone-data
 rm -fr ${OZONE_VOLUME}
+mkdir -p ${OZONE_VOLUME}
 
 # define version-specifics
 export OZONE_DIR=/opt/ozone
