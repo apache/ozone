@@ -122,12 +122,16 @@ public class OzoneAddress {
             OZONE_OM_SERVICE_IDS_KEY);
 
         // When host is not specified
-        if (omServiceIds.size() != 1) {
+        if (omServiceIds.size() > 1) {
           throw new OzoneClientException("Service ID or host name must not"
               + " be omitted when multiple ozone.om.service.ids is defined.");
+        } else if (omServiceIds.size() == 1) {
+          client = OzoneClientFactory
+              .getRpcClient(omServiceIds.iterator().next(), conf);
+        } else {
+          client = OzoneClientFactory.getRpcClient(conf);
         }
-        client = OzoneClientFactory
-            .getRpcClient(omServiceIds.iterator().next(), conf);
+
       }
     } else {
       throw new OzoneClientException(
