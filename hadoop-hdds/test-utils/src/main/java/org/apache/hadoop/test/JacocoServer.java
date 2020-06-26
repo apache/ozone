@@ -23,6 +23,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 
 import org.jacoco.core.data.ExecutionDataWriter;
+import org.jacoco.core.data.IExecutionDataVisitor;
+import org.jacoco.core.data.ISessionInfoVisitor;
 import org.jacoco.core.runtime.RemoteControlReader;
 import org.jacoco.core.runtime.RemoteControlWriter;
 
@@ -30,6 +32,8 @@ import org.jacoco.core.runtime.RemoteControlWriter;
  * Simple TPC server to collect all the Jacoco coverage data.
  */
 public final class JacocoServer {
+
+  private static Object lockMonitor = new Object();
 
   private static int port = 6300;
 
@@ -60,8 +64,10 @@ public final class JacocoServer {
               new RemoteControlWriter(socket.getOutputStream());
           RemoteControlReader reader =
               new RemoteControlReader(socket.getInputStream());
-          reader.setSessionInfoVisitor(destination::visitSessionInfo);
-          reader.setExecutionDataVisitor(destination::visitClassExecution);
+          reader.setSessionInfoVisitor(
+              synchronizedCall(destination::visitSessionInfo));
+          reader.setExecutionDataVisitor(
+              synchronizedCall(destination::visitClassExecution));
           while (reader.read()) {
             ;//read until the end of the stream.
           }
@@ -80,4 +86,27 @@ public final class JacocoServer {
 
   }
 
+  /**
+   * Make the ISessionInfoVisitor call synchronized.
+   */
+  public static ISessionInfoVisitor synchronizedCall(
+      ISessionInfoVisitor origin) {
+    return data -> {
+      synchronized (lockMonitor) {
+        origin.visitSessionInfo(data);
+      }
+    };
+  }
+
+  /**
+   * Make the IExecutionDataVisitor call synchronized.
+   */
+  public static IExecutionDataVisitor synchronizedCall(
+      IExecutionDataVisitor origin) {
+    return data -> {
+      synchronized (lockMonitor) {
+        origin.visitClassExecution(data);
+      }
+    };
+  }
 }
