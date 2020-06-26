@@ -40,9 +40,6 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 public class OMBucketSetPropertyResponse extends OMClientResponse {
   private OmBucketInfo omBucketInfo;
 
-  private static final List<String> OPERATED_TABLES =
-      Arrays.asList(BUCKET_TABLE);
-
   public OMBucketSetPropertyResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse);

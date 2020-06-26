@@ -39,9 +39,6 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 @CleanupTableInfo(cleanupTables = {BUCKET_TABLE})
 public final class OMBucketDeleteResponse extends OMClientResponse {
 
-  private static final List<String> OPERATED_TABLES =
-      Arrays.asList(BUCKET_TABLE);
-
   private String volumeName;
   private String bucketName;
 
