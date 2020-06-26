@@ -553,7 +553,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
           roleInfoProto.getCandidateInfo().getLastLeaderElapsedTimeMs() + "ms";
       break;
     case FOLLOWER:
-      msg = datanode + " is in follower state for " +
+      msg = datanode + " closes pipeline when installSnapshot from leader " +
+          "because leader snapshot doesn't contain any data to replay, " +
+          "all the log entries prior to the snapshot might have been purged." +
+          "So follower should not try to install snapshot from leader but" +
+          "can close the pipeline here. It's in follower state for " +
           roleInfoProto.getRoleElapsedTimeMs() + "ms";
       break;
     case LEADER:
