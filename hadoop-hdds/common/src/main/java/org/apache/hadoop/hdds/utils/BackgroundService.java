@@ -118,8 +118,8 @@ public abstract class BackgroundService {
           } finally {
             long endTime = System.nanoTime();
             if (endTime - startTime > serviceTimeoutInNanos) {
-              LOG.warn("Background task execution took {}ns > {}ns(timeout)",
-                  endTime - startTime, serviceTimeoutInNanos);
+              LOG.warn("{} Background task execution took {}ns > {}ns(timeout)",
+                  serviceName, endTime - startTime, serviceTimeoutInNanos);
             }
           }
         }, exec);

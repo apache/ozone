@@ -321,8 +321,7 @@ public class TestBlockDeletingService {
 
     LogCapturer log = LogCapturer.captureLogs(BackgroundService.LOG);
     GenericTestUtils.waitFor(() -> {
-      if(log.getOutput().contains(
-          "Background task executes timed out, retrying in next interval")) {
+      if(log.getOutput().contains("Background task execution took")) {
         log.stopCapturing();
         return true;
       }
