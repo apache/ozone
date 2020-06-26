@@ -40,13 +40,13 @@ spec:
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: component
-                    operator: In
-                    values:
-                      - datanode
-              topologyKey: kubernetes.io/hostname
+          - labelSelector:
+              matchExpressions:
+              - key: component
+                operator: In
+                values:
+                - datanode
+            topologyKey: kubernetes.io/hostname
       securityContext:
         fsGroup: 1000
       containers:
