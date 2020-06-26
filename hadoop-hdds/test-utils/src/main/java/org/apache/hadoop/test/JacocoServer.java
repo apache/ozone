@@ -71,7 +71,9 @@ public final class JacocoServer {
           while (reader.read()) {
             ;//read until the end of the stream.
           }
-          destination.flush();
+          synchronized (lockMonitor) {
+            destination.flush();
+          }
         } catch (Exception ex) {
           ex.printStackTrace();
         } finally {
