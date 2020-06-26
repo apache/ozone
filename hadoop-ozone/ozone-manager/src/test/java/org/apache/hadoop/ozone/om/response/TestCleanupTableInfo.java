@@ -55,7 +55,9 @@ public class TestCleanupTableInfo {
     Set<Class<? extends OMClientResponse>> subTypes =
         reflections.getSubTypesOf(OMClientResponse.class);
     subTypes.forEach(aClass -> {
-      Assert.assertTrue(aClass.isAnnotationPresent(CleanupTableInfo.class));
+      Assert.assertTrue(aClass + "does not have annotation of" +
+              " CleanupTableInfo",
+          aClass.isAnnotationPresent(CleanupTableInfo.class));
       String[] cleanupTables =
           aClass.getAnnotation(CleanupTableInfo.class).cleanupTables();
       Assert.assertTrue(cleanupTables.length >=1);
