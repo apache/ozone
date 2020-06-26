@@ -104,8 +104,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     BucketInfo.Builder newBucketInfo = bucketInfo.toBuilder();
 
-    // Set creation time.
-    newBucketInfo.setCreationTime(Time.now());
+    // Set creation time & modification time.
+    long initialTime = Time.now();
+    newBucketInfo.setCreationTime(initialTime)
+        .setModificationTime(initialTime);
 
     if (bucketInfo.hasBeinfo()) {
       newBucketInfo.setBeinfo(getBeinfo(kmsProvider, bucketInfo));
