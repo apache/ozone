@@ -19,8 +19,6 @@
 package org.apache.hadoop.ozone.om.response.bucket;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
