@@ -23,7 +23,7 @@ DIST_DIR="$DIR/../../dist/target/ozone-$OZONE_VERSION"
 
 if [ ! -d "$DIST_DIR" ]; then
     echo "Distribution dir is missing. Doing a full build"
-    "$DIR/build.sh" -Pcoverage -Dskip.npx
+    "$DIR/build.sh" -Pcoverage
 fi
 
 mkdir -p "$REPORT_DIR"
