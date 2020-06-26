@@ -234,7 +234,7 @@ public class SCMNodeManager implements NodeManager {
    *                        independent
    *                        of Namenode if required.
    * @param nodeReport      NodeReport.
-   * @return SCMHeartbeatResponseProto
+   * @return SCMRegisteredResponseProto
    */
   @Override
   public RegisteredCommand register(

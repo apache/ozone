@@ -25,7 +25,7 @@ import org.apache.hadoop.net.NetUtils;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_BEFORE_DB_CHECKPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
 
 /**
@@ -165,12 +165,12 @@ public final class OMNodeDetails {
     if (httpPolicy.isHttpEnabled()) {
       if (StringUtils.isNotEmpty(httpAddress)) {
         return "http://" + httpAddress + OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT
-            + "?" + OM_RATIS_SNAPSHOT_BEFORE_DB_CHECKPOINT + "=true";
+            + "?" + OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=true";
       }
     } else {
       if (StringUtils.isNotEmpty(httpsAddress)) {
         return "https://" + httpsAddress + OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT
-            + "?" + OM_RATIS_SNAPSHOT_BEFORE_DB_CHECKPOINT + "=true";
+            + "?" + OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=true";
       }
     }
     return null;
