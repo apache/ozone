@@ -28,4 +28,6 @@ start_docker_env
 
 execute_robot_test scm basic/ozone-shell-single.robot
 
+stop_docker_env
+
 generate_report
