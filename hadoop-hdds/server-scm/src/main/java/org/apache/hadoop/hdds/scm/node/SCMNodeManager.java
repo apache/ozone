@@ -502,15 +502,16 @@ public class SCMNodeManager implements NodeManager {
   }
 
   /**
-   * returns the max of no healthy volumes reported out of the set
-   * of datanodes constituting the pipeline
+   * Returns the max of no healthy volumes reported out of the set
+   * of datanodes constituting the pipeline.
    */
   @Override
   public int getNumHealthyVolumes(List<DatanodeDetails> dnList) {
     List<Integer> volumeCountList = new ArrayList<>(dnList.size());
     for (DatanodeDetails dn : dnList) {
       try {
-        volumeCountList.add(nodeStateManager.getNode(dn).getHealthyVolumeCount());
+        volumeCountList.add(nodeStateManager.getNode(dn).
+                getHealthyVolumeCount());
       } catch (NodeNotFoundException e) {
         LOG.warn("Cannot generate NodeStat, datanode {} not found.",
                 dn.getUuid());

@@ -224,7 +224,8 @@ public final class TestUtils {
 
   public static StorageReportProto createStorageReport(UUID nodeId, String path,
        long capacity, long used, long remaining, StorageTypeProto type) {
-    return createStorageReport(nodeId, path, capacity, used, remaining, type, false);
+    return createStorageReport(nodeId, path, capacity, used, remaining,
+            type, false);
   }
     /**
      * Creates storage report with the given information.
@@ -239,7 +240,8 @@ public final class TestUtils {
      * @return StorageReportProto
      */
   public static StorageReportProto createStorageReport(UUID nodeId, String path,
-      long capacity, long used, long remaining, StorageTypeProto type, boolean failed) {
+      long capacity, long used, long remaining, StorageTypeProto type,
+                                                       boolean failed) {
     Preconditions.checkNotNull(nodeId);
     Preconditions.checkNotNull(path);
     StorageReportProto.Builder srb = StorageReportProto.newBuilder();

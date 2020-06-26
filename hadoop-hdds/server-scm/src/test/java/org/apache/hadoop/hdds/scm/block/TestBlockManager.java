@@ -342,10 +342,12 @@ public class TestBlockManager {
       CompletableFuture
               .allOf(futureList.toArray(
                       new CompletableFuture[futureList.size()])).get();
-      Assert.assertTrue(pipelineManager.getPipelines(type).size() == 1);
+      Assert.assertTrue(
+              pipelineManager.getPipelines(type).size() == 1);
       Pipeline pipeline = pipelineManager.getPipelines(type).get(0);
-      // total no of containers to be created will be number of healthy volumes *
-      // number of numContainerPerOwnerInPipeline which is equal to the thread count
+      // total no of containers to be created will be number of healthy
+      // volumes * number of numContainerPerOwnerInPipeline which is equal to
+      // the thread count
       Assert.assertTrue(threadCount == pipelineManager.
               getNumberOfContainers(pipeline.getId()));
       Assert.assertTrue(

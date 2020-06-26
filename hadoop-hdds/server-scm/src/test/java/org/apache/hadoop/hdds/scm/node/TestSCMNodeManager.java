@@ -897,25 +897,27 @@ public class TestSCMNodeManager {
     List<DatanodeDetails> dnList = new ArrayList<>(1);
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       EventQueue eventQueue = (EventQueue) scm.getEventQueue();
-        DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
-        dnList.add(dn);
-        UUID dnId = dn.getUuid();
-        long free = capacity - used;
-        List<StorageReportProto> reports = new ArrayList<>(volumeCount);
-        boolean failed = true;
+      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      dnList.add(dn);
+      UUID dnId = dn.getUuid();
+      long free = capacity - used;
+      List<StorageReportProto> reports = new ArrayList<>(volumeCount);
+      boolean failed = true;
       for (int x = 0; x < volumeCount; x++) {
         String storagePath = testDir.getAbsolutePath() + "/" + dnId;
         reports.add(TestUtils
-                .createStorageReport(dnId, storagePath, capacity, used, free, null, failed));
+                .createStorageReport(dnId, storagePath, capacity,
+                        used, free, null, failed));
         failed = !failed;
       }
-        nodeManager.register(dn, TestUtils.createNodeReport(reports), null);
-        nodeManager.processHeartbeat(dn);
+      nodeManager.register(dn, TestUtils.createNodeReport(reports), null);
+      nodeManager.processHeartbeat(dn);
       //TODO: wait for EventQueue to be processed
       eventQueue.processAll(8000L);
 
       assertEquals(1, nodeManager.getNodeCount(HEALTHY));
-      assertEquals(volumeCount/2, nodeManager.getNumHealthyVolumes(dnList));
+      assertEquals(volumeCount / 2,
+              nodeManager.getNumHealthyVolumes(dnList));
       dnList.clear();
     }
   }

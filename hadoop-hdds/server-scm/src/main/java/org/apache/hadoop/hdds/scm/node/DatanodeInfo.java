@@ -109,7 +109,7 @@ public class DatanodeInfo extends DatanodeDetails {
   }
 
   /**
-   * returns count of healthy volumes reported from datanode
+   * Returns count of healthy volumes reported from datanode.
    * @return count of healthy volumes
    */
   public int getHealthyVolumeCount() {
@@ -122,7 +122,7 @@ public class DatanodeInfo extends DatanodeDetails {
   }
 
   /**
-   * returns count of failed volumes reported from datanode
+   * Returns count of failed volumes reported from datanode.
    * @return count of failed volumes
    */
   private int getFailedVolumeCount() {
