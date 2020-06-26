@@ -384,15 +384,14 @@ public class TestOzoneShellHA {
     executeWithError(ozoneShell, args, "does not use port information");
 
     // Test case 6: ozone sh bucket create /volume/bucket
-    // Expectation: Failure.
-    args = new String[] {"bucket", "create", "/volume/bucket"};
-    executeWithError(ozoneShell, args,
-        "Service ID or host name must not be omitted");
+    // Expectation: Success.
+    args = new String[] {"bucket", "create", "/volume/bucket-one"};
+    execute(ozoneShell, args);
 
     // Test case 7: ozone sh bucket create o3://om1/volume/bucket
     // Expectation: Success.
     args = new String[] {
-        "bucket", "create", "o3://" + omServiceId + "/volume/bucket"};
+        "bucket", "create", "o3://" + omServiceId + "/volume/bucket-two"};
     execute(ozoneShell, args);
   }
 
