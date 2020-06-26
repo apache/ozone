@@ -23,7 +23,9 @@ fi
 
 SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
 cd "$SCRIPT_DIR"
-for dir in $(find . -maxdepth 1 -mindepth 1 -type d -printf '%f\n'); do
+
+# shellcheck disable=SC2045,SC2035
+for dir in $(ls -d */); do
    cd "$SCRIPT_DIR/$dir"
    flekszible generate
 done
