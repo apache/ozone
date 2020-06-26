@@ -250,39 +250,6 @@
         </property>
       </activation>
 
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-dependency-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>copy-recon-classpath-file</id>
-                <phase>prepare-package</phase>
-                <goals>
-                  <goal>copy</goal>
-                </goals>
-                <configuration>
-                  <outputDirectory>
-                    target/ozone-${ozone.version}/share/ozone/classpath
-                  </outputDirectory>
-                  <artifactItems>
-                    <artifactItem>
-                      <groupId>org.apache.hadoop</groupId>
-                      <artifactId>hadoop-ozone-recon</artifactId>
-                      <version>${ozone.version}</version>
-                      <classifier>classpath</classifier>
-                      <type>cp</type>
-                      <destFileName>hadoop-ozone-recon.classpath</destFileName>
-                    </artifactItem>
-                  </artifactItems>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-
       <dependencies>
         <dependency>
           <groupId>org.apache.hadoop</groupId>
