@@ -103,6 +103,14 @@ services:
     volumes:
       - ${OZONE_VOLUME}/s3g:/data
       - ../..:${OZONE_DIR}
+  debug:
+    command: "bash -c 'id; echo ===; mount; echo ===; df -k; echo ===; ls -la /data'"
+    <<: *common-config
+    networks:
+      net:
+    volumes:
+      - ${OZONE_VOLUME}/scm:/data
+      - ../..:${OZONE_DIR}
   scm:
     command: ["ozone","scm"]
     <<: *common-config
