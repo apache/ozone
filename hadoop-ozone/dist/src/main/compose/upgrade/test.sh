@@ -25,6 +25,19 @@ export COMPOSE_DIR
 
 export OZONE_VOLUME
 
+echo ===
+echo ${OZONE_VOLUME}
+echo ===
+mkdir -pv ${OZONE_VOLUME}/{dn1,dn2,dn3,om,recon,s3g,scm}
+mkdir -pv ${OZONE_VOLUME}/debug
+echo ===
+df -k
+echo ===
+mount
+echo ===
+ls -la ${OZONE_VOLUME}
+echo ===
+
 # define version-specifics
 export OZONE_DIR=/opt/ozone
 export OZONE_IMAGE="apache/ozone:${OZONE_UPGRADE_FROM}"

@@ -109,8 +109,8 @@ services:
     networks:
       net:
     volumes:
-      - ${OZONE_VOLUME}/scm:/data
       - ../..:${OZONE_DIR}
+      - ${OZONE_VOLUME}/debug:/data
   scm:
     command: ["ozone","scm"]
     <<: *common-config
