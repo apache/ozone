@@ -38,6 +38,8 @@ interface IDatanodeResponse {
   containers: number;
   leaderCount: number;
   uuid: string;
+  version: string;
+  setupTime: string;
 }
 
 interface IDatanodesResponse {
@@ -56,6 +58,8 @@ interface IDatanode {
   containers: number;
   leaderCount: number;
   uuid: string;
+  version: string;
+  setupTime: string;
 }
 
 interface IPipeline {
@@ -165,6 +169,18 @@ const COLUMNS = [
     dataIndex: 'containers',
     key: 'containers',
     sorter: (a: IDatanode, b: IDatanode) => a.containers - b.containers
+  },
+  {
+    title: 'Version',
+    dataIndex: 'version',
+    key: 'version',
+    sorter: (a: IDatanode, b: IDatanode) => a.version - b.version
+  },
+  {
+    title: 'SetupTime',
+    dataIndex: 'setupTime',
+    key: 'setupTime',
+    sorter: (a: IDatanode, b: IDatanode) => a.setupTime - b.setupTime
   }
 ];
 
@@ -201,7 +217,9 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
           storageRemaining: datanode.storageReport.remaining,
           pipelines: datanode.pipelines,
           containers: datanode.containers,
-          leaderCount: datanode.leaderCount
+          leaderCount: datanode.leaderCount,
+          version: datanode.version,
+          setupTime: datanode.setupTime
         };
       });
       this.setState({

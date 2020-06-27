@@ -49,6 +49,8 @@ public class DatanodeDetails extends NodeImpl implements
   private String hostName;
   private List<Port> ports;
   private String certSerialId;
+  private String version;
+  private String setupTime;
 
   /**
    * Constructs DatanodeDetails instance. DatanodeDetails.Builder is used
@@ -59,15 +61,20 @@ public class DatanodeDetails extends NodeImpl implements
    * @param networkLocation DataNode's network location path
    * @param ports Ports used by the DataNode
    * @param certSerialId serial id from SCM issued certificate.
+   * @param version DataNode's version
+   * @param setupTime the setup time of DataNode
    */
   private DatanodeDetails(UUID uuid, String ipAddress, String hostName,
-      String networkLocation, List<Port> ports, String certSerialId) {
+      String networkLocation, List<Port> ports, String certSerialId,
+      String version, String setupTime) {
     super(hostName, networkLocation, NetConstants.NODE_COST_DEFAULT);
     this.uuid = uuid;
     this.ipAddress = ipAddress;
     this.hostName = hostName;
     this.ports = ports;
     this.certSerialId = certSerialId;
+    this.version = version;
+    this.setupTime = setupTime;
   }
 
   public DatanodeDetails(DatanodeDetails datanodeDetails) {
@@ -78,6 +85,8 @@ public class DatanodeDetails extends NodeImpl implements
     this.hostName = datanodeDetails.hostName;
     this.ports = datanodeDetails.ports;
     this.setNetworkName(datanodeDetails.getNetworkName());
+    this.version = datanodeDetails.version;
+    this.setupTime = datanodeDetails.setupTime;
   }
 
   /**
@@ -206,6 +215,12 @@ public class DatanodeDetails extends NodeImpl implements
     if (datanodeDetailsProto.hasNetworkLocation()) {
       builder.setNetworkLocation(datanodeDetailsProto.getNetworkLocation());
     }
+    if (datanodeDetailsProto.hasVersion()) {
+      builder.setVersion(datanodeDetailsProto.getVersion());
+    }
+    if (datanodeDetailsProto.hasSetupTime()) {
+      builder.setSetupTime(datanodeDetailsProto.getSetupTime());
+    }
     return builder.build();
   }
 
@@ -247,6 +262,15 @@ public class DatanodeDetails extends NodeImpl implements
           .setValue(port.getValue())
           .build());
     }
+
+    if (!Strings.isNullOrEmpty(getVersion())) {
+      builder.setVersion(getVersion());
+    }
+
+    if (!Strings.isNullOrEmpty(getSetupTime())) {
+      builder.setSetupTime(getSetupTime());
+    }
+
     return builder.build();
   }
 
@@ -299,6 +323,8 @@ public class DatanodeDetails extends NodeImpl implements
     private String networkLocation;
     private List<Port> ports;
     private String certSerialId;
+    private String version;
+    private String setupTime;
 
     /**
      * Default private constructor. To create Builder instance use
@@ -388,6 +414,30 @@ public class DatanodeDetails extends NodeImpl implements
     }
 
     /**
+     * Sets the DataNode version.
+     *
+     * @param version the version of DataNode.
+     *
+     * @return DatanodeDetails.Builder
+     */
+    public Builder setVersion(String version) {
+      this.version = version;
+      return this;
+    }
+
+    /**
+     * Sets the DataNode setup time.
+     *
+     * @param setupTime the setupt time of DataNode.
+     *
+     * @return DatanodeDetails.Builder
+     */
+    public Builder setSetupTime(String setupTime) {
+      this.setupTime = setupTime;
+      return this;
+    }
+
+    /**
      * Builds and returns DatanodeDetails instance.
      *
      * @return DatanodeDetails
@@ -398,7 +448,7 @@ public class DatanodeDetails extends NodeImpl implements
         networkLocation = NetConstants.DEFAULT_RACK;
       }
       DatanodeDetails dn = new DatanodeDetails(id, ipAddress, hostName,
-          networkLocation, ports, certSerialId);
+          networkLocation, ports, certSerialId, version, setupTime);
       if (networkName != null) {
         dn.setNetworkName(networkName);
       }
@@ -503,5 +553,41 @@ public class DatanodeDetails extends NodeImpl implements
    */
   public void setCertSerialId(String certSerialId) {
     this.certSerialId = certSerialId;
+  }
+
+  /**
+   * Returns the DataNode version.
+   *
+   * @return DataNode version
+   */
+  public String getVersion() {
+    return version;
+  }
+
+  /**
+   * Set DataNode version.
+   *
+   * @param version DataNode version
+   */
+  public void setVersion(String version) {
+    this.version = version;
+  }
+
+  /**
+   * Returns the DataNode setup time.
+   *
+   * @return DataNode setup time
+   */
+  public String getSetupTime() {
+    return setupTime;
+  }
+
+  /**
+   * Set DataNode setup time.
+   *
+   * @param setupTime DataNode setup time
+   */
+  public void setSetupTime(String setupTime) {
+    this.setupTime = setupTime;
   }
 }

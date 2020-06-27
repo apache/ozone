@@ -1514,6 +1514,16 @@
                 "id": 7,
                 "name": "networkLocation",
                 "type": "string"
+              },
+              {
+                "id": 8,
+                "name": "version",
+                "type": "string"
+              },
+              {
+                "id": 9,
+                "name": "setupTime",
+                "type": "string"
               }
             ]
           },

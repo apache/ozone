@@ -23,6 +23,7 @@ import java.net.InetAddress;
 import java.security.KeyPair;
 import java.security.cert.CertificateException;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -191,6 +192,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       datanodeDetails = initializeDatanodeDetails();
       datanodeDetails.setHostName(hostname);
       datanodeDetails.setIpAddress(ip);
+      datanodeDetails.setVersion(
+          HddsVersionInfo.HDDS_VERSION_INFO.getVersion());
+      datanodeDetails.setSetupTime(
+          new Date(System.currentTimeMillis()).toString());
       TracingUtil.initTracing(
           "HddsDatanodeService." + datanodeDetails.getUuidString()
               .substring(0, 8), conf);
