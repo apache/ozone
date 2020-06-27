@@ -71,10 +71,6 @@ kubectl cp om-0:/opt/hadoop/etc/hadoop/ozone-site.xml .
 
 ```xml
 <configuration>
-    <property>
-        <name>fs.AbstractFileSystem.o3fs.impl</name>
-        <value>org.apache.hadoop.fs.ozone.OzFs</value>
-     </property>
 </configuration>
 ```
 kubectl cp om-0:/opt/hadoop/share/ozone/lib/hadoop-ozone-filesystem-hadoop2-VERSION.jar hadoop-ozone-filesystem-hadoop2.jar

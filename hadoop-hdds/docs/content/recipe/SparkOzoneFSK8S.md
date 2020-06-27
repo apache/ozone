@@ -72,10 +72,6 @@ And create a custom `core-site.xml`.
 
 ```xml
 <configuration>
-    <property>
-        <name>fs.AbstractFileSystem.o3fs.impl</name>
-        <value>org.apache.hadoop.fs.ozone.OzFs</value>
-     </property>
 </configuration>
 ```
 

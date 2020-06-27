@@ -42,10 +42,6 @@ Please add the following entry to the core-site.xml.
 
 {{< highlight xml >}}
 <property>
-  <name>fs.AbstractFileSystem.o3fs.impl</name>
-  <value>org.apache.hadoop.fs.ozone.OzFs</value>
-</property>
-<property>
   <name>fs.defaultFS</name>
   <value>o3fs://bucket.volume</value>
 </property>
