@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory;
  * A RocksDB based implementation of SCM Metadata Store.
  *
  */
-public class SCMMetadataStoreRDBImpl implements SCMMetadataStore {
+public class SCMMetadataStoreImpl implements SCMMetadataStore {
 
   private Table<Long, DeletedBlocksTransaction> deletedBlocksTable;
 
@@ -61,7 +61,7 @@ public class SCMMetadataStoreRDBImpl implements SCMMetadataStore {
   private Table<PipelineID, Pipeline> pipelineTable;
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(SCMMetadataStoreRDBImpl.class);
+      LoggerFactory.getLogger(SCMMetadataStoreImpl.class);
   private DBStore store;
   private final OzoneConfiguration configuration;
   private final AtomicLong txID;
@@ -72,7 +72,7 @@ public class SCMMetadataStoreRDBImpl implements SCMMetadataStore {
    * @param config - Ozone Configuration.
    * @throws IOException - on Failure.
    */
-  public SCMMetadataStoreRDBImpl(OzoneConfiguration config)
+  public SCMMetadataStoreImpl(OzoneConfiguration config)
       throws IOException {
     this.configuration = config;
     start(this.configuration);

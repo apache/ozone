@@ -71,6 +71,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateV
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteBucketRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclRequest;
@@ -706,6 +707,34 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OMRequest omRequest = createOMRequest(Type.DeleteKey)
         .setDeleteKeyRequest(req)
+        .build();
+
+    handleError(submitRequest(omRequest));
+
+  }
+
+  /**
+   * Deletes existing key/keys. This interface supports delete
+   * multiple keys and a single key.
+   *
+   * @param args the list args of the key.
+   * @throws IOException
+   */
+  @Override
+  public void deleteKeys(List<OmKeyArgs> args) throws IOException {
+    DeleteKeysRequest.Builder req = DeleteKeysRequest.newBuilder();
+    List <KeyArgs> keyArgsList = new ArrayList<KeyArgs>();
+    for (OmKeyArgs omKeyArgs : args) {
+      KeyArgs keyArgs = KeyArgs.newBuilder()
+          .setVolumeName(omKeyArgs.getVolumeName())
+          .setBucketName(omKeyArgs.getBucketName())
+          .setKeyName(omKeyArgs.getKeyName()).build();
+      keyArgsList.add(keyArgs);
+    }
+    req.addAllKeyArgs(keyArgsList);
+
+    OMRequest omRequest = createOMRequest(Type.DeleteKeys)
+        .setDeleteKeysRequest(req)
         .build();
 
     handleError(submitRequest(omRequest));

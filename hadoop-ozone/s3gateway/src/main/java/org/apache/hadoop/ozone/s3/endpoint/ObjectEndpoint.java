@@ -515,6 +515,12 @@ public class ObjectEndpoint extends EndpointBase {
       OzoneBucket ozoneBucket = getBucket(bucket);
       String copyHeader;
       OzoneOutputStream ozoneOutputStream = null;
+
+      if ("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"
+          .equals(headers.getHeaderString("x-amz-content-sha256"))) {
+        body = new SignedChunksInputStream(body);
+      }
+
       try {
         ozoneOutputStream = ozoneBucket.createMultipartKey(
             key, length, partNumber, uploadID);

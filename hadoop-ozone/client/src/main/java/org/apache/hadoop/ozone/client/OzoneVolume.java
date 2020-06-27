@@ -69,6 +69,10 @@ public class OzoneVolume extends WithMetadata {
    */
   private Instant creationTime;
   /**
+   * Modification time of the volume.
+   */
+  private Instant modificationTime;
+  /**
    * Volume ACLs.
    */
   private List<OzoneAcl> acls;
@@ -89,10 +93,8 @@ public class OzoneVolume extends WithMetadata {
    */
   @SuppressWarnings("parameternumber")
   public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy,
-      String name,
-      String admin, String owner, long quotaInBytes,
-      long creationTime, List<OzoneAcl> acls,
-      Map<String, String> metadata) {
+      String name, String admin, String owner, long quotaInBytes,
+      long creationTime, List<OzoneAcl> acls, Map<String, String> metadata) {
     Preconditions.checkNotNull(proxy, "Client proxy is not set.");
     this.proxy = proxy;
     this.name = name;
@@ -103,21 +105,50 @@ public class OzoneVolume extends WithMetadata {
     this.acls = acls;
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
     this.metadata = metadata;
+    modificationTime = Instant.now();
+    if (modificationTime.isBefore(this.creationTime)) {
+      modificationTime = Instant.ofEpochSecond(
+          this.creationTime.getEpochSecond(), this.creationTime.getNano());
+    }
+  }
+
+  /**
+   * @param modificationTime modification time of the volume.
+   */
+  @SuppressWarnings("parameternumber")
+  public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy,
+      String name, String admin, String owner, long quotaInBytes,
+      long creationTime, long modificationTime, List<OzoneAcl> acls,
+      Map<String, String> metadata) {
+    this(conf, proxy, name, admin, owner, quotaInBytes,
+        creationTime, acls, metadata);
+    this.modificationTime = Instant.ofEpochMilli(modificationTime);
   }
 
   @SuppressWarnings("parameternumber")
   public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy,
-      String name,
-      String admin, String owner, long quotaInBytes,
+      String name, String admin, String owner, long quotaInBytes,
       long creationTime, List<OzoneAcl> acls) {
     this(conf, proxy, name, admin, owner, quotaInBytes, creationTime, acls,
         new HashMap<>());
+    modificationTime = Instant.now();
+    if (modificationTime.isBefore(this.creationTime)) {
+      modificationTime = Instant.ofEpochSecond(
+          this.creationTime.getEpochSecond(), this.creationTime.getNano());
+    }
+  }
+
+  @SuppressWarnings("parameternumber")
+  public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy,
+      String name, String admin, String owner, long quotaInBytes,
+      long creationTime, long modificationTime, List<OzoneAcl> acls) {
+    this(conf, proxy, name, admin, owner, quotaInBytes, creationTime, acls);
+    this.modificationTime = Instant.ofEpochMilli(modificationTime);
   }
 
   @VisibleForTesting
   protected OzoneVolume(String name, String admin, String owner,
-      long quotaInBytes,
-      long creationTime, List<OzoneAcl> acls) {
+      long quotaInBytes, long creationTime, List<OzoneAcl> acls) {
     this.proxy = null;
     this.name = name;
     this.admin = admin;
@@ -126,6 +157,19 @@ public class OzoneVolume extends WithMetadata {
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.acls = acls;
     this.metadata = new HashMap<>();
+    modificationTime = Instant.now();
+    if (modificationTime.isBefore(this.creationTime)) {
+      modificationTime = Instant.ofEpochSecond(
+          this.creationTime.getEpochSecond(), this.creationTime.getNano());
+    }
+  }
+
+  @VisibleForTesting
+  protected OzoneVolume(String name, String admin, String owner,
+      long quotaInBytes, long creationTime, long modificationTime,
+      List<OzoneAcl> acls) {
+    this(name, admin, owner, quotaInBytes, creationTime, acls);
+    this.modificationTime = Instant.ofEpochMilli(modificationTime);
   }
 
   /**
@@ -171,6 +215,15 @@ public class OzoneVolume extends WithMetadata {
    */
   public Instant getCreationTime() {
     return creationTime;
+  }
+
+  /**
+   * Returns modification time of the volume.
+   *
+   * @return modification time.
+   */
+  public Instant getModificationTime() {
+    return modificationTime;
   }
 
   /**

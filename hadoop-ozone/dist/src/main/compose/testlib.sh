@@ -25,6 +25,8 @@ SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
 OM_HA_PARAM=""
 if [[ -n "${OM_SERVICE_ID}" ]]; then
   OM_HA_PARAM="--om-service-id=${OM_SERVICE_ID}"
+else
+  OM_SERVICE_ID=om
 fi
 
 ## @description create results directory, purging any prior data
@@ -101,10 +103,19 @@ execute_robot_test(){
   TEST_NAME="$(basename "$COMPOSE_DIR")-${TEST_NAME%.*}"
   set +e
   OUTPUT_NAME="$COMPOSE_ENV_NAME-$TEST_NAME-$CONTAINER"
-  OUTPUT_PATH="$RESULT_DIR_INSIDE/robot-$OUTPUT_NAME.xml"
+
+  # find unique filename
+  declare -i i=0
+  OUTPUT_FILE="robot-${OUTPUT_NAME}.xml"
+  while [[ -f $RESULT_DIR/$OUTPUT_FILE ]]; do
+    let i++
+    OUTPUT_FILE="robot-${OUTPUT_NAME}-${i}.xml"
+  done
+
+  OUTPUT_PATH="$RESULT_DIR_INSIDE/${OUTPUT_FILE}"
   # shellcheck disable=SC2068
   docker-compose -f "$COMPOSE_FILE" exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
-    && docker-compose -f "$COMPOSE_FILE" exec -T -e SECURITY_ENABLED="${SECURITY_ENABLED}" -e OM_HA_PARAM="${OM_HA_PARAM}" -e OM_SERVICE_ID="${OM_SERVICE_ID}" "$CONTAINER" robot ${ARGUMENTS[@]} --log NONE -N "$TEST_NAME" --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" "$SMOKETEST_DIR_INSIDE/$TEST"
+    && docker-compose -f "$COMPOSE_FILE" exec -T "$CONTAINER" robot -v OM_SERVICE_ID:"${OM_SERVICE_ID}" -v SECURITY_ENABLED:"${SECURITY_ENABLED}" -v OM_HA_PARAM:"${OM_HA_PARAM}" ${ARGUMENTS[@]} --log NONE -N "$TEST_NAME" --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" "$SMOKETEST_DIR_INSIDE/$TEST"
   local -i rc=$?
 
   FULL_CONTAINER_NAME=$(docker-compose -f "$COMPOSE_FILE" ps | grep "_${CONTAINER}_" | head -n 1 | awk '{print $1}')

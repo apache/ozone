@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.conf.RatisClientConfig;
+import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
@@ -234,7 +234,7 @@ public final class HddsClientUtils {
    */
   public static int getMaxOutstandingRequests(ConfigurationSource config) {
     return OzoneConfiguration.of(config)
-        .getObject(RatisClientConfig.class)
+        .getObject(RatisClientConfig.RaftConfig.class)
         .getMaxOutstandingRequests();
   }
 

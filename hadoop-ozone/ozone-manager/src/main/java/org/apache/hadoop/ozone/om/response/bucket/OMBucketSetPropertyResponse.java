@@ -21,6 +21,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
@@ -28,9 +29,12 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+
 /**
  * Response for SetBucketProperty request.
  */
+@CleanupTableInfo(cleanupTables = {BUCKET_TABLE})
 public class OMBucketSetPropertyResponse extends OMClientResponse {
   private OmBucketInfo omBucketInfo;
 

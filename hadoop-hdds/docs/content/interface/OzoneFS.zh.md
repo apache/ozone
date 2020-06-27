@@ -40,10 +40,6 @@ ozone sh bucket create /volume/bucket
 
 {{< highlight xml >}}
 <property>
-  <name>fs.o3fs.impl</name>
-  <value>org.apache.hadoop.fs.ozone.OzoneFileSystem</value>
-</property>
-<property>
   <name>fs.AbstractFileSystem.o3fs.impl</name>
   <value>org.apache.hadoop.fs.ozone.OzFs</value>
 </property>
@@ -58,8 +54,10 @@ ozone sh bucket create /volume/bucket
 你还需要将 ozone-filesystem.jar 文件加入 classpath：
 
 {{< highlight bash >}}
-export HADOOP_CLASSPATH=/opt/ozone/share/ozonefs/lib/hadoop-ozone-filesystem-lib-current*.jar:$HADOOP_CLASSPATH
+export HADOOP_CLASSPATH=/opt/ozone/share/ozonefs/lib/hadoop-ozone-filesystem-hadoop3-*.jar:$HADOOP_CLASSPATH
 {{< /highlight >}}
+
+(注意：当使用Hadoop 2.x时，应该在classpath上添加hadoop-ozone-filesystem-hadoop2-*.jar)
 
 当配置了默认的文件系统之后，用户可以运行 ls、put、mkdir 等命令，比如：
 
@@ -109,32 +107,3 @@ hdfs dfs -ls o3fs://bucket.volume.om-host.example.com:6789/key
 注意：在这种情况下，`ozone.om.address` 配置中只有端口号会被用到，主机名是被忽略的。
 
 
-## 兼容旧版本 Hadoop（Legacy jar 和 BasicOzoneFilesystem）
-
-Ozone 文件系统的 jar 包有两种类型，它们都包含了所有的依赖：
-
- * share/ozone/lib/hadoop-ozone-filesystem-lib-current-VERSION.jar
- * share/ozone/lib/hadoop-ozone-filesystem-lib-legacy-VERSION.jar
-
-第一种 jar 包包含了在一个版本兼容的 hadoop（hadoop 3.2）中使用 Ozone 文件系统需要的所有依赖。
-
-第二种 jar 包将所有依赖单独放在一个内部的目录，并且这个目录下的类会用一个特殊的类加载器来加载这些类。通过这种方法，旧版本的 hadoop 就可以使用 hadoop-ozone-filesystem-lib-legacy.jar（比如hadoop 3.1、hadoop 2.7 或者 spark+hadoop 2.7）。
-
-和依赖的 jar 包类似， OzoneFileSystem 也有两种实现。
-
-对于 Hadoop 3.0 之后的版本，你应当使用 `org.apache.hadoop.fs.ozone.OzoneFileSystem`，它是兼容 Hadoop 文件系统 API 的完整实现。
-
-对于 Hadoop 2.x 的版本，你应该使用基础版本 `org.apache.hadoop.fs.ozone.BasicOzoneFileSystem`，两者实现基本相同，但是不包含在 Hadoop 3.0 中引入的特性和依赖（比如文件系统统计信息、加密桶等）。
-
-### 总结
-
-下表总结了各个版本 Hadoop 应当使用的 jar 包和文件系统实现：
-
-Hadoop 版本 | 需要的 jar            | FileSystem 实现  | AbstractFileSystem 实现
----------------|-------------------------|-------------------------------------------------|---------------------------
-3.2            | filesystem-lib-current  | org.apache.hadoop.fs.ozone.OzoneFileSystem      | org.apache.hadoop.fs.ozone.OzFs
-3.1            | filesystem-lib-legacy   | org.apache.hadoop.fs.ozone.OzoneFileSystem      | org.apache.hadoop.fs.ozone.OzFs
-2.9            | filesystem-lib-legacy   | org.apache.hadoop.fs.ozone.BasicOzoneFileSystem | org.apache.hadoop.fs.ozone.BasicOzFs
-2.7            | filesystem-lib-legacy   | org.apache.hadoop.fs.ozone.BasicOzoneFileSystem | org.apache.hadoop.fs.ozone.BasicOzFs
-
-由此可知，低版本的 Hadoop 可以使用 hadoop-ozone-filesystem-lib-legacy.jar（比如 hadoop 2.7 或者 spark+hadoop 2.7）。

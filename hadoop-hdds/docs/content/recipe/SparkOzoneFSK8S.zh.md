@@ -30,7 +30,7 @@ summary: 如何在 K8s 上通过 Apache Spark 使用 Ozone ?
 
 ## 准备
 
-下载 Spark 和 Ozone 的最新发行包并解压，本方法使用 `spark-2.4.0-bin-hadoop2.7` 进行了测试。
+下载 Spark 和 Ozone 的最新发行包并解压，本方法使用 `spark-2.4.6-bin-hadoop2.7` 进行了测试。
 
 你还需要准备以下内容：
 
@@ -46,13 +46,13 @@ summary: 如何在 K8s 上通过 Apache Spark 使用 Ozone ?
 在 Spark 发行包中运行以下命令：
 
 ```bash
-./bin/docker-image-tool.sh -r myrepo -t 2.4.0 build
+./bin/docker-image-tool.sh -r myrepo -t 2.4.6 build
 ```
 
 _注意_: 如果你使用 Minikube，需要加上 `-m` 参数来使用 Minikube 镜像的 docker 进程。
 
 ```bash
-./bin/docker-image-tool.sh -m -r myrepo -t 2.4.0 build
+./bin/docker-image-tool.sh -m -r myrepo -t 2.4.6 build
 ```
 
 `./bin/docker-image-tool.sh` 是 Spark 用来创建镜像的官方工具，上面的步骤会创建多个名为 _myrepo/spark_ 的 Spark 镜像，其中的第一个镜像用作接下来步骤的基础镜像。
@@ -67,38 +67,28 @@ _注意_: 如果你使用 Minikube，需要加上 `-m` 参数来使用 Minikube 
 kubectl cp om-0:/opt/hadoop/etc/hadoop/ozone-site.xml .
 ```
 
-然后创建一个包含以下内容的 core-site.xml：
+从 Ozone 目录中拷贝 `ozonefs.jar`（__使用 hadoop2 版本！__）
 
 ```xml
 <configuration>
-    <property>
-        <name>fs.o3fs.impl</name>
-        <value>org.apache.hadoop.fs.ozone.BasicOzoneFileSystem</value>
-    </property>
     <property>
         <name>fs.AbstractFileSystem.o3fs.impl</name>
         <value>org.apache.hadoop.fs.ozone.OzFs</value>
      </property>
 </configuration>
 ```
-
-_注意_: 你也可以使用不带 `Basic` 前缀的 `org.apache.hadoop.fs.ozone.OzoneFileSystem`，带 `Basic` 的版本不支持 FS statistics 和加密空间，但可以兼容旧版本的 Hadoop。
-
-从 Ozone 目录中拷贝 `ozonefs.jar`（__使用 legacy 版本！__）
-
-```
-kubectl cp om-0:/opt/hadoop/share/ozone/lib/hadoop-ozone-filesystem-lib-legacy-0.4.0-SNAPSHOT.jar .
+kubectl cp om-0:/opt/hadoop/share/ozone/lib/hadoop-ozone-filesystem-hadoop2-VERSION.jar hadoop-ozone-filesystem-hadoop2.jar
 ```
 
 
 编写新的 Dockerfile 并构建镜像：
 ```
-FROM myrepo/spark:2.4.0
+FROM myrepo/spark:2.4.6
 ADD core-site.xml /opt/hadoop/conf/core-site.xml
 ADD ozone-site.xml /opt/hadoop/conf/ozone-site.xml
 ENV HADOOP_CONF_DIR=/opt/hadoop/conf
 ENV SPARK_EXTRA_CLASSPATH=/opt/hadoop/conf
-ADD hadoop-ozone-filesystem-lib-legacy-0.4.0-SNAPSHOT.jar /opt/hadoop-ozone-filesystem-lib-legacy.jar
+ADD hadoop-ozone-filesystem-hadoop2.jar /opt/hadoop-ozone-filesystem-hadoop2.jar
 ```
 
 ```bash
@@ -119,14 +109,6 @@ docker push myrepo/spark-ozone
 kubectl port-forward s3g-0 9878:9878
 aws s3api --endpoint http://localhost:9878 create-bucket --bucket=test
 aws s3api --endpoint http://localhost:9878 put-object --bucket test --key alice.txt --body /tmp/alice.txt
-kubectl exec -it scm-0 ozone s3 path test
-```
-
-最后一个命令的输出形如：
-
-```
-Volume name for S3Bucket is : s3asdlkjqiskjdsks
-Ozone FileSystem Uri is : o3fs://test.s3asdlkjqiskjdsks
 ```
 
 记下 Ozone 文件系统的 URI，在接下来的 spark-submit 命令中会用到它。
@@ -158,9 +140,9 @@ bin/spark-submit \
     --conf spark.kubernetes.authenticate.driver.serviceAccountName=spark \
     --conf spark.kubernetes.container.image=myrepo/spark-ozone \
     --conf spark.kubernetes.container.image.pullPolicy=Always \
-    --jars /opt/hadoop-ozone-filesystem-lib-legacy.jar \
+    --jars /opt/hadoop-ozone-filesystem-hadoop2.jar \
     local:///opt/spark/examples/jars/spark-examples_2.11-2.4.0.jar \
-    o3fs://bucket.volume/alice.txt
+    o3fs://test.s3v.ozone-om-0.ozone-om:9862/alice.txt
 ```
 
 使用 `kubectl get pod` 命令查看可用的 `spark-word-count-...` pod。

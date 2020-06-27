@@ -80,6 +80,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- Apache Ratis version -->
     <ratis.version>0.6.0-6ab75ae-SNAPSHOT</ratis.version>
+
+    <!-- Apache Ratis thirdparty version -->
+    <ratis.thirdpary.version>0.4.0</ratis.thirdpary.version>
+
     <distMgmtSnapshotsId>apache.snapshots.https</distMgmtSnapshotsId>
     <distMgmtSnapshotsName>Apache Development Snapshot Repository</distMgmtSnapshotsName>
     <distMgmtSnapshotsUrl>https://repository.apache.org/content/repositories/snapshots</distMgmtSnapshotsUrl>
@@ -1586,7 +1590,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>org.rocksdb</groupId>
         <artifactId>rocksdbjni</artifactId>
-        <version>6.6.4</version>
+        <version>6.8.1</version>
       </dependency>
       <dependency>
         <groupId>org.xerial</groupId>
@@ -1911,7 +1915,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               <goal>prepare-agent</goal>
             </goals>
             <configuration>
-              <includes>org.apache.hadoop.hdds.*,org.apache.hadoop.ozone.*</includes>
+              <includes>org.apache.hadoop.hdds.*,org.apache.hadoop.ozone.*,org.apache.hadoop.fs.ozone.*</includes>
             </configuration>
           </execution>
         </executions>
