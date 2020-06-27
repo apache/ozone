@@ -572,12 +572,13 @@ public final class HttpServer2 implements FilterContainer {
     this.findPort = b.findPort;
     this.portRanges = b.portRanges;
     initializeWebServer(b.name, b.hostName, b.conf, b.pathSpecs,
-        b.authFilterConfigurationPrefix);
+        b.authFilterConfigurationPrefix, b.securityEnabled);
   }
 
   private void initializeWebServer(String name, String hostName,
       ConfigurationSource conf, String[] pathSpecs,
-      String authFilterConfigPrefix) throws IOException {
+      String authFilterConfigPrefix,
+      boolean securityEnabled) throws IOException {
 
     Preconditions.checkNotNull(webAppContext);
 
@@ -614,14 +615,17 @@ public final class HttpServer2 implements FilterContainer {
     final FilterInitializer[] initializers = getFilterInitializers(conf);
     if (initializers != null) {
       conf.set(BIND_ADDRESS, hostName);
+      org.apache.hadoop.conf.Configuration hadoopConf =
+          LegacyHadoopConfigurationSource.asHadoopConfiguration(conf);
+      Map<String, String> filterConfig = getFilterConfigMap(hadoopConf,
+          authFilterConfigPrefix);
       for (FilterInitializer c : initializers) {
-        //c.initFilter(this, conf) does not work here as it does not take config
-        // prefix key.
-        Map<String, String> filterConfig = getFilterConfigMap(
-            LegacyHadoopConfigurationSource.asHadoopConfiguration(conf),
-            authFilterConfigPrefix);
-        addFilter("authentication", AuthenticationFilter.class.getName(),
-            filterConfig);
+        if ((c instanceof AuthenticationFilterInitializer) && securityEnabled) {
+          addFilter("authentication",
+              AuthenticationFilter.class.getName(), filterConfig);
+        } else {
+          c.initFilter(this, hadoopConf);
+        }
       }
     }
 

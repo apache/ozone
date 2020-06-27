@@ -42,7 +42,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
-import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreRDBImpl;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
@@ -109,7 +109,7 @@ public class TestBlockManager {
     nodeManager = new MockNodeManager(true, 10);
     eventQueue = new EventQueue();
 
-    scmMetadataStore = new SCMMetadataStoreRDBImpl(conf);
+    scmMetadataStore = new SCMMetadataStoreImpl(conf);
     scmMetadataStore.start(conf);
     pipelineManager =
         new SCMPipelineManager(conf, nodeManager,

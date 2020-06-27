@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.util.Time;
 
 /**
  * Ozone volume with in-memory state for testing.
@@ -38,9 +39,9 @@ public class OzoneVolumeStub extends OzoneVolume {
   private Map<String, OzoneBucketStub> buckets = new HashMap<>();
 
   public OzoneVolumeStub(String name, String admin, String owner,
-      long quotaInBytes,
-      long creationTime, List<OzoneAcl> acls) {
-    super(name, admin, owner, quotaInBytes, creationTime, acls);
+      long quotaInBytes, long creationTime, List<OzoneAcl> acls) {
+    super(name, admin, owner, quotaInBytes,
+        creationTime, acls);
   }
 
   @Override
@@ -58,8 +59,7 @@ public class OzoneVolumeStub extends OzoneVolume {
         bucketName,
         bucketArgs.getStorageType(),
         bucketArgs.getVersioning(),
-        System.currentTimeMillis()));
-
+        Time.now()));
   }
 
   @Override

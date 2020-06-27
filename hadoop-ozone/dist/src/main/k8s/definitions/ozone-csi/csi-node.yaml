@@ -58,7 +58,7 @@ spec:
           envFrom:
             - configMapRef:
                 name: config
-          imagePullPolicy: "Always"
+          imagePullPolicy: "IfNotPresent"
           volumeMounts:
             - name: plugin-dir
               mountPath: /var/lib/csi

@@ -345,6 +345,7 @@ public class RpcClient implements ClientProtocol {
         volume.getOwnerName(),
         volume.getQuotaInBytes(),
         volume.getCreationTime(),
+        volume.getModificationTime(),
         volume.getAclMap().ozoneAclGetProtobuf().stream().
             map(OzoneAcl::fromProtobuf).collect(Collectors.toList()),
         volume.getMetadata());
@@ -377,6 +378,7 @@ public class RpcClient implements ClientProtocol {
         volume.getOwnerName(),
         volume.getQuotaInBytes(),
         volume.getCreationTime(),
+        volume.getModificationTime(),
         volume.getAclMap().ozoneAclGetProtobuf().stream().
             map(OzoneAcl::fromProtobuf).collect(Collectors.toList())))
         .collect(Collectors.toList());
@@ -397,6 +399,7 @@ public class RpcClient implements ClientProtocol {
         volume.getOwnerName(),
         volume.getQuotaInBytes(),
         volume.getCreationTime(),
+        volume.getModificationTime(),
         volume.getAclMap().ozoneAclGetProtobuf().stream().
             map(OzoneAcl::fromProtobuf).collect(Collectors.toList()),
         volume.getMetadata()))
@@ -606,6 +609,7 @@ public class RpcClient implements ClientProtocol {
         bucketInfo.getStorageType(),
         bucketInfo.getIsVersionEnabled(),
         bucketInfo.getCreationTime(),
+        bucketInfo.getModificationTime(),
         bucketInfo.getMetadata(),
         bucketInfo.getEncryptionKeyInfo() != null ? bucketInfo
             .getEncryptionKeyInfo().getKeyName() : null,
@@ -629,6 +633,7 @@ public class RpcClient implements ClientProtocol {
         bucket.getStorageType(),
         bucket.getIsVersionEnabled(),
         bucket.getCreationTime(),
+        bucket.getModificationTime(),
         bucket.getMetadata(),
         bucket.getEncryptionKeyInfo() != null ? bucket
             .getEncryptionKeyInfo().getKeyName() : null,
@@ -718,6 +723,24 @@ public class RpcClient implements ClientProtocol {
         .setKeyName(keyName)
         .build();
     ozoneManagerClient.deleteKey(keyArgs);
+  }
+
+  @Override
+  public void deleteKeys(
+          String volumeName, String bucketName, List<String> keyNameList)
+          throws IOException {
+    HddsClientUtils.verifyResourceName(volumeName, bucketName);
+    Preconditions.checkNotNull(keyNameList);
+    List<OmKeyArgs> keyArgsList = new ArrayList<>();
+    for (String keyName: keyNameList) {
+      OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+          .setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .setKeyName(keyName)
+          .build();
+      keyArgsList.add(keyArgs);
+    }
+    ozoneManagerClient.deleteKeys(keyArgsList);
   }
 
   @Override
