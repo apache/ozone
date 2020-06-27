@@ -26,16 +26,19 @@ export COMPOSE_DIR
 export OZONE_VOLUME
 
 echo ===
-echo ${OZONE_VOLUME}
+mkdir -pv "${OZONE_VOLUME}"/{dn1,dn2,dn3,om,recon,s3g,scm}
+mkdir -pv "${OZONE_VOLUME}/debug"
+
+if [[ -n "${OZONE_VOLUME_OWNER}" ]]; then
+  current_user=$(whoami)
+  if [[ "${OZONE_VOLUME_OWNER}" != "${current_user}" ]]; then
+    chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}" \
+      || sudo chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}"
+  fi
+fi
+
 echo ===
-mkdir -pv ${OZONE_VOLUME}/{dn1,dn2,dn3,om,recon,s3g,scm}
-mkdir -pv ${OZONE_VOLUME}/debug
-echo ===
-df -k
-echo ===
-mount
-echo ===
-ls -la ${OZONE_VOLUME}
+ls -la "${OZONE_VOLUME}"
 echo ===
 
 # define version-specifics

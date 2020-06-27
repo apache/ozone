@@ -43,10 +43,10 @@ jobs:
         - run: sudo mv ./hadoop-ozone/dist/target/ozone-* /mnt/ozone && sudo chown runner -R /mnt/ozone
         - run: id
         - run: cd /mnt/ozone && mkdir .aws && sudo chown 1000 .aws
-        - run: cd /mnt/ozone/compose && mkdir data && sudo chown 1000 data
         - run: cd /mnt/ozone/compose && ./test-all.sh
           env:
             KEEP_IMAGE: false
+            OZONE_VOLUME_OWNER: 1000
         - uses: actions/upload-artifact@master
           if: always()
           with:
