@@ -25,9 +25,8 @@ export COMPOSE_DIR
 
 export OZONE_VOLUME
 
-echo ===
-mkdir -pv "${OZONE_VOLUME}"/{dn1,dn2,dn3,om,recon,s3g,scm}
-mkdir -pv "${OZONE_VOLUME}/debug"
+mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,om,recon,s3g,scm}
+mkdir -p "${OZONE_VOLUME}/debug"
 
 if [[ -n "${OZONE_VOLUME_OWNER}" ]]; then
   current_user=$(whoami)
@@ -36,10 +35,6 @@ if [[ -n "${OZONE_VOLUME_OWNER}" ]]; then
       || sudo chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}"
   fi
 fi
-
-echo ===
-ls -la "${OZONE_VOLUME}"
-echo ===
 
 # define version-specifics
 export OZONE_DIR=/opt/ozone
@@ -53,6 +48,8 @@ source "${COMPOSE_DIR}/../testlib.sh"
 start_docker_env
 execute_robot_test scm topology/loaddata.robot
 stop_docker_env
+
+set -x
 
 # run upgrade scripts
 SCRIPT_DIR=../../../../../dev-support/upgrade
