@@ -49,10 +49,8 @@ start_docker_env
 execute_robot_test scm topology/loaddata.robot
 stop_docker_env
 
-set -x
-
 # run upgrade scripts
-SCRIPT_DIR=../../../../../dev-support/upgrade
+SCRIPT_DIR=../../libexec/upgrade
 [[ -f "${SCRIPT_DIR}/${OZONE_UPGRADE_TO}.sh" ]] && "${SCRIPT_DIR}/${OZONE_UPGRADE_TO}.sh"
 
 # update version-specifics

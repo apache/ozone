@@ -108,6 +108,7 @@ run cp "${ROOT}/hadoop-ozone/dist/src/shell/hdds/hadoop-config.cmd" "libexec/"
 run cp "${ROOT}/hadoop-ozone/dist/src/shell/hdds/hadoop-functions.sh" "libexec/"
 run cp "${ROOT}/hadoop-ozone/dist/src/shell/ozone/ozone-config.sh" "libexec/"
 run cp -r "${ROOT}/hadoop-ozone/dist/src/shell/shellprofile.d" "libexec/"
+run cp -r "${ROOT}/hadoop-ozone/dist/src/shell/upgrade" "libexec/"
 
 
 run cp "${ROOT}/hadoop-ozone/dist/src/shell/hdds/hadoop-daemons.sh" "sbin/"
