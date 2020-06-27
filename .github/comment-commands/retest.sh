@@ -14,20 +14,62 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#doc: add new empty commit to trigger new CI build
-set +x #GITHUB_TOKEN
+#doc: provide help on how to trigger new CI build
 
-PR_URL=$(jq -r '.issue.pull_request.url' "$GITHUB_EVENT_PATH")
-read -r REPO_URL BRANCH <<<"$(curl "$PR_URL" | jq -r '.head.repo.clone_url + " " + .head.ref' | sed "s/github.com/$GITHUB_ACTOR:$GITHUB_TOKEN@github.com/g")"
+# posting a new commit from this script does not trigger CI checks
+# https://help.github.com/en/actions/reference/events-that-trigger-workflows#triggering-new-workflows-using-a-personal-access-token
 
-git fetch "$REPO_URL" "$BRANCH"
+set -eu
+
+code='```'
+
+pr_url="$(jq -r '.issue.pull_request.url' "${GITHUB_EVENT_PATH}")"
+commenter="$(jq -r '.comment.user.login' "${GITHUB_EVENT_PATH}")"
+assoc="$(jq -r '.comment.author_association' "${GITHUB_EVENT_PATH}")"
+
+curl -LSs "${pr_url}" -o pull.tmp
+source_repo="$(jq -r '.head.repo.ssh_url' pull.tmp)"
+branch="$(jq -r '.head.ref' pull.tmp)"
+pr_owner="$(jq -r '.head.user.login' pull.tmp)"
+maintainer_can_modify="$(jq -r '.maintainer_can_modify' pull.tmp)"
+
+# PR owner
+# =>
+# has local branch, can simply push
+if [[ "${commenter}" == "${pr_owner}" ]]; then
+  cat <<-EOF
+To re-run CI checks, please follow these steps with the source branch checked out:
+${code}
+git commit --allow-empty -m 'trigger new CI check'
+git push
+${code}
+EOF
+
+# member AND modification allowed by PR author
+# OR
+# repo owner
+# =>
+# include steps to fetch branch
+elif [[ "${maintainer_can_modify}" == "true" ]] && [[ "${assoc}" == "MEMBER" ]] || [[ "${assoc}" == "OWNER" ]]; then
+  cat <<-EOF
+To re-run CI checks, please follow these steps:
+${code}
+git fetch "${source_repo}" "${branch}"
 git checkout FETCH_HEAD
+git commit --allow-empty -m 'trigger new CI check'
+git push "${source_repo}" HEAD:"${branch}"
+${code}
+EOF
 
-export GIT_COMMITTER_EMAIL="noreply@github.com"
-export GIT_COMMITTER_NAME="GitHub actions"
-
-export GIT_AUTHOR_EMAIL="noreply@github.com"
-export GIT_AUTHOR_NAME="GitHub actions"
-
-git commit --allow-empty -m "empty commit to retest build" > /dev/null
-git push $REPO_URL HEAD:$BRANCH
+# other folks
+# =>
+# ping author
+else
+  cat <<-EOF
+@${pr_owner} please trigger new CI check by following these steps:
+${code}
+git commit --allow-empty -m 'trigger new CI check'
+git push
+${code}
+EOF
+fi
