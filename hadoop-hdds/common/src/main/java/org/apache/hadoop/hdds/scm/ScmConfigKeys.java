@@ -109,15 +109,7 @@ public final class ScmConfigKeys {
       "dfs.container.ratis.leader.pending.bytes.limit";
   public static final String
       DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT = "1GB";
-  
-  public static final String DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY =
-      "dfs.ratis.client.request.max.retries";
-  public static final int DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_DEFAULT = 180;
-  public static final String DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_KEY =
-      "dfs.ratis.client.request.retry.interval";
-  public static final TimeDuration
-      DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_DEFAULT =
-      TimeDuration.valueOf(1000, TimeUnit.MILLISECONDS);
+
   public static final String DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY =
       "dfs.ratis.server.retry-cache.timeout.duration";
   public static final TimeDuration

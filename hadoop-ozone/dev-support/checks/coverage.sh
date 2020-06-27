@@ -14,27 +14,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#This script can merge the downloaded jacoco files from other artifacts
-#Works only in github environment where the jacoco .exec files are downloaded
-#from job artifacts
+# This script merges the combined jacoco files (output of unit.sh and others)
+# and generates a report in HTML and XML formats
+
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-cd "$DIR/.." || exit 1
+cd "$DIR/../../.." || exit 1
 
 set -ex
 
-REPORT_DIR="$DIR/../target/coverage"
+REPORT_DIR="$DIR/../../../target/coverage"
 
 mkdir -p "$REPORT_DIR"
 
 #Install jacoco cli
-mvn org.apache.maven.plugins:maven-dependency-plugin:3.1.2:copy -Dartifact=org.jacoco:org.jacoco.cli:0.8.5:jar:nodeps
+mvn --non-recursive --no-transfer-progress \
+  org.apache.maven.plugins:maven-dependency-plugin:3.1.2:copy \
+  -Dartifact=org.jacoco:org.jacoco.cli:0.8.5:jar:nodeps
 
 jacoco() {
   java -jar target/dependency/org.jacoco.cli-0.8.5-nodeps.jar "$@"
 }
 
 #Merge all the jacoco.exec files
-jacoco merge $(find target/artifacts -name jacoco-combined.exec) --destfile "$REPORT_DIR/jacoco-all.exec"
+jacoco merge $(find target -name jacoco-combined.exec) --destfile "$REPORT_DIR/jacoco-all.exec"
 
 rm -rf target/coverage-classes || true
 mkdir -p target/coverage-classes

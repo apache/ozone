@@ -14,7 +14,10 @@
 # limitations under the License.
 name: build-branch
 on:
-  - push
+  pull_request:
+  push:
+  schedule:
+    - cron: 30 0,12 * * *
 jobs:
   build:
     name: compile
@@ -100,41 +103,63 @@ jobs:
   acceptance:
     name: acceptance
     runs-on: ubuntu-18.04
-    needs:
-      - build
     steps:
-        - uses: actions/checkout@master
-        - uses: actions/cache@v2
-          with:
+      - uses: actions/cache@v2
+        with:
+          path: ~/.m2/repository
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
+      - uses: actions/cache@v2
+        with:
             path: |
               ~/.pnpm-store
               **/node_modules
             key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
             restore-keys: |
               ${{ runner.os }}-pnpm-
-        - uses: ./.github/buildenv
-          with:
-            args: ./hadoop-ozone/dev-support/checks/build.sh
-        # remove image created for 'buildenv'
-        - run: docker image rm $(docker images -a -q | head -1) || true
-        # remove its big parent build image
-        - run: docker image rm apache/ozone-build || true
-        - run: sudo pip install robotframework
-        - run: sudo mv ./hadoop-ozone/dist/target/ozone-* /mnt/ozone && sudo chown runner -R /mnt/ozone
-        - run: cd /mnt/ozone && mkdir .aws && sudo chown 1000 .aws
-        - run: cd /mnt/ozone/compose && ./test-all.sh
-          env:
-            KEEP_IMAGE: false
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: acceptance
-            path: /mnt/ozone/compose/result
-  it-freon:
-    name: it-freon
+      - name: checkout to /mnt/ozone
+        run: |
+          sudo chmod 777 /mnt
+          git clone https://github.com/${GITHUB_REPOSITORY}.git /mnt/ozone
+          cd /mnt/ozone
+          git fetch origin "${GITHUB_REF}"
+          git checkout FETCH_HEAD
+          git reset --hard
+      - name: run a full build
+        run: |
+          cd /mnt/ozone
+          hadoop-ozone/dev-support/checks/build.sh -Pcoverage
+      - run: sudo pip install robotframework
+      - run: |
+          cd /mnt/ozone/hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
+          cd /mnt/ozone && hadoop-ozone/dev-support/checks/acceptance.sh
+        env:
+          KEEP_IMAGE: false
+          OZONE_WITH_COVERAGE: true
+      - uses: actions/upload-artifact@master
+        if: always()
+        with:
+          name: acceptance
+          path: /mnt/ozone/target/acceptance
+      - run: |
+          #Never cache local artifacts
+          rm -rf ~/.m2/repository/org/apache/hadoop/hdds
+          rm -rf ~/.m2/repository/org/apache/hadoop/ozone
+        if: always()
+  integration:
+    name: integration
     runs-on: ubuntu-18.04
     needs:
         - build
+    strategy:
+      matrix:
+        profile:
+          - client
+          - filesystem
+          - filesystem-contract
+          - freon
+          - hdds-om
+          - ozone
+      fail-fast: false
     steps:
         - run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
         - uses: actions/checkout@master
@@ -142,112 +167,18 @@ jobs:
             path: mnt/ozone
         - uses: ./mnt/ozone/.github/buildenv
           with:
-             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -Pfreon
+             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
         - uses: actions/upload-artifact@master
           if: always()
           with:
-            name: it-freon
-            path: mnt/ozone/target/integration
-  it-filesystem:
-    name: it-filesystem
-    runs-on: ubuntu-18.04
-    needs:
-        - build
-    steps:
-        - run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
-        - uses: actions/checkout@master
-          with:
-            path: mnt/ozone
-        - uses: ./mnt/ozone/.github/buildenv
-          with:
-             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -Pfilesystem
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: it-filesystem
-            path: mnt/ozone/target/integration
-  it-filesystem-contract:
-    name: it-filesystem-contract
-    runs-on: ubuntu-18.04
-    needs:
-        - build
-    steps:
-        - run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
-        - uses: actions/checkout@master
-          with:
-            path: mnt/ozone
-        - uses: ./mnt/ozone/.github/buildenv
-          with:
-             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -Pfilesystem-contract
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: it-filesystem-contract
-            path: mnt/ozone/target/integration
-  it-client:
-    name: it-client
-    runs-on: ubuntu-18.04
-    needs:
-        - build
-    steps:
-        - run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
-        - uses: actions/checkout@master
-          with:
-            path: mnt/ozone
-        - uses: ./mnt/ozone/.github/buildenv
-          with:
-             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -Pclient
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: it-client
-            path: mnt/ozone/target/integration
-  it-hdds-om:
-    name: it-hdds-om
-    runs-on: ubuntu-18.04
-    needs:
-        - build
-    steps:
-        - run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
-        - uses: actions/checkout@master
-          with:
-            path: mnt/ozone
-        - uses: ./mnt/ozone/.github/buildenv
-          with:
-             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -Phdds-om
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: it-hdds-om
-            path: mnt/ozone/target/integration
-  it-ozone:
-    name: it-ozone
-    runs-on: ubuntu-18.04
-    needs:
-        - build
-    steps:
-        - run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
-        - uses: actions/checkout@master
-          with:
-            path: mnt/ozone
-        - uses: ./mnt/ozone/.github/buildenv
-          with:
-             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -Pozone
-        - uses: actions/upload-artifact@master
-          if: always()
-          with:
-            name: it-ozone
+            name: it-${{ matrix.profile }}
             path: mnt/ozone/target/integration
   coverage:
     name: coverage
     runs-on: ubuntu-18.04
     needs:
-       - it-ozone
-       - it-hdds-om
-       - it-client
-       - it-filesystem-contract
-       - it-filesystem
-       - it-freon
+       - acceptance
+       - integration
        - unit
     steps:
        - uses: actions/checkout@v2
@@ -257,9 +188,9 @@ jobs:
        - uses: actions/download-artifact@v2
          with:
             path: target/artifacts
-       - run: ./.github/coverage-report.sh
+       - run: ./hadoop-ozone/dev-support/checks/coverage.sh
        - uses: ./.github/buildenv
-         if: github.repository == 'apache/hadoop-ozone'
+         if: github.repository == 'apache/hadoop-ozone' && github.event_name != 'pull_request'
          with:
            args: ./hadoop-ozone/dev-support/checks/sonar.sh
          env:

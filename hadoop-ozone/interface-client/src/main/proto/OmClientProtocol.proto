@@ -59,6 +59,7 @@ enum Type {
   ListKeys = 35;
   CommitKey = 36;
   AllocateBlock = 37;
+  DeleteKeys = 38;
 
   InitiateMultiPartUpload = 45;
   CommitMultiPartUpload = 46;
@@ -124,6 +125,7 @@ message OMRequest {
   optional ListKeysRequest                  listKeysRequest                = 35;
   optional CommitKeyRequest                 commitKeyRequest               = 36;
   optional AllocateBlockRequest             allocateBlockRequest           = 37;
+  optional DeleteKeysRequest                deleteKeysRequest              = 38;
 
   optional MultipartInfoInitiateRequest     initiateMultiPartUploadRequest = 45;
   optional MultipartCommitUploadPartRequest commitMultiPartUploadRequest   = 46;
@@ -195,6 +197,7 @@ message OMResponse {
   optional ListKeysResponse                  listKeysResponse              = 35;
   optional CommitKeyResponse                 commitKeyResponse             = 36;
   optional AllocateBlockResponse             allocateBlockResponse         = 37;
+  optional DeleteKeysResponse                deleteKeysResponse            = 38;
 
   optional MultipartInfoInitiateResponse   initiateMultiPartUploadResponse = 45;
   optional MultipartCommitUploadPartResponse commitMultiPartUploadResponse = 46;
@@ -346,6 +349,7 @@ message VolumeInfo {
     optional uint64 creationTime = 7;
     optional uint64 objectID = 8;
     optional uint64 updateID = 9;
+    optional uint64 modificationTime = 10;
 }
 
 /**
@@ -403,6 +407,7 @@ message SetVolumePropertyRequest {
     required string volumeName = 1;
     optional string ownerName = 2;
     optional uint64 quotaInBytes = 3;
+    optional uint64 modificationTime = 4;
 }
 
 message SetVolumePropertyResponse {
@@ -478,6 +483,7 @@ message BucketInfo {
     optional BucketEncryptionInfoProto beinfo = 8;
     optional uint64 objectID = 9;
     optional uint64 updateID = 10;
+    optional uint64 modificationTime = 11;
 }
 
 enum StorageTypeProto {
@@ -841,6 +847,10 @@ message DeleteKeyRequest {
     required KeyArgs keyArgs = 1;
 }
 
+message DeleteKeysRequest {
+    repeated KeyArgs keyArgs = 1;
+}
+
 message DeleteKeyResponse {
 
     optional KeyInfo keyInfo = 2;
@@ -854,6 +864,11 @@ message DeletedKeys {
     required string volumeName = 1;
     required string bucketName = 2;
     repeated string keys = 3;
+}
+
+message DeleteKeysResponse {
+    repeated KeyInfo deletedKeys = 1;
+    repeated KeyInfo unDeletedKeys = 2;
 }
 
 message PurgeKeysRequest {

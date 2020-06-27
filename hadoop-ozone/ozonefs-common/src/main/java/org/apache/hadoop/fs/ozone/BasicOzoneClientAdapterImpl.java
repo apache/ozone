@@ -228,6 +228,11 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     bucket.renameKey(key, newKeyName);
   }
 
+  @Override
+  public void rename(String pathStr, String newPath) throws IOException {
+    throw new IOException("Please use renameKey instead for o3fs.");
+  }
+
   /**
    * Helper method to create an directory specified by key name in bucket.
    *
@@ -261,6 +266,25 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     try {
       incrementCounter(Statistic.OBJECTS_DELETED);
       bucket.deleteKey(keyName);
+      return true;
+    } catch (IOException ioe) {
+      LOG.error("delete key failed {}", ioe.getMessage());
+      return false;
+    }
+  }
+
+  /**
+   * Helper method to delete an object specified by key name in bucket.
+   *
+   * @param keyNameList key name list to be deleted
+   * @return true if the key is deleted, false otherwise
+   */
+  @Override
+  public boolean deleteObjects(List<String> keyNameList) {
+    LOG.trace("issuing delete for key {}", keyNameList);
+    try {
+      incrementCounter(Statistic.OBJECTS_DELETED);
+      bucket.deleteKeys(keyNameList);
       return true;
     } catch (IOException ioe) {
       LOG.error("delete key failed {}", ioe.getMessage());

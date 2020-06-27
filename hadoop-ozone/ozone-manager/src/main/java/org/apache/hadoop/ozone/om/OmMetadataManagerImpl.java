@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -155,6 +156,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table transactionInfoTable;
   private boolean isRatisEnabled;
 
+  private Map<String, Table> tableMap = new HashMap<>();
+
   public OmMetadataManagerImpl(OzoneConfiguration conf) throws IOException {
 
     this.lock = new OzoneManagerLock(conf);
@@ -233,6 +236,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       LOG.error(String.format(logMessage, name));
       throw new IOException(String.format(errMsg, name));
     }
+    this.tableMap.put(name, table);
   }
 
   /**
@@ -1056,6 +1060,25 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    */
   protected void setStore(DBStore store) {
     this.store = store;
+  }
+
+  @Override
+  public Map<String, Table> listTables() {
+    return tableMap;
+  }
+
+  @Override
+  public Table getTable(String tableName) {
+    Table table = tableMap.get(tableName);
+    if (table == null) {
+      throw  new IllegalArgumentException("Unknown table " + tableName);
+    }
+    return table;
+  }
+
+  @Override
+  public Set<String> listTableNames() {
+    return tableMap.keySet();
   }
 
 }
