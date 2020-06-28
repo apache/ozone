@@ -48,6 +48,7 @@ jobs:
           with:
             name: rat
             path: target/rat
+          continue-on-error: true
   author:
     name: author
     runs-on: ubuntu-18.04
@@ -61,6 +62,7 @@ jobs:
           with:
             name: author
             path: target/author
+          continue-on-error: true
   unit:
     name: unit
     runs-on: ubuntu-18.04
@@ -74,6 +76,7 @@ jobs:
           with:
             name: unit
             path: target/unit
+          continue-on-error: true
   checkstyle:
     name: checkstyle
     runs-on: ubuntu-18.04
@@ -87,6 +90,7 @@ jobs:
           with:
             name: checkstyle
             path: target/checkstyle
+          continue-on-error: true
   findbugs:
     name: findbugs
     runs-on: ubuntu-18.04
@@ -100,6 +104,7 @@ jobs:
           with:
             name: findbugs
             path: target/findbugs
+          continue-on-error: true
   acceptance:
     name: acceptance
     runs-on: ubuntu-18.04
@@ -140,6 +145,7 @@ jobs:
         with:
           name: acceptance
           path: /mnt/ozone/target/acceptance
+        continue-on-error: true
       - run: |
           #Never cache local artifacts
           rm -rf ~/.m2/repository/org/apache/hadoop/hdds
@@ -173,6 +179,7 @@ jobs:
           with:
             name: it-${{ matrix.profile }}
             path: mnt/ozone/target/integration
+          continue-on-error: true
   coverage:
     name: coverage
     runs-on: ubuntu-18.04
@@ -206,3 +213,4 @@ jobs:
          with:
            name: coverage
            path: target/coverage
+         continue-on-error: true
