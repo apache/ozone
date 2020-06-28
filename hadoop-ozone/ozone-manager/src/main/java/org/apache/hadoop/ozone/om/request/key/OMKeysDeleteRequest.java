@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -117,10 +118,14 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         getOmRequest());
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     try {
-      for (KeyArgs deleteKeyArgs : deleteKeyArgsList) {
-        volumeName = deleteKeyArgs.getVolumeName();
-        bucketName = deleteKeyArgs.getBucketName();
-        keyName = deleteKeyArgs.getKeyName();
+      List<KeyArgs> updatedArgsList = new ArrayList<>(deleteKeyArgsList.size());
+      for (KeyArgs keyArgs : deleteKeyArgsList) {
+        ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs);
+        keyArgs = bucket.update(keyArgs);
+        updatedArgsList.add(keyArgs);
+        volumeName = keyArgs.getVolumeName();
+        bucketName = keyArgs.getBucketName();
+        keyName = keyArgs.getKeyName();
         String objectKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
             keyName);
         OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(objectKey);
@@ -130,10 +135,11 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
       // Check if any of the key in the batch cannot be deleted. If exists the
       // batch will delete failed.
-      for (KeyArgs deleteKeyArgs : deleteKeyArgsList) {
+      for (KeyArgs deleteKeyArgs : updatedArgsList) {
         volumeName = deleteKeyArgs.getVolumeName();
         bucketName = deleteKeyArgs.getBucketName();
         keyName = deleteKeyArgs.getKeyName();
+        // TODO fix audit
         auditMap = buildKeyArgsAuditMap(deleteKeyArgs);
         // check Acl
         checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
