@@ -37,7 +37,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-thirdparty-misc</artifactId>
-      <version>${ratis.thirdpary.version}</version>
+      <version>${ratis.thirdparty.version}</version>
     </dependency>
     <dependency>
       <groupId>javax.annotation</groupId>
