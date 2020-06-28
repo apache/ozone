@@ -91,10 +91,7 @@ public class OneReplicaPipelineSafeModeRule extends
 
   @Override
   protected boolean validate() {
-    if (currentReportedPipelineCount >= thresholdCount) {
-      return true;
-    }
-    return false;
+    return currentReportedPipelineCount >= thresholdCount;
   }
 
   @Override
