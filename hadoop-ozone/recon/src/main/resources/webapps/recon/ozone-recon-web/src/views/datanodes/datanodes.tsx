@@ -59,7 +59,7 @@ interface IDatanode {
   leaderCount: number;
   uuid: string;
   version: string;
-  setupTime: string;
+  setupTime: number;
 }
 
 interface IPipeline {
@@ -180,7 +180,10 @@ const COLUMNS = [
     title: 'SetupTime',
     dataIndex: 'setupTime',
     key: 'setupTime',
-    sorter: (a: IDatanode, b: IDatanode) => a.setupTime - b.setupTime
+    sorter: (a: IDatanode, b: IDatanode) => a.setupTime - b.setupTime,
+    render:(uptime: number) => {
+      return uptime > 0 ? moment(uptime).format('lll') : 'NA';
+    }
   }
 ];
 

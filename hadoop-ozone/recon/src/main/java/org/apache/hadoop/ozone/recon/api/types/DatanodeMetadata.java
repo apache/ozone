@@ -59,7 +59,7 @@ public final class DatanodeMetadata {
   private String version;
 
   @XmlElement(name = "setupTime")
-  private String setupTime;
+  private long setupTime;
 
   private DatanodeMetadata(Builder builder) {
     this.hostname = builder.hostname;
@@ -110,7 +110,7 @@ public final class DatanodeMetadata {
     return version;
   }
 
-  public String getSetupTime() {
+  public long getSetupTime() {
     return  setupTime;
   }
 
@@ -137,7 +137,7 @@ public final class DatanodeMetadata {
     private int containers;
     private int leaderCount;
     private String version;
-    private String setupTime;
+    private long setupTime;
 
     public Builder() {
       this.containers = 0;
@@ -190,7 +190,7 @@ public final class DatanodeMetadata {
       return this;
     }
 
-    public Builder withSetupTime(String setupTime) {
+    public Builder withSetupTime(long setupTime) {
       this.setupTime = setupTime;
       return this;
     }

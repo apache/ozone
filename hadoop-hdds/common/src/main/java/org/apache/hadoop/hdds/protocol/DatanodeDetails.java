@@ -50,7 +50,7 @@ public class DatanodeDetails extends NodeImpl implements
   private List<Port> ports;
   private String certSerialId;
   private String version;
-  private String setupTime;
+  private long setupTime;
 
   /**
    * Constructs DatanodeDetails instance. DatanodeDetails.Builder is used
@@ -64,9 +64,10 @@ public class DatanodeDetails extends NodeImpl implements
    * @param version DataNode's version
    * @param setupTime the setup time of DataNode
    */
-  private DatanodeDetails(UUID uuid, String ipAddress, String hostName,
+  @SuppressWarnings("parameternumber")
+  private DatanodeDetails(String uuid, String ipAddress, String hostName,
       String networkLocation, List<Port> ports, String certSerialId,
-      String version, String setupTime) {
+      String version, long setupTime) {
     super(hostName, networkLocation, NetConstants.NODE_COST_DEFAULT);
     this.uuid = uuid;
     this.ipAddress = ipAddress;
@@ -267,9 +268,7 @@ public class DatanodeDetails extends NodeImpl implements
       builder.setVersion(getVersion());
     }
 
-    if (!Strings.isNullOrEmpty(getSetupTime())) {
-      builder.setSetupTime(getSetupTime());
-    }
+    builder.setSetupTime(getSetupTime());
 
     return builder.build();
   }
@@ -324,7 +323,7 @@ public class DatanodeDetails extends NodeImpl implements
     private List<Port> ports;
     private String certSerialId;
     private String version;
-    private String setupTime;
+    private long setupTime;
 
     /**
      * Default private constructor. To create Builder instance use
@@ -416,24 +415,24 @@ public class DatanodeDetails extends NodeImpl implements
     /**
      * Sets the DataNode version.
      *
-     * @param version the version of DataNode.
+     * @param ver the version of DataNode.
      *
      * @return DatanodeDetails.Builder
      */
-    public Builder setVersion(String version) {
-      this.version = version;
+    public Builder setVersion(String ver) {
+      this.version = ver;
       return this;
     }
 
     /**
      * Sets the DataNode setup time.
      *
-     * @param setupTime the setupt time of DataNode.
+     * @param time the setup time of DataNode.
      *
      * @return DatanodeDetails.Builder
      */
-    public Builder setSetupTime(String setupTime) {
-      this.setupTime = setupTime;
+    public Builder setSetupTime(long time) {
+      this.setupTime = time;
       return this;
     }
 
@@ -578,7 +577,7 @@ public class DatanodeDetails extends NodeImpl implements
    *
    * @return DataNode setup time
    */
-  public String getSetupTime() {
+  public long getSetupTime() {
     return setupTime;
   }
 
@@ -587,7 +586,7 @@ public class DatanodeDetails extends NodeImpl implements
    *
    * @param setupTime DataNode setup time
    */
-  public void setSetupTime(String setupTime) {
+  public void setSetupTime(long setupTime) {
     this.setupTime = setupTime;
   }
 }
