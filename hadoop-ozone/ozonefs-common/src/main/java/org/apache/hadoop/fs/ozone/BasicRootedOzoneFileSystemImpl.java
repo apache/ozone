@@ -442,7 +442,6 @@ public class BasicRootedOzoneFileSystemImpl {
    * @param pathList key name list to be deleted
    * @return true if the key is deleted, false otherwise
    */
-  @Override
   public boolean deleteObjects(List<String> pathList) {
     // TODO: we will support deleteObjects in ofs.
     LOG.error("ofs currently does not support deleteObjects");
