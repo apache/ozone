@@ -45,7 +45,9 @@ import org.apache.hadoop.test.GenericTestUtils;
 
 import org.apache.commons.io.IOUtils;
 
+import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -163,6 +165,7 @@ public class TestOzoneFileSystem {
     testOzoneFsServiceLoader();
     o3fs = (OzoneFileSystem) fs;
 
+    testGetTrashRoot();
     testGetDirectoryModificationTime();
 
     testListStatusOnRoot();
@@ -560,5 +563,23 @@ public class TestOzoneFileSystem {
       fileStatuses = o3fs.listStatus(mdir1);
       assertTrue(modificationTime <= fileStatuses[0].getModificationTime());
     }
+  }
+
+  public void testGetTrashRoot() {
+    Path expectedTrashRoot = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
+    // Input path doesn't matter, only thing o3fs.getTrashRoot cares about is
+    //  env user.name
+    Path inPath1 = new Path("o3fs://bucket2.volume1/path/to/key");
+    // Test with current user
+    Path outPath1 = o3fs.getTrashRoot(inPath1);
+    Path expectedOutPath1 = new Path(
+        expectedTrashRoot, System.getProperty("user.name"));
+    Assert.assertEquals(expectedOutPath1, outPath1);
+    // Test with testuser1
+    System.setProperty("user.name", "testuser1");
+    Path outPath2 = o3fs.getTrashRoot(inPath1);
+    Path expectedOutPath2 = new Path(
+        expectedTrashRoot, System.getProperty("user.name"));
+    Assert.assertEquals(expectedOutPath2, outPath2);
   }
 }
