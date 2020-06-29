@@ -25,7 +25,6 @@ import java.util.List;
 
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
@@ -46,9 +45,6 @@ public interface OzoneClientAdapter {
       boolean overWrite, boolean recursive) throws IOException;
 
   void renameKey(String key, String newKeyName) throws IOException;
-
-  // Users should use rename instead of renameKey in OFS.
-  void rename(String pathStr, String newPath) throws IOException;
 
   boolean createDirectory(String keyName) throws IOException;
 
