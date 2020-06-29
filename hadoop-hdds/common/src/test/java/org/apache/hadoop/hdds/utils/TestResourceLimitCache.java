@@ -20,7 +20,11 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Test for ResourceLimitCache.
@@ -71,7 +75,7 @@ public class TestResourceLimitCache {
       } catch (InterruptedException e) {
         return null;
       }
-    });
+    },pool);
     Assert.assertTrue(!future.isDone());
     Thread.sleep(100);
     Assert.assertTrue(!future.isDone());
