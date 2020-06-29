@@ -634,7 +634,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     try {
       if (!allUsers) {
         Path userTrash = new Path(trashRoot, userName);
-        if (exists(userTrash)) {
+        if (exists(userTrash) && getFileStatus(userTrash).isDirectory()) {
           ret.add(getFileStatus(userTrash));
         }
       } else {
