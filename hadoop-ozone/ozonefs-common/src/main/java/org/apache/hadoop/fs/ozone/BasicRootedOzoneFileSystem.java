@@ -86,7 +86,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   private String userName;
   private Path workingDir;
   // Using impl directly rather than OzoneClientAdapter in OFS.
-  private BasicRootedOzoneClientAdapterImpl impl;
+  private BasicRootedOzoneFileSystemImpl impl;
 
   private static final String URI_EXCEPTION_TEXT =
       "URL should be one of the following formats: " +
@@ -137,7 +137,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       } else {
         source = new LegacyHadoopConfigurationSource(conf);
       }
-      this.impl = new BasicRootedOzoneClientAdapterImpl(
+      this.impl = new BasicRootedOzoneFileSystemImpl(
           omHostOrServiceId, omPort, source);
 
       try {
@@ -820,7 +820,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
   }
 
-  public BasicRootedOzoneClientAdapterImpl getImpl() {
+  public BasicRootedOzoneFileSystemImpl getImpl() {
     return impl;
   }
 

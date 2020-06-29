@@ -82,7 +82,7 @@ public class TestRootedOzoneFileSystem {
   private FileSystem fs;
   private RootedOzoneFileSystem ofs;
   private ObjectStore objectStore;
-  private static BasicRootedOzoneClientAdapterImpl impl;
+  private static BasicRootedOzoneFileSystemImpl impl;
 
   private String volumeName;
   private String bucketName;

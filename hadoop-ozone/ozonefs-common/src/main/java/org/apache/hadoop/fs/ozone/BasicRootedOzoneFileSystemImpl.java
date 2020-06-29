@@ -83,10 +83,10 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
  * <p>
  * For full featured version use RootedOzoneClientAdapterImpl.
  */
-public class BasicRootedOzoneClientAdapterImpl {
+public class BasicRootedOzoneFileSystemImpl {
 
   static final Logger LOG =
-      LoggerFactory.getLogger(BasicRootedOzoneClientAdapterImpl.class);
+      LoggerFactory.getLogger(BasicRootedOzoneFileSystemImpl.class);
 
   private ClientProtocol proxy;
   private ReplicationType replicationType;
@@ -99,7 +99,7 @@ public class BasicRootedOzoneClientAdapterImpl {
    *
    * @throws IOException In case of a problem.
    */
-  public BasicRootedOzoneClientAdapterImpl() throws IOException {
+  public BasicRootedOzoneFileSystemImpl() throws IOException {
     this(createConf());
   }
 
@@ -114,12 +114,12 @@ public class BasicRootedOzoneClientAdapterImpl {
     }
   }
 
-  public BasicRootedOzoneClientAdapterImpl(OzoneConfiguration conf)
+  public BasicRootedOzoneFileSystemImpl(OzoneConfiguration conf)
       throws IOException {
     this(null, -1, conf);
   }
 
-  public BasicRootedOzoneClientAdapterImpl(String omHost, int omPort,
+  public BasicRootedOzoneFileSystemImpl(String omHost, int omPort,
       ConfigurationSource hadoopConf) throws IOException {
 
     ClassLoader contextClassLoader =
