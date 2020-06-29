@@ -50,6 +50,7 @@ services:
       - docker-config
     ports:
       - 9876:9876
+      - 9860:9860
     environment:
       ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
       HADOOP_OPTS: ${HADOOP_OPTS}

@@ -43,6 +43,7 @@ services:
          - ../..:/opt/hadoop
       ports:
          - 9876:9876
+         - 9860:9860
       env_file:
           - ./docker-config
       environment:
