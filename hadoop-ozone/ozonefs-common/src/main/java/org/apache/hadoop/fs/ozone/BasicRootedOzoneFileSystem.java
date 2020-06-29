@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -890,7 +889,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
   }
 
-  public OzoneClientAdapter getImpl() {
+  public BasicRootedOzoneClientAdapterImpl getImpl() {
     return impl;
   }
 
