@@ -117,28 +117,47 @@ public final class ContainerCache extends LRUMap {
       throws IOException {
     Preconditions.checkState(containerID >= 0,
         "Container ID cannot be negative.");
+    ReferenceCountedDB db;
     lock.lock();
     try {
-      ReferenceCountedDB db = (ReferenceCountedDB) this.get(containerDBPath);
-
-      if (db == null) {
-        MetadataStore metadataStore =
-            MetadataStoreBuilder.newBuilder()
-            .setDbFile(new File(containerDBPath))
-            .setCreateIfMissing(false)
-            .setConf(conf)
-            .setDBType(containerDBType)
-            .build();
-        db = new ReferenceCountedDB(metadataStore, containerDBPath);
-        this.put(containerDBPath, db);
+      db = (ReferenceCountedDB) this.get(containerDBPath);
+      if (db != null) {
+        db.incrementReference();
+        return db;
       }
-      // increment the reference before returning the object
-      db.incrementReference();
-      return db;
+    } finally {
+      lock.unlock();
+    }
+
+    try {
+      MetadataStore metadataStore =
+          MetadataStoreBuilder.newBuilder()
+              .setDbFile(new File(containerDBPath))
+              .setCreateIfMissing(false)
+              .setConf(conf)
+              .setDBType(containerDBType)
+              .build();
+      db = new ReferenceCountedDB(metadataStore, containerDBPath);
     } catch (Exception e) {
       LOG.error("Error opening DB. Container:{} ContainerPath:{}",
           containerID, containerDBPath, e);
       throw e;
+    }
+
+    lock.lock();
+    try {
+      ReferenceCountedDB currentDB =
+          (ReferenceCountedDB) this.get(containerDBPath);
+      if (currentDB != null) {
+        // increment the reference before returning the object
+        currentDB.incrementReference();
+        return currentDB;
+      } else {
+        this.put(containerDBPath, db);
+        // increment the reference before returning the object
+        db.incrementReference();
+        return db;
+      }
     } finally {
       lock.unlock();
     }

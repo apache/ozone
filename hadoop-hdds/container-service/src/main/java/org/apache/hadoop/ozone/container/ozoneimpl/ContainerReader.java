@@ -120,6 +120,7 @@ public class ContainerReader implements Runnable {
       return;
     }
 
+    LOG.info("Start to verify containers on volume {}", hddsVolumeRootDir);
     for (File scmLoc : scmDir) {
       File currentDir = new File(scmLoc, Storage.STORAGE_DIR_CURRENT);
       File[] containerTopDirs = currentDir.listFiles();
@@ -144,6 +145,7 @@ public class ContainerReader implements Runnable {
         }
       }
     }
+    LOG.info("Finish verifying containers on volume {}", hddsVolumeRootDir);
   }
 
   private void verifyContainerFile(long containerID, File containerFile) {
