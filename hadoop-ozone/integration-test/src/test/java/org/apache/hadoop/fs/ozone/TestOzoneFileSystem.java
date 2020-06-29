@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.ozone;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
 import java.util.TreeSet;
@@ -166,6 +167,7 @@ public class TestOzoneFileSystem {
     testOzoneFsServiceLoader();
     o3fs = (OzoneFileSystem) fs;
 
+    testGetTrashRoots();
     testGetTrashRoot();
     testGetDirectoryModificationTime();
 
@@ -575,5 +577,41 @@ public class TestOzoneFileSystem {
     Path outPath1 = o3fs.getTrashRoot(inPath1);
     Path expectedOutPath1 = new Path(trashRoot, username);
     Assert.assertEquals(expectedOutPath1, outPath1);
+  }
+
+  public void testGetTrashRoots() throws IOException {
+    String username = UserGroupInformation.getCurrentUser().getShortUserName();
+    Path trashRoot = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
+    Path userTrash = new Path(trashRoot, username);
+
+    Collection<FileStatus> res = o3fs.getTrashRoots(false);
+    Assert.assertEquals(0, res.size());
+
+    fs.mkdirs(userTrash);
+    res = o3fs.getTrashRoots(false);
+    Assert.assertEquals(1, res.size());
+    res.forEach(e -> Assert.assertEquals(
+        userTrash.toString(), e.getPath().toUri().getPath()));
+    // Only have one user trash for now
+    res = o3fs.getTrashRoots(true);
+    Assert.assertEquals(1, res.size());
+
+    // Create a few more random user trash dir
+    for (int i = 1; i <= 5; i++) {
+      Path moreUserTrash = new Path(trashRoot, "trashuser" + i);
+      fs.mkdirs(moreUserTrash);
+    }
+
+    // And create a file, which should be ignored
+    fs.create(new Path(trashRoot, "trashuser99"));
+
+    // allUsers = false should still return current user trash
+    res = o3fs.getTrashRoots(false);
+    Assert.assertEquals(1, res.size());
+    res.forEach(e -> Assert.assertEquals(
+        userTrash.toString(), e.getPath().toUri().getPath()));
+    // allUsers = true should return all user trash
+    res = o3fs.getTrashRoots(true);
+    Assert.assertEquals(6, res.size());
   }
 }
