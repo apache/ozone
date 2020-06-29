@@ -566,21 +566,14 @@ public class TestOzoneFileSystem {
     }
   }
 
-  public void testGetTrashRoot() {
-    UserGroupInformation ugi;
-    try {
-      ugi = UserGroupInformation.getCurrentUser();
-    } catch (IOException ex) {
-      throw new RuntimeException("Can't get current UGI.", ex);
-    }
-    String username = ugi.getShortUserName();
-    Path expectedTrashRoot = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
+  public void testGetTrashRoot() throws IOException {
+    String username = UserGroupInformation.getCurrentUser().getShortUserName();
+    Path trashRoot = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
     // Input path doesn't matter, o3fs.getTrashRoot() only cares about username
     Path inPath1 = new Path("o3fs://bucket2.volume1/path/to/key");
     // Test with current user
     Path outPath1 = o3fs.getTrashRoot(inPath1);
-    Path expectedOutPath1 = new Path(
-        expectedTrashRoot, username);
+    Path expectedOutPath1 = new Path(trashRoot, username);
     Assert.assertEquals(expectedOutPath1, outPath1);
   }
 }
