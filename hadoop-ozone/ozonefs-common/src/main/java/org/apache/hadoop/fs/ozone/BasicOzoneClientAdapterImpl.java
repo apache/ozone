@@ -338,11 +338,6 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
-  public ClientProtocol getClientProtocol() {
-    return objectStore.getClientProxy();
-  }
-
-  @Override
   public Token<OzoneTokenIdentifier> getDelegationToken(String renewer)
       throws IOException {
     if (!securityEnabled) {

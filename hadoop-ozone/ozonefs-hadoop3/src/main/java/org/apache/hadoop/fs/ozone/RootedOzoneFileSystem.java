@@ -20,7 +20,6 @@ package org.apache.hadoop.fs.ozone;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderTokenIssuer;
 import org.apache.hadoop.fs.FileSystem;
@@ -51,12 +50,12 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
 
   @Override
   public KeyProvider getKeyProvider() throws IOException {
-    return getAdapter().getKeyProvider();
+    return getImpl().getKeyProvider();
   }
 
   @Override
   public URI getKeyProviderUri() throws IOException {
-    return getAdapter().getKeyProviderUri();
+    return getImpl().getKeyProviderUri();
   }
 
   @Override
@@ -84,12 +83,5 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
     if (storageStatistics != null) {
       storageStatistics.incrementCounter(statistic, count);
     }
-  }
-
-  @Override
-  protected OzoneClientAdapter createAdapter(ConfigurationSource conf,
-      String omHost, int omPort) throws IOException {
-    return new RootedOzoneClientAdapterImpl(omHost, omPort, conf,
-        storageStatistics);
   }
 }

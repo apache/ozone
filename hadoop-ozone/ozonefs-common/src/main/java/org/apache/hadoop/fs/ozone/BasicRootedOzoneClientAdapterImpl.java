@@ -752,11 +752,6 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   @Override
-  public ClientProtocol getClientProtocol() {
-    return proxy;
-  }
-
-  @Override
   public Token<OzoneTokenIdentifier> getDelegationToken(String renewer)
       throws IOException {
     if (!securityEnabled) {
@@ -782,6 +777,14 @@ public class BasicRootedOzoneClientAdapterImpl
   @Override
   public String getCanonicalServiceName() {
     return proxy.getCanonicalServiceName();
+  }
+
+  public OzoneVolume getVolumeDetails(String volumeName) throws IOException {
+    return proxy.getVolumeDetails(volumeName);
+  }
+
+  public void deleteVolume(String volumeName) throws IOException {
+    proxy.deleteVolume(volumeName);
   }
 
   /**
