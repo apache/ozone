@@ -82,7 +82,7 @@ public class TestRootedOzoneFileSystem {
   private FileSystem fs;
   private RootedOzoneFileSystem ofs;
   private ObjectStore objectStore;
-  private static BasicRootedOzoneClientAdapterImpl adapter;
+  private static BasicRootedOzoneClientAdapterImpl impl;
 
   private String volumeName;
   private String bucketName;
@@ -115,7 +115,7 @@ public class TestRootedOzoneFileSystem {
     // fs.ofs.impl should be loaded from META-INF, no need to explicitly set it
     fs = FileSystem.get(conf);
     ofs = (RootedOzoneFileSystem) fs;
-    adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
+    impl = ofs.getImpl();
   }
 
   @After
@@ -581,7 +581,7 @@ public class TestRootedOzoneFileSystem {
    */
   private List<FileStatus> callAdapterListStatus(String pathStr,
       boolean recursive, String startPath, long numEntries) throws IOException {
-    return adapter.listStatus(pathStr, recursive, startPath, numEntries,
+    return impl.listStatus(pathStr, recursive, startPath, numEntries,
         ofs.getUri(), ofs.getWorkingDirectory(), ofs.getUsername())
         .stream().map(ofs::convertFileStatus).collect(Collectors.toList());
   }
