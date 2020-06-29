@@ -75,7 +75,7 @@ public class TestResourceLimitCache {
       } catch (InterruptedException e) {
         return null;
       }
-    },pool);
+    }, pool);
     Assert.assertTrue(!future.isDone());
     Thread.sleep(100);
     Assert.assertTrue(!future.isDone());
