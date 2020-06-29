@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import org.apache.commons.io.IOUtils;
@@ -566,20 +567,20 @@ public class TestOzoneFileSystem {
   }
 
   public void testGetTrashRoot() {
+    UserGroupInformation ugi;
+    try {
+      ugi = UserGroupInformation.getCurrentUser();
+    } catch (IOException ex) {
+      throw new RuntimeException("Can't get current UGI.", ex);
+    }
+    String username = ugi.getShortUserName();
     Path expectedTrashRoot = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
-    // Input path doesn't matter, only thing o3fs.getTrashRoot cares about is
-    //  env user.name
+    // Input path doesn't matter, o3fs.getTrashRoot() only cares about username
     Path inPath1 = new Path("o3fs://bucket2.volume1/path/to/key");
     // Test with current user
     Path outPath1 = o3fs.getTrashRoot(inPath1);
     Path expectedOutPath1 = new Path(
-        expectedTrashRoot, System.getProperty("user.name"));
+        expectedTrashRoot, username);
     Assert.assertEquals(expectedOutPath1, outPath1);
-    // Test with testuser1
-    System.setProperty("user.name", "testuser1");
-    Path outPath2 = o3fs.getTrashRoot(inPath1);
-    Path expectedOutPath2 = new Path(
-        expectedTrashRoot, System.getProperty("user.name"));
-    Assert.assertEquals(expectedOutPath2, outPath2);
   }
 }
