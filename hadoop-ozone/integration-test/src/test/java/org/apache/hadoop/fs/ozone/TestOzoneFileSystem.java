@@ -613,5 +613,8 @@ public class TestOzoneFileSystem {
     // allUsers = true should return all user trash
     res = o3fs.getTrashRoots(true);
     Assert.assertEquals(6, res.size());
+
+    // Clean up
+    o3fs.delete(trashRoot, true);
   }
 }
