@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.container.common.utils;
 import com.google.common.base.Preconditions;
 
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.apache.hadoop.hdds.utils.MetadataStore;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,10 +39,10 @@ public class ReferenceCountedDB implements Closeable {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReferenceCountedDB.class);
   private final AtomicInteger referenceCount;
-  private final MetadataStore store;
+  private final DBStore store;
   private final String containerDBPath;
 
-  public ReferenceCountedDB(MetadataStore store, String containerDBPath) {
+  public ReferenceCountedDB(DBStore store, String containerDBPath) {
     this.referenceCount = new AtomicInteger(0);
     this.store = store;
     this.containerDBPath = containerDBPath;
@@ -87,7 +87,7 @@ public class ReferenceCountedDB implements Closeable {
     }
   }
 
-  public MetadataStore getStore() {
+  public DBStore getStore() {
     return store;
   }
 
