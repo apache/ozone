@@ -83,8 +83,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
  * <p>
  * For full featured version use RootedOzoneClientAdapterImpl.
  */
-public class BasicRootedOzoneClientAdapterImpl
-    implements OzoneClientAdapter {
+public class BasicRootedOzoneClientAdapterImpl {
 
   static final Logger LOG =
       LoggerFactory.getLogger(BasicRootedOzoneClientAdapterImpl.class);
@@ -264,17 +263,14 @@ public class BasicRootedOzoneClientAdapterImpl
     return bucket;
   }
 
-  @Override
   public short getDefaultReplication() {
     return (short) replicationFactor.getValue();
   }
 
-  @Override
   public void close() throws IOException {
     proxy.close();
   }
 
-  @Override
   public InputStream readFile(String pathStr) throws IOException {
     incrementCounter(Statistic.OBJECTS_READ);
     OFSPath ofsPath = new OFSPath(pathStr);
@@ -297,7 +293,6 @@ public class BasicRootedOzoneClientAdapterImpl
     //noop: Use OzoneClientAdapterImpl which supports statistics.
   }
 
-  @Override
   public OzoneFSOutputStream createFile(String pathStr, short replication,
       boolean overWrite, boolean recursive) throws IOException {
     incrementCounter(Statistic.OBJECTS_CREATED);
@@ -332,11 +327,6 @@ public class BasicRootedOzoneClientAdapterImpl
     }
   }
 
-  @Override
-  public void renameKey(String key, String newKeyName) throws IOException {
-    throw new IOException("OFS doesn't support renameKey, use rename instead.");
-  }
-
   /**
    * Rename a path into another.
    *
@@ -348,7 +338,6 @@ public class BasicRootedOzoneClientAdapterImpl
    * @param newPath Target path
    * @throws IOException
    */
-  @Override
   public void rename(String path, String newPath) throws IOException {
     incrementCounter(Statistic.OBJECTS_RENAMED);
     OFSPath ofsPath = new OFSPath(path);
@@ -391,7 +380,6 @@ public class BasicRootedOzoneClientAdapterImpl
    * @param pathStr path to be created as directory
    * @return true if the key is created, false otherwise
    */
-  @Override
   public boolean createDirectory(String pathStr) throws IOException {
     LOG.trace("creating dir for path: {}", pathStr);
     incrementCounter(Statistic.OBJECTS_CREATED);
@@ -430,7 +418,6 @@ public class BasicRootedOzoneClientAdapterImpl
    * @param path path to a key to be deleted
    * @return true if the key is deleted, false otherwise
    */
-  @Override
   public boolean deleteObject(String path) {
     LOG.trace("issuing delete for path to key: {}", path);
     incrementCounter(Statistic.OBJECTS_DELETED);
@@ -512,7 +499,6 @@ public class BasicRootedOzoneClientAdapterImpl
     }
   }
 
-  @Override
   public Iterator<BasicKeyInfo> listKeys(String pathStr) {
     incrementCounter(Statistic.OBJECTS_LIST);
     OFSPath ofsPath = new OFSPath(pathStr);
@@ -653,7 +639,6 @@ public class BasicRootedOzoneClientAdapterImpl
     }
   }
 
-  @Override
   public Token<OzoneTokenIdentifier> getDelegationToken(String renewer)
       throws IOException {
     if (!securityEnabled) {
@@ -666,17 +651,14 @@ public class BasicRootedOzoneClientAdapterImpl
 
   }
 
-  @Override
   public KeyProvider getKeyProvider() throws IOException {
     return proxy.getKeyProvider();
   }
 
-  @Override
   public URI getKeyProviderUri() throws IOException {
     return proxy.getKeyProviderUri();
   }
 
-  @Override
   public String getCanonicalServiceName() {
     return proxy.getCanonicalServiceName();
   }
