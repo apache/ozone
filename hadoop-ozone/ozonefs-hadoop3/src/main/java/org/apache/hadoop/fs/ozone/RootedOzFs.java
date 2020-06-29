@@ -38,7 +38,7 @@ public class RootedOzFs extends DelegateToFileSystem {
 
   public RootedOzFs(URI theUri, Configuration conf)
       throws IOException, URISyntaxException {
-    super(theUri, new OzoneFileSystem(), conf,
+    super(theUri, new RootedOzoneFileSystem(), conf,
         OzoneConsts.OZONE_OFS_URI_SCHEME, false);
   }
 }
