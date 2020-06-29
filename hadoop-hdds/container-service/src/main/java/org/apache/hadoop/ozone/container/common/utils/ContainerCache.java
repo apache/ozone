@@ -20,17 +20,21 @@ package org.apache.hadoop.ozone.container.common.utils;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.MetadataStore;
 import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.collections.MapIterator;
 import org.apache.commons.collections.map.LRUMap;
+import org.rocksdb.DBOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -122,14 +126,16 @@ public final class ContainerCache extends LRUMap {
       ReferenceCountedDB db = (ReferenceCountedDB) this.get(containerDBPath);
 
       if (db == null) {
-        MetadataStore metadataStore =
-            MetadataStoreBuilder.newBuilder()
-            .setDbFile(new File(containerDBPath))
-            .setCreateIfMissing(false)
-            .setConf(conf)
-            .setDBType(containerDBType)
-            .build();
-        db = new ReferenceCountedDB(metadataStore, containerDBPath);
+        // TODO : Add support for creating LevelDB Stores in DBStoreBuilder.
+        //  Use the containerDBType param (RocksDB or LevelDB) to determine the type.
+        DBOptions options = new DBOptions();
+        options.setCreateIfMissing(true);
+        DBStore store = DBStoreBuilder.newBuilder(conf)
+                .setPath(Paths.get(containerDBPath))
+                .setDBOption(options)
+                .build();
+
+        db = new ReferenceCountedDB(store, containerDBPath);
         this.put(containerDBPath, db);
       }
       // increment the reference before returning the object
