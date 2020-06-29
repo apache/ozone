@@ -62,8 +62,6 @@ public interface OzoneClientAdapter {
       String startKey, long numEntries, URI uri,
       Path workingDir, String username) throws IOException;
 
-  ClientProtocol getClientProtocol();
-
   Token<OzoneTokenIdentifier> getDelegationToken(String renewer)
       throws IOException;
 
