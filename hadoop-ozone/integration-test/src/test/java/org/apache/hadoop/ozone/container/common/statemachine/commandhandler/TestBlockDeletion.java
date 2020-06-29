@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
@@ -114,6 +115,12 @@ public class TestBlockDeletion {
     conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
+
+    conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
+        + ".client.request.write.timeout", 30, TimeUnit.SECONDS);
+    conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
+        + ".client.request.watch.timeout", 30, TimeUnit.SECONDS);
+
     conf.setQuietMode(false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
@@ -164,7 +171,16 @@ public class TestBlockDeletion {
         om.lookupKey(keyArgs).getKeyLocationVersions();
 
     // verify key blocks were created in DN.
-    verifyBlocksCreated(omKeyLocationInfoGroupList);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        verifyBlocksCreated(omKeyLocationInfoGroupList);
+        return true;
+      } catch (Throwable t) {
+        LOG.warn("Verify blocks creation failed", t);
+        return false;
+      }
+    }, 1000, 10000);
+
     // No containers with deleted blocks
     Assert.assertTrue(containerIdsWithDeletedBlocks.isEmpty());
     // Delete transactionIds for the containers should be 0.
@@ -230,7 +246,7 @@ public class TestBlockDeletion {
         LOG.warn("Container closing failed", t);
         return false;
       }
-    }, 500, 30000);
+    }, 500, 10000);
   }
 
   private void verifyTransactionsCommitted() throws IOException {
@@ -310,17 +326,19 @@ public class TestBlockDeletion {
 
   private void verifyBlocksCreated(
       List<OmKeyLocationInfoGroup> omKeyLocationInfoGroups) throws Exception {
-    ContainerSet dnContainerSet =
-        cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
-            .getContainer().getContainerSet();
-    OzoneTestUtils.performOperationOnKeyContainers((blockID) -> {
-      try(ReferenceCountedDB db =
-          BlockUtils.getDB((KeyValueContainerData) dnContainerSet
-          .getContainer(blockID.getContainerID()).getContainerData(), conf)) {
-        Assert.assertNotNull(db.getStore().get(
-            Longs.toByteArray(blockID.getLocalID())));
-      }
-    }, omKeyLocationInfoGroups);
+    for (HddsDatanodeService datanode : cluster.getHddsDatanodes()) {
+      ContainerSet dnContainerSet =
+          datanode.getDatanodeStateMachine().getContainer().getContainerSet();
+      OzoneTestUtils.performOperationOnKeyContainers((blockID) -> {
+        try (ReferenceCountedDB db = BlockUtils.getDB(
+            (KeyValueContainerData) dnContainerSet
+                .getContainer(blockID.getContainerID()).getContainerData(),
+            conf)) {
+          Assert.assertNotNull(
+              db.getStore().get(Longs.toByteArray(blockID.getLocalID())));
+        }
+      }, omKeyLocationInfoGroups);
+    }
   }
 
   private void verifyBlocksDeleted(
