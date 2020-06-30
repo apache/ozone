@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -124,12 +123,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     IOException exception = null;
     Result result = null;
     try {
-      ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs);
-      keyArgs = bucket.update(keyArgs);
-      bucket.audit(auditMap);
+      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
 
-      multipartKey = omMetadataManager.getMultipartKey(bucket.realVolume(),
-          bucket.realBucket(), keyName, uploadID);
+      multipartKey = omMetadataManager.getMultipartKey(keyArgs.getVolumeName(),
+          keyArgs.getBucketName(), keyName, uploadID);
 
       // TODO to support S3 ACL later.
 
@@ -137,10 +134,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           keyArgs.getVolumeName(), keyArgs.getBucketName());
 
       validateBucketAndVolume(omMetadataManager,
-          bucket.realVolume(), bucket.realBucket());
+          keyArgs.getVolumeName(), keyArgs.getBucketName());
 
       String ozoneKey = omMetadataManager.getOzoneKey(
-          bucket.realVolume(), bucket.realBucket(), keyName);
+          keyArgs.getVolumeName(), keyArgs.getBucketName(), keyName);
 
       OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
 
@@ -280,8 +277,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
           // A newly created key, this is the first version.
           OmKeyInfo.Builder builder =
-              new OmKeyInfo.Builder().setVolumeName(bucket.realVolume())
-              .setBucketName(bucket.realBucket()).setKeyName(keyName)
+              new OmKeyInfo.Builder().setVolumeName(keyArgs.getVolumeName())
+              .setBucketName(keyArgs.getBucketName()).setKeyName(keyName)
               .setReplicationFactor(factor).setReplicationType(type)
               .setCreationTime(keyArgs.getModificationTime())
               .setModificationTime(keyArgs.getModificationTime())

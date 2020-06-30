@@ -27,11 +27,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.PrefixManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -86,6 +88,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   public OMKeyRequest(OMRequest omRequest) {
     super(omRequest);
+  }
+
+  protected static KeyArgs resolveBucketLink(
+      OzoneManager ozoneManager, KeyArgs keyArgs,
+      Map<String, String> auditMap) throws IOException {
+    ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs);
+    keyArgs = bucket.update(keyArgs);
+    bucket.audit(auditMap);
+    return keyArgs;
   }
 
   /**

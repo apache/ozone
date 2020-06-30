@@ -25,7 +25,6 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -126,9 +125,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     try {
-      ResolvedBucket bucket = ozoneManager.resolveBucketLink(commitKeyArgs);
-      commitKeyArgs = bucket.update(commitKeyArgs);
-      bucket.audit(auditMap);
+      commitKeyArgs = resolveBucketLink(ozoneManager, commitKeyArgs, auditMap);
       volumeName = commitKeyArgs.getVolumeName();
       bucketName = commitKeyArgs.getBucketName();
 

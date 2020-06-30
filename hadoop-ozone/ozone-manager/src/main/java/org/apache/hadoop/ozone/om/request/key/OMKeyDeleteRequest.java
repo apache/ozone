@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.Map;
 
 import com.google.common.base.Optional;
-import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -112,9 +111,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
     Result result = null;
     try {
-      ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs);
-      keyArgs = bucket.update(keyArgs);
-      bucket.audit(auditMap);
+      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
 

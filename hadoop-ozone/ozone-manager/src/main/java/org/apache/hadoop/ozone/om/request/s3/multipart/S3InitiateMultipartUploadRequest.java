@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -118,9 +117,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
         getOmRequest());
     OMClientResponse omClientResponse = null;
     try {
-      ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs);
-      keyArgs = bucket.update(keyArgs);
-      bucket.audit(auditMap);
+      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
 
       // TODO to support S3 ACL later.
       acquiredBucketLock =
@@ -128,7 +125,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
               keyArgs.getVolumeName(), keyArgs.getBucketName());
 
       validateBucketAndVolume(omMetadataManager,
-          bucket.realVolume(), bucket.realBucket());
+          keyArgs.getVolumeName(), keyArgs.getBucketName());
 
       // We do not check if this transaction is a replay here to avoid extra
       // DB reads. Even if this transaction is replayed, in
@@ -151,7 +148,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       // for the key.
 
       String multipartKey = omMetadataManager.getMultipartKey(
-          bucket.realVolume(), bucket.realBucket(), keyName,
+          keyArgs.getVolumeName(), keyArgs.getBucketName(), keyName,
           keyArgs.getMultipartUploadID());
 
       // Even if this key already exists in the KeyTable, it would be taken
@@ -169,8 +166,8 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .build();
 
       omKeyInfo = new OmKeyInfo.Builder()
-          .setVolumeName(bucket.realVolume())
-          .setBucketName(bucket.realBucket())
+          .setVolumeName(keyArgs.getVolumeName())
+          .setBucketName(keyArgs.getBucketName())
           .setKeyName(keyArgs.getKeyName())
           .setCreationTime(keyArgs.getModificationTime())
           .setModificationTime(keyArgs.getModificationTime())
@@ -195,8 +192,8 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           new S3InitiateMultipartUploadResponse(
               omResponse.setInitiateMultiPartUploadResponse(
                   MultipartInfoInitiateResponse.newBuilder()
-                      .setVolumeName(bucket.requestedVolume())
-                      .setBucketName(bucket.requestedBucket())
+                      .setVolumeName(volumeName)
+                      .setBucketName(bucketName)
                       .setKeyName(keyName)
                       .setMultipartUploadID(keyArgs.getMultipartUploadID()))
                   .build(), multipartKeyInfo, omKeyInfo);

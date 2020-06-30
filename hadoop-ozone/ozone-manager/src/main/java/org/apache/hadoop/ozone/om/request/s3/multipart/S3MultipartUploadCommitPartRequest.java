@@ -23,7 +23,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -114,20 +113,18 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     OmMultipartKeyInfo multipartKeyInfo = null;
     Result result = null;
     try {
-      ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs);
-      keyArgs = bucket.update(keyArgs);
-      bucket.audit(auditMap);
+      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
 
       // TODO to support S3 ACL later.
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           keyArgs.getVolumeName(), keyArgs.getBucketName());
 
       validateBucketAndVolume(omMetadataManager,
-          bucket.realVolume(), bucket.realBucket());
+          keyArgs.getVolumeName(), keyArgs.getBucketName());
 
       String uploadID = keyArgs.getMultipartUploadID();
       multipartKey = omMetadataManager.getMultipartKey(
-          bucket.realVolume(), bucket.realBucket(),
+          keyArgs.getVolumeName(), keyArgs.getBucketName(),
           keyName, uploadID);
 
       multipartKeyInfo = omMetadataManager.getMultipartInfoTable()
@@ -136,10 +133,10 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       long clientID = multipartCommitUploadPartRequest.getClientID();
 
       openKey = omMetadataManager.getOpenKey(
-          bucket.realVolume(), bucket.realBucket(), keyName, clientID);
+          keyArgs.getVolumeName(), keyArgs.getBucketName(), keyName, clientID);
 
       String ozoneKey = omMetadataManager.getOzoneKey(
-          bucket.realVolume(), bucket.realBucket(), keyName);
+          keyArgs.getVolumeName(), keyArgs.getBucketName(), keyName);
 
       omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
 
