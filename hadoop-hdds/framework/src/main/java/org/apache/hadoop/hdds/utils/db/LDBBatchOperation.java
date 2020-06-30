@@ -49,8 +49,15 @@ public class LDBBatchOperation implements BatchOperation {
   }
 
   @Override
-  public void close() throws IOException{
-    writeBatch.close();
+  public void close() {
+    try {
+      writeBatch.close();
+    }
+    catch (IOException e) {
+      // TODO : Determine how to handle this exception since the parent interface did not declare
+      //  any exceptions thrown from this method (unlike its parent) and adding the exception
+      //  would break compatibility with the classes already using it.
+    }
   }
 
   public void delete(byte[] key) throws IOException {
