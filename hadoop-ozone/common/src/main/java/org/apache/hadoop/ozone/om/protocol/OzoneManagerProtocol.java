@@ -219,7 +219,7 @@ public interface OzoneManagerProtocol
   void renameKey(OmKeyArgs args, String toKeyName) throws IOException;
 
   /**
-   * Rename an existing key within a bucket.
+   * Rename existing keys within a bucket.
    * @param keyMap The key is new key name nad value is original key OmKeyArgs.
    * @throws IOException
    */

@@ -847,7 +847,7 @@ message RenameKeysRequest{
 }
 
 message RenameKeysResponse{
-
+    repeated KeyInfo unRenamedKeys = 1;
 }
 
 message RenameKeyRequest{

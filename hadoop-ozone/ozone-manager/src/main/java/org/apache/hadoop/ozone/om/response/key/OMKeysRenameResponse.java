@@ -19,52 +19,44 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmRenameKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
+import java.util.List;
+
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
- * Response for RenameKey request.
+ * Response for RenameKeys request.
  */
+@CleanupTableInfo(cleanupTables = {KEY_TABLE})
 public class OMKeysRenameResponse extends OMClientResponse {
 
-  private String fromKeyName;
-  private String toKeyName;
-  private OmKeyInfo newKeyInfo;
+  private List<OmRenameKeyInfo> renameKeyInfoList;
+  private long trxnLogIndex;
+  private String fromKeyName = null;
+  private String toKeyName = null;
 
   public OMKeysRenameResponse(@Nonnull OMResponse omResponse,
-                              String fromKeyName, String toKeyName,
-                              @Nonnull OmKeyInfo renameKeyInfo) {
+                              List<OmRenameKeyInfo> renameKeyInfoList,
+                              long trxnLogIndex) {
     super(omResponse);
-    this.fromKeyName = fromKeyName;
-    this.toKeyName = toKeyName;
-    this.newKeyInfo = renameKeyInfo;
+    this.renameKeyInfoList = renameKeyInfoList;
+    this.trxnLogIndex = trxnLogIndex;
   }
 
-  /**
-   * When Rename request is replayed and toKey already exists, but fromKey
-   * has not been deleted.
-   * For example, lets say we have the following sequence of transactions
-   *  Trxn 1 : Create Key1
-   *  Trnx 2 : Rename Key1 to Key2 -> Deletes Key1 and Creates Key2
-   *  Now if these transactions are replayed:
-   *  Replay Trxn 1 : Creates Key1 again as Key1 does not exist in DB
-   *  Replay Trxn 2 : Key2 is not created as it exists in DB and the request
-   *  would be deemed a replay. But Key1 is still in the DB and needs to be
-   *  deleted.
-   */
-  public OMKeysRenameResponse(@Nonnull OMResponse omResponse,
-                              String fromKeyName, OmKeyInfo fromKeyInfo) {
-    super(omResponse);
-    this.fromKeyName = fromKeyName;
-    this.newKeyInfo = fromKeyInfo;
-    this.toKeyName = null;
-  }
 
   /**
    * For when the request is not successful or it is a replay transaction.
@@ -77,22 +69,57 @@ public class OMKeysRenameResponse extends OMClientResponse {
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
-      BatchOperation batchOperation) throws IOException {
-    String volumeName = newKeyInfo.getVolumeName();
-    String bucketName = newKeyInfo.getBucketName();
-    // If toKeyName is null, then we need to only delete the fromKeyName from
-    // KeyTable. This is the case of replay where toKey exists but fromKey
-    // has not been deleted.
-    if (deleteFromKeyOnly()) {
-      omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
-          omMetadataManager.getOzoneKey(volumeName, bucketName, fromKeyName));
-    } else if (createToKeyAndDeleteFromKey()) {
-      // If both from and toKeyName are equal do nothing
-      omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
-          omMetadataManager.getOzoneKey(volumeName, bucketName, fromKeyName));
-      omMetadataManager.getKeyTable().putWithBatch(batchOperation,
-          omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName),
-          newKeyInfo);
+                           BatchOperation batchOperation) throws IOException {
+    boolean acquiredLock = false;
+    for (OmRenameKeyInfo omRenameKeyInfo : renameKeyInfoList) {
+      String volumeName = omRenameKeyInfo.getNewKeyInfo().getVolumeName();
+      String bucketName = omRenameKeyInfo.getNewKeyInfo().getBucketName();
+      fromKeyName = omRenameKeyInfo.getFromKeyName();
+      toKeyName = omRenameKeyInfo.getToKeyName();
+      OmKeyInfo newKeyInfo = omRenameKeyInfo.getNewKeyInfo();
+      Table<String, OmKeyInfo> keyTable = omMetadataManager
+          .getKeyTable();
+      try {
+        acquiredLock =
+            omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
+                volumeName, bucketName);
+        // If toKeyName is null, then we need to only delete the fromKeyName
+        // from KeyTable. This is the case of replay where toKey exists but
+        // fromKey has not been deleted.
+        if (deleteFromKeyOnly()) {
+
+          keyTable.addCacheEntry(new CacheKey<>(fromKeyName),
+              new CacheValue<>(Optional.absent(), trxnLogIndex));
+          omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
+              omMetadataManager
+                  .getOzoneKey(volumeName, bucketName, fromKeyName));
+        } else if (createToKeyAndDeleteFromKey()) {
+
+          // If both from and toKeyName are equal do nothing
+          keyTable.addCacheEntry(new CacheKey<>(fromKeyName),
+              new CacheValue<>(Optional.absent(), trxnLogIndex));
+          keyTable.addCacheEntry(new CacheKey<>(toKeyName),
+              new CacheValue<>(Optional.of(newKeyInfo), trxnLogIndex));
+
+          omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
+              omMetadataManager
+                  .getOzoneKey(volumeName, bucketName, fromKeyName));
+          omMetadataManager.getKeyTable().putWithBatch(batchOperation,
+              omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName),
+              newKeyInfo);
+        }
+        if (acquiredLock) {
+          omMetadataManager.getLock().releaseWriteLock(
+              BUCKET_LOCK, volumeName, bucketName);
+          acquiredLock = false;
+        }
+      } finally {
+        if (acquiredLock) {
+          omMetadataManager.getLock().releaseWriteLock(
+              BUCKET_LOCK, volumeName, bucketName);
+        }
+      }
+
     }
   }
 

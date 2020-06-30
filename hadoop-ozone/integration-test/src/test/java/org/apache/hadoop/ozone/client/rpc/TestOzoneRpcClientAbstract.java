@@ -1312,8 +1312,6 @@ public abstract class TestOzoneRpcClientAbstract {
     } catch (OMException ex) {
       Assert.assertEquals(KEY_NOT_FOUND, ex.getResult());
     }
-
-
   }
 
   // Listing all volumes in the cluster feature has to be fixed after HDDS-357.

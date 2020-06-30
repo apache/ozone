@@ -2427,7 +2427,15 @@
             ]
           },
           {
-            "name": "RenameKeysResponse"
+            "name": "RenameKeysResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "unRenamedKeys",
+                "type": "KeyInfo",
+                "is_repeated": true
+              }
+            ]
           },
           {
             "name": "RenameKeyRequest",
