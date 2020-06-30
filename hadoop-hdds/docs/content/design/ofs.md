@@ -129,10 +129,11 @@ directory. e.g.:
 $ ozone fs -touch /tmp/key1
 ```
 
-# Delete to trash
+# Delete with trash enabled
 
-When keys are deleted to trash, they are moved to a trash directory under
-each bucket, because keys aren't allowed to be moved(renamed) between buckets.
+When keys are deleted with trash enabled, they are moved to a trash directory
+under each bucket, because keys aren't allowed to be moved(renamed) between
+buckets in Ozone.
 
 ```
 $ ozone fs -rm /volume1/bucket1/key1
@@ -158,4 +159,4 @@ information.
 
 Design doc is uploaded to the JIRA HDDS-2665:
 
-https://issues.apache.org/jira/secure/attachment/12987636/Design%20ofs%20v1.pdf
+* https://issues.apache.org/jira/secure/attachment/12987636/Design%20ofs%20v1.pdf
