@@ -48,6 +48,11 @@
                 target/ozone-${ozone.version}/share/ozone/classpath
               </outputDirectory>
               <includes>*.classpath</includes>
+              <includeArtifactIds>
+                hadoop-hdds-server-scm,hadoop-ozone-common,hadoop-ozone-csi,hadoop-ozone-datanode,hadoop-ozone-insight,
+                hadoop-ozone-ozone-manager,hadoop-ozone-recon,hadoop-ozone-s3gateway,hadoop-ozone-tools,
+                hadoop-ozone-upgrade
+              </includeArtifactIds>
             </configuration>
           </execution>
           <execution>
