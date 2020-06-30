@@ -151,6 +151,8 @@ public final class ContainerCache extends LRUMap {
       if (currentDB != null) {
         // increment the reference before returning the object
         currentDB.incrementReference();
+        // clean the db created in previous step
+        db.cleanup();
         return currentDB;
       } else {
         this.put(containerDBPath, db);
