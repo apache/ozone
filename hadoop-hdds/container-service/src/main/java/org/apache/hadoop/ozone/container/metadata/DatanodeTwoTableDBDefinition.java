@@ -20,35 +20,37 @@ package org.apache.hadoop.ozone.container.metadata;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
+
 import java.io.File;
 
 /**
  * Class defines the structure and types of the dn-container.db.
  */
-public class DatanodeDBDefinition implements DBDefinition {
+public class DatanodeTwoTableDBDefinition implements DBDefinition {
 
-  // TODO : Determine the correct types for these tables.
-  public static final DBColumnFamilyDefinition<Long, Long>
+  // TODO : Make new block data codec.
+  public static final DBColumnFamilyDefinition<String, Long>
           BLOCK_DATA =
           new DBColumnFamilyDefinition<>(
                   "block_data",
-                  Long.class,
-                  new LongCodec(),
+                  String.class,
+                  new StringCodec(),
                   Long.class,
                   new LongCodec());
 
-  public static final DBColumnFamilyDefinition<Long, Long>
+  public static final DBColumnFamilyDefinition<String, Long>
           METADATA =
           new DBColumnFamilyDefinition<>(
           "metadata",
-          Long.class,
-          new LongCodec(),
+          String.class,
+          new StringCodec(),
           Long.class,
           new LongCodec());
 
   private File dbDir;
 
-  public DatanodeDBDefinition(String dbPath) {
+  public DatanodeTwoTableDBDefinition(String dbPath) {
     this.dbDir = new File(dbPath);
   }
 

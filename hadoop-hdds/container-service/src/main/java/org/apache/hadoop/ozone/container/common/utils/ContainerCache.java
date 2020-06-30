@@ -126,8 +126,8 @@ public final class ContainerCache extends LRUMap {
       ReferenceCountedDB db = (ReferenceCountedDB) this.get(containerDBPath);
 
       if (db == null) {
-        // TODO : Add support for creating LevelDB Stores in DBStoreBuilder.
-        //  Use the containerDBType param (RocksDB or LevelDB) to determine the type.
+        // TODO : Check containerData and determine which version and datastore implementation to
+        //  use.
         DBOptions options = new DBOptions();
         options.setCreateIfMissing(true);
         DBStore store = DBStoreBuilder.newBuilder(conf)

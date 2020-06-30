@@ -53,19 +53,19 @@ public class DatanodeStoreRDBImpl implements DatanodeStore {
     if (this.store == null) {
 
       // TODO : Determine how to get the path to the DB needed to init this instance.
-      this.store = DBStoreBuilder.createDBStore(config, new DatanodeDBDefinition());
+      this.store = DBStoreBuilder.createDBStore(config, new DatanodeTwoTableDBDefinition());
 
       metadataTable =
-              DatanodeDBDefinition.METADATA.getTable(this.store);
+              DatanodeTwoTableDBDefinition.METADATA.getTable(this.store);
 
       checkTableStatus(metadataTable,
-              DatanodeDBDefinition.METADATA.getName());
+              DatanodeTwoTableDBDefinition.METADATA.getName());
 
       blockDataTable =
-              DatanodeDBDefinition.BLOCK_DATA.getTable(this.store);
+              DatanodeTwoTableDBDefinition.BLOCK_DATA.getTable(this.store);
 
       checkTableStatus(metadataTable,
-              DatanodeDBDefinition.BLOCK_DATA.getName());
+              DatanodeTwoTableDBDefinition.BLOCK_DATA.getName());
 
     }
   }
