@@ -180,11 +180,11 @@ public class DatanodeDetails extends NodeImpl implements
   public static DatanodeDetails getFromProtoBuf(
       HddsProtos.DatanodeDetailsProto datanodeDetailsProto) {
     DatanodeDetails.Builder builder = newBuilder();
-    if (datanodeDetailsProto.hasUuid()) {
-      builder.setUuid(UUID.fromString(datanodeDetailsProto.getUuid()));
-    } else if (datanodeDetailsProto.hasUuid128()) {
+    if (datanodeDetailsProto.hasUuid128()) {
       HddsProtos.UUID uuid = datanodeDetailsProto.getUuid128();
       builder.setUuid(new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits()));
+    } else if (datanodeDetailsProto.hasUuid()) {
+      builder.setUuid(UUID.fromString(datanodeDetailsProto.getUuid()));
     }
 
     if (datanodeDetailsProto.hasIpAddress()) {

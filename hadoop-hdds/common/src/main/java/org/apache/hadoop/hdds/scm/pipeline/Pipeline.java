@@ -307,12 +307,12 @@ public final class Pipeline {
       nodes.add(DatanodeDetails.getFromProtoBuf(member));
     }
     UUID leaderId = null;
-    if (pipeline.hasLeaderID() &&
-        StringUtils.isNotEmpty(pipeline.getLeaderID())) {
-      leaderId = UUID.fromString(pipeline.getLeaderID());
-    } else if (pipeline.hasLeaderID128()) {
+    if (pipeline.hasLeaderID128()) {
       HddsProtos.UUID uuid = pipeline.getLeaderID128();
       leaderId = new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits());
+    } else if (pipeline.hasLeaderID() &&
+        StringUtils.isNotEmpty(pipeline.getLeaderID())) {
+      leaderId = UUID.fromString(pipeline.getLeaderID());
     }
 
     return new Builder().setId(PipelineID.getFromProtobuf(pipeline.getId()))

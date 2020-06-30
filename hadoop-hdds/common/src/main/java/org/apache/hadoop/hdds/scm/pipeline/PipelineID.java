@@ -56,12 +56,12 @@ public final class PipelineID {
   }
 
   public static PipelineID getFromProtobuf(HddsProtos.PipelineID protos) {
-    if (protos.hasId()) {
-      return new PipelineID(UUID.fromString(protos.getId()));
-    } else if (protos.hasUuid128()) {
+    if (protos.hasUuid128()) {
       HddsProtos.UUID uuid = protos.getUuid128();
       return new PipelineID(
           new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits()));
+    } else if (protos.hasId()) {
+      return new PipelineID(UUID.fromString(protos.getId()));
     } else {
       throw new IllegalArgumentException(
           "Pipeline does not has uuid128 in proto");
