@@ -167,7 +167,6 @@ public final class OmUtils {
 
   /**
    * Returns true if OZONE_OM_SERVICE_IDS_KEY is defined and not empty.
-   *
    * @param conf Configuration
    * @return true if OZONE_OM_SERVICE_IDS_KEY is defined and not empty;
    * else false.
@@ -179,8 +178,7 @@ public final class OmUtils {
 
   /**
    * Returns true if HA for OzoneManager is configured for the given service id.
-   *
-   * @param conf      Configuration
+   * @param conf Configuration
    * @param serviceId OM HA cluster service ID
    * @return true if HA is configured in the configuration; else false.
    */
