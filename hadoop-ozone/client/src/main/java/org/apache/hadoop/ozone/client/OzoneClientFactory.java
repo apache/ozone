@@ -137,7 +137,7 @@ public final class OzoneClientFactory {
     // in ozone-default.xml.
 
     String[] serviceIds = config.getTrimmedStrings(OZONE_OM_SERVICE_IDS_KEY);
-    if (serviceIds.length > 0) {
+    if (serviceIds.length > 1) {
       throw new IOException("Following ServiceID's " +
           config.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY) + " are" +
           " defined in the configuration. Use the method getRpcClient which " +
