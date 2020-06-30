@@ -13,35 +13,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-source:
-  - path: ../../definitions
-import:
-  - path: ozone
-    transformations:
-    - type: Image
-      image: "@docker.image@"
-    - type: ozone/prometheus
-    - type: PublishStatefulSet
-    - type: ozone/tracing
-    - type: ozone/profiler
-    - type: ozone/emptydir
-    - type: ozone/csi
-    - type: ozone/onenode
-  - path: prometheus
-  - path: jaeger
-    transformations:
-    - type: PublishService
-  - path: ozone/freon
-    destination: freon
-    transformations:
-    - type: Image
-      image: "@docker.image@"
-    - type: ozone/tracing
-  - path: pv-test
-    destination: pv-test
-  - path: ozone-csi
-    destination: csi
-  - path: pv-test
-    destination: pv-test
-transformations:
-  - type: Namespace
+name: ozone/onenode
+description: remove scheduling rules to make it possible to run multiple datanode on the same k8s node.
+---
+- type: Remove
+  trigger:
+    metadata:
+      name: ozone-datanode
+  path:
+    - spec
+    - template
+    - spec
+    - affinity

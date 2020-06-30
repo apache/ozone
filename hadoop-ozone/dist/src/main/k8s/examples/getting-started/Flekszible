@@ -22,6 +22,7 @@ import:
       image: "@docker.image@"
     - type: PublishStatefulSet
     - type: ozone/emptydir
+    - type: ozone/onenode
   - path: ozone/freon
     destination: freon
     transformations:
