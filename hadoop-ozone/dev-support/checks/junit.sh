@@ -43,10 +43,13 @@ for i in $(seq 1 ${ITERATIONS}); do
 
   # shellcheck source=hadoop-ozone/dev-support/checks/_mvn_unit_report.sh
   source "${DIR}/_mvn_unit_report.sh"
+  if [[ ${irc} == 0 ]] && [[ -s "${REPORT_DIR}/summary.txt" ]]; then
+    irc=1
+  fi
 
   if [[ ${ITERATIONS} -gt 1 ]]; then
     REPORT_DIR="${original_report_dir}"
-    echo "Iteration ${i} exit code: ${irc}" | tee -a "${REPORT_DIR}/output.log"
+    echo "Iteration ${i} exit code: ${irc}" | tee -a "${REPORT_DIR}/summary.txt"
   fi
 
   if [[ ${rc} == 0 ]]; then
@@ -57,7 +60,4 @@ done
 #Archive combined jacoco records
 mvn -B -N jacoco:merge -Djacoco.destFile=$REPORT_DIR/jacoco-combined.exec
 
-if [[ -s "$REPORT_DIR/summary.txt" ]] ; then
-  exit 1
-fi
 exit ${rc}
