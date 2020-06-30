@@ -2498,4 +2498,14 @@
       Timeout for the request submitted directly to Ratis in datanode.
     </description>
   </property>
+  <property>
+    <name>ozone.om.keyname.character.check.enabled</name>
+    <tag>OZONE, OM</tag>
+    <value>false</value>
+    <description>If true, then enable to check if the key name
+      contains illegal characters when creating/renaming key.
+      For the definition of illegal characters, follow the
+      rules in Amazon S3's object key naming guide.
+    </description>
+  </property>
 </configuration>

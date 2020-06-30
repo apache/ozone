@@ -25,6 +25,10 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -84,6 +88,15 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     Preconditions.checkNotNull(commitKeyRequest);
 
     KeyArgs keyArgs = commitKeyRequest.getKeyArgs();
+
+    // Verify key name
+    final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
+         .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
+                 OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
+    if(checkKeyNameEnabled){
+      OmUtils.validateKeyName(StringUtils.removeEnd(keyArgs.getKeyName(),
+              OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
+    }
 
     KeyArgs.Builder newKeyArgs =
         keyArgs.toBuilder().setModificationTime(Time.now());
