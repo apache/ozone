@@ -106,10 +106,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   @Override
   protected boolean validate() {
-    if (currentHealthyPipelineCount >= healthyPipelineThresholdCount) {
-      return true;
-    }
-    return false;
+    return currentHealthyPipelineCount >= healthyPipelineThresholdCount;
   }
 
   @Override

@@ -36,9 +36,11 @@ execute_robot_test scm -v SCHEME:o3fs ozonefs/ozonefs.robot
 
 execute_robot_test s3g s3
 
-execute_robot_test scm admincli
-
+#expects 4 pipelines, should be run before 
+#admincli which creates STANDALONE pipeline
 execute_robot_test scm recon
+
+execute_robot_test scm admincli
 
 execute_robot_test scm spnego
 

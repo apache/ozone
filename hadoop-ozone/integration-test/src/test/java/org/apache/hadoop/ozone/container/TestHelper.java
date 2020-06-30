@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.impl.RaftServerImpl;
@@ -313,6 +314,15 @@ public final class TestHelper {
   public static StateMachine getStateMachine(HddsDatanodeService dn,
       Pipeline pipeline) throws Exception {
     return getRaftServerImpl(dn, pipeline).getStateMachine();
+  }
+
+  public static HddsDatanodeService getDatanodeService(OmKeyLocationInfo info,
+                                                 MiniOzoneCluster cluster)
+          throws IOException {
+    DatanodeDetails dnDetails =  info.getPipeline().
+            getFirstNode();
+    return cluster.getHddsDatanodes().get(cluster.
+            getHddsDatanodeIndex(dnDetails));
   }
 
 }

@@ -234,4 +234,9 @@ public final class OMConfigKeys {
   // hadoop-policy.xml, "*" allows all users/groups to access.
   public static final String OZONE_OM_SECURITY_CLIENT_PROTOCOL_ACL =
       "ozone.om.security.client.protocol.acl";
+
+  public static final String OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY =
+          "ozone.om.keyname.character.check.enabled";
+  public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =
+          false;
 }

@@ -197,6 +197,23 @@ public final class HddsClientUtils {
   }
 
   /**
+   * verifies that key name is a valid name.
+   *
+   * @param keyName key name to be validated
+   *
+   * @throws IllegalArgumentException
+   */
+  public static void verifyKeyName(String keyName) {
+    if (keyName == null) {
+      throw new IllegalArgumentException("Key name is null");
+    }
+    if(!OzoneConsts.KEYNAME_ILLEGAL_CHARACTER_CHECK_REGEX
+            .matcher(keyName).matches()){
+      throw new IllegalArgumentException("Invalid key name: " + keyName);
+    }
+  }
+
+  /**
    * Checks that object parameters passed as reference is not null.
    *
    * @param references Array of object references to be checked.

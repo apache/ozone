@@ -92,6 +92,13 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
         .getVolumeTable().get(volumeKey).getQuotaInBytes();
     Assert.assertEquals(quotaSet, quotaAfterSet);
     Assert.assertNotEquals(quotaBeforeSet, quotaAfterSet);
+
+    // modificationTime should be greater than creationTime.
+    long creationTime = omMetadataManager
+        .getVolumeTable().get(volumeKey).getCreationTime();
+    long modificationTime = omMetadataManager
+        .getVolumeTable().get(volumeKey).getModificationTime();
+    Assert.assertTrue(modificationTime > creationTime);
   }
 
   @Test
