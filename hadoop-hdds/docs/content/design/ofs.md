@@ -1,7 +1,7 @@
 ---
 title: Implement new Ozone FileSystem scheme ofs:// 
 summary: A new schema structure for Hadoop compatible file system
-date: 2019-12-05
+date: 2020-06-30
 jira: HDDS-2665
 status: implemented
 author: Siyao Meng 
