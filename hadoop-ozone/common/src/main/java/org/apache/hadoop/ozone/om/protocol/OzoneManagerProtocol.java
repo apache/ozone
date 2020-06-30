@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.protocol;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -216,6 +217,13 @@ public interface OzoneManagerProtocol
    * @throws IOException
    */
   void renameKey(OmKeyArgs args, String toKeyName) throws IOException;
+
+  /**
+   * Rename an existing key within a bucket.
+   * @param keyMap The key is new key name nad value is original key OmKeyArgs.
+   * @throws IOException
+   */
+  void renameKeys(Map<String, OmKeyArgs> keyMap) throws IOException;
 
   /**
    * Deletes an existing key.

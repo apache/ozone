@@ -25,11 +25,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.security.InvalidKeyException;
 import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -759,6 +755,25 @@ public class RpcClient implements ClientProtocol {
         .build();
     ozoneManagerClient.renameKey(keyArgs, toKeyName);
   }
+
+  @Override
+  public void renameKeys(String volumeName, String bucketName,
+                         Map<String, String> keyMap) throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    HddsClientUtils.checkNotNull(keyMap);
+    Map <String, OmKeyArgs> keyArgsMap = new HashMap<>();
+    for (Map.Entry< String, String > entry : keyMap.entrySet()) {
+      OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+          .setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .setKeyName(entry.getKey())
+          .build();
+      keyArgsMap.put(entry.getValue(), keyArgs);
+    }
+    ozoneManagerClient.renameKeys(keyArgsMap);
+  }
+
 
   @Override
   public List<OzoneKey> listKeys(String volumeName, String bucketName,

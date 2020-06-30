@@ -84,6 +84,10 @@
                 "integer": 38
               },
               {
+                "name": "RenameKeys",
+                "integer": 39
+              },
+              {
                 "name": "InitiateMultiPartUpload",
                 "integer": 45
               },
@@ -712,6 +716,11 @@
                 "type": "DeleteKeysRequest"
               },
               {
+                "id": 39,
+                "name": "renameKeysRequest",
+                "type": "RenameKeysRequest"
+              },
+              {
                 "id": 45,
                 "name": "initiateMultiPartUploadRequest",
                 "type": "MultipartInfoInitiateRequest"
@@ -981,6 +990,11 @@
                 "id": 38,
                 "name": "deleteKeysResponse",
                 "type": "DeleteKeysResponse"
+              },
+              {
+                "id": 39,
+                "name": "renameKeysResponse",
+                "type": "RenameKeysResponse"
               },
               {
                 "id": 45,
@@ -2400,6 +2414,20 @@
                 "type": "uint64"
               }
             ]
+          },
+          {
+            "name": "RenameKeysRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "renameKeyRequest",
+                "type": "RenameKeyRequest",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "RenameKeysResponse"
           },
           {
             "name": "RenameKeyRequest",

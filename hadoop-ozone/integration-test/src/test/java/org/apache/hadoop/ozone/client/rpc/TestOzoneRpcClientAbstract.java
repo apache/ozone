@@ -110,6 +110,7 @@ import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
@@ -121,6 +122,8 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -1202,7 +1205,7 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(keyName, key.getName());
     bucket.deleteKey(keyName);
 
-    OzoneTestUtils.expectOmException(ResultCodes.KEY_NOT_FOUND,
+    OzoneTestUtils.expectOmException(KEY_NOT_FOUND,
         () -> bucket.getKey(keyName));
   }
 
@@ -1244,12 +1247,78 @@ public abstract class TestOzoneRpcClientAbstract {
     } catch (OMException e) {
       oe = e;
     }
-    Assert.assertEquals(ResultCodes.KEY_NOT_FOUND, oe.getResult());
+    Assert.assertEquals(KEY_NOT_FOUND, oe.getResult());
 
     key = bucket.getKey(toKeyName);
     Assert.assertEquals(toKeyName, key.getName());
   }
 
+  @Test
+  public void testKeysRename() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName1 = "dir/file1";
+    String keyName2 = "dir/file2";
+
+    String newKeyName1 = "dir/key1";
+    String newKeyName2 = "dir/key2";
+
+    String value = "sample value";
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    OzoneOutputStream out1 = bucket.createKey(keyName1,
+        value.getBytes().length, STAND_ALONE,
+        ONE, new HashMap<>());
+    out1.write(value.getBytes());
+    out1.close();
+    OzoneOutputStream out2 = bucket.createKey(keyName2,
+        value.getBytes().length, STAND_ALONE,
+        ONE, new HashMap<>());
+    out2.write(value.getBytes());
+    out2.close();
+    OzoneKey key1 = bucket.getKey(keyName1);
+    OzoneKey key2 = bucket.getKey(keyName2);
+    Assert.assertEquals(keyName1, key1.getName());
+    Assert.assertEquals(keyName2, key2.getName());
+
+    Map<String, String> keyMap = new HashMap();
+    keyMap.put(keyName1, newKeyName1);
+    keyMap.put(keyName2, newKeyName2);
+    bucket.renameKeys(keyMap);
+
+    Assert.assertEquals(newKeyName1, bucket.getKey(newKeyName1).getName());
+    Assert.assertEquals(newKeyName2, bucket.getKey(newKeyName2).getName());
+
+    // old key should not exist
+    try {
+      bucket.getKey(keyName1);
+    } catch (OMException ex) {
+      Assert.assertEquals(KEY_NOT_FOUND, ex.getResult());
+    }
+    try {
+      bucket.getKey(keyName2);
+    } catch (OMException ex) {
+      Assert.assertEquals(KEY_NOT_FOUND, ex.getResult());
+    }
+
+    // rename nonexistent key
+    Map<String, String> keyMap1 = new HashMap();
+    keyMap1.put(keyName1, keyName2);
+    keyMap1.put(newKeyName2, keyName2);
+    try {
+      bucket.renameKeys(keyMap1);
+    } catch (OMException ex) {
+      Assert.assertEquals(KEY_NOT_FOUND, ex.getResult());
+    }
+
+
+  }
+
+  // Listing all volumes in the cluster feature has to be fixed after HDDS-357.
+  // TODO: fix this
+  @Ignore
   @Test
   public void testListVolume() throws IOException {
     String volBase = "vol-" + RandomStringUtils.randomNumeric(3);
