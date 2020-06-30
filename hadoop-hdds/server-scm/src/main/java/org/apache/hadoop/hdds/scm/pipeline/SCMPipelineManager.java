@@ -610,7 +610,7 @@ public class SCMPipelineManager implements PipelineManager {
 
   /**
    * returns max count of healthy volumes from the set of
-   * datanodes constituting the pipeline
+   * datanodes constituting the pipeline.
    * @param  pipeline
    * @return healthy volume count
    */
