@@ -228,12 +228,13 @@ public final class OzoneManagerRatisUtils {
   }
 
   /**
-   * Obtain Transaction info from downloaded snapshot DB.
+   * Obtain Transaction info from DB.
    * @param tempConfig
+   * @param dbDir path to DB
    * @return OMTransactionInfo
    * @throws Exception
    */
-  public static OMTransactionInfo getTransactionInfoFromDownloadedSnapshot(
+  public static OMTransactionInfo getTransactionInfoFromDB(
       OzoneConfiguration tempConfig, Path dbDir) throws Exception {
     DBStore dbStore =
         OmMetadataManagerImpl.loadDB(tempConfig, dbDir.toFile());

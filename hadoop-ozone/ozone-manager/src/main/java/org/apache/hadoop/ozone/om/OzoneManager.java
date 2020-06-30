@@ -194,6 +194,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BL
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
@@ -3089,10 +3090,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     LOG.info("Downloaded checkpoint from Leader {}, in to the location {}",
         leaderId, newDBLocation);
 
-    OMTransactionInfo omTransactionInfo = getTransactionInfoFromDB(
+    OMTransactionInfo omTransactionInfo = getTrxnInfoFromCheckpoint(
         newDBLocation);
 
     if (omTransactionInfo == null) {
+      LOG.error("Failed to install snapshot from {}.");
       return null;
     }
 
@@ -3116,65 +3118,64 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return null;
     }
 
-    File dbBackup;
+    File dbBackup = null;
     TermIndex termIndex = omRatisServer.getLastAppliedTermIndex();
-    long currentTerm = termIndex.getTerm();
+    long term = termIndex.getTerm();
     long lastAppliedIndex = termIndex.getIndex();
-    boolean loadSuccess = false;
 
-    try {
-      // Check if current applied log index is smaller than the downloaded
-      // checkpoint transaction index. If yes, proceed by stopping the ratis
-      // server so that the OM state can be re-initialized. If no then do not
-      // proceed with installSnapshot.
-      boolean canProceed = OzoneManagerRatisUtils.verifyTransactionInfo(
-          omTransactionInfo, lastAppliedIndex, leaderId, newDBLocation);
-      if (!canProceed) {
-        return null;
-      }
-
-      try {
-        dbBackup = replaceOMDBWithCheckpoint(lastAppliedIndex, oldDBLocation,
-            newDBLocation);
-      } catch (Exception e) {
-        LOG.error("OM DB checkpoint replacement with new downloaded " +
-            "checkpoint failed.", e);
-        return null;
-      }
-
-      loadSuccess = true;
-    } finally {
-      if (!loadSuccess) {
-        omRatisServer.getOmStateMachine().unpause(lastAppliedIndex,
-            currentTerm);
-      }
+    // Check if current applied log index is smaller than the downloaded
+    // checkpoint transaction index. If yes, proceed by stopping the ratis
+    // server so that the OM state can be re-initialized. If no then do not
+    // proceed with installSnapshot.
+    boolean canProceed = OzoneManagerRatisUtils.verifyTransactionInfo(
+        omTransactionInfo, lastAppliedIndex, leaderId, newDBLocation);
+    if (!canProceed) {
+      return null;
     }
 
-    long leaderIndex = omTransactionInfo.getTransactionIndex();
-    long leaderTerm = omTransactionInfo.getCurrentTerm();
+    try {
+      dbBackup = replaceOMDBWithCheckpoint(lastAppliedIndex, oldDBLocation,
+          newDBLocation);
+      term = omTransactionInfo.getCurrentTerm();
+      lastAppliedIndex = omTransactionInfo.getTransactionIndex();
+      LOG.info("Replaced DB with checkpoint from OM: {}, term: {}, index: {}",
+          leaderId, term, lastAppliedIndex);
+    } catch (Exception e) {
+      LOG.error("Failed to install Snapshot from {} as OM failed to " +
+          "replace DB with downloaded checkpoint. Reloading old OM state.", e);
+    }
 
     // Reload the OM DB store with the new checkpoint.
     // Restart (unpause) the state machine and update its last applied index
     // to the installed checkpoint's snapshot index.
     try {
-      reloadOMState(leaderIndex, leaderTerm);
-      omRatisServer.getOmStateMachine().unpause(leaderIndex, leaderTerm);
+      reloadOMState(lastAppliedIndex, term);
+      omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
+      LOG.info("Reloaded OM state with Term: {} and Index: {}", term,
+          lastAppliedIndex);
     } catch (IOException ex) {
-      String errorMsg = "Failed to reload OM state and instantiate services " +
-          "after installing Snapshot from Leader.";
+      String errorMsg = "Failed to reload OM state and instantiate services.";
       ExitUtils.terminate(1, errorMsg, ex, LOG);
     }
 
     // Delete the backup DB
     try {
-      FileUtils.deleteFully(dbBackup);
+      if (dbBackup != null) {
+        FileUtils.deleteFully(dbBackup);
+      }
     } catch (IOException e) {
       LOG.error("Failed to delete the backup of the original DB {}", dbBackup);
     }
 
+    if (lastAppliedIndex != omTransactionInfo.getTransactionIndex()) {
+      // Install Snapshot failed and old state was reloaded. Return null to
+      // Ratis to indicate that installation failed.
+      return null;
+    }
+
     // TODO: We should only return the snpashotIndex to the leader.
     //  Should be fixed after RATIS-586
-    TermIndex newTermIndex = TermIndex.newTermIndex(leaderTerm, leaderIndex);
+    TermIndex newTermIndex = TermIndex.newTermIndex(term, lastAppliedIndex);
     return newTermIndex;
   }
 
@@ -3203,7 +3204,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metadataManager.stop();
   }
 
-  private OMTransactionInfo getTransactionInfoFromDB(Path dbPath) {
+  private OMTransactionInfo getTrxnInfoFromCheckpoint(Path dbPath) {
     Path dbDir = dbPath.getParent();
     if (dbDir == null) {
       LOG.error("Incorrect DB location path {} received from checkpoint.",
@@ -3212,11 +3213,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     try {
-      return OzoneManagerRatisUtils.getTransactionInfoFromDownloadedSnapshot(
+      return OzoneManagerRatisUtils.getTransactionInfoFromDB(
           configuration, dbDir);
     } catch (Exception ex) {
-      LOG.error("Install Snapshot failed during opening downloaded snapshot " +
-          "from {} to obtain transaction index", dbPath, ex);
+      LOG.error("Failed to open downloaded checkpoint {} and read transaction" +
+          " info", dbPath, ex);
       return null;
     }
   }
@@ -3226,16 +3227,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    *
    * @param lastAppliedIndex the last applied index in the current OM DB.
    * @param checkpointPath   path to the new DB checkpoint
-   * @return location of the backup of the original DB
+   * @return location of backup of the original DB
    * @throws Exception
    */
   File replaceOMDBWithCheckpoint(long lastAppliedIndex, File oldDB,
-      Path checkpointPath) throws Exception {
+      Path checkpointPath) throws IOException {
 
     // Take a backup of the current DB
     String dbBackupName = OzoneConsts.OM_DB_BACKUP_PREFIX +
         lastAppliedIndex + "_" + System.currentTimeMillis();
-    File dbBackup = new File(oldDB.getParentFile(), dbBackupName);
+    File dbDir = oldDB.getParentFile();
+    File dbBackup = new File(dbDir, dbBackupName);
 
     try {
       Files.move(oldDB.toPath(), dbBackup.toPath());
@@ -3246,13 +3248,28 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     // Move the new DB checkpoint into the om metadata dir
+    Path markerFile = new File(dbDir, DB_TRANSIENT_MARKER).toPath();
     try {
+      // Create a Transient Marker file. This file will be deleted if the
+      // checkpoint DB is successfully moved to the old DB location or if the
+      // old DB backup is reset to its location. If not, then the OM DB is in
+      // an inconsistent state and this marker file will fail OM from
+      // starting up.
+      Files.createFile(markerFile);
       Files.move(checkpointPath, oldDB.toPath());
+      Files.deleteIfExists(markerFile);
     } catch (IOException e) {
       LOG.error("Failed to move downloaded DB checkpoint {} to metadata " +
               "directory {}. Resetting to original DB.", checkpointPath,
           oldDB.toPath());
-      Files.move(dbBackup.toPath(), oldDB.toPath());
+      try {
+        Files.move(dbBackup.toPath(), oldDB.toPath());
+        Files.deleteIfExists(markerFile);
+      } catch (IOException ex) {
+        String errorMsg = "Failed to reset to original DB. OM is in an " +
+            "inconsistent state.";
+        ExitUtils.terminate(1, errorMsg, ex, LOG);
+      }
       throw e;
     }
     return dbBackup;

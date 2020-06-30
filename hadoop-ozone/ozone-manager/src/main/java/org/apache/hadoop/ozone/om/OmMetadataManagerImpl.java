@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -77,9 +78,11 @@ import com.google.common.collect.Lists;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
+import org.apache.ratis.util.ExitUtils;
 import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -248,6 +251,20 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     // db, so we need to create the store object and initialize DB.
     if (store == null) {
       File metaDir = OMStorage.getOmDbDir(configuration);
+
+      // Check if there is a DB Inconsistent Marker in the metaDir. This
+      // marker indicates that the DB is in an inconsistent state and hence
+      // the OM process should be terminated.
+      File markerFile = new File(metaDir, DB_TRANSIENT_MARKER);
+      if (Files.exists(markerFile.toPath())) {
+        LOG.error("File {} marks that OM DB is in an inconsistent state.");
+        // Note - The marker file should be deleted only after fixing the DB.
+        // In an HA setup, this can be done by replacing this DB with a
+        // checkpoint from another OM.
+        String errorMsg = "Cannot load OM DB as it is in an inconsistent " +
+            "state.";
+        ExitUtils.terminate(1, errorMsg, LOG);
+      }
 
       RocksDBConfiguration rocksDBConfiguration =
           configuration.getObject(RocksDBConfiguration.class);
