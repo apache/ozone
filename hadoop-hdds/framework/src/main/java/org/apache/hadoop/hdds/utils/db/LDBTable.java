@@ -133,7 +133,7 @@ class LDBTable implements Table<byte[], byte[]> {
   @Override
   public byte[] getIfExist(byte[] key) throws IOException {
     try {
-      db.get(key);
+      return db.get(key);
     } catch (DBException e) {
       throw toIOException("Error in accessing DB. ", e);
     }
@@ -167,7 +167,7 @@ class LDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public String getName() throws IOException {
+  public String getName() {
     // Since LevelDB does not have tables, make it appear as though we are using the default
     // table from a RocksDB instance.
     return "default";
@@ -179,7 +179,7 @@ class LDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public long getEstimatedKeyCount() throws IOException {
+  public long getEstimatedKeyCount() {
     // LevelDB does not provide a way to get an estimated (or exact) number of keys like RocksDB.
     // Only way is to iterate over all the keys.
     throw new UnsupportedOperationException("Cannot estimate key count in LevelDB");
