@@ -517,4 +517,17 @@ public final class OmUtils {
       return null;
     }
   }
+
+  /**
+   * Verify key name is a valid name.
+   */
+  public static void validateKeyName(String keyName)
+          throws OMException {
+    try {
+      HddsClientUtils.verifyKeyName(keyName);
+    } catch (IllegalArgumentException e) {
+      throw new OMException(e.getMessage(),
+              OMException.ResultCodes.INVALID_KEY_NAME);
+    }
+  }
 }
