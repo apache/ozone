@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -270,6 +271,20 @@ public class SCMSafeModeManager implements SafeModeManager {
       return false;
     }
     return inSafeMode.get();
+  }
+
+  /**
+   * Get the safe mode status of all rules.
+   *
+   * @return map of rule statuses.
+   */
+  public Map<String, Pair<Boolean, String>> getRuleStatus() {
+    Map<String, Pair<Boolean, String>> map = new HashMap<>();
+    for (SafeModeExitRule exitRule : exitRules.values()) {
+      map.put(exitRule.getRuleName(),
+          Pair.of(exitRule.validate(), exitRule.getStatusText()));
+    }
+    return map;
   }
 
   public boolean getPreCheckComplete() {

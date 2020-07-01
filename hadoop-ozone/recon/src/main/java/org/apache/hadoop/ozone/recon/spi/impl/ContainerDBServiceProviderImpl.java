@@ -30,7 +30,6 @@ import java.io.File;
 import java.io.IOException;
 import java.sql.Timestamp;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 import javax.inject.Inject;
@@ -50,7 +49,6 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
-import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -356,10 +354,6 @@ public class ContainerDBServiceProviderImpl
       containers.put(containerID, containerMetadata);
     }
     return containers;
-  }
-
-  public List<UnhealthyContainers> getMissingContainers() {
-    return containerSchemaManager.getAllMissingContainers();
   }
 
   @Override

@@ -80,6 +80,10 @@
                 "integer": 37
               },
               {
+                "name": "DeleteKeys",
+                "integer": 38
+              },
+              {
                 "name": "InitiateMultiPartUpload",
                 "integer": 45
               },
@@ -703,6 +707,11 @@
                 "type": "AllocateBlockRequest"
               },
               {
+                "id": 38,
+                "name": "deleteKeysRequest",
+                "type": "DeleteKeysRequest"
+              },
+              {
                 "id": 45,
                 "name": "initiateMultiPartUploadRequest",
                 "type": "MultipartInfoInitiateRequest"
@@ -967,6 +976,11 @@
                 "id": 37,
                 "name": "allocateBlockResponse",
                 "type": "AllocateBlockResponse"
+              },
+              {
+                "id": 38,
+                "name": "deleteKeysResponse",
+                "type": "DeleteKeysResponse"
               },
               {
                 "id": 45,
@@ -2401,6 +2415,17 @@
             ]
           },
           {
+            "name": "DeleteKeysRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyArgs",
+                "type": "KeyArgs",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
             "name": "DeleteKeyResponse",
             "fields": [
               {
@@ -2437,6 +2462,23 @@
                 "id": 3,
                 "name": "keys",
                 "type": "string",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "DeleteKeysResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "deletedKeys",
+                "type": "KeyInfo",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "unDeletedKeys",
+                "type": "KeyInfo",
                 "is_repeated": true
               }
             ]

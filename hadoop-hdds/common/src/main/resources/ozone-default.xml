@@ -1937,6 +1937,14 @@
   </property>
   
   <property>
+    <name>ozone.fs.iterate.batch-size</name>
+    <value>100</value>
+    <tag>OZONE, OZONEFS</tag>
+    <description>
+      Iterate batch size of delete when use BasicOzoneFileSystem.
+    </description>
+  </property>
+  <property>
     <name>ozone.manager.db.checkpoint.transfer.bandwidthPerSec</name>
     <value>0</value>
     <tag>OZONE</tag>
@@ -2488,6 +2496,16 @@
     <value>2m</value>
     <description>
       Timeout for the request submitted directly to Ratis in datanode.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.keyname.character.check.enabled</name>
+    <tag>OZONE, OM</tag>
+    <value>false</value>
+    <description>If true, then enable to check if the key name
+      contains illegal characters when creating/renaming key.
+      For the definition of illegal characters, follow the
+      rules in Amazon S3's object key naming guide.
     </description>
   </property>
 </configuration>

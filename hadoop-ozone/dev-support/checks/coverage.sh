@@ -27,7 +27,9 @@ REPORT_DIR="$DIR/../../../target/coverage"
 mkdir -p "$REPORT_DIR"
 
 #Install jacoco cli
-mvn org.apache.maven.plugins:maven-dependency-plugin:3.1.2:copy -Dartifact=org.jacoco:org.jacoco.cli:0.8.5:jar:nodeps
+mvn --non-recursive --no-transfer-progress \
+  org.apache.maven.plugins:maven-dependency-plugin:3.1.2:copy \
+  -Dartifact=org.jacoco:org.jacoco.cli:0.8.5:jar:nodeps
 
 jacoco() {
   java -jar target/dependency/org.jacoco.cli-0.8.5-nodeps.jar "$@"

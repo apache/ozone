@@ -20,12 +20,12 @@ package org.apache.hadoop.ozone.debug;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.rocksdb.*;
 import picocli.CommandLine;
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -87,6 +87,10 @@ public class DBScanner implements Callable<Void> {
   }
 
   private void constructColumnFamilyMap(DBDefinition dbDefinition) {
+    if (dbDefinition == null){
+      System.out.println("Incorrect Db Path");
+      return;
+    }
     this.columnFamilyMap = new HashMap<>();
     DBColumnFamilyDefinition[] columnFamilyDefinitions = dbDefinition
             .getColumnFamilies();
@@ -120,9 +124,8 @@ public class DBScanner implements Callable<Void> {
           List<ColumnFamilyHandle> columnFamilyHandleList,
           RocksDB rocksDB, String dbPath) throws IOException {
     dbPath = removeTrailingSlashIfNeeded(dbPath);
-    if (dbPath.endsWith(new SCMDBDefinition().getName())){
-      this.constructColumnFamilyMap(new SCMDBDefinition());
-    }
+    this.constructColumnFamilyMap(DBDefinitionFactory.
+            getDefinition(new File(dbPath).getName()));
     if (this.columnFamilyMap !=null) {
       if (!this.columnFamilyMap.containsKey(tableName)) {
         System.out.print("Table with specified name does not exist");

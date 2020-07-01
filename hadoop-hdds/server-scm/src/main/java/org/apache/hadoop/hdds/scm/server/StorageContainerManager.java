@@ -34,6 +34,7 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -67,7 +68,7 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
-import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreRDBImpl;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.DeadNodeHandler;
@@ -502,7 +503,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if(configurator.getMetadataStore() != null) {
       scmMetadataStore = configurator.getMetadataStore();
     } else {
-      scmMetadataStore = new SCMMetadataStoreRDBImpl(conf);
+      scmMetadataStore = new SCMMetadataStoreImpl(conf);
     }
   }
 
@@ -1109,5 +1110,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   public NetworkTopology getClusterMap() {
     return this.clusterMap;
+  }
+
+  /**
+   * Get the safe mode status of all rules.
+   *
+   * @return map of rule statuses.
+   */
+  public Map<String, Pair<Boolean, String>> getRuleStatus() {
+    return scmSafeModeManager.getRuleStatus();
   }
 }
