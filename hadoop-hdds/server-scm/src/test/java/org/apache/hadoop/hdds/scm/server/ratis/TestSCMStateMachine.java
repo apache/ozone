@@ -17,8 +17,8 @@
 package org.apache.hadoop.hdds.scm.server.ratis;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.junit.After;
@@ -56,7 +56,7 @@ public class TestSCMStateMachine {
     scmId = UUID.randomUUID().toString();
 
     initSCM();
-    scm = HddsTestUtils.getScm(conf);
+    scm = TestUtils.getScm(conf);
     scm.start();
     scmRatisServer = scm.getScmRatisServer();
     scmStateMachine = scm.getScmRatisServer().getScmStateMachine();

@@ -102,7 +102,11 @@ public class SCMMetadataStoreImpl implements SCMMetadataStore {
 
       pipelineTable = PIPELINES.getTable(store);
 
+      checkTableStatus(pipelineTable, PIPELINES.getName());
+
       containerTable = CONTAINERS.getTable(store);
+
+      checkTableStatus(containerTable, CONTAINERS.getName());
     }
   }
 

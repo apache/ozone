@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
@@ -302,7 +303,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       AuthenticationException {
     scm.stop();
     scm.join();
-    scm = StorageContainerManager.createSCM(conf);
+    scm = TestUtils.getScmSimple(conf);
     scm.start();
     if (waitForDatanode) {
       waitForClusterToBeReady();
@@ -628,7 +629,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       configureSCM();
       SCMStorageConfig scmStore = new SCMStorageConfig(conf);
       initializeScmStorage(scmStore);
-      StorageContainerManager scm = StorageContainerManager.createSCM(conf);
+      StorageContainerManager scm = TestUtils.getScmSimple(conf);
       HealthyPipelineSafeModeRule rule =
           scm.getScmSafeModeManager().getHealthyPipelineSafeModeRule();
       if (rule != null) {

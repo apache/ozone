@@ -36,9 +36,9 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -267,7 +267,7 @@ public final class TestSecureOzoneCluster {
   public void testSecureScmStartupSuccess() throws Exception {
 
     initSCM();
-    scm = StorageContainerManager.createSCM(conf);
+    scm = TestUtils.getScmSimple(conf);
     //Reads the SCM Info from SCM instance
     ScmInfo scmInfo = scm.getClientProtocolServer().getScmInfo();
     assertEquals(clusterId, scmInfo.getClusterId());
@@ -278,7 +278,7 @@ public final class TestSecureOzoneCluster {
   public void testSCMSecurityProtocol() throws Exception {
 
     initSCM();
-    scm = HddsTestUtils.getScm(conf);
+    scm = TestUtils.getScmSimple(conf);
     //Reads the SCM Info from SCM instance
     try {
       scm.start();
@@ -338,7 +338,7 @@ public final class TestSecureOzoneCluster {
 
     LambdaTestUtils.intercept(IOException.class,
         "Running in secure mode, but config doesn't have a keytab",
-        () -> StorageContainerManager.createSCM(conf));
+        () -> TestUtils.getScmSimple(conf));
 
     conf.set(HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
         "scm/_HOST@EXAMPLE.com");
@@ -346,7 +346,7 @@ public final class TestSecureOzoneCluster {
         "/etc/security/keytabs/scm.keytab");
 
     testCommonKerberosFailures(
-        () -> StorageContainerManager.createSCM(conf));
+        () -> TestUtils.getScmSimple(conf));
 
   }
 
@@ -375,7 +375,7 @@ public final class TestSecureOzoneCluster {
   public void testSecureOMInitializationFailure() throws Exception {
     initSCM();
     // Create a secure SCM instance as om client will connect to it
-    scm = StorageContainerManager.createSCM(conf);
+    scm = TestUtils.getScmSimple(conf);
     setupOm(conf);
     conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY,
         "non-existent-user@EXAMPLE.com");
@@ -389,7 +389,7 @@ public final class TestSecureOzoneCluster {
   public void testSecureOmInitializationSuccess() throws Exception {
     initSCM();
     // Create a secure SCM instance as om client will connect to it
-    scm = StorageContainerManager.createSCM(conf);
+    scm = TestUtils.getScmSimple(conf);
     LogCapturer logs = LogCapturer.captureLogs(OzoneManager.getLogger());
     GenericTestUtils.setLogLevel(OzoneManager.getLogger(), INFO);
 
@@ -407,7 +407,7 @@ public final class TestSecureOzoneCluster {
   public void testAccessControlExceptionOnClient() throws Exception {
     initSCM();
     // Create a secure SCM instance as om client will connect to it
-    scm = StorageContainerManager.createSCM(conf);
+    scm = TestUtils.getScmSimple(conf);
     LogCapturer logs = LogCapturer.captureLogs(OzoneManager.getLogger());
     GenericTestUtils.setLogLevel(OzoneManager.getLogger(), INFO);
     setupOm(conf);
@@ -632,7 +632,7 @@ public final class TestSecureOzoneCluster {
 
     initSCM();
     try {
-      scm = HddsTestUtils.getScm(conf);
+      scm = TestUtils.getScmSimple(conf);
       scm.start();
       conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, false);
       OMStorage omStore = new OMStorage(conf);
@@ -678,7 +678,7 @@ public final class TestSecureOzoneCluster {
     omLogs.clearOutput();
     initSCM();
     try {
-      scm = HddsTestUtils.getScm(conf);
+      scm = TestUtils.getScmSimple(conf);
       scm.start();
 
       OMStorage omStore = new OMStorage(conf);

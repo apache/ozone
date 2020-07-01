@@ -36,10 +36,11 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -115,8 +116,13 @@ public class TestContainerPlacement {
     EventQueue eventQueue = new EventQueue();
 
     PipelineManager pipelineManager =
-        new SCMPipelineManager(config, scmNodeManager,
-            scmMetadataStore.getPipelineTable(), eventQueue);
+        PipelineManagerV2Impl.newPipelineManager(
+            config,
+            MockSCMHAManager.getInstance(),
+            scmNodeManager,
+            scmMetadataStore.getPipelineTable(),
+            eventQueue);
+
     return new SCMContainerManager(config, scmMetadataStore.getContainerTable(),
         scmMetadataStore.getStore(),
         pipelineManager);

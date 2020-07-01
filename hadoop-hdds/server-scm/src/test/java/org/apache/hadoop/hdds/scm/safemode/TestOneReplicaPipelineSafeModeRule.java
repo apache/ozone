@@ -27,12 +27,13 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
-import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.test.GenericTestUtils;
 
@@ -50,7 +51,7 @@ public class TestOneReplicaPipelineSafeModeRule {
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
   private OneReplicaPipelineSafeModeRule rule;
-  private SCMPipelineManager pipelineManager;
+  private PipelineManagerV2Impl pipelineManager;
   private EventQueue eventQueue;
 
   private void setup(int nodes, int pipelineFactorThreeCount,
@@ -72,10 +73,12 @@ public class TestOneReplicaPipelineSafeModeRule {
     SCMMetadataStore scmMetadataStore =
             new SCMMetadataStoreImpl(ozoneConfiguration);
 
-    pipelineManager =
-        new SCMPipelineManager(ozoneConfiguration, mockNodeManager,
-            scmMetadataStore.getPipelineTable(),
-            eventQueue);
+    pipelineManager = PipelineManagerV2Impl.newPipelineManager(
+        ozoneConfiguration,
+        MockSCMHAManager.getInstance(),
+        mockNodeManager,
+        scmMetadataStore.getPipelineTable(),
+        eventQueue);
     pipelineManager.allowPipelineCreation();
 
     PipelineProvider mockRatisProvider =

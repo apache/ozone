@@ -26,6 +26,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys
 import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.junit.Assert.fail;
+
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.junit.Ignore;
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Matchers.eq;
@@ -490,7 +492,7 @@ public class TestStorageContainerManager {
     exception.expect(SCMException.class);
     exception.expectMessage(
         "SCM not initialized due to storage config failure");
-    StorageContainerManager.createSCM(conf);
+    TestUtils.getScmSimple(conf);
   }
 
   @Test
@@ -508,7 +510,7 @@ public class TestStorageContainerManager {
       scmStore.setScmId(scmId);
       // writes the version file properties
       scmStore.initialize();
-      StorageContainerManager scm = StorageContainerManager.createSCM(conf);
+      StorageContainerManager scm = TestUtils.getScmSimple(conf);
       //Reads the SCM Info from SCM instance
       ScmInfo scmInfo = scm.getClientProtocolServer().getScmInfo();
       Assert.assertEquals(clusterId, scmInfo.getClusterId());
