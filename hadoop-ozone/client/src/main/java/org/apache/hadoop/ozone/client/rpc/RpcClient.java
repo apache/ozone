@@ -641,6 +641,42 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public OzoneOutputStream createKey(String volumeName, String bucketName,
+      String keyName, long size, String storageClass,
+      Map<String, String> metadata) throws IOException {
+
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    HddsClientUtils.checkNotNull(storageClass);
+    String requestId = UUID.randomUUID().toString();
+
+    OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setDataSize(size)
+        //        .setStorageClass(storageClass)
+        .addAllMetadata(metadata)
+        .setAcls(getAclList());
+
+    if (Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
+      try {
+        GDPRSymmetricKey gKey = new GDPRSymmetricKey(new SecureRandom());
+        builder.addAllMetadata(gKey.getKeyDetails());
+      } catch (Exception e) {
+        if (e instanceof InvalidKeyException &&
+            e.getMessage().contains("Illegal key size or default parameters")) {
+          LOG.error("Missing Unlimited Strength Policy jars. Please install " +
+              "Java Cryptography Extension (JCE) Unlimited Strength " +
+              "Jurisdiction Policy Files");
+        }
+        throw new IOException(e);
+      }
+    }
+    return null;
+  }
+
+  @Override
   public OzoneOutputStream createKey(
       String volumeName, String bucketName, String keyName, long size,
       ReplicationType type, ReplicationFactor factor,

@@ -363,13 +363,33 @@ public class OzoneBucket extends WithMetadata {
 
   /**
    * Creates a new key in the bucket.
-   * @param key Name of the key to be created.
-   * @param size Size of the data the key will point to.
-   * @param type Replication type to be used.
+   *
+   * @param key    Name of the key to be created.
+   * @param size   Size of the data the key will point to.
+   * @param type   Replication type to be used.
    * @param factor Replication factor of the key.
    * @return OzoneOutputStream to which the data has to be written.
    * @throws IOException
    */
+  @Deprecated
+  public OzoneOutputStream createKey(String key, long size,
+      String storageClass,
+      Map<String, String> keyMetadata)
+      throws IOException {
+    return proxy.createKey(volumeName, name, key, size, storageClass, keyMetadata);
+  }
+
+  /**
+   * Creates a new key in the bucket.
+   *
+   * @param key    Name of the key to be created.
+   * @param size   Size of the data the key will point to.
+   * @param type   Replication type to be used.
+   * @param factor Replication factor of the key.
+   * @return OzoneOutputStream to which the data has to be written.
+   * @throws IOException
+   */
+  @Deprecated
   public OzoneOutputStream createKey(String key, long size,
                                      ReplicationType type,
                                      ReplicationFactor factor,

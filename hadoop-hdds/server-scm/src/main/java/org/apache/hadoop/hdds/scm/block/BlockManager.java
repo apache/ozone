@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.List;
 
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
@@ -45,8 +44,10 @@ public interface BlockManager extends Closeable,
    * @return AllocatedBlock
    * @throws IOException
    */
-  AllocatedBlock allocateBlock(long size, HddsProtos.ReplicationType type,
-      HddsProtos.ReplicationFactor factor, String owner,
+  AllocatedBlock allocateBlock(
+      long size,
+      String storageClass,
+      String owner,
       ExcludeList excludeList) throws IOException;
 
   /**

@@ -18,33 +18,28 @@
 
 package org.apache.hadoop.hdds.scm.container.states;
 
-import com.google.common.base.Preconditions;
-
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.Set;
 import java.util.Collections;
 import java.util.Map;
 import java.util.NavigableSet;
+import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.concurrent.ConcurrentHashMap;
 
-import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes
-    .CONTAINER_EXISTS;
-import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes
-    .FAILED_TO_CHANGE_CONTAINER_STATE;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+
+import com.google.common.base.Preconditions;
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.CONTAINER_EXISTS;
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_CHANGE_CONTAINER_STATE;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Container State Map acts like a unified map for various attributes that are
@@ -86,8 +81,7 @@ public class ContainerStateMap {
 
   private final ContainerAttribute<LifeCycleState> lifeCycleStateMap;
   private final ContainerAttribute<String> ownerMap;
-  private final ContainerAttribute<ReplicationFactor> factorMap;
-  private final ContainerAttribute<ReplicationType> typeMap;
+  private final ContainerAttribute<String> storageClassMap;
   private final Map<ContainerID, ContainerInfo> containerMap;
   private final Map<ContainerID, Set<ContainerReplica>> replicaMap;
   private final Map<ContainerQueryKey, NavigableSet<ContainerID>> resultCache;
@@ -103,8 +97,7 @@ public class ContainerStateMap {
   public ContainerStateMap() {
     this.lifeCycleStateMap = new ContainerAttribute<>();
     this.ownerMap = new ContainerAttribute<>();
-    this.factorMap = new ContainerAttribute<>();
-    this.typeMap = new ContainerAttribute<>();
+    this.storageClassMap = new ContainerAttribute<>();
     this.containerMap = new ConcurrentHashMap<>();
     this.lock = new ReentrantReadWriteLock();
     this.replicaMap = new ConcurrentHashMap<>();
@@ -135,8 +128,7 @@ public class ContainerStateMap {
 
       lifeCycleStateMap.insert(info.getState(), id);
       ownerMap.insert(info.getOwner(), id);
-      factorMap.insert(info.getReplicationFactor(), id);
-      typeMap.insert(info.getReplicationType(), id);
+      storageClassMap.insert(info.getStorageClass(), id);
       replicaMap.put(id, ConcurrentHashMap.newKeySet());
 
       // Flush the cache of this container type, will be added later when
@@ -165,8 +157,7 @@ public class ContainerStateMap {
       final ContainerInfo info = containerMap.remove(containerID);
       lifeCycleStateMap.remove(info.getState(), containerID);
       ownerMap.remove(info.getOwner(), containerID);
-      factorMap.remove(info.getReplicationFactor(), containerID);
-      typeMap.remove(info.getReplicationType(), containerID);
+      storageClassMap.remove(info.getStorageClass(), containerID);
       // Flush the cache of this container type.
       flushCache(info);
       LOG.trace("Removed container with {} successfully.", containerID);
@@ -360,33 +351,17 @@ public class ContainerStateMap {
   }
 
   /**
-   * Returns Containers in the System by the Type.
-   *
-   * @param type - Replication type -- StandAlone, Ratis etc.
-   * @return NavigableSet
-   */
-  NavigableSet<ContainerID> getContainerIDsByType(final ReplicationType type) {
-    Preconditions.checkNotNull(type);
-    lock.readLock().lock();
-    try {
-      return typeMap.getCollection(type);
-    } finally {
-      lock.readLock().unlock();
-    }
-  }
-
-  /**
    * Returns Containers by replication factor.
    *
    * @param factor - Replication Factor.
    * @return NavigableSet.
    */
-  NavigableSet<ContainerID> getContainerIDsByFactor(
-      final ReplicationFactor factor) {
-    Preconditions.checkNotNull(factor);
+  NavigableSet<ContainerID> getContainerIDsByStorageClass(
+      final String storageClass) {
+    Preconditions.checkNotNull(storageClass);
     lock.readLock().lock();
     try {
-      return factorMap.getCollection(factor);
+      return storageClassMap.getCollection(storageClass);
     } finally {
       lock.readLock().unlock();
     }
@@ -414,23 +389,20 @@ public class ContainerStateMap {
    *
    * @param state - LifeCycleState
    * @param owner - Owner
-   * @param factor - Replication Factor
-   * @param type - Replication Type
+   * @param storageClass - StorageClass
    * @return ContainerInfo or Null if not container satisfies the criteria.
    */
   public NavigableSet<ContainerID> getMatchingContainerIDs(
-      final LifeCycleState state, final String owner,
-      final ReplicationFactor factor, final ReplicationType type) {
+      final LifeCycleState state, final String owner, String storageClass) {
 
     Preconditions.checkNotNull(state, "State cannot be null");
     Preconditions.checkNotNull(owner, "Owner cannot be null");
-    Preconditions.checkNotNull(factor, "Factor cannot be null");
-    Preconditions.checkNotNull(type, "Type cannot be null");
+    Preconditions.checkNotNull(storageClass, "StorageClass cannot be null");
 
     lock.readLock().lock();
     try {
       final ContainerQueryKey queryKey =
-          new ContainerQueryKey(state, owner, factor, type);
+          new ContainerQueryKey(state, owner, storageClass);
       if(resultCache.containsKey(queryKey)){
         return resultCache.get(queryKey);
       }
@@ -450,22 +422,15 @@ public class ContainerStateMap {
         return EMPTY_SET;
       }
 
-      final NavigableSet<ContainerID> factorSet =
-          factorMap.getCollection(factor);
-      if (factorSet.size() == 0) {
+      final NavigableSet<ContainerID> storageClassSet =
+          storageClassMap.getCollection(storageClass);
+      if (storageClassSet.size() == 0) {
         return EMPTY_SET;
       }
-
-      final NavigableSet<ContainerID> typeSet =
-          typeMap.getCollection(type);
-      if (typeSet.size() == 0) {
-        return EMPTY_SET;
-      }
-
 
       // if we add more constraints we will just add those sets here..
       final NavigableSet<ContainerID>[] sets = sortBySize(stateSet,
-          ownerSet, factorSet, typeSet);
+          ownerSet, storageClassSet);
 
       NavigableSet<ContainerID> currentSet = sets[0];
       // We take the smallest set and intersect against the larger sets. This
@@ -529,8 +494,7 @@ public class ContainerStateMap {
       final ContainerQueryKey key = new ContainerQueryKey(
           containerInfo.getState(),
           containerInfo.getOwner(),
-          containerInfo.getReplicationFactor(),
-          containerInfo.getReplicationType());
+          containerInfo.getStorageClass());
       resultCache.remove(key);
     }
   }

@@ -158,9 +158,11 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
       AllocateScmBlockRequestProto request)
       throws IOException {
     List<AllocatedBlock> allocatedBlocks =
-        impl.allocateBlock(request.getSize(),
-            request.getNumBlocks(), request.getType(),
-            request.getFactor(), request.getOwner(),
+        impl.allocateBlock(
+            request.getSize(),
+            request.getNumBlocks(),
+            request.getOwner(),
+            request.getStorageClass(),
             ExcludeList.getFromProtoBuf(request.getExcludeList()));
 
     AllocateScmBlockResponseProto.Builder builder =

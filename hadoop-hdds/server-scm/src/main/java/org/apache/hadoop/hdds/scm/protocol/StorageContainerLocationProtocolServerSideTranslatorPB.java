@@ -283,8 +283,9 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public ContainerResponseProto allocateContainer(ContainerRequestProto request)
       throws IOException {
     ContainerWithPipeline containerWithPipeline = impl
-        .allocateContainer(request.getReplicationType(),
-            request.getReplicationFactor(), request.getOwner());
+        .allocateContainer(
+            request.getStorageClass(),
+            request.getOwner());
     return ContainerResponseProto.newBuilder()
         .setContainerWithPipeline(containerWithPipeline.getProtobuf())
         .setErrorCode(ContainerResponseProto.Error.success)

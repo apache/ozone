@@ -1383,6 +1383,11 @@
                 "id": 7,
                 "name": "excludeList",
                 "type": "ExcludeListProto"
+              },
+              {
+                "id": 8,
+                "name": "storageClass",
+                "type": "string"
               }
             ]
           },

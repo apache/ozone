@@ -17,20 +17,18 @@
  */
 package org.apache.hadoop.hdds.scm.protocol;
 
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.security.KerberosInfo;
-import org.apache.hadoop.hdds.scm.ScmInfo;
-import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.ozone.common.BlockGroup;
-import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
-
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
+import org.apache.hadoop.security.KerberosInfo;
 
 /**
  * ScmBlockLocationProtocol is used by an HDFS node to find the set of nodes
@@ -51,15 +49,14 @@ public interface ScmBlockLocationProtocol extends Closeable {
    * set of datanodes that should be used creating this block.
    * @param size - size of the block.
    * @param numBlocks - number of blocks.
-   * @param type - replication type of the blocks.
-   * @param factor - replication factor of the blocks.
+   * @param storageClassName - name of the storageClass
    * @param excludeList List of datanodes/containers to exclude during block
    *                    allocation.
    * @return allocated block accessing info (key, pipeline).
    * @throws IOException
    */
   List<AllocatedBlock> allocateBlock(long size, int numBlocks,
-      ReplicationType type, ReplicationFactor factor, String owner,
+      String owner, String storageClassName,
       ExcludeList excludeList) throws IOException;
 
   /**

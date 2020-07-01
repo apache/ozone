@@ -125,24 +125,26 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
    * set of datanodes that should be used creating this block.
    * @param size - size of the block.
    * @param num - number of blocks.
-   * @param type - replication type of the blocks.
-   * @param factor - replication factor of the blocks.
+   * @param storageClassName - name of the storageClass
    * @param excludeList - exclude list while allocating blocks.
    * @return allocated block accessing info (key, pipeline).
    * @throws IOException
    */
   @Override
-  public List<AllocatedBlock> allocateBlock(long size, int num,
-      HddsProtos.ReplicationType type, HddsProtos.ReplicationFactor factor,
-      String owner, ExcludeList excludeList) throws IOException {
+  public List<AllocatedBlock> allocateBlock(
+      long size,
+      int num,
+      String owner,
+      String storageClassName,
+      ExcludeList excludeList
+  ) throws IOException {
     Preconditions.checkArgument(size > 0, "block size must be greater than 0");
 
     AllocateScmBlockRequestProto request =
         AllocateScmBlockRequestProto.newBuilder()
             .setSize(size)
             .setNumBlocks(num)
-            .setType(type)
-            .setFactor(factor)
+            .setStorageClass(storageClassName)
             .setOwner(owner)
             .setExcludeList(excludeList.getProtoBuf())
             .build();

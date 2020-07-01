@@ -18,9 +18,10 @@
 
 package org.apache.hadoop.hdds.scm.container.states;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 /**
  * Key for the Caching layer for Container Query.
@@ -28,8 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 public class ContainerQueryKey {
   private final HddsProtos.LifeCycleState state;
   private final String owner;
-  private final HddsProtos.ReplicationFactor factor;
-  private final HddsProtos.ReplicationType type;
+  private final String storageClass;
 
   @Override
   public boolean equals(Object o) {
@@ -46,8 +46,7 @@ public class ContainerQueryKey {
     return new EqualsBuilder()
         .append(getState(), that.getState())
         .append(getOwner(), that.getOwner())
-        .append(getFactor(), that.getFactor())
-        .append(getType(), that.getType())
+        .append(getStorageClass(), that.getStorageClass())
         .isEquals();
   }
 
@@ -56,8 +55,8 @@ public class ContainerQueryKey {
     return new HashCodeBuilder(61, 71)
         .append(getState())
         .append(getOwner())
-        .append(getFactor())
-        .append(getType())
+        .append(getStorageClass())
+
         .toHashCode();
   }
 
@@ -65,15 +64,13 @@ public class ContainerQueryKey {
    * Constructor for ContainerQueryKey.
    * @param state LifeCycleState
    * @param owner - Name of the Owner.
-   * @param factor Replication Factor.
-   * @param type - Replication Type.
+   * @param storageClass - StorageClass
    */
   public ContainerQueryKey(HddsProtos.LifeCycleState state, String owner,
-      HddsProtos.ReplicationFactor factor, HddsProtos.ReplicationType type) {
+      String storageClass) {
     this.state = state;
     this.owner = owner;
-    this.factor = factor;
-    this.type = type;
+    this.storageClass = storageClass;
   }
 
   /**
@@ -93,18 +90,9 @@ public class ContainerQueryKey {
   }
 
   /**
-   * Returns the replication factor of containers which this key represents.
-   * @return ReplicationFactor
+   * Returns the storageClass of this specific container.
    */
-  public HddsProtos.ReplicationFactor getFactor() {
-    return factor;
-  }
-
-  /**
-   * Returns the replication type of containers which this key represents.
-   * @return ReplicationType
-   */
-  public HddsProtos.ReplicationType getType() {
-    return type;
+  public String getStorageClass() {
+    return storageClass;
   }
 }

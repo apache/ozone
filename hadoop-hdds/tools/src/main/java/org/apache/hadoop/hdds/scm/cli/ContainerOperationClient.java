@@ -32,7 +32,6 @@ import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
@@ -69,10 +68,10 @@ public class ContainerOperationClient implements ScmClient {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerOperationClient.class);
   private final long containerSizeB;
-  private final HddsProtos.ReplicationFactor replicationFactor;
-  private final HddsProtos.ReplicationType replicationType;
   private final StorageContainerLocationProtocol
       storageContainerLocationClient;
+
+  private final String storageClass = "STANDARD";
 
   public XceiverClientManager getXceiverClientManager() {
     return xceiverClientManager;
@@ -85,16 +84,7 @@ public class ContainerOperationClient implements ScmClient {
     this.xceiverClientManager = newXCeiverClientManager(conf);
     containerSizeB = (int) conf.getStorageSize(OZONE_SCM_CONTAINER_SIZE,
         OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
-    boolean useRatis = conf.getBoolean(
-        ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY,
-        ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT);
-    if (useRatis) {
-      replicationFactor = HddsProtos.ReplicationFactor.THREE;
-      replicationType = HddsProtos.ReplicationType.RATIS;
-    } else {
-      replicationFactor = HddsProtos.ReplicationFactor.ONE;
-      replicationType = HddsProtos.ReplicationType.STAND_ALONE;
-    }
+
   }
 
   private XceiverClientManager newXCeiverClientManager(ConfigurationSource conf)
@@ -146,7 +136,7 @@ public class ContainerOperationClient implements ScmClient {
     try {
       ContainerWithPipeline containerWithPipeline =
           storageContainerLocationClient.
-              allocateContainer(replicationType, replicationFactor, owner);
+              allocateContainer(owner, storageClass);
 
       Pipeline pipeline = containerWithPipeline.getPipeline();
       client = xceiverClientManager.acquireClient(pipeline);
@@ -241,7 +231,7 @@ public class ContainerOperationClient implements ScmClient {
     try {
       // allocate container on SCM.
       ContainerWithPipeline containerWithPipeline =
-          storageContainerLocationClient.allocateContainer(type, factor,
+          storageContainerLocationClient.allocateContainer(storageClass,
               owner);
       Pipeline pipeline = containerWithPipeline.getPipeline();
       // connect to pipeline leader and allocate container on leader datanode.
@@ -378,7 +368,7 @@ public class ContainerOperationClient implements ScmClient {
    * @param containerID - ID of the container.
    * @param pipeline    - Pipeline where the container is located.
    * @return ContainerInfo
-   * @throws IOException
+   * OzoneManagerProtocol.proto@throws IOException
    */
   @Override
   public ContainerDataProto readContainer(long containerID,

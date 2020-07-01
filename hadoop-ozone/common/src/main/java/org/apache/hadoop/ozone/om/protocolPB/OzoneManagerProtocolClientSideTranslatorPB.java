@@ -171,7 +171,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * method has no effect.
    * <p>
    * <p> As noted in {@link AutoCloseable#close()}, cases where the
-   * close may fail require careful attention. It is strongly advised
+   * close may fail require careful attention. It i-s strongly advised
    * to relinquish the underlying resources and to internally
    * <em>mark</em> the {@code Closeable} as closed, prior to throwing
    * the {@code IOException}.

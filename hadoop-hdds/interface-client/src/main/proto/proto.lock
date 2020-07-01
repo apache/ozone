@@ -1732,6 +1732,11 @@
                 "id": 11,
                 "name": "replicationType",
                 "type": "ReplicationType"
+              },
+              {
+                "id": 12,
+                "name": "storageClass",
+                "type": "string"
               }
             ]
           },

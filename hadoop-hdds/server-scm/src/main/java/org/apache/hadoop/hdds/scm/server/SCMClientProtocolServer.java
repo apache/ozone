@@ -181,14 +181,14 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public ContainerWithPipeline allocateContainer(HddsProtos.ReplicationType
-      replicationType, HddsProtos.ReplicationFactor factor,
+  public ContainerWithPipeline allocateContainer(
+      String storageClass,
       String owner) throws IOException {
     ScmUtils.preCheck(ScmOps.allocateContainer, safeModePrecheck);
     getScm().checkAdminAccess(getRpcRemoteUsername());
 
     final ContainerInfo container = scm.getContainerManager()
-        .allocateContainer(replicationType, factor, owner);
+        .allocateContainer(storageClass, owner);
     final Pipeline pipeline = scm.getPipelineManager()
         .getPipeline(container.getPipelineID());
     return new ContainerWithPipeline(container, pipeline);

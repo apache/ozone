@@ -18,30 +18,31 @@
 
 package org.apache.hadoop.hdds.scm.container.states;
 
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 
 /**
  * Class that acts as the container state.
  */
 public class ContainerState {
-  private final String owner;
+  private final String storageClass;
   private final PipelineID pipelineID;
 
   /**
    * Constructs a Container Key.
    *
-   * @param owner - Container Owners
+   * @param owner      - Container Owners
    * @param pipelineID - ID of the pipeline
    */
-  public ContainerState(String owner, PipelineID pipelineID) {
+  public ContainerState(String storageClass, PipelineID pipelineID) {
     this.pipelineID = pipelineID;
-    this.owner = owner;
+    this.storageClass = storageClass;
   }
 
   public String getOwner() {
-    return owner;
+    return storageClass;
   }
 
   @Override
@@ -57,7 +58,7 @@ public class ContainerState {
     ContainerState that = (ContainerState) o;
 
     return new EqualsBuilder()
-        .append(owner, that.owner)
+        .append(storageClass, that.storageClass)
         .append(pipelineID, that.pipelineID)
         .isEquals();
   }
@@ -65,7 +66,7 @@ public class ContainerState {
   @Override
   public int hashCode() {
     return new HashCodeBuilder(137, 757)
-        .append(owner)
+        .append(storageClass)
         .append(pipelineID)
         .toHashCode();
   }
@@ -73,7 +74,7 @@ public class ContainerState {
   @Override
   public String toString() {
     return "ContainerKey{" +
-        ", owner=" + owner +
+        ", storageClass=" + storageClass +
         ", pipelineID=" + pipelineID +
         '}';
   }

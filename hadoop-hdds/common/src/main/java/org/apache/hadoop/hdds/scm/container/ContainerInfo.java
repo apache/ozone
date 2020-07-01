@@ -50,8 +50,11 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   private HddsProtos.LifeCycleState state;
   @JsonIgnore
   private PipelineID pipelineID;
+  @Deprecated
   private ReplicationFactor replicationFactor;
+  @Deprecated
   private ReplicationType replicationType;
+  private String storageClass;
   private long usedBytes;
   private long numberOfKeys;
   private Instant lastUsed;
@@ -72,6 +75,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   private byte[] data;
 
   @SuppressWarnings("parameternumber")
+  @Deprecated
   ContainerInfo(
       long containerID,
       HddsProtos.LifeCycleState state,
@@ -96,6 +100,35 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     this.sequenceId = sequenceId;
     this.replicationFactor = replicationFactor;
     this.replicationType = repType;
+  }
+
+  @SuppressWarnings("parameternumber")
+  ContainerInfo(
+      long containerID,
+      HddsProtos.LifeCycleState state,
+      PipelineID pipelineID,
+      long usedBytes,
+      long numberOfKeys,
+      long stateEnterTime,
+      String owner,
+      long deleteTransactionId,
+      long sequenceId,
+      ReplicationFactor replicationFactor,
+      ReplicationType repType,
+      String storageClass) {
+    this.containerID = containerID;
+    this.pipelineID = pipelineID;
+    this.usedBytes = usedBytes;
+    this.numberOfKeys = numberOfKeys;
+    this.lastUsed = Instant.ofEpochMilli(Time.now());
+    this.state = state;
+    this.stateEnterTime = Instant.ofEpochMilli(stateEnterTime);
+    this.owner = owner;
+    this.deleteTransactionId = deleteTransactionId;
+    this.sequenceId = sequenceId;
+    this.replicationFactor = replicationFactor;
+    this.replicationType = repType;
+    this.storageClass = storageClass;
   }
 
   /**
@@ -192,6 +225,10 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
 
   public ReplicationType getReplicationType() {
     return replicationType;
+  }
+
+  public String getStorageClass() {
+    return storageClass;
   }
 
   public void updateLastUsedTime() {
@@ -377,6 +414,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     private PipelineID pipelineID;
     private ReplicationFactor replicationFactor;
     private ReplicationType replicationType;
+    private String storageClass;
 
     public Builder setReplicationType(
         ReplicationType repType) {
@@ -435,11 +473,17 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
       return this;
     }
 
+    public Builder setStorageClass(String storageClass) {
+      this.storageClass = storageClass;
+      return this;
+    }
+
     public ContainerInfo build() {
       return new ContainerInfo(containerID, state, pipelineID,
           used, keys, stateEnterTime, owner, deleteTransactionId,
-          sequenceId, replicationFactor, replicationType);
+          sequenceId, replicationFactor, replicationType, storageClass);
     }
+
   }
 
   /**

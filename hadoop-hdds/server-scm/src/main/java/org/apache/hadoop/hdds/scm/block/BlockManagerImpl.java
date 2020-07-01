@@ -25,6 +25,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
+import org.apache.hadoop.hdds.StorageClass;
+import org.apache.hadoop.hdds.StorageClassRegistry;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -78,6 +81,9 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   private ObjectName mxBean;
   private SafeModePrecheck safeModePrecheck;
 
+  private StorageClassRegistry storageClassRegistry =
+      new StaticStorageClassRegistry();
+
   /**
    * Constructor.
    *
@@ -86,12 +92,12 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
    * @throws IOException
    */
   public BlockManagerImpl(final ConfigurationSource conf,
-                          final StorageContainerManager scm) {
+      final StorageContainerManager scm) {
     Objects.requireNonNull(scm, "SCM cannot be null");
     this.pipelineManager = scm.getPipelineManager();
     this.containerManager = scm.getContainerManager();
 
-    this.containerSize = (long)conf.getStorageSize(
+    this.containerSize = (long) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES);
@@ -139,20 +145,23 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   /**
    * Allocates a block in a container and returns that info.
    *
-   * @param size - Block Size
-   * @param type Replication Type
-   * @param factor - Replication Factor
-   * @param excludeList List of datanodes/containers to exclude during block
-   *                    allocation.
+   * @param size             - Block Size
+   * @param storageClassName StorageClass
+   * @param excludeList      List of datanodes/containers to exclude during
+   *                         block
+   *                         allocation.
    * @return Allocated block
    * @throws IOException on failure.
    */
   @Override
-  public AllocatedBlock allocateBlock(final long size, ReplicationType type,
-      ReplicationFactor factor, String owner, ExcludeList excludeList)
+  public AllocatedBlock allocateBlock(
+      final long size,
+      String storageClassName,
+      String owner,
+      ExcludeList excludeList)
       throws IOException {
     if (LOG.isTraceEnabled()) {
-      LOG.trace("Size : {} , type : {}, factor : {} ", size, type, factor);
+      LOG.trace("Size : {} , storageClassName : {} ", size, storageClassName);
     }
     ScmUtils.preCheck(ScmOps.allocateBlock, safeModePrecheck);
     if (size < 0 || size > containerSize) {
@@ -176,6 +185,15 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     */
 
     ContainerInfo containerInfo;
+
+    final StorageClass storageClass =
+        storageClassRegistry.getStorageClass(storageClassName);
+
+    final ReplicationFactor factor =
+        storageClass.getOpenStateConfiguration().getReplicationFactor();
+
+    final ReplicationType type =
+        storageClass.getOpenStateConfiguration().getReplicationType();
 
     while (true) {
       List<Pipeline> availablePipelines =
@@ -229,7 +247,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
 
       // look for OPEN containers that match the criteria.
       containerInfo = containerManager.getMatchingContainer(size, owner,
-          pipeline, excludeList.getContainerIds());
+          storageClassName, pipeline, excludeList.getContainerIds());
 
       if (containerInfo != null) {
         return newBlock(containerInfo);

@@ -18,7 +18,6 @@ package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -33,8 +32,6 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -246,26 +243,29 @@ public class SCMContainerManager implements ContainerManager {
     }
   }
 
-
   /**
    * Allocates a new container.
    *
-   * @param replicationFactor - replication factor of the container.
-   * @param owner - The string name of the Service that owns this container.
+   * @param storageClass - String storage class.
+   * @param owner        - The string name of the Service that owns this
+   *                     container.
    * @return - Pipeline that makes up this container.
    * @throws IOException - Exception
    */
   @Override
-  public ContainerInfo allocateContainer(final ReplicationType type,
-      final ReplicationFactor replicationFactor, final String owner)
+  public ContainerInfo allocateContainer(
+      String storageClass,
+      final String owner
+  )
       throws IOException {
     try {
       lock.lock();
       ContainerInfo containerInfo = null;
       try {
         containerInfo =
-            containerStateManager.allocateContainer(pipelineManager, type,
-              replicationFactor, owner);
+            containerStateManager.allocateContainer(pipelineManager,
+                storageClass,
+                owner);
       } catch (IOException ex) {
         scmContainerManagerMetrics.incNumFailureCreateContainers();
         throw ex;
@@ -415,39 +415,50 @@ public class SCMContainerManager implements ContainerManager {
    * @param pipeline     - Pipeline to which the container should belong.
    * @return ContainerInfo, null if there is no match found.
    */
-  public ContainerInfo getMatchingContainer(final long sizeRequired,
-      String owner, Pipeline pipeline) {
-    return getMatchingContainer(sizeRequired, owner, pipeline,
+  public ContainerInfo getMatchingContainer(
+      final long sizeRequired,
+      String owner,
+      String storageClassName,
+      Pipeline pipeline
+  ) {
+    return getMatchingContainer(
+        sizeRequired,
+        owner,
+        storageClassName,
+        pipeline,
         Collections.emptySet());
   }
 
   @SuppressWarnings("squid:S2445")
-  public ContainerInfo getMatchingContainer(final long sizeRequired,
-                                            String owner, Pipeline pipeline,
-                                            Collection<ContainerID>
-                                                      excludedContainers) {
+  public ContainerInfo getMatchingContainer(
+      final long sizeRequired,
+      String owner,
+      String storageClassName,
+      Pipeline pipeline,
+      Set<ContainerID> excludedContainers
+  ) {
     NavigableSet<ContainerID> containerIDs;
     ContainerInfo containerInfo;
     try {
       synchronized (pipeline) {
-        containerIDs = getContainersForOwner(pipeline, owner);
+        containerIDs = getContainersForOwner(storageClassName, pipeline, owner);
 
         if (containerIDs.size() < numContainerPerOwnerInPipeline) {
           containerInfo =
-                  containerStateManager.allocateContainer(
-                          pipelineManager, owner, pipeline);
+              containerStateManager.allocateContainer(
+                  storageClassName, pipelineManager, owner, pipeline);
           // Add to DB
           addContainerToDB(containerInfo);
         } else {
           containerIDs.removeAll(excludedContainers);
           containerInfo =
-                  containerStateManager.getMatchingContainer(
-                          sizeRequired, owner, pipeline.getId(), containerIDs);
+              containerStateManager.getMatchingContainer(storageClassName,
+                  sizeRequired, pipeline.getId(), containerIDs);
           if (containerInfo == null) {
             containerInfo =
-                    containerStateManager.
-                            allocateContainer(pipelineManager, owner,
-                                    pipeline);
+                containerStateManager.
+                    allocateContainer(storageClassName, pipelineManager, owner,
+                        pipeline);
             // Add to DB
             addContainerToDB(containerInfo);
           }
@@ -498,19 +509,23 @@ public class SCMContainerManager implements ContainerManager {
 
   /**
    * Returns the container ID's matching with specified owner.
+   *
    * @param pipeline
    * @param owner
    * @return NavigableSet<ContainerID>
    */
   private NavigableSet<ContainerID> getContainersForOwner(
-      Pipeline pipeline, String owner) throws IOException {
+      String storageClassName, Pipeline pipeline, String owner
+  )
+      throws IOException {
     NavigableSet<ContainerID> containerIDs =
         pipelineManager.getContainersInPipeline(pipeline.getId());
     Iterator<ContainerID> containerIDIterator = containerIDs.iterator();
     while (containerIDIterator.hasNext()) {
       ContainerID cid = containerIDIterator.next();
       try {
-        if (!getContainer(cid).getOwner().equals(owner)) {
+        if (!getContainer(cid).getOwner().equals(owner) ||
+            !getContainer(cid).getStorageClass().equals(storageClassName)) {
           containerIDIterator.remove();
         }
       } catch (ContainerNotFoundException e) {

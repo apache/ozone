@@ -425,6 +425,11 @@
                 "id": 5,
                 "name": "traceID",
                 "type": "string"
+              },
+              {
+                "id": 6,
+                "name": "storageClass",
+                "type": "string"
               }
             ]
           },

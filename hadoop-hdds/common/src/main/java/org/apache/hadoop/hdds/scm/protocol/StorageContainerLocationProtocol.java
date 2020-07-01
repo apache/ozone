@@ -17,20 +17,20 @@
 
 package org.apache.hadoop.hdds.scm.protocol;
 
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.hdds.scm.ScmInfo;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.security.KerberosInfo;
+
+import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * ContainerLocationProtocol is used by an HDFS node to find the set of nodes
@@ -52,8 +52,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
    *
    */
   ContainerWithPipeline allocateContainer(
-      HddsProtos.ReplicationType replicationType,
-      HddsProtos.ReplicationFactor factor, String owner)
+      String owner,
+      String storageClass)
       throws IOException;
 
   /**
