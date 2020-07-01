@@ -21,7 +21,7 @@ package org.apache.hadoop.hdds.conf;
 /**
  * The configuration class for the Prometheus endpoint.
  */
-@ConfigGroup(prefix = "hdds.prometheus.")
+@ConfigGroup(prefix = "hdds.prometheus")
 public class HddsPrometheusConfig {
 
   @Config(key = "endpoint.token",
