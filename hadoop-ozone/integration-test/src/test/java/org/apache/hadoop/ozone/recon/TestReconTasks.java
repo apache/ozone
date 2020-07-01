@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.test.LambdaTestUtils;
+import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.After;
 import org.junit.Before;
@@ -116,7 +117,9 @@ public class TestReconTasks {
     LambdaTestUtils.await(120000, 10000, () -> {
       List<UnhealthyContainers> allMissingContainers =
           reconContainerManager.getContainerSchemaManager()
-              .getAllMissingContainers();
+              .getUnhealthyContainers(
+                  ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
+                  0, 1000);
       return (allMissingContainers.size() == 1);
     });
 
@@ -125,7 +128,9 @@ public class TestReconTasks {
     LambdaTestUtils.await(120000, 10000, () -> {
       List<UnhealthyContainers> allMissingContainers =
           reconContainerManager.getContainerSchemaManager()
-              .getAllMissingContainers();
+              .getUnhealthyContainers(
+                  ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
+                  0, 1000);
       return (allMissingContainers.isEmpty());
     });
   }
