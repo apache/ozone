@@ -540,20 +540,19 @@ public class BasicRootedOzoneClientAdapterImpl
           Path bucketPath = new Path(volumePath, bucket.getName());
           Path trashRoot = new Path(bucketPath, FileSystem.TRASH_PREFIX);
           if (allUsers) {
-            if (!fs.exists(trashRoot)) {
-              continue;
-            }
-            for (FileStatus candidate : fs.listStatus(trashRoot)) {
-              if (fs.exists(candidate.getPath())) {
-                ret.add(candidate);
+            if (fs.exists(trashRoot)) {
+              for (FileStatus candidate : fs.listStatus(trashRoot)) {
+                if (fs.exists(candidate.getPath()) && candidate.isDirectory()) {
+                  ret.add(candidate);
+                }
               }
             }
           } else {
             Path userTrash = new Path(trashRoot, username);
-            if (!fs.exists(userTrash)) {
-              continue;
+            if (fs.exists(userTrash) &&
+                fs.getFileStatus(userTrash).isDirectory()) {
+              ret.add(fs.getFileStatus(userTrash));
             }
-            ret.add(fs.getFileStatus(userTrash));
           }
         }
       }
