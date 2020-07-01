@@ -20,14 +20,15 @@ package org.apache.hadoop.ozone.debug;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -48,7 +49,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import org.apache.ratis.protocol.ClientId;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
@@ -66,7 +66,6 @@ public class ChunkKeyHandler  extends KeyHandler {
   private ContainerOperationClient containerOperationClient;
   private  XceiverClientManager xceiverClientManager;
   private XceiverClientSpi xceiverClient;
-  private final ClientId clientId = ClientId.randomId();
   private OzoneManagerProtocol ozoneManagerClient;
 
   private String getChunkLocationPath(String containerLocation) {
@@ -75,7 +74,7 @@ public class ChunkKeyHandler  extends KeyHandler {
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
-          throws IOException, OzoneClientException {
+          throws IOException, OzoneClientException{
     containerOperationClient = new
         ContainerOperationClient(createOzoneConfiguration());
     xceiverClientManager = containerOperationClient
@@ -83,14 +82,13 @@ public class ChunkKeyHandler  extends KeyHandler {
     ozoneManagerClient = client.getObjectStore().getClientProxy()
             .getOzoneManagerClient();
     address.ensureKeyAddress();
-    JsonObject jsonObj = new JsonObject();
     JsonElement element;
     String volumeName = address.getVolumeName();
     String bucketName = address.getBucketName();
     String keyName = address.getKeyName();
     List<ContainerProtos.ChunkInfo> tempchunks = null;
     List<ChunkDetails> chunkDetailsList = new ArrayList<ChunkDetails>();
-    List<String> chunkPaths = new ArrayList<String>();
+    HashSet<String> chunkPaths = new HashSet<>();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
@@ -98,19 +96,31 @@ public class ChunkKeyHandler  extends KeyHandler {
             .setRefreshPipeline(true)
             .build();
     OmKeyInfo keyInfo = ozoneManagerClient.lookupKey(keyArgs);
-    List<OmKeyLocationInfo> locationInfos = keyInfo
-            .getLatestVersionLocations().getBlocksLatestVersionOnly();
     // querying  the keyLocations.The OM is queried to get containerID and
     // localID pertaining to a given key
+    List<OmKeyLocationInfo> locationInfos = keyInfo
+            .getLatestVersionLocations().getBlocksLatestVersionOnly();
+    // for zero-sized key
+    if(locationInfos.isEmpty()){
+      System.out.println("No Key Locations Found");
+      return;
+    }
     ChunkLayOutVersion chunkLayOutVersion = ChunkLayOutVersion
             .getConfiguredVersion(getConf());
     for (OmKeyLocationInfo keyLocation:locationInfos) {
+      JsonObject jsonObj = new JsonObject();
       ContainerChunkInfo containerChunkInfoVerbose = new ContainerChunkInfo();
       ContainerChunkInfo containerChunkInfo = new ContainerChunkInfo();
       long containerId = keyLocation.getContainerID();
+      chunkPaths.clear();
       Token<OzoneBlockTokenIdentifier> token = keyLocation.getToken();
+      Pipeline pipeline = keyLocation.getPipeline();
+      if (pipeline.getType() != HddsProtos.ReplicationType.STAND_ALONE) {
+        pipeline = Pipeline.newBuilder(pipeline)
+                .setType(HddsProtos.ReplicationType.STAND_ALONE).build();
+      }
       xceiverClient = xceiverClientManager
-              .acquireClient(keyLocation.getPipeline());
+              .acquireClientForReadData(pipeline);
       // Datanode is queried to get chunk information.Thus querying the
       // OM,SCM and datanode helps us get chunk location information
       if (token != null) {
@@ -118,56 +128,60 @@ public class ChunkKeyHandler  extends KeyHandler {
       }
       ContainerProtos.DatanodeBlockID datanodeBlockID = keyLocation.getBlockID()
               .getDatanodeBlockIDProtobuf();
-      ContainerProtos.GetBlockResponseProto response = ContainerProtocolCalls
-                 .getBlock(xceiverClient, datanodeBlockID);
-      tempchunks = response.getBlockData().getChunksList();
-      ContainerProtos.ContainerDataProto containerData =
-              containerOperationClient.readContainer(
-                      keyLocation.getContainerID(),
-                      keyLocation.getPipeline());
-      for (ContainerProtos.ChunkInfo chunkInfo:tempchunks) {
-        ChunkDetails chunkDetails = new ChunkDetails();
-        chunkDetails.setChunkName(chunkInfo.getChunkName());
-        chunkDetails.setChunkOffset(chunkInfo.getOffset());
-        chunkDetailsList.add(chunkDetails);
-        chunkPaths.add(chunkLayOutVersion.getChunkFile(new File(
-                getChunkLocationPath(containerData.getContainerPath())),
-                keyLocation.getBlockID(),
-                ChunkInfo.getFromProtoBuf(chunkInfo)).toString());
+      // doing a getBlock on all nodes
+      HashMap<DatanodeDetails, ContainerProtos.GetBlockResponseProto>
+              responses = null;
+      try {
+        responses = ContainerProtocolCalls
+                .getBlockFromAllNodes(xceiverClient, datanodeBlockID);
+      } catch (InterruptedException e) {
+        LOG.error("Execution interrupted due to " + e);
       }
-      containerChunkInfoVerbose
-              .setContainerPath(containerData.getContainerPath());
-      containerChunkInfoVerbose
-              .setDataNodeList(keyLocation.getPipeline().getNodes());
-      containerChunkInfoVerbose.setPipeline(keyLocation.getPipeline());
-      containerChunkInfoVerbose.setChunkInfos(chunkDetailsList);
-      containerChunkInfo.setFiles(chunkPaths);
-      List<ChunkDataNodeDetails> chunkDataNodeDetails = new
-              ArrayList<ChunkDataNodeDetails>();
-      for (DatanodeDetails datanodeDetails:keyLocation
-              .getPipeline().getNodes()) {
-        chunkDataNodeDetails.add(
-                new ChunkDataNodeDetails(datanodeDetails.getIpAddress(),
-                datanodeDetails.getHostName()));
-      }
-      containerChunkInfo.setChunkDataNodeDetails(chunkDataNodeDetails);
-      containerChunkInfo.setPipelineID(
-              keyLocation.getPipeline().getId().getId());
-      Gson gson = new GsonBuilder().create();
-      if (isVerbose()) {
-        element = gson.toJsonTree(containerChunkInfoVerbose);
-        jsonObj.add("container Id :" + containerId + " "
-                + "blockId :" + keyLocation.getLocalID() + "", element);
-      } else {
-        element = gson.toJsonTree(containerChunkInfo);
-        jsonObj.add("container Id :" + containerId + " "
-                + "blockId :" + keyLocation.getLocalID() + "", element);
+      for (Map.Entry<DatanodeDetails, ContainerProtos.GetBlockResponseProto>
+              entry: responses.entrySet()) {
+        if(entry.getValue() == null){
+          LOG.error("Cant execute getBlock on this node");
+          continue;
+        }
+        tempchunks = entry.getValue().getBlockData().getChunksList();
+        ContainerProtos.ContainerDataProto containerData =
+                containerOperationClient.readContainer(
+                        keyLocation.getContainerID(),
+                        keyLocation.getPipeline());
+        for (ContainerProtos.ChunkInfo chunkInfo : tempchunks) {
+          ChunkDetails chunkDetails = new ChunkDetails();
+          chunkDetails.setChunkName(chunkInfo.getChunkName());
+          chunkDetails.setChunkOffset(chunkInfo.getOffset());
+          chunkDetailsList.add(chunkDetails);
+          chunkPaths.add(chunkLayOutVersion.getChunkFile(new File(
+              getChunkLocationPath(containerData.getContainerPath())),
+                  keyLocation.getBlockID(),
+                  ChunkInfo.getFromProtoBuf(chunkInfo)).toString());
+        }
+        containerChunkInfoVerbose
+                .setContainerPath(containerData.getContainerPath());
+        containerChunkInfoVerbose.setPipeline(keyLocation.getPipeline());
+        containerChunkInfoVerbose.setChunkInfos(chunkDetailsList);
+        containerChunkInfo.setFiles(chunkPaths);
+        containerChunkInfo.setPipelineID(
+                keyLocation.getPipeline().getId().getId());
+        Gson gson = new GsonBuilder().create();
+        if (isVerbose()) {
+          element = gson.toJsonTree(containerChunkInfoVerbose);
+        } else {
+          element = gson.toJsonTree(containerChunkInfo);
+        }
+        jsonObj.addProperty("Datanode HostName ", entry.getKey().getHostName());
+        jsonObj.addProperty("Datanode IP", entry.getKey().getIpAddress());
+        jsonObj.addProperty("Container ID", containerId);
+        jsonObj.addProperty("Block ID", keyLocation.getLocalID());
+        jsonObj.add("Locations", element);
+        xceiverClientManager.releaseClientForReadData(xceiverClient, false);
+        Gson gson2 = new GsonBuilder().setPrettyPrinting().create();
+        String prettyJson = gson2.toJson(jsonObj);
+        System.out.println(prettyJson);
       }
     }
-    xceiverClientManager.releaseClient(xceiverClient, false);
-    Gson gson = new GsonBuilder().setPrettyPrinting().create();
-    String prettyJson = gson.toJson(jsonObj);
-    System.out.println(prettyJson);
   }
 
 

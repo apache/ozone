@@ -21,11 +21,7 @@ package org.apache.hadoop.hdds.scm;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.security.cert.X509Certificate;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -245,6 +241,38 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           "Command " + request + " was interrupted.")
           .initCause(e);
     }
+  }
+
+  @Override
+  public Map<DatanodeDetails, ContainerCommandResponseProto>
+      sendCommandOnAllNodes(
+      ContainerCommandRequestProto request) throws IOException {
+    HashMap<DatanodeDetails, ContainerCommandResponseProto>
+            responseProtoHashMap = new HashMap<>();
+    XceiverClientReply reply = new XceiverClientReply(null);
+    List<DatanodeDetails> datanodeList = pipeline.getNodes();
+    HashMap<DatanodeDetails, CompletableFuture<ContainerCommandResponseProto>>
+            futureHashMap = new HashMap<>();
+    for (DatanodeDetails dn : datanodeList) {
+      reply.addDatanode(dn);
+      try {
+        futureHashMap.put(dn, sendCommandAsync(request, dn).getResponse());
+      } catch (InterruptedException e) {
+        LOG.error("Command execution was interrupted.");
+      }
+    }
+    try{
+      for (Map.Entry<DatanodeDetails,
+              CompletableFuture<ContainerCommandResponseProto> >
+              entry : futureHashMap.entrySet()){
+        responseProtoHashMap.put(entry.getKey(), entry.getValue().get());
+      }
+    } catch (InterruptedException e) {
+      LOG.error("Command execution was interrupted.");
+    } catch (ExecutionException e) {
+      LOG.error("Failed to execute command " + request, e);
+    }
+    return responseProtoHashMap;
   }
 
   @Override

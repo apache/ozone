@@ -21,10 +21,12 @@ package org.apache.hadoop.hdds.scm;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -186,4 +188,13 @@ public abstract class XceiverClientSpi implements Closeable {
    * @return min commit index replicated to all servers.
    */
   public abstract long getReplicatedMinCommitIndex();
+
+  /**
+   * Sends command to all nodes in the pipeline.
+   * @return a map containing datanode as the key and
+   * the command response from that datanode
+   */
+  public abstract Map<DatanodeDetails, ContainerCommandResponseProto>
+      sendCommandOnAllNodes(ContainerCommandRequestProto request)
+      throws IOException, InterruptedException;
 }
