@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -50,6 +49,7 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -99,14 +99,11 @@ public class TestContainerReplicationEndToEnd {
         2 * containerReportInterval, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 1000,
         TimeUnit.SECONDS);
-    conf.setTimeDuration(
-        RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
-        DatanodeRatisServerConfig.RATIS_FOLLOWER_SLOWNESS_TIMEOUT_KEY,
-        1000, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-        RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
-        DatanodeRatisServerConfig.RATIS_SERVER_NO_LEADER_TIMEOUT_KEY,
-        1000, TimeUnit.SECONDS);
+    DatanodeRatisServerConfig ratisServerConfig =
+        conf.getObject(DatanodeRatisServerConfig.class);
+    ratisServerConfig.setFollowerSlownessTimeout(Duration.ofSeconds(1000));
+    ratisServerConfig.setNoLeaderTimeout(Duration.ofSeconds(1000));
+    conf.setFromObject(ratisServerConfig);
     conf.setLong("hdds.scm.replication.thread.interval",
         containerReportInterval);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 2);
