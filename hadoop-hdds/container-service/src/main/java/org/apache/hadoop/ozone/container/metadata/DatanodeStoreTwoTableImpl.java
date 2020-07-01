@@ -19,19 +19,20 @@ package org.apache.hadoop.ozone.container.metadata;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.*;
+import org.rocksdb.DBOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
-public class DatanodeStoreRDBImpl implements DatanodeStore {
+public class DatanodeStoreTwoTableImpl implements DatanodeStore {
 
-  private Table<Long, Long> metadataTable;
+  private Table<String, Long> metadataTable;
 
-  private Table<Long, Long> blockDataTable;
+  private Table<String, Long> blockDataTable;
 
   private static final Logger LOG =
-          LoggerFactory.getLogger(DatanodeStoreRDBImpl.class);
+          LoggerFactory.getLogger(DatanodeStoreTwoTableImpl.class);
   private DBStore store;
   private final OzoneConfiguration configuration;
 
@@ -41,7 +42,7 @@ public class DatanodeStoreRDBImpl implements DatanodeStore {
    * @param config - Ozone Configuration.
    * @throws IOException - on Failure.
    */
-  public DatanodeStoreRDBImpl(OzoneConfiguration config)
+  public DatanodeStoreTwoTableImpl(OzoneConfiguration config)
           throws IOException {
     this.configuration = config;
     start(this.configuration);
@@ -52,6 +53,12 @@ public class DatanodeStoreRDBImpl implements DatanodeStore {
           throws IOException {
     if (this.store == null) {
 
+      DBOptions options = new DBOptions();
+      options.setCreateIfMissing(true);
+      DBStore store = DBStoreBuilder.newBuilder(config)
+              .setDBOption(options)
+              .setPath(dbFile.toPath())
+              .build();
       // TODO : Determine how to get the path to the DB needed to init this instance.
       this.store = DBStoreBuilder.createDBStore(config, new DatanodeTwoTableDBDefinition());
 
@@ -98,7 +105,7 @@ public class DatanodeStoreRDBImpl implements DatanodeStore {
     return blockDataTable;
   }
 
-  private void checkTableStatus(Table table, String name) throws IOException {
+  static void checkTableStatus(Table table, String name) throws IOException {
     String logMessage = "Unable to get a reference to %s table. Cannot " +
             "continue.";
     String errMsg = "Inconsistent DB state, Table - %s. Please check the" +
