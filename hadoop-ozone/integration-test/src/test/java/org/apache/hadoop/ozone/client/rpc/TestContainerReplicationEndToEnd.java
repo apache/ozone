@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.HddsDatanodeService;
@@ -104,8 +105,10 @@ public class TestContainerReplicationEndToEnd {
     ratisServerConfig.setFollowerSlownessTimeout(Duration.ofSeconds(1000));
     ratisServerConfig.setNoLeaderTimeout(Duration.ofSeconds(1000));
     conf.setFromObject(ratisServerConfig);
-    conf.setLong("hdds.scm.replication.thread.interval",
-        containerReportInterval);
+    ReplicationManagerConfiguration replicationConf =
+        conf.getObject(ReplicationManagerConfiguration.class);
+    replicationConf.setInterval(Duration.ofMillis(containerReportInterval));
+    conf.setFromObject(replicationConf);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 2);
 
     conf.setQuietMode(false);
