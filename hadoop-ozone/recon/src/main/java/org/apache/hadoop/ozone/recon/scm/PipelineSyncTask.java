@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -49,8 +48,7 @@ public class PipelineSyncTask extends ReconScmTask {
     super(reconTaskStatusDao);
     this.scmClient = scmClient;
     this.reconPipelineManager = pipelineManager;
-    this.interval = TimeUnit.SECONDS.toMillis(
-        reconTaskConfig.getPipelineSyncTaskInterval());
+    this.interval = reconTaskConfig.getPipelineSyncTaskInterval().toMillis();
   }
 
   @Override
