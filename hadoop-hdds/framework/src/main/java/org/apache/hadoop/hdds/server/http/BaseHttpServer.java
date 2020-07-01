@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.HddsConfServlet;
 import org.apache.hadoop.hdds.conf.HddsPrometheusConfig;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
@@ -149,7 +148,7 @@ public abstract class BaseHttpServer {
         httpServer.getWebAppContext().getServletContext()
             .setAttribute(PROMETHEUS_SINK, prometheusMetricsSink);
         HddsPrometheusConfig prometheusConfig =
-            OzoneConfiguration.of(conf).getObject(HddsPrometheusConfig.class);
+            conf.getObject(HddsPrometheusConfig.class);
         String token = prometheusConfig.getPrometheusEndpointToken();
         if (StringUtils.isNotEmpty(token)) {
           httpServer.getWebAppContext().getServletContext()

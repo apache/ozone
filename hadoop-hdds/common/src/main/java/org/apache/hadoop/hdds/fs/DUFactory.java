@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 /**
  * Uses DU for all volumes.  Saves used value in cache file.
@@ -40,7 +39,7 @@ public class DUFactory implements SpaceUsageCheckFactory {
   @Override
   public SpaceUsageCheckFactory setConfiguration(
       ConfigurationSource configuration) {
-    conf = OzoneConfiguration.of(configuration).getObject(Conf.class);
+    conf = configuration.getObject(Conf.class);
     return this;
   }
 

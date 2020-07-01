@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,7 +69,7 @@ public interface SpaceUsageCheckFactory {
    * instantiated.
    */
   static SpaceUsageCheckFactory create(ConfigurationSource config) {
-    Conf conf = OzoneConfiguration.of(config).getObject(Conf.class);
+    Conf conf = config.getObject(Conf.class);
     Class<? extends SpaceUsageCheckFactory> aClass = null;
     String className = conf.getClassName();
     if (className != null && !className.isEmpty()) {
