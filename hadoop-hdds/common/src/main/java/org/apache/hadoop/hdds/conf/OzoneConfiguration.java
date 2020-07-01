@@ -47,7 +47,7 @@ import com.google.common.base.Preconditions;
  */
 @InterfaceAudience.Private
 public class OzoneConfiguration extends Configuration
-    implements ConfigurationSource {
+    implements MutableConfigurationSource {
   static {
     activate();
   }
@@ -70,6 +70,25 @@ public class OzoneConfiguration extends Configuration
     return conf instanceof OzoneConfiguration
         ? (OzoneConfiguration) conf
         : new OzoneConfiguration(conf);
+  }
+
+  /**
+   * @return a new config object of type {@code T} configured with defaults
+   * and any overrides from XML
+   */
+  public static <T> T newInstanceOf(Class<T> configurationClass) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    return conf.getObject(configurationClass);
+  }
+
+  /**
+   * @return a new {@code OzoneConfiguration} instance set from the given
+   * {@code configObject}
+   */
+  public static <T> OzoneConfiguration fromObject(T configObject) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setFromObject(configObject);
+    return conf;
   }
 
   public OzoneConfiguration() {

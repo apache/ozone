@@ -22,7 +22,7 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
@@ -105,7 +105,7 @@ public class OzoneAdmin extends GenericCli implements WithScmClient {
     }
   }
 
-  private void checkAndSetSCMAddressArg(ConfigurationSource conf) {
+  private void checkAndSetSCMAddressArg(MutableConfigurationSource conf) {
     if (StringUtils.isNotEmpty(scm)) {
       conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, scm);
     }
