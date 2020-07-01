@@ -165,7 +165,7 @@ public final class ConfigurationReflectionUtil {
     }
   }
 
-  public static <T> void updateConfiguration(ConfigurationSource config,
+  public static <T> void updateConfiguration(ConfigurationTarget config,
       T object, String prefix) {
 
     Class<?> configClass = object.getClass();
@@ -183,7 +183,7 @@ public final class ConfigurationReflectionUtil {
   }
 
   private static <T> void updateConfigurationFromObject(
-      ConfigurationSource config, Class<?> configClass, T configObject,
+      ConfigurationTarget config, Class<?> configClass, T configObject,
       String prefix) {
 
     for (Field field : configClass.getDeclaredFields()) {

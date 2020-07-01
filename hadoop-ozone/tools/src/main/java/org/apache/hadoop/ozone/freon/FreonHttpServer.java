@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.freon;
 
 import java.io.IOException;
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
@@ -27,7 +27,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
  * Http server to provide metrics + profile endpoint.
  */
 public class FreonHttpServer extends BaseHttpServer {
-  public FreonHttpServer(ConfigurationSource conf) throws IOException {
+  public FreonHttpServer(MutableConfigurationSource conf) throws IOException {
     super(conf, "freon");
   }
 

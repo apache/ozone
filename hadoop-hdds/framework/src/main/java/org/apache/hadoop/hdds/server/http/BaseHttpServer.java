@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.HddsConfServlet;
 import org.apache.hadoop.hdds.conf.HddsPrometheusConfig;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -70,7 +71,7 @@ public abstract class BaseHttpServer {
       "org.eclipse.jetty.webapp.basetempdir";
 
   private HttpServer2 httpServer;
-  private final ConfigurationSource conf;
+  private final MutableConfigurationSource conf;
 
   private InetSocketAddress httpAddress;
   private InetSocketAddress httpsAddress;
@@ -84,7 +85,7 @@ public abstract class BaseHttpServer {
 
   private boolean profilerSupport;
 
-  public BaseHttpServer(ConfigurationSource conf, String name)
+  public BaseHttpServer(MutableConfigurationSource conf, String name)
       throws IOException {
     this.name = name;
     this.conf = conf;
@@ -186,7 +187,7 @@ public abstract class BaseHttpServer {
    * Recon to initialize their HTTP / HTTPS server.
    */
   public static HttpServer2.Builder newHttpServer2BuilderForOzone(
-      ConfigurationSource conf, final InetSocketAddress httpAddr,
+      MutableConfigurationSource conf, final InetSocketAddress httpAddr,
       final InetSocketAddress httpsAddr, String name) throws IOException {
     HttpConfig.Policy policy = getHttpPolicy(conf);
 

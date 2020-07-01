@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hdds.conf;
 
-import org.apache.hadoop.hdds.conf.TimeDurationUtil.ParsedTimeDuration;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
@@ -27,7 +25,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Lightweight interface to defined the contract of the Configuration objects.
+ * Defines read-only contract of Configuration objects.
  */
 public interface ConfigurationSource {
 
@@ -39,8 +37,6 @@ public interface ConfigurationSource {
 
   char[] getPassword(String key) throws IOException;
 
-  void set(String key, String value);
-
   default String get(String key, String defaultValue) {
     String value = get(key);
     return value != null ? value : defaultValue;
@@ -49,10 +45,6 @@ public interface ConfigurationSource {
   default int getInt(String key, int defaultValue) {
     String value = get(key);
     return value != null ? Integer.parseInt(value) : defaultValue;
-  }
-
-  default void setInt(String name, int value) {
-    set(name, Integer.toString(value));
   }
 
   /**
@@ -79,17 +71,9 @@ public interface ConfigurationSource {
     return value != null ? Long.parseLong(value) : defaultValue;
   }
 
-  default void setLong(String name, long value) {
-    set(name, Long.toString(value));
-  }
-
   default boolean getBoolean(String key, boolean defaultValue) {
     String value = get(key);
     return value != null ? Boolean.parseBoolean(value) : defaultValue;
-  }
-
-  default void setBoolean(String name, boolean value) {
-    set(name, Boolean.toString(value));
   }
 
   default float getFloat(String key, float defaultValue) {
@@ -164,13 +148,6 @@ public interface ConfigurationSource {
 
     return configObject;
 
-  }
-
-  default <T> void setFromObject(T object) {
-    ConfigGroup configGroup =
-        object.getClass().getAnnotation(ConfigGroup.class);
-    String prefix = configGroup.prefix();
-    ConfigurationReflectionUtil.updateConfiguration(this, object, prefix);
   }
 
   /**
@@ -253,10 +230,6 @@ public interface ConfigurationSource {
     } else {
       return TimeDurationUtil.getTimeDurationHelper(name, vStr, unit);
     }
-  }
-
-  default void setTimeDuration(String name, long value, TimeUnit unit) {
-    set(name, value + ParsedTimeDuration.unitFor(unit).suffix());
   }
 
   default long getTimeDuration(String name, String defaultValue,

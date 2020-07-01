@@ -47,7 +47,7 @@ import com.google.common.base.Preconditions;
  */
 @InterfaceAudience.Private
 public class OzoneConfiguration extends Configuration
-    implements ConfigurationSource {
+    implements MutableConfigurationSource {
   static {
     activate();
   }
