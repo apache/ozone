@@ -73,6 +73,22 @@ public class KeyValueContainerData extends ContainerData {
   private String schemaVersion;
 
   /**
+  Indicates the table layout of the container's database.
+  Enum implementation expanded so that version numbers can be specified.
+   */
+  public enum SchemaVersion {
+    // Version 1: All data written to default column family.
+    ONE_TABLE(1),
+    // Version 2: Metadata and block data written to different column families.
+    TWO_TABLES(2);
+
+    public final int version;
+
+    SchemaVersion(int version) { this.version = version; }
+  }
+  private SchemaVersion schemaVersion;
+
+  /**
    * Number of pending deletion blocks in KeyValueContainer.
    */
   private final AtomicLong numPendingDeletionBlocks;
