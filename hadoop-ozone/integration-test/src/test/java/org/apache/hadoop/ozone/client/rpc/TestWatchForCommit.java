@@ -49,6 +49,7 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -103,15 +104,11 @@ public class TestWatchForCommit {
             + ".client.request.write.timeout", 10, TimeUnit.SECONDS);
     conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
             + ".client.request.watch.timeout", 10, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
-                    DatanodeRatisServerConfig.RATIS_SERVER_REQUEST_TIMEOUT_KEY,
-            3, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
-                    DatanodeRatisServerConfig.
-                            RATIS_SERVER_WATCH_REQUEST_TIMEOUT_KEY,
-            3, TimeUnit.SECONDS);
+    DatanodeRatisServerConfig ratisServerConfig =
+        conf.getObject(DatanodeRatisServerConfig.class);
+    ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
+    ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(3));
+    conf.setFromObject(ratisServerConfig);
     conf.setTimeDuration(
             RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
                     "rpc.request.timeout",

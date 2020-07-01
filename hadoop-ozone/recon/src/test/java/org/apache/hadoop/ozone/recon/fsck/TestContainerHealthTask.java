@@ -24,6 +24,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -123,7 +124,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     long currentTime = System.currentTimeMillis();
     ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
     ReconTaskConfig reconTaskConfig = new ReconTaskConfig();
-    reconTaskConfig.setMissingContainerTaskInterval(2);
+    reconTaskConfig.setMissingContainerTaskInterval(Duration.ofSeconds(2));
     ContainerHealthTask containerHealthTask =
         new ContainerHealthTask(scmMock.getContainerManager(),
             reconTaskStatusDao, containerSchemaManager,

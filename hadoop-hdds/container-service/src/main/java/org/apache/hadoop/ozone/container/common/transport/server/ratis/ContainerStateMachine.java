@@ -38,7 +38,6 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Container2BCSIDMapProto;
@@ -162,7 +161,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     metrics = CSMMetrics.create(gid);
     this.writeChunkFutureMap = new ConcurrentHashMap<>();
     applyTransactionCompletionMap = new ConcurrentHashMap<>();
-    int numPendingRequests = OzoneConfiguration.of(conf)
+    int numPendingRequests = conf
         .getObject(DatanodeRatisServerConfig.class)
         .getLeaderNumPendingRequests();
     int pendingRequestsByteLimit = (int) conf.getStorageSize(
