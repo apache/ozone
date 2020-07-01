@@ -520,6 +520,20 @@ public class BasicRootedOzoneClientAdapterImpl
     }
   }
 
+  /**
+   * Get trash roots for current user or all users.
+   *
+   * Note:
+   * 1. When allUsers flag is false, this only returns the trash roots for
+   * those that the current user has access to.
+   * 2. Also it is not particularly efficient to use this API when there are
+   * a lot of volumes and buckets as the client has to iterate through all
+   * buckets in all volumes.
+   *
+   * @param allUsers return trashRoots of all users if true, used by emptier
+   * @param fs Pointer to the current OFS FileSystem
+   * @return
+   */
   public Collection<FileStatus> getTrashRoots(boolean allUsers,
       BasicRootedOzoneFileSystem fs) {
     List<FileStatus> ret = new ArrayList<>();
