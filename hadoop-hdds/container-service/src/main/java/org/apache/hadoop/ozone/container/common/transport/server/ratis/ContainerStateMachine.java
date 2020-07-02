@@ -421,7 +421,10 @@ public class ContainerStateMachine extends BaseStateMachine {
       if (((RaftServerProxy) server).getImpl(gid).isLeader()) {
         stateMachineDataCache.put(entryIndex, write.getData());
       }
-    } catch (IOException | InterruptedException ioe) {
+    } catch (InterruptedException ioe) {
+      Thread.currentThread().interrupt();
+      return completeExceptionally(ioe);
+    } catch (IOException ioe) {
       return completeExceptionally(ioe);
     }
     DispatcherContext context =
@@ -439,9 +442,9 @@ public class ContainerStateMachine extends BaseStateMachine {
           try {
             return runCommand(requestProto, context);
           } catch (Exception e) {
-            LOG.error(gid + ": writeChunk writeStateMachineData failed: blockId"
-                + write.getBlockID() + " logIndex " + entryIndex + " chunkName "
-                + write.getChunkData().getChunkName() + e);
+            LOG.error("{}: writeChunk writeStateMachineData failed: blockId" +
+                "{} logIndex {} chunkName {} {}", gid, write.getBlockID(),
+                entryIndex, write.getChunkData().getChunkName(), e);
             metrics.incNumWriteDataFails();
             // write chunks go in parallel. It's possible that one write chunk
             // see the stateMachine is marked unhealthy by other parallel thread
@@ -453,9 +456,9 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     writeChunkFutureMap.put(entryIndex, writeChunkFuture);
     if (LOG.isDebugEnabled()) {
-      LOG.debug(gid + ": writeChunk writeStateMachineData : blockId " +
-          write.getBlockID() + " logIndex " + entryIndex + " chunkName "
-          + write.getChunkData().getChunkName());
+      LOG.error("{}: writeChunk writeStateMachineData : blockId" +
+              "{} logIndex {} chunkName {} {}", gid, write.getBlockID(),
+          entryIndex, write.getChunkData().getChunkName());
     }
     // Remove the future once it finishes execution from the
     // writeChunkFutureMap.
@@ -808,7 +811,11 @@ public class ContainerStateMachine extends BaseStateMachine {
             Time.monotonicNowNanos() - applyTxnStartTime);
       });
       return applyTransactionFuture;
-    } catch (IOException | InterruptedException e) {
+    } catch (InterruptedException e) {
+      metrics.incNumApplyTransactionsFails();
+      Thread.currentThread().interrupt();
+      return completeExceptionally(e);
+    } catch (IOException e) {
       metrics.incNumApplyTransactionsFails();
       return completeExceptionally(e);
     }
@@ -867,6 +874,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         containerController.markContainerForClose(cid);
         containerController.quasiCloseContainer(cid);
       } catch (IOException e) {
+        LOG.debug("Failed to quasi-close container {}", cid);
       }
     }
   }
@@ -907,7 +915,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         builder.append(", container path=");
         builder.append(location);
       }
-    } catch (Throwable t) {
+    } catch (Exception t) {
       LOG.info("smProtoToString failed", t);
       builder.append("smProtoToString failed with");
       builder.append(t.getMessage());

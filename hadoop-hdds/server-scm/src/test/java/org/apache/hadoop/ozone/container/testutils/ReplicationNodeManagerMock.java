@@ -259,7 +259,7 @@ public class ReplicationNodeManagerMock implements NodeManager {
    *
    * @param dd DatanodeDetailsProto
    * @param nodeReport NodeReportProto
-   * @return SCMHeartbeatResponseProto
+   * @return SCMRegisteredResponseProto
    */
   @Override
   public RegisteredCommand register(DatanodeDetails dd,

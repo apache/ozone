@@ -29,13 +29,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.slf4j.Logger;
@@ -59,6 +59,7 @@ public final class Pipeline {
   private ThreadLocal<List<DatanodeDetails>> nodesInOrder = new ThreadLocal<>();
   // Current reported Leader for the pipeline
   private UUID leaderId;
+  private String strLeaderID = "";
   // Timestamp for pipeline upon creation
   private Instant creationTimestamp;
 
@@ -146,6 +147,9 @@ public final class Pipeline {
    */
   void setLeaderId(UUID leaderId) {
     this.leaderId = leaderId;
+    if (leaderId != null) {
+      this.strLeaderID = leaderId.toString();
+    }
   }
 
   /**
@@ -256,16 +260,19 @@ public final class Pipeline {
 
   public HddsProtos.Pipeline getProtobufMessage()
       throws UnknownPipelineStateException {
+    List<HddsProtos.DatanodeDetailsProto> members = new ArrayList<>();
+    for (DatanodeDetails dn : nodeStatus.keySet()) {
+      members.add(dn.getProtoBufMessage());
+    }
+
     HddsProtos.Pipeline.Builder builder = HddsProtos.Pipeline.newBuilder()
         .setId(id.getProtobuf())
         .setType(type)
         .setFactor(factor)
         .setState(PipelineState.getProtobuf(state))
-        .setLeaderID(leaderId != null ? leaderId.toString() : "")
+        .setLeaderID(strLeaderID)
         .setCreationTimeStamp(creationTimestamp.toEpochMilli())
-        .addAllMembers(nodeStatus.keySet().stream()
-            .map(DatanodeDetails::getProtoBufMessage)
-            .collect(Collectors.toList()));
+        .addAllMembers(members);
     // To save the message size on wire, only transfer the node order based on
     // network topology
     List<DatanodeDetails> nodes = nodesInOrder.get();
@@ -289,14 +296,19 @@ public final class Pipeline {
   public static Pipeline getFromProtobuf(HddsProtos.Pipeline pipeline)
       throws UnknownPipelineStateException {
     Preconditions.checkNotNull(pipeline, "Pipeline is null");
+
+    List<DatanodeDetails> nodes = new ArrayList<>();
+    for (DatanodeDetailsProto member : pipeline.getMembersList()) {
+      nodes.add(DatanodeDetails.getFromProtoBuf(member));
+    }
+
     return new Builder().setId(PipelineID.getFromProtobuf(pipeline.getId()))
         .setFactor(pipeline.getFactor())
         .setType(pipeline.getType())
         .setState(PipelineState.fromProtobuf(pipeline.getState()))
         .setLeaderId(StringUtils.isNotEmpty(pipeline.getLeaderID()) ?
             UUID.fromString(pipeline.getLeaderID()) : null)
-        .setNodes(pipeline.getMembersList().stream()
-            .map(DatanodeDetails::getFromProtoBuf).collect(Collectors.toList()))
+        .setNodes(nodes)
         .setNodesInOrder(pipeline.getMemberOrdersList())
         .setCreateTimestamp(pipeline.getCreationTimeStamp())
         .build();
@@ -341,7 +353,7 @@ public final class Pipeline {
     b.append(", Type:").append(getType());
     b.append(", Factor:").append(getFactor());
     b.append(", State:").append(getPipelineState());
-    b.append(", leaderId:").append(getLeaderId());
+    b.append(", leaderId:").append(strLeaderID);
     b.append(", CreationTimestamp").append(getCreationTimestamp());
     b.append("]");
     return b.toString();

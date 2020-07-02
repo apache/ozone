@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.protocol.proto
@@ -31,6 +32,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -70,6 +72,7 @@ public class TestReplicationManager {
   private PlacementPolicy containerPlacementPolicy;
   private EventQueue eventQueue;
   private DatanodeCommandHandler datanodeCommandHandler;
+  private SCMNodeManager scmNodeManager;
 
   @Before
   public void setup() throws IOException, InterruptedException {
@@ -114,12 +117,18 @@ public class TestReplicationManager {
           return new ContainerPlacementStatusDefault(2, 2, 3);
         });
 
+    scmNodeManager = Mockito.mock(SCMNodeManager.class);
+    Mockito.when(scmNodeManager.getNodeState(
+        Mockito.any(DatanodeDetails.class)))
+        .thenReturn(NodeState.HEALTHY);
+
     replicationManager = new ReplicationManager(
         new ReplicationManagerConfiguration(),
         containerManager,
         containerPlacementPolicy,
         eventQueue,
-        new LockManager<>(conf));
+        new LockManager<>(conf),
+        scmNodeManager);
     replicationManager.start();
     Thread.sleep(100L);
   }
@@ -640,7 +649,7 @@ public class TestReplicationManager {
     //default is not included in ozone-site.xml but generated from annotation
     //to the ozone-site-generated.xml which should be loaded by the
     // OzoneConfiguration.
-    Assert.assertEquals(600000, rmc.getEventTimeout());
+    Assert.assertEquals(1800000, rmc.getEventTimeout());
 
   }
 

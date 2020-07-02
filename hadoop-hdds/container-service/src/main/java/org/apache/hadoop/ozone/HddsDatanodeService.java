@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
@@ -60,13 +61,10 @@ import org.apache.hadoop.util.ServicePlugin;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import io.prometheus.client.CollectorRegistry;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
 import static org.apache.hadoop.util.ExitUtil.terminate;
-import org.apache.ratis.metrics.MetricRegistries;
-import org.apache.ratis.metrics.MetricsReporting;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -95,7 +93,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private boolean printBanner;
   private String[] args;
   private volatile AtomicBoolean isStopped = new AtomicBoolean(false);
-
+  private final Map<String, RatisDropwizardExports> ratisMetricsMap =
+      new ConcurrentHashMap<>();
   //Constructor for DataNode PluginService
   public HddsDatanodeService(){}
 
@@ -181,15 +180,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   public void start() {
-
-    //All the Ratis metrics (registered from now) will be published via JMX and
-    //via the prometheus exporter (used by the /prom servlet
-    MetricRegistries.global()
-        .addReporterRegistration(MetricsReporting.jmxReporter());
-    MetricRegistries.global().addReporterRegistration(
-        registry -> CollectorRegistry.defaultRegistry.register(
-            new RatisDropwizardExports(
-                registry.getDropWizardMetricRegistry())));
+    RatisDropwizardExports.
+        registerRatisMetricReporters(ratisMetricsMap);
 
     OzoneConfiguration.activate();
     HddsServerUtil.initializeMetrics(conf, "HddsDatanode");
