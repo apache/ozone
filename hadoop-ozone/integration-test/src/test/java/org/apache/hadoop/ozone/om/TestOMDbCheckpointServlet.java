@@ -238,22 +238,4 @@ class TestDBCheckpoint implements DBCheckpoint {
   public void cleanupCheckpoint() throws IOException {
     FileUtils.deleteDirectory(checkpointFile.toFile());
   }
-
-  @Override
-  public void setRatisSnapshotIndex(long omRatisSnapshotIndex) {
-  }
-
-  @Override
-  public long getRatisSnapshotIndex() {
-    return 0;
-  }
-
-  @Override
-  public void setRatisSnapshotTerm(long omRatisSnapshotTermIndex) {
-  }
-
-  @Override
-  public long getRatisSnapshotTerm() {
-    return 0;
-  }
 }
