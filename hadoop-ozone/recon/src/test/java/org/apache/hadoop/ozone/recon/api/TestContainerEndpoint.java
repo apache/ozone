@@ -24,7 +24,9 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestRe
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -37,6 +39,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
 
 import org.apache.commons.lang3.StringUtils;
@@ -58,6 +62,8 @@ import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
+import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
+import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
 import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
@@ -69,6 +75,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImp
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
+import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.pojos.ContainerHistory;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.Assert;
@@ -76,6 +83,7 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.mockito.Mockito;
 
 /**
  * Test for container endpoint.
@@ -108,14 +116,14 @@ public class TestContainerEndpoint {
     ContainerManager mockContainerManager =
         mock(ReconContainerManager.class);
 
-    when(mockContainerManager.getContainer(containerID)).thenReturn(
+    when(mockContainerManager.getContainer(Mockito.any(ContainerID.class)))
+        .thenReturn(
         new ContainerInfo.Builder()
             .setContainerID(containerID.getId())
             .setNumberOfKeys(keyCount)
             .setReplicationFactor(ReplicationFactor.THREE)
             .setPipelineID(pipelineID)
-            .build()
-    );
+            .build());
     when(mockReconSCM.getContainerManager())
         .thenReturn(mockContainerManager);
 
@@ -447,6 +455,169 @@ public class TestContainerEndpoint {
   }
 
   @Test
+  public void testUnhealthyContainers() {
+    Response response = containerEndpoint.getUnhealthyContainers(1000, 1);
+
+    UnhealthyContainersResponse responseObject =
+        (UnhealthyContainersResponse) response.getEntity();
+
+    assertEquals(0, responseObject.getMissingCount());
+    assertEquals(0, responseObject.getOverReplicatedCount());
+    assertEquals(0, responseObject.getUnderReplicatedCount());
+    assertEquals(0, responseObject.getMisReplicatedCount());
+
+    assertEquals(Collections.EMPTY_LIST, responseObject.getContainers());
+
+    createUnhealthyRecords(5, 4, 3, 2);
+
+    response = containerEndpoint.getUnhealthyContainers(1000, 1);
+
+    responseObject = (UnhealthyContainersResponse) response.getEntity();
+    assertEquals(5, responseObject.getMissingCount());
+    assertEquals(4, responseObject.getOverReplicatedCount());
+    assertEquals(3, responseObject.getUnderReplicatedCount());
+    assertEquals(2, responseObject.getMisReplicatedCount());
+
+    Collection<UnhealthyContainerMetadata> records
+        = responseObject.getContainers();
+    List<UnhealthyContainerMetadata> missing = records
+        .stream()
+        .filter(r -> r.getContainerState()
+            .equals(UnHealthyContainerStates.MISSING.toString()))
+        .collect(Collectors.toList());
+    assertEquals(5, missing.size());
+    assertEquals(3, missing.get(0).getExpectedReplicaCount());
+    assertEquals(0, missing.get(0).getActualReplicaCount());
+    assertEquals(3, missing.get(0).getReplicaDeltaCount());
+    assertEquals(12345L, missing.get(0).getUnhealthySince());
+    assertEquals(1L, missing.get(0).getContainerID());
+    assertEquals(keyCount, missing.get(0).getKeys());
+    assertEquals(pipelineID.getId(), missing.get(0).getPipelineID());
+    assertEquals(3, missing.get(0).getReplicas().size());
+    assertNull(missing.get(0).getReason());
+
+    Set<String> datanodes = Collections.unmodifiableSet(
+        new HashSet<>(Arrays.asList("host2", "host3", "host4")));
+    List<ContainerHistory> containerReplicas = missing.get(0).getReplicas();
+    containerReplicas.forEach(history -> {
+      Assert.assertTrue(datanodes.contains(history.getDatanodeHost()));
+    });
+
+    List<UnhealthyContainerMetadata> overRep = records
+        .stream()
+        .filter(r -> r.getContainerState()
+            .equals(UnHealthyContainerStates.OVER_REPLICATED.toString()))
+        .collect(Collectors.toList());
+    assertEquals(4, overRep.size());
+    assertEquals(3, overRep.get(0).getExpectedReplicaCount());
+    assertEquals(5, overRep.get(0).getActualReplicaCount());
+    assertEquals(-2, overRep.get(0).getReplicaDeltaCount());
+    assertEquals(12345L, overRep.get(0).getUnhealthySince());
+    assertEquals(6L, overRep.get(0).getContainerID());
+    assertNull(overRep.get(0).getReason());
+
+    List<UnhealthyContainerMetadata> underRep = records
+        .stream()
+        .filter(r -> r.getContainerState()
+            .equals(UnHealthyContainerStates.UNDER_REPLICATED.toString()))
+        .collect(Collectors.toList());
+    assertEquals(3, underRep.size());
+    assertEquals(3, underRep.get(0).getExpectedReplicaCount());
+    assertEquals(1, underRep.get(0).getActualReplicaCount());
+    assertEquals(2, underRep.get(0).getReplicaDeltaCount());
+    assertEquals(12345L, underRep.get(0).getUnhealthySince());
+    assertEquals(10L, underRep.get(0).getContainerID());
+    assertNull(underRep.get(0).getReason());
+
+    List<UnhealthyContainerMetadata> misRep = records
+        .stream()
+        .filter(r -> r.getContainerState()
+            .equals(UnHealthyContainerStates.MIS_REPLICATED.toString()))
+        .collect(Collectors.toList());
+    assertEquals(2, misRep.size());
+    assertEquals(2, misRep.get(0).getExpectedReplicaCount());
+    assertEquals(1, misRep.get(0).getActualReplicaCount());
+    assertEquals(1, misRep.get(0).getReplicaDeltaCount());
+    assertEquals(12345L, misRep.get(0).getUnhealthySince());
+    assertEquals(13L, misRep.get(0).getContainerID());
+    assertEquals("some reason", misRep.get(0).getReason());
+  }
+
+  @Test
+  public void testUnhealthyContainersFilteredResponse() {
+    String missing =  UnHealthyContainerStates.MISSING.toString();
+
+    Response response = containerEndpoint
+        .getUnhealthyContainers(missing, 1000, 1);
+
+    UnhealthyContainersResponse responseObject =
+        (UnhealthyContainersResponse) response.getEntity();
+
+    assertEquals(0, responseObject.getMissingCount());
+    assertEquals(0, responseObject.getOverReplicatedCount());
+    assertEquals(0, responseObject.getUnderReplicatedCount());
+    assertEquals(0, responseObject.getMisReplicatedCount());
+    assertEquals(Collections.EMPTY_LIST, responseObject.getContainers());
+
+    createUnhealthyRecords(5, 4, 3, 2);
+
+    response =  containerEndpoint.getUnhealthyContainers(missing, 1000, 1);
+
+    responseObject = (UnhealthyContainersResponse) response.getEntity();
+    // Summary should have the count for all unhealthy:
+    assertEquals(5, responseObject.getMissingCount());
+    assertEquals(4, responseObject.getOverReplicatedCount());
+    assertEquals(3, responseObject.getUnderReplicatedCount());
+    assertEquals(2, responseObject.getMisReplicatedCount());
+
+    Collection<UnhealthyContainerMetadata> records
+        = responseObject.getContainers();
+
+    // There should only be 5 missing containers and no others as we asked for
+    // only missing.
+    assertEquals(5, records.size());
+    for (UnhealthyContainerMetadata r : records) {
+      assertEquals(missing, r.getContainerState());
+    }
+  }
+
+  @Test
+  public void testUnhealthyContainersInvalidState() {
+    try {
+      containerEndpoint.getUnhealthyContainers("invalid", 1000, 1);
+      fail("Expected exception to be raised");
+    } catch (WebApplicationException e) {
+      assertEquals("HTTP 400 Bad Request", e.getMessage());
+    }
+  }
+
+  @Test
+  public void testUnhealthyContainersPaging() {
+    createUnhealthyRecords(5, 4, 3, 2);
+    UnhealthyContainersResponse firstBatch =
+        (UnhealthyContainersResponse) containerEndpoint.getUnhealthyContainers(
+            3, 1).getEntity();
+
+    UnhealthyContainersResponse secondBatch =
+        (UnhealthyContainersResponse) containerEndpoint.getUnhealthyContainers(
+            3, 2).getEntity();
+
+    ArrayList<UnhealthyContainerMetadata> records
+        = new ArrayList<>(firstBatch.getContainers());
+    assertEquals(3, records.size());
+    assertEquals(1L, records.get(0).getContainerID());
+    assertEquals(2L, records.get(1).getContainerID());
+    assertEquals(3L, records.get(2).getContainerID());
+
+    records
+        = new ArrayList<>(secondBatch.getContainers());
+    assertEquals(3, records.size());
+    assertEquals(4L, records.get(0).getContainerID());
+    assertEquals(5L, records.get(1).getContainerID());
+    assertEquals(6L, records.get(2).getContainerID());
+  }
+
+  @Test
   public void testGetReplicaHistoryForContainer() {
     // Add container history for id 1
     containerSchemaManager.upsertContainerHistory(1L, "host1", 1L);
@@ -468,5 +639,52 @@ public class TestContainerEndpoint {
         Assert.assertEquals(5L, (long) history.getLastReportTimestamp());
       }
     });
+  }
+
+  private void createUnhealthyRecords(int missing, int overRep, int underRep,
+      int misRep) {
+    int cid = 0;
+    for (int i=0; i<missing; i++) {
+      createUnhealthyRecord(++cid,
+          UnHealthyContainerStates.MISSING.toString(), 3, 0, 3, null);
+    }
+    for (int i=0; i<overRep; i++) {
+      createUnhealthyRecord(++cid,
+          UnHealthyContainerStates.OVER_REPLICATED.toString(),
+          3, 5, -2, null);
+    }
+    for (int i=0; i<underRep; i++) {
+      createUnhealthyRecord(++cid,
+          UnHealthyContainerStates.UNDER_REPLICATED.toString(),
+          3, 1, 2, null);
+    }
+    for (int i=0; i<misRep; i++) {
+      createUnhealthyRecord(++cid,
+          UnHealthyContainerStates.MIS_REPLICATED.toString(),
+          2, 1, 1, "some reason");
+    }
+  }
+
+  private void createUnhealthyRecord(int id, String state, int expected,
+      int actual, int delta, String reason) {
+    long cID = Integer.toUnsignedLong(id);
+    UnhealthyContainers missing = new UnhealthyContainers();
+    missing.setContainerId(cID);
+    missing.setContainerState(state);
+    missing.setInStateSince(12345L);
+    missing.setActualReplicaCount(actual);
+    missing.setExpectedReplicaCount(expected);
+    missing.setReplicaDelta(delta);
+    missing.setReason(reason);
+
+    ArrayList<UnhealthyContainers> missingList =
+        new ArrayList<UnhealthyContainers>();
+    missingList.add(missing);
+    containerSchemaManager.insertUnhealthyContainerRecords(missingList);
+
+    containerSchemaManager.upsertContainerHistory(cID, "host1", 1L);
+    containerSchemaManager.upsertContainerHistory(cID, "host2", 2L);
+    containerSchemaManager.upsertContainerHistory(cID, "host3", 3L);
+    containerSchemaManager.upsertContainerHistory(cID, "host4", 4L);
   }
 }

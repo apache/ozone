@@ -13,6 +13,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-HADOOP_VERSION=3
-OZONE_RUNNER_VERSION=${docker.ozone-runner.version}
+name: ozone/onenode
+description: remove scheduling rules to make it possible to run multiple datanode on the same k8s node.
+---
+- type: Remove
+  trigger:
+    metadata:
+      name: ozone-datanode
+  path:
+    - spec
+    - template
+    - spec
+    - affinity

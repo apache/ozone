@@ -66,6 +66,10 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    * Creation time of bucket.
    */
   private final long creationTime;
+  /**
+   * modification time of bucket.
+   */
+  private long modificationTime;
 
   /**
    * Bucket encryption key info if encryption is enabled.
@@ -80,6 +84,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
    * @param isVersionEnabled - Bucket version flag.
    * @param storageType - Storage type to be used.
    * @param creationTime - Bucket creation time.
+   * @param modificationTime - Bucket modification time.
    * @param metadata - metadata.
    * @param bekInfo - bucket encryption key info.
    */
@@ -90,6 +95,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
                        boolean isVersionEnabled,
                        StorageType storageType,
                        long creationTime,
+                       long modificationTime,
                        long objectID,
                        long updateID,
                        Map<String, String> metadata,
@@ -100,6 +106,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     this.isVersionEnabled = isVersionEnabled;
     this.storageType = storageType;
     this.creationTime = creationTime;
+    this.modificationTime = modificationTime;
     this.objectID = objectID;
     this.updateID = updateID;
     this.metadata = metadata;
@@ -185,6 +192,15 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
   }
 
   /**
+   * Returns modification time.
+   * @return long
+   */
+  public long getModificationTime() {
+    return modificationTime;
+  }
+
+
+  /**
    * Returns bucket encryption key info.
    * @return bucket encryption key info
    */
@@ -217,6 +233,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     auditMap.put(OzoneConsts.CREATION_TIME, String.valueOf(this.creationTime));
     auditMap.put(OzoneConsts.BUCKET_ENCRYPTION_KEY,
         (bekInfo != null) ? bekInfo.getKeyName() : null);
+    auditMap.put(OzoneConsts.MODIFICATION_TIME,
+        String.valueOf(this.modificationTime));
     return auditMap;
   }
 
@@ -230,6 +248,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setStorageType(storageType)
         .setIsVersionEnabled(isVersionEnabled)
         .setCreationTime(creationTime)
+        .setModificationTime(modificationTime)
         .setObjectID(objectID)
         .setUpdateID(updateID)
         .setBucketEncryptionKey(bekInfo != null ?
@@ -257,6 +276,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     private Boolean isVersionEnabled;
     private StorageType storageType;
     private long creationTime;
+    private long modificationTime;
     private long objectID;
     private long updateID;
     private Map<String, String> metadata;
@@ -309,6 +329,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       return this;
     }
 
+    public Builder setModificationTime(long modifiedOn) {
+      this.modificationTime = modifiedOn;
+      return this;
+    }
+
     public Builder setObjectID(long obId) {
       this.objectID = obId;
       return this;
@@ -349,7 +374,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
       Preconditions.checkNotNull(storageType);
 
       return new OmBucketInfo(volumeName, bucketName, acls, isVersionEnabled,
-          storageType, creationTime, objectID, updateID, metadata, bekInfo);
+          storageType, creationTime, modificationTime, objectID, updateID,
+          metadata, bekInfo);
     }
   }
 
@@ -364,6 +390,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setIsVersionEnabled(isVersionEnabled)
         .setStorageType(storageType.toProto())
         .setCreationTime(creationTime)
+        .setModificationTime(modificationTime)
         .setObjectID(objectID)
         .setUpdateID(updateID)
         .addAllMetadata(KeyValueUtil.toProtobuf(metadata));
@@ -386,7 +413,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
             OzoneAcl::fromProtobuf).collect(Collectors.toList()))
         .setIsVersionEnabled(bucketInfo.getIsVersionEnabled())
         .setStorageType(StorageType.valueOf(bucketInfo.getStorageType()))
-        .setCreationTime(bucketInfo.getCreationTime());
+        .setCreationTime(bucketInfo.getCreationTime())
+        .setModificationTime(bucketInfo.getModificationTime());
     if (bucketInfo.hasObjectID()) {
       obib.setObjectID(bucketInfo.getObjectID());
     }
@@ -424,6 +452,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     }
     OmBucketInfo that = (OmBucketInfo) o;
     return creationTime == that.creationTime &&
+        modificationTime == that.modificationTime &&
         volumeName.equals(that.volumeName) &&
         bucketName.equals(that.bucketName) &&
         Objects.equals(acls, that.acls) &&

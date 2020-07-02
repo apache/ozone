@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
@@ -31,6 +30,7 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
 
+import static org.apache.hadoop.hdds.conf.OzoneConfiguration.newInstanceOf;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
@@ -43,7 +43,7 @@ import static org.junit.Assert.assertTrue;
 public class TestOzoneAclUtil {
 
   private static final List<OzoneAcl> DEFAULT_ACLS =
-      getDefaultAcls(new OzoneConfiguration());
+      getDefaultAcls();
 
   private static final OzoneAcl USER1 = new OzoneAcl(USER, "user1",
       ACLType.READ_ACL, ACCESS);
@@ -56,7 +56,7 @@ public class TestOzoneAclUtil {
 
   @Test
   public void testAddAcl() throws IOException {
-    List<OzoneAcl> currentAcls = getDefaultAcls(new OzoneConfiguration());
+    List<OzoneAcl> currentAcls = getDefaultAcls();
     assertTrue(currentAcls.size() > 0);
 
     // Add new permission to existing acl entry.
@@ -88,7 +88,7 @@ public class TestOzoneAclUtil {
     addAndVerifyAcl(currentAcls, USER1, false, 0);
     removeAndVerifyAcl(currentAcls, USER1, false, 0);
 
-    currentAcls = getDefaultAcls(new OzoneConfiguration());
+    currentAcls = getDefaultAcls();
     assertTrue(currentAcls.size() > 0);
 
     // Add new permission to existing acl entru.
@@ -166,7 +166,7 @@ public class TestOzoneAclUtil {
    * @return list of ozoneAcls.
    * @throws IOException
    * */
-  private static List<OzoneAcl> getDefaultAcls(OzoneConfiguration conf) {
+  private static List<OzoneAcl> getDefaultAcls() {
     List<OzoneAcl> ozoneAcls = new ArrayList<>();
     //User ACL
     UserGroupInformation ugi;
@@ -176,7 +176,7 @@ public class TestOzoneAclUtil {
       ugi = UserGroupInformation.createRemoteUser("user0");
     }
 
-    OzoneAclConfig aclConfig = conf.getObject(OzoneAclConfig.class);
+    OzoneAclConfig aclConfig = newInstanceOf(OzoneAclConfig.class);
     IAccessAuthorizer.ACLType userRights = aclConfig.getUserDefaultRights();
     IAccessAuthorizer.ACLType groupRights = aclConfig.getGroupDefaultRights();
 

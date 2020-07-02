@@ -27,14 +27,13 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import org.junit.Assert;
@@ -70,12 +69,12 @@ public class TestOneReplicaPipelineSafeModeRule {
 
     eventQueue = new EventQueue();
 
-    DBStore dbStore =
-        DBStoreBuilder.createDBStore(ozoneConfiguration, new SCMDBDefinition());
+    SCMMetadataStore scmMetadataStore =
+            new SCMMetadataStoreImpl(ozoneConfiguration);
 
     pipelineManager =
         new SCMPipelineManager(ozoneConfiguration, mockNodeManager,
-            SCMDBDefinition.PIPELINES.getTable(dbStore),
+            scmMetadataStore.getPipelineTable(),
             eventQueue);
     pipelineManager.allowPipelineCreation();
 

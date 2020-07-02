@@ -281,15 +281,7 @@ public final class OzoneConfigKeys {
 
   public static final String DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR =
       "dfs.container.ratis.datanode.storage.dir";
-  public static final String DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY =
-      ScmConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY;
-  public static final int DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_DEFAULT =
-      ScmConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_DEFAULT;
-  public static final String DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_KEY =
-      ScmConfigKeys.DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_KEY;
-  public static final TimeDuration
-      DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_DEFAULT =
-      ScmConfigKeys.DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_DEFAULT;
+
   public static final String DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY =
       ScmConfigKeys.DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY;
   public static final TimeDuration
@@ -400,6 +392,10 @@ public final class OzoneConfigKeys {
   public static final String OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY =
       "ozone.s3.token.max.lifetime";
   public static final String OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY_DEFAULT = "3m";
+
+  public static final String OZONE_FS_ITERATE_BATCH_SIZE =
+      "ozone.fs.iterate.batch-size";
+  public static final int OZONE_FS_ITERATE_BATCH_SIZE_DEFAULT = 100;
 
   // Ozone Client Retry and Failover configurations
   public static final String OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY =

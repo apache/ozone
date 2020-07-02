@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -35,6 +34,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static org.apache.hadoop.hdds.conf.OzoneConfiguration.newInstanceOf;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -67,8 +67,7 @@ public class TestContainerScrubberMetrics {
 
   @Before
   public void setup() {
-    conf = new OzoneConfiguration()
-        .getObject(ContainerScrubberConfiguration.class);
+    conf = newInstanceOf(ContainerScrubberConfiguration.class);
     conf.setMetadataScanInterval(0);
     conf.setDataScanInterval(0);
     controller = mockContainerController();
