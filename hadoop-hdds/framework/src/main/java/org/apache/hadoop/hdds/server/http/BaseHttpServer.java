@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.HddsConfServlet;
 import org.apache.hadoop.hdds.conf.HddsPrometheusConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
@@ -70,7 +70,7 @@ public abstract class BaseHttpServer {
       "org.eclipse.jetty.webapp.basetempdir";
 
   private HttpServer2 httpServer;
-  private final ConfigurationSource conf;
+  private final MutableConfigurationSource conf;
 
   private InetSocketAddress httpAddress;
   private InetSocketAddress httpsAddress;
@@ -84,7 +84,7 @@ public abstract class BaseHttpServer {
 
   private boolean profilerSupport;
 
-  public BaseHttpServer(ConfigurationSource conf, String name)
+  public BaseHttpServer(MutableConfigurationSource conf, String name)
       throws IOException {
     this.name = name;
     this.conf = conf;
@@ -115,9 +115,11 @@ public abstract class BaseHttpServer {
       if (isSecurityEnabled) {
         String httpAuthType = conf.get(getHttpAuthType(), "simple");
         LOG.info("HttpAuthType: {} = {}", getHttpAuthType(), httpAuthType);
+        // Ozone config prefix must be set to avoid AuthenticationFilter
+        // fall back to default one form hadoop.http.authentication.
+        builder.authFilterConfigurationPrefix(getHttpAuthConfigPrefix());
         if (httpAuthType.equals("kerberos")) {
           builder.setSecurityEnabled(true);
-          builder.authFilterConfigurationPrefix(getHttpAuthConfigPrefix());
           builder.setUsernameConfKey(getSpnegoPrincipal());
           builder.setKeytabConfKey(getKeytabFile());
         }
@@ -148,7 +150,7 @@ public abstract class BaseHttpServer {
         httpServer.getWebAppContext().getServletContext()
             .setAttribute(PROMETHEUS_SINK, prometheusMetricsSink);
         HddsPrometheusConfig prometheusConfig =
-            OzoneConfiguration.of(conf).getObject(HddsPrometheusConfig.class);
+            conf.getObject(HddsPrometheusConfig.class);
         String token = prometheusConfig.getPrometheusEndpointToken();
         if (StringUtils.isNotEmpty(token)) {
           httpServer.getWebAppContext().getServletContext()
@@ -186,7 +188,7 @@ public abstract class BaseHttpServer {
    * Recon to initialize their HTTP / HTTPS server.
    */
   public static HttpServer2.Builder newHttpServer2BuilderForOzone(
-      ConfigurationSource conf, final InetSocketAddress httpAddr,
+      MutableConfigurationSource conf, final InetSocketAddress httpAddr,
       final InetSocketAddress httpsAddr, String name) throws IOException {
     HttpConfig.Policy policy = getHttpPolicy(conf);
 

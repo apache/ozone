@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -362,4 +363,23 @@ public interface OMMetadataManager {
    */
   Set<String> getMultipartUploadKeys(String volumeName,
       String bucketName, String prefix) throws IOException;
+
+  /**
+   * Return table mapped to the specified table name.
+   * @param tableName
+   * @return Table
+   */
+  Table getTable(String tableName);
+
+  /**
+   * Return a map of tableName and table in OM DB.
+   * @return map of table and table name.
+   */
+  Map<String, Table> listTables();
+
+  /**
+   * Return Set of table names created in OM DB.
+   * @return table names in OM DB.
+   */
+  Set<String> listTableNames();
 }

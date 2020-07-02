@@ -31,14 +31,13 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import org.junit.Assert;
@@ -53,25 +52,26 @@ public class TestHealthyPipelineSafeModeRule {
   @Test
   public void testHealthyPipelineSafeModeRuleWithNoPipelines()
       throws Exception {
-    DBStore store = null;
-    String storageDir = GenericTestUtils.getTempPath(
-        TestHealthyPipelineSafeModeRule.class.getName() + UUID.randomUUID());
-    try {
-      EventQueue eventQueue = new EventQueue();
-      List<ContainerInfo> containers =
-          new ArrayList<>(HddsTestUtils.getContainerInfo(1));
+    EventQueue eventQueue = new EventQueue();
+    List<ContainerInfo> containers =
+            new ArrayList<>(HddsTestUtils.getContainerInfo(1));
 
-      OzoneConfiguration config = new OzoneConfiguration();
-      MockNodeManager nodeManager = new MockNodeManager(true, 0);
-      config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
-      // enable pipeline check
-      config.setBoolean(
-          HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
-      config.setBoolean(
-          HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
-      store = DBStoreBuilder.createDBStore(config, new SCMDBDefinition());
+    String storageDir = GenericTestUtils.getTempPath(
+            TestHealthyPipelineSafeModeRule.class.getName() +
+                    UUID.randomUUID());
+    OzoneConfiguration config = new OzoneConfiguration();
+    MockNodeManager nodeManager = new MockNodeManager(true, 0);
+    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
+    // enable pipeline check
+    config.setBoolean(
+            HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
+    config.setBoolean(
+            HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
+    SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(config);
+
+    try {
       SCMPipelineManager pipelineManager = new SCMPipelineManager(config,
-          nodeManager, SCMDBDefinition.PIPELINES.getTable(store), eventQueue);
+          nodeManager, scmMetadataStore.getPipelineTable(), eventQueue);
       PipelineProvider mockRatisProvider =
           new MockRatisPipelineProvider(nodeManager,
               pipelineManager.getStateManager(), config);
@@ -86,7 +86,7 @@ public class TestHealthyPipelineSafeModeRule {
       // This should be immediately satisfied, as no pipelines are there yet.
       Assert.assertTrue(healthyPipelineSafeModeRule.validate());
     } finally {
-      store.close();
+      scmMetadataStore.getStore().close();
       FileUtil.fullyDelete(new File(storageDir));
     }
   }
@@ -95,27 +95,27 @@ public class TestHealthyPipelineSafeModeRule {
   public void testHealthyPipelineSafeModeRuleWithPipelines() throws Exception {
     String storageDir = GenericTestUtils.getTempPath(
         TestHealthyPipelineSafeModeRule.class.getName() + UUID.randomUUID());
-    DBStore store = null;
+
+    EventQueue eventQueue = new EventQueue();
+    List<ContainerInfo> containers =
+            new ArrayList<>(HddsTestUtils.getContainerInfo(1));
+
+    OzoneConfiguration config = new OzoneConfiguration();
+    // In Mock Node Manager, first 8 nodes are healthy, next 2 nodes are
+    // stale and last one is dead, and this repeats. So for a 12 node, 9
+    // healthy, 2 stale and one dead.
+    MockNodeManager nodeManager = new MockNodeManager(true, 12);
+    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
+    // enable pipeline check
+    config.setBoolean(
+            HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
+    config.setBoolean(
+            HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
+
+    SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(config);
     try {
-      EventQueue eventQueue = new EventQueue();
-      List<ContainerInfo> containers =
-          new ArrayList<>(HddsTestUtils.getContainerInfo(1));
-
-      OzoneConfiguration config = new OzoneConfiguration();
-      // In Mock Node Manager, first 8 nodes are healthy, next 2 nodes are
-      // stale and last one is dead, and this repeats. So for a 12 node, 9
-      // healthy, 2 stale and one dead.
-      MockNodeManager nodeManager = new MockNodeManager(true, 12);
-      config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
-      // enable pipeline check
-      config.setBoolean(
-          HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
-      config.setBoolean(
-          HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
-
-      store = DBStoreBuilder.createDBStore(config, new SCMDBDefinition());
       SCMPipelineManager pipelineManager = new SCMPipelineManager(config,
-          nodeManager, SCMDBDefinition.PIPELINES.getTable(store), eventQueue);
+          nodeManager, scmMetadataStore.getPipelineTable(), eventQueue);
       pipelineManager.allowPipelineCreation();
 
       PipelineProvider mockRatisProvider =
@@ -158,7 +158,7 @@ public class TestHealthyPipelineSafeModeRule {
       GenericTestUtils.waitFor(() -> healthyPipelineSafeModeRule.validate(),
           1000, 5000);
     } finally {
-      store.close();
+      scmMetadataStore.getStore().close();
       FileUtil.fullyDelete(new File(storageDir));
     }
   }
@@ -170,29 +170,28 @@ public class TestHealthyPipelineSafeModeRule {
 
     String storageDir = GenericTestUtils.getTempPath(
         TestHealthyPipelineSafeModeRule.class.getName() + UUID.randomUUID());
-    DBStore store = null;
 
+    EventQueue eventQueue = new EventQueue();
+    List<ContainerInfo> containers =
+            new ArrayList<>(HddsTestUtils.getContainerInfo(1));
+
+    OzoneConfiguration config = new OzoneConfiguration();
+
+    // In Mock Node Manager, first 8 nodes are healthy, next 2 nodes are
+    // stale and last one is dead, and this repeats. So for a 12 node, 9
+    // healthy, 2 stale and one dead.
+    MockNodeManager nodeManager = new MockNodeManager(true, 12);
+    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
+    // enable pipeline check
+    config.setBoolean(
+            HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
+    config.setBoolean(
+            HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
+
+    SCMMetadataStore scmMetadataStore = new SCMMetadataStoreImpl(config);
     try {
-      EventQueue eventQueue = new EventQueue();
-      List<ContainerInfo> containers =
-          new ArrayList<>(HddsTestUtils.getContainerInfo(1));
-
-      OzoneConfiguration config = new OzoneConfiguration();
-
-      // In Mock Node Manager, first 8 nodes are healthy, next 2 nodes are
-      // stale and last one is dead, and this repeats. So for a 12 node, 9
-      // healthy, 2 stale and one dead.
-      MockNodeManager nodeManager = new MockNodeManager(true, 12);
-      config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
-      // enable pipeline check
-      config.setBoolean(
-          HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
-      config.setBoolean(
-          HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
-
-      store = DBStoreBuilder.createDBStore(config, new SCMDBDefinition());
       SCMPipelineManager pipelineManager = new SCMPipelineManager(config,
-          nodeManager, SCMDBDefinition.PIPELINES.getTable(store), eventQueue);
+          nodeManager, scmMetadataStore.getPipelineTable(), eventQueue);
 
       pipelineManager.allowPipelineCreation();
       PipelineProvider mockRatisProvider =
@@ -244,7 +243,7 @@ public class TestHealthyPipelineSafeModeRule {
           1000, 5000);
 
     } finally {
-      store.close();
+      scmMetadataStore.getStore().close();
       FileUtil.fullyDelete(new File(storageDir));
     }
 

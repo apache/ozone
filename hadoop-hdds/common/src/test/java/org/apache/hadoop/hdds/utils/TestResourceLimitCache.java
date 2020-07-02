@@ -23,6 +23,8 @@ import org.junit.Test;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Test for ResourceLimitCache.
@@ -60,25 +62,27 @@ public class TestResourceLimitCache {
     resourceCache.remove(4);
 
     GenericTestUtils.waitFor(future::isDone, 100, 1000);
-    // map has the ket 1
+    // map has the key 1
     Assert.assertTrue(future.isDone() && !future.isCompletedExceptionally());
     Assert.assertNotNull(resourceCache.get(1));
 
     // Create a future which blocks to put 4. Currently map has acquired 7
     // permits out of 10
+    ExecutorService pool = Executors.newCachedThreadPool();
     future = CompletableFuture.supplyAsync(() -> {
       try {
         return resourceCache.put(4, "a");
       } catch (InterruptedException e) {
-        e.printStackTrace();
+        return null;
       }
-      return null;
-    });
+    }, pool);
     Assert.assertTrue(!future.isDone());
     Thread.sleep(100);
     Assert.assertTrue(!future.isDone());
 
-    // Cancel the future for putting key 4
+    // Shutdown the thread pool for putting key 4
+    pool.shutdownNow();
+    // Mark the future as cancelled
     future.cancel(true);
     // remove key 1 so currently map has acquired 6 permits out of 10
     resourceCache.remove(1);

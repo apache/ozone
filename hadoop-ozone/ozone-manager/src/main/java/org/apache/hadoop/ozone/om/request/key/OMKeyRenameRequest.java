@@ -23,7 +23,9 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -84,6 +86,14 @@ public class OMKeyRenameRequest extends OMKeyRequest {
 
     RenameKeyRequest renameKeyRequest = getOmRequest().getRenameKeyRequest();
     Preconditions.checkNotNull(renameKeyRequest);
+
+    // Verify key name
+    final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
+         .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
+                 OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
+    if(checkKeyNameEnabled){
+      OmUtils.validateKeyName(renameKeyRequest.getToKeyName());
+    }
 
     // Set modification time.
     KeyArgs.Builder newKeyArgs = renameKeyRequest.getKeyArgs().toBuilder()

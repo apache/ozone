@@ -124,7 +124,7 @@ public class KeyValueBlockIterator implements BlockIterator<BlockData>,
     if (nextBlock != null) {
       return true;
     }
-    if (blockIterator.hasNext()) {
+    while (blockIterator.hasNext()) {
       KeyValue block = blockIterator.next();
       if (blockFilter.filterKey(null, block.getKey(), null)) {
         nextBlock = BlockUtils.getBlockData(block.getValue());
@@ -134,7 +134,6 @@ public class KeyValueBlockIterator implements BlockIterator<BlockData>,
         }
         return true;
       }
-      hasNext();
     }
     return false;
   }

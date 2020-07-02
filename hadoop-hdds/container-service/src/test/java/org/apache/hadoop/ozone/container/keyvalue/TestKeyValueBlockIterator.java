@@ -209,7 +209,7 @@ public class TestKeyValueBlockIterator {
   @Test
   public void testKeyValueBlockIteratorWithFilter() throws Exception {
     long containerId = 103L;
-    int deletedBlocks = 5;
+    int deletedBlocks = 10;
     int normalBlocks = 5;
     createContainerWithBlocks(containerId, normalBlocks, deletedBlocks);
     String containerPath = new File(containerData.getMetadataPath())
@@ -223,6 +223,7 @@ public class TestKeyValueBlockIterator {
         BlockData blockData = keyValueBlockIterator.nextBlock();
         assertEquals(blockData.getLocalID(), counter++);
       }
+      assertEquals(10, counter);
     }
   }
 

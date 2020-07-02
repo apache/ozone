@@ -18,6 +18,7 @@ package org.apache.hadoop.hdds.scm.container;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -180,7 +181,7 @@ public interface ContainerManager extends Closeable {
    * @return ContainerInfo for the matching container.
    */
   ContainerInfo getMatchingContainer(long size, String owner,
-      Pipeline pipeline, List<ContainerID> excludedContainerIDS);
+      Pipeline pipeline, Collection<ContainerID> excludedContainerIDS);
 
   /**
    * Once after report processor handler completes, call this to notify

@@ -47,7 +47,7 @@ import com.google.common.base.Preconditions;
  */
 @InterfaceAudience.Private
 public class OzoneConfiguration extends Configuration
-    implements ConfigurationSource {
+    implements MutableConfigurationSource {
   static {
     activate();
   }
@@ -70,6 +70,25 @@ public class OzoneConfiguration extends Configuration
     return conf instanceof OzoneConfiguration
         ? (OzoneConfiguration) conf
         : new OzoneConfiguration(conf);
+  }
+
+  /**
+   * @return a new config object of type {@code T} configured with defaults
+   * and any overrides from XML
+   */
+  public static <T> T newInstanceOf(Class<T> configurationClass) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    return conf.getObject(configurationClass);
+  }
+
+  /**
+   * @return a new {@code OzoneConfiguration} instance set from the given
+   * {@code configObject}
+   */
+  public static <T> OzoneConfiguration fromObject(T configObject) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setFromObject(configObject);
+    return conf;
   }
 
   public OzoneConfiguration() {
@@ -100,6 +119,12 @@ public class OzoneConfiguration extends Configuration
     } catch (IOException e) {
       e.printStackTrace();
     }
+    // Adding core-site here because properties from core-site are
+    // distributed to executors by spark driver. Ozone properties which are
+    // added to core-site, will be overriden by properties from adding Resource
+    // ozone-default.xml. So, adding core-site again will help to resolve
+    // this override issue.
+    addResource("core-site.xml");
     addResource("ozone-site.xml");
   }
 

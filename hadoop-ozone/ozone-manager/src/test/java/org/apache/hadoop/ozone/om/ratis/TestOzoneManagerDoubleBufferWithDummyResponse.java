@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -45,6 +46,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.test.GenericTestUtils.waitFor;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -163,6 +165,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
   /**
    * DummyCreatedBucket Response class used in testing.
    */
+  @CleanupTableInfo(cleanupTables = {BUCKET_TABLE})
   private static class OMDummyCreateBucketResponse extends OMClientResponse {
     private final OmBucketInfo omBucketInfo;
 
@@ -181,6 +184,5 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
       omMetadataManager.getBucketTable().putWithBatch(batchOperation,
           dbBucketKey, omBucketInfo);
     }
-
   }
 }

@@ -54,7 +54,6 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -175,7 +174,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForBlockClients;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
@@ -1583,11 +1581,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    *
    * @return true if permission granted, false if permission denied.
    */
-  private boolean hasAcls(ResourceType resType, StoreType store,
-      ACLType acl, String vol, String bucket, String key) {
+  private boolean hasAcls(String userName, ResourceType resType,
+      StoreType store, ACLType acl, String vol, String bucket, String key) {
     try {
       return checkAcls(resType, store, acl, vol, bucket, key,
-          ProtobufRpcEngine.Server.getRemoteUser(),
+          UserGroupInformation.createRemoteUser(userName),
           ProtobufRpcEngine.Server.getRemoteIp(),
           ProtobufRpcEngine.Server.getRemoteIp().getHostName(),
           false);
@@ -1849,8 +1847,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         List<OmVolumeArgs> result = new ArrayList<>();
         // Filter all volumes by LIST ACL
         for (OmVolumeArgs volumeArgs : listAllVolumes) {
-          if (hasAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.LIST,
-              volumeArgs.getVolume(), null, null)) {
+          if (hasAcls(userName, ResourceType.VOLUME, StoreType.OZONE,
+              ACLType.LIST, volumeArgs.getVolume(), null, null)) {
             result.add(volumeArgs);
           }
         }
@@ -2217,6 +2215,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
+  /**
+   * Deletes an existing key.
+   *
+   * @param args - List attributes of the key.
+   * @throws IOException
+   */
+  @Override
+  public void deleteKeys(List<OmKeyArgs> args) throws IOException {
+    if (args != null) {
+      for (OmKeyArgs keyArgs : args) {
+        deleteKey(keyArgs);
+      }
+    }
+  }
+
   @Override
   public List<OmKeyInfo> listKeys(String volumeName, String bucketName,
       String startKey, String keyPrefix, int maxKeys) throws IOException {
@@ -2480,28 +2493,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .setType(ServicePort.Type.RPC)
             .setValue(scmAddr.getPort()).build());
     services.add(scmServiceInfoBuilder.build());
-
-    List<HddsProtos.Node> nodes = scmContainerClient.queryNode(HEALTHY,
-        HddsProtos.QueryScope.CLUSTER, "");
-
-    for (HddsProtos.Node node : nodes) {
-      HddsProtos.DatanodeDetailsProto datanode = node.getNodeID();
-
-      ServiceInfo.Builder dnServiceInfoBuilder = ServiceInfo.newBuilder()
-          .setNodeType(HddsProtos.NodeType.DATANODE)
-          .setHostname(datanode.getHostName());
-
-      if (DatanodeDetails.getFromProtoBuf(datanode)
-          .getPort(DatanodeDetails.Port.Name.REST) != null) {
-        dnServiceInfoBuilder.addServicePort(ServicePort.newBuilder()
-            .setType(ServicePort.Type.HTTP)
-            .setValue(DatanodeDetails.getFromProtoBuf(datanode)
-                .getPort(DatanodeDetails.Port.Name.REST).getValue())
-            .build());
-      }
-
-      services.add(dnServiceInfoBuilder.build());
-    }
 
     metrics.incNumGetServiceLists();
     // For now there is no exception that can can happen in this call,

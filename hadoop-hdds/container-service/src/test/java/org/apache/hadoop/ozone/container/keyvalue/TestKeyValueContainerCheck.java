@@ -109,7 +109,7 @@ import static org.junit.Assert.assertFalse;
     conf.set(OZONE_METADATA_STORE_IMPL, storeImpl);
     chunkManagerTestInfo.updateConfig(conf);
     volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf);
-    chunkManager = chunkManagerTestInfo.createChunkManager(true);
+    chunkManager = chunkManagerTestInfo.createChunkManager(true, null);
   }
 
   @After public void teardown() {

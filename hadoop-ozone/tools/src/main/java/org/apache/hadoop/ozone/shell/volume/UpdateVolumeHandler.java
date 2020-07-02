@@ -63,6 +63,8 @@ public class UpdateVolumeHandler extends VolumeHandler {
       }
     }
 
-    printObjectAsJson(volume);
+    // For printing newer modificationTime.
+    OzoneVolume updatedVolume = client.getObjectStore().getVolume(volumeName);
+    printObjectAsJson(updatedVolume);
   }
 }

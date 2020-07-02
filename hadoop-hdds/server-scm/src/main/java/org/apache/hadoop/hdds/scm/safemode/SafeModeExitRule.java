@@ -111,4 +111,9 @@ public abstract class SafeModeExitRule<T> implements EventHandler<T> {
     return safeModeManager.getSafeModeMetrics();
   }
 
+  /**
+   * Returns the status text of the rule.
+   * @return status text.
+   */
+  abstract String getStatusText();
 }
