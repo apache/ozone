@@ -75,8 +75,8 @@ public class OMKeysRenameResponse extends OMClientResponse {
       String volumeName = omRenameKeyInfo.getNewKeyInfo().getVolumeName();
       String bucketName = omRenameKeyInfo.getNewKeyInfo().getBucketName();
       fromKeyName = omRenameKeyInfo.getFromKeyName();
-      toKeyName = omRenameKeyInfo.getToKeyName();
       OmKeyInfo newKeyInfo = omRenameKeyInfo.getNewKeyInfo();
+      toKeyName = newKeyInfo.getKeyName();
       Table<String, OmKeyInfo> keyTable = omMetadataManager
           .getKeyTable();
       try {

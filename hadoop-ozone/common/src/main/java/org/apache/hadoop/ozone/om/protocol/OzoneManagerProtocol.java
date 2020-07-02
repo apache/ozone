@@ -220,10 +220,10 @@ public interface OzoneManagerProtocol
 
   /**
    * Rename existing keys within a bucket.
-   * @param keyMap The key is new key name nad value is original key OmKeyArgs.
+   * @param keyMap The key is original key OmKeyArgs and value is new key name.
    * @throws IOException
    */
-  void renameKeys(Map<String, OmKeyArgs> keyMap) throws IOException;
+  void renameKeys(Map<OmKeyArgs, String> keyMap) throws IOException;
 
   /**
    * Deletes an existing key.

@@ -679,20 +679,19 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void renameKeys(Map<String, OmKeyArgs> keyMap) throws IOException {
+  public void renameKeys(Map<OmKeyArgs, String> keyMap) throws IOException {
     RenameKeysRequest.Builder reqKeys = RenameKeysRequest.newBuilder();
     List<RenameKeyRequest> renameKeyRequestList  = new ArrayList<>();
-    for (Map.Entry< String, OmKeyArgs > entry : keyMap.entrySet()) {
+    for (Map.Entry< OmKeyArgs, String> entry : keyMap.entrySet()) {
       RenameKeyRequest.Builder reqKey = RenameKeyRequest.newBuilder();
-      OmKeyArgs args = entry.getValue();
+      OmKeyArgs args = entry.getKey();
       KeyArgs keyArgs = KeyArgs.newBuilder()
           .setVolumeName(args.getVolumeName())
           .setBucketName(args.getBucketName())
           .setKeyName(args.getKeyName())
-          .setModificationTime(Time.now())
-          .setDataSize(args.getDataSize()).build();
+          .setModificationTime(Time.now()).build();
       reqKey.setKeyArgs(keyArgs);
-      reqKey.setToKeyName(entry.getKey());
+      reqKey.setToKeyName(entry.getValue());
       renameKeyRequestList.add(reqKey.build());
     }
     reqKeys.addAllRenameKeyRequest(renameKeyRequestList);

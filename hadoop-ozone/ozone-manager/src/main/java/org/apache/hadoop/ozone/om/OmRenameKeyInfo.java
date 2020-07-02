@@ -27,23 +27,17 @@ import javax.annotation.Nonnull;
  */
 public class OmRenameKeyInfo {
 
-  private String toKeyName;
   private OmKeyInfo newKeyInfo;
   private String fromKeyName;
 
-  public OmRenameKeyInfo(String fromKeyName, String toKeyName,
+  public OmRenameKeyInfo(String fromKeyName,
                          @Nonnull OmKeyInfo renameKeyInfo) {
     this.fromKeyName = fromKeyName;
-    this.toKeyName = toKeyName;
     this.newKeyInfo = renameKeyInfo;
   }
 
   public String getFromKeyName() {
     return fromKeyName;
-  }
-
-  public String getToKeyName() {
-    return toKeyName;
   }
 
   public OmKeyInfo getNewKeyInfo() {

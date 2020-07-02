@@ -767,14 +767,14 @@ public class RpcClient implements ClientProtocol {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     HddsClientUtils.checkNotNull(keyMap);
-    Map <String, OmKeyArgs> keyArgsMap = new HashMap<>();
+    Map <OmKeyArgs, String> keyArgsMap = new HashMap<>();
     for (Map.Entry< String, String > entry : keyMap.entrySet()) {
       OmKeyArgs keyArgs = new OmKeyArgs.Builder()
           .setVolumeName(volumeName)
           .setBucketName(bucketName)
           .setKeyName(entry.getKey())
           .build();
-      keyArgsMap.put(entry.getValue(), keyArgs);
+      keyArgsMap.put(keyArgs, entry.getValue());
     }
     ozoneManagerClient.renameKeys(keyArgsMap);
   }

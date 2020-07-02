@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,13 +80,21 @@ public class OMKeysRenameRequest extends OMKeyRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
-    RenameKeysRequest renameKeysRequest = getOmRequest().getRenameKeysRequest();
-    Preconditions.checkNotNull(renameKeysRequest);
+    RenameKeysRequest renameKeys = getOmRequest().getRenameKeysRequest();
+    Preconditions.checkNotNull(renameKeys);
 
-    return getOmRequest().toBuilder()
-        .setRenameKeysRequest(renameKeysRequest.toBuilder())
+    List<RenameKeyRequest> renameKeyList = new ArrayList<>();
+    for (RenameKeyRequest renameKey : renameKeys.getRenameKeyRequestList()) {
+      // Set modification time.
+      KeyArgs.Builder newKeyArgs = renameKey.getKeyArgs().toBuilder()
+          .setModificationTime(Time.now());
+      renameKey.toBuilder().setKeyArgs(newKeyArgs);
+      renameKeyList.add(renameKey);
+    }
+    RenameKeysRequest renameKeysRequest = RenameKeysRequest
+        .newBuilder().addAllRenameKeyRequest(renameKeyList).build();
+    return getOmRequest().toBuilder().setRenameKeysRequest(renameKeysRequest)
         .setUserInfo(getUserInfo()).build();
-
   }
 
   @Override
@@ -193,7 +202,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
                 // Add to cache. Only fromKey should be deleted. ToKey already
                 // exists in DB as this transaction is a replay.
                 result = Result.DELETE_FROM_KEY_ONLY;
-                renameKeyInfoList.add(new OmRenameKeyInfo(fromKeyName,
+                renameKeyInfoList.add(new OmRenameKeyInfo(
                     null, fromKeyValue));
               }
             }
@@ -226,7 +235,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
           fromKeyValue.setModificationTime(renameKeyArgs.getModificationTime());
 
           renameKeyInfoList
-              .add(new OmRenameKeyInfo(fromKeyName, toKeyName, fromKeyValue));
+              .add(new OmRenameKeyInfo(fromKeyName, fromKeyValue));
         }
       }
       omClientResponse = new OMKeysRenameResponse(omResponse
