@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -48,6 +47,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -121,7 +121,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
     OmKeyInfo fromKeyValue = null;
 
     Result result = null;
-    Map<String, String> auditMap = null;
+    Map<String, String> auditMap = new HashMap<>();
     RenameKeyRequest renameRequest = null;
     String toKey = null;
     String fromKey = null;
@@ -141,6 +141,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
             fromKeyName);
         OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(objectKey);
         unRenamedKeys.add(omKeyInfo);
+        auditMap.put(fromKeyName, renameKeyRequest.getToKeyName());
       }
 
       for (RenameKeyRequest renameKeyRequest : renameKeysRequest
@@ -152,7 +153,6 @@ public class OMKeysRenameRequest extends OMKeyRequest {
         bucketName = renameKeyArgs.getBucketName();
         fromKeyName = renameKeyArgs.getKeyName();
         toKeyName = renameKeyRequest.getToKeyName();
-        auditMap = buildAuditMap(renameKeyArgs, renameKeyRequest);
         renameRequest = renameKeyRequest;
 
         if (toKeyName.length() == 0 || fromKeyName.length() == 0) {
@@ -260,14 +260,8 @@ public class OMKeysRenameRequest extends OMKeyRequest {
 
     switch (result) {
     case SUCCESS:
-      LOG.debug("Rename Key is successfully completed for volume:{} bucket:{}"
-              + " fromKey:{} toKey:{}. ", volumeName, bucketName, fromKeyName,
-          toKeyName);
-      break;
-    case DELETE_FROM_KEY_ONLY:
-      LOG.debug("Replayed transaction {}: {}. Renamed Key {} already exists. "
-              + "Deleting old key {}.", trxnLogIndex, renameRequest, toKey,
-          fromKey);
+      LOG.debug("Rename Keys is successfully completed for volume:{} bucket:{}"
+              + " auditMap:{}.", volumeName, bucketName, auditMap.toString());
       break;
     case REPLAY:
       LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
@@ -275,9 +269,8 @@ public class OMKeysRenameRequest extends OMKeyRequest {
       break;
     case FAILURE:
       ozoneManager.getMetrics().incNumKeyRenameFails();
-      LOG.error("Rename key failed for volume:{} bucket:{} fromKey:{} " +
-              "toKey:{}. Key: {} not found.", volumeName, bucketName,
-          fromKeyName, toKeyName, fromKeyName);
+      LOG.error("Rename keys failed for volume:{} bucket:{} auditMap:{}.",
+          volumeName, bucketName, auditMap.toString());
       break;
     default:
       LOG.error("Unrecognized Result for OMKeyRenameRequest: {}",
@@ -285,14 +278,5 @@ public class OMKeysRenameRequest extends OMKeyRequest {
     }
 
     return omClientResponse;
-  }
-
-  private Map<String, String> buildAuditMap(
-      KeyArgs keyArgs, RenameKeyRequest renameKeyRequest) {
-    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
-    auditMap.remove(OzoneConsts.KEY);
-    auditMap.put(OzoneConsts.SRC_KEY, keyArgs.getKeyName());
-    auditMap.put(OzoneConsts.DST_KEY, renameKeyRequest.getToKeyName());
-    return auditMap;
   }
 }
