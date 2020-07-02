@@ -26,7 +26,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys
 import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.junit.Assert.fail;
-import org.junit.Ignore;
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
@@ -109,7 +108,6 @@ import com.google.common.collect.Maps;
 /**
  * Test class that exercises the StorageContainerManager.
  */
-@Ignore
 public class TestStorageContainerManager {
   private static XceiverClientManager xceiverClientManager;
   private static final Logger LOG = LoggerFactory.getLogger(
@@ -119,7 +117,7 @@ public class TestStorageContainerManager {
    * Set the timeout for every test.
    */
   @Rule
-  public Timeout testTimeout = new Timeout(300000);
+  public Timeout testTimeout = new Timeout(900000);
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
@@ -154,6 +152,7 @@ public class TestStorageContainerManager {
         "adminUser1, adminUser2");
     // Non-admin user will get permission denied.
     testRpcPermissionWithConf(ozoneConf, "unknownUser", true);
+
     // Admin user will pass the permission check.
     testRpcPermissionWithConf(ozoneConf, "adminUser2", false);
   }
@@ -525,7 +524,7 @@ public class TestStorageContainerManager {
   /**
    * Test datanode heartbeat well processed with a 4-layer network topology.
    */
-  @Test(timeout = 60000)
+  @Test(timeout = 180000)
   public void testScmProcessDatanodeHeartbeat() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     String scmId = UUID.randomUUID().toString();
