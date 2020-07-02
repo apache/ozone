@@ -233,7 +233,7 @@ public class TestCloseContainerCommandHandler {
     DatanodeDetails.Port restPort = DatanodeDetails.newPort(
         DatanodeDetails.Port.Name.REST, 0);
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
-    builder.setUuid(UUID.randomUUID().toString())
+    builder.setUuid(UUID.randomUUID())
         .setHostName("localhost")
         .setIpAddress(ipAddress)
         .addPort(containerPort)

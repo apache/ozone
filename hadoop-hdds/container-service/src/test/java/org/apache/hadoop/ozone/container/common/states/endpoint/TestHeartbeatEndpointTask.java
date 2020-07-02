@@ -268,7 +268,7 @@ public class TestHeartbeatEndpointTask {
       StateContext context,
       StorageContainerDatanodeProtocolClientSideTranslatorPB proxy) {
     DatanodeDetails datanodeDetails = DatanodeDetails.newBuilder()
-        .setUuid(UUID.randomUUID().toString())
+        .setUuid(UUID.randomUUID())
         .setHostName("localhost")
         .setIpAddress("127.0.0.1")
         .build();
