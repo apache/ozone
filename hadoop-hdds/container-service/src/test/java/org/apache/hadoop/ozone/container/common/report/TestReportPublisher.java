@@ -166,7 +166,6 @@ public class TestReportPublisher {
    * @return DatanodeDetails
    */
   private static DatanodeDetails getDatanodeDetails() {
-    String uuid = UUID.randomUUID().toString();
     Random random = new Random();
     String ipAddress =
         random.nextInt(256) + "." + random.nextInt(256) + "." + random
@@ -179,7 +178,7 @@ public class TestReportPublisher {
     DatanodeDetails.Port restPort = DatanodeDetails.newPort(
         DatanodeDetails.Port.Name.REST, 0);
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
-    builder.setUuid(uuid)
+    builder.setUuid(UUID.randomUUID())
         .setHostName("localhost")
         .setIpAddress(ipAddress)
         .addPort(containerPort)

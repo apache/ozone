@@ -94,7 +94,7 @@ public final class MockDatanodeDetails {
     DatanodeDetails.Port restPort = DatanodeDetails.newPort(
         DatanodeDetails.Port.Name.REST, port);
     return DatanodeDetails.newBuilder()
-        .setUuid(uuid)
+        .setUuid(UUID.fromString(uuid))
         .setHostName(hostname)
         .setIpAddress(ipAddress)
         .addPort(containerPort)
