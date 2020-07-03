@@ -30,4 +30,4 @@ OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_ozone.recon.address=recon:9891
 OZONE-SITE.XML_recon.om.snapshot.task.interval.delay=1m
 
-no_proxy=om,scm,s3g,kdc,localhost,127.0.0.1
+no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1
