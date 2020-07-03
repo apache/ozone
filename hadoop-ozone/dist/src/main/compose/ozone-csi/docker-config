@@ -29,4 +29,4 @@ OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
 OZONE-SITE.XML_ozone.scm.client.address=scm
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 
-no_proxy=om,scm,csi,s3g,kdc,localhost,127.0.0.1
+no_proxy=om,scm,csi,s3g,recon,kdc,localhost,127.0.0.1
