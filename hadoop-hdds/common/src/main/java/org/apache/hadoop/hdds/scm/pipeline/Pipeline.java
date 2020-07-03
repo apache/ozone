@@ -59,7 +59,6 @@ public final class Pipeline {
   private ThreadLocal<List<DatanodeDetails>> nodesInOrder = new ThreadLocal<>();
   // Current reported Leader for the pipeline
   private UUID leaderId;
-  private String strLeaderID = "";
   // Timestamp for pipeline upon creation
   private Instant creationTimestamp;
 
@@ -147,9 +146,6 @@ public final class Pipeline {
    */
   void setLeaderId(UUID leaderId) {
     this.leaderId = leaderId;
-    if (leaderId != null) {
-      this.strLeaderID = leaderId.toString();
-    }
   }
 
   /**
@@ -270,9 +266,18 @@ public final class Pipeline {
         .setType(type)
         .setFactor(factor)
         .setState(PipelineState.getProtobuf(state))
-        .setLeaderID(strLeaderID)
+        .setLeaderID(leaderId != null ? leaderId.toString() : "")
         .setCreationTimeStamp(creationTimestamp.toEpochMilli())
         .addAllMembers(members);
+
+    if (leaderId != null) {
+      HddsProtos.UUID uuid128 = HddsProtos.UUID.newBuilder()
+          .setMostSigBits(leaderId.getMostSignificantBits())
+          .setLeastSigBits(leaderId.getLeastSignificantBits())
+          .build();
+      builder.setLeaderID128(uuid128);
+    }
+
     // To save the message size on wire, only transfer the node order based on
     // network topology
     List<DatanodeDetails> nodes = nodesInOrder.get();
@@ -301,14 +306,21 @@ public final class Pipeline {
     for (DatanodeDetailsProto member : pipeline.getMembersList()) {
       nodes.add(DatanodeDetails.getFromProtoBuf(member));
     }
+    UUID leaderId = null;
+    if (pipeline.hasLeaderID128()) {
+      HddsProtos.UUID uuid = pipeline.getLeaderID128();
+      leaderId = new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits());
+    } else if (pipeline.hasLeaderID() &&
+        StringUtils.isNotEmpty(pipeline.getLeaderID())) {
+      leaderId = UUID.fromString(pipeline.getLeaderID());
+    }
 
     return new Builder().setId(PipelineID.getFromProtobuf(pipeline.getId()))
         .setFactor(pipeline.getFactor())
         .setType(pipeline.getType())
         .setState(PipelineState.fromProtobuf(pipeline.getState()))
-        .setLeaderId(StringUtils.isNotEmpty(pipeline.getLeaderID()) ?
-            UUID.fromString(pipeline.getLeaderID()) : null)
         .setNodes(nodes)
+        .setLeaderId(leaderId)
         .setNodesInOrder(pipeline.getMemberOrdersList())
         .setCreateTimestamp(pipeline.getCreationTimeStamp())
         .build();
@@ -353,7 +365,7 @@ public final class Pipeline {
     b.append(", Type:").append(getType());
     b.append(", Factor:").append(getFactor());
     b.append(", State:").append(getPipelineState());
-    b.append(", leaderId:").append(strLeaderID);
+    b.append(", leaderId:").append(leaderId != null ? leaderId.toString() : "");
     b.append(", CreationTimestamp").append(getCreationTimestamp());
     b.append("]");
     return b.toString();
