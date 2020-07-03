@@ -141,7 +141,9 @@ public class OMKeysRenameRequest extends OMKeyRequest {
             fromKeyName);
         OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(objectKey);
         unRenamedKeys.add(omKeyInfo);
-        auditMap.put(fromKeyName, renameKeyRequest.getToKeyName());
+        auditMap.put(volumeName + "/" + bucketName + "/" + fromKeyName,
+            volumeName + "/" + bucketName + "/" +
+                renameKeyRequest.getToKeyName());
       }
 
       for (RenameKeyRequest renameKeyRequest : renameKeysRequest
