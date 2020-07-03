@@ -153,7 +153,7 @@ public class ChunkKeyHandler  extends KeyHandler {
                         keyLocation.getPipeline());
         for (ContainerProtos.ChunkInfo chunkInfo : tempchunks) {
           String fileName = chunkLayOutVersion.getChunkFile(new File(
-                          getChunkLocationPath(containerData.getContainerPath())),
+              getChunkLocationPath(containerData.getContainerPath())),
                   keyLocation.getBlockID(),
                   ChunkInfo.getFromProtoBuf(chunkInfo)).toString();
           chunkPaths.add(fileName);
