@@ -260,12 +260,21 @@ public class SCMNodeManager implements NodeManager {
       if (networkLocation != null) {
         datanodeDetails.setNetworkLocation(networkLocation);
       }
-      nodeStateManager.addNode(datanodeDetails);
-      clusterMap.add(datanodeDetails);
-      addEntryTodnsToUuidMap(dnsName, datanodeDetails.getUuidString());
-      // Updating Node Report, as registration is successful
-      processNodeReport(datanodeDetails, nodeReport);
-      LOG.info("Registered Data node : {}", datanodeDetails);
+      if (!isNodeRegistered(datanodeDetails)) {
+        clusterMap.add(datanodeDetails);
+        nodeStateManager.addNode(datanodeDetails);
+        // Check that datanode in nodeStateManager has topology parent set
+        DatanodeDetails dn =
+            getNodeByUuid(datanodeDetails.getUuid().toString());
+        Preconditions.checkState(dn.getParent() != null);
+        addEntryTodnsToUuidMap(dnsName, datanodeDetails.getUuidString());
+        // Updating Node Report, as registration is successful
+        processNodeReport(datanodeDetails, nodeReport);
+        LOG.info("Registered Data node : {}", datanodeDetails);
+      } else {
+        LOG.trace("Datanode is already registered. Datanode: {}",
+            datanodeDetails.toString());
+      }
     } catch (NodeAlreadyExistsException e) {
       if (LOG.isTraceEnabled()) {
         LOG.trace("Datanode is already registered. Datanode: {}",

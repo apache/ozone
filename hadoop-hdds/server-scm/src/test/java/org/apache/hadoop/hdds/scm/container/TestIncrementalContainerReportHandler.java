@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -26,10 +26,16 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
     .IncrementalContainerReportFromDatanode;
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -37,7 +43,10 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.TestUtils.getContainer;
@@ -55,9 +64,18 @@ public class TestIncrementalContainerReportHandler {
 
   @Before
   public void setup() throws IOException {
-    final ConfigurationSource conf = new OzoneConfiguration();
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    final String path =
+        GenericTestUtils.getTempPath(UUID.randomUUID().toString());
+    Path scmPath = Paths.get(path, "scm-meta");
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
     this.containerManager = Mockito.mock(ContainerManager.class);
-    this.nodeManager = Mockito.mock(NodeManager.class);
+    NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
+    EventQueue eventQueue = new EventQueue();
+    SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
+    this.nodeManager =
+        new SCMNodeManager(conf, storageConfig, eventQueue, clusterMap);
+
     this.containerStateManager = new ContainerStateManager(conf);
     this.publisher = Mockito.mock(EventPublisher.class);
 
@@ -105,6 +123,9 @@ public class TestIncrementalContainerReportHandler {
     final DatanodeDetails datanodeOne = randomDatanodeDetails();
     final DatanodeDetails datanodeTwo = randomDatanodeDetails();
     final DatanodeDetails datanodeThree = randomDatanodeDetails();
+    nodeManager.register(datanodeOne, null, null);
+    nodeManager.register(datanodeTwo, null, null);
+    nodeManager.register(datanodeThree, null, null);
     final Set<ContainerReplica> containerReplicas = getReplicas(
         container.containerID(),
         ContainerReplicaProto.State.CLOSING,
@@ -139,6 +160,9 @@ public class TestIncrementalContainerReportHandler {
     final DatanodeDetails datanodeOne = randomDatanodeDetails();
     final DatanodeDetails datanodeTwo = randomDatanodeDetails();
     final DatanodeDetails datanodeThree = randomDatanodeDetails();
+    nodeManager.register(datanodeOne, null, null);
+    nodeManager.register(datanodeTwo, null, null);
+    nodeManager.register(datanodeThree, null, null);
     final Set<ContainerReplica> containerReplicas = getReplicas(
         container.containerID(),
         ContainerReplicaProto.State.CLOSING,
@@ -174,6 +198,9 @@ public class TestIncrementalContainerReportHandler {
     final DatanodeDetails datanodeOne = randomDatanodeDetails();
     final DatanodeDetails datanodeTwo = randomDatanodeDetails();
     final DatanodeDetails datanodeThree = randomDatanodeDetails();
+    nodeManager.register(datanodeOne, null, null);
+    nodeManager.register(datanodeTwo, null, null);
+    nodeManager.register(datanodeThree, null, null);
     final Set<ContainerReplica> containerReplicas = getReplicas(
         container.containerID(),
         ContainerReplicaProto.State.CLOSING,
@@ -212,6 +239,9 @@ public class TestIncrementalContainerReportHandler {
     final DatanodeDetails datanodeOne = randomDatanodeDetails();
     final DatanodeDetails datanodeTwo = randomDatanodeDetails();
     final DatanodeDetails datanodeThree = randomDatanodeDetails();
+    nodeManager.register(datanodeOne, null, null);
+    nodeManager.register(datanodeTwo, null, null);
+    nodeManager.register(datanodeThree, null, null);
     final Set<ContainerReplica> containerReplicas = getReplicas(
         container.containerID(),
         ContainerReplicaProto.State.CLOSED,
