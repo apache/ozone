@@ -30,23 +30,23 @@ import java.util.stream.Collectors;
  */
 public class OmKeyLocationInfoGroup {
   private final long version;
-  private final Map<Long, List<OmKeyLocationInfo>> locationVersionList;
+  private final Map<Long, List<OmKeyLocationInfo>> locationVersionMap;
 
   public OmKeyLocationInfoGroup(long version,
                                 List<OmKeyLocationInfo> locations) {
     this.version = version;
-    this.locationVersionList = locations.stream()
+    this.locationVersionMap = locations.stream()
         .collect(Collectors.groupingBy(OmKeyLocationInfo::getCreateVersion));
     //prevent NPE
-    this.locationVersionList.putIfAbsent(version, new ArrayList<>());
+    this.locationVersionMap.putIfAbsent(version, new ArrayList<>());
   }
 
   public OmKeyLocationInfoGroup(long version,
                                 Map<Long, List<OmKeyLocationInfo>> locations) {
     this.version = version;
-    this.locationVersionList = locations;
+    this.locationVersionMap = locations;
     //prevent NPE
-    this.locationVersionList.putIfAbsent(version, new ArrayList<>());
+    this.locationVersionMap.putIfAbsent(version, new ArrayList<>());
   }
 
   /**
@@ -55,7 +55,7 @@ public class OmKeyLocationInfoGroup {
    * @return the list of blocks that are created in the latest version.
    */
   public List<OmKeyLocationInfo> getBlocksLatestVersionOnly() {
-    return new ArrayList<>(locationVersionList.get(version));
+    return new ArrayList<>(locationVersionMap.get(version));
   }
 
   public long getVersion() {
@@ -63,23 +63,23 @@ public class OmKeyLocationInfoGroup {
   }
 
   public List<OmKeyLocationInfo> getLocationList() {
-    return locationVersionList.values().stream().flatMap(List::stream)
+    return locationVersionMap.values().stream().flatMap(List::stream)
         .collect(Collectors.toList());
   }
 
   public long getLocationListCount() {
-    return locationVersionList.values().stream().mapToLong(List::size).sum();
+    return locationVersionMap.values().stream().mapToLong(List::size).sum();
   }
 
   public List<OmKeyLocationInfo> getLocationList(Long versionToFetch) {
-    return new ArrayList<>(locationVersionList.get(versionToFetch));
+    return new ArrayList<>(locationVersionMap.get(versionToFetch));
   }
 
   public KeyLocationList getProtobuf() {
     return KeyLocationList.newBuilder()
         .setVersion(version)
         .addAllKeyLocations(
-            locationVersionList.values().stream()
+            locationVersionMap.values().stream()
                 .flatMap(List::stream)
                 .map(OmKeyLocationInfo::getProtobuf)
                 .collect(Collectors.toList()))
@@ -106,13 +106,13 @@ public class OmKeyLocationInfoGroup {
   OmKeyLocationInfoGroup generateNextVersion(
       List<OmKeyLocationInfo> newLocationList) {
     Map<Long, List<OmKeyLocationInfo>> newMap =
-        new HashMap<>(locationVersionList);
+        new HashMap<>(locationVersionMap);
     newMap.put(version + 1, new ArrayList<>(newLocationList));
     return new OmKeyLocationInfoGroup(version + 1, newMap);
   }
 
   void appendNewBlocks(List<OmKeyLocationInfo> newLocationList) {
-    List<OmKeyLocationInfo> locationList = locationVersionList.get(version);
+    List<OmKeyLocationInfo> locationList = locationVersionMap.get(version);
     for (OmKeyLocationInfo info : newLocationList) {
       info.setCreateVersion(version);
       locationList.add(info);
@@ -120,12 +120,12 @@ public class OmKeyLocationInfoGroup {
   }
 
   void removeBlocks(long versionToRemove){
-    locationVersionList.remove(versionToRemove);
+    locationVersionMap.remove(versionToRemove);
   }
 
   void addAll(long versionToAdd, List<OmKeyLocationInfo> locationInfoList) {
-    locationVersionList.putIfAbsent(versionToAdd, new ArrayList<>());
-    List<OmKeyLocationInfo> list = locationVersionList.get(versionToAdd);
+    locationVersionMap.putIfAbsent(versionToAdd, new ArrayList<>());
+    List<OmKeyLocationInfo> list = locationVersionMap.get(versionToAdd);
     list.addAll(locationInfoList);
   }
 
@@ -133,7 +133,7 @@ public class OmKeyLocationInfoGroup {
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("version:").append(version).append(" ");
-    for (List<OmKeyLocationInfo> kliList : locationVersionList.values()) {
+    for (List<OmKeyLocationInfo> kliList : locationVersionMap.values()) {
       for(OmKeyLocationInfo kli: kliList) {
         sb.append(kli.getLocalID()).append(" || ");
       }
