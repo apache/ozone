@@ -512,7 +512,7 @@ public class ReplicationManager
    */
   private void handleUnderReplicatedContainer(final ContainerInfo container,
       final Set<ContainerReplica> replicas) {
-    LOG.debug("Handling underreplicated container: {}",
+    LOG.debug("Handling under-replicated container: {}",
         container.getContainerID());
     try {
       final ContainerID id = container.containerID();
@@ -543,11 +543,15 @@ public class ReplicationManager
         List<DatanodeDetails> targetReplicas = new ArrayList<>(source);
         // Then add any pending additions
         targetReplicas.addAll(replicationInFlight);
-
-        int delta = replicationFactor - getReplicaCount(id, replicas);
         final ContainerPlacementStatus placementStatus =
             containerPlacement.validateContainerPlacement(
                 targetReplicas, replicationFactor);
+        int delta = replicationFactor - getReplicaCount(id, replicas);
+        if (placementStatus.isPolicySatisfied() && delta <= 0) {
+          LOG.debug(
+              "Container {} meets placement policy with inflight replicas", id);
+          return;
+        }
         final int misRepDelta = placementStatus.misReplicationCount();
         final int replicasNeeded
             = delta < misRepDelta ? misRepDelta : delta;
