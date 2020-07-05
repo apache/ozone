@@ -3404,7 +3404,7 @@
         "options": [
           {
             "name": "java_package",
-            "value": "org.apache.hadoop.security.proto"
+            "value": "org.apache.hadoop.ozone.security.proto"
           },
           {
             "name": "java_outer_classname",
