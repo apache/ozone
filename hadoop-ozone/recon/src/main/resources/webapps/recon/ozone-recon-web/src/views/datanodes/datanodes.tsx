@@ -203,7 +203,7 @@ const COLUMNS = [
 ];
 
 const allColumnsOption: IOption = {
-  label: 'All',
+  label: 'Select all',
   value: '*'
 };
 
