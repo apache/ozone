@@ -36,6 +36,7 @@ interface IMultiSelectProps extends ReactSelectProps<IOption> {
   options: IOption[];
   allowSelectAll: boolean;
   allOption?: IOption;
+  maxShowValues?: number;
 }
 
 const defaultProps = {
@@ -48,7 +49,7 @@ const defaultProps = {
 export class MultiSelect extends PureComponent<IMultiSelectProps> {
   static defaultProps = defaultProps;
   render() {
-    const {allowSelectAll, allOption, options, onChange} = this.props;
+    const {allowSelectAll, allOption, options, maxShowValues = 5, onChange} = this.props;
     if (allowSelectAll) {
       const Option = (props: OptionProps<IOption>) => {
         return (
@@ -70,7 +71,7 @@ export class MultiSelect extends PureComponent<IMultiSelectProps> {
         let toBeRendered = children;
         if (currentValues.some(val => val.value === allOption!.value) && children) {
           toBeRendered = allOption!.label;
-        } else if (currentValues.length >= 5) {
+        } else if (currentValues.length > maxShowValues) {
           toBeRendered = `${currentValues.length} selected`;
         }
 

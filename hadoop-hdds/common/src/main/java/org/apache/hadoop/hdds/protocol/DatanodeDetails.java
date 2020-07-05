@@ -65,7 +65,7 @@ public class DatanodeDetails extends NodeImpl implements
    * @param setupTime the setup time of DataNode
    */
   @SuppressWarnings("parameternumber")
-  private DatanodeDetails(String uuid, String ipAddress, String hostName,
+  private DatanodeDetails(UUID uuid, String ipAddress, String hostName,
       String networkLocation, List<Port> ports, String certSerialId,
       String version, long setupTime) {
     super(hostName, networkLocation, NetConstants.NODE_COST_DEFAULT);
