@@ -19,13 +19,10 @@ package org.apache.hadoop.ozone.container.metadata;
 
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
-import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.rocksdb.RocksDB;
-
-import java.io.File;
 
 /**
  * This class allows support of the old RocksDB layout for datanode, where block data and
@@ -33,7 +30,7 @@ import java.io.File;
  * in the new format (which has separate column families for block data and metadata), even
  * though they both map back to the default table in this implementation.
  */
-public class DatanodeOneTableDBDefinition implements DBDefinition {
+public class DatanodeOneTableDBDefinition extends AbstractDatanodeDBDefinition {
   // In the underlying database, tables are retrieved by name, and then the codecs/classes are
   // applied on top.
   // By defining two different DBDefinitions with different codecs that both map to the default
@@ -56,24 +53,17 @@ public class DatanodeOneTableDBDefinition implements DBDefinition {
                   Long.class,
                   new LongCodec());
 
-  private File dbDir;
-
-  public DatanodeOneTableDBDefinition(String dbPath) {
-    this.dbDir = new File(dbPath);
+  protected DatanodeOneTableDBDefinition(String dbPath) {
+    super(dbPath);
   }
 
   @Override
-  public String getName() {
-    return dbDir.getName();
+  public DBColumnFamilyDefinition<String, BlockData> getBlockDataColumnFamily() {
+    return BLOCK_DATA;
   }
 
   @Override
-  public String getLocationConfigKey() {
-    return dbDir.getParentFile().getParentFile().getAbsolutePath();
-  }
-
-  @Override
-  public DBColumnFamilyDefinition[] getColumnFamilies() {
-    return new DBColumnFamilyDefinition[] {BLOCK_DATA, METADATA};
+  public DBColumnFamilyDefinition<String, Long> getMetadataColumnFamily() {
+    return METADATA;
   }
 }

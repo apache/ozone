@@ -18,19 +18,16 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
-import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-
-import java.io.File;
 
 /**
  * This class defines the new RocksDB structure for datanodes, where the block data and metadata
  * are put in their own separate column families. In the old format, everything was placed in teh
  * default column family.
  */
-public class DatanodeTwoTableDBDefinition implements DBDefinition {
+public class DatanodeTwoTableDBDefinition extends AbstractDatanodeDBDefinition {
 
   public static final DBColumnFamilyDefinition<String, BlockData>
           BLOCK_DATA =
@@ -50,24 +47,17 @@ public class DatanodeTwoTableDBDefinition implements DBDefinition {
           Long.class,
           new LongCodec());
 
-  private File dbDir;
-
-  public DatanodeTwoTableDBDefinition(String dbPath) {
-    this.dbDir = new File(dbPath);
+  protected DatanodeTwoTableDBDefinition(String dbPath) {
+    super(dbPath);
   }
 
   @Override
-  public String getName() {
-    return dbDir.getName();
+  public DBColumnFamilyDefinition<String, BlockData> getBlockDataColumnFamily() {
+    return BLOCK_DATA;
   }
 
   @Override
-  public String getLocationConfigKey() {
-    return dbDir.getParentFile().getParentFile().getAbsolutePath();
-  }
-
-  @Override
-  public DBColumnFamilyDefinition[] getColumnFamilies() {
-    return new DBColumnFamilyDefinition[] {BLOCK_DATA, METADATA};
+  public DBColumnFamilyDefinition<String, Long> getMetadataColumnFamily() {
+    return METADATA;
   }
 }
