@@ -55,7 +55,6 @@ import org.junit.runners.Parameterized;
 /**
  * This class tests the CLI that transforms om.db into SQLite DB files.
  */
-@RunWith(Parameterized.class)
 public class TestOmSQLCli {
 
   /**
