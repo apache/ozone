@@ -22,21 +22,30 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.UUID;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Test;
 
 /**
@@ -59,17 +68,26 @@ public class TestReconIncrementalContainerReportHandler
             datanodeDetails.getUuidString());
     when(reportMock.getReport()).thenReturn(containerReport);
 
-    NodeManager nodeManagerMock = mock(NodeManager.class);
+    final String path =
+        GenericTestUtils.getTempPath(UUID.randomUUID().toString());
+    Path scmPath = Paths.get(path, "scm-meta");
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
+    NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
+    EventQueue eventQueue = new EventQueue();
+    SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
+    NodeManager nodeManager =
+        new SCMNodeManager(conf, storageConfig, eventQueue, clusterMap);
+    nodeManager.register(datanodeDetails, null, null);
 
     ReconContainerManager containerManager = getContainerManager();
     ReconIncrementalContainerReportHandler reconIcr =
-        new ReconIncrementalContainerReportHandler(nodeManagerMock,
+        new ReconIncrementalContainerReportHandler(nodeManager,
             containerManager);
     EventPublisher eventPublisherMock = mock(EventPublisher.class);
 
     reconIcr.onMessage(reportMock, eventPublisherMock);
-    verify(nodeManagerMock, times(1))
-        .addContainer(datanodeDetails, containerID);
+    nodeManager.addContainer(datanodeDetails, containerID);
     assertTrue(containerManager.exists(containerID));
     assertEquals(1, containerManager.getContainerReplicas(containerID).size());
   }
