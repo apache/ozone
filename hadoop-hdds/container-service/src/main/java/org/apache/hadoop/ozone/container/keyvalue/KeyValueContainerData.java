@@ -41,6 +41,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static java.lang.Math.max;
+<<<<<<< HEAD
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_BLOCK_COUNT_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.CHUNKS_PATH;
@@ -48,6 +49,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.DB_CONTAINER_BYTES_USED_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE;
 import static org.apache.hadoop.ozone.OzoneConsts.METADATA_PATH;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_PENDING_DELETE_BLOCK_COUNT_KEY;
+=======
+import static org.apache.hadoop.ozone.OzoneConsts.*;
+>>>>>>> a0440aab0... Add schemaVersion yaml field as string to .container options
 
 /**
  * This class represents the KeyValueContainer metadata, which is the
@@ -71,22 +75,6 @@ public class KeyValueContainerData extends ContainerData {
   private File dbFile = null;
 
   private String schemaVersion;
-
-  /**
-  Indicates the table layout of the container's database.
-  Enum implementation expanded so that version numbers can be specified.
-   */
-  public enum SchemaVersion {
-    // Version 1: All data written to default column family.
-    ONE_TABLE(1),
-    // Version 2: Metadata and block data written to different column families.
-    TWO_TABLES(2);
-
-    public final int version;
-
-    SchemaVersion(int version) { this.version = version; }
-  }
-  private SchemaVersion schemaVersion;
 
   /**
    * Number of pending deletion blocks in KeyValueContainer.
