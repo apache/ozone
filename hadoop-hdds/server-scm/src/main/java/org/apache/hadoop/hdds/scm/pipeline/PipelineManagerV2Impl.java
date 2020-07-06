@@ -134,7 +134,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   }
 
   @Override
-  public synchronized Pipeline createPipeline(ReplicationType type,
+  public Pipeline createPipeline(ReplicationType type,
                                  ReplicationFactor factor) throws IOException {
     if (!isPipelineCreationAllowed() && factor != ReplicationFactor.ONE) {
       LOG.debug("Pipeline creation is not allowed until safe mode prechecks " +
@@ -331,7 +331,6 @@ public final class PipelineManagerV2Impl implements PipelineManager {
     PipelineID pipelineID = pipeline.getId();
     lock.writeLock().lock();
     try {
-      closeContainersForPipeline(pipelineID);
       stateManager.removePipeline(pipelineID.getProtobuf());
       metrics.incNumPipelineDestroyed();
     } catch (IOException ex) {
@@ -377,6 +376,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
       lock.writeLock().unlock();
     }
     if (!onTimeout) {
+      closeContainersForPipeline(pipelineID);
       removePipeline(pipeline);
     }
   }
@@ -417,6 +417,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
       if (p.getPipelineState() == Pipeline.PipelineState.CLOSED) {
         LOG.info("Scrubbing pipeline: id: " + p.getId().toString() +
             " since it stays at CLOSED stage.");
+        closeContainersForPipeline(p.getId());
         removePipeline(p);
       }
     }
