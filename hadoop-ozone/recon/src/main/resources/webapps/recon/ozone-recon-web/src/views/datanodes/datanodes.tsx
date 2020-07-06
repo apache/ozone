@@ -196,7 +196,7 @@ const COLUMNS = [
     key: 'setupTime',
     isVisible: false,
     sorter: (a: IDatanode, b: IDatanode) => a.setupTime - b.setupTime,
-    render:(uptime: number) => {
+    render: (uptime: number) => {
       return uptime > 0 ? moment(uptime).format('lll') : 'NA';
     }
   }
@@ -223,7 +223,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       totalCount: 0,
       lastUpdated: 0,
       selectedColumns: [],
-      columnOptions: defaultColumns,
+      columnOptions: defaultColumns
     };
     this.autoReload = new AutoReloadHelper(this._loadData);
   }
@@ -262,13 +262,13 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       const selectedColumns: IOption[] = COLUMNS.filter(column => column.isVisible).map(column => ({
         label: column.key,
         value: column.key
-      }))
-      
+      }));
+
       this.setState({
         loading: false,
         dataSource,
         totalCount,
-        lastUpdated: Number(moment()),
+        lastUpdated: Number(moment())
       }, () => {
         this._handleColumnChange(selectedColumns, {action: 'select-option'});
       });
@@ -302,15 +302,15 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       onShowSizeChange: this.onShowSizeChange
     };
     return (
-      <div className="datanodes-container">
-        <div className="page-header">
+      <div className='datanodes-container'>
+        <div className='page-header'>
           Datanodes ({totalCount})
-          <div className="filter-block">
+          <div className='filter-block'>
             <MultiSelect
-              maxShowValues={3}
               allowSelectAll
               isMulti
-              className="multi-select-container"
+              maxShowValues={3}
+              className='multi-select-container'
               options={columnOptions}
               closeMenuOnSelect={false}
               hideSelectedOptions={false}
@@ -327,15 +327,15 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
           />
         </div>
 
-        <div className="content-div">
+        <div className='content-div'>
           <Table
             dataSource={dataSource}
-            columns={COLUMNS.filter((column) =>
-              selectedColumns.some((e) => e.label === column.key)
+            columns={COLUMNS.filter(column =>
+              selectedColumns.some(e => e.value === column.key)
             )}
             loading={loading}
             pagination={paginationConfig}
-            rowKey="hostname"
+            rowKey='hostname'
           />
         </div>
       </div>
