@@ -70,21 +70,7 @@ public class KeyValueContainerData extends ContainerData {
 
   private File dbFile = null;
 
-  /**
-  Indicates the table layout of the container's database.
-  Enum implementation expanded so that version numbers can be specified.
-   */
-  public enum SchemaVersion {
-    // Version 1: All data written to default column family.
-    ONE_TABLE(1),
-    // Version 2: Metadata and block data written to different column families.
-    TWO_TABLES(2);
-
-    public final int version;
-
-    SchemaVersion(int version) { this.version = version; }
-  }
-  private SchemaVersion schemaVersion;
+  private String schemaVersion;
 
   /**
    * Number of pending deletion blocks in KeyValueContainer.
@@ -102,6 +88,7 @@ public class KeyValueContainerData extends ContainerData {
     KV_YAML_FIELDS.add(METADATA_PATH);
     KV_YAML_FIELDS.add(CHUNKS_PATH);
     KV_YAML_FIELDS.add(CONTAINER_DB_TYPE);
+    KV_YAML_FIELDS.add(SCHEMA_VERSION);
   }
 
   /**
@@ -129,14 +116,14 @@ public class KeyValueContainerData extends ContainerData {
   /**
    * @param version The schema version indicating the table layout of the container's database.
    */
-  public void setSchemaVersion(SchemaVersion version) {
+  public void setSchemaVersion(String version) {
     schemaVersion = version;
   }
 
   /**
    * @return The schema version describing the container database's table layout.
    */
-  public SchemaVersion getSchemaVersion() {
+  public String getSchemaVersion() {
     return schemaVersion;
   }
 

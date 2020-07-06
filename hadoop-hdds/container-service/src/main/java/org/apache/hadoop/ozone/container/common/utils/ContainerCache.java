@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import com.google.common.base.Preconditions;
 import org.apache.commons.collections.MapIterator;
 import org.apache.commons.collections.map.LRUMap;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreOneTableImpl;
@@ -122,7 +123,7 @@ public final class ContainerCache extends LRUMap {
    */
   public ReferenceCountedDB getDB(long containerID, String containerDBType,
                                   String containerDBPath,
-                                  KeyValueContainerData.SchemaVersion schemaVersion,
+                                  String schemaVersion,
                                   ConfigurationSource conf)
       throws IOException {
     Preconditions.checkState(containerID >= 0,
@@ -133,17 +134,15 @@ public final class ContainerCache extends LRUMap {
 
       if (db == null) {
         DatanodeStore store;
-
-        switch (schemaVersion) {
-          case TWO_TABLES:
-            store = new DatanodeStoreTwoTableImpl(conf, containerDBPath);
-            break;
-          // Schema version should always be one of the enum values, but make the default case
-          // one table to avoid compiler warning.
-          case ONE_TABLE:
-          default:
-            store = new DatanodeStoreOneTableImpl(conf, containerDBPath);
-            break;
+        if (schemaVersion == OzoneConsts.SCHEMA_V1) {
+          store = new DatanodeStoreOneTableImpl(conf, containerDBPath);
+        }
+        else if (schemaVersion == OzoneConsts.SCHEMA_V2) {
+          store = new DatanodeStoreTwoTableImpl(conf, containerDBPath);
+        }
+        else {
+          throw new IllegalArgumentException("Unrecognized schema version for container: " +
+                  schemaVersion);
         }
 
         db = new ReferenceCountedDB(store, containerDBPath);
