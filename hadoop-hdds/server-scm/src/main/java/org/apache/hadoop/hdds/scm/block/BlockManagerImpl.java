@@ -81,6 +81,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   private ObjectName mxBean;
   private SafeModePrecheck safeModePrecheck;
 
+  // TODO(baoloongmao): assign this froms configuration
   private StorageClassRegistry storageClassRegistry =
       new StaticStorageClassRegistry();
 

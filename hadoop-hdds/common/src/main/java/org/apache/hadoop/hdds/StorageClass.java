@@ -6,6 +6,7 @@ public interface StorageClass {
 
   OpenStateConfiguration getOpenStateConfiguration();
 
+  // TODO(baoloongmao): Use this to implement replication factor two
   ClosedStateConfiguration getClosedStateConfiguration();
 
   String getName();

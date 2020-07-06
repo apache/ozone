@@ -126,6 +126,7 @@ public class ContainerStateManager {
   private final AtomicLongMap<LifeCycleState> containerStateCount =
       AtomicLongMap.create();
 
+  // TODO(baoloongmao): assign this froms configuration
   private StorageClassRegistry storageClassRegistry =
       new StaticStorageClassRegistry();
 
