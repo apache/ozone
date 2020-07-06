@@ -17,22 +17,40 @@
  */
 package org.apache.hadoop.ozone.container.metadata;
 
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.rocksdb.RocksDB;
 
 import java.io.File;
 
 /**
- * Class defines the structure and types of the dn-container.db.
+ * This class allows support of the old RocksDB layout for datanode, where block data and
+ * metadata were kept in the same default table. Clients can use this class as if the database is
+ * in the new format (which has separate column families for block data and metadata), even
+ * though they both map back to the default table in this implementation.
  */
 public class DatanodeOneTableDBDefinition implements DBDefinition {
+  // In the underlying database, tables are retrieved by name, and then the codecs/classes are
+  // applied on top.
+  // By defining two different DBDefinitions with different codecs that both map to the default
+  // table, clients are unaware they are using the same table for both interpretations of the data.
+  public static final DBColumnFamilyDefinition<String, BlockData>
+          BLOCK_DATA =
+          new DBColumnFamilyDefinition<>(
+                  StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+                  String.class,
+                  new StringCodec(),
+                  BlockData.class,
+                  new BlockDataCodec());
 
   public static final DBColumnFamilyDefinition<String, Long>
-          DEFAULT =
+          METADATA =
           new DBColumnFamilyDefinition<>(
-                  "default",
+                  StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
                   String.class,
                   new StringCodec(),
                   Long.class,
@@ -56,6 +74,6 @@ public class DatanodeOneTableDBDefinition implements DBDefinition {
 
   @Override
   public DBColumnFamilyDefinition[] getColumnFamilies() {
-    return new DBColumnFamilyDefinition[] {DEFAULT};
+    return new DBColumnFamilyDefinition[] {BLOCK_DATA, METADATA};
   }
 }

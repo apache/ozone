@@ -21,23 +21,25 @@ import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 
 import java.io.File;
 
 /**
- * Class defines the structure and types of the dn-container.db.
+ * This class defines the new RocksDB structure for datanodes, where the block data and metadata
+ * are put in their own separate column families. In the old format, everything was placed in teh
+ * default column family.
  */
 public class DatanodeTwoTableDBDefinition implements DBDefinition {
 
-  // TODO : Make new block data codec.
-  public static final DBColumnFamilyDefinition<String, Long>
+  public static final DBColumnFamilyDefinition<String, BlockData>
           BLOCK_DATA =
           new DBColumnFamilyDefinition<>(
                   "block_data",
                   String.class,
                   new StringCodec(),
-                  Long.class,
-                  new LongCodec());
+                  BlockData.class,
+                  new BlockDataCodec());
 
   public static final DBColumnFamilyDefinition<String, Long>
           METADATA =
