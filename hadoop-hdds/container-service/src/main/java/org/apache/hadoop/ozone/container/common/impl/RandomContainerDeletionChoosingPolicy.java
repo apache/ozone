@@ -18,9 +18,9 @@
 package org.apache.hadoop.ozone.container.common.impl;
 
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.container.common.interfaces
     .ContainerDeletionChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -50,8 +50,9 @@ public class RandomContainerDeletionChoosingPolicy
     List<ContainerData> result = new LinkedList<>();
     ContainerData[] values = new ContainerData[candidateContainers.size()];
     // to get a shuffle list
-    for (ContainerData entry : DFSUtil.shuffle(
-        candidateContainers.values().toArray(values))) {
+    ContainerData[] shuffled = candidateContainers.values().toArray(values);
+    ArrayUtils.shuffle(shuffled);
+    for (ContainerData entry : shuffled) {
       if (currentCount < count) {
         result.add(entry);
         currentCount++;
