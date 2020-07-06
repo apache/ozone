@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.metadata;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.db.*;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.slf4j.Logger;
@@ -35,7 +35,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
           LoggerFactory.getLogger(AbstractDatanodeStore.class);
   private DBStore store;
   private AbstractDatanodeDBDefinition dbDef;
-  private final OzoneConfiguration configuration;
+  private final ConfigurationSource configuration;
 
   /**
    * Constructs the metadata store and starts the DB services.
@@ -43,7 +43,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
    * @param config - Ozone Configuration.
    * @throws IOException - on Failure.
    */
-  protected AbstractDatanodeStore(OzoneConfiguration config, AbstractDatanodeDBDefinition dbDef)
+  protected AbstractDatanodeStore(ConfigurationSource config, AbstractDatanodeDBDefinition dbDef)
           throws IOException {
     this.configuration = config;
     this.dbDef = dbDef;
@@ -51,7 +51,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
-  public void start(OzoneConfiguration config)
+  public void start(ConfigurationSource config)
           throws IOException {
     if (this.store == null) {
       // TODO : Determine how to make sure the DB is created if missing.

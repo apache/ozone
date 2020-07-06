@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -34,7 +34,7 @@ public interface DatanodeStore {
    * @param configuration - Configuration
    * @throws IOException - Unable to start datanode store.
    */
-  void start(OzoneConfiguration configuration) throws IOException;
+  void start(ConfigurationSource configuration) throws IOException;
 
   /**
    * Stop datanode manager.

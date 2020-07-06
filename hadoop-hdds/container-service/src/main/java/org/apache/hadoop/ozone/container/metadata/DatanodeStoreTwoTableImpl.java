@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.metadata;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 
 import java.io.IOException;
 
@@ -29,7 +29,7 @@ public class DatanodeStoreTwoTableImpl extends AbstractDatanodeStore {
    * @param config - Ozone Configuration.
    * @throws IOException - on Failure.
    */
-  public DatanodeStoreTwoTableImpl(OzoneConfiguration config, String dbPath)
+  public DatanodeStoreTwoTableImpl(ConfigurationSource config, String dbPath)
           throws IOException {
     super(config, new DatanodeTwoTableDBDefinition(dbPath));
   }
