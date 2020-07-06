@@ -42,3 +42,14 @@
     </tr>
     </tbody>
 </table>
+
+<h2>Safemode rules statuses</h2>
+
+<table class="table table-bordered table-striped" class="col-md-6">
+    <tbody>
+    <tr ng-repeat="typestat in $ctrl.scmmetrics.RuleStatusMetrics">
+        <td>{{typestat.key}}</td>
+        <td>{{typestat.value}}</td>
+    </tr>
+    </tbody>
+</table>
