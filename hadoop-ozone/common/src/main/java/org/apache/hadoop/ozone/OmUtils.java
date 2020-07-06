@@ -33,9 +33,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
@@ -499,9 +497,8 @@ public final class OmUtils {
   /**
    * Return OM Client Rpc Time out.
    */
-  public static long getOMClientRpcTimeOut(Configuration configuration) {
-    return OzoneConfiguration.of(configuration)
-        .getObject(OMClientConfig.class).getRpcTimeOut();
+  public static long getOMClientRpcTimeOut(ConfigurationSource configuration) {
+    return configuration.getObject(OMClientConfig.class).getRpcTimeOut();
   }
 
   /**

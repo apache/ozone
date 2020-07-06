@@ -182,7 +182,7 @@ public class LeaderAppendLogEntryGenerator extends BaseAppendLogGenerator
     List<DatanodeDetails> datanodes = new ArrayList<>();
 
     datanodes.add(DatanodeDetails.newBuilder()
-        .setUuid(serverId)
+        .setUuid(UUID.fromString(serverId))
         .setHostName("localhost")
         .setIpAddress("127.0.0.1")
         .addPort(DatanodeDetails.newPort(Name.RATIS, 9858))

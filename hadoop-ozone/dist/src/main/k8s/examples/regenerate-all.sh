@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -13,20 +14,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+set -e
 
-OZONE-SITE.XML_ozone.csi.owner=hadoop
-OZONE-SITE.XML_ozone.csi.socket=/tmp/csi.sock
+if [ ! -x "$(command -v flekszible)" ]; then
+    echo "flekszible tool is required for regenerating Kubernetes files"
+    exit 1
+fi
 
-OZONE-SITE.XML_ozone.om.address=om
-OZONE-SITE.XML_ozone.om.http-address=om:9874
-OZONE-SITE.XML_ozone.scm.container.size=1GB
-OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
-OZONE-SITE.XML_ozone.scm.names=scm
-OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
-OZONE-SITE.XML_ozone.scm.block.client.address=scm
-OZONE-SITE.XML_ozone.metadata.dirs=/data/metadata
-OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
-OZONE-SITE.XML_ozone.scm.client.address=scm
-OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
+SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
+cd "$SCRIPT_DIR"
 
-no_proxy=om,scm,csi,s3g,recon,kdc,localhost,127.0.0.1
+# shellcheck disable=SC2045,SC2035
+for dir in $(ls -d */); do
+   cd "$SCRIPT_DIR/$dir"
+   flekszible generate
+done

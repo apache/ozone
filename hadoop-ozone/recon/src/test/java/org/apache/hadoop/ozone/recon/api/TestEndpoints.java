@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
@@ -197,9 +198,16 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
                     .build())
             .build();
 
+    UUID pipelineUuid = UUID.fromString(pipelineId);
+    HddsProtos.UUID uuid128 = HddsProtos.UUID.newBuilder()
+        .setMostSigBits(pipelineUuid.getMostSignificantBits())
+        .setLeastSigBits(pipelineUuid.getLeastSignificantBits())
+        .build();
+
     PipelineReport pipelineReport = PipelineReport.newBuilder()
         .setPipelineID(
-            PipelineID.newBuilder().setId(pipelineId).build())
+            PipelineID.newBuilder().setId(pipelineId).setUuid128(uuid128)
+                .build())
         .setIsLeader(true)
         .build();
     PipelineReportsProto pipelineReportsProto =

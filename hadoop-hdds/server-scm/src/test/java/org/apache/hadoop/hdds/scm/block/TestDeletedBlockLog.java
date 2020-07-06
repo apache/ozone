@@ -102,13 +102,13 @@ public class TestDeletedBlockLog {
 
   private void setupContainerManager() throws IOException {
     dnList.add(
-        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID().toString())
+        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
             .build());
     dnList.add(
-        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID().toString())
+        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
             .build());
     dnList.add(
-        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID().toString())
+        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
             .build());
 
     final ContainerInfo container =
@@ -251,7 +251,7 @@ public class TestDeletedBlockLog {
     blocks = getTransactions(50);
     Assert.assertEquals(30, blocks.size());
     commitTransactions(blocks, dnList.get(1), dnList.get(2),
-        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID().toString())
+        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
             .build());
 
     blocks = getTransactions(50);

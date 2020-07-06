@@ -15,22 +15,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.conf;
+package org.apache.hadoop.ozone.recon.api.types;
 
 /**
- * Parent class for the example configuration.
+ * Simple POJO to receive the results of a Jooq query.
  */
-public class SimpleConfigurationParent {
+public class UnhealthyContainersSummary {
 
-  @Config(key = "enabled", defaultValue = "true", description = "Example "
-      + "boolean config.", tags = ConfigTag.MANAGEMENT)
-  private boolean enabled;
+  private Integer count;
+  private String containerState;
 
-  public boolean isEnabled() {
-    return enabled;
+  public UnhealthyContainersSummary(String containerState, Integer cnt) {
+    this.containerState = containerState;
+    this.count = cnt;
   }
 
-  public void setEnabled(boolean enabled) {
-    this.enabled = enabled;
+  public String getContainerState() {
+    return containerState;
   }
+
+  public long getCount() {
+    return count.longValue();
+  }
+
 }
