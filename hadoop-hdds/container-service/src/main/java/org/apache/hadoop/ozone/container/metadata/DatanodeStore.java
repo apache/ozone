@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 
 import java.io.IOException;
 
@@ -53,14 +54,14 @@ public interface DatanodeStore {
    *
    * @return Table
    */
-  Table<Long, Long> getBlockDataTable();
+  Table<String, BlockData> getBlockDataTable();
 
   /**
    * A Table that keeps the metadata.
    *
    * @return Table
    */
-  Table<Long, Long> getMetadataTable();
+  Table<String, Long> getMetadataTable();
 
   /**
    * Helper to create and write batch transactions.

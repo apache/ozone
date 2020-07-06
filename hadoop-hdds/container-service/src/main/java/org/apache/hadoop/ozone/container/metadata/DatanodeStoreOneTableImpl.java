@@ -18,20 +18,10 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
-public class DatanodeStoreOneTableImpl implements DatanodeStore {
-
-  private Table<String, Long> defaultTable;
-
-  private static final Logger LOG =
-          LoggerFactory.getLogger(DatanodeStoreOneTableImpl.class);
-  private DBStore store;
-  private final OzoneConfiguration configuration;
+public class DatanodeStoreOneTableImpl extends AbstractDatanodeStore {
 
   /**
    * Constructs the metadata store and starts the DB Services.
@@ -39,64 +29,8 @@ public class DatanodeStoreOneTableImpl implements DatanodeStore {
    * @param config - Ozone Configuration.
    * @throws IOException - on Failure.
    */
-  public DatanodeStoreOneTableImpl(OzoneConfiguration config)
+  public DatanodeStoreOneTableImpl(OzoneConfiguration config, String dbPath)
           throws IOException {
-    this.configuration = config;
-    start(this.configuration);
-  }
-
-  @Override
-  public void start(OzoneConfiguration config)
-          throws IOException {
-    if (this.store == null) {
-
-      // TODO : Determine how to get the path to the DB needed to init this instance.
-      this.store = DBStoreBuilder.createDBStore(config, new DatanodeTwoTableDBDefinition());
-
-      defaultTable =
-              DatanodeOneTableDBDefinition.DEFAULT.getTable(this.store);
-
-      checkTableStatus(defaultTable,
-              DatanodeTwoTableDBDefinition.METADATA.getName());
-    }
-  }
-
-  @Override
-  public void stop() throws Exception {
-    if (store != null) {
-      store.close();
-      store = null;
-    }
-  }
-
-  @Override
-  public DBStore getStore() {
-    return this.store;
-  }
-
-  @Override
-  public BatchOperationHandler getBatchHandler() {
-    return this.store;
-  }
-
-  @Override
-  public Table<String, Long> getMetadataTable() {
-    return defaultTable;
-  }
-
-  @Override
-  public Table<Long, Long> getBlockDataTable() {
-    return blockDataTable;
-  }
-
-  private void checkTableStatus(Table table, String name) throws IOException {
-    String logMessage = "Unable to get a reference to %s table. Cannot " +
-            "continue.";
-    String errMsg = "Inconsistent DB state, Table - %s. Please check the" +
-            " logs for more info.";
-    if (table == null) {
-      LOG.error(String.format(logMessage, name));
-      throw new IOException(String.format(errMsg, name));
-    }
+    super(config, new DatanodeOneTableDBDefinition(dbPath));
   }
 }

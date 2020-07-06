@@ -18,23 +18,10 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.*;
-import org.rocksdb.DBOptions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
-public class DatanodeStoreTwoTableImpl implements DatanodeStore {
-
-  private Table<String, Long> metadataTable;
-
-  private Table<String, Long> blockDataTable;
-
-  private static final Logger LOG =
-          LoggerFactory.getLogger(DatanodeStoreTwoTableImpl.class);
-  private DBStore store;
-  private final OzoneConfiguration configuration;
+public class DatanodeStoreTwoTableImpl extends AbstractDatanodeStore {
 
   /**
    * Constructs the metadata store and starts the DB Services.
@@ -42,77 +29,8 @@ public class DatanodeStoreTwoTableImpl implements DatanodeStore {
    * @param config - Ozone Configuration.
    * @throws IOException - on Failure.
    */
-  public DatanodeStoreTwoTableImpl(OzoneConfiguration config)
+  public DatanodeStoreTwoTableImpl(OzoneConfiguration config, String dbPath)
           throws IOException {
-    this.configuration = config;
-    start(this.configuration);
-  }
-
-  @Override
-  public void start(OzoneConfiguration config)
-          throws IOException {
-    if (this.store == null) {
-
-      DBOptions options = new DBOptions();
-      options.setCreateIfMissing(true);
-      DBStore store = DBStoreBuilder.newBuilder(config)
-              .setDBOption(options)
-              .setPath(dbFile.toPath())
-              .build();
-      // TODO : Determine how to get the path to the DB needed to init this instance.
-      this.store = DBStoreBuilder.createDBStore(config, new DatanodeTwoTableDBDefinition());
-
-      metadataTable =
-              DatanodeTwoTableDBDefinition.METADATA.getTable(this.store);
-
-      checkTableStatus(metadataTable,
-              DatanodeTwoTableDBDefinition.METADATA.getName());
-
-      blockDataTable =
-              DatanodeTwoTableDBDefinition.BLOCK_DATA.getTable(this.store);
-
-      checkTableStatus(metadataTable,
-              DatanodeTwoTableDBDefinition.BLOCK_DATA.getName());
-
-    }
-  }
-
-  @Override
-  public void stop() throws Exception {
-    if (store != null) {
-      store.close();
-      store = null;
-    }
-  }
-
-  @Override
-  public DBStore getStore() {
-    return this.store;
-  }
-
-  @Override
-  public BatchOperationHandler getBatchHandler() {
-    return this.store;
-  }
-
-  @Override
-  public Table<Long, Long> getMetadataTable() {
-    return metadataTable;
-  }
-
-  @Override
-  public Table<Long, Long> getBlockDataTable() {
-    return blockDataTable;
-  }
-
-  static void checkTableStatus(Table table, String name) throws IOException {
-    String logMessage = "Unable to get a reference to %s table. Cannot " +
-            "continue.";
-    String errMsg = "Inconsistent DB state, Table - %s. Please check the" +
-            " logs for more info.";
-    if (table == null) {
-      LOG.error(String.format(logMessage, name));
-      throw new IOException(String.format(errMsg, name));
-    }
+    super(config, new DatanodeTwoTableDBDefinition(dbPath));
   }
 }
