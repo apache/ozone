@@ -34,6 +34,10 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import com.google.common.base.Preconditions;
 import org.apache.commons.collections.MapIterator;
 import org.apache.commons.collections.map.LRUMap;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreOneTableImpl;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreTwoTableImpl;
 import org.rocksdb.DBOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -117,7 +121,9 @@ public final class ContainerCache extends LRUMap {
    * @return ReferenceCountedDB.
    */
   public ReferenceCountedDB getDB(long containerID, String containerDBType,
-                             String containerDBPath, ConfigurationSource conf)
+                                  String containerDBPath,
+                                  KeyValueContainerData.SchemaVersion schemaVersion,
+                                  ConfigurationSource conf)
       throws IOException {
     Preconditions.checkState(containerID >= 0,
         "Container ID cannot be negative.");
@@ -126,14 +132,19 @@ public final class ContainerCache extends LRUMap {
       ReferenceCountedDB db = (ReferenceCountedDB) this.get(containerDBPath);
 
       if (db == null) {
-        // TODO : Check containerData and determine which version and datastore implementation to
-        //  use.
-        DBOptions options = new DBOptions();
-        options.setCreateIfMissing(true);
-        DBStore store = DBStoreBuilder.newBuilder(conf)
-                .setPath(Paths.get(containerDBPath))
-                .setDBOption(options)
-                .build();
+        DatanodeStore store;
+
+        switch (schemaVersion) {
+          case TWO_TABLES:
+            store = new DatanodeStoreTwoTableImpl(conf, containerDBPath);
+            break;
+          // Schema version should always be one of the enum values, but make the default case
+          // one table to avoid compiler warning.
+          case ONE_TABLE:
+          default:
+            store = new DatanodeStoreOneTableImpl(conf, containerDBPath);
+            break;
+        }
 
         db = new ReferenceCountedDB(store, containerDBPath);
         this.put(containerDBPath, db);

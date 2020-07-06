@@ -125,6 +125,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
       //Create Metadata path chunks path and metadata db
       File dbFile = getContainerDBFile();
+      // TODO : Determine how to set the schema version here and pass it in.
       KeyValueContainerUtil.createContainerMetaData(containerMetaDataPath,
           chunksPath, dbFile, config);
 
