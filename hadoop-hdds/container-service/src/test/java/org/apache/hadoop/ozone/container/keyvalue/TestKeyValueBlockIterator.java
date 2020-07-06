@@ -45,9 +45,6 @@ import org.apache.hadoop.test.GenericTestUtils;
 
 import com.google.common.primitives.Longs;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_LEVELDB;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_ROCKSDB;
 import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
 import org.junit.After;
@@ -71,22 +68,18 @@ public class TestKeyValueBlockIterator {
   private OzoneConfiguration conf;
   private File testRoot;
 
-  private final String storeImpl;
   private final ChunkLayOutVersion layout;
 
-  public TestKeyValueBlockIterator(String metadataImpl,
-      ChunkLayOutVersion layout) {
-    this.storeImpl = metadataImpl;
+  public TestKeyValueBlockIterator(ChunkLayOutVersion layout) {
     this.layout = layout;
   }
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(new Object[][] {
-        {OZONE_METADATA_STORE_IMPL_LEVELDB, FILE_PER_CHUNK},
-        {OZONE_METADATA_STORE_IMPL_ROCKSDB, FILE_PER_CHUNK},
-        {OZONE_METADATA_STORE_IMPL_LEVELDB, FILE_PER_BLOCK},
-        {OZONE_METADATA_STORE_IMPL_ROCKSDB, FILE_PER_BLOCK}});
+        {FILE_PER_CHUNK},
+        {FILE_PER_BLOCK}
+    });
   }
 
   @Before
@@ -94,7 +87,6 @@ public class TestKeyValueBlockIterator {
     testRoot = GenericTestUtils.getRandomizedTestDir();
     conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
-    conf.set(OZONE_METADATA_STORE_IMPL, storeImpl);
     volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf);
   }
 

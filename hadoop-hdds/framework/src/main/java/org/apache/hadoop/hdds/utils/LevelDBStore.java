@@ -42,6 +42,7 @@ import java.util.Map.Entry;
 /**
  * LevelDB interface.
  */
+@Deprecated
 public class LevelDBStore implements MetadataStore {
 
   private static final Logger LOG =

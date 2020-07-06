@@ -129,12 +129,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       KeyValueContainerUtil.createContainerMetaData(containerMetaDataPath,
           chunksPath, dbFile, config);
 
-      String impl = config.getTrimmed(OzoneConfigKeys.OZONE_METADATA_STORE_IMPL,
-          OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_DEFAULT);
-
       //Set containerData for the KeyValueContainer.
       containerData.setChunksPath(chunksPath.getPath());
-      containerData.setContainerDBType(impl);
       containerData.setDbFile(dbFile);
       containerData.setVolume(containerVolume);
 

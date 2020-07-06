@@ -82,21 +82,6 @@ public class TestOmSQLCli {
   private String keyName2 = "key2";
   private String keyName3 = "key3";
 
-  @Parameterized.Parameters
-  public static Collection<Object[]> data() {
-    return Arrays.asList(new Object[][] {
-        // Uncomment the below line if we support leveldb in future.
-        //{OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_LEVELDB},
-        {OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_ROCKSDB}
-    });
-  }
-
-  private String metaStoreType;
-
-  public TestOmSQLCli(String type) {
-    metaStoreType = type;
-  }
-
   /**
    * Create a MiniDFSCluster for testing.
    * <p>
@@ -123,7 +108,6 @@ public class TestOmSQLCli {
 
     cluster.getOzoneManager().stop();
     cluster.getStorageContainerManager().stop();
-    conf.set(OzoneConfigKeys.OZONE_METADATA_STORE_IMPL, metaStoreType);
     cli = new SQLCLI(conf);
   }
 

@@ -32,28 +32,30 @@ import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.MetadataKeyFilter;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import com.google.common.collect.Lists;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
-import static org.apache.hadoop.test.PlatformAssumptions.assumeNotWindows;
+
 import org.junit.After;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import static org.junit.runners.Parameterized.Parameters;
 import org.slf4j.event.Level;
 
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_LEVELDB;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
+import static org.apache.hadoop.test.PlatformAssumptions.assumeNotWindows;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.junit.runners.Parameterized.Parameters;
+import static java.nio.charset.StandardCharsets.UTF_8;
 /**
  * Test class for ozone metadata store.
  */
@@ -68,20 +70,21 @@ public class TestMetadataStore {
   private File testDir;
 
   public TestMetadataStore(String metadataImpl) {
+    System.out.println("---- Store Impl: " + metadataImpl);
     this.storeImpl = metadataImpl;
   }
 
   @Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(new Object[][] {
-        {OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_LEVELDB},
-        {OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_ROCKSDB}
+        {CONTAINER_DB_TYPE_LEVELDB},
+        {CONTAINER_DB_TYPE_ROCKSDB}
     });
   }
 
   @Before
   public void init() throws IOException {
-    if (OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_ROCKSDB.equals(storeImpl)) {
+    if (CONTAINER_DB_TYPE_ROCKSDB.equals(storeImpl)) {
       // The initialization of RocksDB fails on Windows
       assumeNotWindows();
     }
@@ -90,12 +93,12 @@ public class TestMetadataStore {
         + "-" + storeImpl.toLowerCase());
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OzoneConfigKeys.OZONE_METADATA_STORE_IMPL, storeImpl);
 
     store = MetadataStoreBuilder.newBuilder()
         .setConf(conf)
         .setCreateIfMissing(true)
         .setDbFile(testDir)
+        .setDBType(storeImpl)
         .build();
 
     // Add 20 entries.
@@ -110,12 +113,13 @@ public class TestMetadataStore {
   @Test
   public void testIterator() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OzoneConfigKeys.OZONE_METADATA_STORE_IMPL, storeImpl);
+
     File dbDir = GenericTestUtils.getRandomizedTestDir();
     MetadataStore dbStore = MetadataStoreBuilder.newBuilder()
         .setConf(conf)
         .setCreateIfMissing(true)
         .setDbFile(dbDir)
+        .setDBType(storeImpl)
         .build();
 
     //As database is empty, check whether iterator is working as expected or
@@ -166,12 +170,12 @@ public class TestMetadataStore {
   public void testMetaStoreConfigDifferentFromType() throws IOException {
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OzoneConfigKeys.OZONE_METADATA_STORE_IMPL, storeImpl);
+
     String dbType;
     GenericTestUtils.setLogLevel(MetadataStoreBuilder.LOG, Level.DEBUG);
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(MetadataStoreBuilder.LOG);
-    if (storeImpl.equals(OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_LEVELDB)) {
+    if (storeImpl.equals(CONTAINER_DB_TYPE_LEVELDB)) {
       dbType = "RocksDB";
     } else {
       dbType = "LevelDB";
@@ -193,7 +197,7 @@ public class TestMetadataStore {
   public void testdbTypeNotSet() throws IOException {
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OzoneConfigKeys.OZONE_METADATA_STORE_IMPL, storeImpl);
+
     GenericTestUtils.setLogLevel(MetadataStoreBuilder.LOG, Level.DEBUG);
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(MetadataStoreBuilder.LOG);
@@ -203,7 +207,7 @@ public class TestMetadataStore {
     MetadataStore dbStore = MetadataStoreBuilder.newBuilder().setConf(conf)
         .setCreateIfMissing(true).setDbFile(dbDir).build();
     assertTrue(logCapturer.getOutput().contains("dbType is null, using dbType" +
-        " " + storeImpl));
+        " " + CONTAINER_DB_TYPE_ROCKSDB));
     dbStore.close();
     dbStore.destroy();
     FileUtils.deleteDirectory(dbDir);
@@ -213,8 +217,11 @@ public class TestMetadataStore {
   @After
   public void cleanup() throws IOException {
     if (store != null) {
+      System.out.println("--- Closing Store: " + store.getClass());
       store.close();
       store.destroy();
+    } else {
+      System.out.println("--- Store already closed: " + store.getClass());
     }
     if (testDir != null) {
       FileUtils.deleteDirectory(testDir);
@@ -460,7 +467,6 @@ public class TestMetadataStore {
   public void testDestroyDB() throws IOException {
     // create a new DB to test db destroy
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OzoneConfigKeys.OZONE_METADATA_STORE_IMPL, storeImpl);
 
     File dbDir = GenericTestUtils.getTestDir(getClass().getSimpleName()
         + "-" + storeImpl.toLowerCase() + "-toDestroy");
@@ -468,6 +474,7 @@ public class TestMetadataStore {
         .setConf(conf)
         .setCreateIfMissing(true)
         .setDbFile(dbDir)
+        .setDBType(storeImpl)
         .build();
 
     dbStore.put(getBytes("key1"), getBytes("value1"));
@@ -485,7 +492,6 @@ public class TestMetadataStore {
   @Test
   public void testBatchWrite() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OzoneConfigKeys.OZONE_METADATA_STORE_IMPL, storeImpl);
 
     File dbDir = GenericTestUtils.getTestDir(getClass().getSimpleName()
         + "-" + storeImpl.toLowerCase() + "-batchWrite");
@@ -493,6 +499,7 @@ public class TestMetadataStore {
         .setConf(conf)
         .setCreateIfMissing(true)
         .setDbFile(dbDir)
+        .setDBType(storeImpl)
         .build();
 
     List<String> expectedResult = Lists.newArrayList();

@@ -289,8 +289,6 @@ public class TestScmSafeMode {
 
   @Test(timeout = 300_000)
   public void testSCMSafeModeRestrictedOp() throws Exception {
-    conf.set(OzoneConfigKeys.OZONE_METADATA_STORE_IMPL,
-        OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_LEVELDB);
     cluster.stop();
     cluster = builder.build();
     StorageContainerManager scm = cluster.getStorageContainerManager();

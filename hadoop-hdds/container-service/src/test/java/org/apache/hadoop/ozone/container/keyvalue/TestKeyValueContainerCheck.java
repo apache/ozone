@@ -58,10 +58,6 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL;
-
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_LEVELDB;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_ROCKSDB;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -76,7 +72,6 @@ import static org.junit.Assert.assertFalse;
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyValueContainerCheck.class);
 
-  private final String storeImpl;
   private final ChunkLayoutTestInfo chunkManagerTestInfo;
   private KeyValueContainer container;
   private KeyValueContainerData containerData;
@@ -85,28 +80,22 @@ import static org.junit.Assert.assertFalse;
   private File testRoot;
   private ChunkManager chunkManager;
 
-  public TestKeyValueContainerCheck(String metadataImpl,
-      ChunkLayoutTestInfo chunkManagerTestInfo) {
-    this.storeImpl = metadataImpl;
+  public TestKeyValueContainerCheck(ChunkLayoutTestInfo chunkManagerTestInfo) {
     this.chunkManagerTestInfo = chunkManagerTestInfo;
   }
 
   @Parameterized.Parameters public static Collection<Object[]> data() {
     return Arrays.asList(new Object[][] {
-        {OZONE_METADATA_STORE_IMPL_LEVELDB, ChunkLayoutTestInfo.FILE_PER_CHUNK},
-        {OZONE_METADATA_STORE_IMPL_LEVELDB, ChunkLayoutTestInfo.FILE_PER_BLOCK},
-        {OZONE_METADATA_STORE_IMPL_ROCKSDB, ChunkLayoutTestInfo.FILE_PER_CHUNK},
-        {OZONE_METADATA_STORE_IMPL_ROCKSDB, ChunkLayoutTestInfo.FILE_PER_BLOCK}
+        {ChunkLayoutTestInfo.FILE_PER_CHUNK},
+        {ChunkLayoutTestInfo.FILE_PER_BLOCK}
     });
   }
 
   @Before public void setUp() throws Exception {
-    LOG.info("Testing store:{} layout:{}",
-        storeImpl, chunkManagerTestInfo.getLayout());
+    LOG.info("Testing  layout:{}", chunkManagerTestInfo.getLayout());
     this.testRoot = GenericTestUtils.getRandomizedTestDir();
     conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
-    conf.set(OZONE_METADATA_STORE_IMPL, storeImpl);
     chunkManagerTestInfo.updateConfig(conf);
     volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf);
     chunkManager = chunkManagerTestInfo.createChunkManager(true, null);
