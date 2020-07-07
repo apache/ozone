@@ -38,7 +38,7 @@ import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
-import org.apache.hadoop.hdds.utils.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -294,15 +294,17 @@ public class BlockDeletingService extends BackgroundService {
 
         // Once files are deleted... replace deleting entries with deleted
         // entries
-        BatchOperation batch = new BatchOperation();
-        succeedBlocks.forEach(entry -> {
+        BatchOperation batch = meta.getStore().getBatchHandler().initBatchOperation();
+        for (String entry: succeedBlocks) {
           String blockId =
               entry.substring(OzoneConsts.DELETING_KEY_PREFIX.length());
           String deletedEntry = OzoneConsts.DELETED_KEY_PREFIX + blockId;
-          batch.put(StringUtils.string2Bytes(deletedEntry),
-              StringUtils.string2Bytes(blockId));
-          batch.delete(StringUtils.string2Bytes(entry));
-        });
+
+          meta.getStore().getMetadataTable().putWithBatch(batch, deletedEntry, blockId);
+          meta.getStore().getMetadataTable().deleteWithBatch(batch, entry);
+
+          meta.getStore().getBatchHandler().commitBatchOperation(batch);
+        }
 
 
         int deleteBlockCount = succeedBlocks.size();

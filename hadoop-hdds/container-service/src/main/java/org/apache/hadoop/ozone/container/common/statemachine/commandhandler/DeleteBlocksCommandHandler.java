@@ -31,7 +31,9 @@ import org.apache.hadoop.hdds.protocol.proto
     .DeleteBlockTransactionResult;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers
     .DeletedContainerBlocksSummary;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -47,7 +49,7 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteBlockCommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.hdds.utils.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,8 +60,7 @@ import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .Result.CONTAINER_NOT_FOUND;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_CONTAINER_DELETE_TRANSACTION_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_PENDING_DELETE_BLOCK_COUNT_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.*;
 
 /**
  * Handle block deletion commands.
@@ -210,14 +211,17 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     try(ReferenceCountedDB containerDB =
             BlockUtils.getDB(containerData, conf)) {
       for (Long blk : delTX.getLocalIDList()) {
-        BatchOperation batch = new BatchOperation();
-        byte[] blkBytes = Longs.toByteArray(blk);
-        byte[] blkInfo = containerDB.getStore().get(blkBytes);
+        // TODO : Figure out the correct tables and types to use here.
+        BatchOperation batch = containerDB.getStore()
+                .getBatchHandler().initBatchOperation();
+        Long blkInfo = containerDB.getStore().getMetadataTable().get(blk);
         if (blkInfo != null) {
+          Table<String, Long> metadataTable = containerDB.getStore().getMetadataTable();
           String deletingKey = OzoneConsts.DELETING_KEY_PREFIX + blk;
           String deletedKey = OzoneConsts.DELETED_KEY_PREFIX + blk;
-          if (containerDB.getStore().get(deletingKey) != null
-              || containerDB.getStore().get(deletedKey) != null) {
+
+          if (metadataTable.get(deletingKey) != null
+              || metadataTable.get(deletedKey) != null) {
             if (LOG.isDebugEnabled()) {
               LOG.debug(String.format(
                   "Ignoring delete for block %d in container %d."
@@ -227,10 +231,10 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           }
           // Found the block in container db,
           // use an atomic update to change its state to deleting.
-          batch.put(deletingKey, blkInfo);
-          batch.delete(blkBytes);
+          metadataTable.putWithBatch(batch, deletingKey, blkInfo);
+          metadataTable.deleteWithBatch(batch, blk);
           try {
-            containerDB.getStore().writeBatch(batch);
+            containerDB.getStore().getBatchHandler().commitBatchOperation(batch);
             newDeletionBlocks++;
             if (LOG.isDebugEnabled()) {
               LOG.debug("Transited Block {} to DELETING state in container {}",
@@ -252,20 +256,22 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       }
 
       // Finally commit the DB counters.
-      BatchOperation batchOperation = new BatchOperation();
+      BatchOperation batchOperation = containerDB.getStore().getBatchHandler().initBatchOperation();
+      Table<String, Long> metadataTable = containerDB.getStore().getMetadataTable();
 
       // In memory is updated only when existing delete transactionID is
       // greater.
       if (delTX.getTxID() > containerData.getDeleteTransactionId()) {
         // Update in DB pending delete key count and delete transaction ID.
-        batchOperation.put(DB_CONTAINER_DELETE_TRANSACTION_KEY,
-            Longs.toByteArray(delTX.getTxID()));
+        metadataTable.putWithBatch(batchOperation,
+                DELETE_TRANSACTION_KEY_PREFIX, delTX.getTxID());
       }
 
-      batchOperation.put(DB_PENDING_DELETE_BLOCK_COUNT_KEY, Longs.toByteArray(
-          containerData.getNumPendingDeletionBlocks() + newDeletionBlocks));
+      long pendingDeleteBlocks = containerData.getNumPendingDeletionBlocks() + newDeletionBlocks;
+      metadataTable.putWithBatch(batchOperation,
+              PENDING_DELETE_BLOCK_COUNT, pendingDeleteBlocks);
 
-      containerDB.getStore().writeBatch(batchOperation);
+      containerDB.getStore().getBatchHandler().commitBatchOperation(batchOperation);
 
 
       // update pending deletion blocks count and delete transaction ID in
