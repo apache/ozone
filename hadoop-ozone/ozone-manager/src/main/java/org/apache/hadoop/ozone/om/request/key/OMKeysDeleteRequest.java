@@ -112,6 +112,14 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         getOmRequest());
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
+    // As right now, only client exposed API is for a single volume and
+    // bucket. So, all entries will have same volume name and bucket name.
+    // So, we can validate once.
+    if (deleteKeyArgsList.size() > 0) {
+      volumeName = deleteKeyArgsList.get(0).getVolumeName();
+      bucketName = deleteKeyArgsList.get(0).getBucketName();
+    }
+
     boolean acquiredLock =
         omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
             bucketName);
@@ -120,6 +128,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     try {
 
       // Validate bucket and volume exists or not.
+
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
 
