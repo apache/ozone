@@ -18,31 +18,27 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.key.OMKeyDeleteResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeysDeleteResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .DeleteKeysRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .DeleteKeysResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
@@ -51,12 +47,11 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
  * Handles DeleteKey request.
@@ -96,7 +91,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         getOmRequest().getDeleteKeysRequest();
 
     List<KeyArgs> deleteKeyArgsList = deleteKeyRequest.getKeyArgsList();
-    Set<OmKeyInfo> unDeletedKeys = new HashSet<>();
+
     IOException exception = null;
     OMClientResponse omClientResponse = null;
     Result result = null;
@@ -116,88 +111,100 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+
+    boolean acquiredLock =
+        omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
+            bucketName);
+
+    int indexFailed = 0;
     try {
-      for (KeyArgs deleteKeyArgs : deleteKeyArgsList) {
+
+      // Validate bucket and volume exists or not.
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+
+
+      // Check if any of the key in the batch cannot be deleted. If exists the
+      // batch delete will be failed.
+
+      for (indexFailed = 0; indexFailed < deleteKeyArgsList.size();
+           indexFailed++) {
+        KeyArgs deleteKeyArgs = deleteKeyArgsList.get(0);
+        auditMap = buildKeyArgsAuditMap(deleteKeyArgs);
         volumeName = deleteKeyArgs.getVolumeName();
         bucketName = deleteKeyArgs.getBucketName();
         keyName = deleteKeyArgs.getKeyName();
         String objectKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
             keyName);
         OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(objectKey);
-        omKeyInfoList.add(omKeyInfo);
-        unDeletedKeys.add(omKeyInfo);
-      }
 
-      // Check if any of the key in the batch cannot be deleted. If exists the
-      // batch will delete failed.
-      for (KeyArgs deleteKeyArgs : deleteKeyArgsList) {
-        volumeName = deleteKeyArgs.getVolumeName();
-        bucketName = deleteKeyArgs.getBucketName();
-        keyName = deleteKeyArgs.getKeyName();
-        auditMap = buildKeyArgsAuditMap(deleteKeyArgs);
+
+        // Do we need to fail the batch if one of the key does not exist?
+        // For now following the previous code behavior. If this code changes
+        // behavior, this will be incompatible change across upgrades, and we
+        // need to version the Requests and do logic accordingly.
+
+        if (omKeyInfo == null) {
+          LOG.error("Key does not exist {}", objectKey);
+          throw new OMException("Key Not Found " + objectKey, KEY_NOT_FOUND);
+        }
+
         // check Acl
         checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
             IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
 
-        String objectKey = omMetadataManager.getOzoneKey(
-            volumeName, bucketName, keyName);
-
-        // Validate bucket and volume exists or not.
-        validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-
-        OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(objectKey);
-
-        if (omKeyInfo == null) {
-          throw new OMException("Key not found: " + keyName, KEY_NOT_FOUND);
-        }
-
-        // Check if this transaction is a replay of ratis logs.
-        if (isReplay(ozoneManager, omKeyInfo, trxnLogIndex)) {
-          // Replay implies the response has already been returned to
-          // the client. So take no further action and return a dummy
-          // OMClientResponse.
-          throw new OMReplayException();
-        }
+        omKeyInfoList.add(omKeyInfo);
       }
+
+
+      // Mark all keys in cache as deleted.
+      for (KeyArgs deleteKeyArgs : deleteKeyArgsList) {
+        volumeName = deleteKeyArgs.getVolumeName();
+        bucketName = deleteKeyArgs.getBucketName();
+        keyName = deleteKeyArgs.getKeyName();
+        omMetadataManager.getKeyTable().addCacheEntry(
+            new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
+                keyName)),
+            new CacheValue<>(Optional.absent(), trxnLogIndex));
+      }
+
 
       omClientResponse = new OMKeysDeleteResponse(omResponse
-          .setDeleteKeysResponse(DeleteKeysResponse.newBuilder()).build(),
-          omKeyInfoList, trxnLogIndex, ozoneManager.isRatisEnabled());
+          .setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
+              .setStatus(true)).build(), omKeyInfoList, trxnLogIndex,
+          ozoneManager.isRatisEnabled());
       result = Result.SUCCESS;
-    } catch (IOException ex) {
-      if (ex instanceof OMReplayException) {
-        result = Result.REPLAY;
-        omClientResponse = new OMKeyDeleteResponse(createReplayOMResponse(
-            omResponse));
-      } else {
-        result = Result.FAILURE;
-        exception = ex;
 
-        omClientResponse = new OMKeyDeleteResponse(
-            createOperationKeysErrorOMResponse(omResponse, exception,
-                unDeletedKeys));
-      }
+    } catch (IOException ex) {
+      result = Result.FAILURE;
+      exception = ex;
+      omClientResponse = new OMKeysDeleteResponse(
+          omResponse.setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
+              .setStatus(false).build()).build());
 
     } finally {
+      if (acquiredLock) {
+        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
+            bucketName);
+      }
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
     }
 
-    // Performing audit logging outside of the lock.
-    if (result != Result.REPLAY) {
-      auditLog(auditLogger, buildAuditMessage(
-          OMAction.DELETE_KEY, auditMap, exception, userInfo));
+    // When we get any error during iteration build the remaining audit map
+    // from deleteKeyArgsList.
+    for (int i = indexFailed; i < deleteKeyArgsList.size(); i++) {
+      buildKeyArgsAuditMap(deleteKeyArgsList.get(i));
     }
+
+    auditLog(auditLogger, buildAuditMessage(
+        OMAction.DELETE_KEYS, auditMap, exception, userInfo));
+
 
     switch (result) {
     case SUCCESS:
       omMetrics.decNumKeys();
       LOG.debug("Key deleted. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);
-      break;
-    case REPLAY:
-      LOG.debug("Replayed Transaction {} ignored. Request: {}",
-          trxnLogIndex, deleteKeyRequest);
       break;
     case FAILURE:
       omMetrics.incNumKeyDeleteFails();
