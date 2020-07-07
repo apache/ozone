@@ -214,12 +214,10 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         byte[] blkBytes = Longs.toByteArray(blk);
         byte[] blkInfo = containerDB.getStore().get(blkBytes);
         if (blkInfo != null) {
-          byte[] deletingKeyBytes =
-              StringUtils.string2Bytes(OzoneConsts.DELETING_KEY_PREFIX + blk);
-          byte[] deletedKeyBytes =
-              StringUtils.string2Bytes(OzoneConsts.DELETED_KEY_PREFIX + blk);
-          if (containerDB.getStore().get(deletingKeyBytes) != null
-              || containerDB.getStore().get(deletedKeyBytes) != null) {
+          String deletingKey = OzoneConsts.DELETING_KEY_PREFIX + blk;
+          String deletedKey = OzoneConsts.DELETED_KEY_PREFIX + blk;
+          if (containerDB.getStore().get(deletingKey) != null
+              || containerDB.getStore().get(deletedKey) != null) {
             if (LOG.isDebugEnabled()) {
               LOG.debug(String.format(
                   "Ignoring delete for block %d in container %d."
@@ -229,7 +227,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           }
           // Found the block in container db,
           // use an atomic update to change its state to deleting.
-          batch.put(deletingKeyBytes, blkInfo);
+          batch.put(deletingKey, blkInfo);
           batch.delete(blkBytes);
           try {
             containerDB.getStore().writeBatch(batch);
