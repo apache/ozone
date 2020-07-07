@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
 
+import org.apache.hadoop.hdds.StorageClassConverter;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -112,7 +113,8 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
 
     timer.time(() -> {
       try (OutputStream stream = bucket.createKey(key, keySize,
-              ReplicationType.RATIS, factor, metadata)) {
+          StorageClassConverter.convert(
+              null, factor, ReplicationType.RATIS), metadata)) {
         contentGenerator.write(stream);
         stream.flush();
       }

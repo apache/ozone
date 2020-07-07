@@ -426,8 +426,7 @@ public final class TestUtils {
       allocateContainer(ContainerManager containerManager)
       throws IOException {
     return containerManager
-        .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, "root");
+        .allocateContainer("STANDARD", "root");
 
   }
 

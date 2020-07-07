@@ -27,8 +27,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -40,10 +38,8 @@ import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.commons.codec.digest.DigestUtils;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.*;
+
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -58,15 +54,9 @@ public class PutKeyHandler extends KeyHandler {
   @Parameters(index = "1", arity = "1..1", description = "File to upload")
   private String fileName;
 
-  @Option(names = {"-r", "--replication"},
-      description = "Replication factor of the new key. (use ONE or THREE) "
-          + "Default is specified in the cluster-wide config.")
-  private ReplicationFactor replicationFactor;
-
-  @Option(names = {"-t", "--type"},
-      description = "Replication type of the new key. (use RATIS or " +
-          "STAND_ALONE) Default is specified in the cluster-wide config.")
-  private ReplicationType replicationType;
+  @Option(names = {"-sc", "--storageClass"},
+      description = "StorageClass")
+  private String storageClass;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
@@ -85,16 +75,11 @@ public class PutKeyHandler extends KeyHandler {
       }
     }
 
-    if (replicationFactor == null) {
-      replicationFactor = ReplicationFactor.valueOf(
-          getConf().getInt(OZONE_REPLICATION, OZONE_REPLICATION_DEFAULT));
+    if (storageClass == null) {
+      storageClass =
+          getConf().get(OZONE_STORAGE_CLASS, OZONE_STORAGE_CLASS_DEFAULT);
     }
 
-    if (replicationType == null) {
-      replicationType = ReplicationType.valueOf(
-          getConf()
-              .get(OZONE_REPLICATION_TYPE, OZONE_REPLICATION_TYPE_DEFAULT));
-    }
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = vol.getBucket(bucketName);
 
@@ -108,9 +93,8 @@ public class PutKeyHandler extends KeyHandler {
         OZONE_SCM_CHUNK_SIZE_DEFAULT, StorageUnit.BYTES);
     try (InputStream input = new FileInputStream(dataFile);
          OutputStream output = bucket.createKey(keyName, dataFile.length(),
-             replicationType, replicationFactor, keyMetadata)) {
+             storageClass, keyMetadata)) {
       IOUtils.copyBytes(input, output, chunkSize);
     }
   }
-
 }

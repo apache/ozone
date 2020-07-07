@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.ListIterator;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -74,8 +73,7 @@ public class BlockOutputStreamEntryPool {
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public BlockOutputStreamEntryPool(OzoneManagerProtocol omClient,
-      int chunkSize, String requestId, HddsProtos.ReplicationFactor factor,
-      HddsProtos.ReplicationType type,
+      int chunkSize, String requestId, String sc,
       int bufferSize, long bufferFlushSize,
       boolean bufferFlushDelay, long bufferMaxSize,
       long size, long watchTimeout, ContainerProtos.ChecksumType checksumType,
@@ -87,7 +85,7 @@ public class BlockOutputStreamEntryPool {
     this.omClient = omClient;
     this.keyArgs = new OmKeyArgs.Builder().setVolumeName(info.getVolumeName())
         .setBucketName(info.getBucketName()).setKeyName(info.getKeyName())
-        .setType(type).setFactor(factor).setDataSize(info.getDataSize())
+        .setStorageClass(sc).setDataSize(info.getDataSize())
         .setIsMultipartKey(isMultipart).setMultipartUploadID(uploadID)
         .setMultipartUploadPartNumber(partNumber).build();
     this.xceiverClientManager = xceiverClientManager;

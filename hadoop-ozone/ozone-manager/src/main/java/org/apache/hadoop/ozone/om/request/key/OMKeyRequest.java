@@ -95,9 +95,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
    */
   @SuppressWarnings("parameternumber")
   protected List< OmKeyLocationInfo > allocateBlock(ScmClient scmClient,
-      OzoneBlockTokenSecretManager secretManager,
-      HddsProtos.ReplicationType replicationType,
-      HddsProtos.ReplicationFactor replicationFactor,
+      OzoneBlockTokenSecretManager secretManager, String storageClass,
       ExcludeList excludeList, long requestedSize, long scmBlockSize,
       int preallocateBlocksMax, boolean grpcBlockTokenEnabled, String omID)
       throws IOException {
@@ -110,8 +108,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
     List<AllocatedBlock> allocatedBlocks;
     try {
       allocatedBlocks = scmClient.getBlockClient()
-          .allocateBlock(scmBlockSize, numBlocks, replicationType,
-              replicationFactor, omID, excludeList);
+          .allocateBlock(
+              scmBlockSize, numBlocks, storageClass, omID, excludeList);
     } catch (SCMException ex) {
       if (ex.getResult()
           .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
@@ -230,8 +228,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   @SuppressWarnings("parameterNumber")
   protected OmKeyInfo createKeyInfo(@Nonnull KeyArgs keyArgs,
       @Nonnull List<OmKeyLocationInfo> locations,
-      @Nonnull HddsProtos.ReplicationFactor factor,
-      @Nonnull HddsProtos.ReplicationType type, long size,
+      @Nonnull String sc, long size,
       @Nullable FileEncryptionInfo encInfo,
       @Nonnull PrefixManager prefixManager,
       @Nullable OmBucketInfo omBucketInfo,
@@ -247,8 +244,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
         .setCreationTime(keyArgs.getModificationTime())
         .setModificationTime(keyArgs.getModificationTime())
         .setDataSize(size)
-        .setReplicationType(type)
-        .setReplicationFactor(factor)
+        .setStorageClass(sc)
         .setFileEncryptionInfo(encInfo)
         .setAcls(getAclsForKey(keyArgs, omBucketInfo, prefixManager))
         .addAllMetadata(KeyValueUtil.getFromProtobuf(keyArgs.getMetadataList()))
@@ -333,8 +329,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     // the key does not exist, create a new object.
     // Blocks will be appended as version 0.
-    return createKeyInfo(keyArgs, locations, keyArgs.getFactor(),
-        keyArgs.getType(), keyArgs.getDataSize(), encInfo, prefixManager,
+    return createKeyInfo(keyArgs, locations, keyArgs.getStorageClass(),
+        keyArgs.getDataSize(), encInfo, prefixManager,
         omBucketInfo, transactionLogIndex);
   }
 
@@ -372,14 +368,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
       throw new OMException("No such Multipart upload is with specified " +
           "uploadId " + uploadID,
           OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
-    } else {
-      factor = partKeyInfo.getFactor();
-      type = partKeyInfo.getType();
     }
     // For this upload part we don't need to check in KeyTable. As this
     // is not an actual key, it is a part of the key.
-    return createKeyInfo(args, locations, factor, type, size, encInfo,
-        prefixManager, omBucketInfo, transactionLogIndex);
+    return createKeyInfo(args, locations, partKeyInfo.getStorageClass(),
+        size, encInfo, prefixManager, omBucketInfo, transactionLogIndex);
   }
 
   /**

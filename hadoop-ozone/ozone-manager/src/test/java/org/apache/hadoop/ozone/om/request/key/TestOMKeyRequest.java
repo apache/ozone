@@ -137,8 +137,7 @@ public class TestOMKeyRequest {
     allocatedBlocks.add(allocatedBlock);
 
     when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(),
-        any(HddsProtos.ReplicationType.class),
-        any(HddsProtos.ReplicationFactor.class),
+        anyString(),
         anyString(), any(ExcludeList.class))).thenReturn(allocatedBlocks);
 
 

@@ -24,8 +24,7 @@ import java.io.IOException;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
@@ -67,8 +66,8 @@ public class TestObjectHead {
     //GIVEN
     String value = RandomStringUtils.randomAlphanumeric(32);
     OzoneOutputStream out = bucket.createKey("key1",
-        value.getBytes(UTF_8).length, ReplicationType.STAND_ALONE,
-        ReplicationFactor.ONE, new HashMap<>());
+        value.getBytes(UTF_8).length,
+        StaticStorageClassRegistry.STAND_ALONE_ONE.getName(), new HashMap<>());
     out.write(value.getBytes(UTF_8));
     out.close();
 

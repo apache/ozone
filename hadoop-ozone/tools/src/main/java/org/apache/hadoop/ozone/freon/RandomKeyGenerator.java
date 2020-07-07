@@ -39,11 +39,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.OzoneQuota;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -162,19 +161,11 @@ public final class RandomKeyGenerator implements Callable<Void> {
   )
   private String jsonDir;
 
-  @Option(
-      names = "--replicationType",
-      description = "Replication type (STAND_ALONE, RATIS)",
-      defaultValue = "STAND_ALONE"
-  )
-  private ReplicationType type = ReplicationType.STAND_ALONE;
 
-  @Option(
-      names = "--factor",
-      description = "Replication factor (ONE, THREE)",
-      defaultValue = "ONE"
-  )
-  private ReplicationFactor factor = ReplicationFactor.ONE;
+  @Option(names = {"-sc", "--storageClass"},
+      description = "StorageClass")
+  private String storageClass =
+      StaticStorageClassRegistry.STAND_ALONE_ONE.getName();
 
   @Option(
       names = "--om-service-id",
@@ -403,8 +394,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
     out.println("Number of Volumes created: " + numberOfVolumesCreated);
     out.println("Number of Buckets created: " + numberOfBucketsCreated);
     out.println("Number of Keys added: " + numberOfKeysAdded);
-    out.println("Ratis replication factor: " + factor.name());
-    out.println("Ratis replication type: " + type.name());
+    out.println("StorageClass is : " + storageClass);
     out.println(
         "Average Time spent in volume creation: " + prettyAverageVolumeTime);
     out.println(
@@ -693,8 +683,8 @@ public final class RandomKeyGenerator implements Callable<Void> {
     try {
       try (AutoCloseable scope = TracingUtil.createActivatedSpan("createKey")) {
         long keyCreateStart = System.nanoTime();
-        try (OzoneOutputStream os = bucket.createKey(keyName, keySize, type,
-            factor, new HashMap<>())) {
+        try (OzoneOutputStream os = bucket.createKey(keyName, keySize,
+            storageClass, new HashMap<>())) {
           long keyCreationDuration = System.nanoTime() - keyCreateStart;
           histograms.get(FreonOps.KEY_CREATE.ordinal())
               .update(keyCreationDuration);
@@ -767,6 +757,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
 
   private final class FreonJobInfo {
 
+    private final String storageClass;
     private String status;
     private String gitBaseRevision;
     private String jobStartTime;
@@ -776,8 +767,6 @@ public final class RandomKeyGenerator implements Callable<Void> {
     private int numOfThreads;
     private String dataWritten;
     private String execTime;
-    private String replicationFactor;
-    private String replicationType;
 
     private long keySize;
     private int bufferSize;
@@ -809,8 +798,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
       this.keySize = RandomKeyGenerator.this.keySize;
       this.bufferSize = RandomKeyGenerator.this.bufferSize;
       this.jobStartTime = Time.formatTime(RandomKeyGenerator.this.jobStartTime);
-      this.replicationFactor = RandomKeyGenerator.this.factor.name();
-      this.replicationType = RandomKeyGenerator.this.type.name();
+      this.storageClass = RandomKeyGenerator.this.storageClass;
 
       long totalBytes =
           (long) numOfVolumes * numOfBuckets * numOfKeys * keySize;
@@ -947,12 +935,8 @@ public final class RandomKeyGenerator implements Callable<Void> {
       return execTime;
     }
 
-    public String getReplicationFactor() {
-      return replicationFactor;
-    }
-
-    public String getReplicationType() {
-      return replicationType;
+    public String getStorageClass() {
+      return storageClass;
     }
 
     public String getStatus() {
@@ -1094,13 +1078,8 @@ public final class RandomKeyGenerator implements Callable<Void> {
   }
 
   @VisibleForTesting
-  public void setType(ReplicationType type) {
-    this.type = type;
-  }
-
-  @VisibleForTesting
-  public void setFactor(ReplicationFactor factor) {
-    this.factor = factor;
+  public void setStorageClass(String storageClass) {
+    this.storageClass = storageClass;
   }
 
   @VisibleForTesting

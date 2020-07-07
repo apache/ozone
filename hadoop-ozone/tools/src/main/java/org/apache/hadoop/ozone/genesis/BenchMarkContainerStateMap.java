@@ -19,9 +19,8 @@
 package org.apache.hadoop.ozone.genesis;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -195,7 +194,7 @@ public class BenchMarkContainerStateMap {
       state.stateMap.addContainer(getContainerInfo(state));
     }
     bh.consume(state.stateMap
-        .getMatchingContainerIDs(OPEN, OzoneConsts.OZONE, ReplicationFactor.ONE,
-            ReplicationType.STAND_ALONE));
+        .getMatchingContainerIDs(OPEN, OzoneConsts.OZONE,
+            StaticStorageClassRegistry.STAND_ALONE_ONE.getName()));
   }
 }

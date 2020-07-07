@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 /**
  * The replication factor to be used while writing key into ozone.
  */
+@Deprecated
 public enum ReplicationFactor {
   ONE(1),
   THREE(3);

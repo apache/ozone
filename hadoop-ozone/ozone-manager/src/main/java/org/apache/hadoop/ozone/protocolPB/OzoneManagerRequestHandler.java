@@ -487,8 +487,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
     omPartInfoList.forEach(partInfo -> partInfoList.add(partInfo.getProto()));
 
-    response.setType(omMultipartUploadListParts.getReplicationType());
-    response.setFactor(omMultipartUploadListParts.getReplicationFactor());
+    response.setStorageClass(omMultipartUploadListParts.getStorageClass());
     response.setNextPartNumberMarker(
         omMultipartUploadListParts.getNextPartNumberMarker());
     response.setIsTruncated(omMultipartUploadListParts.isTruncated());
@@ -506,6 +505,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         impl.listMultipartUploads(request.getVolume(), request.getBucket(),
             request.getPrefix());
 
+    // TODO(baoloongmao): need compatible
     List<MultipartUploadInfo> info = omMultipartUploadList
         .getUploads()
         .stream()
@@ -514,8 +514,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             .setBucketName(upload.getBucketName())
             .setKeyName(upload.getKeyName())
             .setUploadId(upload.getUploadId())
-            .setType(upload.getReplicationType())
-            .setFactor(upload.getReplicationFactor())
+            .setStorageClass(upload.getStorageClass())
             .setCreationTime(upload.getCreationTime().toEpochMilli())
             .build())
         .collect(Collectors.toList());

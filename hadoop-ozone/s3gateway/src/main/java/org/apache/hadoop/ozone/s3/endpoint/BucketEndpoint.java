@@ -36,7 +36,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
 
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
@@ -49,7 +48,6 @@ import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteResponse.Error;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.ContinueToken;
-import org.apache.hadoop.ozone.s3.util.S3StorageType;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.StringUtils;
@@ -235,8 +233,7 @@ public class BucketEndpoint extends EndpointBase {
             upload.getKeyName(),
             upload.getUploadId(),
             upload.getCreationTime(),
-            S3StorageType.fromReplicationType(upload.getReplicationType(),
-                upload.getReplicationFactor())
+            upload.getStorageClass()
         )));
     return Response.ok(result).build();
   }
@@ -337,12 +334,7 @@ public class BucketEndpoint extends EndpointBase {
     keyMetadata.setKey(next.getName());
     keyMetadata.setSize(next.getDataSize());
     keyMetadata.setETag("" + next.getModificationTime());
-    if (next.getReplicationType().toString().equals(ReplicationType
-        .STAND_ALONE.toString())) {
-      keyMetadata.setStorageClass(S3StorageType.REDUCED_REDUNDANCY.toString());
-    } else {
-      keyMetadata.setStorageClass(S3StorageType.STANDARD.toString());
-    }
+    keyMetadata.setStorageClass(next.getStorageClass());
     keyMetadata.setLastModified(next.getModificationTime());
     response.addKey(keyMetadata);
   }

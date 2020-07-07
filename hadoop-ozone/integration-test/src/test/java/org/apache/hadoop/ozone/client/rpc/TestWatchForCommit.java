@@ -18,10 +18,10 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.*;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -239,8 +239,8 @@ public class TestWatchForCommit {
   public void testWatchForCommitForRetryfailure() throws Exception {
     XceiverClientManager clientManager = new XceiverClientManager(conf);
     ContainerWithPipeline container1 = storageContainerLocationClient
-        .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
+        .allocateContainer(
+            StaticStorageClassRegistry.STANDARD.getName(), OzoneConsts.OZONE);
     XceiverClientSpi xceiverClient = clientManager
         .acquireClient(container1.getPipeline());
     Assert.assertEquals(1, xceiverClient.getRefcount());
@@ -282,8 +282,8 @@ public class TestWatchForCommit {
     XceiverClientManager clientManager = new XceiverClientManager(conf);
 
     ContainerWithPipeline container1 = storageContainerLocationClient
-        .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
+        .allocateContainer(
+            StaticStorageClassRegistry.STANDARD.getName(), OzoneConsts.OZONE);
     XceiverClientSpi xceiverClient = clientManager
         .acquireClient(container1.getPipeline());
     Assert.assertEquals(1, xceiverClient.getRefcount());
@@ -325,8 +325,8 @@ public class TestWatchForCommit {
   public void testWatchForCommitForGroupMismatchException() throws Exception {
     XceiverClientManager clientManager = new XceiverClientManager(conf);
     ContainerWithPipeline container1 = storageContainerLocationClient
-        .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
+        .allocateContainer(
+            StaticStorageClassRegistry.STANDARD.getName(), OzoneConsts.OZONE);
     XceiverClientSpi xceiverClient = clientManager
         .acquireClient(container1.getPipeline());
     Assert.assertEquals(1, xceiverClient.getRefcount());

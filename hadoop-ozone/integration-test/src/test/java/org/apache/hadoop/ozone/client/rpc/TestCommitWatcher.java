@@ -18,11 +18,11 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
@@ -169,8 +169,8 @@ public class TestCommitWatcher {
     BufferPool bufferPool = new BufferPool(chunkSize, capacity);
     XceiverClientManager clientManager = new XceiverClientManager(conf);
     ContainerWithPipeline container = storageContainerLocationClient
-        .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
+        .allocateContainer(
+            StaticStorageClassRegistry.STANDARD.getName(), OzoneConsts.OZONE);
     Pipeline pipeline = container.getPipeline();
     long containerId = container.getContainerInfo().getContainerID();
     XceiverClientSpi xceiverClient = clientManager.acquireClient(pipeline);
@@ -246,8 +246,8 @@ public class TestCommitWatcher {
     BufferPool bufferPool = new BufferPool(chunkSize, capacity);
     XceiverClientManager clientManager = new XceiverClientManager(conf);
     ContainerWithPipeline container = storageContainerLocationClient
-        .allocateContainer(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
+        .allocateContainer(
+            StaticStorageClassRegistry.STANDARD.getName(), OzoneConsts.OZONE);
     Pipeline pipeline = container.getPipeline();
     long containerId = container.getContainerInfo().getContainerID();
     XceiverClientSpi xceiverClient = clientManager.acquireClient(pipeline);

@@ -34,8 +34,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -275,8 +275,8 @@ public class TestContainerKeyMapperTask {
         .setBucketName(bucket)
         .setVolumeName(volume)
         .setKeyName(key)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
-        .setReplicationType(HddsProtos.ReplicationType.STAND_ALONE)
+        .setStorageClass(
+            StaticStorageClassRegistry.STAND_ALONE_ONE.getName())
         .setOmKeyLocationInfos(Collections.singletonList(
             omKeyLocationInfoGroup))
         .build();

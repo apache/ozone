@@ -18,9 +18,6 @@
 
 package org.apache.hadoop.ozone.client;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,9 +26,7 @@ import java.util.List;
  */
 public class OzoneMultipartUploadPartListParts {
 
-  private ReplicationType replicationType;
-
-  private ReplicationFactor replicationFactor;
+  private String storageClass;
 
   //When a list is truncated, this element specifies the last part in the list,
   // as well as the value to use for the part-number-marker request parameter
@@ -44,13 +39,11 @@ public class OzoneMultipartUploadPartListParts {
   private boolean truncated;
   private List<PartInfo> partInfoList = new ArrayList<>();
 
-  public OzoneMultipartUploadPartListParts(ReplicationType type,
-      ReplicationFactor factor,
+  public OzoneMultipartUploadPartListParts(String storageClass,
       int nextMarker, boolean truncate) {
-    this.replicationType = type;
     this.nextPartNumberMarker = nextMarker;
     this.truncated = truncate;
-    this.replicationFactor = factor;
+    this.storageClass = storageClass;
   }
 
   public void addAllParts(List<PartInfo> partInfos) {
@@ -59,10 +52,6 @@ public class OzoneMultipartUploadPartListParts {
 
   public void addPart(PartInfo partInfo) {
     this.partInfoList.add(partInfo);
-  }
-
-  public ReplicationType getReplicationType() {
-    return replicationType;
   }
 
   public int getNextPartNumberMarker() {
@@ -77,8 +66,8 @@ public class OzoneMultipartUploadPartListParts {
     return partInfoList;
   }
 
-  public ReplicationFactor getReplicationFactor() {
-    return replicationFactor;
+  public String getStorageClass() {
+    return storageClass;
   }
 
   /**

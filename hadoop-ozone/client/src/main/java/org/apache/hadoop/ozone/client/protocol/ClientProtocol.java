@@ -25,8 +25,6 @@ import java.util.Map;
 
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.OzoneQuota;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -272,23 +270,6 @@ public interface ClientProtocol {
       Map<String, String> metadata)
       throws IOException;
 
-
-  /**
-   * Writes a key in an existing bucket.
-   * @param volumeName Name of the Volume
-   * @param bucketName Name of the Bucket
-   * @param keyName Name of the Key
-   * @param size Size of the data
-   * @param metadata custom key value metadata
-   * @return {@link OzoneOutputStream}
-   *
-   */
-  OzoneOutputStream createKey(String volumeName, String bucketName,
-                              String keyName, long size, ReplicationType type,
-                              ReplicationFactor factor,
-                              Map<String, String> metadata)
-      throws IOException;
-
   /**
    * Reads a key from an existing bucket.
    * @param volumeName Name of the Volume
@@ -404,14 +385,12 @@ public interface ClientProtocol {
    * @param volumeName
    * @param bucketName
    * @param keyName
-   * @param type
-   * @param factor
+   * @param storageClass
    * @return {@link OmMultipartInfo}
    * @throws IOException
    */
   OmMultipartInfo initiateMultipartUpload(String volumeName, String
-      bucketName, String keyName, ReplicationType type, ReplicationFactor
-      factor) throws IOException;
+      bucketName, String keyName, String storageClass) throws IOException;
 
   /**
    * Create a part key for a multipart upload key.
@@ -584,8 +563,7 @@ public interface ClientProtocol {
    * @param bucketName Bucket name
    * @param keyName    Absolute path of the file to be written
    * @param size       Size of data to be written
-   * @param type       Replication Type
-   * @param factor     Replication Factor
+   * @param sc         storageClass
    * @param overWrite  if true existing file at the location will be overwritten
    * @param recursive  if true file would be created even if parent directories
    *                   do not exist
@@ -599,7 +577,7 @@ public interface ClientProtocol {
    */
   @SuppressWarnings("checkstyle:parameternumber")
   OzoneOutputStream createFile(String volumeName, String bucketName,
-      String keyName, long size, ReplicationType type, ReplicationFactor factor,
+      String keyName, long size, String sc,
       boolean overWrite, boolean recursive) throws IOException;
 
   /**

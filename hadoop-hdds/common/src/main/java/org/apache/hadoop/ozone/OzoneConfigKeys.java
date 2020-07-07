@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone;
 
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -180,9 +181,21 @@ public final class OzoneConfigKeys {
       "ozone.client.connection.timeout";
   public static final int OZONE_CLIENT_CONNECTION_TIMEOUT_DEFAULT = 5000;
 
+  /**
+   * Using the {@link #OZONE_STORAGE_CLASS} instead.
+   */
+  @Deprecated
   public static final String OZONE_REPLICATION = "ozone.replication";
+  /**
+   * Using the {@link #OZONE_STORAGE_CLASS_DEFAULT} instead.
+   */
+  @Deprecated
   public static final int OZONE_REPLICATION_DEFAULT =
       ReplicationFactor.THREE.getValue();
+
+  public static final String OZONE_STORAGE_CLASS = "ozone.storage.class";
+  public static final String OZONE_STORAGE_CLASS_DEFAULT =
+      StaticStorageClassRegistry.STANDARD.getName();
 
   public static final String OZONE_REPLICATION_TYPE = "ozone.replication.type";
   public static final String OZONE_REPLICATION_TYPE_DEFAULT =

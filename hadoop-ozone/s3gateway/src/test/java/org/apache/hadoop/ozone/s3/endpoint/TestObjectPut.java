@@ -26,6 +26,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
@@ -251,7 +252,12 @@ public class TestObjectPut {
         clientStub.getObjectStore().getS3Bucket(bucketName)
             .getKey(keyName);
 
+    StaticStorageClassRegistry staticStorageClassRegistry =
+        new StaticStorageClassRegistry();
     //default type is set
-    Assert.assertEquals(ReplicationType.RATIS, key.getReplicationType());
+    Assert.assertEquals(ReplicationType.RATIS,
+        staticStorageClassRegistry.getStorageClass(key.getStorageClass())
+            .getOpenStateConfiguration()
+            .getReplicationType());
   }
 }

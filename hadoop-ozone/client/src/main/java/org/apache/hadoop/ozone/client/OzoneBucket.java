@@ -23,8 +23,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.StorageType;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
@@ -66,16 +64,8 @@ public class OzoneBucket extends WithMetadata {
    * Name of the bucket.
    */
   private final String name;
-  /**
-   * Default replication factor to be used while creating keys.
-   */
-  private final ReplicationFactor defaultReplication;
 
-  /**
-   * Default replication type to be used while creating keys.
-   */
-  private final ReplicationType defaultReplicationType;
-
+  private final String storageClass;
   /**
    * Type of storage to be used for this bucket.
    * [RAM_DISK, SSD, DISK, ARCHIVE]
@@ -111,26 +101,18 @@ public class OzoneBucket extends WithMetadata {
 
 
   private OzoneBucket(ConfigurationSource conf, String volumeName,
-      String bucketName, ReplicationFactor defaultReplication,
-      ReplicationType defaultReplicationType, ClientProtocol proxy) {
+      String bucketName, String storageClass, ClientProtocol proxy) {
     Preconditions.checkNotNull(proxy, "Client proxy is not set.");
     this.volumeName = volumeName;
     this.name = bucketName;
-    if (defaultReplication == null) {
-      this.defaultReplication = ReplicationFactor.valueOf(conf.getInt(
-          OzoneConfigKeys.OZONE_REPLICATION,
-          OzoneConfigKeys.OZONE_REPLICATION_DEFAULT));
+    if (storageClass == null) {
+      this.storageClass = conf.get(
+          OzoneConfigKeys.OZONE_STORAGE_CLASS,
+          OzoneConfigKeys.OZONE_STORAGE_CLASS_DEFAULT);
     } else {
-      this.defaultReplication = defaultReplication;
+      this.storageClass = storageClass;
     }
 
-    if (defaultReplicationType == null) {
-      this.defaultReplicationType = ReplicationType.valueOf(conf.get(
-          OzoneConfigKeys.OZONE_REPLICATION_TYPE,
-          OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT));
-    } else {
-      this.defaultReplicationType = defaultReplicationType;
-    }
     this.proxy = proxy;
     this.ozoneObj = OzoneObjInfo.Builder.newBuilder()
         .setBucketName(bucketName)
@@ -143,7 +125,7 @@ public class OzoneBucket extends WithMetadata {
       String volumeName, String bucketName, StorageType storageType,
       Boolean versioning, long creationTime, Map<String, String> metadata,
       String encryptionKeyName) {
-    this(conf, volumeName, bucketName, null, null, proxy);
+    this(conf, volumeName, bucketName, null, proxy);
     this.storageType = storageType;
     this.versioning = versioning;
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
@@ -181,7 +163,7 @@ public class OzoneBucket extends WithMetadata {
   public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
       String volumeName, String bucketName, StorageType storageType,
       Boolean versioning, long creationTime, Map<String, String> metadata) {
-    this(conf, volumeName, bucketName, null, null, proxy);
+    this(conf, volumeName, bucketName, null, proxy);
     this.storageType = storageType;
     this.versioning = versioning;
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
@@ -210,14 +192,12 @@ public class OzoneBucket extends WithMetadata {
   @VisibleForTesting
   @SuppressWarnings("parameternumber")
   OzoneBucket(String volumeName, String name,
-      ReplicationFactor defaultReplication,
-      ReplicationType defaultReplicationType, StorageType storageType,
+      String storageClass, StorageType storageType,
       Boolean versioning, long creationTime) {
     this.proxy = null;
     this.volumeName = volumeName;
     this.name = name;
-    this.defaultReplication = defaultReplication;
-    this.defaultReplicationType = defaultReplicationType;
+    this.storageClass = storageClass;
     this.storageType = storageType;
     this.versioning = versioning;
     this.creationTime = Instant.ofEpochMilli(creationTime);
@@ -357,8 +337,7 @@ public class OzoneBucket extends WithMetadata {
    */
   public OzoneOutputStream createKey(String key, long size)
       throws IOException {
-    return createKey(key, size, defaultReplicationType, defaultReplication,
-        new HashMap<>());
+    return createKey(key, size, storageClass, new HashMap<>());
   }
 
   /**
@@ -366,37 +345,15 @@ public class OzoneBucket extends WithMetadata {
    *
    * @param key    Name of the key to be created.
    * @param size   Size of the data the key will point to.
-   * @param type   Replication type to be used.
-   * @param factor Replication factor of the key.
    * @return OzoneOutputStream to which the data has to be written.
    * @throws IOException
    */
   @Deprecated
   public OzoneOutputStream createKey(String key, long size,
-      String storageClass,
-      Map<String, String> keyMetadata)
+      String sc, Map<String, String> keyMetadata)
       throws IOException {
-    return proxy.createKey(volumeName, name, key, size, storageClass, keyMetadata);
-  }
-
-  /**
-   * Creates a new key in the bucket.
-   *
-   * @param key    Name of the key to be created.
-   * @param size   Size of the data the key will point to.
-   * @param type   Replication type to be used.
-   * @param factor Replication factor of the key.
-   * @return OzoneOutputStream to which the data has to be written.
-   * @throws IOException
-   */
-  @Deprecated
-  public OzoneOutputStream createKey(String key, long size,
-                                     ReplicationType type,
-                                     ReplicationFactor factor,
-                                     Map<String, String> keyMetadata)
-      throws IOException {
-    return proxy
-        .createKey(volumeName, name, key, size, type, factor, keyMetadata);
+    return proxy.createKey(volumeName, name, key, size, sc,
+        keyMetadata);
   }
 
   /**
@@ -478,17 +435,13 @@ public class OzoneBucket extends WithMetadata {
   /**
    * Initiate multipart upload for a specified key.
    * @param keyName
-   * @param type
-   * @param factor
+   * @param sc storageClass
    * @return OmMultipartInfo
    * @throws IOException
    */
-  public OmMultipartInfo initiateMultipartUpload(String keyName,
-                                                 ReplicationType type,
-                                                 ReplicationFactor factor)
+  public OmMultipartInfo initiateMultipartUpload(String keyName, String sc)
       throws IOException {
-    return  proxy.initiateMultipartUpload(volumeName, name, keyName, type,
-        factor);
+    return  proxy.initiateMultipartUpload(volumeName, name, keyName, sc);
   }
 
   /**
@@ -500,8 +453,7 @@ public class OzoneBucket extends WithMetadata {
    */
   public OmMultipartInfo initiateMultipartUpload(String key)
       throws IOException {
-    return initiateMultipartUpload(key, defaultReplicationType,
-        defaultReplication);
+    return initiateMultipartUpload(key, storageClass);
   }
 
   /**
@@ -620,10 +572,10 @@ public class OzoneBucket extends WithMetadata {
    *                     invalid arguments
    */
   public OzoneOutputStream createFile(String keyName, long size,
-      ReplicationType type, ReplicationFactor factor, boolean overWrite,
+      String sc, boolean overWrite,
       boolean recursive) throws IOException {
     return proxy
-        .createFile(volumeName, name, keyName, size, type, factor, overWrite,
+        .createFile(volumeName, name, keyName, size, sc, overWrite,
             recursive);
   }
 

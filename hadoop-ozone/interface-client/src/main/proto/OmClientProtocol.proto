@@ -685,6 +685,8 @@ message KeyArgs {
     required string bucketName = 2;
     required string keyName = 3;
     optional uint64 dataSize = 4;
+    // TODO(baoloongmao): Remove these two future
+    // deprecated, please use storageClass instead
     optional hadoop.hdds.ReplicationType type = 5;
     optional hadoop.hdds.ReplicationFactor factor = 6;
     repeated KeyLocation keyLocations = 7;
@@ -1004,11 +1006,15 @@ message MultipartInfoInitiateResponse {
 message MultipartKeyInfo {
     required string uploadID = 1;
     required uint64 creationTime = 2;
+    // TODO(baoloongmao): Remove these two future
+    // deprecated, please use storageClass instead
     required hadoop.hdds.ReplicationType type = 3;
     required hadoop.hdds.ReplicationFactor factor = 4;
     repeated PartKeyInfo partKeyInfoList = 5;
     optional uint64 objectID = 6;
     optional uint64 updateID = 7;
+    optional string storageClass = 8;
+
 }
 
 message PartKeyInfo {
@@ -1061,12 +1067,14 @@ message MultipartUploadListPartsRequest {
 }
 
 message MultipartUploadListPartsResponse {
+    // TODO(baoloongmao): Remove these two future
+    // deprecated, please use storageClass instead
     optional hadoop.hdds.ReplicationType type = 2;
     optional hadoop.hdds.ReplicationFactor factor = 3;
     optional uint32 nextPartNumberMarker = 4;
     optional bool isTruncated = 5;
     repeated PartInfo partsList = 6;
-
+    optional string storageClass = 7;
 }
 
 message ListMultipartUploadsRequest {
@@ -1086,9 +1094,11 @@ message MultipartUploadInfo {
     required string keyName = 3;
     required string uploadId = 4;
     required uint64 creationTime = 5;
-    required hadoop.hdds.ReplicationType type = 6;
-    required hadoop.hdds.ReplicationFactor factor = 7;
-
+    // TODO(baoloongmao): Remove these two future
+    // deprecated, please use storageClass instead
+    optional hadoop.hdds.ReplicationType type = 6;
+    optional hadoop.hdds.ReplicationFactor factor = 7;
+    optional string storageClass = 8;
 }
 
 message PartInfo {

@@ -543,12 +543,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
     }
 
-    if (args.getFactor() != null) {
-      keyArgs.setFactor(args.getFactor());
-    }
-
-    if (args.getType() != null) {
-      keyArgs.setType(args.getType());
+    if (args.getStorageClass() != null) {
+      keyArgs.setStorageClass(args.getStorageClass());
     }
 
     if (args.getDataSize() > 0) {
@@ -602,12 +598,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setKeyName(args.getKeyName())
         .setDataSize(args.getDataSize());
 
-    if (args.getFactor() != null) {
-      keyArgs.setFactor(args.getFactor());
-    }
-
-    if (args.getType() != null) {
-      keyArgs.setType(args.getType());
+    if (args.getStorageClass() != null) {
+      keyArgs.setStorageClass(args.getStorageClass());
     }
 
     req.setKeyArgs(keyArgs);
@@ -827,10 +819,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setVolumeName(omKeyArgs.getVolumeName())
         .setBucketName(omKeyArgs.getBucketName())
         .setKeyName(omKeyArgs.getKeyName())
-        .setFactor(omKeyArgs.getFactor())
+        .setStorageClass(omKeyArgs.getStorageClass())
         .addAllAcls(omKeyArgs.getAcls().stream().map(a ->
-            OzoneAcl.toProtobuf(a)).collect(Collectors.toList()))
-        .setType(omKeyArgs.getType());
+            OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
     multipartInfoInitiateRequest.setKeyArgs(keyArgs.build());
 
     OMRequest omRequest = createOMRequest(
@@ -960,7 +951,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
 
     OmMultipartUploadListParts omMultipartUploadListParts =
-        new OmMultipartUploadListParts(response.getType(), response.getFactor(),
+        new OmMultipartUploadListParts(response.getStorageClass(),
             response.getNextPartNumberMarker(), response.getIsTruncated());
     omMultipartUploadListParts.addProtoPartList(response.getPartsListList());
 
@@ -986,6 +977,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     ListMultipartUploadsResponse listMultipartUploadsResponse =
         handleError(submitRequest(omRequest)).getListMultipartUploadsResponse();
 
+    // TODO(baoloongmao): need compatible
     List<OmMultipartUpload> uploadList =
         listMultipartUploadsResponse.getUploadsListList()
             .stream()
@@ -995,8 +987,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                 proto.getKeyName(),
                 proto.getUploadId(),
                 Instant.ofEpochMilli(proto.getCreationTime()),
-                proto.getType(),
-                proto.getFactor()
+                proto.getStorageClass()
             ))
             .collect(Collectors.toList());
 
@@ -1334,8 +1325,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
         .setDataSize(args.getDataSize())
-        .setType(args.getType())
-        .setFactor(args.getFactor())
+        .setStorageClass(args.getStorageClass())
         .addAllAcls(args.getAcls().stream().map(a ->
             OzoneAcl.toProtobuf(a)).collect(Collectors.toList()))
         .build();

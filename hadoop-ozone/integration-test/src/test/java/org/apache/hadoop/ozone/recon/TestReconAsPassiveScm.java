@@ -30,6 +30,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.Optional;
 
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -126,7 +127,9 @@ public class TestReconAsPassiveScm {
     // Create container
     ContainerManager reconContainerManager = reconScm.getContainerManager();
     ContainerInfo containerInfo =
-        scmContainerManager.allocateContainer(RATIS, ONE, "test");
+        scmContainerManager.allocateContainer(
+            StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
+            "test");
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline =
         scmPipelineManager.getPipeline(containerInfo.getPipelineID());
@@ -165,7 +168,8 @@ public class TestReconAsPassiveScm {
 
     // Create container in SCM.
     ContainerInfo containerInfo =
-        scmContainerManager.allocateContainer(RATIS, ONE, "test");
+        scmContainerManager.allocateContainer(
+            StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(), "test");
     long containerID = containerInfo.getContainerID();
     PipelineManager scmPipelineManager = scm.getPipelineManager();
     Pipeline pipeline =

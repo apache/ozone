@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone.client;
 
-import org.apache.hadoop.hdds.client.ReplicationType;
-
 import java.time.Instant;
 
 /**
@@ -52,9 +50,7 @@ public class OzoneKey {
    */
   private Instant modificationTime;
 
-  private ReplicationType replicationType;
-
-  private int replicationFactor;
+  private String storageClass;
 
   /**
    * Constructs OzoneKey from OmKeyInfo.
@@ -63,16 +59,14 @@ public class OzoneKey {
   @SuppressWarnings("parameternumber")
   public OzoneKey(String volumeName, String bucketName,
                   String keyName, long size, long creationTime,
-                  long modificationTime, ReplicationType type,
-                  int replicationFactor) {
+                  long modificationTime, String storageClass) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.name = keyName;
     this.dataSize = size;
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
-    this.replicationType = type;
-    this.replicationFactor = replicationFactor;
+    this.storageClass = storageClass;
   }
 
   /**
@@ -129,22 +123,7 @@ public class OzoneKey {
     return modificationTime;
   }
 
-  /**
-   * Returns the replication type of the key.
-   *
-   * @return replicationType
-   */
-  public ReplicationType getReplicationType() {
-    return replicationType;
+  public String getStorageClass() {
+    return storageClass;
   }
-
-  /**
-   * Returns the replication factor of the key.
-   *
-   * @return replicationFactor
-   */
-  public int getReplicationFactor() {
-    return replicationFactor;
-  }
-
 }

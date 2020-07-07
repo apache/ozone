@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
@@ -76,8 +77,8 @@ public class TestS3MultipartResponse {
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
         .setUploadID(multipartUploadID)
         .setCreationTime(Time.now())
-        .setReplicationType(HddsProtos.ReplicationType.RATIS)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+        .setStorageClass(
+            StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName())
         .build();
 
     OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
@@ -86,8 +87,8 @@ public class TestS3MultipartResponse {
         .setKeyName(keyName)
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
-        .setReplicationType(HddsProtos.ReplicationType.RATIS)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
+        .setStorageClass(
+            StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName())
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
         .build();

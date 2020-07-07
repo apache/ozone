@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -30,13 +31,8 @@ import org.junit.Test;
 
 import java.io.IOException;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.protocol.proto
-        .HddsProtos.ReplicationFactor.THREE;
 import org.junit.Rule;
 import org.junit.rules.Timeout;
-import static org.apache.hadoop.hdds.protocol.proto
-        .HddsProtos.ReplicationType.RATIS;
 
 /**
  * Test SCM restart and recovery wrt pipelines.
@@ -79,10 +75,12 @@ public class TestSCMRestart {
     pipelineManager = scm.getPipelineManager();
     ratisPipeline1 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
-        RATIS, THREE, "Owner1").getPipelineID());
+            StaticStorageClassRegistry.STANDARD.getName(), "Owner1")
+            .getPipelineID());
     ratisPipeline2 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
-        RATIS, ONE, "Owner2").getPipelineID());
+            StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(), "Owner2")
+            .getPipelineID());
     // At this stage, there should be 2 pipeline one with 1 open container
     // each. Try restarting the SCM and then discover that pipeline are in
     // correct state.
@@ -117,7 +115,8 @@ public class TestSCMRestart {
     // Try creating a new container, it should be from the same pipeline
     // as was before restart
     ContainerInfo containerInfo = newContainerManager
-        .allocateContainer(RATIS, THREE, "Owner1");
+        .allocateContainer(
+            StaticStorageClassRegistry.STANDARD.getName(), "Owner1");
     Assert.assertEquals(containerInfo.getPipelineID(), ratisPipeline1.getId());
   }
 }

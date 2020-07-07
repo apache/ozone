@@ -21,9 +21,9 @@ package org.apache.hadoop.ozone.genesis;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.BucketManager;
 import org.apache.hadoop.ozone.om.BucketManagerImpl;
 import org.apache.hadoop.ozone.om.KeyManager;
@@ -108,8 +108,8 @@ public class BenchMarkOMKeyAllocation {
         .setBucketName(bucketName)
         .setKeyName(UUID.randomUUID().toString())
         .setDataSize(0)
-        .setFactor(HddsProtos.ReplicationFactor.THREE)
-        .setType(HddsProtos.ReplicationType.RATIS).build();
+        .setStorageClass(StaticStorageClassRegistry.STANDARD.getName())
+        .build();
     OpenKeySession openKeySession = keyManager.openKey(omKeyArgs);
     // setting location info list
     omKeyArgs.setLocationInfoList(keyLocationInfos);

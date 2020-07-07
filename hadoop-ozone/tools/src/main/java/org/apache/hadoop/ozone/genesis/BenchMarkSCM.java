@@ -24,6 +24,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
@@ -119,7 +120,7 @@ public class BenchMarkSCM {
   public void allocateBlockBenchMark(BenchMarkSCM state,
       Blackhole bh) throws IOException {
     state.blockManager
-        .allocateBlock(50, ReplicationType.RATIS, ReplicationFactor.THREE,
+        .allocateBlock(50, StaticStorageClassRegistry.STANDARD.getName(),
             "Genesis", new ExcludeList());
   }
 }

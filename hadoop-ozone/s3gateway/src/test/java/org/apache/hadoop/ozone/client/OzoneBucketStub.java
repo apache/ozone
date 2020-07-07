@@ -32,8 +32,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -73,8 +72,7 @@ public class OzoneBucketStub extends OzoneBucket {
       long creationTime) {
     super(volumeName,
         bucketName,
-        ReplicationFactor.ONE,
-        ReplicationType.STAND_ALONE,
+        StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
         storageType,
         versioning,
         creationTime);
@@ -82,15 +80,14 @@ public class OzoneBucketStub extends OzoneBucket {
 
   @Override
   public OzoneOutputStream createKey(String key, long size) throws IOException {
-    return createKey(key, size, ReplicationType.STAND_ALONE,
-        ReplicationFactor.ONE, new HashMap<>());
+    return createKey(key, size,
+        StaticStorageClassRegistry.STAND_ALONE_ONE.getName(), new HashMap<>());
   }
 
   @Override
   public OzoneOutputStream createKey(String key, long size,
-                                     ReplicationType type,
-                                     ReplicationFactor factor,
-                                     Map<String, String> metadata)
+                                    String storageClass,
+                                    Map<String, String> metadata)
       throws IOException {
     ByteArrayOutputStream byteArrayOutputStream =
         new ByteArrayOutputStream((int) size) {
@@ -104,8 +101,8 @@ public class OzoneBucketStub extends OzoneBucket {
                 size,
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
-                new ArrayList<>(), type, metadata, null,
-                factor.getValue()
+                new ArrayList<>(), metadata, null,
+                storageClass
             ));
             super.close();
           }
@@ -162,8 +159,7 @@ public class OzoneBucketStub extends OzoneBucket {
 
   @Override
   public OmMultipartInfo initiateMultipartUpload(String keyName,
-                                                 ReplicationType type,
-                                                 ReplicationFactor factor)
+      String storageClass)
       throws IOException {
     String uploadID = UUID.randomUUID().toString();
     multipartUploadIdMap.put(keyName, uploadID);
@@ -253,8 +249,8 @@ public class OzoneBucketStub extends OzoneBucket {
     List<PartInfo> partInfoList = new ArrayList<>();
 
     if (partList.get(key) == null) {
-      return new OzoneMultipartUploadPartListParts(ReplicationType.RATIS,
-          ReplicationFactor.ONE, 0, false);
+      return new OzoneMultipartUploadPartListParts(
+          StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(), 0, false);
     } else {
       Map<Integer, Part> partMap = partList.get(key);
       Iterator<Map.Entry<Integer, Part>> partIterator =
@@ -283,8 +279,8 @@ public class OzoneBucketStub extends OzoneBucket {
       }
 
       OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
-          new OzoneMultipartUploadPartListParts(ReplicationType.RATIS,
-              ReplicationFactor.ONE,
+          new OzoneMultipartUploadPartListParts(
+              StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
               nextPartNumberMarker, truncated);
       ozoneMultipartUploadPartListParts.addAllParts(partInfoList);
 

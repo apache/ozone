@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.freon;
 import java.util.ArrayList;
 import java.util.concurrent.Callable;
 
+import org.apache.hadoop.hdds.StorageClassConverter;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -107,8 +108,8 @@ public class OmKeyGenerator extends BaseFreonGenerator
     OmKeyArgs keyArgs = new Builder()
         .setBucketName(bucketName)
         .setVolumeName(volumeName)
-        .setType(ReplicationType.RATIS)
-        .setFactor(factor)
+        .setStorageClass(StorageClassConverter.convert(
+            null, factor, ReplicationType.RATIS))
         .setKeyName(generateObjectName(counter))
         .setLocationInfoList(new ArrayList<>())
         .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),

@@ -137,11 +137,12 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
     List< OmKeyLocationInfo > omKeyLocationInfoList =
         allocateBlock(ozoneManager.getScmClient(),
-              ozoneManager.getBlockTokenSecretManager(), type, factor,
-              new ExcludeList(), requestedSize, scmBlockSize,
-              ozoneManager.getPreallocateBlocksMax(),
-              ozoneManager.isGrpcBlockTokenEnabled(),
-              ozoneManager.getOMNodeId());
+            ozoneManager.getBlockTokenSecretManager(),
+            keyArgs.getStorageClass(),
+            new ExcludeList(), requestedSize, scmBlockSize,
+            ozoneManager.getPreallocateBlocksMax(),
+            ozoneManager.isGrpcBlockTokenEnabled(),
+            ozoneManager.getOMNodeId());
 
     KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
         .setModificationTime(Time.now()).setType(type).setFactor(factor)

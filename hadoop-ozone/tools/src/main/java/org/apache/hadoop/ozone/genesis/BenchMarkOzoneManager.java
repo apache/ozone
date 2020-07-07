@@ -27,8 +27,8 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -128,8 +128,7 @@ public class BenchMarkOzoneManager {
           .setBucketName(bucketName)
           .setKeyName(key)
           .setDataSize(0)
-          .setFactor(HddsProtos.ReplicationFactor.THREE)
-          .setType(HddsProtos.ReplicationType.RATIS)
+          .setStorageClass(StaticStorageClassRegistry.STANDARD.getName())
           .build();
       OpenKeySession keySession = om.getKeyManager().openKey(omKeyArgs);
       long clientID = keySession.getId();
@@ -167,8 +166,7 @@ public class BenchMarkOzoneManager {
         .setBucketName(bucketName)
         .setKeyName(key)
         .setDataSize(50)
-        .setFactor(HddsProtos.ReplicationFactor.THREE)
-        .setType(HddsProtos.ReplicationType.RATIS)
+        .setStorageClass(StaticStorageClassRegistry.STANDARD.getName())
         .build();
     state.om.allocateBlock(omKeyArgs, clientIDs.get(index), new ExcludeList());
   }
@@ -183,8 +181,7 @@ public class BenchMarkOzoneManager {
         .setBucketName(bucketName)
         .setKeyName(key)
         .setDataSize(50)
-        .setFactor(HddsProtos.ReplicationFactor.THREE)
-        .setType(HddsProtos.ReplicationType.RATIS)
+        .setStorageClass(StaticStorageClassRegistry.STANDARD.getName())
         .build();
     OpenKeySession openKeySession = state.om.openKey(omKeyArgs);
     state.om.allocateBlock(omKeyArgs, openKeySession.getId(),

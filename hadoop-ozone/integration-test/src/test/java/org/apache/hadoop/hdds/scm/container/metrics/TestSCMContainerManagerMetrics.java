@@ -18,10 +18,8 @@
 package org.apache.hadoop.hdds.scm.container.metrics;
 
 import org.apache.commons.lang3.RandomUtils;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -87,8 +85,7 @@ public class TestSCMContainerManagerMetrics {
         "NumSuccessfulCreateContainers", metrics);
 
     ContainerInfo containerInfo = containerManager.allocateContainer(
-        HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
+        StaticStorageClassRegistry.STANDARD.getName(), OzoneConsts.OZONE);
 
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
     Assert.assertEquals(getLongCounter("NumSuccessfulCreateContainers",
@@ -96,8 +93,7 @@ public class TestSCMContainerManagerMetrics {
 
     try {
       containerManager.allocateContainer(
-          HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
+          StaticStorageClassRegistry.STANDARD.getName(), OzoneConsts.OZONE);
       fail("testContainerOpsMetrics failed");
     } catch (IOException ex) {
       // Here it should fail, so it should have the old metric value.
@@ -160,13 +156,12 @@ public class TestSCMContainerManagerMetrics {
         .createBucket(volumeName, bucketName);
     OzoneOutputStream ozoneOutputStream = cluster.getRpcClient()
         .getObjectStore().getClientProxy().createKey(volumeName, bucketName,
-            key, 0, ReplicationType.RATIS, ReplicationFactor.ONE,
+            key, 0, StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
             new HashMap<>());
 
     String data = "file data";
     ozoneOutputStream.write(data.getBytes(), 0, data.length());
     ozoneOutputStream.close();
-
 
     GenericTestUtils.waitFor(() -> {
       final MetricsRecordBuilder scmMetrics =

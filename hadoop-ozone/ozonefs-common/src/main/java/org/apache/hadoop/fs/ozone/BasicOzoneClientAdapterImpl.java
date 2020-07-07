@@ -31,8 +31,10 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
+import org.apache.hadoop.hdds.StorageClass;
+import org.apache.hadoop.hdds.StorageClassConverter;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -73,13 +75,13 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
   static final Logger LOG =
       LoggerFactory.getLogger(BasicOzoneClientAdapterImpl.class);
+  private final StaticStorageClassRegistry staticStorageClassRegistry;
 
   private OzoneClient ozoneClient;
   private ObjectStore objectStore;
   private OzoneVolume volume;
   private OzoneBucket bucket;
-  private ReplicationType replicationType;
-  private ReplicationFactor replicationFactor;
+  private StorageClass storageClass;
   private boolean securityEnabled;
   private int configuredDnPort;
 
@@ -135,13 +137,6 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       this.securityEnabled = true;
     }
 
-    String replicationTypeConf =
-        conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
-            OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT);
-
-    int replicationCountConf = conf.getInt(OzoneConfigKeys.OZONE_REPLICATION,
-        OzoneConfigKeys.OZONE_REPLICATION_DEFAULT);
-
     if (OmUtils.isOmHAServiceId(conf, omHost)) {
       // omHost is listed as one of the service ids in the config,
       // thus we should treat omHost as omServiceId
@@ -157,8 +152,11 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     objectStore = ozoneClient.getObjectStore();
     this.volume = objectStore.getVolume(volumeStr);
     this.bucket = volume.getBucket(bucketStr);
-    this.replicationType = ReplicationType.valueOf(replicationTypeConf);
-    this.replicationFactor = ReplicationFactor.valueOf(replicationCountConf);
+    staticStorageClassRegistry =
+        new StaticStorageClassRegistry();
+    this.storageClass = staticStorageClassRegistry.getStorageClass(
+        conf.get(OzoneConfigKeys.OZONE_STORAGE_CLASS,
+        OzoneConfigKeys.OZONE_STORAGE_CLASS_DEFAULT));
     this.configuredDnPort = conf.getInt(
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
@@ -166,7 +164,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
   @Override
   public short getDefaultReplication() {
-    return (short) replicationFactor.getValue();
+    return (short) storageClass.getOpenStateConfiguration()
+        .getReplicationFactor().getNumber();
   }
 
   @Override
@@ -204,11 +203,13 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
           || replication == ReplicationFactor.THREE.getValue()) {
         ReplicationFactor clientReplication = ReplicationFactor
             .valueOf(replication);
-        ozoneOutputStream = bucket.createFile(key, 0, replicationType,
-            clientReplication, overWrite, recursive);
+        String sc = StorageClassConverter.convert(null, clientReplication,
+            storageClass.getOpenStateConfiguration().getReplicationType());
+        ozoneOutputStream = bucket.createFile(key, 0, sc, overWrite,
+            recursive);
       } else {
-        ozoneOutputStream = bucket.createFile(key, 0, replicationType,
-            replicationFactor, overWrite, recursive);
+        ozoneOutputStream = bucket.createFile(key, 0,
+            storageClass.getName(), overWrite, recursive);
       }
       return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
     } catch (OMException ex) {
@@ -449,7 +450,11 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   private FileStatusAdapter toFileStatusAdapter(OzoneFileStatus status,
       String owner, URI defaultUri, Path workingDir) {
     OmKeyInfo keyInfo = status.getKeyInfo();
-    short replication = (short) keyInfo.getFactor().getNumber();
+    short replication = (short) staticStorageClassRegistry
+        .getStorageClass(keyInfo.getStorageClass())
+        .getOpenStateConfiguration()
+        .getReplicationFactor()
+        .getNumber();
     return new FileStatusAdapter(
         keyInfo.getDataSize(),
         new Path(OZONE_URI_DELIMITER + keyInfo.getKeyName())

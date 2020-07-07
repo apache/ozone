@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.StorageClassConverter;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
@@ -49,8 +50,6 @@ public final class OmKeyInfo extends WithObjectID {
   private List<OmKeyLocationInfoGroup> keyLocationVersions;
   private final long creationTime;
   private long modificationTime;
-  private HddsProtos.ReplicationType type;
-  private HddsProtos.ReplicationFactor factor;
   private String storageClass;
   private FileEncryptionInfo encInfo;
 
@@ -63,8 +62,7 @@ public final class OmKeyInfo extends WithObjectID {
   OmKeyInfo(String volumeName, String bucketName, String keyName,
       List<OmKeyLocationInfoGroup> versions, long dataSize,
       long creationTime, long modificationTime,
-      HddsProtos.ReplicationType type,
-      HddsProtos.ReplicationFactor factor,
+      String storageClass,
       Map<String, String> metadata,
       FileEncryptionInfo encInfo, List<OzoneAcl> acls,
       long objectID, long updateID) {
@@ -86,8 +84,6 @@ public final class OmKeyInfo extends WithObjectID {
     this.keyLocationVersions = versions;
     this.creationTime = creationTime;
     this.modificationTime = modificationTime;
-    this.factor = factor;
-    this.type = type;
     this.metadata = metadata;
     this.encInfo = encInfo;
     this.acls = acls;
@@ -101,14 +97,6 @@ public final class OmKeyInfo extends WithObjectID {
 
   public String getBucketName() {
     return bucketName;
-  }
-
-  public HddsProtos.ReplicationType getType() {
-    return type;
-  }
-
-  public HddsProtos.ReplicationFactor getFactor() {
-    return factor;
   }
 
   public String getKeyName() {
@@ -253,6 +241,10 @@ public final class OmKeyInfo extends WithObjectID {
     return OzoneAclUtil.setAcl(acls, newAcls);
   }
 
+  public String getStorageClass() {
+    return storageClass;
+  }
+
   /**
    * Builder of OmKeyInfo.
    */
@@ -265,13 +257,12 @@ public final class OmKeyInfo extends WithObjectID {
         new ArrayList<>();
     private long creationTime;
     private long modificationTime;
-    private HddsProtos.ReplicationType type;
-    private HddsProtos.ReplicationFactor factor;
     private Map<String, String> metadata;
     private FileEncryptionInfo encInfo;
     private List<OzoneAcl> acls;
     private long objectID;
     private long updateID;
+    private String storageClass;
 
     public Builder() {
       this.metadata = new HashMap<>();
@@ -325,16 +316,6 @@ public final class OmKeyInfo extends WithObjectID {
       return this;
     }
 
-    public Builder setReplicationFactor(HddsProtos.ReplicationFactor replFact) {
-      this.factor = replFact;
-      return this;
-    }
-
-    public Builder setReplicationType(HddsProtos.ReplicationType replType) {
-      this.type = replType;
-      return this;
-    }
-
     public Builder addMetadata(String key, String value) {
       metadata.put(key, value);
       return this;
@@ -374,10 +355,15 @@ public final class OmKeyInfo extends WithObjectID {
       return this;
     }
 
+    public Builder setStorageClass(String sc) {
+      this.storageClass = sc;
+      return this;
+    }
+
     public OmKeyInfo build() {
       return new OmKeyInfo(
           volumeName, bucketName, keyName, omKeyLocationInfoGroups,
-          dataSize, creationTime, modificationTime, type, factor, metadata,
+          dataSize, creationTime, modificationTime, storageClass, metadata,
           encInfo, acls, objectID, updateID);
     }
   }
@@ -396,8 +382,6 @@ public final class OmKeyInfo extends WithObjectID {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setDataSize(dataSize)
-        .setFactor(factor)
-        .setType(type)
         .addAllKeyLocationList(keyLocations)
         .setLatestVersion(latestVersion)
         .setCreationTime(creationTime)
@@ -423,6 +407,22 @@ public final class OmKeyInfo extends WithObjectID {
           OmKeyLocationInfoGroup.getFromProtobuf(keyLocationList));
     }
 
+    String storageClass;
+    if (keyInfo.hasStorageClass()) {
+      storageClass = keyInfo.getStorageClass();
+    } else {
+      // TODO(baoloongmao): remove these compatible purpose code future.
+      HddsProtos.ReplicationFactor factor = null;
+      HddsProtos.ReplicationType type = null;
+      if (keyInfo.hasFactor()) {
+        factor = keyInfo.getFactor();
+      }
+      if (keyInfo.hasType()) {
+        type = keyInfo.getType();
+      }
+      storageClass = StorageClassConverter.convert(null, factor, type);
+    }
+
     Builder builder = new Builder()
         .setVolumeName(keyInfo.getVolumeName())
         .setBucketName(keyInfo.getBucketName())
@@ -431,8 +431,7 @@ public final class OmKeyInfo extends WithObjectID {
         .setDataSize(keyInfo.getDataSize())
         .setCreationTime(keyInfo.getCreationTime())
         .setModificationTime(keyInfo.getModificationTime())
-        .setReplicationType(keyInfo.getType())
-        .setReplicationFactor(keyInfo.getFactor())
+        .setStorageClass(storageClass)
         .addAllMetadata(KeyValueUtil.getFromProtobuf(keyInfo.getMetadataList()))
         .setFileEncryptionInfo(keyInfo.hasFileEncryptionInfo() ?
             OMPBHelper.convert(keyInfo.getFileEncryptionInfo()) : null)
@@ -454,8 +453,7 @@ public final class OmKeyInfo extends WithObjectID {
         ", key='" + keyName + '\'' +
         ", dataSize='" + dataSize + '\'' +
         ", creationTime='" + creationTime + '\'' +
-        ", type='" + type + '\'' +
-        ", factor='" + factor + '\'' +
+        ", storageClass='" + storageClass + '\'' +
         '}';
   }
 
@@ -476,8 +474,7 @@ public final class OmKeyInfo extends WithObjectID {
         keyName.equals(omKeyInfo.keyName) &&
         Objects
             .equals(keyLocationVersions, omKeyInfo.keyLocationVersions) &&
-        type == omKeyInfo.type &&
-        factor == omKeyInfo.factor &&
+        storageClass.equals(omKeyInfo.storageClass) &&
         Objects.equals(metadata, omKeyInfo.metadata) &&
         Objects.equals(acls, omKeyInfo.acls) &&
         objectID == omKeyInfo.objectID &&
@@ -500,8 +497,7 @@ public final class OmKeyInfo extends WithObjectID {
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
         .setDataSize(dataSize)
-        .setReplicationType(type)
-        .setReplicationFactor(factor)
+        .setStorageClass(storageClass)
         .setFileEncryptionInfo(encInfo)
         .setObjectID(objectID).setUpdateID(updateID);
 

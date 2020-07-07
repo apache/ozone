@@ -107,8 +107,7 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
   /**
    * Returns Fake blocks to the BlockManager so we get blocks in the Database.
    * @param size - size of the block.
-   * @param type Replication Type
-   * @param factor - Replication factor
+   * @param storageClass storageClass
    * @param owner - String owner.
    * @param excludeList list of dns/pipelines to exclude
    * @return
@@ -116,8 +115,8 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
    */
   @Override
   public List<AllocatedBlock> allocateBlock(long size, int num,
-      HddsProtos.ReplicationType type, HddsProtos.ReplicationFactor factor,
-      String owner, ExcludeList excludeList) throws IOException {
+      String storageClass, String owner, ExcludeList excludeList)
+      throws IOException {
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
     Pipeline pipeline = createPipeline(datanodeDetails);
     long containerID = Time.monotonicNow();

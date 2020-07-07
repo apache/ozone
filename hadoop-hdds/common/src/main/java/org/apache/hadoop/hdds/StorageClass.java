@@ -13,9 +13,9 @@ public interface StorageClass {
 
   class OpenStateConfiguration {
 
-    final HddsProtos.ReplicationType replicationType;
+    private final HddsProtos.ReplicationType replicationType;
 
-    final HddsProtos.ReplicationFactor replicationFactor;
+    private final HddsProtos.ReplicationFactor replicationFactor;
 
     public OpenStateConfiguration(
         HddsProtos.ReplicationType replicationType,
@@ -35,7 +35,7 @@ public interface StorageClass {
 
   class ClosedStateConfiguration {
 
-    final HddsProtos.ReplicationFactor replicationFactor;
+    private final HddsProtos.ReplicationFactor replicationFactor;
 
     public ClosedStateConfiguration(
         HddsProtos.ReplicationFactor replicationFactor) {

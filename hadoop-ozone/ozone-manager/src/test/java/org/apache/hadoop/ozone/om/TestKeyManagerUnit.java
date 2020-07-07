@@ -32,6 +32,7 @@ import java.util.UUID;
 import com.google.common.base.Optional;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -282,8 +283,7 @@ public class TestKeyManagerUnit {
         .setVolumeName(volume)
         .setBucketName(bucket)
         .setKeyName(key)
-        .setType(ReplicationType.RATIS)
-        .setFactor(ReplicationFactor.THREE)
+        .setStorageClass(StaticStorageClassRegistry.STANDARD.getName())
         .setAcls(new ArrayList<>())
         .build();
     return omtest.initiateMultipartUpload(key1);
@@ -297,8 +297,7 @@ public class TestKeyManagerUnit {
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
         .setUploadID(uploadID)
         .setCreationTime(Time.now())
-        .setReplicationType(ReplicationType.RATIS)
-        .setReplicationFactor(ReplicationFactor.THREE)
+        .setStorageClass(StaticStorageClassRegistry.STANDARD.getName())
         .setPartKeyInfoList(partKeyInfoMap)
         .build();
 
@@ -395,8 +394,7 @@ public class TestKeyManagerUnit {
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(256000)
-        .setReplicationType(ReplicationType.RATIS)
-        .setReplicationFactor(ReplicationFactor.THREE)
+        .setStorageClass(StaticStorageClassRegistry.STANDARD.getName())
         .setAcls(Collections.emptyList())
         .build();
     TestOMRequestUtils.addKeyToOM(metadataManager, keyInfo);

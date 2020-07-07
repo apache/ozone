@@ -20,9 +20,6 @@ package org.apache.hadoop.ozone.client;
 
 import java.time.Instant;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
-
 /**
  * Information about one initialized upload.
  */
@@ -38,21 +35,17 @@ public class OzoneMultipartUpload {
 
   private Instant creationTime;
 
-  private ReplicationType replicationType;
-
-  private ReplicationFactor replicationFactor;
+  private String storageClass;
 
   public OzoneMultipartUpload(String volumeName, String bucketName,
       String keyName, String uploadId, Instant creationTime,
-      ReplicationType replicationType,
-      ReplicationFactor replicationFactor) {
+      String storageClass) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyName = keyName;
     this.uploadId = uploadId;
     this.creationTime = creationTime;
-    this.replicationType = replicationType;
-    this.replicationFactor = replicationFactor;
+    this.storageClass = storageClass;
   }
 
   public String getVolumeName() {
@@ -79,11 +72,7 @@ public class OzoneMultipartUpload {
     this.creationTime = creationTime;
   }
 
-  public ReplicationType getReplicationType() {
-    return replicationType;
-  }
-
-  public ReplicationFactor getReplicationFactor() {
-    return replicationFactor;
+  public String getStorageClass() {
+    return storageClass;
   }
 }

@@ -32,8 +32,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.om.helpers.*;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.ratis.protocol.AlreadyClosedException;
@@ -123,7 +121,7 @@ public class KeyOutputStream extends OutputStream {
   public KeyOutputStream(OpenKeySession handler,
       XceiverClientManager xceiverClientManager,
       OzoneManagerProtocol omClient, int chunkSize,
-      String requestId, ReplicationFactor factor, ReplicationType type,
+      String requestId, String sc,
       int bufferSize, long bufferFlushSize, boolean isBufferFlushDelay,
       long bufferMaxSize, long size, long watchTimeout,
       ChecksumType checksumType, int bytesPerChecksum,
@@ -131,8 +129,8 @@ public class KeyOutputStream extends OutputStream {
       int maxRetryCount, long retryInterval) {
     OmKeyInfo info = handler.getKeyInfo();
     blockOutputStreamEntryPool =
-        new BlockOutputStreamEntryPool(omClient, chunkSize, requestId, factor,
-            type, bufferSize, bufferFlushSize, isBufferFlushDelay,
+        new BlockOutputStreamEntryPool(omClient, chunkSize, requestId, sc,
+            bufferSize, bufferFlushSize, isBufferFlushDelay,
             bufferMaxSize, size,
             watchTimeout, checksumType, bytesPerChecksum, uploadID, partNumber,
             isMultipart, info, xceiverClientManager, handler.getId());
@@ -539,8 +537,7 @@ public class KeyOutputStream extends OutputStream {
     private OzoneManagerProtocol omClient;
     private int chunkSize;
     private String requestID;
-    private ReplicationType type;
-    private ReplicationFactor factor;
+    private String storageClass;
     private int streamBufferSize;
     private long streamBufferFlushSize;
     private boolean streamBufferFlushDelay;
@@ -590,13 +587,8 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
-    public Builder setType(ReplicationType replicationType) {
-      this.type = replicationType;
-      return this;
-    }
-
-    public Builder setFactor(ReplicationFactor replicationFactor) {
-      this.factor = replicationFactor;
+    public Builder setStorageClass(String sc) {
+      this.storageClass = sc;
       return this;
     }
 
@@ -652,7 +644,7 @@ public class KeyOutputStream extends OutputStream {
 
     public KeyOutputStream build() {
       return new KeyOutputStream(openHandler, xceiverManager, omClient,
-          chunkSize, requestID, factor, type,
+          chunkSize, requestID, storageClass,
           streamBufferSize, streamBufferFlushSize, streamBufferFlushDelay,
           streamBufferMaxSize,
           blockSize, watchTimeout, checksumType,

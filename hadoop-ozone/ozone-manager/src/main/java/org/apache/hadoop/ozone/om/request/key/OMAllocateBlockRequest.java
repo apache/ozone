@@ -105,8 +105,9 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     // scmBlockSize.
     List<OmKeyLocationInfo> omKeyLocationInfoList =
         allocateBlock(ozoneManager.getScmClient(),
-            ozoneManager.getBlockTokenSecretManager(), keyArgs.getType(),
-            keyArgs.getFactor(), excludeList, ozoneManager.getScmBlockSize(),
+            ozoneManager.getBlockTokenSecretManager(),
+            keyArgs.getStorageClass(),
+            excludeList, ozoneManager.getScmBlockSize(),
             ozoneManager.getScmBlockSize(),
             ozoneManager.getPreallocateBlocksMax(),
             ozoneManager.isGrpcBlockTokenEnabled(), ozoneManager.getOMNodeId());

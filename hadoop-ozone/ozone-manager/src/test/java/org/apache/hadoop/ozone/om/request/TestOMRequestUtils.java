@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.hdds.StorageClassConverter;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -193,8 +194,9 @@ public final class TestOMRequestUtils {
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(1000L)
-        .setReplicationType(replicationType)
-        .setReplicationFactor(replicationFactor).build();
+        .setStorageClass(StorageClassConverter.convert(
+        null, replicationFactor, replicationType))
+        .build();
   }
 
   /**
@@ -222,8 +224,8 @@ public final class TestOMRequestUtils {
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(1000L)
-        .setReplicationType(replicationType)
-        .setReplicationFactor(replicationFactor)
+        .setStorageClass(StorageClassConverter.convert(
+            null, replicationFactor, replicationType))
         .setObjectID(objectID)
         .setUpdateID(objectID)
         .build();

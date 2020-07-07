@@ -134,7 +134,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
       List< OmKeyLocationInfo > omKeyLocationInfoList =
           allocateBlock(ozoneManager.getScmClient(),
-              ozoneManager.getBlockTokenSecretManager(), type, factor,
+              ozoneManager.getBlockTokenSecretManager(),
+              keyArgs.getStorageClass(),
               new ExcludeList(), requestedSize, scmBlockSize,
               ozoneManager.getPreallocateBlocksMax(),
               ozoneManager.isGrpcBlockTokenEnabled(),
@@ -142,6 +143,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now())
               .setType(type).setFactor(factor)
+              .setStorageClass(keyArgs.getStorageClass())
               .setDataSize(requestedSize);
 
       newKeyArgs.addAllKeyLocations(omKeyLocationInfoList.stream()

@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.om.codec;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
@@ -38,8 +38,7 @@ public class TestOmMultipartKeyInfoCodec {
     OmMultipartKeyInfo omMultipartKeyInfo = new OmMultipartKeyInfo.Builder()
         .setUploadID(UUID.randomUUID().toString())
         .setCreationTime(Time.now())
-        .setReplicationType(HddsProtos.ReplicationType.RATIS)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.THREE)
+        .setStorageClass(StaticStorageClassRegistry.STANDARD.getName())
         .build();
 
     byte[] data = new byte[0];

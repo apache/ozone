@@ -156,7 +156,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
           response.getErrorMessage() : "Allocate container failed.");
     }
     return ContainerWithPipeline.fromProtobuf(
-        response.getContainerWithPipeline());  }
+        response.getContainerWithPipeline());
+  }
 
   public ContainerInfo getContainer(long containerID) throws IOException {
     Preconditions.checkState(containerID >= 0,

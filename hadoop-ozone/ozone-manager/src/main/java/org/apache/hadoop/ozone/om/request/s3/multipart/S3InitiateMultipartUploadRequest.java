@@ -152,8 +152,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       multipartKeyInfo = new OmMultipartKeyInfo.Builder()
           .setUploadID(keyArgs.getMultipartUploadID())
           .setCreationTime(keyArgs.getModificationTime())
-          .setReplicationType(keyArgs.getType())
-          .setReplicationFactor(keyArgs.getFactor())
+          .setStorageClass(keyArgs.getStorageClass())
           .setObjectID(objectID)
           .setUpdateID(transactionLogIndex)
           .build();
@@ -164,8 +163,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .setKeyName(keyArgs.getKeyName())
           .setCreationTime(keyArgs.getModificationTime())
           .setModificationTime(keyArgs.getModificationTime())
-          .setReplicationType(keyArgs.getType())
-          .setReplicationFactor(keyArgs.getFactor())
+          .setStorageClass(keyArgs.getStorageClass())
           .setOmKeyLocationInfos(Collections.singletonList(
               new OmKeyLocationInfoGroup(0, new ArrayList<>())))
           .setAcls(OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()))

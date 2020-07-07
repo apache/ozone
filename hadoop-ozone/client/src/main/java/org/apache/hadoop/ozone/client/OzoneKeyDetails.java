@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.client;
 
 import org.apache.hadoop.fs.FileEncryptionInfo;
-import org.apache.hadoop.hdds.client.ReplicationType;
 
 import java.util.List;
 import java.util.Map;
@@ -45,10 +44,10 @@ public class OzoneKeyDetails extends OzoneKey {
   public OzoneKeyDetails(String volumeName, String bucketName, String keyName,
                          long size, long creationTime, long modificationTime,
                          List<OzoneKeyLocation> ozoneKeyLocations,
-                         ReplicationType type, Map<String, String> metadata,
-                         FileEncryptionInfo feInfo, int replicationFactor) {
+                         Map<String, String> metadata,
+                         FileEncryptionInfo feInfo, String storageClass) {
     super(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, type, replicationFactor);
+        modificationTime, storageClass);
     this.ozoneKeyLocations = ozoneKeyLocations;
     this.metadata = metadata;
     this.feInfo = feInfo;

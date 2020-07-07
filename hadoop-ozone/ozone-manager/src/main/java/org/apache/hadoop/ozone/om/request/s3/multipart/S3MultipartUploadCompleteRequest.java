@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -254,10 +253,9 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
         // All parts have same replication information. Here getting from last
         // part.
-        HddsProtos.ReplicationType type = partKeyInfoMap.lastEntry().getValue()
-            .getPartKeyInfo().getType();
-        HddsProtos.ReplicationFactor factor =
-            partKeyInfoMap.lastEntry().getValue().getPartKeyInfo().getFactor();
+        String storageClass =
+            partKeyInfoMap.lastEntry().getValue().getPartKeyInfo()
+                .getStorageClass();
 
         if (omKeyInfo == null) {
           // This is a newly added key, it does not have any versions.
@@ -272,7 +270,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           OmKeyInfo.Builder builder =
               new OmKeyInfo.Builder().setVolumeName(volumeName)
               .setBucketName(bucketName).setKeyName(keyName)
-              .setReplicationFactor(factor).setReplicationType(type)
+              .setStorageClass(storageClass)
               .setCreationTime(keyArgs.getModificationTime())
               .setModificationTime(keyArgs.getModificationTime())
               .setDataSize(dataSize)

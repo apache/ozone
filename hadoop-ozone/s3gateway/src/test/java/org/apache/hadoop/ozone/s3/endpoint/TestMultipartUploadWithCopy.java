@@ -32,8 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -76,14 +75,14 @@ public class TestMultipartUploadWithCopy {
 
     byte[] keyContent = EXISTING_KEY_CONTENT.getBytes();
     try (OutputStream stream = bucket
-        .createKey(EXISTING_KEY, keyContent.length, ReplicationType.RATIS,
-            ReplicationFactor.THREE, new HashMap<>())) {
+        .createKey(EXISTING_KEY, keyContent.length,
+            StaticStorageClassRegistry.STANDARD.getName(), new HashMap<>())) {
       stream.write(keyContent);
     }
 
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
-        "STANDARD");
+        StaticStorageClassRegistry.STANDARD.getName());
 
     REST.setHeaders(headers);
     REST.setClient(CLIENT);
@@ -205,7 +204,7 @@ public class TestMultipartUploadWithCopy {
   private void setHeaders(Map<String, String> additionalHeaders) {
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
-        "STANDARD");
+        StaticStorageClassRegistry.STANDARD.getName());
 
     additionalHeaders
         .forEach((k, v) -> when(headers.getHeaderString(k)).thenReturn(v));
