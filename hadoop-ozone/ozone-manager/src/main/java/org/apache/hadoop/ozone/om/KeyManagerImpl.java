@@ -1747,8 +1747,8 @@ public class KeyManagerImpl implements KeyManager {
     // Key is not found, throws exception
     if (LOG.isDebugEnabled()) {
       LOG.debug("Unable to get file status for the key: volume: {}, bucket:" +
-                      " {}, key: {}, with error: No such file exists.", volumeName,
-              bucketName, keyName);
+                      " {}, key: {}, with error: No such file exists.",
+              volumeName, bucketName, keyName);
     }
     throw new OMException("Unable to get file status: volume: " +
             volumeName + " bucket: " + bucketName + " key: " + keyName,
@@ -1895,7 +1895,7 @@ public class KeyManagerImpl implements KeyManager {
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
     OzoneFileStatus fileStatus = getOzoneFileStatus(volumeName, bucketName,
-            keyName,false);
+            keyName, false);
       //if key is not of type file or if key is not found we throw an exception
     if (fileStatus != null && fileStatus.isFile()) {
       if (args.getRefreshPipeline()) {
