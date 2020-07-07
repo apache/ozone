@@ -30,7 +30,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   private Table<String, Long> metadataTable;
 
-  private Table<String, BlockData> blockDataTable;
+  private Table<Long, BlockData> blockDataTable;
 
   private static final Logger LOG =
           LoggerFactory.getLogger(AbstractDatanodeStore.class);
@@ -97,7 +97,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
-  public Table<String, BlockData> getBlockDataTable() {
+  public Table<Long, BlockData> getBlockDataTable() {
     return blockDataTable;
   }
 

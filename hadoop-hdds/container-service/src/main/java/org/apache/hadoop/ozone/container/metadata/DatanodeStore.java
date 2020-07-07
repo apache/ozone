@@ -54,7 +54,7 @@ public interface DatanodeStore {
    *
    * @return Table
    */
-  Table<String, BlockData> getBlockDataTable();
+  Table<Long, BlockData> getBlockDataTable();
 
   /**
    * A Table that keeps the metadata.
