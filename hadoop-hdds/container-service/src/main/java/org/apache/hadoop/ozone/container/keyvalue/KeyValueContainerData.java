@@ -28,7 +28,8 @@ import com.google.common.primitives.Longs;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto;
-import org.apache.hadoop.hdds.utils.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
@@ -287,15 +288,15 @@ public class KeyValueContainerData extends ContainerData {
   public void updateAndCommitDBCounters(
       ReferenceCountedDB db, BatchOperation batchOperation,
       int deletedBlockCount) throws IOException {
+    Table<String, Long> metadataTable = db.getStore().getMetadataTable();
+
     // Set Bytes used and block count key.
-    batchOperation.put(DB_CONTAINER_BYTES_USED_KEY,
-        Longs.toByteArray(getBytesUsed()));
-    batchOperation.put(DB_BLOCK_COUNT_KEY, Longs.toByteArray(
-        getKeyCount() - deletedBlockCount));
-    batchOperation.put(DB_PENDING_DELETE_BLOCK_COUNT_KEY, Longs.toByteArray(
-        getNumPendingDeletionBlocks() - deletedBlockCount));
-    db.getStore().writeBatch(batchOperation);
+    metadataTable.putWithBatch(batchOperation, CONTAINER_BYTES_USED, getBytesUsed());
+    metadataTable.putWithBatch(batchOperation, BLOCK_COUNT,
+            getKeyCount() - deletedBlockCount);
+    metadataTable.putWithBatch(batchOperation, PENDING_DELETE_BLOCK_COUNT,
+            (long)(getNumPendingDeletionBlocks() - deletedBlockCount));
+
+    db.getStore().getBatchHandler().commitBatchOperation(batchOperation);
   }
-
-
 }
