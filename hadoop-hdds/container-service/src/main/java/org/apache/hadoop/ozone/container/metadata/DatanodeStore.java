@@ -67,4 +67,8 @@ public interface DatanodeStore {
    * Helper to create and write batch transactions.
    */
   BatchOperationHandler getBatchHandler();
+
+  void flushDB(boolean sync) throws IOException;
+
+  void compactDB() throws IOException;
 }
