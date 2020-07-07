@@ -101,6 +101,17 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
     return blockDataTable;
   }
 
+  @Override
+  public void flushDB(boolean sync) throws IOException {
+    // TODO : Callers are expecting WAL flush here, but this implementation uses full DB flush.
+    store.flush();
+  }
+
+  @Override
+  public void compactDB() throws IOException {
+    store.compactDB();
+  }
+
   static void checkTableStatus(Table table, String name) throws IOException {
     String logMessage = "Unable to get a reference to %s table. Cannot " +
             "continue.";
