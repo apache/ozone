@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.metadata;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.db.*;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.rocksdb.DBOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,8 +55,13 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   public void start(ConfigurationSource config)
           throws IOException {
     if (this.store == null) {
-      // TODO : Determine how to make sure the DB is created if missing.
-      this.store = DBStoreBuilder.createDBStore(config, dbDef);
+      DBOptions options = new DBOptions();
+      options.setCreateIfMissing(true);
+
+      this.store = DBStoreBuilder.newBuilder(config)
+              .registerTables(dbDef)
+              .setDBOption(options)
+              .build();
 
       metadataTable = dbDef.getMetadataColumnFamily().getTable(this.store);
 
