@@ -90,7 +90,7 @@ public class OMKeysDeleteResponse extends OMClientResponse {
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           omMetadataManager.getDeletedTable().get(deleteKey);
       repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-          omKeyInfo, repeatedOmKeyInfo, omKeyInfo.getUpdateID(),
+          omKeyInfo, repeatedOmKeyInfo, trxnLogIndex,
           isRatisEnabled);
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
           deleteKey, repeatedOmKeyInfo);
