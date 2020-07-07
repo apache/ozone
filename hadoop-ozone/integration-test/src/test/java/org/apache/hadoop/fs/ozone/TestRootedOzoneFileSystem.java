@@ -59,6 +59,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
@@ -877,6 +878,19 @@ public class TestRootedOzoneFileSystem {
   }
 
   /**
+   * Helper function for testGetTrashRoots() for checking the first element
+   * in the FileStatus Collection.
+   * @param expected Expected path String
+   * @param res Collection of FileStatus from getTrashRoots()
+   */
+  private void checkFirstFileStatusPath(String expected,
+      Collection<FileStatus> res) {
+    Optional<FileStatus> optional = res.stream().findFirst();
+    Assert.assertTrue(optional.isPresent());
+    Assert.assertEquals(expected, optional.get().getPath().toUri().getPath());
+  }
+
+  /**
    * Test getTrashRoots() in OFS. Different from the existing test for o3fs.
    */
   @Test
@@ -897,12 +911,10 @@ public class TestRootedOzoneFileSystem {
     // Results should be getTrashRoots(false)=1, gTR(true)=1
     Collection<FileStatus> res = fs.getTrashRoots(false);
     Assert.assertEquals(1, res.size());
-    res.forEach(e -> Assert.assertEquals(
-        user1Trash1.toString(), e.getPath().toUri().getPath()));
+    checkFirstFileStatusPath(user1Trash1.toString(), res);
     res = fs.getTrashRoots(true);
     Assert.assertEquals(1, res.size());
-    res.forEach(e -> Assert.assertEquals(
-        user1Trash1.toString(), e.getPath().toUri().getPath()));
+    checkFirstFileStatusPath(user1Trash1.toString(), res);
 
     // Create one more trash for user2 in the same bucket
     Path user2Trash1 = new Path(trashRoot1, "testuser2");
@@ -923,8 +935,7 @@ public class TestRootedOzoneFileSystem {
     }
     // Results should still be getTrashRoots(false)=1, gTR(true)=2
     Assert.assertEquals(1, fs.getTrashRoots(false).size());
-    res.forEach(e -> Assert.assertEquals(
-        user1Trash1.toString(), e.getPath().toUri().getPath()));
+    checkFirstFileStatusPath(user1Trash1.toString(), res);
     Assert.assertEquals(2, fs.getTrashRoots(true).size());
     // Remove the file and create a dir instead. It should be recognized now
     fs.delete(user1Trash2, false);
