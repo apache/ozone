@@ -109,8 +109,6 @@ public class TestRootedOzoneFileSystem {
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
     volumeName = bucket.getVolumeName();
     volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
-    // Set owner of the volume to current user, so it will show up in vol list
-    Assert.assertTrue(objectStore.getVolume(volumeName).setOwner(username));
     bucketName = bucket.getName();
     bucketPath = new Path(volumePath, bucketName);
 
@@ -885,6 +883,10 @@ public class TestRootedOzoneFileSystem {
   public void testGetTrashRoots() throws IOException {
     String username = UserGroupInformation.getCurrentUser().getShortUserName();
     OzoneVolume volume1 = objectStore.getVolume(volumeName);
+    String prevOwner = volume1.getOwner();
+    // Set owner of the volume to current user, so it will show up in vol list
+    Assert.assertTrue(volume1.setOwner(username));
+
     Path trashRoot1 = new Path(bucketPath, TRASH_PREFIX);
     Path user1Trash1 = new Path(trashRoot1, username);
     // When user trash dir isn't been created
@@ -969,6 +971,8 @@ public class TestRootedOzoneFileSystem {
     fs.delete(user1Trash1, true);
     Assert.assertEquals(0, fs.getTrashRoots(false).size());
     Assert.assertEquals(0, fs.getTrashRoots(true).size());
+    // Restore owner
+    Assert.assertTrue(volume1.setOwner(prevOwner));
   }
 
 }
