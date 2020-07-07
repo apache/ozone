@@ -2482,15 +2482,8 @@
             "fields": [
               {
                 "id": 1,
-                "name": "deletedKeys",
-                "type": "KeyInfo",
-                "is_repeated": true
-              },
-              {
-                "id": 2,
-                "name": "unDeletedKeys",
-                "type": "KeyInfo",
-                "is_repeated": true
+                "name": "status",
+                "type": "bool"
               }
             ]
           },

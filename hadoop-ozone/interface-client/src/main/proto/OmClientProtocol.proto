@@ -864,9 +864,9 @@ message DeletedKeys {
 }
 
 message DeleteKeysResponse {
-    repeated KeyInfo deletedKeys = 1;
-    repeated KeyInfo unDeletedKeys = 2;
+    optional bool status = 1;
 }
+
 
 message PurgeKeysRequest {
     repeated DeletedKeys deletedKeys = 1;
