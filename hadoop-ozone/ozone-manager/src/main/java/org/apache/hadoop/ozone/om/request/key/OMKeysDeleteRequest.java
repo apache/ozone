@@ -177,9 +177,10 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     } catch (IOException ex) {
       result = Result.FAILURE;
       exception = ex;
-      omClientResponse = new OMKeysDeleteResponse(
-          omResponse.setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
-              .setStatus(false).build()).build());
+      createErrorOMResponse(omResponse, ex);
+      omResponse.setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
+          .setStatus(false).build()).build();
+      omClientResponse = new OMKeysDeleteResponse(omResponse.build());
 
     } finally {
       if (acquiredLock) {
