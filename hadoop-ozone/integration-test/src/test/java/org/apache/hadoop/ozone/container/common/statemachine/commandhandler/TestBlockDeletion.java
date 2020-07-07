@@ -324,8 +324,8 @@ public class TestBlockDeletion {
       try(ReferenceCountedDB db =
           BlockUtils.getDB((KeyValueContainerData) dnContainerSet
           .getContainer(blockID.getContainerID()).getContainerData(), conf)) {
-        Assert.assertNotNull(db.getStore().get(
-            Longs.toByteArray(blockID.getLocalID())));
+        Assert.assertNotNull(
+                db.getStore().getBlockDataTable().get(blockID.getLocalID()));
       }
     }, omKeyLocationInfoGroups);
   }
@@ -339,10 +339,10 @@ public class TestBlockDeletion {
       try(ReferenceCountedDB db =
           BlockUtils.getDB((KeyValueContainerData) dnContainerSet
           .getContainer(blockID.getContainerID()).getContainerData(), conf)) {
-        Assert.assertNull(db.getStore().get(
-            Longs.toByteArray(blockID.getLocalID())));
-        Assert.assertNull(db.getStore().get(StringUtils.string2Bytes(
-            OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID())));
+        Assert.assertNotNull(
+                db.getStore().getBlockDataTable().get(blockID.getLocalID()));
+        String idKey = OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID();
+        Assert.assertNull(db.getStore().getBlockdataTable().get(idKey));
         Assert.assertNotNull(StringUtils.string2Bytes(
             OzoneConsts.DELETED_KEY_PREFIX + blockID.getLocalID()));
       }

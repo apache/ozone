@@ -250,16 +250,13 @@ import static org.junit.Assert.assertFalse;
         }
         blockData.setChunks(chunkList);
 
+        // normal key
+        long key = blockID.getLocalID();
         if (i >= normalBlocks) {
           // deleted key
-          metadataStore.getStore().put(StringUtils.string2Bytes(
-              OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID()),
-              blockData.getProtoBufMessage().toByteArray());
-        } else {
-          // normal key
-          metadataStore.getStore().put(Longs.toByteArray(blockID.getLocalID()),
-              blockData.getProtoBufMessage().toByteArray());
+          key = OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID();
         }
+        metadataStore.getStore().getBlockDataTable().put(key, blockData);
       }
 
       chunkManagerTestInfo.validateFileCount(chunksPath, totalBlocks,

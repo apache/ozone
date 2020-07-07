@@ -165,8 +165,8 @@ public class TestBlockDeletingService {
             chunks.add(info);
           }
           kd.setChunks(chunks);
-          metadata.getStore().put(StringUtils.string2Bytes(deleteStateName),
-              kd.getProtoBufMessage().toByteArray());
+          metadata.getStore().getBlockDataTable().put(
+                  deleteStateName, kd);
           container.getContainerData().incrPendingDeletionBlocks(1);
         }
 
@@ -174,12 +174,14 @@ public class TestBlockDeletingService {
         container.getContainerData().setBytesUsed(
             blockLength * numOfBlocksPerContainer);
         // Set block count, bytes used and pending delete block count.
-        metadata.getStore().put(DB_BLOCK_COUNT_KEY,
-            Longs.toByteArray(numOfBlocksPerContainer));
-        metadata.getStore().put(OzoneConsts.DB_CONTAINER_BYTES_USED_KEY,
-            Longs.toByteArray(blockLength * numOfBlocksPerContainer));
-        metadata.getStore().put(DB_PENDING_DELETE_BLOCK_COUNT_KEY,
-            Longs.toByteArray(numOfBlocksPerContainer));
+        metadata.getStore().getMetadataTable().put(
+                OzoneConsts.BLOCK_COUNT, (long)numOfBlocksPerContainer);
+        metadata.getStore().getMetadataTable().put(
+                OzoneConsts.CONTAINER_BYTES_USED,
+                blockLength * numOfBlocksPerContainer);
+        metadata.getStore().getMetadataTable().put(
+                OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
+                (long)numOfBlocksPerContainer);
       }
     }
   }
@@ -270,10 +272,10 @@ public class TestBlockDeletingService {
 
       // Check finally DB counters.
       // Not checking bytes used, as handler is a mock call.
-      Assert.assertEquals(0, Longs.fromByteArray(
-          meta.getStore().get(DB_PENDING_DELETE_BLOCK_COUNT_KEY)));
-      Assert.assertEquals(0, Longs.fromByteArray(
-          meta.getStore().get(DB_BLOCK_COUNT_KEY)));
+      Assert.assertEquals(0,
+              meta.getStore().getMetadataTable().get(OzoneConsts.PENDING_DELETE_BLOCK_COUNT).longValue());
+      Assert.assertEquals(0,
+              meta.getStore().getMetadataTable().get(OzoneConsts.BLOCK_COUNT).longValue());
     }
 
     svc.shutdown();

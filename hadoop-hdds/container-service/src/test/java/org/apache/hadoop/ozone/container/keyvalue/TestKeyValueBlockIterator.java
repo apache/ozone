@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -355,14 +356,14 @@ public class TestKeyValueBlockIterator {
       chunkList.add(info.getProtoBufMessage());
 
       int blockIndex = 0;
+      Table<Long, BlockData> blockDataTable = metadataStore.getStore().getBlockDataTable();
+
       for (int i = 0; i < normalBlocks; i++) {
         BlockID blockID = new BlockID(containerId, blockIndex);
         blockIndex++;
         BlockData blockData = new BlockData(blockID);
         blockData.setChunks(chunkList);
-        metadataStore.getStore().put(Longs.toByteArray(blockID.getLocalID()),
-            blockData
-            .getProtoBufMessage().toByteArray());
+        blockDataTable.put(blockID.getLocalID(), blockData);
       }
 
       for (int i = 0; i < deletingBlocks; i++) {
@@ -370,9 +371,8 @@ public class TestKeyValueBlockIterator {
         blockIndex++;
         BlockData blockData = new BlockData(blockID);
         blockData.setChunks(chunkList);
-        metadataStore.getStore().put(StringUtils.string2Bytes(OzoneConsts
-            .DELETING_KEY_PREFIX + blockID.getLocalID()), blockData
-            .getProtoBufMessage().toByteArray());
+        String localID = OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID();
+        blockDataTable.put(localID, blockData);
       }
 
       for (int i = 0; i < deletedBlocks; i++) {
