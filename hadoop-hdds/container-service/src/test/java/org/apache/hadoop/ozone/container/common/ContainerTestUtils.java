@@ -98,7 +98,6 @@ public final class ContainerTestUtils {
         random.nextInt(256) + "." + random.nextInt(256) + "." + random
             .nextInt(256) + "." + random.nextInt(256);
 
-    String uuid = UUID.randomUUID().toString();
     DatanodeDetails.Port containerPort =
         DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 0);
     DatanodeDetails.Port ratisPort =
@@ -106,7 +105,7 @@ public final class ContainerTestUtils {
     DatanodeDetails.Port restPort =
         DatanodeDetails.newPort(DatanodeDetails.Port.Name.REST, 0);
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
-    builder.setUuid(uuid)
+    builder.setUuid(UUID.randomUUID())
         .setHostName("localhost")
         .setIpAddress(ipAddress)
         .addPort(containerPort)

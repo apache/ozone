@@ -23,9 +23,10 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * This class contains set of dns and containers which ozone client provides
@@ -33,22 +34,22 @@ import java.util.Collection;
  */
 public class ExcludeList {
 
-  private final List<DatanodeDetails> datanodes;
-  private final List<ContainerID> containerIds;
-  private final List<PipelineID> pipelineIds;
+  private final Set<DatanodeDetails> datanodes;
+  private final Set<ContainerID> containerIds;
+  private final Set<PipelineID> pipelineIds;
 
 
   public ExcludeList() {
-    datanodes = new ArrayList<>();
-    containerIds = new ArrayList<>();
-    pipelineIds = new ArrayList<>();
+    datanodes = new HashSet<>();
+    containerIds = new HashSet<>();
+    pipelineIds = new HashSet<>();
   }
 
-  public List<ContainerID> getContainerIds() {
+  public Set<ContainerID> getContainerIds() {
     return containerIds;
   }
 
-  public List<DatanodeDetails> getDatanodes() {
+  public Set<DatanodeDetails> getDatanodes() {
     return datanodes;
   }
 
@@ -57,24 +58,18 @@ public class ExcludeList {
   }
 
   public void addDatanode(DatanodeDetails dn) {
-    if (!datanodes.contains(dn)) {
-      datanodes.add(dn);
-    }
+    datanodes.add(dn);
   }
 
   public void addConatinerId(ContainerID containerId) {
-    if (!containerIds.contains(containerId)) {
-      containerIds.add(containerId);
-    }
+    containerIds.add(containerId);
   }
 
   public void addPipeline(PipelineID pipelineId) {
-    if (!pipelineIds.contains(pipelineId)) {
-      pipelineIds.add(pipelineId);
-    }
+    pipelineIds.add(pipelineId);
   }
 
-  public List<PipelineID> getPipelineIds() {
+  public Set<PipelineID> getPipelineIds() {
     return pipelineIds;
   }
 
@@ -100,7 +95,7 @@ public class ExcludeList {
     });
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
     excludeListProto.getDatanodesList().forEach(dn -> {
-      builder.setUuid(dn);
+      builder.setUuid(UUID.fromString(dn));
       excludeList.addDatanode(builder.build());
     });
     excludeListProto.getPipelineIdsList().forEach(pipelineID -> {

@@ -1610,19 +1610,19 @@
 
   <property>
     <name>ozone.om.ratis.segment.size</name>
-    <value>16KB</value>
+    <value>4MB</value>
     <tag>OZONE, OM, RATIS, PERFORMANCE</tag>
     <description>The size of the raft segment used by Apache Ratis on OM.
-      (16 KB by default)
+      (4 MB by default)
     </description>
   </property>
 
   <property>
     <name>ozone.om.ratis.segment.preallocated.size</name>
-    <value>16KB</value>
+    <value>4MB</value>
     <tag>OZONE, OM, RATIS, PERFORMANCE</tag>
     <description>The size of the buffer which is preallocated for raft segment
-      used by Apache Ratis on OM.(16 KB by default)
+      used by Apache Ratis on OM.(4 MB by default)
     </description>
   </property>
 
@@ -2496,6 +2496,16 @@
     <value>2m</value>
     <description>
       Timeout for the request submitted directly to Ratis in datanode.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.keyname.character.check.enabled</name>
+    <tag>OZONE, OM</tag>
+    <value>false</value>
+    <description>If true, then enable to check if the key name
+      contains illegal characters when creating/renaming key.
+      For the definition of illegal characters, follow the
+      rules in Amazon S3's object key naming guide.
     </description>
   </property>
 </configuration>

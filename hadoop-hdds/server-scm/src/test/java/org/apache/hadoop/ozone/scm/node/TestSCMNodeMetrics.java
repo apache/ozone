@@ -69,7 +69,7 @@ public class TestSCMNodeMetrics {
     registeredDatanode = DatanodeDetails.newBuilder()
         .setHostName("localhost")
         .setIpAddress("127.0.0.1")
-        .setUuid(UUID.randomUUID().toString())
+        .setUuid(UUID.randomUUID())
         .build();
 
     nodeManager.register(registeredDatanode, createNodeReport(),

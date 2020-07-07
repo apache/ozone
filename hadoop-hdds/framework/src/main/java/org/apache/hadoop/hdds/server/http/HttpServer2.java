@@ -55,6 +55,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.http.FilterContainer;
@@ -199,7 +200,7 @@ public final class HttpServer2 implements FilterContainer {
   public static class Builder {
     private ArrayList<URI> endpoints = Lists.newArrayList();
     private String name;
-    private ConfigurationSource conf;
+    private MutableConfigurationSource conf;
     private ConfigurationSource sslConf;
     private String[] pathSpecs;
     private AccessControlList adminsAcl;
@@ -298,7 +299,7 @@ public final class HttpServer2 implements FilterContainer {
       return this;
     }
 
-    public Builder setConf(ConfigurationSource configuration) {
+    public Builder setConf(MutableConfigurationSource configuration) {
       this.conf = configuration;
       return this;
     }
@@ -576,7 +577,7 @@ public final class HttpServer2 implements FilterContainer {
   }
 
   private void initializeWebServer(String name, String hostName,
-      ConfigurationSource conf, String[] pathSpecs,
+      MutableConfigurationSource conf, String[] pathSpecs,
       String authFilterConfigPrefix,
       boolean securityEnabled) throws IOException {
 

@@ -21,7 +21,6 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
@@ -32,8 +31,8 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import org.junit.Rule;
 import org.junit.rules.Timeout;
 
@@ -61,14 +60,11 @@ public class TestNodeFailure {
   @BeforeClass
   public static void init() throws Exception {
     final OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setTimeDuration(
-        RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
-        DatanodeRatisServerConfig.RATIS_FOLLOWER_SLOWNESS_TIMEOUT_KEY,
-        10, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-        RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
-        DatanodeRatisServerConfig.RATIS_SERVER_NO_LEADER_TIMEOUT_KEY,
-        10, TimeUnit.SECONDS);
+    DatanodeRatisServerConfig ratisServerConfig =
+        conf.getObject(DatanodeRatisServerConfig.class);
+    ratisServerConfig.setFollowerSlownessTimeout(Duration.ofSeconds(10));
+    ratisServerConfig.setNoLeaderTimeout(Duration.ofSeconds(10));
+    conf.setFromObject(ratisServerConfig);
     conf.set(HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL, "2s");
 
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -84,7 +80,7 @@ public class TestNodeFailure {
         HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.THREE);
 
-    timeForFailure = (int) conf.getObject(DatanodeRatisServerConfig.class)
+    timeForFailure = (int) ratisServerConfig
         .getFollowerSlownessTimeout();
   }
 

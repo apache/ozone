@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.freon;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -49,9 +48,6 @@ public class TestDataValidateWithDummyContainers
   @BeforeClass
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    ContainerScrubberConfiguration sc =
-        conf.getObject(ContainerScrubberConfiguration.class);
-    sc.setEnabled(false);
     conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA, false);
     conf.setBoolean(OzoneConfigKeys.OZONE_UNSAFEBYTEOPERATIONS_ENABLED,
         false);

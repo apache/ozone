@@ -262,4 +262,26 @@ public class TestHddsClientUtils {
       }
     }
   }
+
+  @Test
+  public void testVerifyKeyName() {
+    List<String> invalidNames = new ArrayList<>();
+    invalidNames.add("#");
+    invalidNames.add("ab^cd");
+    invalidNames.add("test|name~");
+    invalidNames.add("~hi!ozone");
+    invalidNames.add("test<string>");
+    invalidNames.add("10%3=1");
+    invalidNames.add("photo[0201]");
+    invalidNames.add("what?");
+
+    for (String name : invalidNames) {
+      try {
+        HddsClientUtils.verifyKeyName(name);
+        fail("Did not reject invalid string [" + name + "] as a name");
+      } catch (IllegalArgumentException e) {
+        // throwing up on an invalid name. it's working.
+      }
+    }
+  }
 }
