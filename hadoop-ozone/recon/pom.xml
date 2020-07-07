@@ -48,6 +48,7 @@
           <executable>java</executable>
           <classpathScope>compile</classpathScope>
           <mainClass>org.hadoop.ozone.recon.codegen.JooqCodeGenerator</mainClass>
+          <cleanupDaemonThreads>false</cleanupDaemonThreads>
           <arguments>
             <argument>${project.build.directory}/generated-sources/java</argument>
           </arguments>
