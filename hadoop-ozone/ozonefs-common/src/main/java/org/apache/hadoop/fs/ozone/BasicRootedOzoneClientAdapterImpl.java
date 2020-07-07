@@ -571,7 +571,8 @@ public class BasicRootedOzoneClientAdapterImpl
         }
       }
     } catch (IOException ex) {
-      throw new RuntimeException(ex);
+      LOG.warn("Can't get all trash roots", ex);
+      return Collections.emptyList();
     }
     return ret;
   }
