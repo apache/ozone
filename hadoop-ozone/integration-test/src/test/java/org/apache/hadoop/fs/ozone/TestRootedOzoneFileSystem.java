@@ -891,6 +891,19 @@ public class TestRootedOzoneFileSystem {
   }
 
   /**
+   * Helper function for testGetTrashRoots() for checking all owner field in
+   * FileStatuses in the Collection.
+   * @param expectedSize Expected size of the FileStatus Collection
+   * @param expectedOwner Expected owner String
+   * @param res Collection of FileStatus from getTrashRoots()
+   */
+  private void checkFileStatusOwner(int expectedSize, String expectedOwner,
+      Collection<FileStatus> res) {
+    Assert.assertEquals(expectedSize, res.size());
+    res.forEach(e -> Assert.assertEquals(expectedOwner, e.getOwner()));
+  }
+
+  /**
    * Test getTrashRoots() in OFS. Different from the existing test for o3fs.
    */
   @Test
@@ -920,7 +933,7 @@ public class TestRootedOzoneFileSystem {
     Path user2Trash1 = new Path(trashRoot1, "testuser2");
     fs.mkdirs(user2Trash1);
     // Results should be getTrashRoots(false)=1, gTR(true)=2
-    Assert.assertEquals(1, fs.getTrashRoots(false).size());
+    checkFileStatusOwner(1, username, fs.getTrashRoots(false));
     Assert.assertEquals(2, fs.getTrashRoots(true).size());
 
     // Create a new bucket in the same volume
@@ -934,14 +947,14 @@ public class TestRootedOzoneFileSystem {
       out1.write(123);
     }
     // Results should still be getTrashRoots(false)=1, gTR(true)=2
-    Assert.assertEquals(1, fs.getTrashRoots(false).size());
+    checkFileStatusOwner(1, username, fs.getTrashRoots(false));
     checkFirstFileStatusPath(user1Trash1.toString(), res);
     Assert.assertEquals(2, fs.getTrashRoots(true).size());
     // Remove the file and create a dir instead. It should be recognized now
     fs.delete(user1Trash2, false);
     fs.mkdirs(user1Trash2);
     // Results should now be getTrashRoots(false)=2, gTR(true)=3
-    Assert.assertEquals(2, fs.getTrashRoots(false).size());
+    checkFileStatusOwner(2, username, fs.getTrashRoots(false));
     Assert.assertEquals(3, fs.getTrashRoots(true).size());
 
     // Create a new volume and a new bucket
@@ -955,24 +968,24 @@ public class TestRootedOzoneFileSystem {
     Path user1Trash3 = new Path(trashRoot3, username);
     // Results should be getTrashRoots(false)=3, gTR(true)=4
     fs.mkdirs(user1Trash3);
-    Assert.assertEquals(3, fs.getTrashRoots(false).size());
+    checkFileStatusOwner(3, username, fs.getTrashRoots(false));
     Assert.assertEquals(4, fs.getTrashRoots(true).size());
     // One more user
     Path user3Trash1 = new Path(trashRoot3, "testuser3");
     fs.mkdirs(user3Trash1);
     // Results should be getTrashRoots(false)=3, gTR(true)=5
-    Assert.assertEquals(3, fs.getTrashRoots(false).size());
+    checkFileStatusOwner(3, username, fs.getTrashRoots(false));
     Assert.assertEquals(5, fs.getTrashRoots(true).size());
 
     // Clean up, and check while doing so
     fs.delete(trashRoot3, true);
-    Assert.assertEquals(2, fs.getTrashRoots(false).size());
+    checkFileStatusOwner(2, username, fs.getTrashRoots(false));
     Assert.assertEquals(3, fs.getTrashRoots(true).size());
     fs.delete(trashRoot2, true);
-    Assert.assertEquals(1, fs.getTrashRoots(false).size());
+    checkFileStatusOwner(1, username, fs.getTrashRoots(false));
     Assert.assertEquals(2, fs.getTrashRoots(true).size());
     fs.delete(user2Trash1, true);
-    Assert.assertEquals(1, fs.getTrashRoots(false).size());
+    checkFileStatusOwner(1, username, fs.getTrashRoots(false));
     Assert.assertEquals(1, fs.getTrashRoots(true).size());
 
     volume3.deleteBucket(bucket3.getName());
