@@ -128,8 +128,9 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     try {
 
       // Validate bucket and volume exists or not.
-
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      if (deleteKeyArgsList.size() > 0) {
+        validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      }
 
 
       // Check if any of the key in the batch cannot be deleted. If exists the
