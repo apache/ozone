@@ -210,7 +210,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     int newDeletionBlocks = 0;
     try(ReferenceCountedDB containerDB =
             BlockUtils.getDB(containerData, conf)) {
-      for (Long blk : delTX.getLocalIDList()) {
+      for (Long blkLong : delTX.getLocalIDList()) {
+        String blk = blkLong.toString();
         // TODO : Figure out the correct tables and types to use here.
         BatchOperation batch = containerDB.getStore()
                 .getBatchHandler().initBatchOperation();
@@ -224,7 +225,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
               || metadataTable.get(deletedKey) != null) {
             if (LOG.isDebugEnabled()) {
               LOG.debug(String.format(
-                  "Ignoring delete for block %d in container %d."
+                  "Ignoring delete for block %s in container %d."
                       + " Entry already added.", blk, containerId));
             }
             continue;

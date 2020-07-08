@@ -356,14 +356,14 @@ public class TestKeyValueBlockIterator {
       chunkList.add(info.getProtoBufMessage());
 
       int blockIndex = 0;
-      Table<Long, BlockData> blockDataTable = metadataStore.getStore().getBlockDataTable();
+      Table<String, BlockData> blockDataTable = metadataStore.getStore().getBlockDataTable();
 
       for (int i = 0; i < normalBlocks; i++) {
         BlockID blockID = new BlockID(containerId, blockIndex);
         blockIndex++;
         BlockData blockData = new BlockData(blockID);
         blockData.setChunks(chunkList);
-        blockDataTable.put(blockID.getLocalID(), blockData);
+        blockDataTable.put(Long.toString(blockID.getLocalID()), blockData);
       }
 
       for (int i = 0; i < deletingBlocks; i++) {

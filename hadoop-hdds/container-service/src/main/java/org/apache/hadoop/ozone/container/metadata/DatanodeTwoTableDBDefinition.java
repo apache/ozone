@@ -29,12 +29,12 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
  */
 public class DatanodeTwoTableDBDefinition extends AbstractDatanodeDBDefinition {
 
-  public static final DBColumnFamilyDefinition<Long, BlockData>
+  public static final DBColumnFamilyDefinition<String, BlockData>
           BLOCK_DATA =
           new DBColumnFamilyDefinition<>(
                   "block_data",
-                  Long.class,
-                  new LongCodec(),
+                  String.class,
+                  new StringCodec(),
                   BlockData.class,
                   new BlockDataCodec());
 
@@ -52,7 +52,7 @@ public class DatanodeTwoTableDBDefinition extends AbstractDatanodeDBDefinition {
   }
 
   @Override
-  public DBColumnFamilyDefinition<Long, BlockData> getBlockDataColumnFamily() {
+  public DBColumnFamilyDefinition<String, BlockData> getBlockDataColumnFamily() {
     return BLOCK_DATA;
   }
 

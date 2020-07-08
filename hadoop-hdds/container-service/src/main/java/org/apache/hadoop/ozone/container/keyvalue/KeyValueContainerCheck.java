@@ -243,9 +243,10 @@ public class KeyValueContainerCheck {
 
           if (!chunkFile.exists()) {
             // concurrent mutation in Block DB? lookup the block again.
+            String localBlockID = Long.toString(block.getBlockID().getLocalID());
             BlockData bdata = db.getStore()
                     .getBlockDataTable()
-                    .get(block.getBlockID().getLocalID());
+                    .get(localBlockID);
             if (bdata != null) {
               throw new IOException("Missing chunk file "
                   + chunkFile.getAbsolutePath());
