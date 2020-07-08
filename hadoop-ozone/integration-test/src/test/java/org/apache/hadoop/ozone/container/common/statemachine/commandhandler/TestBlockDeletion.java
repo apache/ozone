@@ -342,7 +342,7 @@ public class TestBlockDeletion {
         Assert.assertNotNull(
                 db.getStore().getBlockDataTable().get(blockID.getLocalID()));
         String idKey = OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID();
-        Assert.assertNull(db.getStore().getBlockdataTable().get(idKey));
+        Assert.assertNull(db.getStore().getBlockDataTable().get(idKey));
         Assert.assertNotNull(StringUtils.string2Bytes(
             OzoneConsts.DELETED_KEY_PREFIX + blockID.getLocalID()));
       }
