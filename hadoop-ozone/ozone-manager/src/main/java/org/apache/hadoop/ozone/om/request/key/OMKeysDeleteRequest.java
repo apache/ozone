@@ -138,7 +138,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
       for (indexFailed = 0; indexFailed < deleteKeyArgsList.size();
            indexFailed++) {
-        KeyArgs deleteKeyArgs = deleteKeyArgsList.get(0);
+        KeyArgs deleteKeyArgs = deleteKeyArgsList.get(indexFailed);
         auditMap = buildKeyArgsAuditMap(deleteKeyArgs);
         volumeName = deleteKeyArgs.getVolumeName();
         bucketName = deleteKeyArgs.getBucketName();
