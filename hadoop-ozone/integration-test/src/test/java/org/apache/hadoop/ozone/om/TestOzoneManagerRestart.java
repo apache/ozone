@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.UUID;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -191,7 +191,8 @@ public class TestOzoneManagerRestart {
 
     String data = "random data";
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(key,
-        data.length(), ReplicationType.RATIS, ReplicationFactor.ONE,
+        data.length(),
+        StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
         new HashMap<>());
 
     ozoneOutputStream.write(data.getBytes(), 0, data.length());
@@ -207,8 +208,13 @@ public class TestOzoneManagerRestart {
     // Get key.
     OzoneKey ozoneKey = ozoneBucket.getKey(key);
     Assert.assertTrue(ozoneKey.getName().equals(key));
-    Assert.assertTrue(ozoneKey.getReplicationType().equals(
-        ReplicationType.RATIS));
+
+    StaticStorageClassRegistry staticStorageClassRegistry =
+        new StaticStorageClassRegistry();
+    Assert.assertEquals(ReplicationType.RATIS,
+        staticStorageClassRegistry.getStorageClass(ozoneKey.getStorageClass())
+            .getOpenStateConfiguration()
+            .getReplicationType());
   }
 
 

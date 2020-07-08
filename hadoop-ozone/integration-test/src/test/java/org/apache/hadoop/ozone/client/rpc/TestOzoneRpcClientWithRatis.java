@@ -23,7 +23,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.UUID;
 
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -42,7 +42,6 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.junit.Assert.fail;
 
 /**
@@ -97,8 +96,8 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
 
     // Write data into a key
     try (OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes().length, ReplicationType.RATIS,
-        THREE, new HashMap<>())) {
+        value.getBytes().length, StaticStorageClassRegistry.STANDARD.getName(),
+        new HashMap<>())) {
       out.write(value.getBytes());
     }
 

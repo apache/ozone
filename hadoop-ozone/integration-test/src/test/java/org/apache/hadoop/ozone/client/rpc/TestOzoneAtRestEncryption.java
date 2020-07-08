@@ -30,6 +30,7 @@ import org.apache.hadoop.crypto.key.kms.KMSClientProvider;
 import org.apache.hadoop.crypto.key.kms.server.MiniKMS;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -177,8 +178,9 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
       String keyName = UUID.randomUUID().toString();
 
       try (OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes("UTF-8").length, ReplicationType.STAND_ALONE,
-          ReplicationFactor.ONE, new HashMap<>())) {
+          value.getBytes("UTF-8").length,
+          StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+          new HashMap<>())) {
         out.write(value.getBytes("UTF-8"));
       }
 
@@ -235,8 +237,8 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
     Map<String, String> keyMetadata = new HashMap<>();
     keyMetadata.put(OzoneConsts.GDPR_FLAG, "true");
     try (OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes("UTF-8").length, ReplicationType.STAND_ALONE,
-        ReplicationFactor.ONE, keyMetadata)) {
+        value.getBytes("UTF-8").length,
+        StaticStorageClassRegistry.STAND_ALONE_ONE.getName(), keyMetadata)) {
       out.write(value.getBytes("UTF-8"));
     }
 

@@ -18,10 +18,8 @@ package org.apache.hadoop.ozone.om;
 
 import org.apache.commons.lang3.RandomStringUtils;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.*;
@@ -100,8 +98,9 @@ public class TestContainerReportWithKeys {
     objectStore.getVolume(volumeName).createBucket(bucketName);
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
-            .createKey(keyName, keySize, ReplicationType.STAND_ALONE,
-                ReplicationFactor.ONE, new HashMap<>());
+            .createKey(keyName, keySize,
+                StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+                new HashMap<>());
     String dataString = RandomStringUtils.randomAlphabetic(keySize);
     key.write(dataString.getBytes());
     key.close();
@@ -110,8 +109,8 @@ public class TestContainerReportWithKeys {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setType(HddsProtos.ReplicationType.STAND_ALONE)
-        .setFactor(HddsProtos.ReplicationFactor.ONE).setDataSize(keySize)
+        .setStorageClass(StaticStorageClassRegistry.STAND_ALONE_ONE.getName())
+        .setDataSize(keySize)
         .setRefreshPipeline(true)
         .build();
 

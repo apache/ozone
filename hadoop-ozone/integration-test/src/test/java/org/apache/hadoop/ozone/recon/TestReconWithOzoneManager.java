@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -389,8 +390,8 @@ public class TestReconWithOzoneManager {
             .setBucketName(bucket)
             .setVolumeName(volume)
             .setKeyName(key)
-            .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
-            .setReplicationType(HddsProtos.ReplicationType.STAND_ALONE)
+            .setStorageClass(
+                StaticStorageClassRegistry.STAND_ALONE_ONE.getName())
             .setOmKeyLocationInfos(omKeyLocationInfoGroupList)
             .build());
   }

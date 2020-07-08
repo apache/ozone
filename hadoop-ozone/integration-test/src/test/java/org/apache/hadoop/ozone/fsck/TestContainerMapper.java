@@ -18,8 +18,7 @@
 
 package org.apache.hadoop.ozone.fsck;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
@@ -92,7 +91,7 @@ public class TestContainerMapper {
       String key = UUID.randomUUID().toString();
       keyList.add(key);
       OzoneOutputStream out = bucket.createKey(key, data.length,
-          ReplicationType.STAND_ALONE, ReplicationFactor.ONE,
+          StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
           new HashMap<String, String>());
       out.write(data, 0, data.length);
       out.close();

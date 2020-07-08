@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.scm;
 
 import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -55,7 +55,6 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
     .NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
-import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 
@@ -110,8 +109,8 @@ public class TestSCMContainerPlacementPolicyMetrics {
 
     // Write data into a key
     try (OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes().length, ReplicationType.RATIS,
-        THREE, new HashMap<>())) {
+        value.getBytes().length,
+        StaticStorageClassRegistry.STANDARD.getName(), new HashMap<>())) {
       out.write(value.getBytes());
     }
 

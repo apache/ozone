@@ -26,6 +26,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys
 import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.junit.Assert.fail;
+
+import org.apache.hadoop.hdds.StorageClassConverter;
 import org.junit.Ignore;
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Matchers.eq;
@@ -187,8 +189,11 @@ public class TestStorageContainerManager {
 
       try {
         ContainerWithPipeline container2 = mockClientServer
-            .allocateContainer(SCMTestUtils.getReplicationType(ozoneConf),
-            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
+            .allocateContainer(
+                StorageClassConverter.convert(null,
+                    HddsProtos.ReplicationFactor.ONE,
+                    SCMTestUtils.getReplicationType(ozoneConf)),
+                OzoneConsts.OZONE);
         if (expectPermissionDenied) {
           fail("Operation should fail, expecting an IOException here.");
         } else {
@@ -200,8 +205,11 @@ public class TestStorageContainerManager {
 
       try {
         ContainerWithPipeline container3 = mockClientServer
-            .allocateContainer(SCMTestUtils.getReplicationType(ozoneConf),
-            HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
+            .allocateContainer(
+                StorageClassConverter.convert(null,
+                    HddsProtos.ReplicationFactor.ONE,
+                    SCMTestUtils.getReplicationType(ozoneConf)),
+                OzoneConsts.OZONE);
         if (expectPermissionDenied) {
           fail("Operation should fail, expecting an IOException here.");
         } else {
