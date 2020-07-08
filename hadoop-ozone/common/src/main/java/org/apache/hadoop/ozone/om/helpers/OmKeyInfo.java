@@ -89,6 +89,7 @@ public final class OmKeyInfo extends WithObjectID {
     this.acls = acls;
     this.objectID = objectID;
     this.updateID = updateID;
+    this.storageClass = storageClass;
   }
 
   public String getVolumeName() {

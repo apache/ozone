@@ -296,7 +296,8 @@ public class ContainerStateManager {
     }
 
     synchronized (pipeline) {
-      return allocateContainer(storageClassName, pipelineManager, owner, pipeline);
+      return allocateContainer(storageClassName, pipelineManager,
+          owner, pipeline);
     }
   }
 

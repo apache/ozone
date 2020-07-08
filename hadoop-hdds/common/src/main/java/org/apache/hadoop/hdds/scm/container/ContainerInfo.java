@@ -473,8 +473,8 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
       return this;
     }
 
-    public Builder setStorageClass(String storageClass) {
-      this.storageClass = storageClass;
+    public Builder setStorageClass(String sc) {
+      this.storageClass = sc;
       return this;
     }
 

@@ -25,22 +25,40 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY;
 
+/**
+ * StorageClassConverter utility class.
+ */
 public final class StorageClassConverter {
   private StorageClassConverter() {}
 
   public static String convert(OzoneConfiguration conf,
                                ReplicationFactor factor,
                                ReplicationType type) {
-    // TODO(baoloongmao): FIXME
-    boolean useRatis = conf.getBoolean(DFS_CONTAINER_RATIS_ENABLED_KEY,
-        DFS_CONTAINER_RATIS_ENABLED_DEFAULT);
-    if (factor == null) {
-      factor = useRatis ? ReplicationFactor.THREE : ReplicationFactor.ONE;
+    if (conf != null) {
+      boolean useRatis = conf.getBoolean(DFS_CONTAINER_RATIS_ENABLED_KEY,
+          DFS_CONTAINER_RATIS_ENABLED_DEFAULT);
+      if (factor == null) {
+        factor = useRatis ? ReplicationFactor.THREE : ReplicationFactor.ONE;
+      }
+      if (type == null) {
+        type = useRatis ? ReplicationType.RATIS : ReplicationType.STAND_ALONE;
+      }
     }
-    if (type == null) {
-      type = useRatis ? ReplicationType.RATIS : ReplicationType.STAND_ALONE;
+
+    if (factor == ReplicationFactor.THREE && type == ReplicationType.RATIS) {
+      return StaticStorageClassRegistry.STANDARD.getName();
     }
-    return "REDUCED";
+
+    if (factor == ReplicationFactor.ONE && type == ReplicationType.RATIS) {
+      return StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName();
+    }
+
+    if (factor == ReplicationFactor.ONE
+        && type == ReplicationType.STAND_ALONE) {
+      return StaticStorageClassRegistry.STAND_ALONE_ONE.getName();
+    }
+
+    return StaticStorageClassRegistry.STANDARD.getName();
   }
 
   public static String convert(OzoneConfiguration conf,
@@ -61,7 +79,6 @@ public final class StorageClassConverter {
   }
 
   public static String convert(Pipeline pipeline) {
-    return StorageClassConverter.convert(null,
-        pipeline.getFactor(), pipeline.getType());
+    return convert(null, pipeline.getFactor(), pipeline.getType());
   }
 }
