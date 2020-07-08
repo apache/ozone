@@ -68,7 +68,9 @@ public interface DatanodeStore {
    */
   BatchOperationHandler getBatchHandler();
 
-  void flushDB(boolean sync) throws IOException;
+  void flushLog(boolean sync) throws IOException;
+
+  void flushDB() throws IOException;
 
   void compactDB() throws IOException;
 }
