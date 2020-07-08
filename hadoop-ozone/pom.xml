@@ -318,7 +318,7 @@
               <goal>build-classpath</goal>
             </goals>
             <configuration>
-              <outputFile>${project.build.outputDirectory}/${pom.artifactId}.classpath</outputFile>
+              <outputFile>${project.build.outputDirectory}/${project.artifactId}.classpath</outputFile>
               <prefix>$HDDS_LIB_JARS_DIR</prefix>
               <outputFilterFile>true</outputFilterFile>
               <includeScope>runtime</includeScope>
