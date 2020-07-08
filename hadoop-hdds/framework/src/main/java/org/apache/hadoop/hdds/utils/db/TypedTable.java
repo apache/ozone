@@ -19,18 +19,21 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheResult;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheImpl;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheImpl.CacheCleanupPolicy;
+import org.apache.hadoop.hdfs.util.ByteArray;
 
 import static org.apache.hadoop.hdds.utils.db.cache.CacheResult.CacheStatus.EXISTS;
 import static org.apache.hadoop.hdds.utils.db.cache.CacheResult.CacheStatus.NOT_EXIST;
@@ -293,6 +296,37 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   public Iterator<Map.Entry<CacheKey<KEY>, CacheValue<VALUE>>> cacheIterator() {
     return cache.iterator();
+  }
+
+  @Override
+  public List<TypedKeyValue> getRangeKVs(
+          KEY startKey, int count,
+          MetadataKeyFilters.MetadataKeyFilter... filters)
+          throws IOException, IllegalArgumentException {
+
+    byte[] startKeyBytes = codecRegistry.asRawData(startKey);
+    List<? extends KeyValue<byte[], byte[]>> rangeKVBytes =
+            rawTable.getRangeKVs(startKeyBytes, count, filters);
+
+    List<TypedKeyValue> rangeKVs = new ArrayList<>();
+    rangeKVBytes.forEach(byteKV -> rangeKVs.add(new TypedKeyValue(byteKV)));
+
+    return rangeKVs;
+  }
+
+  @Override
+  public List<TypedKeyValue> getSequentialRangeKVs(
+          KEY startKey, int count, MetadataKeyFilters.MetadataKeyFilter... filters)
+          throws IOException, IllegalArgumentException {
+
+    byte[] startKeyBytes = codecRegistry.asRawData(startKey);
+    List<? extends KeyValue<byte[], byte[]>> rangeKVBytes =
+            rawTable.getSequentialRangeKVs(startKeyBytes, count, filters);
+
+    List<TypedKeyValue> rangeKVs = new ArrayList<>();
+    rangeKVBytes.forEach(byteKV -> rangeKVs.add(new TypedKeyValue(byteKV)));
+
+    return rangeKVs;
   }
 
   @Override
