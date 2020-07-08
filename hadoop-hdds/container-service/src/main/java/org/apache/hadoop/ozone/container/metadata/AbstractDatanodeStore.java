@@ -102,9 +102,13 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
-  public void flushDB(boolean sync) throws IOException {
-    // TODO : Callers are expecting WAL flush here, but this implementation uses full DB flush.
-    store.flush();
+  public void flushDB() throws IOException {
+    store.flushDB();
+  }
+
+  @Override
+  public void flushLog(boolean sync) throws IOException {
+    store.flushLog(sync);
   }
 
   @Override
