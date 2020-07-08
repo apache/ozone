@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY;
@@ -57,5 +58,10 @@ public final class StorageClassConverter {
     ReplicationFactor replicationFactor =
         ReplicationFactor.valueOf(factor.name());
     return convert(conf, replicationFactor, type);
+  }
+
+  public static String convert(Pipeline pipeline) {
+    return StorageClassConverter.convert(null,
+        pipeline.getFactor(), pipeline.getType());
   }
 }

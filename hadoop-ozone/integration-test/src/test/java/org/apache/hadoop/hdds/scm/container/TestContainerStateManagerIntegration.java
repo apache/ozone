@@ -282,6 +282,7 @@ public class TestContainerStateManagerIntegration {
     // next container should be the same as first container
     ContainerInfo info = containerManager
         .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
+            StorageClassConverter.convert(container1.getPipeline()),
             container1.getPipeline(),
             new HashSet<>(Collections.singletonList(new ContainerID(1))));
     Assert.assertNotEquals(container1.getContainerInfo().getContainerID(),
@@ -313,6 +314,7 @@ public class TestContainerStateManagerIntegration {
 
     ContainerInfo info = containerManager
         .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
+            StorageClassConverter.convert(container1.getPipeline()),
             container1.getPipeline(),
             new HashSet<>(Arrays.asList(new ContainerID(1), new
                 ContainerID(2), new ContainerID(3))));

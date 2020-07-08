@@ -24,8 +24,7 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -174,8 +173,8 @@ public class TestContainerStateMachineFailureOnRead {
     OmKeyLocationInfo omKeyLocationInfo;
     OzoneOutputStream key = objectStore.getVolume(volumeName)
         .getBucket(bucketName)
-        .createKey("ratis", 1024, ReplicationType.RATIS,
-            ReplicationFactor.THREE, new HashMap<>());
+        .createKey("ratis", 1024,
+            StaticStorageClassRegistry.STANDARD.getName(), new HashMap<>());
     // First write and flush creates a container in the datanode
     key.write("ratis".getBytes());
     key.flush();

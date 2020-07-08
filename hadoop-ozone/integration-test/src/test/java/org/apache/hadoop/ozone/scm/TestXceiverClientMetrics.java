@@ -28,6 +28,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 
+import org.apache.hadoop.hdds.StorageClassConverter;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
@@ -96,8 +97,10 @@ public class TestXceiverClientMetrics {
 
     ContainerWithPipeline container = storageContainerLocationClient
         .allocateContainer(
-            SCMTestUtils.getReplicationType(conf),
-            SCMTestUtils.getReplicationFactor(conf),
+            StorageClassConverter.convert(
+                null,
+                SCMTestUtils.getReplicationFactor(conf),
+                SCMTestUtils.getReplicationType(conf)),
             OzoneConsts.OZONE);
     XceiverClientSpi client = clientManager
         .acquireClient(container.getPipeline());

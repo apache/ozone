@@ -19,8 +19,8 @@
 package org.apache.hadoop.ozone.scm.pipeline;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -107,8 +107,9 @@ public class TestSCMPipelineMetrics {
   public void testNumBlocksAllocated() throws IOException {
     AllocatedBlock block =
         cluster.getStorageContainerManager().getScmBlockManager()
-            .allocateBlock(5, HddsProtos.ReplicationType.RATIS,
-                HddsProtos.ReplicationFactor.ONE, "Test", new ExcludeList());
+            .allocateBlock(5,
+                StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
+                "Test", new ExcludeList());
     MetricsRecordBuilder metrics =
         getMetrics(SCMPipelineMetrics.class.getSimpleName());
     Pipeline pipeline = block.getPipeline();
