@@ -622,15 +622,15 @@ public class KeyManagerImpl implements KeyManager {
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
-      String keyBytes = metadataManager.getOzoneKey(
-          volumeName, bucketName, keyName);
-      OmKeyInfo value = metadataManager.getKeyTable().get(keyBytes);
-      if (value == null) {
+      OzFileInfo ozFileInfo = getOzFileInfo(args, volumeName,
+              bucketName, keyName);
+      if (ozFileInfo == null) {
         LOG.debug("volume:{} bucket:{} Key:{} not found",
             volumeName, bucketName, keyName);
         throw new OMException("Key not found",
             KEY_NOT_FOUND);
       }
+      OmKeyInfo value = ozFileInfo.getOmKeyInfo();
       if (grpcBlockTokenEnabled) {
         String remoteUser = getRemoteUser().getShortUserName();
         for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
@@ -641,11 +641,6 @@ public class KeyManagerImpl implements KeyManager {
                 k.getLength()));
           });
         }
-      }
-      // Refresh container pipeline info from SCM
-      // based on OmKeyArgs.refreshPipeline flag
-      if (args.getRefreshPipeline()) {
-        refreshPipeline(value);
       }
       if (args.getSortDatanodes()) {
         sortDatanodeInPipeline(value, clientAddress);
@@ -1989,6 +1984,7 @@ public class KeyManagerImpl implements KeyManager {
         bucketName);
     String seekKeyInDb = "";
     String prefixName = keyName;
+    String prefixKeyInDb = "";
     try {
       if (Strings.isNullOrEmpty(startKey)) {
         OzFileInfo ozFileInfo = getOzFileInfoIncludingUri(args);
@@ -1999,30 +1995,36 @@ public class KeyManagerImpl implements KeyManager {
           return Collections.singletonList(fileStatus);
         }
         if(ozFileInfo.isUri){
-          // keyName is a directory
-          // startKey; // TODO - startKey logic to be supported
+          // keyName is a uri
           seekKeyInDb = ozFileInfo.getParentId()
                   + OZONE_URI_DELIMITER;
         } else {
           // keyName is a directory
-          // startKey; // TODO - startKey logic to be supported
           seekKeyInDb = ozFileInfo.getOmKeyInfo().getObjectID()
                   + OZONE_URI_DELIMITER;
         }
+        prefixKeyInDb = seekKeyInDb;
+      } else {
+        // Check if the key is a dir.
+        OzFileInfo ozPrefixKeyInfo = getOzFileInfoIncludingUri(args);
+        if(ozPrefixKeyInfo.isUri){
+          // keyName is a uri
+          prefixKeyInDb = ozPrefixKeyInfo.getParentId() + OZONE_URI_DELIMITER;
+        } else {
+          // keyName is a directory
+          prefixKeyInDb = ozPrefixKeyInfo.getOmKeyInfo().getObjectID()
+                  + OZONE_URI_DELIMITER;
+        }
+        // startKey will be used in iterator seek and sets the beginning point
+        // for key traversal.
+        // key name will be used as parent ID where the user has requested to
+        // list the keys from.
+        OzFileInfo ozFileInfo = getOzFileInfo(args, volumeName, bucketName,
+                startKey);
+        if (ozFileInfo != null) {
+          seekKeyInDb = prefixKeyInDb + ozFileInfo.getOmKeyInfo().getLeafNodeName();
+        }
       }
-
-     /*
-      // TODO - startKey logic to be supported
-      Table keyTable = metadataManager.getKeyTable();
-      Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
-          cacheIter = keyTable.cacheIterator();
-      String startCacheKey = OZONE_URI_DELIMITER + volumeName +
-          OZONE_URI_DELIMITER + bucketName + OZONE_URI_DELIMITER +
-          ((startKey.equals(OZONE_URI_DELIMITER)) ? "" : startKey);
-      // Note: eliminating the case where startCacheKey could end with '//'
-      String keyArgs = OzoneFSUtils.addTrailingSlashIfNeeded(
-          metadataManager.getOzoneKey(volumeName, bucketName, keyName));
-      */
 
       // Not required to search in TableCache because, all the deleted
       // keys are marked directly into the directory table or in key table by
@@ -2041,7 +2043,7 @@ public class KeyManagerImpl implements KeyManager {
       while (iterator.hasNext() && numEntries - countEntries > 0) {
         String entryInDb = iterator.key();
         OmDirectoryInfo dirInfo = iterator.value().getValue();
-        if (!isImmediateChild(dirInfo.getParentObjectID(), seekKeyInDb)) {
+        if (!isImmediateChild(dirInfo.getParentObjectID(), prefixKeyInDb)) {
           break;
         }
         if (recursive) {

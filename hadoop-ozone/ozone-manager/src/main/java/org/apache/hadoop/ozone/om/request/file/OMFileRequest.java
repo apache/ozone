@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
@@ -37,6 +38,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -348,6 +350,8 @@ public final class OMFileRequest {
     // TODO: hardcoded below values to directory. Do we need to persist this?
     builder.setReplicationType(HddsProtos.ReplicationType.RATIS);
     builder.setReplicationFactor(HddsProtos.ReplicationFactor.ONE);
+    builder.setOmKeyLocationInfos(Collections.singletonList(
+            new OmKeyLocationInfoGroup(0, new ArrayList<>())));
     return builder.build();
   }
 

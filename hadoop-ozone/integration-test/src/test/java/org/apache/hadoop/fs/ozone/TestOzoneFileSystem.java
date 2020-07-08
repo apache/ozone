@@ -92,6 +92,11 @@ public class TestOzoneFileSystem {
     } catch (FileAlreadyExistsException fae){
       // ignore as its expected
     }
+    try (FSDataOutputStream outputStream1 = fs.create(dir1, true)) {
+      fail("Should throw FileAlreadyExistsException");
+    } catch (FileAlreadyExistsException fae){
+      // ignore as its expected
+    }
 
     Path file2 = new Path("/d1/d2/d3/d4/key3");
     try (FSDataOutputStream outputStream2 = fs.create(file2, false)) {
@@ -102,6 +107,17 @@ public class TestOzoneFileSystem {
       fail("Should throw FileAlreadyExistsException");
     } catch (FileAlreadyExistsException fae) {
       // ignore as its expected
+    }
+
+    // overwrite = false
+    try (FSDataOutputStream outputStream2 = fs.create(file2, false)) {
+      fail("Should throw FileAlreadyExistsException");
+    } catch (FileAlreadyExistsException fae) {
+      // ignore as its expected
+    }
+    // overwrite = true
+    try (FSDataOutputStream outputStream = fs.create(file2, true)) {
+      assertNotNull("Should be able to create file", outputStream);
     }
 
     // Op 3. create file -> /d1/d2/d3 (d3 as a file inside /d1/d2)
@@ -359,7 +375,8 @@ public class TestOzoneFileSystem {
     testDeleteCreatesFakeParentDir();
     testNonExplicitlyCreatedPathExistsAfterItsLeafsWereRemoved();
 
-    testRenameDir();
+    // TODO: [HDDS-2939] rename should be supported
+    // testRenameDir();
     testSeekOnFileLength();
     testDeleteRoot();
   }
@@ -513,13 +530,34 @@ public class TestOzoneFileSystem {
       rootItemCount++;
     }
 
-    FileStatus[] fileStatuses = o3fs.listStatus(root);
+    // Add second level sub dirs and do list files on sub dir parent.
+    int subDir = numDirs / 2;
+    Path subDirPath = new Path(root + String.valueOf(subDir),
+            String.valueOf(subDir));
+    fs.mkdirs(subDirPath);
+    String subDirName = subDirPath.getName();
+    Path subDirParent = subDirPath.getParent();
+    FileStatus[] fileStatuses = o3fs.listStatus(subDirParent);
+    assertEquals("Failed to list dirs", 1,
+            fileStatuses.length);
+    assertEquals("Failed to list dirs",
+            subDirName, fileStatuses[0].getPath().getName());
+
+    // List Files of root directory should only list immediate child.
+    fileStatuses = o3fs.listStatus(root);
     assertEquals(
         "Total directories listed do not match the existing directories",
         rootItemCount, fileStatuses.length);
 
-    for (int i=0; i < numDirs; i++) {
+    for (int i = 0; i < numDirs; i++) {
       assertTrue(paths.contains(fileStatuses[i].getPath().getName()));
+      String subDirPathname = "o3fs://" + bucketName + "." + volumeName
+              + subDirPath.toString();
+      assertFalse("Sub directories: " + subDirName + " other than " +
+                      "immediate child shouldn't be listed as " +
+                      "recursive flag is false from ozoneclient-to-server. " +
+                      "File name: " + fileStatuses[i].getPath().getName(),
+              subDirPathname.equals(fileStatuses[i].getPath().toString()));
     }
   }
 
@@ -593,12 +631,14 @@ public class TestOzoneFileSystem {
 
     // after rename listStatus for interimPath should succeed and
     // interimPath should have no children
-    FileStatus[] statuses = fs.listStatus(interimPath);
+    // TODO: [HDDS-2939]rename should be supported
+    /* FileStatus[] statuses = fs.listStatus(interimPath);
     assertNotNull("liststatus returns a null array", statuses);
     assertEquals("Statuses array is not empty", 0, statuses.length);
     FileStatus fileStatus = fs.getFileStatus(interimPath);
     assertEquals("FileStatus does not point to interimPath",
         interimPath.getName(), fileStatus.getPath().getName());
+     */
   }
 
   private void testRenameDir() throws Exception {
