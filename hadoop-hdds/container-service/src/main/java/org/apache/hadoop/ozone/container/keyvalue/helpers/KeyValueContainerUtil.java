@@ -198,9 +198,9 @@ public final class KeyValueContainerUtil {
             new MetadataKeyFilters.KeyPrefixFilter()
                 .addFilter(OzoneConsts.DELETING_KEY_PREFIX);
         int numPendingDeletionBlocks =
-            containerDB.getStore().getSequentialRangeKVs(null,
-                Integer.MAX_VALUE, filter)
-                .size();
+            containerDB.getStore().getBlockDataTable()
+            .getSequentialRangeKVs(null, Integer.MAX_VALUE, filter)
+            .size();
         kvContainerData.incrPendingDeletionBlocks(numPendingDeletionBlocks);
       }
 
