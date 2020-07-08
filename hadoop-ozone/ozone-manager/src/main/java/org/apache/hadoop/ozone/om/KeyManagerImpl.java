@@ -643,35 +643,38 @@ public class KeyManagerImpl implements KeyManager {
       String keyBytes = metadataManager.getOzoneKey(
           volumeName, bucketName, keyName);
       value = metadataManager.getKeyTable().get(keyBytes);
-      if (value == null) {
-        LOG.debug("volume:{} bucket:{} Key:{} not found",
-            volumeName, bucketName, keyName);
-        throw new OMException("Key not found",
-            KEY_NOT_FOUND);
-      }
-      if (grpcBlockTokenEnabled) {
-        String remoteUser = getRemoteUser().getShortUserName();
-        for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
-          key.getLocationList().forEach(k -> {
-            k.setToken(secretManager.generateToken(remoteUser,
-                k.getBlockID().getContainerBlockID().toString(),
-                getAclForUser(remoteUser),
-                k.getLength()));
-          });
-        }
-      }
     } catch (IOException ex) {
       if (ex instanceof OMException) {
         throw ex;
       }
-      LOG.debug("Get key failed for volume:{} bucket:{} key:{}",
-          volumeName, bucketName, keyName, ex);
-      throw new OMException(ex.getMessage(),
-          KEY_NOT_FOUND);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Get key failed for volume:{} bucket:{} key:{}", volumeName,
+                bucketName, keyName, ex);
+      }
+      throw new OMException(ex.getMessage(), KEY_NOT_FOUND);
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
     }
+
+    if (value == null) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("volume:{} bucket:{} Key:{} not found", volumeName,
+                bucketName, keyName);
+      }
+      throw new OMException("Key not found", KEY_NOT_FOUND);
+    }
+    if (grpcBlockTokenEnabled) {
+      String remoteUser = getRemoteUser().getShortUserName();
+      for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
+        key.getLocationList().forEach(k -> {
+          k.setToken(secretManager.generateToken(remoteUser,
+                  k.getBlockID().getContainerBlockID().toString(),
+                  getAclForUser(remoteUser), k.getLength()));
+        });
+      }
+    }
+
     // Refresh container pipeline info from SCM
     // based on OmKeyArgs.refreshPipeline flag
     // value won't be null as the check is done inside try/catch block.
