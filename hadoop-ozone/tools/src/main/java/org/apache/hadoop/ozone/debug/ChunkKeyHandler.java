@@ -25,6 +25,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.HashSet;
+import com.google.gson.GsonBuilder;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -48,10 +53,6 @@ import org.apache.hadoop.ozone.shell.keys.KeyHandler;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
@@ -79,13 +80,14 @@ public class ChunkKeyHandler  extends KeyHandler {
   protected void execute(OzoneClient client, OzoneAddress address)
           throws IOException, OzoneClientException{
     containerOperationClient = new
-        ContainerOperationClient(createOzoneConfiguration());
+            ContainerOperationClient(createOzoneConfiguration());
     xceiverClientManager = containerOperationClient
-        .getXceiverClientManager();
+            .getXceiverClientManager();
     ozoneManagerClient = client.getObjectStore().getClientProxy()
             .getOzoneManagerClient();
     address.ensureKeyAddress();
     JsonElement element;
+    JsonObject result = new JsonObject();
     String volumeName = address.getVolumeName();
     String bucketName = address.getBucketName();
     String keyName = address.getKeyName();
@@ -110,8 +112,8 @@ public class ChunkKeyHandler  extends KeyHandler {
     }
     ChunkLayOutVersion chunkLayOutVersion = ChunkLayOutVersion
             .getConfiguredVersion(getConf());
+    JsonArray responseArrayList = new JsonArray();
     for (OmKeyLocationInfo keyLocation:locationInfos) {
-      JsonObject jsonObj = new JsonObject();
       ContainerChunkInfo containerChunkInfoVerbose = new ContainerChunkInfo();
       ContainerChunkInfo containerChunkInfo = new ContainerChunkInfo();
       long containerId = keyLocation.getContainerID();
@@ -140,8 +142,10 @@ public class ChunkKeyHandler  extends KeyHandler {
       } catch (InterruptedException e) {
         LOG.error("Execution interrupted due to " + e);
       }
+      JsonArray responseFromAllNodes = new JsonArray();
       for (Map.Entry<DatanodeDetails, ContainerProtos.GetBlockResponseProto>
               entry: responses.entrySet()) {
+        JsonObject jsonObj = new JsonObject();
         if(entry.getValue() == null){
           LOG.error("Cant execute getBlock on this node");
           continue;
@@ -175,18 +179,19 @@ public class ChunkKeyHandler  extends KeyHandler {
         } else {
           element = gson.toJsonTree(containerChunkInfo);
         }
-        jsonObj.addProperty("Datanode HostName ", entry.getKey().getHostName());
-        jsonObj.addProperty("Datanode IP", entry.getKey().getIpAddress());
-        jsonObj.addProperty("Container ID", containerId);
-        jsonObj.addProperty("Block ID", keyLocation.getLocalID());
+        jsonObj.addProperty("Datanode-HostName", entry.getKey().getHostName());
+        jsonObj.addProperty("Datanode-IP", entry.getKey().getIpAddress());
+        jsonObj.addProperty("Container-ID", containerId);
+        jsonObj.addProperty("Block-ID", keyLocation.getLocalID());
         jsonObj.add("Locations", element);
+        responseFromAllNodes.add(jsonObj);
         xceiverClientManager.releaseClientForReadData(xceiverClient, false);
-        Gson gson2 = new GsonBuilder().setPrettyPrinting().create();
-        String prettyJson = gson2.toJson(jsonObj);
-        System.out.println(prettyJson);
       }
+      responseArrayList.add(responseFromAllNodes);
     }
+    result.add("KeyLocations", responseArrayList);
+    Gson gson2 = new GsonBuilder().setPrettyPrinting().create();
+    String prettyJson = gson2.toJson(result);
+    System.out.println(prettyJson);
   }
-
-
 }
