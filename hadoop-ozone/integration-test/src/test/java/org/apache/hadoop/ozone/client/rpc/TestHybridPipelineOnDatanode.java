@@ -19,8 +19,7 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -112,8 +111,9 @@ public class TestHybridPipelineOnDatanode {
 
     // Write data into a key
     OzoneOutputStream out = bucket
-        .createKey(keyName1, data.length, ReplicationType.RATIS,
-            ReplicationFactor.ONE, new HashMap<>());
+        .createKey(keyName1, data.length,
+            StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
+            new HashMap<>());
     out.write(value.getBytes());
     out.close();
 
@@ -121,8 +121,9 @@ public class TestHybridPipelineOnDatanode {
 
     // Write data into a key
     out = bucket
-        .createKey(keyName2, data.length, ReplicationType.RATIS,
-            ReplicationFactor.THREE, new HashMap<>());
+        .createKey(keyName2, data.length,
+            StaticStorageClassRegistry.STANDARD.getName(),
+            new HashMap<>());
     out.write(value.getBytes());
     out.close();
 

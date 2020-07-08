@@ -18,8 +18,7 @@
 
 package org.apache.hadoop.ozone.freon;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -75,8 +74,8 @@ public abstract class TestDataValidate {
     randomKeyGenerator.setNumOfVolumes(1);
     randomKeyGenerator.setNumOfBuckets(1);
     randomKeyGenerator.setNumOfKeys(1);
-    randomKeyGenerator.setType(ReplicationType.RATIS);
-    randomKeyGenerator.setFactor(ReplicationFactor.THREE);
+    randomKeyGenerator.setStorageClass(
+        StaticStorageClassRegistry.STANDARD.getName());
     randomKeyGenerator.setKeySize(20971520);
     randomKeyGenerator.setValidateWrites(true);
     randomKeyGenerator.call();
@@ -94,8 +93,8 @@ public abstract class TestDataValidate {
     randomKeyGenerator.setNumOfBuckets(5);
     randomKeyGenerator.setNumOfKeys(10);
     randomKeyGenerator.setValidateWrites(true);
-    randomKeyGenerator.setType(ReplicationType.RATIS);
-    randomKeyGenerator.setFactor(ReplicationFactor.THREE);
+    randomKeyGenerator.setStorageClass(
+        StaticStorageClassRegistry.STANDARD.getName());
     randomKeyGenerator.call();
     Assert.assertEquals(2, randomKeyGenerator.getNumberOfVolumesCreated());
     Assert.assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());

@@ -19,8 +19,7 @@ package org.apache.hadoop.ozone.client.rpc;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -138,8 +137,9 @@ public class TestContainerStateMachineFlushDelay {
   public void testContainerStateMachineFailures() throws Exception {
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
-            .createKey("ratis", 1024, ReplicationType.RATIS,
-                ReplicationFactor.ONE, new HashMap<>());
+            .createKey("ratis", 1024,
+                StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
+                new HashMap<>());
     // Now ozone.client.stream.buffer.flush.delay is currently enabled
     // by default. Here we  written data(length 110) greater than chunk
     // Size(length 100), make sure flush will sync data.

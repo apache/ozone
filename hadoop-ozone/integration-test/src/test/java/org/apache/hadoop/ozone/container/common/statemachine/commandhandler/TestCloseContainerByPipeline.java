@@ -17,11 +17,9 @@
 
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -105,7 +103,8 @@ public class TestCloseContainerByPipeline {
   public void testIfCloseContainerCommandHandlerIsInvoked() throws Exception {
     String keyName = "testIfCloseContainerCommandHandlerIsInvoked";
     OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
-        .createKey(keyName, 1024, ReplicationType.RATIS, ReplicationFactor.ONE,
+        .createKey(keyName, 1024,
+            StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
             new HashMap<>());
     key.write(keyName.getBytes());
     key.close();
@@ -113,8 +112,9 @@ public class TestCloseContainerByPipeline {
     //get the name of a valid container
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
-            .setType(HddsProtos.ReplicationType.RATIS)
-            .setFactor(HddsProtos.ReplicationFactor.ONE).setDataSize(1024)
+            .setStorageClass(
+                StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName())
+            .setDataSize(1024)
             .setKeyName(keyName).setRefreshPipeline(true).build();
     OmKeyLocationInfo omKeyLocationInfo =
         cluster.getOzoneManager().lookupKey(keyArgs).getKeyLocationVersions()
@@ -159,16 +159,18 @@ public class TestCloseContainerByPipeline {
       throws IOException, TimeoutException, InterruptedException {
 
     OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
-        .createKey("standalone", 1024, ReplicationType.RATIS,
-            ReplicationFactor.ONE, new HashMap<>());
+        .createKey("standalone", 1024,
+            StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
+            new HashMap<>());
     key.write("standalone".getBytes());
     key.close();
 
     //get the name of a valid container
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
-            .setType(HddsProtos.ReplicationType.RATIS)
-            .setFactor(HddsProtos.ReplicationFactor.ONE).setDataSize(1024)
+            .setStorageClass(
+                StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName())
+            .setDataSize(1024)
             .setKeyName("standalone")
             .setRefreshPipeline(true)
             .build();
@@ -215,15 +217,17 @@ public class TestCloseContainerByPipeline {
       TimeoutException, InterruptedException {
 
     OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
-        .createKey("ratis", 1024, ReplicationType.RATIS,
-            ReplicationFactor.THREE, new HashMap<>());
+        .createKey("ratis", 1024,
+            StaticStorageClassRegistry.STANDARD.getName(), new HashMap<>());
     key.write("ratis".getBytes());
     key.close();
 
     //get the name of a valid container
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName("test").
-        setBucketName("test").setType(HddsProtos.ReplicationType.RATIS)
-        .setFactor(HddsProtos.ReplicationFactor.THREE).setDataSize(1024)
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName("test")
+        .setBucketName("test")
+        .setStorageClass(
+            StaticStorageClassRegistry.STANDARD.getName())
+        .setDataSize(1024)
         .setKeyName("ratis").setRefreshPipeline(true).build();
 
     OmKeyLocationInfo omKeyLocationInfo =
@@ -276,15 +280,17 @@ public class TestCloseContainerByPipeline {
 
     String keyName = "testQuasiCloseTransitionViaRatis";
     OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
-        .createKey(keyName, 1024, ReplicationType.RATIS,
-            ReplicationFactor.ONE, new HashMap<>());
+        .createKey(keyName, 1024,
+            StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
+            new HashMap<>());
     key.write(keyName.getBytes());
     key.close();
 
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
-            .setType(HddsProtos.ReplicationType.RATIS)
-            .setFactor(HddsProtos.ReplicationFactor.ONE).setDataSize(1024)
+            .setStorageClass(
+                StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName())
+            .setDataSize(1024)
             .setKeyName(keyName)
             .setRefreshPipeline(true)
             .build();

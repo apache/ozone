@@ -17,8 +17,7 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -168,8 +167,8 @@ public abstract class TestOzoneManagerHA {
     String keyName = "key" + RandomStringUtils.randomNumeric(5);
     String data = "data" + RandomStringUtils.randomNumeric(5);
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName,
-        data.length(), ReplicationType.STAND_ALONE,
-        ReplicationFactor.ONE, new HashMap<>());
+        data.length(), StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+        new HashMap<>());
     ozoneOutputStream.write(data.getBytes(), 0, data.length());
     ozoneOutputStream.close();
     return keyName;

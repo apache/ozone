@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -162,8 +163,9 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
       String keyName = UUID.randomUUID().toString();
 
       try (OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes().length, ReplicationType.STAND_ALONE,
-          ReplicationFactor.ONE, new HashMap<>())) {
+          value.getBytes().length,
+          StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+          new HashMap<>())) {
         out.write(value.getBytes());
       }
 
@@ -206,8 +208,9 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
       String keyName = UUID.randomUUID().toString();
 
       try (OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes().length, ReplicationType.STAND_ALONE,
-          ReplicationFactor.ONE, new HashMap<>())) {
+          value.getBytes().length,
+          StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+          new HashMap<>())) {
         LambdaTestUtils.intercept(IOException.class, "UNAUTHENTICATED: Fail " +
                 "to find any token ",
             () -> out.write(value.getBytes()));

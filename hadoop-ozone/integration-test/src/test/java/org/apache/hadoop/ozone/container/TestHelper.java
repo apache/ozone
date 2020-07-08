@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
+
+import org.apache.hadoop.hdds.StorageClassConverter;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
@@ -102,8 +104,10 @@ public final class TestHelper {
         type == ReplicationType.STAND_ALONE ?
             org.apache.hadoop.hdds.client.ReplicationFactor.ONE :
             org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
+    String storageClass =
+        StorageClassConverter.convert(null, factor, type);
     return objectStore.getVolume(volumeName).getBucket(bucketName)
-        .createKey(keyName, size, type, factor, new HashMap<>());
+        .createKey(keyName, size, storageClass, new HashMap<>());
   }
 
   public static OzoneOutputStream createKey(String keyName,
@@ -111,8 +115,10 @@ public final class TestHelper {
       org.apache.hadoop.hdds.client.ReplicationFactor factor, long size,
       ObjectStore objectStore, String volumeName, String bucketName)
       throws Exception {
+    String storageClass =
+        StorageClassConverter.convert(null, factor, type);
     return objectStore.getVolume(volumeName).getBucket(bucketName)
-        .createKey(keyName, size, type, factor, new HashMap<>());
+        .createKey(keyName, size, storageClass, new HashMap<>());
   }
 
   public static void validateData(String keyName, byte[] data,

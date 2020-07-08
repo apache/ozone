@@ -18,8 +18,7 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -131,8 +130,9 @@ public class TestContainerStateMachine {
   public void testContainerStateMachineFailures() throws Exception {
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
-            .createKey("ratis", 1024, ReplicationType.RATIS,
-                ReplicationFactor.ONE, new HashMap<>());
+            .createKey("ratis", 1024,
+                StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
+                new HashMap<>());
     // First write and flush creates a container in the datanode
     key.write("ratis".getBytes());
     key.flush();
@@ -177,8 +177,9 @@ public class TestContainerStateMachine {
     for (int i = 1; i <= 10; i++) {
       OzoneOutputStream key =
           objectStore.getVolume(volumeName).getBucket(bucketName)
-              .createKey(("ratis" + i), 1024, ReplicationType.RATIS,
-                  ReplicationFactor.ONE, new HashMap<>());
+              .createKey(("ratis" + i), 1024,
+                  StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
+                  new HashMap<>());
       // First write and flush creates a container in the datanode
       key.write(("ratis" + i).getBytes());
       key.flush();
@@ -201,8 +202,9 @@ public class TestContainerStateMachine {
     for (int i = 11; i <= 20; i++) {
       OzoneOutputStream key =
           objectStore.getVolume(volumeName).getBucket(bucketName)
-              .createKey(("ratis" + i), 1024, ReplicationType.RATIS,
-                  ReplicationFactor.ONE, new HashMap<>());
+              .createKey(("ratis" + i), 1024,
+                  StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
+                  new HashMap<>());
       // First write and flush creates a container in the datanode
       key.write(("ratis" + i).getBytes());
       key.flush();

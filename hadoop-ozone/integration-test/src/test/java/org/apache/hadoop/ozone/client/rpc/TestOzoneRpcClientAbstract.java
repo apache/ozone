@@ -34,6 +34,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
+import org.apache.hadoop.hdds.StorageClassConverter;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -629,8 +631,9 @@ public abstract class TestOzoneRpcClientAbstract {
       String keyName = UUID.randomUUID().toString();
 
       OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes().length, STAND_ALONE,
-          ONE, new HashMap<>());
+          value.getBytes().length,
+          StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+          new HashMap<>());
       out.write(value.getBytes());
       out.close();
       OzoneKey key = bucket.getKey(keyName);
@@ -661,7 +664,8 @@ public abstract class TestOzoneRpcClientAbstract {
 
     // create the initial key with size 0, write will allocate the first block.
     OzoneOutputStream out = bucket.createKey(keyName, 0,
-        STAND_ALONE, ONE, new HashMap<>());
+        StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+        new HashMap<>());
     out.write(value.getBytes());
     out.close();
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder();
@@ -696,8 +700,9 @@ public abstract class TestOzoneRpcClientAbstract {
       String keyName = UUID.randomUUID().toString();
 
       OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes().length, ReplicationType.RATIS,
-          ONE, new HashMap<>());
+          value.getBytes().length,
+          StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+          new HashMap<>());
       out.write(value.getBytes());
       out.close();
       OzoneKey key = bucket.getKey(keyName);
@@ -730,8 +735,8 @@ public abstract class TestOzoneRpcClientAbstract {
       String keyName = UUID.randomUUID().toString();
 
       OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes().length, ReplicationType.RATIS,
-          ReplicationFactor.THREE, new HashMap<>());
+          value.getBytes().length,
+          StaticStorageClassRegistry.STANDARD.getName(), new HashMap<>());
       out.write(value.getBytes());
       out.close();
       OzoneKey key = bucket.getKey(keyName);
@@ -771,8 +776,9 @@ public abstract class TestOzoneRpcClientAbstract {
           String data = generateData(5 * 1024 * 1024,
               (byte) RandomUtils.nextLong()).toString();
           OzoneOutputStream out = bucket.createKey(keyName,
-              data.getBytes().length, ReplicationType.RATIS,
-              ReplicationFactor.THREE, new HashMap<>());
+              data.getBytes().length,
+              StaticStorageClassRegistry.STANDARD.getName(),
+              new HashMap<>());
           out.write(data.getBytes());
           out.close();
           OzoneKey key = bucket.getKey(keyName);
@@ -849,8 +855,9 @@ public abstract class TestOzoneRpcClientAbstract {
 
     // Write data into a key
     OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes().length, ReplicationType.RATIS,
-        ONE, new HashMap<>());
+        value.getBytes().length,
+        StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
+        new HashMap<>());
     out.write(value.getBytes());
     out.close();
 
@@ -922,8 +929,9 @@ public abstract class TestOzoneRpcClientAbstract {
     //String keyValue = "this is a test value.glx";
     // create the initial key with size 0, write will allocate the first block.
     OzoneOutputStream out = bucket.createKey(keyName,
-        keyValue.getBytes().length, STAND_ALONE,
-        ONE, new HashMap<>());
+        keyValue.getBytes().length,
+        StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+        new HashMap<>());
     out.write(keyValue.getBytes());
     out.close();
 
@@ -1010,8 +1018,9 @@ public abstract class TestOzoneRpcClientAbstract {
 
     // Write data into a key
     OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes().length, ReplicationType.RATIS,
-        ONE, new HashMap<>());
+        value.getBytes().length,
+        StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
+        new HashMap<>());
     out.write(value.getBytes());
     out.close();
 
@@ -1064,8 +1073,9 @@ public abstract class TestOzoneRpcClientAbstract {
 
     // Write data into a key
     OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes().length, ReplicationType.RATIS,
-        ReplicationFactor.THREE, new HashMap<>());
+        value.getBytes().length,
+        StaticStorageClassRegistry.STANDARD.getName(),
+        new HashMap<>());
     out.write(value.getBytes());
     out.close();
 
@@ -1178,8 +1188,9 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes().length, STAND_ALONE,
-        ONE, new HashMap<>());
+        value.getBytes().length,
+        StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+        new HashMap<>());
     out.write(value.getBytes());
     out.close();
     OzoneKey key = bucket.getKey(keyName);
@@ -1202,8 +1213,9 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     OzoneOutputStream out = bucket.createKey(fromKeyName,
-        value.getBytes().length, STAND_ALONE,
-        ONE, new HashMap<>());
+        value.getBytes().length,
+        StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+        new HashMap<>());
     out.write(value.getBytes());
     out.close();
     OzoneKey key = bucket.getKey(fromKeyName);
@@ -1397,25 +1409,29 @@ public abstract class TestOzoneRpcClientAbstract {
       byte[] value = RandomStringUtils.randomAscii(10240).getBytes();
       OzoneOutputStream one = volAbucketA.createKey(
           keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, STAND_ALONE, ONE,
+          value.length,
+          StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
           new HashMap<>());
       one.write(value);
       one.close();
       OzoneOutputStream two = volAbucketB.createKey(
           keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, STAND_ALONE, ONE,
+          value.length,
+          StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
           new HashMap<>());
       two.write(value);
       two.close();
       OzoneOutputStream three = volBbucketA.createKey(
           keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, STAND_ALONE, ONE,
+          value.length,
+          StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
           new HashMap<>());
       three.write(value);
       three.close();
       OzoneOutputStream four = volBbucketB.createKey(
           keyBaseA + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, STAND_ALONE, ONE,
+          value.length,
+          StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
           new HashMap<>());
       four.write(value);
       four.close();
@@ -1430,25 +1446,28 @@ public abstract class TestOzoneRpcClientAbstract {
       byte[] value = RandomStringUtils.randomAscii(10240).getBytes();
       OzoneOutputStream one = volAbucketA.createKey(
           keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, STAND_ALONE, ONE,
+          value.length,
+          StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
           new HashMap<>());
       one.write(value);
       one.close();
       OzoneOutputStream two = volAbucketB.createKey(
           keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, STAND_ALONE, ONE,
+          value.length,
+          StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
           new HashMap<>());
       two.write(value);
       two.close();
       OzoneOutputStream three = volBbucketA.createKey(
           keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, STAND_ALONE, ONE,
+          value.length, StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
           new HashMap<>());
       three.write(value);
       three.close();
       OzoneOutputStream four = volBbucketB.createKey(
           keyBaseB + i + "-" + RandomStringUtils.randomNumeric(5),
-          value.length, STAND_ALONE, ONE,
+          value.length,
+          StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
           new HashMap<>());
       four.write(value);
       four.close();
@@ -1529,7 +1548,7 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
-        STAND_ALONE, ONE);
+        StaticStorageClassRegistry.STAND_ALONE_ONE.getName());
 
     assertNotNull(multipartInfo);
     String uploadID = multipartInfo.getUploadID();
@@ -1541,7 +1560,7 @@ public abstract class TestOzoneRpcClientAbstract {
     // Call initiate multipart upload for the same key again, this should
     // generate a new uploadID.
     multipartInfo = bucket.initiateMultipartUpload(keyName,
-        STAND_ALONE, ONE);
+        StaticStorageClassRegistry.STAND_ALONE_ONE.getName());
 
     assertNotNull(multipartInfo);
     Assert.assertEquals(volumeName, multipartInfo.getVolumeName());
@@ -1597,7 +1616,7 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
-        STAND_ALONE, ONE);
+        StaticStorageClassRegistry.STAND_ALONE_ONE.getName());
 
     assertNotNull(multipartInfo);
     String uploadID = multipartInfo.getUploadID();
@@ -1634,7 +1653,7 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
-        STAND_ALONE, ONE);
+        StaticStorageClassRegistry.STAND_ALONE_ONE.getName());
 
     assertNotNull(multipartInfo);
     String uploadID = multipartInfo.getUploadID();
@@ -1686,7 +1705,7 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
-        ReplicationType.RATIS, ReplicationFactor.THREE);
+        StaticStorageClassRegistry.STANDARD.getName());
 
     assertNotNull(multipartInfo);
     String uploadID = multipartInfo.getUploadID();
@@ -1967,8 +1986,12 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
         bucket.listParts(keyName, uploadID, 0, 3);
 
-    Assert.assertEquals(STAND_ALONE,
-        ozoneMultipartUploadPartListParts.getReplicationType());
+    StaticStorageClassRegistry registry = new StaticStorageClassRegistry();
+    HddsProtos.ReplicationType actualType = registry.getStorageClass(
+        ozoneMultipartUploadPartListParts.getStorageClass())
+        .getOpenStateConfiguration()
+        .getReplicationType();
+    Assert.assertEquals(STAND_ALONE, actualType);
     Assert.assertEquals(3,
         ozoneMultipartUploadPartListParts.getPartInfoList().size());
 
@@ -2018,8 +2041,13 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneMultipartUploadPartListParts ozoneMultipartUploadPartListParts =
         bucket.listParts(keyName, uploadID, 0, 2);
 
-    Assert.assertEquals(STAND_ALONE,
-        ozoneMultipartUploadPartListParts.getReplicationType());
+    StaticStorageClassRegistry registry = new StaticStorageClassRegistry();
+    HddsProtos.ReplicationType actualType = registry.getStorageClass(
+        ozoneMultipartUploadPartListParts.getStorageClass())
+        .getOpenStateConfiguration()
+        .getReplicationType();
+
+    Assert.assertEquals(STAND_ALONE, actualType);
 
     Assert.assertEquals(2,
         ozoneMultipartUploadPartListParts.getPartInfoList().size());
@@ -2119,8 +2147,13 @@ public abstract class TestOzoneRpcClientAbstract {
 
     Assert.assertEquals(0,
         ozoneMultipartUploadPartListParts.getPartInfoList().size());
-    Assert.assertEquals(STAND_ALONE,
-        ozoneMultipartUploadPartListParts.getReplicationType());
+
+    StaticStorageClassRegistry registry = new StaticStorageClassRegistry();
+    HddsProtos.ReplicationType actualType = registry.getStorageClass(
+        ozoneMultipartUploadPartListParts.getStorageClass())
+        .getOpenStateConfiguration()
+        .getReplicationType();
+    Assert.assertEquals(STAND_ALONE, actualType);
 
     // As we don't have any parts with greater than partNumberMarker and list
     // is not truncated, so it should return false here.
@@ -2465,8 +2498,8 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   private void writeKey(String key1, OzoneBucket bucket) throws IOException {
-    OzoneOutputStream out = bucket.createKey(key1, 1024, STAND_ALONE,
-        ONE, new HashMap<>());
+    OzoneOutputStream out = bucket.createKey(key1, 1024,
+        StaticStorageClassRegistry.STAND_ALONE_ONE.getName(), new HashMap<>());
     out.write(RandomStringUtils.random(1024).getBytes());
     out.close();
   }
@@ -2536,8 +2569,10 @@ public abstract class TestOzoneRpcClientAbstract {
   private String initiateMultipartUpload(OzoneBucket bucket, String keyName,
       ReplicationType replicationType, ReplicationFactor replicationFactor)
       throws Exception {
+    String storageClass = StorageClassConverter.convert(
+        null, replicationFactor, replicationType);
     OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
-        replicationType, replicationFactor);
+        storageClass);
 
     String uploadID = multipartInfo.getUploadID();
     Assert.assertNotNull(uploadID);
@@ -2615,7 +2650,8 @@ public abstract class TestOzoneRpcClientAbstract {
     Map<String, String> keyMetadata = new HashMap<>();
     keyMetadata.put(OzoneConsts.GDPR_FLAG, "true");
     OzoneOutputStream out = bucket.createKey(keyName,
-        text.getBytes().length, STAND_ALONE, ONE, keyMetadata);
+        text.getBytes().length,
+        StaticStorageClassRegistry.STAND_ALONE_ONE.getName(), keyMetadata);
     out.write(text.getBytes());
     out.close();
     Assert.assertNull(keyMetadata.get(OzoneConsts.GDPR_SECRET));
@@ -2697,7 +2733,9 @@ public abstract class TestOzoneRpcClientAbstract {
     Map<String, String> keyMetadata = new HashMap<>();
     keyMetadata.put(OzoneConsts.GDPR_FLAG, "true");
     OzoneOutputStream out = bucket.createKey(keyName,
-        text.getBytes().length, STAND_ALONE, ONE, keyMetadata);
+        text.getBytes().length,
+        StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+        keyMetadata);
     out.write(text.getBytes());
     out.close();
 

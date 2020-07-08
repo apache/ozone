@@ -17,8 +17,7 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -265,7 +264,8 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
       throws Exception {
 
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createFile(keyName,
-        data.length(), ReplicationType.RATIS, ReplicationFactor.ONE,
+        data.length(),
+        StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
         overwrite, recursive);
 
     ozoneOutputStream.write(data.getBytes(), 0, data.length());
@@ -357,8 +357,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
     OmMultipartInfo omMultipartInfo =
         ozoneBucket.initiateMultipartUpload(keyName,
-            ReplicationType.RATIS,
-            ReplicationFactor.ONE);
+            StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName());
 
     String uploadID = omMultipartInfo.getUploadID();
     Assert.assertTrue(uploadID != null);
@@ -422,8 +421,9 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
       String value = "random data";
       OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName,
-          value.length(), ReplicationType.STAND_ALONE,
-          ReplicationFactor.ONE, new HashMap<>());
+          value.length(),
+          StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
+          new HashMap<>());
       ozoneOutputStream.write(value.getBytes(), 0, value.length());
       ozoneOutputStream.close();
 

@@ -19,9 +19,8 @@ package org.apache.hadoop.ozone.client.rpc;
 
 import com.google.common.primitives.Longs;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.StringUtils;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -157,8 +156,9 @@ public class TestValidateBCSIDOnRestart {
   public void testValidateBCSIDOnDnRestart() throws Exception {
     OzoneOutputStream key =
             objectStore.getVolume(volumeName).getBucket(bucketName)
-                    .createKey("ratis", 1024, ReplicationType.RATIS,
-                            ReplicationFactor.ONE, new HashMap<>());
+                    .createKey("ratis", 1024,
+                        StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
+                        new HashMap<>());
     // First write and flush creates a container in the datanode
     key.write("ratis".getBytes());
     key.flush();
@@ -213,8 +213,9 @@ public class TestValidateBCSIDOnRestart {
                     .contains(containerID));
     // write a new key
     key = objectStore.getVolume(volumeName).getBucket(bucketName)
-            .createKey("ratis", 1024, ReplicationType.RATIS,
-                    ReplicationFactor.ONE, new HashMap<>());
+            .createKey("ratis", 1024,
+                StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
+                new HashMap<>());
     // First write and flush creates a container in the datanode
     key.write("ratis1".getBytes());
     key.flush();

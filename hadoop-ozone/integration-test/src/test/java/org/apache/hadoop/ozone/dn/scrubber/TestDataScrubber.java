@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.dn.scrubber;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -134,8 +135,9 @@ public class TestDataScrubber {
       String keyName = UUID.randomUUID().toString();
 
       OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes().length, STAND_ALONE,
-          ONE, new HashMap<>());
+          value.getBytes().length,
+          StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+          new HashMap<>());
       out.write(value.getBytes());
       out.close();
       OzoneKey key = bucket.getKey(keyName);
