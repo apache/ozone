@@ -261,13 +261,13 @@ public class TestKeyValueBlockIterator {
       ChunkInfo info = new ChunkInfo("chunkfile", 0, 1024);
       chunkList.add(info.getProtoBufMessage());
 
-      Table<Long, BlockData> blockDataTable = metadataStore.getStore().getBlockDataTable();
+      Table<String, BlockData> blockDataTable = metadataStore.getStore().getBlockDataTable();
 
       for (int i = 0; i < normalBlocks; i++) {
         BlockID blockID = new BlockID(containerId, i);
         BlockData blockData = new BlockData(blockID);
         blockData.setChunks(chunkList);
-        blockDataTable.put(blockID.getLocalID(), blockData);
+        blockDataTable.put(Long.toString(blockID.getLocalID()), blockData);
       }
 
       for (int i = normalBlocks; i < deletedBlocks; i++) {

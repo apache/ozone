@@ -251,7 +251,7 @@ import static org.junit.Assert.assertFalse;
         blockData.setChunks(chunkList);
 
         // normal key
-        long key = blockID.getLocalID();
+        String key = Long.toString(blockID.getLocalID());
         if (i >= normalBlocks) {
           // deleted key
           key = OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID();

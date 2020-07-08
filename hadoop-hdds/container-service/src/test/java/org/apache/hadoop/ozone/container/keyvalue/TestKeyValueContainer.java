@@ -167,7 +167,7 @@ public class TestKeyValueContainer {
         chunkList.add(info.getProtoBufMessage());
         blockData.setChunks(chunkList);
         metadataStore.getStore().getBlockDataTable()
-                .put(blockID.getLocalID(), blockData);
+                .put(Long.toString(blockID.getLocalID()), blockData);
       }
     }
   }

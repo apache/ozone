@@ -248,7 +248,7 @@ public class BlockManagerImpl implements BlockManager {
 
       // Update DB to delete block and set block count and bytes used.
       BatchOperation batch = db.getStore().getBatchHandler().initBatchOperation();
-      long localID = blockID.getLocalID();
+      String localID = Long.toString(blockID.getLocalID());
       db.getStore().getBlockDataTable().deleteWithBatch(batch, localID);
       // Update DB to delete block and set block count.
       // No need to set bytes used here, as bytes used is taken care during
@@ -310,7 +310,7 @@ public class BlockManagerImpl implements BlockManager {
 
   private byte[] getBlockByID(ReferenceCountedDB db, BlockID blockID)
       throws IOException {
-    long blockKey = blockID.getLocalID();
+    String blockKey = Long.toString(blockID.getLocalID());
 
     BlockData blockData = db.getStore().getBlockDataTable().get(blockKey);
     if (blockData == null) {

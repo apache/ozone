@@ -35,12 +35,12 @@ public class DatanodeOneTableDBDefinition extends AbstractDatanodeDBDefinition {
   // applied on top.
   // By defining two different DBDefinitions with different codecs that both map to the default
   // table, clients are unaware they are using the same table for both interpretations of the data.
-  public static final DBColumnFamilyDefinition<Long, BlockData>
+  public static final DBColumnFamilyDefinition<String, BlockData>
           BLOCK_DATA =
           new DBColumnFamilyDefinition<>(
                   StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
-                  Long.class,
-                  new LongCodec(),
+                  String.class,
+                  new StringCodec(),
                   BlockData.class,
                   new BlockDataCodec());
 
@@ -58,7 +58,7 @@ public class DatanodeOneTableDBDefinition extends AbstractDatanodeDBDefinition {
   }
 
   @Override
-  public DBColumnFamilyDefinition<Long, BlockData> getBlockDataColumnFamily() {
+  public DBColumnFamilyDefinition<String, BlockData> getBlockDataColumnFamily() {
     return BLOCK_DATA;
   }
 

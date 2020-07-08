@@ -128,10 +128,10 @@ public class TestContainerReader {
         .getContainerData(), conf)) {
 
       for (int i = 0; i < count; i++) {
-        Table<Long, BlockData> blockDataTable = metadataStore.getStore().getBlockDataTable();
+        Table<String, BlockData> blockDataTable = metadataStore.getStore().getBlockDataTable();
 
-        long blk = blockNames.get(i);
-        BlockData blkInfo = blockDataTable.get(blockNames.get(i));
+        String blk = Long.toString(blockNames.get(i));
+        BlockData blkInfo = blockDataTable.get(blk);
 
         String deletingKey = OzoneConsts.DELETING_KEY_PREFIX + blockNames.get(i);
 
@@ -170,13 +170,14 @@ public class TestContainerReader {
         blockData.addMetadata(OzoneConsts.OWNER,
             OzoneConsts.OZONE_SIMPLE_HDFS_USER);
         List<ContainerProtos.ChunkInfo> chunkList = new ArrayList<>();
-        ChunkInfo info = new ChunkInfo(String.format("%d.data.%d", blockID
-            .getLocalID(), 0), 0, blockLen);
+        long localBlockID = blockID.getLocalID();
+        ChunkInfo info = new ChunkInfo(String.format(
+                "%d.data.%d", localBlockID, 0), 0, blockLen);
         chunkList.add(info.getProtoBufMessage());
         blockData.setChunks(chunkList);
-        blkNames.add(blockID.getLocalID());
+        blkNames.add(localBlockID);
         metadataStore.getStore().getBlockDataTable()
-                .put(blockID.getLocalID(), blockData);
+                .put(Long.toString(localBlockID), blockData);
       }
 
       if (setMetaData) {

@@ -267,7 +267,7 @@ public class TestOzoneContainer {
         .getContainerData(), conf);
 
     Table<String, Long> metadataTable = db.getStore().getMetadataTable();
-    Table<Long, BlockData> blockDataTable = db.getStore().getBlockDataTable();
+    Table<String, BlockData> blockDataTable = db.getStore().getBlockDataTable();
 
     for (int bi = 0; bi < blocks; bi++) {
       // Creating BlockData
@@ -284,7 +284,7 @@ public class TestOzoneContainer {
         chunkList.add(info.getProtoBufMessage());
       }
       blockData.setChunks(chunkList);
-      blockDataTable.put(blockID.getLocalID(), blockData);
+      blockDataTable.put(Long.toString(blockID.getLocalID()), blockData);
     }
 
     // Set Block count and used bytes.
