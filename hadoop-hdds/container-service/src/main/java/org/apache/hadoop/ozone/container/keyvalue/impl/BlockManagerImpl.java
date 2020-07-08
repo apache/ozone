@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -285,13 +286,12 @@ public class BlockManagerImpl implements BlockManager {
           (KeyValueContainerData) container.getContainerData();
       try (ReferenceCountedDB db = BlockUtils.getDB(cData, config)) {
         result = new ArrayList<>();
-        byte[] startKeyInBytes = Longs.toByteArray(startLocalID);
-        List<Map.Entry<byte[], byte[]>> range = db.getStore()
-            .getSequentialRangeKVs(startKeyInBytes, count,
+        List<? extends Table.KeyValue<String, BlockData>> range =
+            db.getStore().getBlockDataTable()
+            .getSequentialRangeKVs(Long.toString(startLocalID), count,
                 MetadataKeyFilters.getNormalKeyFilter());
-        for (Map.Entry<byte[], byte[]> entry : range) {
-          BlockData value = BlockUtils.getBlockData(entry.getValue());
-          BlockData data = new BlockData(value.getBlockID());
+        for (Table.KeyValue<String, BlockData> entry: range) {
+          BlockData data = new BlockData(entry.getValue().getBlockID());
           result.add(data);
         }
         return result;

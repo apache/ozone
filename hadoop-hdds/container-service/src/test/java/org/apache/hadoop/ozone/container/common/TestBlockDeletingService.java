@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common;
 
 
+import java.awt.image.DataBuffer;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -202,19 +203,17 @@ public class TestBlockDeletingService {
    */
   private int getUnderDeletionBlocksCount(ReferenceCountedDB meta)
       throws IOException {
-    List<Map.Entry<byte[], byte[]>> underDeletionBlocks =
-        meta.getStore().getRangeKVs(null, 100,
-            new MetadataKeyFilters.KeyPrefixFilter()
-                .addFilter(OzoneConsts.DELETING_KEY_PREFIX));
-    return underDeletionBlocks.size();
+      return meta.getStore().getBlockDataTable()
+        .getRangeKVs(null, 100,
+        new MetadataKeyFilters.KeyPrefixFilter()
+        .addFilter(OzoneConsts.DELETING_KEY_PREFIX)).size();
   }
 
   private int getDeletedBlocksCount(ReferenceCountedDB db) throws IOException {
-    List<Map.Entry<byte[], byte[]>> underDeletionBlocks =
-        db.getStore().getRangeKVs(null, 100,
+      return db.getStore().getBlockDataTable()
+            .getRangeKVs(null, 100,
             new MetadataKeyFilters.KeyPrefixFilter()
-            .addFilter(OzoneConsts.DELETED_KEY_PREFIX));
-    return underDeletionBlocks.size();
+            .addFilter(OzoneConsts.DELETED_KEY_PREFIX)).size();
   }
 
   @Test
