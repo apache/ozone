@@ -49,8 +49,6 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 
 /**
  * This class tests the CLI that transforms om.db into SQLite DB files.

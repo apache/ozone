@@ -70,7 +70,6 @@ public class TestMetadataStore {
   private File testDir;
 
   public TestMetadataStore(String metadataImpl) {
-    System.out.println("---- Store Impl: " + metadataImpl);
     this.storeImpl = metadataImpl;
   }
 
@@ -176,9 +175,9 @@ public class TestMetadataStore {
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(MetadataStoreBuilder.LOG);
     if (storeImpl.equals(CONTAINER_DB_TYPE_LEVELDB)) {
-      dbType = "RocksDB";
-    } else {
       dbType = "LevelDB";
+    } else {
+      dbType = "RocksDB";
     }
 
     File dbDir = GenericTestUtils.getTestDir(getClass().getSimpleName()
