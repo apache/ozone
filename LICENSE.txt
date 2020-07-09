@@ -231,9 +231,9 @@ MIT License
 hadoop-hdds/framework/src/main/resources/webapps/static/bootstrap-3.4.1
 hadoop-hdds/docs/themes/ozonedoc/static/css/bootstrap-*
 
-hadoop-hdds/framework/src/main/resources/webapps/static/angular-route-1.6.4.min.js
+hadoop-hdds/framework/src/main/resources/webapps/static/angular-route-1.7.9.min.js
 hadoop-hdds/framework/src/main/resources/webapps/static/angular-nvd3-1.0.9.min.js
-hadoop-hdds/framework/src/main/resources/webapps/static/angular-1.6.4.min.js
+hadoop-hdds/framework/src/main/resources/webapps/static/angular-1.7.9.min.js
 
 hadoop-hdds/framework/src/main/resources/webapps/static/jquery-3.4.1.min.js
 hadoop-hdds/docs/themes/ozonedoc/static/js/jquery-3.4.1.min.js
