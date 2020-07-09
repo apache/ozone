@@ -67,7 +67,7 @@ public class NodeStateMap {
    */
   private void initStateMap() {
     for (NodeState state : NodeState.values()) {
-      stateMap.put(state, new HashSet<>());
+      stateMap.put(state, ConcurrentHashMap.newKeySet());
     }
   }
 
