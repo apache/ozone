@@ -547,14 +547,14 @@ public class ReplicationManager
             containerPlacement.validateContainerPlacement(
                 targetReplicas, replicationFactor);
         int delta = replicationFactor - getReplicaCount(id, replicas);
-        if (placementStatus.isPolicySatisfied() && delta <= 0) {
-          LOG.debug(
-              "Container {} meets placement policy with inflight replicas", id);
-          return;
-        }
         final int misRepDelta = placementStatus.misReplicationCount();
         final int replicasNeeded
             = delta < misRepDelta ? misRepDelta : delta;
+        if (replicasNeeded <= 0) {
+          LOG.debug("Container {} meets replication requirement with " +
+              "inflight replicas", id);
+          return;
+        }
 
         final List<DatanodeDetails> excludeList = replicas.stream()
             .map(ContainerReplica::getDatanodeDetails)
@@ -615,7 +615,7 @@ public class ReplicationManager
 
     final ContainerID id = container.containerID();
     final int replicationFactor = container.getReplicationFactor().getNumber();
-    // Dont consider inflight replication while calculating excess here.
+    // Don't consider inflight replication while calculating excess here.
     int excess = replicas.size() - replicationFactor -
         inflightDeletion.getOrDefault(id, Collections.emptyList()).size();
 
