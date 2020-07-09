@@ -180,7 +180,8 @@ public class ContainerReader implements Runnable {
             containerData;
         containerData.setVolume(hddsVolume);
 
-        KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
+        KeyValueContainerUtil.parseKVContainerData(
+            kvContainerData, config, false);
         KeyValueContainer kvContainer = new KeyValueContainer(
             kvContainerData, config);
 
