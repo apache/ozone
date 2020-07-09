@@ -414,8 +414,10 @@ public class SCMPipelineManager implements PipelineManager {
     } finally {
       lock.writeLock().unlock();
     }
+    // close containers.
+    closeContainersForPipeline(pipelineID);
     if (!onTimeout) {
-      closeContainersForPipeline(pipelineID);
+      // close pipeline right away.
       removePipeline(pipeline);
     }
   }

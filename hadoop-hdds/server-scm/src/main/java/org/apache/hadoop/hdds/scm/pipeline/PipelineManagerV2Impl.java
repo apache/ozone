@@ -375,8 +375,10 @@ public final class PipelineManagerV2Impl implements PipelineManager {
     } finally {
       lock.writeLock().unlock();
     }
+    // close containers.
+    closeContainersForPipeline(pipelineID);
     if (!onTimeout) {
-      closeContainersForPipeline(pipelineID);
+      // close pipeline right away.
       removePipeline(pipeline);
     }
   }
@@ -389,7 +391,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
    */
   @Override
   public void scrubPipeline(ReplicationType type, ReplicationFactor factor)
-      throws IOException{
+      throws IOException {
     if (type != ReplicationType.RATIS || factor != ReplicationFactor.THREE) {
       // Only srub pipeline for RATIS THREE pipeline
       return;
