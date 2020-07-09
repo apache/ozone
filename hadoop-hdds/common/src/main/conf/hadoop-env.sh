@@ -30,6 +30,9 @@
 ## {YARN_xyz|HDFS_xyz} > HADOOP_xyz > hard-coded defaults
 ##
 
+# Enable core dump when crash in C++
+ulimit -c unlimited
+
 # Many of the options here are built from the perspective that users
 # may want to provide OVERWRITING values on the command line.
 # For example:
