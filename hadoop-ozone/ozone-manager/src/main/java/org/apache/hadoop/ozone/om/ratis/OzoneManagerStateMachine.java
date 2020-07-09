@@ -107,13 +107,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     this.snapshotInfo = ozoneManager.getSnapshotInfo();
     loadSnapshotInfoFromDB();
 
-    this.ozoneManagerDoubleBuffer = new OzoneManagerDoubleBuffer.Builder()
-        .setOmMetadataManager(ozoneManager.getMetadataManager())
-        .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
-        .enableRatis(true)
-        .enableTracing(isTracingEnabled)
-        .setIndexToTerm(this::getTermForIndex)
-        .build();
+    this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
 
     this.handler = new OzoneManagerRequestHandler(ozoneManager,
         ozoneManagerDoubleBuffer);
@@ -329,17 +323,21 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   public void unpause(long newLastAppliedSnaphsotIndex,
       long newLastAppliedSnapShotTermIndex) {
     getLifeCycle().startAndTransition(() -> {
-      this.ozoneManagerDoubleBuffer =
-          new OzoneManagerDoubleBuffer.Builder()
-              .setOmMetadataManager(ozoneManager.getMetadataManager())
-              .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
-              .enableRatis(true)
-              .enableTracing(isTracingEnabled)
-              .build();
+      this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
       handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
       this.setLastAppliedTermIndex(TermIndex.newTermIndex(
           newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
     });
+  }
+
+  public OzoneManagerDoubleBuffer buildDoubleBufferForRatis() {
+    return new OzoneManagerDoubleBuffer.Builder()
+        .setOmMetadataManager(ozoneManager.getMetadataManager())
+        .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
+        .setIndexToTerm(this::getTermForIndex)
+        .enableRatis(true)
+        .enableTracing(isTracingEnabled)
+        .build();
   }
 
   /**
