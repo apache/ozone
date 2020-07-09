@@ -2791,6 +2791,14 @@ function hadoop_assembly_classpath() {
   fi
   hadoop_add_classpath "${MAIN_ARTIFACT}"
 
+  # Add two Ozone FileSystem jars to CLASSPATH for trash cleanup thread
+  OZONE_FS_ARTIFACT_NAME="hadoop-ozone-filesystem"
+  FS_ARTIFACTS=$(find "$ARTIFACT_LIB_DIR" -name "${OZONE_FS_ARTIFACT_NAME}-*.jar")
+  while IFS= read -r FS_ARTIFACT; do
+    hadoop_debug "Adding $OZONE_FS_ARTIFACT_NAME jar to CLASSPATH: $FS_ARTIFACT"
+    hadoop_add_classpath "${FS_ARTIFACT}"
+  done <<< "$FS_ARTIFACTS"
+
   #Add optional jars to the classpath
   OPTIONAL_CLASSPATH_DIR="${HADOOP_HDFS_HOME}/share/ozone/lib/${ARTIFACT_NAME}"
   if [[ -d "$OPTIONAL_CLASSPATH_DIR" ]]; then

@@ -50,6 +50,8 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -170,6 +172,9 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
 import org.apache.commons.lang3.StringUtils;
+
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_DEFAULT;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForBlockClients;
@@ -250,6 +255,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final ProtocolMessageMetrics<ProtocolMessageEnum>
       omClientProtocolMetrics;
   private OzoneManagerHttpServer httpServer;
+  private Thread emptier;
   private final OMStorage omStorage;
   private final ScmBlockLocationProtocol scmBlockClient;
   private final StorageContainerLocationProtocol scmContainerClient;
@@ -1123,6 +1129,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // Allow OM to start as Http Server failure is not fatal.
       LOG.error("OM HttpServer failed to start.", ex);
     }
+    try {
+      startTrashEmptier(configuration);
+    } catch (Exception ex) {
+      LOG.error("Trash emptier failed to start.", ex);
+    }
     registerMXBean();
 
     startJVMPauseMonitor();
@@ -1169,13 +1180,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omRpcServer = getRpcServer(configuration);
     omRpcServer.start();
     isOmRpcServerRunning = true;
-
     try {
       httpServer = new OzoneManagerHttpServer(configuration, this);
       httpServer.start();
     } catch (Exception ex) {
       // Allow OM to start as Http Server failure is not fatal.
       LOG.error("OM HttpServer failed to start.", ex);
+    }
+    // TODO: Check is trash emptier thread will be stopped when OM is restarted
+    try {
+      startTrashEmptier(configuration);
+    } catch (Exception ex) {
+      LOG.error("Trash emptier failed to start.", ex);
     }
     registerMXBean();
 
@@ -1265,6 +1281,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (httpServer != null) {
         httpServer.stop();
       }
+      stopTrashEmptier();
       metadataManager.stop();
       metrics.unRegister();
       omClientProtocolMetrics.unregister();
@@ -3311,5 +3328,27 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     jvmPauseMonitor = new JvmPauseMonitor();
     jvmPauseMonitor.init(configuration);
     jvmPauseMonitor.start();
+  }
+
+  private void startTrashEmptier(final OzoneConfiguration conf)
+      throws IOException {
+    long trashInterval =
+        conf.getLong(FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT);
+    if (trashInterval <= 0) {
+      return;
+    }
+    // TODO: Also check if fs.defaultFS is set to ofs or o3fs?
+    FileSystem fs = SecurityUtil.doAsLoginUser(() -> FileSystem.get(conf));
+    this.emptier =
+        new Thread(new Trash(fs, conf).getEmptier(), "Trash Emptier");
+    this.emptier.setDaemon(true);
+    this.emptier.start();
+  }
+
+  private void stopTrashEmptier() {
+    if (this.emptier != null) {
+      emptier.interrupt();
+      emptier = null;
+    }
   }
 }
