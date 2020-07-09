@@ -18,8 +18,11 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
@@ -28,11 +31,9 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
-import org.apache.hadoop.hdds.utils.MetaStoreIterator;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
-import org.apache.hadoop.hdds.utils.MetadataStore.KeyValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,7 +56,7 @@ public class KeyValueBlockIterator implements BlockIterator<BlockData>,
   private static final Logger LOG = LoggerFactory.getLogger(
       KeyValueBlockIterator.class);
 
-  private MetaStoreIterator<KeyValue> blockIterator;
+  private TableIterator<String, ? extends Table.KeyValue<String, BlockData>> blockIterator;
   private final ReferenceCountedDB db;
   private static KeyPrefixFilter defaultBlockFilter = MetadataKeyFilters
       .getNormalKeyFilter();
@@ -96,7 +97,7 @@ public class KeyValueBlockIterator implements BlockIterator<BlockData>,
         .getContainerDBFile(metdataPath, containerId));
     db = BlockUtils.getDB(keyValueContainerData, new
         OzoneConfiguration());
-    blockIterator = db.getStore().iterator();
+    blockIterator = db.getStore().getBlockDataTable().iterator();
     blockFilter = filter;
   }
 
