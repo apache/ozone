@@ -28,6 +28,10 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 @ConfigGroup(prefix = "hdds.container.scrub")
 public class ContainerScrubberConfiguration {
 
+  // only for log
+  public static final String HDDS_CONTAINER_SCRUB_ENABLED =
+      "hdds.container.scrub.enabled";
+
   @Config(key = "enabled",
       type = ConfigType.BOOLEAN,
       defaultValue = "false",

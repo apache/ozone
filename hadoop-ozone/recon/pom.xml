@@ -48,6 +48,7 @@
           <executable>java</executable>
           <classpathScope>compile</classpathScope>
           <mainClass>org.hadoop.ozone.recon.codegen.JooqCodeGenerator</mainClass>
+          <cleanupDaemonThreads>false</cleanupDaemonThreads>
           <arguments>
             <argument>${project.build.directory}/generated-sources/java</argument>
           </arguments>
@@ -88,6 +89,7 @@
         <artifactId>frontend-maven-plugin</artifactId>
         <version>${frontend-maven-plugin.version}</version>
         <configuration>
+          <npmInheritsProxyConfigFromMaven>false</npmInheritsProxyConfigFromMaven>
           <installDirectory>target</installDirectory>
           <workingDirectory>${basedir}/src/main/resources/webapps/recon/ozone-recon-web</workingDirectory>
         </configuration>

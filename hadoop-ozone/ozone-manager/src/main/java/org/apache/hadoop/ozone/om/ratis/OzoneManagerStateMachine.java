@@ -144,7 +144,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   @Override
   public SnapshotInfo getLatestSnapshot() {
-    LOG.info("Latest Snapshot Info {}", snapshotInfo);
+    LOG.debug("Latest Snapshot Info {}", snapshotInfo);
     return snapshotInfo;
   }
 
