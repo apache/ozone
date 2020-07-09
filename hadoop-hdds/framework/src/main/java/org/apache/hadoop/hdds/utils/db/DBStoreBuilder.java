@@ -277,8 +277,7 @@ public final class DBStoreBuilder {
   private static DBStoreBuilder createDBStoreBuilder(
       ConfigurationSource configuration, DBDefinition definition) {
 
-    File metadataDir = getDirectoryFromConfig(configuration,
-        definition.getLocationConfigKey(), definition.getName());
+    File metadataDir = definition.getDBLocation(configuration);
 
     if (metadataDir == null) {
 

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.metadata;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -41,8 +42,14 @@ public abstract class AbstractDatanodeDBDefinition implements DBDefinition {
   }
 
   @Override
+  public File getDBLocation(ConfigurationSource conf) {
+    return dbDir.getParentFile().getParentFile();
+  }
+
+  @Override
   public String getLocationConfigKey() {
-    return dbDir.getParentFile().getParentFile().getAbsolutePath();
+    throw new UnsupportedOperationException("No location config key available for datanode " +
+          "databases.");
   }
 
   @Override
