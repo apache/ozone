@@ -106,6 +106,14 @@ public final class DBStoreBuilder {
     return new DBStoreBuilder(configuration, rocksDBConfiguration);
   }
 
+  public static DBStoreBuilder newBuilder(ConfigurationSource configuration,
+                                          DBDefinition definition) {
+    DBStoreBuilder builder = createDBStoreBuilder(configuration, definition);
+    builder.registerTables(definition);
+
+    return builder;
+  }
+
   public DBStoreBuilder setProfile(DBProfile profile) {
     dbProfile = profile;
     return this;
