@@ -18,9 +18,7 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import com.google.common.primitives.Longs;
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -52,9 +50,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import static org.apache.hadoop.ozone.OzoneConsts.DB_BLOCK_COUNT_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_CONTAINER_BYTES_USED_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_PENDING_DELETE_BLOCK_COUNT_KEY;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
