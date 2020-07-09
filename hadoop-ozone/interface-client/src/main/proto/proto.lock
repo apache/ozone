@@ -1229,6 +1229,11 @@
                 "id": 9,
                 "name": "updateID",
                 "type": "uint64"
+              },
+              {
+                "id": 10,
+                "name": "modificationTime",
+                "type": "uint64"
               }
             ]
           },
@@ -1332,6 +1337,11 @@
               {
                 "id": 3,
                 "name": "quotaInBytes",
+                "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "modificationTime",
                 "type": "uint64"
               }
             ]
@@ -1503,6 +1513,11 @@
               {
                 "id": 10,
                 "name": "updateID",
+                "type": "uint64"
+              },
+              {
+                "id": 11,
+                "name": "modificationTime",
                 "type": "uint64"
               }
             ]
