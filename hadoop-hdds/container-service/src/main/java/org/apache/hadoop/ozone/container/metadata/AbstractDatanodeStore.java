@@ -58,8 +58,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       DBOptions options = new DBOptions();
       options.setCreateIfMissing(true);
 
-      this.store = DBStoreBuilder.newBuilder(config)
-              .registerTables(dbDef)
+      this.store = DBStoreBuilder.newBuilder(config, dbDef)
               .setDBOption(options)
               .build();
 
