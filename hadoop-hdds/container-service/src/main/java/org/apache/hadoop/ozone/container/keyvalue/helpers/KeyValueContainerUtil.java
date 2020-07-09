@@ -96,10 +96,10 @@ public final class KeyValueContainerUtil {
     }
 
     DatanodeStore store;
-    if (schemaVersion == OzoneConsts.SCHEMA_V1) {
+    if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
       store = new DatanodeStoreOneTableImpl(conf, dbFile.getAbsolutePath());
     }
-    else if (schemaVersion == OzoneConsts.SCHEMA_V2) {
+    else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
       store = new DatanodeStoreTwoTableImpl(conf, dbFile.getAbsolutePath());
     }
     else {

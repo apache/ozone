@@ -43,12 +43,8 @@ import sun.jvm.hotspot.debugger.bsd.amd64.BsdAMD64ThreadContext;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.*;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_BLOCK_COMMIT_SEQUENCE_ID_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_BLOCK_COUNT_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_CONTAINER_BYTES_USED_KEY;
 
 /**
  * This class is for performing block related operations on the KeyValue
@@ -117,7 +113,7 @@ public class BlockManagerImpl implements BlockManager {
       // update the blockData as well as BlockCommitSequenceId here
       BatchOperation batch = db.getStore().getBatchHandler().initBatchOperation();
       db.getStore().getBlockDataTable().putWithBatch(
-              batch, data.getLocalID(), data);
+              batch, Long.toString(data.getLocalID()), data);
       db.getStore().getMetadataTable().putWithBatch(
               batch, OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX, bcsId);
 
