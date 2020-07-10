@@ -2131,9 +2131,6 @@ public class KeyManagerImpl implements KeyManager {
         // No need to check if a key is deleted or not here, this is handled
         // when adding entries to cacheKeyMap from DB.
         OzoneFileStatus fileStatus = entry.getValue();
-        if (fileStatus.isFile()) {
-          refreshPipeline(fileStatus.getKeyInfo());
-        }
         fileStatusList.add(fileStatus);
         countEntries++;
         if (countEntries >= numEntries) {
