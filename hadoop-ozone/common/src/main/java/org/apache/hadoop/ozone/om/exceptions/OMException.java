@@ -222,5 +222,7 @@ public class OMException extends IOException {
     DIRECTORY_ALREADY_EXISTS,
 
     INVALID_VOLUME_NAME,
+
+    PARTIAL_DELETE
   }
 }
