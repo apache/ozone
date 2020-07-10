@@ -19,6 +19,8 @@
 package org.apache.hadoop.hdds.scm.metadata;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -33,41 +35,41 @@ public class PipelineIDCodec implements Codec<PipelineID> {
   public byte[] toPersistedFormat(PipelineID object) throws IOException {
     byte[] bytes = new byte[16];
     System.arraycopy(
-        asByteArray(object.getId().getLeastSignificantBits()), 0, bytes, 8, 8);
-    System.arraycopy(
         asByteArray(object.getId().getMostSignificantBits()), 0, bytes, 0, 8);
+    System.arraycopy(
+        asByteArray(object.getId().getLeastSignificantBits()), 0, bytes, 8, 8);
     return bytes;
   }
 
   private byte[] asByteArray(long bits) {
-    byte[] bytes = new byte[8];
-    for (int i = 0; i < 8; i++) {
-      bytes[i] = (byte) (bits >> (i * 8) & 0x00000000000000FF);
-    }
-    return bytes;
+    ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
+    buffer.putLong(bits);
+    return buffer.array();
   }
 
   @Override
   public PipelineID fromPersistedFormat(byte[] rawData) throws IOException {
-    if (rawData.length!=16) {
-      throw new IllegalArgumentException("Invalid key in DB.");
-    }
-    long leastSignificantBits = toLong(rawData, 8);
     long mostSiginificantBits = toLong(rawData, 0);
+    long leastSignificantBits = toLong(rawData, 8);
 
     UUID id = new UUID(mostSiginificantBits, leastSignificantBits);
     return PipelineID.valueOf(id);
   }
 
-  private long toLong(byte[] arr, int startIdx) {
+  private long toLong(byte[] arr, int startIdx) throws IOException {
     if (arr.length < startIdx + 8) {
-      throw new ArrayIndexOutOfBoundsException();
+      throw new IOException("Key conversion error.",
+          new ArrayIndexOutOfBoundsException(
+              "Key does not have the least expected amount of bytes,"
+                  + "and does not contain a UUID. Key: "
+                  + Arrays.toString(arr)
+          )
+      );
     }
-    long val = 0x0000000000000000L;
-    for (int i=7; i>=0; i--) {
-      val |= ((long) arr[i+startIdx]) << i * 8;
-    }
-    return val;
+    ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
+    buffer.put(arr, startIdx, 8);
+    buffer.flip();
+    return buffer.getLong();
   }
 
   @Override
