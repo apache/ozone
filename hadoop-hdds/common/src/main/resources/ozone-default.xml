@@ -634,17 +634,6 @@
       dfs.container.ratis.datanode.storage.dir be configured separately.
     </description>
   </property>
-  <property>
-    <name>ozone.metastore.impl</name>
-    <value>RocksDB</value>
-    <tag>OZONE, OM, SCM, CONTAINER, STORAGE</tag>
-    <description>
-      Ozone metadata store implementation. Ozone metadata are well
-      distributed to multiple services such as ozoneManager, scm. They are stored in
-      some local key-value databases. This property determines which database
-      library to use. Supported value is either LevelDB or RocksDB.
-    </description>
-  </property>
 
   <property>
     <name>ozone.metastore.rocksdb.statistics</name>
@@ -2289,15 +2278,6 @@
     <tag>OZONE, PERFORMANCE</tag>
     <description>
       Whether to enable topology aware read to improve the read performance.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.container.db.impl</name>
-    <value>RocksDB</value>
-    <tag>OZONE, RECON, STORAGE</tag>
-    <description>
-      Ozone Recon container DB store implementation.Supported value is either
-      LevelDB or RocksDB.
     </description>
   </property>
   <property>
