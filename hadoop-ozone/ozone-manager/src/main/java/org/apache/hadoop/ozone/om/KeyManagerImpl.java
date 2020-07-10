@@ -1611,7 +1611,7 @@ public class KeyManagerImpl implements KeyManager {
         keyInfo = metadataManager.getOpenKeyTable().get(objectKey);
       } else {
         try {
-          OzoneFileStatus fileStatus = getFileStatus(args);
+          OzoneFileStatus fileStatus = getFileStatus(args, null);
           keyInfo = fileStatus.getKeyInfo();
         } catch (IOException e) {
           // OzoneFS will check whether the key exists when write a new key.
@@ -1689,7 +1689,8 @@ public class KeyManagerImpl implements KeyManager {
    * @throws IOException if there is error in the db
    *                     invalid arguments
    */
-  public OzoneFileStatus getFileStatus(OmKeyArgs args) throws IOException {
+  public OzoneFileStatus getFileStatus(OmKeyArgs args, String clientAddress)
+          throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
@@ -1711,6 +1712,9 @@ public class KeyManagerImpl implements KeyManager {
       if (fileKeyInfo != null) {
         if (args.getRefreshPipeline()) {
           refreshPipeline(fileKeyInfo);
+        }
+        if (args.getSortDatanodes()) {
+          sortDatanodeInPipeline(fileKeyInfo, clientAddress);
         }
         // this is a file
         return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
@@ -1832,7 +1836,7 @@ public class KeyManagerImpl implements KeyManager {
     try {
       OzoneFileStatus fileStatus;
       try {
-        fileStatus = getFileStatus(args);
+        fileStatus = getFileStatus(args, null);
         if (fileStatus.isDirectory()) {
           throw new OMException("Can not write to directory: " + keyName,
               ResultCodes.NOT_A_FILE);
@@ -1881,7 +1885,7 @@ public class KeyManagerImpl implements KeyManager {
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
-      OzoneFileStatus fileStatus = getFileStatus(args);
+      OzoneFileStatus fileStatus = getFileStatus(args, null);
       if (fileStatus.isFile()) {
         if (args.getRefreshPipeline()) {
           refreshPipeline(fileStatus.getKeyInfo());
@@ -1951,7 +1955,7 @@ public class KeyManagerImpl implements KeyManager {
    * @return list of file status
    */
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
-      String startKey, long numEntries) throws IOException {
+      String startKey, long numEntries, String clientAddress) throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
 
     List<OzoneFileStatus> fileStatusList = new ArrayList<>();
@@ -1971,7 +1975,7 @@ public class KeyManagerImpl implements KeyManager {
         bucketName);
     try {
       if (Strings.isNullOrEmpty(startKey)) {
-        OzoneFileStatus fileStatus = getFileStatus(args);
+        OzoneFileStatus fileStatus = getFileStatus(args, null);
         if (fileStatus.isFile()) {
           return Collections.singletonList(fileStatus);
         }
@@ -2070,6 +2074,9 @@ public class KeyManagerImpl implements KeyManager {
         if (args.getRefreshPipeline()) {
           refreshPipeline(entry.getValue().getKeyInfo());
         }
+        if (args.getSortDatanodes()) {
+          sortDatanodeInPipeline(entry.getValue().getKeyInfo(), clientAddress);
+        }
         fileStatusList.add(entry.getValue());
         countEntries++;
         if (countEntries >= numEntries) {
@@ -2127,7 +2134,7 @@ public class KeyManagerImpl implements KeyManager {
       String keyName = path.toString();
       try {
         OzoneFileStatus fileStatus =
-            getFileStatus(argsBuilder.setKeyName(keyName).build());
+            getFileStatus(argsBuilder.setKeyName(keyName).build(), null);
         if (fileStatus.isFile()) {
           LOG.error("Unable to create directory (File already exists): "
                   + "volume: {} bucket: {} key: {}", volumeName, bucketName,

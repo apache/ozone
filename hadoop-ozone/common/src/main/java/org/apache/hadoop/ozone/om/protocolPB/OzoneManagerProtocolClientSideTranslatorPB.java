@@ -1147,6 +1147,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
+        .setSortDatanodes(args.getSortDatanodes())
         .build();
     GetFileStatusRequest req =
         GetFileStatusRequest.newBuilder()
@@ -1360,6 +1361,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
+        .setSortDatanodes(args.getSortDatanodes())
         .build();
     ListStatusRequest listStatusRequest =
         ListStatusRequest.newBuilder()
