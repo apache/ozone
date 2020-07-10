@@ -294,8 +294,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
-      String dbName)
-      throws IOException {
+      String dbName) throws IOException {
     RocksDBConfiguration rocksDBConfiguration =
         configuration.getObject(RocksDBConfiguration.class);
     DBStoreBuilder dbStoreBuilder = DBStoreBuilder.newBuilder(configuration,

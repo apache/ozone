@@ -16,7 +16,9 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -37,6 +39,7 @@ import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
 import static org.junit.Assert.assertTrue;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.ozone.util.ExitManager;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.After;
@@ -47,6 +50,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.Timeout;
+import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
 /**
@@ -247,6 +251,60 @@ public class TestOMRatisSnapshots {
     Assert.assertEquals(followerTermIndex, followerRatisServer.getLastAppliedTermIndex());
   }
 
+  @Test
+  public void testInstallCorruptedCheckpointFailure() throws Exception {
+    // Get the leader OM
+    String leaderOMNodeId = OmFailoverProxyUtil
+        .getFailoverProxyProvider(objectStore.getClientProxy())
+        .getCurrentProxyOMNodeId();
+
+    OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
+    OzoneManagerRatisServer leaderRatisServer = leaderOM.getOmRatisServer();
+
+    // Find the inactive OM
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getOMNodeId();
+    if (cluster.isOMActive(followerNodeId)) {
+      followerNodeId = leaderOM.getPeerNodes().get(1).getOMNodeId();
+    }
+    OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
+    OzoneManagerRatisServer followerRatisServer = followerOM.getOmRatisServer();
+
+    // Do some transactions so that the log index increases
+    writeKeysToIncreaseLogIndex(leaderRatisServer, 100);
+
+    DBCheckpoint leaderDbCheckpoint = leaderOM.getMetadataManager().getStore()
+        .getCheckpoint(false);
+    Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
+    OMTransactionInfo leaderCheckpointTrxnInfo = leaderOM
+        .getTrxnInfoFromCheckpoint(leaderCheckpointLocation);
+
+    // Corrupt the leader checkpoint and install that on the OM. The
+    // operation should fail and OM should shutdown.
+    boolean delete = true;
+    for (File file : leaderCheckpointLocation.toFile()
+        .listFiles()) {
+      if (file.getName().contains(".sst")) {
+        if (delete) {
+          file.delete();
+          delete = false;
+        } else {
+          delete = true;
+        }
+      }
+    }
+
+    GenericTestUtils.setLogLevel(OzoneManager.LOG, Level.ERROR);
+    GenericTestUtils.LogCapturer logCapture =
+        GenericTestUtils.LogCapturer.captureLogs(OzoneManager.LOG);
+    followerOM.setExitManagerForTesting(new DummyExitManager());
+
+    followerOM.installCheckpoint(leaderOMNodeId, leaderCheckpointLocation,
+        leaderCheckpointTrxnInfo);
+
+    Assert.assertTrue(logCapture.getOutput().contains("System Exit: " +
+        "Failed to reload OM state and instantiate services."));
+  }
+
   private List<String> writeKeysToIncreaseLogIndex(
       OzoneManagerRatisServer omRatisServer, long targetLogIndex)
       throws IOException, InterruptedException {
@@ -258,5 +316,13 @@ public class TestOMRatisSnapshots {
       logIndex = omRatisServer.getLastAppliedTermIndex().getIndex();
     }
     return keys;
+  }
+
+  private class DummyExitManager extends ExitManager {
+    @Override
+    public void exitSystem(int status, String message, Throwable throwable,
+        Logger log) {
+      log.error("System Exit: " + message, throwable);
+    }
   }
 }

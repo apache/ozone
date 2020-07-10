@@ -155,6 +155,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
+import org.apache.hadoop.ozone.util.ExitManager;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -309,6 +310,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean useRatisForReplication;
 
   private boolean isNativeAuthorizerEnabled;
+
+  private ExitManager exitManager;
 
   private enum State {
     INITIALIZED,
@@ -3099,12 +3102,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * state via this checkpoint. Before re-initializing OM state, the OM Ratis
    * server should be stopped so that no new transactions can be applied.
    */
-  public TermIndex installCheckpoint(String leaderId,
+  TermIndex installCheckpoint(String leaderId,
       DBCheckpoint omDBCheckpoint) throws Exception {
 
-    Path newDBLocation = omDBCheckpoint.getCheckpointLocation();
+    Path checkpointLocation = omDBCheckpoint.getCheckpointLocation();
     OMTransactionInfo omTransactionInfo = getTrxnInfoFromCheckpoint(
-        newDBLocation);
+        checkpointLocation);
+
+    return installCheckpoint(leaderId, checkpointLocation, omTransactionInfo);
+  }
+
+  TermIndex installCheckpoint(String leaderId, Path checkpointLocation,
+      OMTransactionInfo checkpointTrxnInfo) throws Exception {
 
     File oldDBLocation = metadataManager.getStore().getDbLocation();
     try {
@@ -3134,14 +3143,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // server so that the OM state can be re-initialized. If no then do not
     // proceed with installSnapshot.
     boolean canProceed = OzoneManagerRatisUtils.verifyTransactionInfo(
-        omTransactionInfo, lastAppliedIndex, leaderId, newDBLocation);
+        checkpointTrxnInfo, lastAppliedIndex, leaderId, checkpointLocation);
 
     if (canProceed) {
       try {
         dbBackup = replaceOMDBWithCheckpoint(lastAppliedIndex, oldDBLocation,
-            newDBLocation);
-        term = omTransactionInfo.getTerm();
-        lastAppliedIndex = omTransactionInfo.getTransactionIndex();
+            checkpointLocation);
+        term = checkpointTrxnInfo.getTerm();
+        lastAppliedIndex = checkpointTrxnInfo.getTransactionIndex();
         LOG.info("Replaced DB with checkpoint from OM: {}, term: {}, index: {}",
             leaderId, term, lastAppliedIndex);
       } catch (Exception e) {
@@ -3151,7 +3160,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } else {
       LOG.warn("Cannot proceed with InstallSnapshot as OM is at TermIndex {} " +
           "and checkpoint has lower TermIndex {}. Reloading old state of OM.",
-          termIndex, omTransactionInfo.getTermIndex());
+          termIndex, checkpointTrxnInfo.getTermIndex());
     }
 
     // Reload the OM DB store with the new checkpoint.
@@ -3164,7 +3173,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           lastAppliedIndex);
     } catch (IOException ex) {
       String errorMsg = "Failed to reload OM state and instantiate services.";
-      ExitUtils.terminate(1, errorMsg, ex, LOG);
+      exitManager.exitSystem(1, errorMsg, ex, LOG);
     }
 
     // Delete the backup DB
@@ -3176,7 +3185,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("Failed to delete the backup of the original DB {}", dbBackup);
     }
 
-    if (lastAppliedIndex != omTransactionInfo.getTransactionIndex()) {
+    if (lastAppliedIndex != checkpointTrxnInfo.getTransactionIndex()) {
       // Install Snapshot failed and old state was reloaded. Return null to
       // Ratis to indicate that installation failed.
       return null;
@@ -3213,7 +3222,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metadataManager.stop();
   }
 
-  private OMTransactionInfo getTrxnInfoFromCheckpoint(Path dbPath)
+  @VisibleForTesting
+  OMTransactionInfo getTrxnInfoFromCheckpoint(Path dbPath)
       throws Exception {
     Path dbDir = dbPath.getParent();
     String dbName = dbPath.getFileName().toString();
@@ -3490,4 +3500,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         visited);
   }
 
+  @VisibleForTesting
+  void setExitManagerForTesting(ExitManager exitManagerForTesting) {
+    this.exitManager = exitManagerForTesting;
+  }
 }
