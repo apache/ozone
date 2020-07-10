@@ -52,7 +52,7 @@ we have no way of knowing who the user is or we don't care.
 
 
 <div class="alert alert-success" role="alert">
-  A S3 user accesing Ozone via AWS v4 signature protocol will be translated
+  A S3 user accessing Ozone via AWS v4 signature protocol will be translated
   to the appropriate Kerberos user by Ozone Manager.
 </div>
 
