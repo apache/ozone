@@ -32,6 +32,8 @@ import java.io.IOException;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
 
 /**
  * Response for DeleteKey request.
@@ -58,6 +60,13 @@ public class OMKeysDeleteResponse extends OMClientResponse {
   public OMKeysDeleteResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
     checkStatusNotOK();
+  }
+
+  public void checkAndUpdateDB(OMMetadataManager omMetadataManager,
+      BatchOperation batchOperation) throws IOException {
+    if (getOMResponse().getStatus() == OK || getOMResponse().getStatus() == PARTIAL_DELETE) {
+      addToDBBatch(omMetadataManager, batchOperation);
+    }
   }
 
   @Override
