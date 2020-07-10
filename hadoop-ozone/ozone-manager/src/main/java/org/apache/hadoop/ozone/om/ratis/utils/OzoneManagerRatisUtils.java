@@ -228,13 +228,30 @@ public final class OzoneManagerRatisUtils {
   }
 
   /**
+   * Obtain OMTransactionInfo from Checkpoint.
+   */
+  public static OMTransactionInfo getTrxnInfoFromCheckpoint(
+      OzoneConfiguration conf, Path dbPath) throws Exception {
+    Path dbDir = dbPath.getParent();
+    String dbName = dbPath.getFileName().toString();
+    if (dbDir == null) {
+      throw new IOException("Checkpoint {} does not have proper DB location");
+    }
+
+    OMTransactionInfo checkpointTrxnInfo = getTransactionInfoFromDB(conf, dbDir,
+        dbName);
+
+    return checkpointTrxnInfo;
+  }
+
+  /**
    * Obtain Transaction info from DB.
    * @param tempConfig
    * @param dbDir path to DB
    * @return OMTransactionInfo
    * @throws Exception
    */
-  public static OMTransactionInfo getTransactionInfoFromDB(
+  private static OMTransactionInfo getTransactionInfoFromDB(
       OzoneConfiguration tempConfig, Path dbDir, String dbName)
       throws Exception {
     DBStore dbStore = OmMetadataManagerImpl.loadDB(tempConfig, dbDir.toFile(),
@@ -247,8 +264,11 @@ public final class OzoneManagerRatisUtils {
     OMTransactionInfo omTransactionInfo =
         transactionInfoTable.get(TRANSACTION_INFO_KEY);
     dbStore.close();
-    OzoneManager.LOG.info("Downloaded checkpoint with OMTransactionInfo {}",
-        omTransactionInfo);
+
+    if (omTransactionInfo == null) {
+      throw new IOException("Failed to read OMTransactionInfo from DB " +
+          dbName + " at " + dbDir);
+    }
     return omTransactionInfo;
   }
 

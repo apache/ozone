@@ -3102,14 +3102,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * state via this checkpoint. Before re-initializing OM state, the OM Ratis
    * server should be stopped so that no new transactions can be applied.
    */
-  TermIndex installCheckpoint(String leaderId,
-      DBCheckpoint omDBCheckpoint) throws Exception {
+  TermIndex installCheckpoint(String leaderId, DBCheckpoint omDBCheckpoint)
+      throws Exception {
 
     Path checkpointLocation = omDBCheckpoint.getCheckpointLocation();
-    OMTransactionInfo omTransactionInfo = getTrxnInfoFromCheckpoint(
-        checkpointLocation);
+    OMTransactionInfo checkpointTrxnInfo = OzoneManagerRatisUtils
+        .getTrxnInfoFromCheckpoint(configuration, checkpointLocation);
 
-    return installCheckpoint(leaderId, checkpointLocation, omTransactionInfo);
+    LOG.info("Installing checkpoint with OMTransactionInfo {}",
+        checkpointTrxnInfo);
+
+    return installCheckpoint(leaderId, checkpointLocation, checkpointTrxnInfo);
   }
 
   TermIndex installCheckpoint(String leaderId, Path checkpointLocation,
@@ -3220,19 +3223,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     keyManager.stop();
     stopSecretManager();
     metadataManager.stop();
-  }
-
-  @VisibleForTesting
-  OMTransactionInfo getTrxnInfoFromCheckpoint(Path dbPath)
-      throws Exception {
-    Path dbDir = dbPath.getParent();
-    String dbName = dbPath.getFileName().toString();
-    if (dbDir == null) {
-      throw new IOException("Checkpoint {} does not have proper DB location");
-    }
-
-    return OzoneManagerRatisUtils.getTransactionInfoFromDB(configuration,
-        dbDir, dbName);
   }
 
   /**

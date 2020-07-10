@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -34,14 +35,14 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.util.ExitManager;
+import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ratis.server.protocol.TermIndex;
 
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
 import static org.junit.Assert.assertTrue;
 
-import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.ozone.util.ExitManager;
-import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -248,7 +249,8 @@ public class TestOMRatisSnapshots {
     Assert.assertTrue(logCapture.getOutput().contains(errorMsg));
     Assert.assertNull("OM installed checkpoint even though checkpoint " +
         "logIndex is less than it's lastAppliedIndex", newTermIndex);
-    Assert.assertEquals(followerTermIndex, followerRatisServer.getLastAppliedTermIndex());
+    Assert.assertEquals(followerTermIndex,
+        followerRatisServer.getLastAppliedTermIndex());
   }
 
   @Test
@@ -275,8 +277,8 @@ public class TestOMRatisSnapshots {
     DBCheckpoint leaderDbCheckpoint = leaderOM.getMetadataManager().getStore()
         .getCheckpoint(false);
     Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
-    OMTransactionInfo leaderCheckpointTrxnInfo = leaderOM
-        .getTrxnInfoFromCheckpoint(leaderCheckpointLocation);
+    OMTransactionInfo leaderCheckpointTrxnInfo = OzoneManagerRatisUtils
+        .getTrxnInfoFromCheckpoint(conf, leaderCheckpointLocation);
 
     // Corrupt the leader checkpoint and install that on the OM. The
     // operation should fail and OM should shutdown.
