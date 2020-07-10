@@ -2478,4 +2478,17 @@
       rules in Amazon S3's object key naming guide.
     </description>
   </property>
+
+  <property>
+    <name>ozone.om.create.intermediate.directories</name>
+    <tag>OZONE, OM</tag>
+    <value>false</value>
+    <description>If true, then intermediate directories will be created
+      during Key/MPU create requests. This flag will be helpful when objects
+      created by S3G need to be accessed using OFS/O3Fs.
+      If false, it will fallback to default behavior of Key/MPU create
+      requests where any intermediate directories will not be created or any
+      file checks happens to check filesystem semantics.
+    </description>
+  </property>
 </configuration>
