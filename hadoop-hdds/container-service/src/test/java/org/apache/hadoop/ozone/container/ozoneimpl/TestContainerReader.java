@@ -43,7 +43,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.mockito.Mockito;
-import sun.jvm.hotspot.ui.tree.MetadataTreeNodeAdapter;
 
 import java.io.File;
 import java.util.ArrayList;
