@@ -1955,7 +1955,8 @@ public class KeyManagerImpl implements KeyManager {
    * @return list of file status
    */
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
-      String startKey, long numEntries, String clientAddress) throws IOException {
+      String startKey, long numEntries, String clientAddress)
+          throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
 
     List<OzoneFileStatus> fileStatusList = new ArrayList<>();
