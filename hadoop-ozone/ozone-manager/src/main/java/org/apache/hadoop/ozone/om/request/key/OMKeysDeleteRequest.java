@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -27,7 +26,6 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -36,22 +34,26 @@ import org.apache.hadoop.ozone.om.response.key.OMKeysDeleteResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.OzoneConsts.BUCKET;
+import static org.apache.hadoop.ozone.OzoneConsts.DELETED_KEYS_LIST;
+import static org.apache.hadoop.ozone.OzoneConsts.UNDELETED_KEYS_LIST;
+import static org.apache.hadoop.ozone.OzoneConsts.VOLUME;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
 
 /**
  * Handles DeleteKey request.
@@ -66,31 +68,16 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
   }
 
   @Override
-  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    DeleteKeysRequest deleteKeyRequest =
-        getOmRequest().getDeleteKeysRequest();
-    Preconditions.checkNotNull(deleteKeyRequest);
-    List<KeyArgs> newKeyArgsList = new ArrayList<>();
-    for (KeyArgs keyArgs : deleteKeyRequest.getKeyArgsList()) {
-      newKeyArgsList.add(
-          keyArgs.toBuilder().setModificationTime(Time.now()).build());
-    }
-    DeleteKeysRequest newDeleteKeyRequest = DeleteKeysRequest
-        .newBuilder().addAllKeyArgs(newKeyArgsList).build();
-
-    return getOmRequest().toBuilder()
-        .setDeleteKeysRequest(newDeleteKeyRequest)
-        .setUserInfo(getUserInfo()).build();
-  }
-
-  @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
     DeleteKeysRequest deleteKeyRequest =
         getOmRequest().getDeleteKeysRequest();
 
-    List<KeyArgs> deleteKeyArgsList = deleteKeyRequest.getKeyArgsList();
+    OzoneManagerProtocolProtos.DeleteKeyArgs deleteKeyArgs =
+        deleteKeyRequest.getDeleteKeys();
+
+    List<String> deleteKeys = new ArrayList<>(deleteKeyArgs.getKeysList());
 
     IOException exception = null;
     OMClientResponse omClientResponse = null;
@@ -99,8 +86,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumKeyDeletes();
     Map<String, String> auditMap = null;
-    String volumeName = "";
-    String bucketName = "";
+    String volumeName = deleteKeyArgs.getVolumeName();
+    String bucketName = deleteKeyArgs.getBucketName();
     String keyName = "";
     List<OmKeyInfo> omKeyInfoList = new ArrayList<>();
 
@@ -112,84 +99,80 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         getOmRequest());
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
-    // As right now, only client exposed API is for a single volume and
-    // bucket. So, all entries will have same volume name and bucket name.
-    // So, we can validate once.
-    if (deleteKeyArgsList.size() > 0) {
-      volumeName = deleteKeyArgsList.get(0).getVolumeName();
-      bucketName = deleteKeyArgsList.get(0).getBucketName();
-    }
 
     boolean acquiredLock =
         omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
             bucketName);
 
     int indexFailed = 0;
+    int length = deleteKeys.size();
+    OzoneManagerProtocolProtos.DeleteKeyArgs.Builder unDeletedKeys =
+        OzoneManagerProtocolProtos.DeleteKeyArgs.newBuilder()
+            .setVolumeName(volumeName).setBucketName(bucketName);
+
+    boolean deleteStatus = true;
     try {
 
       // Validate bucket and volume exists or not.
-      if (deleteKeyArgsList.size() > 0) {
-        validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-      }
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
-
-      // Check if any of the key in the batch cannot be deleted. If exists the
-      // batch delete will be failed.
-
-      for (indexFailed = 0; indexFailed < deleteKeyArgsList.size();
-           indexFailed++) {
-        KeyArgs deleteKeyArgs = deleteKeyArgsList.get(indexFailed);
-        auditMap = buildKeyArgsAuditMap(deleteKeyArgs);
-        volumeName = deleteKeyArgs.getVolumeName();
-        bucketName = deleteKeyArgs.getBucketName();
-        keyName = deleteKeyArgs.getKeyName();
+      for (indexFailed = 0; indexFailed < length; indexFailed++) {
+        keyName = deleteKeyArgs.getKeys(indexFailed);
         String objectKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
             keyName);
         OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(objectKey);
 
-
-        // Do we need to fail the batch if one of the key does not exist?
-        // For now following the previous code behavior. If this code changes
-        // behavior, this will be incompatible change across upgrades, and we
-        // need to version the Requests and do logic accordingly.
-
         if (omKeyInfo == null) {
-          LOG.error("Key does not exist {}", objectKey);
-          throw new OMException("Key Not Found " + objectKey, KEY_NOT_FOUND);
+          deleteStatus = false;
+          LOG.error("Received a request to delete a Key does not exist {}",
+              objectKey);
+          unDeletedKeys.addKeys(keyName);
+          continue;
         }
 
-        // check Acl
-        checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-            IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
-
-        omKeyInfoList.add(omKeyInfo);
+        try {
+          // check Acl
+          checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
+              IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
+          omKeyInfoList.add(omKeyInfo);
+          deleteKeys.remove(keyName);
+        } catch (Exception ex) {
+          deleteStatus = false;
+          LOG.error("Acl check failed for Key: {}", objectKey, ex);
+          unDeletedKeys.addKeys(keyName);
+        }
       }
 
-
-      // Mark all keys in cache as deleted.
-      for (KeyArgs deleteKeyArgs : deleteKeyArgsList) {
-        volumeName = deleteKeyArgs.getVolumeName();
-        bucketName = deleteKeyArgs.getBucketName();
-        keyName = deleteKeyArgs.getKeyName();
+      // Mark all keys which can be deleted, in cache as deleted.
+      for (OmKeyInfo omKeyInfo : omKeyInfoList) {
         omMetadataManager.getKeyTable().addCacheEntry(
             new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
-                keyName)),
+                omKeyInfo.getKeyName())),
             new CacheValue<>(Optional.absent(), trxnLogIndex));
       }
 
-
       omClientResponse = new OMKeysDeleteResponse(omResponse
           .setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
-              .setStatus(true)).build(), omKeyInfoList, trxnLogIndex,
+              .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys))
+          .setStatus(deleteStatus ? OK : PARTIAL_DELETE)
+          .setSuccess(deleteStatus).build(),
+          omKeyInfoList, trxnLogIndex,
           ozoneManager.isRatisEnabled());
+
       result = Result.SUCCESS;
 
     } catch (IOException ex) {
       result = Result.FAILURE;
       exception = ex;
       createErrorOMResponse(omResponse, ex);
+
+      // Add all keys which are failed due to any other exception .
+      for (int i = indexFailed; i < deleteKeys.size(); i++) {
+        unDeletedKeys.addKeys(deleteKeyArgs.getKeys(indexFailed));
+      }
+
       omResponse.setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
-          .setStatus(false).build()).build();
+          .setStatus(false).setUnDeletedKeys(unDeletedKeys).build()).build();
       omClientResponse = new OMKeysDeleteResponse(omResponse.build());
 
     } finally {
@@ -201,11 +184,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           omDoubleBufferHelper);
     }
 
-    // When we get any error during iteration build the remaining audit map
-    // from deleteKeyArgsList.
-    for (int i = indexFailed; i < deleteKeyArgsList.size(); i++) {
-      buildKeyArgsAuditMap(deleteKeyArgsList.get(i));
-    }
+    auditMap = buildDeleteKeysAuditMap(volumeName, bucketName, deleteKeys,
+        unDeletedKeys.getKeysList());
 
     auditLog(auditLogger, buildAuditMessage(
         OMAction.DELETE_KEYS, auditMap, exception, userInfo));
@@ -228,5 +208,24 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     }
 
     return omClientResponse;
+  }
+
+  /**
+   * Build audit map for DeleteKeys request.
+   * @param volumeName
+   * @param bucketName
+   * @param deletedKeys
+   * @param unDeletedKeys
+   * @return
+   */
+  private Map<String, String> buildDeleteKeysAuditMap(String volumeName,
+      String bucketName, List<String> deletedKeys, List<String> unDeletedKeys) {
+    Map< String, String > auditMap = new HashMap<>();
+    auditMap.put(VOLUME, volumeName);
+    auditMap.put(BUCKET, bucketName);
+    auditMap.put(DELETED_KEYS_LIST, String.join(",", deletedKeys));
+    auditMap.put(UNDELETED_KEYS_LIST, String.join(",",
+        unDeletedKeys));
+    return auditMap;
   }
 }
