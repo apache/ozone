@@ -3068,35 +3068,43 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   /**
    * Download and install latest checkpoint from leader OM.
-   * If the download checkpoints snapshot index is greater than this OM's
-   * last applied transaction index, then re-initialize the OM state via this
-   * checkpoint. Before re-initializing OM state, the OM Ratis server should
-   * be stopped so that no new transactions can be applied.
    *
    * @param leaderId peerNodeID of the leader OM
-   * @return If checkpoint is installed, return the corresponding termIndex.
-   * Otherwise, return null.
+   * @return If checkpoint is installed successfully, return the
+   *         corresponding termIndex. Otherwise, return null.
    */
-  public TermIndex installSnapshot(String leaderId) {
+  public TermIndex installSnapshotFromLeader(String leaderId) {
     if (omSnapshotProvider == null) {
       LOG.error("OM Snapshot Provider is not configured as there are no peer " +
           "nodes.");
       return null;
     }
 
-    DBCheckpoint omDBcheckpoint = getDBCheckpointFromLeader(leaderId);
-    Path newDBLocation = omDBcheckpoint.getCheckpointLocation();
+    DBCheckpoint omDBCheckpoint = getDBCheckpointFromLeader(leaderId);
+    LOG.info("Downloaded checkpoint from Leader {} to the location {}",
+        leaderId, omDBCheckpoint.getCheckpointLocation());
 
-    LOG.info("Downloaded checkpoint from Leader {}, in to the location {}",
-        leaderId, newDBLocation);
+    TermIndex termIndex = null;
+    try {
+      termIndex = installCheckpoint(leaderId, omDBCheckpoint);
+    } catch (Exception ex) {
+      LOG.error("Failed to install snapshot from Leader OM: {}", ex);
+    }
+    return termIndex;
+  }
 
+  /**
+   * Install checkpoint. If the checkpoints snapshot index is greater than
+   * OM's last applied transaction index, then re-initialize the OM
+   * state via this checkpoint. Before re-initializing OM state, the OM Ratis
+   * server should be stopped so that no new transactions can be applied.
+   */
+  public TermIndex installCheckpoint(String leaderId,
+      DBCheckpoint omDBCheckpoint) throws Exception {
+
+    Path newDBLocation = omDBCheckpoint.getCheckpointLocation();
     OMTransactionInfo omTransactionInfo = getTrxnInfoFromCheckpoint(
         newDBLocation);
-
-    if (omTransactionInfo == null) {
-      LOG.error("Failed to install snapshot from {}.");
-      return null;
-    }
 
     File oldDBLocation = metadataManager.getStore().getDbLocation();
     try {
@@ -3109,13 +3117,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omRatisServer.getOmStateMachine().pause();
     } catch (Exception e) {
       LOG.error("Failed to stop/ pause the services. Cannot proceed with " +
-          "installing the new checkpoint.", e);
-
+          "installing the new checkpoint.");
       // During stopServices, if KeyManager was stopped successfully and
       // OMMetadataManager stop failed, we should restart the KeyManager.
       keyManager.start(configuration);
-
-      return null;
+      throw e;
     }
 
     File dbBackup = null;
@@ -3134,7 +3140,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       try {
         dbBackup = replaceOMDBWithCheckpoint(lastAppliedIndex, oldDBLocation,
             newDBLocation);
-        term = omTransactionInfo.getCurrentTerm();
+        term = omTransactionInfo.getTerm();
         lastAppliedIndex = omTransactionInfo.getTransactionIndex();
         LOG.info("Replaced DB with checkpoint from OM: {}, term: {}, index: {}",
             leaderId, term, lastAppliedIndex);
@@ -3143,11 +3149,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             " DB with downloaded checkpoint. Reloading old OM state.", e);
       }
     } else {
-      LOG.warn("Cannot proceed with InstallSnapshot as OM is at termIndex: " +
-          "({},{}) and checkpoint has lower termIndex: ({},{}). Reloading old" +
-          " state of OM.", term, lastAppliedIndex,
-          omTransactionInfo.getCurrentTerm(),
-          omTransactionInfo.getTransactionIndex());
+      LOG.warn("Cannot proceed with InstallSnapshot as OM is at TermIndex {} " +
+          "and checkpoint has lower TermIndex {}. Reloading old state of OM.",
+          termIndex, omTransactionInfo.getTermIndex());
     }
 
     // Reload the OM DB store with the new checkpoint.
@@ -3209,22 +3213,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metadataManager.stop();
   }
 
-  private OMTransactionInfo getTrxnInfoFromCheckpoint(Path dbPath) {
+  private OMTransactionInfo getTrxnInfoFromCheckpoint(Path dbPath)
+      throws Exception {
     Path dbDir = dbPath.getParent();
+    String dbName = dbPath.getFileName().toString();
     if (dbDir == null) {
-      LOG.error("Incorrect DB location path {} received from checkpoint.",
-          dbPath);
-      return null;
+      throw new IOException("Checkpoint {} does not have proper DB location");
     }
 
-    try {
-      return OzoneManagerRatisUtils.getTransactionInfoFromDB(
-          configuration, dbDir);
-    } catch (Exception ex) {
-      LOG.error("Failed to open downloaded checkpoint {} and read transaction" +
-          " info", dbPath, ex);
-      return null;
-    }
+    return OzoneManagerRatisUtils.getTransactionInfoFromDB(configuration,
+        dbDir, dbName);
   }
 
   /**

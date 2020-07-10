@@ -290,10 +290,16 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir)
       throws IOException {
+    return loadDB(configuration, metaDir, OM_DB_NAME);
+  }
+
+  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
+      String dbName)
+      throws IOException {
     RocksDBConfiguration rocksDBConfiguration =
         configuration.getObject(RocksDBConfiguration.class);
     DBStoreBuilder dbStoreBuilder = DBStoreBuilder.newBuilder(configuration,
-        rocksDBConfiguration).setName(OM_DB_NAME)
+        rocksDBConfiguration).setName(dbName)
         .setPath(Paths.get(metaDir.getPath()));
     DBStore dbStore = addOMTablesAndCodecs(dbStoreBuilder).build();
     return dbStore;

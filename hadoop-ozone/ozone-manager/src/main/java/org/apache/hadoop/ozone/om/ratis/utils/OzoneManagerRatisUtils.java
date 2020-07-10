@@ -235,9 +235,10 @@ public final class OzoneManagerRatisUtils {
    * @throws Exception
    */
   public static OMTransactionInfo getTransactionInfoFromDB(
-      OzoneConfiguration tempConfig, Path dbDir) throws Exception {
-    DBStore dbStore =
-        OmMetadataManagerImpl.loadDB(tempConfig, dbDir.toFile());
+      OzoneConfiguration tempConfig, Path dbDir, String dbName)
+      throws Exception {
+    DBStore dbStore = OmMetadataManagerImpl.loadDB(tempConfig, dbDir.toFile(),
+        dbName);
 
     Table<String, OMTransactionInfo> transactionInfoTable =
         dbStore.getTable(TRANSACTION_INFO_TABLE,
