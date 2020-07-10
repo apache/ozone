@@ -41,6 +41,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.lang.Math.max;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_BLOCK_COUNT_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.CHUNKS_PATH;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_CONTAINER_BYTES_USED_KEY;
@@ -65,7 +66,7 @@ public class KeyValueContainerData extends ContainerData {
   private String metadataPath;
 
   //Type of DB used to store key to chunks mapping
-  private String containerDBType;
+  private String containerDBType = CONTAINER_DB_TYPE_ROCKSDB;
 
   private File dbFile = null;
 
