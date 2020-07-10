@@ -422,8 +422,8 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     }
 
     @Override
-    public void remove() {
-      rawIterator.remove();
+    public void removeFromDB() throws IOException {
+      rawIterator.removeFromDB();
     }
   }
 }

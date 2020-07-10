@@ -107,16 +107,12 @@ public class RDBStoreIterator
   }
 
   @Override
-  public void remove() {
+  public void removeFromDB() throws IOException {
     if (rocksDBTable == null) {
       throw new UnsupportedOperationException("remove");
     }
     if (rocksDBIterator.isValid()) {
-      try {
-        rocksDBTable.delete(rocksDBIterator.key());
-      } catch (IOException e) {
-        throw new RuntimeException("Failed to delete key from RocksDB.", e);
-      }
+      rocksDBTable.delete(rocksDBIterator.key());
     }
   }
 

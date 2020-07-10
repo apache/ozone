@@ -60,4 +60,6 @@ public interface TableIterator<KEY, T> extends Iterator<T>, Closeable {
    */
   T value();
 
+  void removeFromDB() throws IOException;
+
 }
