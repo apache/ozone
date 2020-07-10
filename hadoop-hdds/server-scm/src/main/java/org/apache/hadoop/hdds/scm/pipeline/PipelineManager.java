@@ -77,8 +77,7 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean,
 
   void openPipeline(PipelineID pipelineId) throws IOException;
 
-  void finalizeAndDestroyPipeline(Pipeline pipeline, boolean onTimeout)
-      throws IOException;
+  void closePipeline(Pipeline pipeline, boolean onTimeout) throws IOException;
 
   void scrubPipeline(ReplicationType type, ReplicationFactor factor)
       throws IOException;

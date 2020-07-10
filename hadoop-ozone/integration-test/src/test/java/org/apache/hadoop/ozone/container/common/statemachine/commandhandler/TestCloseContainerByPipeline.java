@@ -204,7 +204,7 @@ public class TestCloseContainerByPipeline {
     Assert.assertTrue(isContainerClosed(cluster, containerID, datanodeDetails));
 
     cluster.getStorageContainerManager().getPipelineManager()
-        .finalizeAndDestroyPipeline(pipeline, false);
+        .closePipeline(pipeline, false);
     Thread.sleep(5000);
     // Pipeline close should not affect a container in CLOSED state
     Assert.assertTrue(isContainerClosed(cluster, containerID, datanodeDetails));
@@ -307,7 +307,7 @@ public class TestCloseContainerByPipeline {
 
     // close the pipeline
     cluster.getStorageContainerManager()
-        .getPipelineManager().finalizeAndDestroyPipeline(pipeline, false);
+        .getPipelineManager().closePipeline(pipeline, false);
 
     // All the containers in OPEN or CLOSING state should transition to
     // QUASI-CLOSED after pipeline close

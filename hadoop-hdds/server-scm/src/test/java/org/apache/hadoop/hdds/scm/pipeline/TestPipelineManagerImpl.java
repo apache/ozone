@@ -185,7 +185,7 @@ public class TestPipelineManagerImpl {
             Pipeline.PipelineState.OPEN).contains(pipeline));
 
     try {
-      pipelineManager.removePipeline(pipeline.getId());
+      pipelineManager.removePipeline(pipeline);
       fail();
     } catch (IOException ioe) {
       // Should not be able to remove the OPEN pipeline.
@@ -195,7 +195,7 @@ public class TestPipelineManagerImpl {
     }
 
     // Destroy pipeline
-    pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
+    pipelineManager.closePipeline(pipeline, false);
     try {
       pipelineManager.getPipeline(pipeline.getId());
       fail("Pipeline should not have been retrieved");
@@ -238,7 +238,7 @@ public class TestPipelineManagerImpl {
         .assertTrue(pipelineManager.getPipeline(pipeline.getId()).isOpen());
 
     // close the pipeline
-    pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
+    pipelineManager.closePipeline(pipeline, false);
 
     // pipeline report for destroyed pipeline should be ignored
     nodes.subList(0, 2).forEach(dn -> sendPipelineReport(dn, pipeline,
