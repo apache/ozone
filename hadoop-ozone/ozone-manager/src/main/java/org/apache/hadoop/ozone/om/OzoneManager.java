@@ -2555,7 +2555,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       auditSuccess = true;
     } catch (IOException ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction
-          .INITIATE_MULTIPART_UPLOAD, (keyArgs == null) ? null : keyArgs
+          .COMMIT_MULTIPART_UPLOAD_PARTKEY, (keyArgs == null) ? null : keyArgs
           .toAuditMap(), ex));
       metrics.incNumCommitMultipartUploadPartFails();
       throw ex;
