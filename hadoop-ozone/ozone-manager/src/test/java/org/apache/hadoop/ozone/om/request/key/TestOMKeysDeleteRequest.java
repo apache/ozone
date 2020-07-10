@@ -111,8 +111,8 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
               deleteKey)));
     }
 
-    DeleteKeyArgs unDeletedKeys =
-        omClientResponse.getOMResponse().getDeleteKeysResponse().getUnDeletedKeys();
+    DeleteKeyArgs unDeletedKeys = omClientResponse.getOMResponse()
+        .getDeleteKeysResponse().getUnDeletedKeys();
     Assert.assertEquals(1,
         unDeletedKeys.getKeysCount());
     Assert.assertEquals("dummy", unDeletedKeys.getKeys(0));
