@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.metadata;
 
 import java.io.IOException;
+import java.util.UUID;
 
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Codec;
@@ -30,12 +31,43 @@ public class PipelineIDCodec implements Codec<PipelineID> {
 
   @Override
   public byte[] toPersistedFormat(PipelineID object) throws IOException {
-    return object.getProtobuf().toByteArray();
+    byte[] bytes = new byte[16];
+    System.arraycopy(
+        asByteArray(object.getId().getLeastSignificantBits()), 0, bytes, 8, 8);
+    System.arraycopy(
+        asByteArray(object.getId().getMostSignificantBits()), 0, bytes, 0, 8);
+    return bytes;
+  }
+
+  private byte[] asByteArray(long bits) {
+    byte[] bytes = new byte[8];
+    for (int i = 0; i < 8; i++) {
+      bytes[i] = (byte) (bits >> (i * 8) & 0x00000000000000FF);
+    }
+    return bytes;
   }
 
   @Override
   public PipelineID fromPersistedFormat(byte[] rawData) throws IOException {
-    return null;
+    if (rawData.length!=16) {
+      throw new IllegalArgumentException("Invalid key in DB.");
+    }
+    long leastSignificantBits = toLong(rawData, 8);
+    long mostSiginificantBits = toLong(rawData, 0);
+
+    UUID id = new UUID(mostSiginificantBits, leastSignificantBits);
+    return PipelineID.valueOf(id);
+  }
+
+  private long toLong(byte[] arr, int startIdx) {
+    if (arr.length < startIdx + 8) {
+      throw new ArrayIndexOutOfBoundsException();
+    }
+    long val = 0x0000000000000000L;
+    for (int i=7; i>=0; i--) {
+      val |= ((long) arr[i+startIdx]) << i * 8;
+    }
+    return val;
   }
 
   @Override

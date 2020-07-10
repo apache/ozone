@@ -161,9 +161,30 @@ public class SCMPipelineManager implements PipelineManager {
     TableIterator<PipelineID, ? extends KeyValue<PipelineID, Pipeline>>
         iterator = pipelineStore.iterator();
     while (iterator.hasNext()) {
-      Pipeline pipeline = iterator.next().getValue();
+      Pipeline pipeline = nextPipelineFromIterator(iterator);
       stateManager.addPipeline(pipeline);
       nodeManager.addPipeline(pipeline);
+    }
+  }
+
+  private Pipeline nextPipelineFromIterator(
+      TableIterator<PipelineID, ? extends KeyValue<PipelineID, Pipeline>> it
+  ) throws IOException {
+    KeyValue<PipelineID, Pipeline> actual = it.next();
+    Pipeline pipeline = actual.getValue();
+    PipelineID pipelineID = actual.getKey();
+    checkKeyAndReplaceIfObsolete(it, pipeline, pipelineID);
+    return pipeline;
+  }
+
+  private void checkKeyAndReplaceIfObsolete(
+      TableIterator<PipelineID, ? extends KeyValue<PipelineID, Pipeline>> it,
+      Pipeline pipeline,
+      PipelineID pipelineID
+  ) throws IOException {
+    if (!pipelineID.equals(pipeline.getId())) {
+      it.remove();
+      pipelineStore.put(pipeline.getId(), pipeline);
     }
   }
 
