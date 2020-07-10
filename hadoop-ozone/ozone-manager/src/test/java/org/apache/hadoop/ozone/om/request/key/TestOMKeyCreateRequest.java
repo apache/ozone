@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.junit.Assert;
 import org.junit.Test;
@@ -40,10 +41,13 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 
-
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CREATE_INTERMEDIATE_DIRECTORY;
 import static org.apache.hadoop.ozone.om.request.TestOMRequestUtils.addKeyToTable;
 import static org.apache.hadoop.ozone.om.request.TestOMRequestUtils.addVolumeAndBucketToDB;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.mockito.Mockito.when;
 
 /**
@@ -89,7 +93,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assert.assertEquals(OK,
         omKeyCreateResponse.getOMResponse().getStatus());
 
     // Check open table whether key is added or not.
@@ -364,6 +368,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         omKeyCreateRequest.validateAndUpdateCache(ozoneManager,
         100L, ozoneManagerDoubleBufferHelper);
 
+    Assert.assertEquals(omClientResponse.getOMResponse().getStatus(), OK);
+
     Path keyPath = Paths.get(keyName);
 
     // Check intermediate paths are created
@@ -381,6 +387,29 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
 
     Assert.assertNotNull(omKeyInfo);
+
+
+    // Create a file, where a file already exists in the path.
+
+    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
+        0L, RATIS, THREE, omMetadataManager);
+
+    // Now try with a file exists in path. Should fail.
+    keyName = "a/b/c/file1/file2";
+    omRequest = createKeyRequest(false, 0, keyName);
+
+    omKeyCreateRequest = new OMKeyCreateRequest(omRequest);
+
+    omRequest = omKeyCreateRequest.preExecute(ozoneManager);
+
+    omKeyCreateRequest = new OMKeyCreateRequest(omRequest);
+
+    omClientResponse =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager,
+            101L, ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(omClientResponse.getOMResponse().getStatus(),
+        NOT_A_FILE);
 
   }
 
