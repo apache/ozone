@@ -3129,20 +3129,25 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // proceed with installSnapshot.
     boolean canProceed = OzoneManagerRatisUtils.verifyTransactionInfo(
         omTransactionInfo, lastAppliedIndex, leaderId, newDBLocation);
-    if (!canProceed) {
-      return null;
-    }
 
-    try {
-      dbBackup = replaceOMDBWithCheckpoint(lastAppliedIndex, oldDBLocation,
-          newDBLocation);
-      term = omTransactionInfo.getCurrentTerm();
-      lastAppliedIndex = omTransactionInfo.getTransactionIndex();
-      LOG.info("Replaced DB with checkpoint from OM: {}, term: {}, index: {}",
-          leaderId, term, lastAppliedIndex);
-    } catch (Exception e) {
-      LOG.error("Failed to install Snapshot from {} as OM failed to " +
-          "replace DB with downloaded checkpoint. Reloading old OM state.", e);
+    if (canProceed) {
+      try {
+        dbBackup = replaceOMDBWithCheckpoint(lastAppliedIndex, oldDBLocation,
+            newDBLocation);
+        term = omTransactionInfo.getCurrentTerm();
+        lastAppliedIndex = omTransactionInfo.getTransactionIndex();
+        LOG.info("Replaced DB with checkpoint from OM: {}, term: {}, index: {}",
+            leaderId, term, lastAppliedIndex);
+      } catch (Exception e) {
+        LOG.error("Failed to install Snapshot from {} as OM failed to replace" +
+            " DB with downloaded checkpoint. Reloading old OM state.", e);
+      }
+    } else {
+      LOG.warn("Cannot proceed with InstallSnapshot as OM is at termIndex: " +
+          "({},{}) and checkpoint has lower termIndex: ({},{}). Reloading old" +
+          " state of OM.", term, lastAppliedIndex,
+          omTransactionInfo.getCurrentTerm(),
+          omTransactionInfo.getTransactionIndex());
     }
 
     // Reload the OM DB store with the new checkpoint.
