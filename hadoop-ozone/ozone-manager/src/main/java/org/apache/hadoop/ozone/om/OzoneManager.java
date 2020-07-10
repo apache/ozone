@@ -2229,8 +2229,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public void deleteKeys(OmDeleteKeys deleteKeys) throws IOException {
-    throw new NotImplementedException("OzoneManager does not require this to " +
-        "be implemented. As write requests use a new approach");
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
   }
 
   @Override

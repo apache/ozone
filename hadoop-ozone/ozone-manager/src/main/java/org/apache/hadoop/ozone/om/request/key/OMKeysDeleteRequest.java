@@ -22,7 +22,6 @@ import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
-import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -51,6 +50,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.BUCKET;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETED_KEYS_LIST;
 import static org.apache.hadoop.ozone.OzoneConsts.UNDELETED_KEYS_LIST;
 import static org.apache.hadoop.ozone.OzoneConsts.VOLUME;
+import static org.apache.hadoop.ozone.audit.OMAction.DELETE_KEYS;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
@@ -171,7 +171,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       deleteKeys = new ArrayList<>();
       // Add all keys which are failed due to any other exception .
       for (int i = indexFailed; i < length; i++) {
-        unDeletedKeys.addKeys(deleteKeyArgs.getKeys(indexFailed));
+        unDeletedKeys.addKeys(deleteKeyArgs.getKeys(i));
       }
 
       omResponse.setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
@@ -190,23 +190,30 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     auditMap = buildDeleteKeysAuditMap(volumeName, bucketName, deleteKeys,
         unDeletedKeys.getKeysList());
 
-    auditLog(auditLogger, buildAuditMessage(
-        OMAction.DELETE_KEYS, auditMap, exception, userInfo));
+    auditLog(auditLogger, buildAuditMessage(DELETE_KEYS, auditMap, exception,
+        userInfo));
 
 
     switch (result) {
     case SUCCESS:
-      omMetrics.decNumKeys();
-      LOG.debug("Key deleted. Volume:{}, Bucket:{}, Key:{}", volumeName,
-          bucketName, keyName);
+      omMetrics.setNumKeys(deleteKeys.size());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Keys delete success. Volume:{}, Bucket:{}, Keys:{}",
+            volumeName, bucketName, auditMap.get(DELETED_KEYS_LIST));
+      }
       break;
     case FAILURE:
+      omMetrics.setNumKeys(deleteKeys.size());
       omMetrics.incNumKeyDeleteFails();
-      LOG.error("Key delete failed. Volume:{}, Bucket:{}, Key:{}",
-          volumeName, bucketName, keyName, exception);
+      if (LOG.isDebugEnabled()) {
+        LOG.error("Keys delete failed. Volume:{}, Bucket:{}, DeletedKey:{}, " +
+                "UnDeletedKeys:{}", volumeName, bucketName, keyName,
+            auditMap.get(DELETED_KEYS_LIST), auditMap.get(UNDELETED_KEYS_LIST),
+            exception);
+      }
       break;
     default:
-      LOG.error("Unrecognized Result for OMKeyDeleteRequest: {}",
+      LOG.error("Unrecognized Result for OMKeysDeleteRequest: {}",
           deleteKeyRequest);
     }
 
