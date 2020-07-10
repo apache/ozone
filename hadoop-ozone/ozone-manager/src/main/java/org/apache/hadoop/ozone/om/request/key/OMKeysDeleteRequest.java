@@ -126,6 +126,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           deleteStatus = false;
           LOG.error("Received a request to delete a Key does not exist {}",
               objectKey);
+          deleteKeys.remove(keyName);
           unDeletedKeys.addKeys(keyName);
           continue;
         }
@@ -135,10 +136,10 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
               IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
           omKeyInfoList.add(omKeyInfo);
-          deleteKeys.remove(keyName);
         } catch (Exception ex) {
           deleteStatus = false;
           LOG.error("Acl check failed for Key: {}", objectKey, ex);
+          deleteKeys.remove(keyName);
           unDeletedKeys.addKeys(keyName);
         }
       }
@@ -166,8 +167,10 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       exception = ex;
       createErrorOMResponse(omResponse, ex);
 
+      // reset deleteKeys as request failed.
+      deleteKeys = new ArrayList<>();
       // Add all keys which are failed due to any other exception .
-      for (int i = indexFailed; i < deleteKeys.size(); i++) {
+      for (int i = indexFailed; i < length; i++) {
         unDeletedKeys.addKeys(deleteKeyArgs.getKeys(indexFailed));
       }
 
