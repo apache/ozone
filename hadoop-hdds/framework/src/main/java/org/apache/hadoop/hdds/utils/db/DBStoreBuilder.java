@@ -306,12 +306,12 @@ public final class DBStoreBuilder {
   }
 
   public <KEY, VALUE> DBStoreBuilder registerTables(DBDefinition definition) {
-    for (DBColumnFamilyDefinition<KEY, VALUE> cfDefinition :
+    for (DBColumnFamilyDefinition<KEY, VALUE> columnFamily :
             definition.getColumnFamilies()) {
 
-      addTable(definition.getName())
-              .addCodec(cfDefinition.getKeyType(), cfDefinition.getKeyCodec())
-              .addCodec(cfDefinition.getValueType(), cfDefinition.getValueCodec());
+      addTable(columnFamily.getName())
+              .addCodec(columnFamily.getKeyType(), columnFamily.getKeyCodec())
+              .addCodec(columnFamily.getValueType(), columnFamily.getValueCodec());
     }
 
     return this;
