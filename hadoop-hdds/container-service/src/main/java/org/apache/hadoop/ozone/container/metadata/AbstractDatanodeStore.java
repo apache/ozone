@@ -57,6 +57,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
     if (this.store == null) {
       DBOptions options = new DBOptions();
       options.setCreateIfMissing(true);
+      options.setCreateMissingColumnFamilies(true);
 
       this.store = DBStoreBuilder.newBuilder(config, dbDef)
               .setDBOption(options)
