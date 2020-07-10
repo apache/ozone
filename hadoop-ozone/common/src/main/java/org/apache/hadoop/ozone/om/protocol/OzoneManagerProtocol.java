@@ -18,10 +18,6 @@
 
 package org.apache.hadoop.ozone.om.protocol;
 
-import java.io.Closeable;
-import java.io.IOException;
-import java.util.List;
-
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -29,6 +25,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -51,6 +48,10 @@ import org.apache.hadoop.ozone.security.OzoneDelegationTokenSelector;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.token.TokenInfo;
+
+import java.io.Closeable;
+import java.io.IOException;
+import java.util.List;
 
 /**
  * Protocol to talk to OM.
@@ -229,10 +230,10 @@ public interface OzoneManagerProtocol
    * multiple keys and a single key. Used by deleting files
    * through OzoneFileSystem.
    *
-   * @param args the list args of the key.
+   * @param deleteKeys
    * @throws IOException
    */
-  void deleteKeys(List<OmKeyArgs> args) throws IOException;
+  void deleteKeys(OmDeleteKeys deleteKeys) throws IOException;
 
   /**
    * Deletes an existing empty bucket from volume.

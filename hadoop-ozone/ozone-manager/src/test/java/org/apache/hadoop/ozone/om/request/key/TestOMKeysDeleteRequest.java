@@ -22,8 +22,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.junit.Assert;
 import org.junit.Test;
@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
 
 /**
@@ -40,7 +41,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
 
 
-  private List<KeyArgs> keyArgsList;
+  private List<String> deleteKeyList;
   private OMRequest omRequest;
 
   @Test
@@ -51,22 +52,27 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
     OMKeysDeleteRequest omKeysDeleteRequest =
         new OMKeysDeleteRequest(omRequest);
 
-
     OMClientResponse omClientResponse =
         omKeysDeleteRequest.validateAndUpdateCache(ozoneManager, 0L,
             ozoneManagerDoubleBufferHelper);
-
-
 
     Assert.assertTrue(omClientResponse.getOMResponse().getSuccess());
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
+    Assert.assertTrue(omClientResponse.getOMResponse().getDeleteKeysResponse()
+        .getStatus());
+    DeleteKeyArgs unDeletedKeys =
+        omClientResponse.getOMResponse().getDeleteKeysResponse()
+            .getUnDeletedKeys();
+    Assert.assertEquals(0,
+        unDeletedKeys.getKeysCount());
+
     // Check all keys are deleted.
-    for (KeyArgs keyArgs : keyArgsList) {
+    for (String deleteKey : deleteKeyList) {
       Assert.assertNull(omMetadataManager.getKeyTable()
           .get(omMetadataManager.getOzoneKey(volumeName, bucketName,
-              keyArgs.getKeyName())));
+              deleteKey)));
     }
 
   }
@@ -76,15 +82,13 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
 
     createPreRequisites();
 
-    KeyArgs dummyKeyArgs = KeyArgs.newBuilder().setVolumeName(volumeName)
-        .setKeyName("dummy").setBucketName(bucketName).build();
-
     // Add a key which not exist, which causes batch delete to fail.
-    keyArgsList.add(dummyKeyArgs);
 
     omRequest = omRequest.toBuilder()
             .setDeleteKeysRequest(DeleteKeysRequest.newBuilder()
-                .addAllKeyArgs(keyArgsList).build()).build();
+                .setDeleteKeys(DeleteKeyArgs.newBuilder()
+                .setBucketName(bucketName).setVolumeName(volumeName)
+                    .addAllKeys(deleteKeyList).addKeys("dummy"))).build();
 
     OMKeysDeleteRequest omKeysDeleteRequest =
         new OMKeysDeleteRequest(omRequest);
@@ -94,46 +98,58 @@ public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
         ozoneManagerDoubleBufferHelper);
 
     Assert.assertFalse(omClientResponse.getOMResponse().getSuccess());
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
+    Assert.assertEquals(PARTIAL_DELETE,
         omClientResponse.getOMResponse().getStatus());
 
+    Assert.assertFalse(omClientResponse.getOMResponse().getDeleteKeysResponse()
+        .getStatus());
 
-    keyArgsList.remove(dummyKeyArgs);
-
-    // Key Delete failed, so all keys should be present.
-    for (KeyArgs keyArgs : keyArgsList) {
-      Assert.assertNotNull(omMetadataManager.getKeyTable()
+    // Check keys are deleted and in response check unDeletedKey.
+    for (String deleteKey : deleteKeyList) {
+      Assert.assertNull(omMetadataManager.getKeyTable()
           .get(omMetadataManager.getOzoneKey(volumeName, bucketName,
-              keyArgs.getKeyName())));
+              deleteKey)));
     }
+
+    DeleteKeyArgs unDeletedKeys =
+        omClientResponse.getOMResponse().getDeleteKeysResponse().getUnDeletedKeys();
+    Assert.assertEquals(1,
+        unDeletedKeys.getKeysCount());
+    Assert.assertEquals("dummy", unDeletedKeys.getKeys(0));
+
   }
 
   private void createPreRequisites() throws Exception {
+
+    deleteKeyList = new ArrayList<>();
     // Add volume, bucket and key entries to OM DB.
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
     int count = 10;
 
-    keyArgsList = new ArrayList<>();
+    DeleteKeyArgs.Builder deleteKeyArgs = DeleteKeyArgs.newBuilder()
+        .setBucketName(bucketName).setVolumeName(volumeName);
 
     // Create 10 keys
     String parentDir = "/user";
     String key = "";
+
+
     for (int i = 0; i < count; i++) {
       key = parentDir.concat("/key" + i);
       TestOMRequestUtils.addKeyToTableCache(volumeName, bucketName,
           parentDir.concat("/key" + i), HddsProtos.ReplicationType.RATIS,
           HddsProtos.ReplicationFactor.THREE, omMetadataManager);
-      keyArgsList.add(KeyArgs.newBuilder().setBucketName(bucketName)
-          .setVolumeName(volumeName).setKeyName(key).build());
+      deleteKeyArgs.addKeys(key);
+      deleteKeyList.add(key);
     }
 
     omRequest =
         OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
             .setCmdType(DeleteKeys)
             .setDeleteKeysRequest(DeleteKeysRequest.newBuilder()
-                .addAllKeyArgs(keyArgsList).build()).build();
+                .setDeleteKeys(deleteKeyArgs).build()).build();
   }
 
 }
