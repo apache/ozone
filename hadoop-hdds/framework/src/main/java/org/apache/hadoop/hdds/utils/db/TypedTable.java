@@ -304,7 +304,13 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
 
-    byte[] startKeyBytes = codecRegistry.asRawData(startKey);
+    // A null start key means to start from the beginning of the table.
+    // Cannot convert a null key to bytes.
+    byte[] startKeyBytes = null;
+    if (startKey != null) {
+      startKeyBytes = codecRegistry.asRawData(startKey);
+    }
+
     List<? extends KeyValue<byte[], byte[]>> rangeKVBytes =
             rawTable.getRangeKVs(startKeyBytes, count, filters);
 
