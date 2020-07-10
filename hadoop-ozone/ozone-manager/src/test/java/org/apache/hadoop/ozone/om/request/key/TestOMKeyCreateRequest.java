@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.junit.Assert;
 import org.junit.Test;

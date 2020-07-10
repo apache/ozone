@@ -73,7 +73,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CREATE_INTERMEDIA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
-import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 
 /**
@@ -171,6 +170,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
   }
 
   @Override
+  @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
     CreateKeyRequest createKeyRequest = getOmRequest().getCreateKeyRequest();
@@ -227,7 +227,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
               OZONE_OM_CREATE_INTERMEDIATE_DIRECTORY_DEFAULT);
 
       // If FILE_EXISTS we just override like how we used to do for Key Create.
-      List<OzoneAcl> inheritAcls;
+      List< OzoneAcl > inheritAcls;
       if (createIntermediateDir) {
         OMFileRequest.OMPathInfo pathInfo =
             OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
@@ -240,10 +240,11 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         if (omDirectoryResult == DIRECTORY_EXISTS) {
           throw new OMException("Can not write to directory: " + keyName,
               NOT_A_FILE);
-        } else if (omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
+        } else
+          if (omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
             throw new OMException("Can not create file: " + keyName +
                 " as there is already file in the given path", NOT_A_FILE);
-        }
+          }
 
         missingParentInfos = OMDirectoryCreateRequest
             .getAllParentInfo(ozoneManager, keyArgs,
@@ -258,7 +259,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       }
 
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
-          keyArgs.getDataSize(), locations,  getFileEncryptionInfo(keyArgs),
+          keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),
           ozoneManager.getPrefixManager(), bucketInfo, trxnLogIndex,
           ozoneManager.isRatisEnabled());
 
@@ -317,7 +318,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       break;
     case FAILURE:
       LOG.error("Key creation failed. Volume:{}, Bucket:{}, Key{}. " +
-              "Exception:{}", volumeName, bucketName, keyName, exception);
+          "Exception:{}", volumeName, bucketName, keyName, exception);
       break;
     default:
       LOG.error("Unrecognized Result for OMKeyCreateRequest: {}",
