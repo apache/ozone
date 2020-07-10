@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.jvm.hotspot.debugger.bsd.amd64.BsdAMD64ThreadContext;
 
 import java.io.IOException;
 import java.util.ArrayList;
