@@ -1234,9 +1234,6 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(toKeyName, key.getName());
   }
 
-  // Listing all volumes in the cluster feature has to be fixed after HDDS-357.
-  // TODO: fix this
-  @Ignore
   @Test
   public void testListVolume() throws IOException {
     String volBase = "vol-" + RandomStringUtils.randomNumeric(3);
