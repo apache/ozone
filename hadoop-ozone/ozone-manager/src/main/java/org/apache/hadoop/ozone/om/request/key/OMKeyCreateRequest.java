@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +28,11 @@ import java.util.stream.Collectors;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,7 +68,13 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.UniqueId;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CREATE_INTERMEDIATE_DIRECTORY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CREATE_INTERMEDIATE_DIRECTORY_DEFAULT;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
+import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS;
+import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 
 /**
  * Handles CreateKey request.
@@ -184,6 +195,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         getOmRequest());
     IOException exception = null;
     Result result = null;
+    List<OmKeyInfo> missingParentInfos = null;
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
       volumeName = keyArgs.getVolumeName();
@@ -208,6 +220,42 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
       OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
           omMetadataManager.getBucketKey(volumeName, bucketName));
+
+      boolean createIntermediateDir =
+          ozoneManager.getConfiguration().getBoolean(
+              OZONE_OM_CREATE_INTERMEDIATE_DIRECTORY,
+              OZONE_OM_CREATE_INTERMEDIATE_DIRECTORY_DEFAULT);
+
+      // If FILE_EXISTS we just override like how we used to do for Key Create.
+      List<OzoneAcl> inheritAcls;
+      if (createIntermediateDir) {
+        OMFileRequest.OMPathInfo pathInfo =
+            OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
+                bucketName, keyName, Paths.get(keyName));
+        OMFileRequest.OMDirectoryResult omDirectoryResult =
+            pathInfo.getDirectoryResult();
+        inheritAcls = pathInfo.getAcls();
+
+        // Check if a file or directory exists with same key name.
+        if (omDirectoryResult == DIRECTORY_EXISTS) {
+          throw new OMException("Can not write to directory: " + keyName,
+              NOT_A_FILE);
+        } else if (omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
+            throw new OMException("Can not create file: " + keyName +
+                " as there is already file in the given path", NOT_A_FILE);
+        }
+
+        missingParentInfos = OMDirectoryCreateRequest
+            .getAllParentInfo(ozoneManager, keyArgs,
+                pathInfo.getMissingParents(), inheritAcls, trxnLogIndex);
+
+        // Add cache entries for the prefix directories.
+        // Skip adding for the file key itself, until Key Commit.
+        OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
+            bucketName, Optional.absent(), Optional.of(missingParentInfos),
+            trxnLogIndex);
+
+      }
 
       omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
           keyArgs.getDataSize(), locations,  getFileEncryptionInfo(keyArgs),
@@ -238,7 +286,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           .setOpenVersion(openVersion).build())
           .setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponse(omResponse.build(),
-          omKeyInfo, null, clientID);
+          omKeyInfo, missingParentInfos, clientID);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

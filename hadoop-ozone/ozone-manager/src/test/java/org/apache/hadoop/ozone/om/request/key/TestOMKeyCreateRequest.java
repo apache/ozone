@@ -18,9 +18,12 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.junit.Assert;
 import org.junit.Test;
@@ -37,7 +40,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 
+
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CREATE_INTERMEDIATE_DIRECTORY;
+import static org.apache.hadoop.ozone.om.request.TestOMRequestUtils.addKeyToTable;
 import static org.apache.hadoop.ozone.om.request.TestOMRequestUtils.addVolumeAndBucketToDB;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests OMCreateKeyRequest class.
@@ -310,6 +317,11 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   @SuppressWarnings("parameterNumber")
   private OMRequest createKeyRequest(boolean isMultipartKey, int partNumber) {
+    return createKeyRequest(isMultipartKey, partNumber, keyName);
+  }
+
+  private OMRequest createKeyRequest(boolean isMultipartKey, int partNumber,
+      String keyName) {
 
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
@@ -327,6 +339,48 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateKey)
         .setClientId(UUID.randomUUID().toString())
         .setCreateKeyRequest(createKeyRequest).build();
+  }
+
+  @Test
+  public void testKeyCreateWithIntermediateDir() throws Exception {
+
+    String keyName = "a/b/c/file1";
+    OMRequest omRequest = createKeyRequest(false, 0, keyName);
+
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    configuration.setBoolean(OZONE_OM_CREATE_INTERMEDIATE_DIRECTORY, true);
+    when(ozoneManager.getConfiguration()).thenReturn(configuration);
+    OMKeyCreateRequest omKeyCreateRequest = new OMKeyCreateRequest(omRequest);
+
+    omRequest = omKeyCreateRequest.preExecute(ozoneManager);
+
+    omKeyCreateRequest = new OMKeyCreateRequest(omRequest);
+
+    // Add volume and bucket entries to DB.
+    addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager);
+
+    OMClientResponse omClientResponse =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager,
+        100L, ozoneManagerDoubleBufferHelper);
+
+    Path keyPath = Paths.get(keyName);
+
+    // Check intermediate paths are created
+    keyPath = keyPath.getParent();
+    while(keyPath != null) {
+      Assert.assertNotNull(omMetadataManager.getKeyTable().get(
+          omMetadataManager.getOzoneDirKey(volumeName, bucketName,
+              keyPath.toString())));
+      keyPath = keyPath.getParent();
+    }
+
+    // Check open key entry
+    String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
+        keyName, omRequest.getCreateKeyRequest().getClientID());
+    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+
+    Assert.assertNotNull(omKeyInfo);
 
   }
 
