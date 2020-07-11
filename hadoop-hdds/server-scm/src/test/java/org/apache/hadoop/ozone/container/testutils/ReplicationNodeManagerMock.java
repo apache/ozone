@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.ozone.protocol.commands.StopDataNodeCommand;
 
 import java.io.IOException;
 import java.util.List;
@@ -265,6 +266,11 @@ public class ReplicationNodeManagerMock implements NodeManager {
   public RegisteredCommand register(DatanodeDetails dd,
                                     NodeReportProto nodeReport,
                                     PipelineReportsProto pipelineReportsProto) {
+    return null;
+  }
+
+  @Override
+  public StopDataNodeCommand stopDataNode(DatanodeDetails datanodeDetails) {
     return null;
   }
 

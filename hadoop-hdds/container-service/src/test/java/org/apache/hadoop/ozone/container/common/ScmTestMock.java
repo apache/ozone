@@ -233,6 +233,25 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
   }
 
   /**
+   * Stop Datanode.
+   *
+   * @param datanodeDetailsProto DatanodDetailsProto.
+   * @return SCM Command.
+   */
+  @Override
+  public StorageContainerDatanodeProtocolProtos
+      .SCMStopDataNodeResponseProto stopDataNode(
+          DatanodeDetailsProto datanodeDetailsProto) {
+    rpcCount.incrementAndGet();
+    return StorageContainerDatanodeProtocolProtos.SCMStopDataNodeResponseProto
+        .newBuilder()
+        .setErrorCode(
+            StorageContainerDatanodeProtocolProtos
+                .SCMStopDataNodeResponseProto.ErrorCode.success)
+        .build();
+  }
+
+  /**
    * Update nodeReport.
    * @param datanodeDetailsProto
    * @param nodeReport

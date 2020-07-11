@@ -105,6 +105,13 @@ public class StorageContainerDatanodeProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setRegisterResponse(register(request.getRegisterRequest()))
             .build();
+      case StopDataNode:
+        return SCMDatanodeResponse.newBuilder()
+            .setCmdType(cmdType)
+            .setStatus(Status.OK)
+            .setStopDataNodeResponse(impl.stopDataNode(
+                request.getStopDataNodeRequest().getDatanodeDetails()))
+            .build();
       default:
         throw new ServiceException("Unknown command type: " + cmdType);
       }

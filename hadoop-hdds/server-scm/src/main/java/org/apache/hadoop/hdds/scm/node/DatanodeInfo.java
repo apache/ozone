@@ -66,6 +66,18 @@ public class DatanodeInfo extends DatanodeDetails {
   }
 
   /**
+   * Updates the last heartbeat time with current time.
+   */
+  public void updateLastHeartbeatTime(long heartbeatTime) {
+    try {
+      lock.writeLock().lock();
+      lastHeartbeatTime = heartbeatTime;
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  /**
    * Returns the last heartbeat time.
    *
    * @return last heartbeat time.

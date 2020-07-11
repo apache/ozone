@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.ozone.protocol.commands.StopDataNodeCommand;
 
 import java.util.List;
 
@@ -59,6 +60,13 @@ public interface StorageContainerNodeProtocol {
   RegisteredCommand register(DatanodeDetails datanodeDetails,
                              NodeReportProto nodeReport,
                              PipelineReportsProto pipelineReport);
+
+  /**
+   * Stop the node.
+   * @param datanodeDetails DatanodeDetails
+   * @return SCMStopDataNodeResponseProto
+   */
+  StopDataNodeCommand stopDataNode(DatanodeDetails datanodeDetails);
 
   /**
    * Send heartbeat to indicate the datanode is alive and doing well.

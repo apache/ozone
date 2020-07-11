@@ -37,6 +37,8 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMRegisterRequestProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMStopDataNodeRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMStopDataNodeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -173,5 +175,22 @@ public class StorageContainerDatanodeProtocolClientSideTranslatorPB
     return submitRequest(Type.Register,
         (builder) -> builder.setRegisterRequest(req))
         .getRegisterResponse();
+  }
+
+  /**
+   * Stop Datanode.
+   *
+   * @param datanodeDetailsProto - Datanode Details
+   * @return SCM Command.
+   */
+  @Override
+  public SCMStopDataNodeResponseProto stopDataNode(
+      DatanodeDetailsProto datanodeDetailsProto) throws IOException {
+    SCMStopDataNodeRequestProto.Builder req =
+        SCMStopDataNodeRequestProto.newBuilder();
+    req.setDatanodeDetails(datanodeDetailsProto);
+    return submitRequest(Type.StopDataNode,
+        (builder) -> builder.setStopDataNodeRequest(req))
+            .getStopDataNodeResponse();
   }
 }

@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.ozone.protocol.commands.StopDataNodeCommand;
 import org.assertj.core.util.Preconditions;
 
 import java.io.IOException;
@@ -439,6 +440,11 @@ public class MockNodeManager implements NodeManager {
     } catch (SCMException e) {
       e.printStackTrace();
     }
+    return null;
+  }
+
+  @Override
+  public StopDataNodeCommand stopDataNode(DatanodeDetails datanodeDetails) {
     return null;
   }
 

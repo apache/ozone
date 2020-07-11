@@ -18,6 +18,10 @@
               {
                 "name": "SendHeartbeat",
                 "integer": 3
+              },
+              {
+                "name": "StopDataNode",
+                "integer": 4
               }
             ]
           },
@@ -43,6 +47,19 @@
               },
               {
                 "name": "errorNodeNotPermitted",
+                "integer": 2
+              }
+            ]
+          },
+          {
+            "name": "SCMStopDataNodeResponseProto.ErrorCode",
+            "enum_fields": [
+              {
+                "name": "success",
+                "integer": 1
+              },
+              {
+                "name": "failed",
                 "integer": 2
               }
             ]
@@ -200,6 +217,10 @@
               {
                 "name": "closePipelineCommand",
                 "integer": 7
+              },
+              {
+                "name": "stopDataNodeCommand",
+                "integer": 8
               }
             ]
           }
@@ -232,6 +253,11 @@
                 "id": 5,
                 "name": "sendHeartbeatRequest",
                 "type": "SCMHeartbeatRequestProto"
+              },
+              {
+                "id": 6,
+                "name": "stopDataNodeRequest",
+                "type": "SCMStopDataNodeRequestProto"
               }
             ]
           },
@@ -283,6 +309,11 @@
                 "id": 8,
                 "name": "sendHeartbeatResponse",
                 "type": "SCMHeartbeatResponseProto"
+              },
+              {
+                "id": 9,
+                "name": "stopDataNodeResponse",
+                "type": "SCMStopDataNodeResponseProto"
               }
             ]
           },
@@ -372,6 +403,26 @@
                 "id": 8,
                 "name": "networkLocation",
                 "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "SCMStopDataNodeRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "datanodeDetails",
+                "type": "DatanodeDetailsProto"
+              }
+            ]
+          },
+          {
+            "name": "SCMStopDataNodeResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "errorCode",
+                "type": "ErrorCode"
               }
             ]
           },
@@ -819,11 +870,19 @@
                 "id": 8,
                 "name": "closePipelineCommandProto",
                 "type": "ClosePipelineCommandProto"
+              },
+              {
+                "id": 9,
+                "name": "stopDataNodeCommandProto",
+                "type": "StopDataNodeCommandProto"
               }
             ]
           },
           {
             "name": "ReregisterCommandProto"
+          },
+          {
+            "name": "StopDataNodeCommandProto"
           },
           {
             "name": "DeleteBlocksCommandProto",

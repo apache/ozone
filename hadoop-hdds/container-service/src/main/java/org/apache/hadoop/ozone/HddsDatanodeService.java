@@ -24,6 +24,7 @@ import java.security.KeyPair;
 import java.security.cert.CertificateException;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -54,6 +55,8 @@ import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
+import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -70,6 +73,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
 import org.apache.hadoop.util.Time;
+import static org.apache.hadoop.util.RunJar.SHUTDOWN_HOOK_PRIORITY;
+
+import org.apache.hadoop.util.ShutdownHookManager;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,6 +112,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) {};
   private ObjectName dnInfoBeanName;
 
+  private Runnable stopDataNodeShutdownHook;
   //Constructor for DataNode PluginService
   public HddsDatanodeService(){}
 
@@ -164,8 +171,28 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           HddsDatanodeService.class, args, LOG);
     }
     start(createOzoneConfiguration());
+    stopDataNodeShutdownHook = () ->
+            stopDataNode();
+    ShutdownHookManager.get().addShutdownHook(stopDataNodeShutdownHook,
+            SHUTDOWN_HOOK_PRIORITY);
     join();
     return null;
+  }
+  
+  private void stopDataNode() {
+    Collection<EndpointStateMachine> endpointStateMachines =
+        datanodeStateMachine.getConnectionManager().getValues();
+    for (EndpointStateMachine endpointStateMachine : endpointStateMachines) {
+      try {
+        // Make sure the heartbeat is not sent
+        // after stop datanode request to scm.
+        datanodeStateMachine.getContext().setState(DatanodeStates.SHUTDOWN);
+        endpointStateMachine.getEndPoint()
+            .stopDataNode(datanodeDetails.getProtoBufMessage());
+      } catch (IOException e) {
+        LOG.warn("{} is unable to stop DataNode.", endpointStateMachine, e);
+      }
+    }
   }
 
   public void setConfiguration(OzoneConfiguration configuration) {

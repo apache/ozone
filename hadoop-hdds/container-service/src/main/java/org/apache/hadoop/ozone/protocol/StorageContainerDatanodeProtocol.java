@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMStopDataNodeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -84,4 +85,11 @@ public interface StorageContainerDatanodeProtocol {
           ContainerReportsProto containerReportsRequestProto,
           PipelineReportsProto pipelineReports) throws IOException;
 
+  /**
+   * Stop Datanode.
+   * @param datanodeDetails - Datanode Details.
+   * @return SCM Command.
+   */
+  SCMStopDataNodeResponseProto stopDataNode(
+          DatanodeDetailsProto datanodeDetails) throws IOException;
 }

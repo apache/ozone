@@ -265,7 +265,6 @@ public class NodeStateManager implements Runnable, Closeable {
     stateMachine.addTransition(
         NodeState.DECOMMISSIONING, NodeState.DECOMMISSIONED,
         NodeLifeCycleEvent.DECOMMISSIONED);
-
   }
 
   /**
@@ -706,6 +705,21 @@ public class NodeStateManager implements Runnable, Closeable {
               " Current state: {}, life cycle event: {}",
           node, state, lifeCycleEvent);
     }
+  }
+
+  /**
+   *
+   * @param datanodeDetails
+   */
+  public void stopNode(DatanodeDetails datanodeDetails)
+      throws NodeNotFoundException {
+    UUID uuid = datanodeDetails.getUuid();
+    NodeState state = nodeStateMap.getNodeState(uuid);
+    DatanodeInfo node = nodeStateMap.getNodeInfo(uuid);
+    nodeStateMap.updateNodeState(datanodeDetails.getUuid(), state,
+        NodeState.DEAD);
+    node.updateLastHeartbeatTime(0L);
+    eventPublisher.fireEvent(state2EventMap.get(NodeState.DEAD), node);
   }
 
   @Override

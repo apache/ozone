@@ -62,6 +62,7 @@ import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.ozone.protocol.commands.StopDataNodeCommand;
 import org.apache.hadoop.util.ReflectionUtils;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -286,6 +287,21 @@ public class SCMNodeManager implements NodeManager {
         .setDatanode(datanodeDetails)
         .setClusterID(this.scmStorageConfig.getClusterID())
         .build();
+  }
+
+  @Override
+  public StopDataNodeCommand stopDataNode(DatanodeDetails datanodeDetails) {
+    try {
+      nodeStateManager.stopNode(datanodeDetails);
+    } catch (NodeNotFoundException e) {
+      LOG.error("Cannot find datanode {} from nodeStateManager",
+          datanodeDetails.toString());
+    }
+
+    return StopDataNodeCommand.newBuilder().setErrorCode(
+        org.apache.hadoop.hdds.protocol.proto
+            .StorageContainerDatanodeProtocolProtos
+            .SCMStopDataNodeResponseProto.ErrorCode.success).build();
   }
 
   /**
