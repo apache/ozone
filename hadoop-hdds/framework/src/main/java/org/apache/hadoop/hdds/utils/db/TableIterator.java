@@ -61,7 +61,7 @@ public interface TableIterator<KEY, T> extends Iterator<T>, Closeable {
   T value();
 
   /**
-   * Removes the actual value of the iterator from the database table on
+   * Remove the actual value of the iterator from the database table on
    * which the iterator is working on.
    *
    * @throws IOException when there is an error occured during deletion.
