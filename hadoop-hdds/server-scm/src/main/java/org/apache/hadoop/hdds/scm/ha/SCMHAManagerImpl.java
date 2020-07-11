@@ -17,7 +17,17 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.ratis.protocol.NotLeaderException;
+import org.apache.ratis.protocol.RaftGroupMemberId;
+import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.server.RaftServer;
+import org.apache.ratis.server.impl.RaftServerImpl;
+import org.apache.ratis.server.impl.RaftServerProxy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
@@ -31,14 +41,17 @@ import java.io.IOException;
  */
 public class SCMHAManagerImpl implements SCMHAManager {
 
-  private static boolean isLeader = true;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(SCMHAManagerImpl.class);
 
   private final SCMRatisServerImpl ratisServer;
+  private final ConfigurationSource conf;
 
   /**
    * Creates SCMHAManager instance.
    */
   public SCMHAManagerImpl(final ConfigurationSource conf) throws IOException {
+    this.conf = conf;
     this.ratisServer = new SCMRatisServerImpl(
         conf.getObject(SCMHAConfiguration.class), conf);
   }
@@ -56,7 +69,28 @@ public class SCMHAManagerImpl implements SCMHAManager {
    */
   @Override
   public boolean isLeader() {
-    return isLeader;
+    if (!SCMHAUtils.isSCMHAEnabled(conf)) {
+      // When SCM HA is not enabled, the current SCM is always the leader.
+      return true;
+    }
+    RaftServer server = ratisServer.getServer();
+    Preconditions.checkState(server instanceof RaftServerProxy);
+    RaftServerImpl serverImpl = null;
+    try {
+      // SCM only has one raft group.
+      serverImpl = ((RaftServerProxy) server)
+          .getImpl(ratisServer.getRaftGroupId());
+    } catch (IOException ioe) {
+      LOG.error("Fail to get RaftServer impl and therefore it's not clear " +
+          "whether it's leader. ", ioe);
+    } finally {
+      if (serverImpl != null) {
+        // Only when it's sure the current SCM is the leader, otherwise
+        // it should all return false.
+        return serverImpl.isLeader();
+      }
+    }
+    return false;
   }
 
   /**
@@ -67,6 +101,44 @@ public class SCMHAManagerImpl implements SCMHAManager {
     return ratisServer;
   }
 
+  private RaftPeerId getPeerIdFromRoleInfo(RaftServerImpl serverImpl) {
+    if (serverImpl.isLeader()) {
+      return RaftPeerId.getRaftPeerId(
+          serverImpl.getRoleInfoProto().getLeaderInfo().toString());
+    } else if (serverImpl.isFollower()) {
+      return RaftPeerId.getRaftPeerId(
+          serverImpl.getRoleInfoProto().getFollowerInfo()
+              .getLeaderInfo().getId().getAddress());
+    } else {
+      return null;
+    }
+  }
+
+  @Override
+  public RaftPeer getSuggestedLeader() {
+    RaftServer server = ratisServer.getServer();
+    Preconditions.checkState(server instanceof RaftServerProxy);
+    RaftServerImpl serverImpl = null;
+    try {
+      // SCM only has one raft group.
+      serverImpl = ((RaftServerProxy) server)
+          .getImpl(ratisServer.getRaftGroupId());
+    } catch (IOException ioe) {
+      LOG.error("Fail to get RaftServer impl and therefore it's not clear " +
+          "whether it's leader. ", ioe);
+    } finally {
+      if (serverImpl != null) {
+        RaftPeerId peerId =  getPeerIdFromRoleInfo(serverImpl);
+        if (peerId != null) {
+          return new RaftPeer(peerId);
+        } else {
+          return null;
+        }
+      }
+    }
+    return null;
+  }
+
   /**
    * {@inheritDoc}
    */
@@ -75,4 +147,15 @@ public class SCMHAManagerImpl implements SCMHAManager {
     ratisServer.stop();
   }
 
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public NotLeaderException triggerNotLeaderException() {
+    return new NotLeaderException(RaftGroupMemberId.valueOf(
+        ratisServer.getServer().getId(),
+        ratisServer.getRaftGroupId()),
+        getSuggestedLeader(),
+        ratisServer.getRaftPeers());
+  }
 }

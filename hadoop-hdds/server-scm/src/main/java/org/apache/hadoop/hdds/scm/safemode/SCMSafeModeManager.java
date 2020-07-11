@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.ratis.protocol.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -152,7 +153,12 @@ public class SCMSafeModeManager implements SafeModeManager {
           HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION_DEFAULT);
 
       if (createPipelineInSafemode) {
-        pipelineManager.startPipelineCreator();
+        try {
+          pipelineManager.startPipelineCreator();
+        } catch (NotLeaderException ex) {
+          LOG.warn("Not the current leader SCM and cannot start pipeline" +
+                  " creation.");
+        }
       }
     } else {
       this.safeModeMetrics = null;

@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.server.ratis.SCMRatisServer;
@@ -37,12 +37,12 @@ public final class SCMHAUtils {
   }
 
   // Check if SCM HA is enabled.
-  public static boolean isSCMHAEnabled(OzoneConfiguration conf) {
+  public static boolean isSCMHAEnabled(ConfigurationSource conf) {
     return conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
         ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
   }
 
-  public static File createSCMRatisDir(OzoneConfiguration conf)
+  public static File createSCMRatisDir(ConfigurationSource conf)
       throws  IllegalArgumentException {
     String scmRatisDir = SCMRatisServer.getSCMRatisDirectory(conf);
     if (scmRatisDir == null || scmRatisDir.isEmpty()) {

@@ -485,7 +485,7 @@ public class TestSCMSafeModeManager {
 
 
   @Test
-  public void testDisableSafeMode() {
+  public void testDisableSafeMode() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration(config);
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, false);
     PipelineManager pipelineManager = Mockito.mock(PipelineManager.class);
