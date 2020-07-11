@@ -21,6 +21,9 @@ import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
@@ -77,6 +80,122 @@ public class OzoneTokenIdentifier extends
     return KIND_NAME;
   }
 
+  /** Instead of relying on proto serialization, this
+   *  provides  explicit serialization for OzoneTokenIdentifier.
+   * @return byte[]
+   */
+  public byte[] toUniqueSerializedKey() {
+    ByteBuffer result =
+        ByteBuffer.allocate(4096);
+    result.order(ByteOrder.BIG_ENDIAN);
+    try {
+      result.putLong(getIssueDate());
+      result.putInt(getMasterKeyId());
+      result.putInt(getSequenceNumber());
+
+      result.putLong(getMaxDate());
+
+      result.putInt(getOwner().toString().length());
+      result.put(getOwner().toString().getBytes(StandardCharsets.UTF_8));
+
+      result.putInt(getRealUser().toString().length());
+      result.put(getRealUser().toString().getBytes(StandardCharsets.UTF_8));
+
+      result.putInt(getRenewer().toString().length());
+      result.put(getRenewer().toString().getBytes(StandardCharsets.UTF_8));
+
+      result.putInt(getTokenType().getNumber());
+      // Set s3 specific fields.
+      if (getTokenType().equals(S3AUTHINFO)) {
+        result.putInt(getAwsAccessId().length());
+        result.put(getAwsAccessId().getBytes(StandardCharsets.UTF_8));
+
+        result.putInt(getSignature().length());
+        result.put(getSignature().getBytes(StandardCharsets.UTF_8));
+
+        result.putInt(getStrToSign().length());
+        result.put(getStrToSign().getBytes(StandardCharsets.UTF_8));
+      } else {
+        result.putInt(getOmCertSerialId().length());
+        result.put(getOmCertSerialId().getBytes(StandardCharsets.UTF_8));
+        if (getOmServiceId() != null) {
+          result.putInt(getOmServiceId().length());
+          result.put(getOmServiceId().getBytes(StandardCharsets.UTF_8));
+        } else {
+          result.putInt(0);
+        }
+      }
+    } catch (IndexOutOfBoundsException e) {
+      throw new IllegalArgumentException(
+          "Can't encode the the raw data ", e);
+    }
+    return result.array();
+  }
+
+  /** Instead of relying on proto deserialization, this
+   *  provides  explicit deserialization for OzoneTokenIdentifier.
+   * @return byte[]
+   */
+  public static OzoneTokenIdentifier fromUniqueSerializedKey(byte[] rawData) {
+    OzoneTokenIdentifier result = newInstance();
+    ByteBuffer inbuf = ByteBuffer.wrap(rawData);
+    inbuf.order(ByteOrder.BIG_ENDIAN);
+    result.setIssueDate(inbuf.getLong());
+    result.setMasterKeyId(inbuf.getInt());
+    result.setSequenceNumber(inbuf.getInt());
+
+    result.setMaxDate(inbuf.getLong());
+
+    int strsize = 0;
+    strsize = inbuf.getInt();
+    byte[] ownerBytes = new byte[strsize];
+    inbuf.get(ownerBytes);
+    result.setOwner(new Text(ownerBytes));
+
+    strsize = inbuf.getInt();
+    byte[] ruserBytes = new byte[strsize];
+    inbuf.get(ruserBytes);
+    result.setRealUser(new Text(ruserBytes));
+
+    strsize = inbuf.getInt();
+    byte[] renewerBytes = new byte[strsize];
+    inbuf.get(renewerBytes);
+    result.setRenewer(new Text(renewerBytes));
+
+    // Set s3 specific fields.
+    if (inbuf.getInt() == S3AUTHINFO.getNumber()) {
+      strsize = inbuf.getInt();
+      byte[] awsAccessIdBytes = new byte[strsize];
+      inbuf.get(awsAccessIdBytes);
+      result.setAwsAccessId(new String(awsAccessIdBytes,
+          StandardCharsets.UTF_8));
+
+      strsize = inbuf.getInt();
+      byte[] signatureBytes = new byte[strsize];
+      inbuf.get(signatureBytes);
+      result.setSignature(new String(signatureBytes, StandardCharsets.UTF_8));
+
+      strsize = inbuf.getInt();
+      byte[] strToSignBytes = new byte[strsize];
+      inbuf.get(strToSignBytes);
+      result.setStrToSign(new String(strToSignBytes, StandardCharsets.UTF_8));
+    } else {
+      strsize = inbuf.getInt();
+      byte[] omCertIdBytes = new byte[strsize];
+      inbuf.get(omCertIdBytes);
+      result.setOmCertSerialId(new String(omCertIdBytes,
+          StandardCharsets.UTF_8));
+      int nextStrsize = inbuf.getInt();
+      if (nextStrsize != 0) {
+        byte[] omServiceIdBytes = new byte[nextStrsize];
+        inbuf.get(omServiceIdBytes);
+        result.setOmServiceId(new String(omServiceIdBytes,
+            StandardCharsets.UTF_8));
+      }
+    }
+    return result;
+  }
+
   /**
    * Overrides default implementation to write using Protobuf.
    *
@@ -92,7 +211,6 @@ public class OzoneTokenIdentifier extends
         .setRealUser(getRealUser().toString())
         .setRenewer(getRenewer().toString())
         .setIssueDate(getIssueDate())
-        .setMaxDate(getMaxDate())
         .setSequenceNumber(getSequenceNumber())
         .setMasterKeyId(getMasterKeyId());
 
