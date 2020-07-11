@@ -68,7 +68,6 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -634,7 +633,7 @@ public class TestSCMPipelineManager {
   }
 
   private KeyValue<PipelineID, Pipeline>
-  mockKeyValueToProvideOldKeyFormat(Pipeline pipeline)
+      mockKeyValueToProvideOldKeyFormat(Pipeline pipeline)
       throws IOException {
     KeyValue<PipelineID, Pipeline> kv = mock(KeyValue.class);
     when(kv.getValue()).thenReturn(pipeline);
@@ -642,13 +641,12 @@ public class TestSCMPipelineManager {
         .thenReturn(
             new PipelineIDCodec().fromPersistedFormat(
                 pipeline.getId().getProtobuf().toByteArray()
-            )
-        );
+            ));
     return kv;
   }
 
   private KeyValue<PipelineID, Pipeline>
-  mockKeyValueToProvideNormalFormat(Pipeline pipeline)
+      mockKeyValueToProvideNormalFormat(Pipeline pipeline)
       throws IOException {
     KeyValue<PipelineID, Pipeline> kv = mock(KeyValue.class);
     when(kv.getValue()).thenReturn(pipeline);
