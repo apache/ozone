@@ -311,6 +311,9 @@ enum Status {
     DETECTED_LOOP_IN_BUCKET_LINKS = 63;
 
     NOT_SUPPORTED_OPERATION = 64;
+
+    PARTIAL_RENAME = 65;
+
 }
 
 /**
@@ -846,8 +849,16 @@ message RenameKeysRequest{
     repeated RenameKeyRequest renameKeyRequest = 1;
 }
 
+message RenameKeyArgs{
+    required string volumeName = 1;
+    required string bucketName = 2;
+    optional string fromKeyName = 3;
+    optional string toKeyName = 4;
+}
+
 message RenameKeysResponse{
-    repeated KeyInfo unRenamedKeys = 1;
+    repeated RenameKeyArgs unRenamedKeys = 1;
+    optional bool status = 2;
 }
 
 message RenameKeyRequest{

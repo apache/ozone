@@ -423,6 +423,10 @@
               {
                 "name": "PARTIAL_DELETE",
                 "integer": 62
+              },
+              {
+                "name": "PARTIAL_RENAME",
+                "integer": 64
               }
             ]
           },
@@ -2427,13 +2431,43 @@
             ]
           },
           {
+            "name": "RenameKeyArgs",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "fromKeyName",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "toKeyName",
+                "type": "string"
+              }
+            ]
+          },
+          {
             "name": "RenameKeysResponse",
             "fields": [
               {
                 "id": 1,
                 "name": "unRenamedKeys",
-                "type": "KeyInfo",
+                "type": "RenameKeyArgs",
                 "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "status",
+                "type": "bool"
               }
             ]
           },
