@@ -132,7 +132,7 @@ public class DeletedBlockLogImpl
         if (block == null) {
           // Should we make this an error ? How can we not find the deleted
           // TXID?
-          LOG.warn("Deleted TXID not found.");
+          LOG.warn("Deleted TXID {} not found.", txID);
           continue;
         }
         DeletedBlocksTransaction.Builder builder = block.toBuilder();

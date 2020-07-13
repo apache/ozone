@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.TestUtils;
-import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.SCMNodeMetrics;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
@@ -45,7 +45,6 @@ import org.junit.Assert;
 import static org.junit.Assert.assertEquals;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.mockito.Mockito;
 
 /**
  * Test cases to verify the metrics exposed by SCMNodeManager.
@@ -64,7 +63,7 @@ public class TestSCMNodeMetrics {
     SCMStorageConfig config =
         new SCMStorageConfig(NodeType.DATANODE, new File("/tmp"), "storage");
     nodeManager = new SCMNodeManager(source, config, publisher,
-        Mockito.mock(NetworkTopology.class));
+        new NetworkTopologyImpl(source));
 
     registeredDatanode = DatanodeDetails.newBuilder()
         .setHostName("localhost")

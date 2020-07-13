@@ -241,34 +241,43 @@ public class SCMNodeManager implements NodeManager {
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
       PipelineReportsProto pipelineReportsProto) {
 
-    InetAddress dnAddress = Server.getRemoteIp();
-    if (dnAddress != null) {
-      // Mostly called inside an RPC, update ip and peer hostname
-      datanodeDetails.setHostName(dnAddress.getHostName());
-      datanodeDetails.setIpAddress(dnAddress.getHostAddress());
-    }
-    try {
-      String dnsName;
-      String networkLocation;
-      datanodeDetails.setNetworkName(datanodeDetails.getUuidString());
-      if (useHostname) {
-        dnsName = datanodeDetails.getHostName();
-      } else {
-        dnsName = datanodeDetails.getIpAddress();
+    if (!isNodeRegistered(datanodeDetails)) {
+      InetAddress dnAddress = Server.getRemoteIp();
+      if (dnAddress != null) {
+        // Mostly called inside an RPC, update ip and peer hostname
+        datanodeDetails.setHostName(dnAddress.getHostName());
+        datanodeDetails.setIpAddress(dnAddress.getHostAddress());
       }
-      networkLocation = nodeResolve(dnsName);
-      if (networkLocation != null) {
-        datanodeDetails.setNetworkLocation(networkLocation);
-      }
-      nodeStateManager.addNode(datanodeDetails);
-      clusterMap.add(datanodeDetails);
-      addEntryTodnsToUuidMap(dnsName, datanodeDetails.getUuidString());
-      // Updating Node Report, as registration is successful
-      processNodeReport(datanodeDetails, nodeReport);
-      LOG.info("Registered Data node : {}", datanodeDetails);
-    } catch (NodeAlreadyExistsException e) {
-      if (LOG.isTraceEnabled()) {
-        LOG.trace("Datanode is already registered. Datanode: {}",
+      try {
+        String dnsName;
+        String networkLocation;
+        datanodeDetails.setNetworkName(datanodeDetails.getUuidString());
+        if (useHostname) {
+          dnsName = datanodeDetails.getHostName();
+        } else {
+          dnsName = datanodeDetails.getIpAddress();
+        }
+        networkLocation = nodeResolve(dnsName);
+        if (networkLocation != null) {
+          datanodeDetails.setNetworkLocation(networkLocation);
+        }
+
+        clusterMap.add(datanodeDetails);
+        nodeStateManager.addNode(datanodeDetails);
+        // Check that datanode in nodeStateManager has topology parent set
+        DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
+        Preconditions.checkState(dn.getParent() != null);
+        addEntryTodnsToUuidMap(dnsName, datanodeDetails.getUuidString());
+        // Updating Node Report, as registration is successful
+        processNodeReport(datanodeDetails, nodeReport);
+        LOG.info("Registered Data node : {}", datanodeDetails);
+      } catch (NodeAlreadyExistsException e) {
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("Datanode is already registered. Datanode: {}",
+              datanodeDetails.toString());
+        }
+      } catch (NodeNotFoundException e) {
+        LOG.error("Cannot find datanode {} from nodeStateManager",
             datanodeDetails.toString());
       }
     }
