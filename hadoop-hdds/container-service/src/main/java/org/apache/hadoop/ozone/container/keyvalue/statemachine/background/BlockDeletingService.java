@@ -302,8 +302,6 @@ public class BlockDeletingService extends BackgroundService {
 
           meta.getStore().getMetadataTable().putWithBatch(batch, deletedEntry, blockId);
           meta.getStore().getMetadataTable().deleteWithBatch(batch, entry);
-
-          meta.getStore().getBatchHandler().commitBatchOperation(batch);
         }
 
 
