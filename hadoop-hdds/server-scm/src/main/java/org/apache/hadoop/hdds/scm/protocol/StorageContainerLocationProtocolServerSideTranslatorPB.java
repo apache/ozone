@@ -271,6 +271,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setScmDeleteContainerResponse(deleteContainer(
                 request.getScmDeleteContainerRequest()))
+            。build();
       case GetSafeModeRuleStatuses:
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType()).setStatus(Status.OK)
