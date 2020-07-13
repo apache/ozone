@@ -247,19 +247,6 @@
     </description>
   </property>
   <property>
-    <name>dfs.ratis.client.request.max.retries</name>
-    <value>180</value>
-    <tag>OZONE, RATIS, MANAGEMENT</tag>
-    <description>Number of retries for ratis client request.</description>
-  </property>
-  <property>
-    <name>dfs.ratis.client.request.retry.interval</name>
-    <value>1000ms</value>
-    <tag>OZONE, RATIS, MANAGEMENT</tag>
-    <description>Interval between successive retries for a ratis client request.
-    </description>
-  </property>
-  <property>
     <name>dfs.ratis.server.retry-cache.timeout.duration</name>
     <value>600000ms</value>
     <tag>OZONE, RATIS, MANAGEMENT</tag>
@@ -390,11 +377,13 @@
   </property>
   <property>
     <name>ozone.client.stream.buffer.flush.delay</name>
-    <value>false</value>
+    <value>true</value>
     <tag>OZONE, CLIENT</tag>
-    <description>If set true, when call flush() and determine whether the
-      data in the current buffer is greater than ozone.client.stream.buffer.size.
-      if greater than then send buffer to the datanode.
+    <description>
+      Default true, when call flush() and determine whether the data in the
+      current buffer is greater than ozone.client.stream.buffer.size, if
+      greater than then send buffer to the datanode. You can turn this off
+      by setting this configuration to false.
     </description>
   </property>
   <property>
@@ -643,17 +632,6 @@
       For production clusters or any time you care about performance, it is
       recommended that ozone.om.db.dirs, ozone.scm.db.dirs and
       dfs.container.ratis.datanode.storage.dir be configured separately.
-    </description>
-  </property>
-  <property>
-    <name>ozone.metastore.impl</name>
-    <value>RocksDB</value>
-    <tag>OZONE, OM, SCM, CONTAINER, STORAGE</tag>
-    <description>
-      Ozone metadata store implementation. Ozone metadata are well
-      distributed to multiple services such as ozoneManager, scm. They are stored in
-      some local key-value databases. This property determines which database
-      library to use. Supported value is either LevelDB or RocksDB.
     </description>
   </property>
 
@@ -1089,19 +1067,6 @@
   </property>
 
   <property>
-    <name>ozone.scm.container.creation.lease.timeout</name>
-    <value>60s</value>
-    <tag>OZONE, SCM</tag>
-    <description>
-      Container creation timeout in milliseconds to be used by SCM. When
-      BEGIN_CREATE event happens the container is moved from ALLOCATED to
-      CREATING state, SCM will now wait for the configured amount of time
-      to get COMPLETE_CREATE event if it doesn't receive it will move the
-      container to DELETING.
-    </description>
-  </property>
-
-  <property>
     <name>ozone.key.preallocation.max.blocks</name>
     <value>64</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
@@ -1368,16 +1333,6 @@
   </property>
 
   <property>
-    <name>hdds.container.scrub.enabled</name>
-    <value>false</value>
-    <tag>DATANODE</tag>
-    <description>
-      Boolean value to enable data and metadata scrubbing in the containers
-      running on each datanode.
-    </description>
-  </property>
-
-  <property>
     <name>hdds.container.action.max.limit</name>
     <value>20</value>
     <tag>DATANODE</tag>
@@ -1634,19 +1589,19 @@
 
   <property>
     <name>ozone.om.ratis.segment.size</name>
-    <value>16KB</value>
+    <value>4MB</value>
     <tag>OZONE, OM, RATIS, PERFORMANCE</tag>
     <description>The size of the raft segment used by Apache Ratis on OM.
-      (16 KB by default)
+      (4 MB by default)
     </description>
   </property>
 
   <property>
     <name>ozone.om.ratis.segment.preallocated.size</name>
-    <value>16KB</value>
+    <value>4MB</value>
     <tag>OZONE, OM, RATIS, PERFORMANCE</tag>
     <description>The size of the buffer which is preallocated for raft segment
-      used by Apache Ratis on OM.(16 KB by default)
+      used by Apache Ratis on OM.(4 MB by default)
     </description>
   </property>
 
@@ -1670,15 +1625,6 @@
     <tag>OZONE, OM, RATIS</tag>
     <description>The minimum gap between log indices for Raft server to purge
       its log segments after taking snapshot.
-    </description>
-  </property>
-
-  <property>
-    <name>ozone.om.ratis.snapshot.auto.trigger.threshold</name>
-    <value>400000</value>
-    <tag>OZONE, DEBUG, OM, RATIS</tag>
-    <description>The log index threshold after ratis will auto trigger
-      snapshot on the OM state machine.
     </description>
   </property>
 
@@ -1968,19 +1914,13 @@
       not be renewed.
     </description>
   </property>
-
+  
   <property>
-    <name>ozone.fs.isolated-classloader</name>
-    <value></value>
+    <name>ozone.fs.iterate.batch-size</name>
+    <value>100</value>
     <tag>OZONE, OZONEFS</tag>
     <description>
-      Enable it for older hadoops to separate the classloading of all the
-      Ozone classes. With 'true' value, ozonefs can be used with older
-      hadoop versions as the hadoop3/ozone related classes are loaded by
-      an isolated classloader.
-
-      Default depends from the used jar. true for ozone-filesystem-lib-legacy
-      jar and false for the ozone-filesystem-lib-current.jar
+      Iterate batch size of delete when use BasicOzoneFileSystem.
     </description>
   </property>
   <property>
@@ -2341,15 +2281,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.recon.container.db.impl</name>
-    <value>RocksDB</value>
-    <tag>OZONE, RECON, STORAGE</tag>
-    <description>
-      Ozone Recon container DB store implementation.Supported value is either
-      LevelDB or RocksDB.
-    </description>
-  </property>
-  <property>
     <name>ozone.recon.om.db.dir</name>
   <value/>
   <tag>OZONE, RECON, STORAGE</tag>
@@ -2535,6 +2466,16 @@
     <value>2m</value>
     <description>
       Timeout for the request submitted directly to Ratis in datanode.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.keyname.character.check.enabled</name>
+    <tag>OZONE, OM</tag>
+    <value>false</value>
+    <description>If true, then enable to check if the key name
+      contains illegal characters when creating/renaming key.
+      For the definition of illegal characters, follow the
+      rules in Amazon S3's object key naming guide.
     </description>
   </property>
 </configuration>

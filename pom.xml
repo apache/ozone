@@ -75,10 +75,15 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <hdds.version>${ozone.version}</hdds.version>
     <ozone.version>0.6.0-SNAPSHOT</ozone.version>
     <ozone.release>Denali</ozone.release>
+    <declared.hdds.version>${hdds.version}</declared.hdds.version>
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
 
     <!-- Apache Ratis version -->
-    <ratis.version>0.6.0-cac3336-SNAPSHOT</ratis.version>
+    <ratis.version>0.6.0-6ab75ae-SNAPSHOT</ratis.version>
+
+    <!-- Apache Ratis thirdparty version -->
+    <ratis.thirdparty.version>0.4.0</ratis.thirdparty.version>
+
     <distMgmtSnapshotsId>apache.snapshots.https</distMgmtSnapshotsId>
     <distMgmtSnapshotsName>Apache Development Snapshot Repository</distMgmtSnapshotsName>
     <distMgmtSnapshotsUrl>https://repository.apache.org/content/repositories/snapshots</distMgmtSnapshotsUrl>
@@ -180,7 +185,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- Maven protoc compiler -->
     <protobuf-maven-plugin.version>0.5.1</protobuf-maven-plugin.version>
     <protobuf-compile.version>3.11.0</protobuf-compile.version>
-    <grpc-compile.version>1.28.1</grpc-compile.version>
+    <grpc-compile.version>1.29.0</grpc-compile.version>
     <os-maven-plugin.version>1.5.0.Final</os-maven-plugin.version>
 
     <netty.version>4.1.48.Final</netty.version>
@@ -227,7 +232,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <surefire.fork.timeout>900</surefire.fork.timeout>
     <aws-java-sdk.version>1.11.615</aws-java-sdk.version>
     <hsqldb.version>2.3.4</hsqldb.version>
-    <frontend-maven-plugin.version>1.6</frontend-maven-plugin.version>
+    <frontend-maven-plugin.version>1.10.0</frontend-maven-plugin.version>
     <!-- the version of Hadoop declared in the version resources; can be overridden
     so that Hadoop 3.x can declare itself a 2.x artifact. -->
     <declared.hadoop.version>${hadoop.version}</declared.hadoop.version>
@@ -1585,7 +1590,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>org.rocksdb</groupId>
         <artifactId>rocksdbjni</artifactId>
-        <version>6.6.4</version>
+        <version>6.8.1</version>
       </dependency>
       <dependency>
         <groupId>org.xerial</groupId>
@@ -1793,7 +1798,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <plugin>
           <groupId>org.jacoco</groupId>
           <artifactId>jacoco-maven-plugin</artifactId>
-          <version>0.8.3</version>
+          <version>0.8.5</version>
         </plugin>
         <plugin>
           <groupId>io.fabric8</groupId>
@@ -1892,12 +1897,26 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
+        <configuration>
+          <fileSets>
+            <fileSet>
+              <directory>${project.basedir}</directory>
+              <includes>
+                <include>**/jacoco.exec</include>
+              </includes>
+              <useDefaultExcludes>false</useDefaultExcludes>
+            </fileSet>
+          </fileSets>
+        </configuration>
         <executions>
           <execution>
             <id>default-prepare-agent</id>
             <goals>
               <goal>prepare-agent</goal>
             </goals>
+            <configuration>
+              <includes>org.apache.hadoop.hdds.*,org.apache.hadoop.ozone.*,org.apache.hadoop.fs.ozone.*</includes>
+            </configuration>
           </execution>
         </executions>
       </plugin>
@@ -1930,6 +1949,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <java.security.egd>${java.security.egd}</java.security.egd>
             <require.test.libhadoop>${require.test.libhadoop}</require.test.libhadoop>
           </systemPropertyVariables>
+          <properties>
+            <property>
+              <name>listener</name>
+              <value>org.apache.hadoop.test.TimedOutTestsListener</value>
+            </property>
+          </properties>
           <includes>
             <include>**/Test*.java</include>
           </includes>

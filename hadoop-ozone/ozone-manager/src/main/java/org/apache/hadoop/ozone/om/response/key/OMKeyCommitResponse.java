@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -27,9 +28,13 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import java.io.IOException;
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
+
 /**
  * Response for CommitKey request.
  */
+@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, KEY_TABLE})
 public class OMKeyCommitResponse extends OMClientResponse {
 
   private OmKeyInfo omKeyInfo;
@@ -82,4 +87,5 @@ public class OMKeyCommitResponse extends OMClientResponse {
           omKeyInfo);
     }
   }
+
 }

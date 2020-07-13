@@ -234,7 +234,7 @@ public class SCMNodeManager implements NodeManager {
    *                        independent
    *                        of Namenode if required.
    * @param nodeReport      NodeReport.
-   * @return SCMHeartbeatResponseProto
+   * @return SCMRegisteredResponseProto
    */
   @Override
   public RegisteredCommand register(
@@ -615,7 +615,8 @@ public class SCMNodeManager implements NodeManager {
       LOG.warn("uuid is null");
       return null;
     }
-    DatanodeDetails temp = DatanodeDetails.newBuilder().setUuid(uuid).build();
+    DatanodeDetails temp = DatanodeDetails.newBuilder()
+        .setUuid(UUID.fromString(uuid)).build();
     try {
       return nodeStateManager.getNode(temp);
     } catch (NodeNotFoundException e) {
@@ -645,7 +646,8 @@ public class SCMNodeManager implements NodeManager {
     }
 
     for (String uuid : uuids) {
-      DatanodeDetails temp = DatanodeDetails.newBuilder().setUuid(uuid).build();
+      DatanodeDetails temp = DatanodeDetails.newBuilder()
+          .setUuid(UUID.fromString(uuid)).build();
       try {
         results.add(nodeStateManager.getNode(temp));
       } catch (NodeNotFoundException e) {

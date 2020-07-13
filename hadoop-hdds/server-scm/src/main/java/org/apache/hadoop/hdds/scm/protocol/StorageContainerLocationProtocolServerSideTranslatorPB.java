@@ -18,8 +18,11 @@
 package org.apache.hadoop.hdds.scm.protocol;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
@@ -62,6 +65,9 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -265,6 +271,11 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setScmDeleteContainerResponse(deleteContainer(
                 request.getScmDeleteContainerRequest()))
+      case GetSafeModeRuleStatuses:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType()).setStatus(Status.OK)
+            .setGetSafeModeRuleStatusesResponse(getSafeModeRuleStatues(
+                request.getGetSafeModeRuleStatusesRequest()))
             .build();
       default:
         throw new IllegalArgumentException(
@@ -446,6 +457,21 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return InSafeModeResponseProto.newBuilder()
         .setInSafeMode(impl.inSafeMode()).build();
 
+  }
+
+  public GetSafeModeRuleStatusesResponseProto getSafeModeRuleStatues(
+      GetSafeModeRuleStatusesRequestProto request) throws IOException {
+    Map<String, Pair<Boolean, String>>
+        map = impl.getSafeModeRuleStatuses();
+    List<SafeModeRuleStatusProto> proto = new ArrayList();
+    for (Map.Entry<String, Pair<Boolean, String>> entry : map.entrySet()) {
+      proto.add(SafeModeRuleStatusProto.newBuilder().setRuleName(entry.getKey())
+          .setValidate(entry.getValue().getLeft())
+          .setStatusText(entry.getValue().getRight())
+          .build());
+    }
+    return GetSafeModeRuleStatusesResponseProto.newBuilder()
+        .addAllSafeModeRuleStatusesProto(proto).build();
   }
 
   public ForceExitSafeModeResponseProto forceExitSafeMode(

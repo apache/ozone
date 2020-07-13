@@ -25,13 +25,11 @@ import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Path;
-import java.util.Calendar;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.TimeZone;
 
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -72,7 +70,6 @@ public final class HddsUtils {
   public static final String OZONE_SCM_SERVICE_ID = "OzoneScmService";
   public static final String OZONE_SCM_SERVICE_INSTANCE_ID =
       "OzoneScmServiceInstance";
-  private static final TimeZone UTC_ZONE = TimeZone.getTimeZone("UTC");
 
   private static final String MULTIPLE_SCM_NOT_YET_SUPPORTED =
       ScmConfigKeys.OZONE_SCM_NAMES + " must contain a single hostname."
@@ -465,11 +462,11 @@ public final class HddsUtils {
   }
 
   /**
-   * Get the current UTC time in milliseconds.
-   * @return the current UTC time in milliseconds.
+   * Get the current time in milliseconds.
+   * @return the current time in milliseconds.
    */
-  public static long getUtcTime() {
-    return Calendar.getInstance(UTC_ZONE).getTimeInMillis();
+  public static long getTime() {
+    return System.currentTimeMillis();
   }
 
   /**

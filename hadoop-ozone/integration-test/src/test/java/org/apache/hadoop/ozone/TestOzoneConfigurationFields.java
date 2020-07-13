@@ -26,11 +26,19 @@ import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 
 import java.util.Arrays;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 
 /**
  * Tests if configuration constants documented in ozone-defaults.xml.
  */
 public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   @Override
   public void initializeMemberVariables() {
@@ -59,7 +67,8 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OMConfigKeys.OZONE_OM_NODES_KEY,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE,
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY,
-        ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR
+        ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR,
+        OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY
         // TODO HDDS-2856
     ));
   }

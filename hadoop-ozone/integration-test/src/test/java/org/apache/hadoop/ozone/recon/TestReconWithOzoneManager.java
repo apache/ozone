@@ -65,11 +65,19 @@ import org.junit.Test;
 
 import com.google.gson.Gson;
 import com.google.gson.internal.LinkedTreeMap;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 
 /**
  * Test Ozone Recon.
  */
 public class TestReconWithOzoneManager {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
   private static OMMetadataManager metadataManager;

@@ -68,13 +68,6 @@ public class AbstractContainerReportHandler {
       throws IOException {
     final ContainerID containerId = ContainerID
         .valueof(replicaProto.getContainerID());
-    final ContainerReplica replica = ContainerReplica.newBuilder()
-        .setContainerID(containerId)
-        .setContainerState(replicaProto.getState())
-        .setDatanodeDetails(datanodeDetails)
-        .setOriginNodeId(UUID.fromString(replicaProto.getOriginNodeId()))
-        .setSequenceId(replicaProto.getBlockCommitSequenceId())
-        .build();
 
     if (logger.isDebugEnabled()) {
       logger.debug("Processing replica of container {} from datanode {}",
@@ -84,8 +77,8 @@ public class AbstractContainerReportHandler {
     // once we have introduced lock inside ContainerInfo.
     synchronized (containerManager.getContainer(containerId)) {
       updateContainerStats(containerId, replicaProto);
-      updateContainerState(datanodeDetails, containerId, replica);
-      containerManager.updateContainerReplica(containerId, replica);
+      updateContainerState(datanodeDetails, containerId, replicaProto);
+      updateContainerReplica(datanodeDetails, containerId, replicaProto);
     }
   }
 
@@ -101,7 +94,7 @@ public class AbstractContainerReportHandler {
                                     final ContainerReplicaProto replicaProto)
       throws ContainerNotFoundException {
 
-    if (!isUnhealthy(replicaProto::getState)) {
+    if (isHealthy(replicaProto::getState)) {
       final ContainerInfo containerInfo = containerManager
           .getContainer(containerId);
 
@@ -129,7 +122,7 @@ public class AbstractContainerReportHandler {
    */
   private void updateContainerState(final DatanodeDetails datanode,
                                     final ContainerID containerId,
-                                    final ContainerReplica replica)
+                                    final ContainerReplicaProto replica)
       throws IOException {
 
     final ContainerInfo container = containerManager
@@ -177,7 +170,7 @@ public class AbstractContainerReportHandler {
       if (replica.getState() == State.CLOSED) {
         logger.info("Moving container {} to CLOSED state, datanode {} " +
             "reported CLOSED replica.", containerId, datanode);
-        Preconditions.checkArgument(replica.getSequenceId()
+        Preconditions.checkArgument(replica.getBlockCommitSequenceId()
             == container.getSequenceId());
         containerManager.updateContainerState(containerId,
             LifeCycleEvent.CLOSE);
@@ -203,7 +196,7 @@ public class AbstractContainerReportHandler {
       if (replica.getState() == State.CLOSED) {
         logger.info("Moving container {} to CLOSED state, datanode {} " +
             "reported CLOSED replica.", containerId, datanode);
-        Preconditions.checkArgument(replica.getSequenceId()
+        Preconditions.checkArgument(replica.getBlockCommitSequenceId()
             == container.getSequenceId());
         containerManager.updateContainerState(containerId,
             LifeCycleEvent.FORCE_CLOSE);
@@ -225,14 +218,37 @@ public class AbstractContainerReportHandler {
     }
   }
 
+  private void updateContainerReplica(final DatanodeDetails datanodeDetails,
+                                      final ContainerID containerId,
+                                      final ContainerReplicaProto replicaProto)
+      throws ContainerNotFoundException, ContainerReplicaNotFoundException {
+    final ContainerReplica replica = ContainerReplica.newBuilder()
+        .setContainerID(containerId)
+        .setContainerState(replicaProto.getState())
+        .setDatanodeDetails(datanodeDetails)
+        .setOriginNodeId(UUID.fromString(replicaProto.getOriginNodeId()))
+        .setSequenceId(replicaProto.getBlockCommitSequenceId())
+        .build();
+
+    if (replica.getState().equals(State.DELETED)) {
+      containerManager.removeContainerReplica(containerId, replica);
+    } else {
+      containerManager.updateContainerReplica(containerId, replica);
+    }
+  }
+
   /**
-   * Returns true if the container replica is not marked as UNHEALTHY.
+   * Returns true if the container replica is HEALTHY. <br>
+   * A replica is considered healthy if it's not in UNHEALTHY,
+   * INVALID or DELETED state.
    *
    * @param replicaState State of the container replica.
-   * @return true if unhealthy, false otherwise
+   * @return true if healthy, false otherwise
    */
-  private boolean isUnhealthy(final Supplier<State> replicaState) {
-    return replicaState.get() == ContainerReplicaProto.State.UNHEALTHY;
+  private boolean isHealthy(final Supplier<State> replicaState) {
+    return replicaState.get() != State.UNHEALTHY
+        && replicaState.get() != State.INVALID
+        && replicaState.get() != State.DELETED;
   }
 
   /**

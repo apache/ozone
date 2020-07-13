@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.block;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -32,7 +33,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -102,13 +102,13 @@ public class TestDeletedBlockLog {
 
   private void setupContainerManager() throws IOException {
     dnList.add(
-        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID().toString())
+        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
             .build());
     dnList.add(
-        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID().toString())
+        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
             .build());
     dnList.add(
-        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID().toString())
+        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
             .build());
 
     final ContainerInfo container =
@@ -251,7 +251,7 @@ public class TestDeletedBlockLog {
     blocks = getTransactions(50);
     Assert.assertEquals(30, blocks.size());
     commitTransactions(blocks, dnList.get(1), dnList.get(2),
-        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID().toString())
+        DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
             .build());
 
     blocks = getTransactions(50);
@@ -268,7 +268,7 @@ public class TestDeletedBlockLog {
     int added = 0, committed = 0;
     List<DeletedBlocksTransaction> blocks = new ArrayList<>();
     List<Long> txIDs = new ArrayList<>();
-    byte[] latestTxid = DFSUtil.string2Bytes("#LATEST_TXID#");
+    byte[] latestTxid = StringUtils.string2Bytes("#LATEST_TXID#");
     MetadataKeyFilters.MetadataKeyFilter avoidLatestTxid =
         (preKey, currentKey, nextKey) ->
             !Arrays.equals(latestTxid, currentKey);

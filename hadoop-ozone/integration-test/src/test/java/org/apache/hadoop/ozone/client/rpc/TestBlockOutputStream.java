@@ -43,14 +43,23 @@ import java.io.OutputStream;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY;
 
 /**
  * Tests BlockOutputStream class.
  */
 public class TestBlockOutputStream {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf = new OzoneConfiguration();
   private static OzoneClient client;
@@ -82,6 +91,7 @@ public class TestBlockOutputStream {
     conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
         StorageUnit.MB);
+    conf.setBoolean(OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY, false);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(7)
         .setTotalPipelineNumLimit(10)

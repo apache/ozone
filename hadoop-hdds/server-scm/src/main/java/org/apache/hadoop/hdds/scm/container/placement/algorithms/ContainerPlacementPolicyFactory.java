@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * A factory to create container placement instance based on configuration
- * property ozone.scm.container.placement.classname.
+ * property {@link ScmConfigKeys#OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY}.
  */
 public final class ContainerPlacementPolicyFactory {
   private static final Logger LOG =

@@ -48,12 +48,20 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 
 /**
  * This class tests the metrics of XceiverClient.
  */
 public class TestXceiverClientMetrics {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   // only for testing
   private volatile boolean breakFlag;
   private CountDownLatch latch;

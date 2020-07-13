@@ -2037,11 +2037,11 @@ public class KeyManagerImpl implements KeyManager {
                 // if entry is a directory
                 if (!deletedKeySet.contains(entryInDb)) {
                   if (!entryKeyName.equals(immediateChild)) {
-                    OmKeyInfo fakeDirEntry = new OmKeyInfo.Builder()
-                        .setVolumeName(omKeyInfo.getVolumeName())
-                        .setBucketName(omKeyInfo.getBucketName())
-                        .setKeyName(immediateChild)
-                        .build();
+                    OmKeyInfo fakeDirEntry = createDirectoryKey(
+                        omKeyInfo.getVolumeName(),
+                        omKeyInfo.getBucketName(),
+                        immediateChild,
+                        omKeyInfo.getAcls());
                     cacheKeyMap.put(entryInDb,
                         new OzoneFileStatus(fakeDirEntry, scmBlockSize, true));
                   } else {

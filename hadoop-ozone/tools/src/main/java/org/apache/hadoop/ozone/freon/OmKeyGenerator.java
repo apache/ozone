@@ -111,7 +111,7 @@ public class OmKeyGenerator extends BaseFreonGenerator
         .setFactor(factor)
         .setKeyName(generateObjectName(counter))
         .setLocationInfoList(new ArrayList<>())
-        .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroups(),
+        .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
             ALL, ALL))
         .build();
 

@@ -195,7 +195,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       break;
     case FAILURE:
       omMetrics.incNumKeyDeleteFails();
-      LOG.error("Key delete failed. Volume:{}, Bucket:{}, Key{}. Exception:{}",
+      LOG.error("Key delete failed. Volume:{}, Bucket:{}, Key:{}.",
           volumeName, bucketName, keyName, exception);
       break;
     default:

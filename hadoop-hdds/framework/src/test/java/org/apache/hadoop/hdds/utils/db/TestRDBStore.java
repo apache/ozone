@@ -315,7 +315,7 @@ public class TestRDBStore {
       for (int i = 0; i < 50; i++) {
         Assert.assertFalse(db.keyMayExist(
             org.apache.commons.codec.binary.StringUtils
-                .getBytesUtf16("key" + i), new StringBuilder()));
+                .getBytesUtf16("key" + i), null));
       }
       end = System.nanoTime();
       long keyMayExistLatency = end - start;
@@ -348,5 +348,49 @@ public class TestRDBStore {
     }
   }
 
+  @Test
+  public void testDowngrade() throws Exception {
+
+    // Write data to current DB which has 6 column families at the time of
+    // writing this test.
+    for (String family : families) {
+      try (Table table = rdbStore.getTable(family)) {
+        byte[] key = family.getBytes(StandardCharsets.UTF_8);
+        byte[] value =
+            RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+        table.put(key, value);
+      }
+    }
+    // Close current DB.
+    rdbStore.close();
+
+    // Reopen DB with the last column family removed.
+    options = new DBOptions();
+    options.setCreateIfMissing(true);
+    options.setCreateMissingColumnFamilies(true);
+    configSet = new HashSet<>();
+    List<String> familiesMinusOne = families.subList(0, families.size() - 1);
+    for(String name : familiesMinusOne) {
+      TableConfig newConfig = new TableConfig(name, new ColumnFamilyOptions());
+      configSet.add(newConfig);
+    }
+    rdbStore = new RDBStore(rdbStore.getDbLocation(), options, configSet);
+    for (String family : familiesMinusOne) {
+      try (Table table = rdbStore.getTable(family)) {
+        Assert.assertNotNull(family + "is null", table);
+        Object val = table.get(family.getBytes(StandardCharsets.UTF_8));
+        Assert.assertNotNull(val);
+      }
+    }
+
+    // Technically the extra column family should also be open, even though
+    // we do not use it.
+    String extraFamily = families.get(families.size() - 1);
+    try (Table table = rdbStore.getTable(extraFamily)) {
+      Assert.assertNotNull(extraFamily + "is null", table);
+      Object val = table.get(extraFamily.getBytes(StandardCharsets.UTF_8));
+      Assert.assertNotNull(val);
+    }
+  }
 
 }

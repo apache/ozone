@@ -33,6 +33,8 @@ import java.io.IOException;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto
         .HddsProtos.ReplicationFactor.THREE;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.apache.hadoop.hdds.protocol.proto
         .HddsProtos.ReplicationType.RATIS;
 
@@ -40,6 +42,12 @@ import static org.apache.hadoop.hdds.protocol.proto
  * Test SCM restart and recovery wrt pipelines.
  */
 public class TestSCMRestart {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;

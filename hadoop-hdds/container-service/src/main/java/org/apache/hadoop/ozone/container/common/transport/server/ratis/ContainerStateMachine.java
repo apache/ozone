@@ -38,7 +38,6 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Container2BCSIDMapProto;
@@ -162,7 +161,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     metrics = CSMMetrics.create(gid);
     this.writeChunkFutureMap = new ConcurrentHashMap<>();
     applyTransactionCompletionMap = new ConcurrentHashMap<>();
-    int numPendingRequests = OzoneConfiguration.of(conf)
+    int numPendingRequests = conf
         .getObject(DatanodeRatisServerConfig.class)
         .getLeaderNumPendingRequests();
     int pendingRequestsByteLimit = (int) conf.getStorageSize(
@@ -237,19 +236,25 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     // initialize the dispatcher with snapshot so that it build the missing
     // container list
+    buildMissingContainerSet(snapshotFile);
+    return last.getIndex();
+  }
+
+  @VisibleForTesting
+  public void buildMissingContainerSet(File snapshotFile) throws IOException {
+    // initialize the dispatcher with snapshot so that it build the missing
+    // container list
     try (FileInputStream fin = new FileInputStream(snapshotFile)) {
       ContainerProtos.Container2BCSIDMapProto proto =
-          ContainerProtos.Container2BCSIDMapProto
-              .parseFrom(fin);
+              ContainerProtos.Container2BCSIDMapProto
+                      .parseFrom(fin);
       // read the created containers list from the snapshot file and add it to
       // the container2BCSIDMap here.
       // container2BCSIDMap will further grow as and when containers get created
       container2BCSIDMap.putAll(proto.getContainer2BCSIDMap());
       dispatcher.buildMissingContainerSetAndValidate(container2BCSIDMap);
     }
-    return last.getIndex();
   }
-
   /**
    * As a part of taking snapshot with Ratis StateMachine, it will persist
    * the existing container set in the snapshotFile.
@@ -421,7 +426,10 @@ public class ContainerStateMachine extends BaseStateMachine {
       if (((RaftServerProxy) server).getImpl(gid).isLeader()) {
         stateMachineDataCache.put(entryIndex, write.getData());
       }
-    } catch (IOException | InterruptedException ioe) {
+    } catch (InterruptedException ioe) {
+      Thread.currentThread().interrupt();
+      return completeExceptionally(ioe);
+    } catch (IOException ioe) {
       return completeExceptionally(ioe);
     }
     DispatcherContext context =
@@ -439,9 +447,9 @@ public class ContainerStateMachine extends BaseStateMachine {
           try {
             return runCommand(requestProto, context);
           } catch (Exception e) {
-            LOG.error(gid + ": writeChunk writeStateMachineData failed: blockId"
-                + write.getBlockID() + " logIndex " + entryIndex + " chunkName "
-                + write.getChunkData().getChunkName() + e);
+            LOG.error("{}: writeChunk writeStateMachineData failed: blockId" +
+                "{} logIndex {} chunkName {} {}", gid, write.getBlockID(),
+                entryIndex, write.getChunkData().getChunkName(), e);
             metrics.incNumWriteDataFails();
             // write chunks go in parallel. It's possible that one write chunk
             // see the stateMachine is marked unhealthy by other parallel thread
@@ -453,9 +461,9 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     writeChunkFutureMap.put(entryIndex, writeChunkFuture);
     if (LOG.isDebugEnabled()) {
-      LOG.debug(gid + ": writeChunk writeStateMachineData : blockId " +
-          write.getBlockID() + " logIndex " + entryIndex + " chunkName "
-          + write.getChunkData().getChunkName());
+      LOG.error("{}: writeChunk writeStateMachineData : blockId" +
+              "{} logIndex {} chunkName {} {}", gid, write.getBlockID(),
+          entryIndex, write.getChunkData().getChunkName());
     }
     // Remove the future once it finishes execution from the
     // writeChunkFutureMap.
@@ -808,7 +816,11 @@ public class ContainerStateMachine extends BaseStateMachine {
             Time.monotonicNowNanos() - applyTxnStartTime);
       });
       return applyTransactionFuture;
-    } catch (IOException | InterruptedException e) {
+    } catch (InterruptedException e) {
+      metrics.incNumApplyTransactionsFails();
+      Thread.currentThread().interrupt();
+      return completeExceptionally(e);
+    } catch (IOException e) {
       metrics.incNumApplyTransactionsFails();
       return completeExceptionally(e);
     }
@@ -867,6 +879,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         containerController.markContainerForClose(cid);
         containerController.quasiCloseContainer(cid);
       } catch (IOException e) {
+        LOG.debug("Failed to quasi-close container {}", cid);
       }
     }
   }
@@ -907,7 +920,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         builder.append(", container path=");
         builder.append(location);
       }
-    } catch (Throwable t) {
+    } catch (Exception t) {
       LOG.info("smProtoToString failed", t);
       builder.append("smProtoToString failed with");
       builder.append(t.getMessage());

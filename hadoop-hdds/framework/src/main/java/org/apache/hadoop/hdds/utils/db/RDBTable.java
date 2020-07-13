@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.StringUtils;
 
 import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.Holder;
 import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
@@ -128,11 +129,12 @@ class RDBTable implements Table<byte[], byte[]> {
       // If the key definitely does not exist in the database, then this
       // method returns false, else true.
       rdbMetrics.incNumDBKeyMayExistChecks();
-      StringBuilder outValue = new StringBuilder();
+      Holder<byte[]> outValue = new Holder<>();
       boolean keyMayExist = db.keyMayExist(handle, key, outValue);
       if (keyMayExist) {
-        boolean keyExists = (outValue.length() > 0) ||
-            (db.get(handle, key) != null);
+        boolean keyExists =
+            (outValue.getValue() != null && outValue.getValue().length > 0) ||
+                (db.get(handle, key) != null);
         if (!keyExists) {
           rdbMetrics.incNumDBKeyMayExistMisses();
         }
@@ -162,8 +164,7 @@ class RDBTable implements Table<byte[], byte[]> {
       // If the key definitely does not exist in the database, then this
       // method returns false, else true.
       rdbMetrics.incNumDBKeyGetIfExistChecks();
-      StringBuilder outValue = new StringBuilder();
-      boolean keyMayExist = db.keyMayExist(handle, key, outValue);
+      boolean keyMayExist = db.keyMayExist(handle, key, null);
       if (keyMayExist) {
         // Not using out value from string builder, as that is causing
         // IllegalArgumentException during protobuf parsing.

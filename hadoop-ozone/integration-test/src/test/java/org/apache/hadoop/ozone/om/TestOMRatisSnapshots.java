@@ -16,8 +16,14 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import org.apache.commons.lang3.RandomStringUtils;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -25,29 +31,23 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
+import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
-import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+
+import org.apache.commons.lang3.RandomStringUtils;
+import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.Timeout;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
-
-import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
-
 /**
  * Tests the Ratis snaphsots feature in OM.
  */
-@Ignore
 public class TestOMRatisSnapshots {
 
   private MiniOzoneHAClusterImpl cluster = null;
@@ -79,10 +79,10 @@ public class TestOMRatisSnapshots {
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
+    conf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, LOG_PURGE_GAP);
     conf.setLong(
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         SNAPSHOT_THRESHOLD);
-    conf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, LOG_PURGE_GAP);
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
@@ -108,8 +108,10 @@ public class TestOMRatisSnapshots {
   @Test
   public void testInstallSnapshot() throws Exception {
     // Get the leader OM
-    String leaderOMNodeId = objectStore.getClientProxy().getOMProxyProvider()
+    String leaderOMNodeId = OmFailoverProxyUtil
+        .getFailoverProxyProvider(objectStore.getClientProxy())
         .getCurrentProxyOMNodeId();
+
     OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
     OzoneManagerRatisServer leaderRatisServer = leaderOM.getOmRatisServer();
 
@@ -148,7 +150,11 @@ public class TestOMRatisSnapshots {
     }
 
     // Get the latest db checkpoint from the leader OM.
-    TermIndex leaderOMTermIndex = leaderOM.saveRatisSnapshot();
+    OMTransactionInfo omTransactionInfo =
+        OMTransactionInfo.readTransactionInfo(leaderOM.getMetadataManager());
+    TermIndex leaderOMTermIndex =
+        TermIndex.newTermIndex(omTransactionInfo.getCurrentTerm(),
+            omTransactionInfo.getTransactionIndex());
     long leaderOMSnaphsotIndex = leaderOMTermIndex.getIndex();
     long leaderOMSnapshotTermIndex = leaderOMTermIndex.getTerm();
 
@@ -165,10 +171,12 @@ public class TestOMRatisSnapshots {
         followerOMLastAppliedIndex < leaderOMSnaphsotIndex);
 
     // Install leader OM's db checkpoint on the lagging OM.
+    File oldDbLocation = followerOM.getMetadataManager().getStore()
+        .getDbLocation();
     followerOM.getOmRatisServer().getOmStateMachine().pause();
     followerOM.getMetadataManager().getStore().close();
-    followerOM.replaceOMDBWithCheckpoint(
-        leaderOMSnaphsotIndex, leaderDbCheckpoint.getCheckpointLocation());
+    followerOM.replaceOMDBWithCheckpoint(leaderOMSnaphsotIndex, oldDbLocation,
+        leaderDbCheckpoint.getCheckpointLocation());
 
     // Reload the follower OM with new DB checkpoint from the leader OM.
     followerOM.reloadOMState(leaderOMSnaphsotIndex, leaderOMSnapshotTermIndex);

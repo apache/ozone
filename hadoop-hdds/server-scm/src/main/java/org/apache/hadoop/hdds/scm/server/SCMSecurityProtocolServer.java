@@ -26,8 +26,8 @@ import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.OzoneManagerDetailsProto;
@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
@@ -61,8 +60,7 @@ import static org.apache.hadoop.hdds.security.x509.certificate.authority.Certifi
 public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
 
   private static final Logger LOGGER = LoggerFactory
-      .getLogger(SCMClientProtocolServer.class);
-  private final SecurityConfig config;
+      .getLogger(SCMSecurityProtocolServer.class);
   private final CertificateServer certificateServer;
   private final RPC.Server rpcServer;
   private final InetSocketAddress rpcAddress;
@@ -70,7 +68,6 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
 
   SCMSecurityProtocolServer(OzoneConfiguration conf,
       CertificateServer certificateServer) throws IOException {
-    this.config = new SecurityConfig(conf);
     this.certificateServer = certificateServer;
 
     final int handlerCount =
@@ -95,8 +92,8 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
             SCMSecurityProtocolPB.class,
             secureProtoPbService,
             handlerCount);
-    if (conf.getBoolean(CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION,
-        false)) {
+    if (conf.getBoolean(
+        CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, false)) {
       rpcServer.refreshServiceAcl(conf, SCMPolicyProvider.getInstance());
     }
   }
@@ -121,8 +118,10 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
 
     try {
       return CertificateCodec.getPEMEncodedString(future.get());
-    } catch (InterruptedException | ExecutionException e) {
-      LOGGER.error("getDataNodeCertificate operation failed. ", e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IOException("getDataNodeCertificate operation failed. ", e);
+    } catch (ExecutionException e) {
       throw new IOException("getDataNodeCertificate operation failed. ", e);
     }
   }
@@ -146,8 +145,10 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
 
     try {
       return CertificateCodec.getPEMEncodedString(future.get());
-    } catch (InterruptedException | ExecutionException e) {
-      LOGGER.error("getOMCertificate operation failed. ", e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IOException("getOMCertificate operation failed. ", e);
+    } catch (ExecutionException e) {
       throw new IOException("getOMCertificate operation failed. ", e);
     }
   }
@@ -169,7 +170,6 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
         return CertificateCodec.getPEMEncodedString(certificate);
       }
     } catch (CertificateException e) {
-      LOGGER.error("getCertificate operation failed. ", e);
       throw new IOException("getCertificate operation failed. ", e);
     }
     LOGGER.debug("Certificate with serial id {} not found.", certSerialId);
@@ -188,7 +188,6 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
       return CertificateCodec.getPEMEncodedString(
           certificateServer.getCACertificate());
     } catch (CertificateException e) {
-      LOGGER.error("getRootCertificate operation failed. ", e);
       throw new IOException("getRootCertificate operation failed. ", e);
     }
   }
@@ -202,8 +201,9 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol {
   }
 
   public void start() {
-    LOGGER.info(StorageContainerManager.buildRpcServerStartMessage("Starting"
-        + " RPC server for SCMSecurityProtocolServer.", getRpcAddress()));
+    String startupMsg = StorageContainerManager.buildRpcServerStartMessage(
+        "Starting RPC server for SCMSecurityProtocolServer.", getRpcAddress());
+    LOGGER.info(startupMsg);
     metrics.register();
     getRpcServer().start();
   }

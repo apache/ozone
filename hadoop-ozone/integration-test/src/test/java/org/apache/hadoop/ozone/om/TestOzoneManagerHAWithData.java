@@ -16,25 +16,17 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import java.net.ConnectException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
-import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Test;
-
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -42,15 +34,23 @@ import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.VolumeArgs;
-import org.apache.hadoop.ozone.client.ObjectStore;
+import org.junit.Assert;
+import org.junit.Ignore;
+import org.junit.Test;
 
-import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl
-    .NODE_FAILURE_TIMEOUT;
+import java.io.IOException;
+import java.net.ConnectException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.junit.Assert.fail;
 
 /**
@@ -150,6 +150,46 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
       Assert.assertEquals(NOT_A_FILE, ex.getResult());
     }
 
+  }
+
+  @Test
+  public void testKeysDelete() throws Exception {
+    OzoneBucket ozoneBucket = setupBucket();
+    String data = "random data";
+    String keyName1 = "dir/file1";
+    String keyName2 = "dir/file2";
+    String keyName3 = "dir/file3";
+    String keyName4 = "dir/file4";
+    List<String> keyList1 = new ArrayList<>();
+    keyList1.add(keyName2);
+    keyList1.add(keyName3);
+
+    testCreateFile(ozoneBucket, keyName1, data, true, false);
+    testCreateFile(ozoneBucket, keyName2, data, true, false);
+    testCreateFile(ozoneBucket, keyName3, data, true, false);
+    testCreateFile(ozoneBucket, keyName4, data, true, false);
+    ozoneBucket.getKey("dir/file1").getName();
+
+    // Delete keyName1 use deleteKey api.
+    ozoneBucket.deleteKey(keyName1);
+
+    // Delete keyName2 and keyName3 in keyList1 using the deleteKeys api.
+    ozoneBucket.deleteKeys(keyList1);
+
+    // In keyList2 keyName3 was previously deleted and KeyName4 exists .
+    List<String> keyList2 = new ArrayList<>();
+    keyList2.add(keyName3);
+    keyList2.add(keyName4);
+
+    // Because keyName3 has been deleted, there should be a KEY_NOT_FOUND
+    // exception. In this case, we test for deletion failure.
+    try {
+      ozoneBucket.deleteKeys(keyList2);
+      fail("testFilesDelete");
+    } catch (OMException ex) {
+      // The expected exception KEY_NOT_FOUND.
+      Assert.assertEquals(KEY_NOT_FOUND, ex.getResult());
+    }
   }
 
 
@@ -259,7 +299,8 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     // multipart upload is happening successfully or not.
 
     OMFailoverProxyProvider omFailoverProxyProvider =
-        getObjectStore().getClientProxy().getOMProxyProvider();
+        OmFailoverProxyUtil
+            .getFailoverProxyProvider(getObjectStore().getClientProxy());
 
     // The OMFailoverProxyProvider will point to the current leader OM node.
     String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
@@ -292,7 +333,8 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
         OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY,
         OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT);
     OMFailoverProxyProvider omFailoverProxyProvider =
-        getObjectStore().getClientProxy().getOMProxyProvider();
+        OmFailoverProxyUtil
+            .getFailoverProxyProvider(getObjectStore().getClientProxy());
 
     // The OMFailoverProxyProvider will point to the current leader OM node.
     String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
@@ -425,8 +467,10 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     retVolumeinfo.createBucket(bucketName);
     OzoneBucket ozoneBucket = retVolumeinfo.getBucket(bucketName);
 
-    String leaderOMNodeId = objectStore.getClientProxy().getOMProxyProvider()
+    String leaderOMNodeId = OmFailoverProxyUtil
+        .getFailoverProxyProvider(objectStore.getClientProxy())
         .getCurrentProxyOMNodeId();
+
     OzoneManager ozoneManager = getCluster().getOzoneManager(leaderOMNodeId);
 
     // Send commands to ratis to increase the log index so that ratis
@@ -440,8 +484,12 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     }
 
     GenericTestUtils.waitFor(() -> {
-      if (ozoneManager.getRatisSnapshotIndex() > 0) {
-        return true;
+      try {
+        if (ozoneManager.getRatisSnapshotIndex() > 0) {
+          return true;
+        }
+      } catch (IOException ex) {
+        fail("test failed during transactionInfo read");
       }
       return false;
     }, 1000, 100000);
@@ -464,8 +512,12 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     }
 
     GenericTestUtils.waitFor(() -> {
-      if (ozoneManager.getRatisSnapshotIndex() > 0) {
-        return true;
+      try {
+        if (ozoneManager.getRatisSnapshotIndex() > 0) {
+          return true;
+        }
+      } catch (IOException ex) {
+        fail("test failed during transactionInfo read");
       }
       return false;
     }, 1000, 100000);
@@ -481,8 +533,10 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
   public void testOMRestart() throws Exception {
     ObjectStore objectStore = getObjectStore();
     // Get the leader OM
-    String leaderOMNodeId = objectStore.getClientProxy().getOMProxyProvider()
+    String leaderOMNodeId = OmFailoverProxyUtil
+        .getFailoverProxyProvider(objectStore.getClientProxy())
         .getCurrentProxyOMNodeId();
+
     OzoneManager leaderOM = getCluster().getOzoneManager(leaderOMNodeId);
 
     // Get follower OMs
@@ -537,7 +591,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
     followerOM1.restart();
 
     // Get the latest snapshotIndex from the leader OM.
-    long leaderOMSnaphsotIndex = leaderOM.saveRatisSnapshot().getIndex();
+    long leaderOMSnaphsotIndex = leaderOM.getRatisSnapshotIndex();
 
     // The recently started OM should be lagging behind the leader OM.
     long followerOMLastAppliedIndex =
@@ -565,13 +619,6 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
         .getLastAppliedTermIndex().getIndex();
     Assert.assertTrue(followerOM1lastAppliedIndex >
         leaderOMSnaphsotIndex);
-
-    // The follower OMs should be in sync. There can be a small lag between
-    // leader OM and follower OMs as txns are applied first on leader OM.
-    long followerOM2lastAppliedIndex = followerOM1.getOmRatisServer()
-        .getLastAppliedTermIndex().getIndex();
-    Assert.assertEquals(followerOM1lastAppliedIndex,
-        followerOM2lastAppliedIndex);
 
   }
 

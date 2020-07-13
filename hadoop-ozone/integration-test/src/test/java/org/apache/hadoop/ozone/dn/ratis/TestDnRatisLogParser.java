@@ -31,12 +31,20 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 
 /**
  * Test Datanode Ratis log parser.
  */
 public class TestDnRatisLogParser {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static MiniOzoneCluster cluster = null;
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();

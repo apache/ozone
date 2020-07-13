@@ -41,14 +41,14 @@ public enum ChunkLayOutVersion {
   FILE_PER_CHUNK(1, "One file per chunk") {
     @Override
     public File getChunkFile(File chunkDir, BlockID blockID,
-        ChunkInfo info) throws StorageContainerException {
-      return chunkDir.toPath().resolve(info.getChunkName()).toFile();
+        ChunkInfo info) {
+      return new File(chunkDir, info.getChunkName());
     }
   },
   FILE_PER_BLOCK(2, "One file per block") {
     @Override
     public File getChunkFile(File chunkDir, BlockID blockID,
-        ChunkInfo info) throws StorageContainerException {
+        ChunkInfo info) {
       return new File(chunkDir, blockID.getLocalID() + ".block");
     }
   };
@@ -117,12 +117,12 @@ public enum ChunkLayOutVersion {
   }
 
   public abstract File getChunkFile(File chunkDir,
-      BlockID blockID, ChunkInfo info) throws StorageContainerException;
+      BlockID blockID, ChunkInfo info);
 
   public File getChunkFile(ContainerData containerData, BlockID blockID,
       ChunkInfo info) throws StorageContainerException {
-    File chunksLoc = verifyChunkDirExists(containerData);
-    return getChunkFile(chunksLoc, blockID, info);
+    File chunkDir = getChunkDir(containerData);
+    return getChunkFile(chunkDir, blockID, info);
   }
 
   @Override
@@ -130,7 +130,7 @@ public enum ChunkLayOutVersion {
     return "ChunkLayout:v" + version;
   }
 
-  private static File verifyChunkDirExists(ContainerData containerData)
+  private static File getChunkDir(ContainerData containerData)
       throws StorageContainerException {
     Preconditions.checkNotNull(containerData, "Container data can't be null");
 
@@ -140,13 +140,7 @@ public enum ChunkLayOutVersion {
       throw new StorageContainerException("Unable to get Chunks directory.",
           UNABLE_TO_FIND_DATA_DIR);
     }
-    File chunksLoc = new File(chunksPath);
-    if (!chunksLoc.exists()) {
-      LOG.error("Chunks path does not exist");
-      throw new StorageContainerException("Unable to get Chunks directory.",
-          UNABLE_TO_FIND_DATA_DIR);
-    }
-    return chunksLoc;
+    return new File(chunksPath);
   }
 
 }

@@ -57,12 +57,20 @@ import java.util.concurrent.TimeUnit;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Tests Close Container Exception handling by Ozone Client.
  */
 public class TestCloseContainerHandlingByClient {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf = new OzoneConfiguration();
@@ -281,6 +289,7 @@ public class TestCloseContainerHandlingByClient {
     validateData(keyName, dataCommitted.getBytes(UTF_8));
   }
 
+  @Ignore("HDDS-3151")
   @Test
   public void testMultiBlockWrites3() throws Exception {
 

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -27,10 +27,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -46,6 +48,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClie
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
@@ -55,17 +58,13 @@ import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.ServicePlugin;
-import org.apache.hadoop.util.StringUtils;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import io.prometheus.client.CollectorRegistry;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
 import static org.apache.hadoop.util.ExitUtil.terminate;
-import org.apache.ratis.metrics.MetricRegistries;
-import org.apache.ratis.metrics.MetricsReporting;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,7 +93,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private boolean printBanner;
   private String[] args;
   private volatile AtomicBoolean isStopped = new AtomicBoolean(false);
-
+  private final Map<String, RatisDropwizardExports> ratisMetricsMap =
+      new ConcurrentHashMap<>();
   //Constructor for DataNode PluginService
   public HddsDatanodeService(){}
 
@@ -148,8 +148,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   @Override
   public Void call() throws Exception {
     if (printBanner) {
-      StringUtils
-          .startupShutdownMessage(HddsDatanodeService.class, args, LOG);
+      StringUtils.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
+          HddsDatanodeService.class, args, LOG);
     }
     start(createOzoneConfiguration());
     join();
@@ -180,15 +180,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   public void start() {
-
-    //All the Ratis metrics (registered from now) will be published via JMX and
-    //via the prometheus exporter (used by the /prom servlet
-    MetricRegistries.global()
-        .addReporterRegistration(MetricsReporting.jmxReporter());
-    MetricRegistries.global().addReporterRegistration(
-        registry -> CollectorRegistry.defaultRegistry.register(
-            new RatisDropwizardExports(
-                registry.getDropWizardMetricRegistry())));
+    RatisDropwizardExports.
+        registerRatisMetricReporters(ratisMetricsMap);
 
     OzoneConfiguration.activate();
     HddsServerUtil.initializeMetrics(conf, "HddsDatanode");
@@ -401,8 +394,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     } else {
       // There is no datanode.id file, this might be the first time datanode
       // is started.
-      String datanodeUuid = UUID.randomUUID().toString();
-      return DatanodeDetails.newBuilder().setUuid(datanodeUuid).build();
+      return DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
     }
   }
 

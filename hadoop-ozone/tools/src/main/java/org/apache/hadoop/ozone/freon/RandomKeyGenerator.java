@@ -39,13 +39,13 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -273,7 +273,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
       init(freon.createOzoneConfiguration());
     }
 
-    keyValueBuffer = DFSUtil.string2Bytes(
+    keyValueBuffer = StringUtils.string2Bytes(
         RandomStringUtils.randomAscii(bufferSize));
 
     // Compute the common initial digest for all keys without their UUID

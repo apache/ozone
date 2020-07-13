@@ -37,6 +37,7 @@ interface IDatanodeResponse {
   pipelines: IPipeline[];
   containers: number;
   leaderCount: number;
+  uuid: string;
 }
 
 interface IDatanodesResponse {
@@ -54,6 +55,7 @@ interface IDatanode {
   pipelines: IPipeline[];
   containers: number;
   leaderCount: number;
+  uuid: string;
 }
 
 interface IPipeline {
@@ -91,6 +93,13 @@ const COLUMNS = [
     sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state)
   },
   {
+    title: 'Uuid',
+    dataIndex: 'uuid',
+    key: 'uuid',
+    sorter: (a: IDatanode, b: IDatanode) => a.uuid.localeCompare(b.uuid),
+    defaultSortOrder: 'ascend' as const
+  },
+  {
     title: 'Hostname',
     dataIndex: 'hostname',
     key: 'hostname',
@@ -126,10 +135,11 @@ const COLUMNS = [
           {
             pipelines.map((pipeline, index) => (
               <div key={index} className='pipeline-container'>
-                <ReplicationIcon replicationFactor={pipeline.replicationFactor}
-                                 replicationType={pipeline.replicationType}
-                                 leaderNode={pipeline.leaderNode}
-                                 isLeader={pipeline.leaderNode === record.hostname}/>
+                <ReplicationIcon
+                  replicationFactor={pipeline.replicationFactor}
+                  replicationType={pipeline.replicationType}
+                  leaderNode={pipeline.leaderNode}
+                  isLeader={pipeline.leaderNode === record.hostname}/>
                 {pipeline.pipelineID}
               </div>
             ))
@@ -139,12 +149,13 @@ const COLUMNS = [
     }
   },
   {
-    title: <span>
-      Leader Count&nbsp;
-      <Tooltip title='The number of Ratis Pipelines in which the given datanode is elected as a leader.'>
-        <Icon type='info-circle'/>
-      </Tooltip>
-    </span>,
+    title:
+  <span>
+    Leader Count&nbsp;
+    <Tooltip title='The number of Ratis Pipelines in which the given datanode is elected as a leader.'>
+      <Icon type='info-circle'/>
+    </Tooltip>
+  </span>,
     dataIndex: 'leaderCount',
     key: 'leaderCount',
     sorter: (a: IDatanode, b: IDatanode) => a.leaderCount - b.leaderCount
@@ -182,6 +193,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       const dataSource: IDatanode[] = datanodes.map(datanode => {
         return {
           hostname: datanode.hostname,
+          uuid: datanode.uuid,
           state: datanode.state,
           lastHeartbeat: datanode.lastHeartbeat,
           storageUsed: datanode.storageReport.used,

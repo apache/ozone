@@ -26,6 +26,7 @@ import:
     - type: ozone/profiler
     - type: ozone/emptydir
     - type: ozone/csi
+    - type: ozone/onenode
   - path: prometheus
   - path: jaeger
     transformations:

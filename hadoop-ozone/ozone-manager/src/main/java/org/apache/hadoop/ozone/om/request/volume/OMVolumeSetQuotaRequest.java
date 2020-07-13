@@ -25,6 +25,7 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,6 +64,20 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
 
   public OMVolumeSetQuotaRequest(OMRequest omRequest) {
     super(omRequest);
+  }
+
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+
+    long modificationTime = Time.now();
+    SetVolumePropertyRequest modifiedRequest = getOmRequest()
+        .getSetVolumePropertyRequest().toBuilder()
+        .setModificationTime(modificationTime).build();
+
+    return getOmRequest().toBuilder()
+        .setSetVolumePropertyRequest(modifiedRequest.toBuilder())
+        .setUserInfo(getUserInfo())
+        .build();
   }
 
   @Override
@@ -133,6 +148,8 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
       omVolumeArgs.setQuotaInBytes(setVolumePropertyRequest.getQuotaInBytes());
       omVolumeArgs.setUpdateID(transactionLogIndex,
           ozoneManager.isRatisEnabled());
+      omVolumeArgs.setModificationTime(
+          setVolumePropertyRequest.getModificationTime());
 
       // update cache.
       omMetadataManager.getVolumeTable().addCacheEntry(

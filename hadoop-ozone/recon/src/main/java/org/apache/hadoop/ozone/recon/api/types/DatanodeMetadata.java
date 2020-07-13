@@ -31,6 +31,9 @@ import java.util.List;
 @XmlAccessorType(XmlAccessType.FIELD)
 public final class DatanodeMetadata {
 
+  @XmlElement(name = "uuid")
+  private String uuid;
+
   @XmlElement(name = "hostname")
   private String hostname;
 
@@ -54,6 +57,7 @@ public final class DatanodeMetadata {
 
   private DatanodeMetadata(Builder builder) {
     this.hostname = builder.hostname;
+    this.uuid = builder.uuid;
     this.state = builder.state;
     this.lastHeartbeat = builder.lastHeartbeat;
     this.datanodeStorageReport = builder.datanodeStorageReport;
@@ -90,6 +94,10 @@ public final class DatanodeMetadata {
     return leaderCount;
   }
 
+  public String getUuid() {
+    return uuid;
+  }
+
   /**
    * Returns new builder class that builds a DatanodeMetadata.
    *
@@ -105,6 +113,7 @@ public final class DatanodeMetadata {
   @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
     private String hostname;
+    private String uuid;
     private NodeState state;
     private long lastHeartbeat;
     private DatanodeStorageReport datanodeStorageReport;
@@ -150,6 +159,11 @@ public final class DatanodeMetadata {
 
     public Builder withLeaderCount(int leaderCount) {
       this.leaderCount = leaderCount;
+      return this;
+    }
+
+    public Builder withUUid(String uuid) {
+      this.uuid = uuid;
       return this;
     }
 

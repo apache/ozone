@@ -307,7 +307,7 @@ public final class OzoneManagerRatisServer {
     RaftPeerId localRaftPeerId = RaftPeerId.getRaftPeerId(omNodeId);
 
     InetSocketAddress ratisAddr = new InetSocketAddress(
-        omNodeDetails.getAddress(), omNodeDetails.getRatisPort());
+        omNodeDetails.getInetAddress(), omNodeDetails.getRatisPort());
 
     RaftPeer localRaftPeer = new RaftPeer(localRaftPeerId, ratisAddr);
 
@@ -317,10 +317,15 @@ public final class OzoneManagerRatisServer {
 
     for (OMNodeDetails peerInfo : peerNodes) {
       String peerNodeId = peerInfo.getOMNodeId();
-      InetSocketAddress peerRatisAddr = new InetSocketAddress(
-          peerInfo.getAddress(), peerInfo.getRatisPort());
       RaftPeerId raftPeerId = RaftPeerId.valueOf(peerNodeId);
-      RaftPeer raftPeer = new RaftPeer(raftPeerId, peerRatisAddr);
+      RaftPeer raftPeer;
+      if (peerInfo.isHostUnresolved()) {
+        raftPeer = new RaftPeer(raftPeerId, peerInfo.getRatisHostPortStr());
+      } else {
+        InetSocketAddress peerRatisAddr = new InetSocketAddress(
+            peerInfo.getInetAddress(), peerInfo.getRatisPort());
+        raftPeer = new RaftPeer(raftPeerId, peerRatisAddr);
+      }
 
       // Add other OM nodes belonging to the same OM service to the Ratis ring
       raftPeers.add(raftPeer);
@@ -337,7 +342,8 @@ public final class OzoneManagerRatisServer {
   /**
    * Initializes and returns OzoneManager StateMachine.
    */
-  private OzoneManagerStateMachine getStateMachine(ConfigurationSource conf) {
+  private OzoneManagerStateMachine getStateMachine(ConfigurationSource conf)
+      throws IOException {
     return new OzoneManagerStateMachine(this,
         TracingUtil.isTracingEnabled(conf));
   }
@@ -523,14 +529,24 @@ public final class OzoneManagerRatisServer {
     this.roleCheckInitialDelayMs = leaderElectionMinTimeout
         .toLong(TimeUnit.MILLISECONDS);
 
+    // Set auto trigger snapshot. We don't need to configure auto trigger
+    // threshold in OM, as last applied index is flushed during double buffer
+    // flush automatically. (But added this property internally, so that this
+    // helps during testing, when want to trigger snapshots frequently, and
+    // which will purge logs when purge gap condition is satisfied and which
+    // will trigger installSnapshot when logs are cleaned up.)
+    // The transaction info value in OM DB is used as
+    // snapshot value after restart.
+
+    RaftServerConfigKeys.Snapshot.setAutoTriggerEnabled(
+        properties, true);
+
     long snapshotAutoTriggerThreshold = conf.getLong(
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_DEFAULT);
-    RaftServerConfigKeys.Snapshot.setAutoTriggerEnabled(
-        properties, true);
-    RaftServerConfigKeys.Snapshot.setAutoTriggerThreshold(
-        properties, snapshotAutoTriggerThreshold);
 
+    RaftServerConfigKeys.Snapshot.setAutoTriggerThreshold(properties,
+        snapshotAutoTriggerThreshold);
     return properties;
   }
 

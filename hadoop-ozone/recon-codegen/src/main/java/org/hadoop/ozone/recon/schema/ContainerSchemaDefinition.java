@@ -19,6 +19,8 @@
 package org.hadoop.ozone.recon.schema;
 
 import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
+import static org.jooq.impl.DSL.field;
+import static org.jooq.impl.DSL.name;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
@@ -38,9 +40,22 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
 
   public static final String CONTAINER_HISTORY_TABLE_NAME =
       "CONTAINER_HISTORY";
-  public static final String MISSING_CONTAINERS_TABLE_NAME =
-      "MISSING_CONTAINERS";
+  public static final String UNHEALTHY_CONTAINERS_TABLE_NAME =
+      "UNHEALTHY_CONTAINERS";
+
+  /**
+   * ENUM describing the allowed container states which can be stored in the
+   * unhealthy containers table.
+   */
+  public enum UnHealthyContainerStates {
+    MISSING,
+    UNDER_REPLICATED,
+    OVER_REPLICATED,
+    MIS_REPLICATED
+  }
+
   private static final String CONTAINER_ID = "container_id";
+  private static final String CONTAINER_STATE = "container_state";
   private final DataSource dataSource;
   private DSLContext dslContext;
 
@@ -56,8 +71,8 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
     if (!TABLE_EXISTS_CHECK.test(conn, CONTAINER_HISTORY_TABLE_NAME)) {
       createContainerHistoryTable();
     }
-    if (!TABLE_EXISTS_CHECK.test(conn, MISSING_CONTAINERS_TABLE_NAME)) {
-      createMissingContainersTable();
+    if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
+      createUnhealthyContainersTable();
     }
   }
 
@@ -78,12 +93,20 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
   /**
    * Create the Missing Containers table.
    */
-  private void createMissingContainersTable() {
-    dslContext.createTableIfNotExists(MISSING_CONTAINERS_TABLE_NAME)
-        .column(CONTAINER_ID, SQLDataType.BIGINT)
-        .column("missing_since", SQLDataType.BIGINT)
+  private void createUnhealthyContainersTable() {
+    dslContext.createTableIfNotExists(UNHEALTHY_CONTAINERS_TABLE_NAME)
+        .column(CONTAINER_ID, SQLDataType.BIGINT.nullable(false))
+        .column(CONTAINER_STATE, SQLDataType.VARCHAR(16).nullable(false))
+        .column("in_state_since", SQLDataType.BIGINT.nullable(false))
+        .column("expected_replica_count", SQLDataType.INTEGER.nullable(false))
+        .column("actual_replica_count", SQLDataType.INTEGER.nullable(false))
+        .column("replica_delta", SQLDataType.INTEGER.nullable(false))
+        .column("reason", SQLDataType.VARCHAR(500).nullable(true))
         .constraint(DSL.constraint("pk_container_id")
-            .primaryKey(CONTAINER_ID))
+            .primaryKey(CONTAINER_ID, CONTAINER_STATE))
+        .constraint(DSL.constraint(UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1")
+            .check(field(name("container_state"))
+                .in(UnHealthyContainerStates.values())))
         .execute();
   }
 

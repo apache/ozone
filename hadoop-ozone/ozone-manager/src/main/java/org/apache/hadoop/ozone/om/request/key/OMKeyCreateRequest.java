@@ -26,6 +26,8 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,6 +85,13 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
 
+    // Verify key name
+    final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
+         .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
+                 OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
+    if(checkKeyNameEnabled){
+      OmUtils.validateKeyName(keyArgs.getKeyName());
+    }
     // We cannot allocate block for multipart upload part when
     // createMultipartKey is called, as we will not know type and factor with
     // which initiateMultipartUpload has started for this key. When

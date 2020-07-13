@@ -19,12 +19,16 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -46,6 +50,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .CommitKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
+    .KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -82,6 +88,15 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     Preconditions.checkNotNull(commitKeyRequest);
 
     KeyArgs keyArgs = commitKeyRequest.getKeyArgs();
+
+    // Verify key name
+    final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
+         .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
+                 OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
+    if(checkKeyNameEnabled){
+      OmUtils.validateKeyName(StringUtils.removeEnd(keyArgs.getKeyName(),
+              OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
+    }
 
     KeyArgs.Builder newKeyArgs =
         keyArgs.toBuilder().setModificationTime(Time.now());
@@ -132,10 +147,10 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           keyName, IAccessAuthorizer.ACLType.WRITE,
           commitKeyRequest.getClientID());
 
-      List<OmKeyLocationInfo> locationInfoList = commitKeyArgs
-          .getKeyLocationsList().stream()
-          .map(OmKeyLocationInfo::getFromProtobuf)
-          .collect(Collectors.toList());
+      List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
+      for (KeyLocation keyLocation : commitKeyArgs.getKeyLocationsList()) {
+        locationInfoList.add(OmKeyLocationInfo.getFromProtobuf(keyLocation));
+      }
 
       bucketLockAcquired = omMetadataManager.getLock().acquireLock(BUCKET_LOCK,
           volumeName, bucketName);

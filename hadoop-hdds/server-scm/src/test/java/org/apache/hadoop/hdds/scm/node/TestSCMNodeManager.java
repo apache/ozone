@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
@@ -75,7 +76,6 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -839,8 +839,6 @@ public class TestSCMNodeManager {
    * @throws TimeoutException
    */
   @Test
-  @Ignore
-  // TODO: Enable this after we implement NodeReportEvent handler.
   public void testScmStatsFromNodeReport()
       throws IOException, InterruptedException, AuthenticationException {
     OzoneConfiguration conf = getConf();
@@ -852,18 +850,20 @@ public class TestSCMNodeManager {
     final long remaining = capacity - used;
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      EventQueue eventQueue = (EventQueue) scm.getEventQueue();
       for (int x = 0; x < nodeCount; x++) {
-        DatanodeDetails datanodeDetails = TestUtils
-            .createRandomDatanodeAndRegister(nodeManager);
-        UUID dnId = datanodeDetails.getUuid();
+        DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+        UUID dnId = dn.getUuid();
         long free = capacity - used;
         String storagePath = testDir.getAbsolutePath() + "/" + dnId;
         StorageReportProto report = TestUtils
             .createStorageReport(dnId, storagePath, capacity, used, free, null);
-        nodeManager.processHeartbeat(datanodeDetails);
+        nodeManager.register(dn, TestUtils.createNodeReport(report), null);
+        nodeManager.processHeartbeat(dn);
       }
-      //TODO: wait for heartbeat to be processed
-      Thread.sleep(4 * 1000);
+      //TODO: wait for EventQueue to be processed
+      eventQueue.processAll(8000L);
+
       assertEquals(nodeCount, nodeManager.getNodeCount(HEALTHY));
       assertEquals(capacity * nodeCount, (long) nodeManager.getStats()
           .getCapacity().get());

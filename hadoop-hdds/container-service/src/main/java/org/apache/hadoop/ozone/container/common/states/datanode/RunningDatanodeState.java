@@ -72,8 +72,7 @@ public class RunningDatanodeState implements DatanodeState {
    * each end point state.
    */
   private void initEndPointTask() {
-    endpointTasks = new HashMap<EndpointStateMachine, Map<EndPointStates,
-        Callable<EndPointStates>>>();
+    endpointTasks = new HashMap<>();
     for (EndpointStateMachine endpoint : connectionManager.getValues()) {
       EnumMap<EndPointStates, Callable<EndPointStates>> endpointTaskForState =
           new EnumMap<>(EndPointStates.class);
@@ -182,7 +181,10 @@ public class RunningDatanodeState implements DatanodeState {
           // if any endpoint tells us to shutdown we move to shutdown state.
           return DatanodeStateMachine.DatanodeStates.SHUTDOWN;
         }
-      } catch (InterruptedException | ExecutionException e) {
+      } catch (InterruptedException e) {
+        LOG.error("Error in executing end point task.", e);
+        Thread.currentThread().interrupt();
+      } catch (ExecutionException e) {
         LOG.error("Error in executing end point task.", e);
       }
     }

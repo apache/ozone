@@ -52,12 +52,15 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.
         OZONE_SCM_STALENODE_INTERVAL;
@@ -66,6 +69,12 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.
  * Class to test CommitWatcher functionality.
  */
 public class TestCommitWatcher {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf = new OzoneConfiguration();
   private static OzoneClient client;
@@ -98,15 +107,11 @@ public class TestCommitWatcher {
             10, TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 1000,
             TimeUnit.SECONDS);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
-                    DatanodeRatisServerConfig.RATIS_SERVER_REQUEST_TIMEOUT_KEY,
-            3, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
-                    DatanodeRatisServerConfig.
-                            RATIS_SERVER_WATCH_REQUEST_TIMEOUT_KEY,
-            3, TimeUnit.SECONDS);
+    DatanodeRatisServerConfig ratisServerConfig =
+        conf.getObject(DatanodeRatisServerConfig.class);
+    ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
+    ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(3));
+    conf.setFromObject(ratisServerConfig);
     conf.setTimeDuration(
             RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
                     "rpc.request.timeout",
@@ -115,10 +120,10 @@ public class TestCommitWatcher {
             RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
                     "watch.request.timeout",
             3, TimeUnit.SECONDS);
-    conf.setInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY, 15);
-    conf.setTimeDuration(
-            OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_KEY,
-            1, TimeUnit.SECONDS);
+    conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
+        + ".client.request.write.timeout", 30, TimeUnit.SECONDS);
+    conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
+        + ".client.request.watch.timeout", 30, TimeUnit.SECONDS);
     conf.set(OzoneConfigKeys.OZONE_CLIENT_CHECKSUM_TYPE, "NONE");
     conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,

@@ -24,6 +24,7 @@ import javax.annotation.Nonnull;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
@@ -31,9 +32,12 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
+
 /**
  * Response for CreateKey request.
  */
+@CleanupTableInfo(cleanupTables = OPEN_KEY_TABLE)
 public class OMKeyCreateResponse extends OMClientResponse {
 
   public static final Logger LOG =

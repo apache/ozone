@@ -19,11 +19,13 @@
 import React from 'react';
 import axios from 'axios';
 import {Icon, Table, Tooltip} from 'antd';
-import './missingContainers.less';
 import {PaginationConfig} from 'antd/lib/pagination';
-import prettyBytes from 'pretty-bytes';
+import filesize from 'filesize';
 import moment from 'moment';
-import {showDataFetchError, timeFormat} from '../../utils/common';
+import {showDataFetchError, timeFormat} from 'utils/common';
+import './missingContainers.less';
+
+const size = filesize.partial({standard: 'iec'});
 
 interface IMissingContainerResponse {
   containerID: number;
@@ -140,7 +142,7 @@ const KEY_TABLE_COLUMNS = [
     title: 'Size',
     dataIndex: 'DataSize',
     key: 'DataSize',
-    render: (dataSize: number) => <div>{prettyBytes(dataSize)}</div>
+    render: (dataSize: number) => <div>{size(dataSize)}</div>
   },
   {
     title: 'Date Created',

@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
@@ -448,9 +449,15 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     ServiceListResponse.Builder resp = ServiceListResponse.newBuilder();
 
     ServiceInfoEx serviceInfoEx = impl.getServiceInfo();
-    resp.addAllServiceInfo(serviceInfoEx.getServiceInfoList().stream()
-        .map(ServiceInfo::getProtobuf)
-        .collect(Collectors.toList()));
+
+    List<OzoneManagerProtocolProtos.ServiceInfo> serviceInfoProtos =
+        new ArrayList<>();
+    List<ServiceInfo> serviceInfos = serviceInfoEx.getServiceInfoList();
+    for (ServiceInfo info : serviceInfos) {
+      serviceInfoProtos.add(info.getProtobuf());
+    }
+
+    resp.addAllServiceInfo(serviceInfoProtos);
     if (serviceInfoEx.getCaCertificate() != null) {
       resp.setCaCertificate(serviceInfoEx.getCaCertificate());
     }

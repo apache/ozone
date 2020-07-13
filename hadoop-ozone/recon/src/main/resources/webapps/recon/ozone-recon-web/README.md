@@ -17,15 +17,18 @@
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
+This project uses [pnpm](https://pnpm.js.org/) as package manager. To install pnpm, follow the instructions [here](https://pnpm.js.org/en/installation).
+After installation, run `pnpm install` to install dependencies for the first time.    
+
 ## Available Scripts
 
 In the project directory, you can run:
 
-### `yarn run dev`
+### `pnpm run dev`
 
 Starts a mock json server to serve mock API responses and the frontend app in the development mode in parallel.
 
-### `yarn start`
+### `pnpm start`
 
 Runs the app in the development mode.<br>
 Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
@@ -33,16 +36,16 @@ Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
 The page will reload if you make edits.<br>
 You will also see any lint errors in the console.
 
-### `yarn run mock:api`
+### `pnpm run mock:api`
 
 Runs a mock json server in port 9888. During development, always run the mock api server to see mock response in the frontend. 
 
-### `yarn test`
+### `pnpm test`
 
 Launches the test runner in the interactive watch mode.<br>
 See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
 
-### `yarn run build`
+### `pnpm run build`
 
 Builds the app for production to the `build` folder.<br>
 It correctly bundles React in production mode and optimizes the build for the best performance.

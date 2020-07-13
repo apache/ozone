@@ -20,9 +20,12 @@ package org.apache.hadoop.ozone.om.ratis;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 
+import java.io.IOException;
 import java.util.Objects;
 
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_SPLIT_KEY;
 
 /**
@@ -115,6 +118,16 @@ public final class OMTransactionInfo {
     return Objects.hash(currentTerm, transactionIndex);
   }
 
+  /**
+   * Return transaction info persisted in OM DB.
+   * @param metadataManager
+   * @return
+   * @throws IOException
+   */
+  public static OMTransactionInfo readTransactionInfo(
+      OMMetadataManager metadataManager) throws IOException {
+    return metadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
+  }
   /**
    * Builder to build {@link OMTransactionInfo}.
    */

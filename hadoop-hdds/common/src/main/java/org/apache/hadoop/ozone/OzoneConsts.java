@@ -18,11 +18,13 @@
 
 package org.apache.hadoop.ozone;
 
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.thirdparty.io.grpc.Context;
 import org.apache.ratis.thirdparty.io.grpc.Metadata;
+
+import java.util.regex.Pattern;
 
 import static org.apache.ratis.thirdparty.io.grpc.Metadata.ASCII_STRING_MARSHALLER;
 
@@ -85,6 +87,7 @@ public final class OzoneConsts {
 
   // Ozone File System scheme
   public static final String OZONE_URI_SCHEME = "o3fs";
+  public static final String OZONE_OFS_URI_SCHEME = "ofs";
 
   public static final String OZONE_RPC_SCHEME = "o3";
   public static final String OZONE_HTTP_SCHEME = "http";
@@ -148,15 +151,15 @@ public final class OzoneConsts {
 
 
   public static final byte[] DB_BLOCK_COUNT_KEY =
-      DFSUtil.string2Bytes(OzoneConsts.BLOCK_COUNT);
+      StringUtils.string2Bytes(OzoneConsts.BLOCK_COUNT);
   public static final byte[] DB_CONTAINER_BYTES_USED_KEY =
-      DFSUtil.string2Bytes(OzoneConsts.CONTAINER_BYTES_USED);
+      StringUtils.string2Bytes(OzoneConsts.CONTAINER_BYTES_USED);
   public static final byte[] DB_PENDING_DELETE_BLOCK_COUNT_KEY =
-      DFSUtil.string2Bytes(PENDING_DELETE_BLOCK_COUNT);
+      StringUtils.string2Bytes(PENDING_DELETE_BLOCK_COUNT);
   public static final byte[] DB_CONTAINER_DELETE_TRANSACTION_KEY =
-      DFSUtil.string2Bytes(DELETE_TRANSACTION_KEY_PREFIX);
+      StringUtils.string2Bytes(DELETE_TRANSACTION_KEY_PREFIX);
   public static final byte[] DB_BLOCK_COMMIT_SEQUENCE_ID_KEY =
-      DFSUtil.string2Bytes(BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
+      StringUtils.string2Bytes(BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
 
 
 
@@ -279,6 +282,7 @@ public final class OzoneConsts {
   public static final String RESOURCE_TYPE = "resourceType";
   public static final String IS_VERSION_ENABLED = "isVersionEnabled";
   public static final String CREATION_TIME = "creationTime";
+  public static final String MODIFICATION_TIME = "modificationTime";
   public static final String DATA_SIZE = "dataSize";
   public static final String REPLICATION_TYPE = "replicationType";
   public static final String REPLICATION_FACTOR = "replicationFactor";
@@ -320,16 +324,6 @@ public final class OzoneConsts {
   // Dummy OMNodeID for OM Clients to use for a non-HA OM setup
   public static final String OM_NODE_ID_DUMMY = "omNodeIdDummy";
 
-  // OM Ratis snapshot file to store the last applied index
-  public static final String OM_RATIS_SNAPSHOT_INDEX = "ratisSnapshotIndex";
-
-  public static final String OM_RATIS_SNAPSHOT_TERM = "ratisSnapshotTerm";
-
-  // OM Http request parameter to be used while downloading DB checkpoint
-  // from OM leader to follower
-  public static final String OM_RATIS_SNAPSHOT_BEFORE_DB_CHECKPOINT =
-      "snapshotBeforeCheckpoint";
-
   public static final String JAVA_TMP_DIR = "java.io.tmpdir";
   public static final String LOCALHOST = "localhost";
 
@@ -346,9 +340,26 @@ public final class OzoneConsts {
   public static final String GDPR_SECRET = "secret";
   public static final String GDPR_ALGORITHM = "algorithm";
 
+  /**
+   * Block key name as illegal characters
+   *
+   * This regular expression is used to check if key name
+   * contains illegal characters when creating/renaming key.
+   *
+   * Avoid the following characters in a key name:
+   * "\", "{", "}", "^", "<", ">", "#", "|", "%", "`", "[", "]", "~", "?"
+   * and Non-printable ASCII characters (128–255 decimal characters).
+   * https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html
+   */
+  public static final Pattern KEYNAME_ILLEGAL_CHARACTER_CHECK_REGEX  =
+          Pattern.compile("^[^^{}<>^?%~#`\\[\\]\\|\\\\(\\x80-\\xff)]+$");
+
+  public static final String FS_FILE_COPYING_TEMP_SUFFIX= "._COPYING_";
 
   // Transaction Info
   public static final String TRANSACTION_INFO_KEY = "#TRANSACTIONINFO";
   public static final String TRANSACTION_INFO_SPLIT_KEY = "#";
 
+  public static final String CONTAINER_DB_TYPE_ROCKSDB = "RocksDB";
+  public static final String CONTAINER_DB_TYPE_LEVELDB = "LevelDB";
 }

@@ -24,6 +24,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.R
 import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.runTestOzoneContainerViaDataNode;
 import static org.junit.Assert.assertEquals;
 
+import java.time.Duration;
 import java.util.List;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -36,18 +37,27 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.test.LambdaTestUtils;
-import org.hadoop.ozone.recon.schema.tables.pojos.MissingContainers;
+import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
+import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.rules.Timeout;
 
 /**
  * Integration Tests for Recon's tasks.
  */
 public class TestReconTasks {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private MiniOzoneCluster cluster = null;
   private OzoneConfiguration conf;
@@ -60,7 +70,11 @@ public class TestReconTasks {
     conf = new OzoneConfiguration();
     conf.set(HDDS_CONTAINER_REPORT_INTERVAL, "5s");
     conf.set(HDDS_PIPELINE_REPORT_INTERVAL, "5s");
-    conf.set("ozone.recon.task.missingcontainer.interval", "15s");
+
+    ReconTaskConfig taskConfig = conf.getObject(ReconTaskConfig.class);
+    taskConfig.setMissingContainerTaskInterval(Duration.ofSeconds(15));
+    conf.setFromObject(taskConfig);
+
     conf.set("ozone.scm.stale.node.interval", "10s");
     conf.set("ozone.scm.dead.node.interval", "20s");
     cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1)
@@ -107,18 +121,22 @@ public class TestReconTasks {
     cluster.shutdownHddsDatanode(pipeline.getFirstNode());
 
     LambdaTestUtils.await(120000, 10000, () -> {
-      List<MissingContainers> allMissingContainers =
+      List<UnhealthyContainers> allMissingContainers =
           reconContainerManager.getContainerSchemaManager()
-              .getAllMissingContainers();
+              .getUnhealthyContainers(
+                  ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
+                  0, 1000);
       return (allMissingContainers.size() == 1);
     });
 
     // Restart the Datanode to make sure we remove the missing container.
     cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
     LambdaTestUtils.await(120000, 10000, () -> {
-      List<MissingContainers> allMissingContainers =
+      List<UnhealthyContainers> allMissingContainers =
           reconContainerManager.getContainerSchemaManager()
-              .getAllMissingContainers();
+              .getUnhealthyContainers(
+                  ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
+                  0, 1000);
       return (allMissingContainers.isEmpty());
     });
   }

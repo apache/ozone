@@ -112,6 +112,7 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.junit.rules.Timeout;
 import static org.mockito.Matchers.anyList;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.doThrow;
@@ -124,6 +125,12 @@ import static org.mockito.Mockito.when;
  * Test class for @{@link KeyManagerImpl}.
  */
 public class TestKeyManagerImpl {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static PrefixManager prefixManager;
   private static KeyManagerImpl keyManager;
@@ -272,7 +279,7 @@ public class TestKeyManagerImpl {
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName(KEY_NAME)
         .setDataSize(1000)
-        .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroups(),
+        .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
             ALL, ALL))
         .build();
     LambdaTestUtils.intercept(OMException.class,
@@ -1356,7 +1363,7 @@ public class TestKeyManagerImpl {
         .setFactor(ReplicationFactor.ONE)
         .setDataSize(0)
         .setType(ReplicationType.STAND_ALONE)
-        .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroups(),
+        .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
             ALL, ALL))
         .setVolumeName(VOLUME_NAME);
   }

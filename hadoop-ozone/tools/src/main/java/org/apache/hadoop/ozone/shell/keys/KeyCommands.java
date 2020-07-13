@@ -41,6 +41,7 @@ import picocli.CommandLine.ParentCommand;
         CatKeyHandler.class,
         PutKeyHandler.class,
         RenameKeyHandler.class,
+        CopyKeyHandler.class,
         DeleteKeyHandler.class,
         AddAclKeyHandler.class,
         RemoveAclKeyHandler.class,

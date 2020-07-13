@@ -33,6 +33,9 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <module>hadoop-dependency-client</module>
     <module>hadoop-dependency-test</module>
     <module>hadoop-dependency-server</module>
+    <module>interface-client</module>
+    <module>interface-admin</module>
+    <module>interface-server</module>
     <module>client</module>
     <module>common</module>
     <module>framework</module>
@@ -83,6 +86,24 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <artifactId>hadoop-hdds-hadoop-dependency-test</artifactId>
         <version>${hdds.version}</version>
         <scope>test</scope>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-interface-server</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-interface-client</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-interface-admin</artifactId>
+        <version>${hdds.version}</version>
       </dependency>
 
       <dependency>
@@ -234,9 +255,9 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             <exclude>**/target/**</exclude>
             <exclude>.gitattributes</exclude>
             <exclude>.idea/**</exclude>
-            <exclude>src/main/resources/webapps/static/angular-1.6.4.min.js</exclude>
+            <exclude>src/main/resources/webapps/static/angular-1.7.9.min.js</exclude>
             <exclude>src/main/resources/webapps/static/angular-nvd3-1.0.9.min.js</exclude>
-            <exclude>src/main/resources/webapps/static/angular-route-1.6.4.min.js</exclude>
+            <exclude>src/main/resources/webapps/static/angular-route-1.7.9.min.js</exclude>
             <exclude>src/main/resources/webapps/static/d3-3.5.17.min.js</exclude>
             <exclude>src/main/resources/webapps/static/nvd3-1.8.5.min.css.map</exclude>
             <exclude>src/main/resources/webapps/static/nvd3-1.8.5.min.css</exclude>
@@ -258,37 +279,15 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <executions>
           <execution>
             <id>add-classpath-descriptor</id>
-            <phase>package</phase>
+            <phase>prepare-package</phase>
             <goals>
               <goal>build-classpath</goal>
             </goals>
             <configuration>
-              <outputFile>${project.build.directory}/classpath</outputFile>
+              <outputFile>${project.build.outputDirectory}/${project.artifactId}.classpath</outputFile>
               <prefix>$HDDS_LIB_JARS_DIR</prefix>
               <outputFilterFile>true</outputFilterFile>
               <includeScope>runtime</includeScope>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>build-helper-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>attach-classpath-artifact</id>
-            <phase>package</phase>
-            <goals>
-              <goal>attach-artifact</goal>
-            </goals>
-            <configuration>
-              <artifacts>
-                <artifact>
-                  <file>${project.build.directory}/classpath</file>
-                  <type>cp</type>
-                  <classifier>classpath</classifier>
-                </artifact>
-              </artifacts>
             </configuration>
           </execution>
         </executions>

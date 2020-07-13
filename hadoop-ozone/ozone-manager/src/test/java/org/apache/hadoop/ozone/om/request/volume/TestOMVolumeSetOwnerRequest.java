@@ -92,6 +92,13 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
         .getVolumeTable().get(volumeKey).getOwnerName();
     Assert.assertEquals(newOwner, fromDBOwner);
 
+    // modificationTime should be greater than creationTime.
+    long creationTime = omMetadataManager.getVolumeTable()
+        .get(volumeKey).getCreationTime();
+    long modificationTime = omMetadataManager.getVolumeTable()
+        .get(volumeKey).getModificationTime();
+    Assert.assertTrue(modificationTime > creationTime);
+
 
     OzoneManagerProtocolProtos.UserVolumeInfo newOwnerVolumeList =
         omMetadataManager.getUserTable().get(newOwnerKey);

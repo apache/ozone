@@ -771,9 +771,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private void sendPipelineReport() {
-    // TODO: Send IncrementalPipelineReport instead of full PipelineReport
-    context.addReport(context.getParent().getContainer().getPipelineReport());
-    context.getParent().triggerHeartbeat();
+    if (context !=  null) {
+      // TODO: Send IncrementalPipelineReport instead of full PipelineReport
+      context.addReport(context.getParent().getContainer().getPipelineReport());
+      context.getParent().triggerHeartbeat();
+    }
   }
 
   private static List<ThreadPoolExecutor> createChunkExecutors(

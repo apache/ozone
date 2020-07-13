@@ -24,12 +24,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocationList;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.util.Time;
 
@@ -384,6 +384,12 @@ public final class OmKeyInfo extends WithObjectID {
   public KeyInfo getProtobuf() {
     long latestVersion = keyLocationVersions.size() == 0 ? -1 :
         keyLocationVersions.get(keyLocationVersions.size() - 1).getVersion();
+
+    List<KeyLocationList> keyLocations = new ArrayList<>();
+    for (OmKeyLocationInfoGroup locationInfoGroup : keyLocationVersions) {
+      keyLocations.add(locationInfoGroup.getProtobuf());
+    }
+
     KeyInfo.Builder kb = KeyInfo.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -391,9 +397,7 @@ public final class OmKeyInfo extends WithObjectID {
         .setDataSize(dataSize)
         .setFactor(factor)
         .setType(type)
-        .addAllKeyLocationList(keyLocationVersions.stream()
-            .map(OmKeyLocationInfoGroup::getProtobuf)
-            .collect(Collectors.toList()))
+        .addAllKeyLocationList(keyLocations)
         .setLatestVersion(latestVersion)
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
@@ -411,13 +415,18 @@ public final class OmKeyInfo extends WithObjectID {
     if (keyInfo == null) {
       return null;
     }
+
+    List<OmKeyLocationInfoGroup> omKeyLocationInfos = new ArrayList<>();
+    for (KeyLocationList keyLocationList : keyInfo.getKeyLocationListList()) {
+      omKeyLocationInfos.add(
+          OmKeyLocationInfoGroup.getFromProtobuf(keyLocationList));
+    }
+
     Builder builder = new Builder()
         .setVolumeName(keyInfo.getVolumeName())
         .setBucketName(keyInfo.getBucketName())
         .setKeyName(keyInfo.getKeyName())
-        .setOmKeyLocationInfos(keyInfo.getKeyLocationListList().stream()
-            .map(OmKeyLocationInfoGroup::getFromProtobuf)
-            .collect(Collectors.toList()))
+        .setOmKeyLocationInfos(omKeyLocationInfos)
         .setDataSize(keyInfo.getDataSize())
         .setCreationTime(keyInfo.getCreationTime())
         .setModificationTime(keyInfo.getModificationTime())

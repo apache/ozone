@@ -1,4 +1,4 @@
-/**
+  /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -52,7 +52,7 @@ import java.util.Iterator;
 import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
 
-import static org.apache.ratis.server.metrics.RatisMetrics.RATIS_APPLICATION_NAME_METRICS;
+import static org.apache.ratis.server.metrics.RaftLogMetrics.RATIS_APPLICATION_NAME_METRICS;
 import static org.junit.Assert.fail;
 
 /**
@@ -142,8 +142,11 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
   @Test
   public void testOMProxyProviderInitialization() throws Exception {
     OzoneClient rpcClient = getCluster().getRpcClient();
+
     OMFailoverProxyProvider omFailoverProxyProvider =
-        rpcClient.getObjectStore().getClientProxy().getOMProxyProvider();
+        OmFailoverProxyUtil.getFailoverProxyProvider(
+            rpcClient.getObjectStore().getClientProxy());
+
     List<OMProxyInfo> omProxies =
         omFailoverProxyProvider.getOMProxyInfos();
 
@@ -174,7 +177,8 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
       throws Exception {
     ObjectStore objectStore = getObjectStore();
     OMFailoverProxyProvider omFailoverProxyProvider =
-        objectStore.getClientProxy().getOMProxyProvider();
+        OmFailoverProxyUtil
+            .getFailoverProxyProvider(objectStore.getClientProxy());
     String firstProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
     createVolumeTest(true);
@@ -204,8 +208,8 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
   @Test
   public void testOMProxyProviderFailoverToCurrentLeader() throws Exception {
     ObjectStore objectStore = getObjectStore();
-    OMFailoverProxyProvider omFailoverProxyProvider =
-        objectStore.getClientProxy().getOMProxyProvider();
+    OMFailoverProxyProvider omFailoverProxyProvider = OmFailoverProxyUtil
+        .getFailoverProxyProvider(objectStore.getClientProxy());
 
     // Run couple of createVolume tests to discover the current Leader OM
     createVolumeTest(true);
@@ -269,8 +273,9 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     ObjectStore objectStore = getObjectStore();
     objectStore.createVolume(volumeName);
 
-    OMFailoverProxyProvider omFailoverProxyProvider =
-        objectStore.getClientProxy().getOMProxyProvider();
+    OMFailoverProxyProvider omFailoverProxyProvider = OmFailoverProxyUtil
+        .getFailoverProxyProvider(objectStore.getClientProxy());
+
     String currentLeaderNodeId = omFailoverProxyProvider
         .getCurrentProxyOMNodeId();
 
@@ -283,7 +288,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
       final ObjectStore store = OzoneClientFactory.getRpcClient(
           getOmServiceId(), getConf()).getObjectStore();
       final OMFailoverProxyProvider proxyProvider =
-          store.getClientProxy().getOMProxyProvider();
+          OmFailoverProxyUtil.getFailoverProxyProvider(store.getClientProxy());
 
       // Failover to the OM node that the objectStore points to
       omFailoverProxyProvider.performFailoverIfRequired(
@@ -334,7 +339,8 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
         getCluster().getOzoneManager(0).getOmRatisServer();
     ObjectName oname = new ObjectName(RATIS_APPLICATION_NAME_METRICS, "name",
         RATIS_APPLICATION_NAME_METRICS + ".log_worker." +
-            ratisServer.getRaftPeerId().toString() + ".flushCount");
+            ratisServer.getRaftPeerId().toString() +
+            "@" + ratisServer.getRaftGroup().getGroupId() + ".flushCount");
     MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
     MBeanInfo mBeanInfo = mBeanServer.getMBeanInfo(oname);
     Assert.assertNotNull(mBeanInfo);

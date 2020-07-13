@@ -168,6 +168,8 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
 
     Assert.assertEquals(bucketInfoFromProto.getCreationTime(),
         dbBucketInfo.getCreationTime());
+    Assert.assertEquals(bucketInfoFromProto.getModificationTime(),
+        dbBucketInfo.getModificationTime());
     Assert.assertEquals(bucketInfoFromProto.getAcls(),
         dbBucketInfo.getAcls());
     Assert.assertEquals(bucketInfoFromProto.getIsVersionEnabled(),
