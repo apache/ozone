@@ -215,14 +215,14 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         // TODO : Figure out the correct tables and types to use here.
         BatchOperation batch = containerDB.getStore()
                 .getBatchHandler().initBatchOperation();
-        Long blkInfo = containerDB.getStore().getMetadataTable().get(blk);
+        Table<String, BlockData> blockDataTable = containerDB.getStore().getBlockDataTable();
+        BlockData blkInfo = blockDataTable.get(blk);
         if (blkInfo != null) {
-          Table<String, Long> metadataTable = containerDB.getStore().getMetadataTable();
           String deletingKey = OzoneConsts.DELETING_KEY_PREFIX + blk;
           String deletedKey = OzoneConsts.DELETED_KEY_PREFIX + blk;
 
-          if (metadataTable.get(deletingKey) != null
-              || metadataTable.get(deletedKey) != null) {
+          if (blockDataTable.get(deletingKey) != null
+              || blockDataTable.get(deletedKey) != null) {
             if (LOG.isDebugEnabled()) {
               LOG.debug(String.format(
                   "Ignoring delete for block %s in container %d."
@@ -232,8 +232,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           }
           // Found the block in container db,
           // use an atomic update to change its state to deleting.
-          metadataTable.putWithBatch(batch, deletingKey, blkInfo);
-          metadataTable.deleteWithBatch(batch, blk);
+          blockDataTable.putWithBatch(batch, deletingKey, blkInfo);
+          blockDataTable.deleteWithBatch(batch, blk);
           try {
             containerDB.getStore().getBatchHandler().commitBatchOperation(batch);
             newDeletionBlocks++;
