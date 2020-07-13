@@ -206,8 +206,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       omMetrics.decNumKeys(deleteKeys.size());
       omMetrics.incNumKeyDeleteFails();
       if (LOG.isDebugEnabled()) {
-        LOG.error("Keys delete failed. Volume:{}, Bucket:{}, DeletedKey:{}, " +
-                "UnDeletedKeys:{}", volumeName, bucketName, keyName,
+        LOG.debug("Keys delete failed. Volume:{}, Bucket:{}, DeletedKeys:{}, " +
+                "UnDeletedKeys:{}", volumeName, bucketName,
             auditMap.get(DELETED_KEYS_LIST), auditMap.get(UNDELETED_KEYS_LIST),
             exception);
       }
