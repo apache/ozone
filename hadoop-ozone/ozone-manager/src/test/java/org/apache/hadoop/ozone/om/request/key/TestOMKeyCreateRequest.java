@@ -347,7 +347,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   @Test
   public void testKeyCreateWithIntermediateDir() throws Exception {
 
-    String keyName = "a/b/c/file1";
+    String keyName = "/a/b/c/file1";
     OMRequest omRequest = createKeyRequest(false, 0, keyName);
 
     OzoneConfiguration configuration = new OzoneConfiguration();
@@ -393,8 +393,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName, keyName,
         0L, RATIS, THREE, omMetadataManager);
 
-    // Now try with a file exists in path. Should fail.
-    keyName = "a/b/c/file1/file2";
+    // Now create another file in same dir path.
+    keyName = "/a/b/c/file2";
     omRequest = createKeyRequest(false, 0, keyName);
 
     omKeyCreateRequest = new OMKeyCreateRequest(omRequest);
@@ -407,8 +407,24 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         omKeyCreateRequest.validateAndUpdateCache(ozoneManager,
             101L, ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(omClientResponse.getOMResponse().getStatus(),
-        NOT_A_FILE);
+    Assert.assertEquals(OK, omClientResponse.getOMResponse().getStatus());
+
+    // Now try with a file exists in path. Should fail.
+    keyName = "/a/b/c/file1/file2";
+    omRequest = createKeyRequest(false, 0, keyName);
+
+    omKeyCreateRequest = new OMKeyCreateRequest(omRequest);
+
+    omRequest = omKeyCreateRequest.preExecute(ozoneManager);
+
+    omKeyCreateRequest = new OMKeyCreateRequest(omRequest);
+
+    omClientResponse =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager,
+            101L, ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(NOT_A_FILE,
+        omClientResponse.getOMResponse().getStatus());
 
   }
 

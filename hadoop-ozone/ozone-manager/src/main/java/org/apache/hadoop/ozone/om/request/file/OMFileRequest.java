@@ -79,15 +79,11 @@ public final class OMFileRequest {
       String dbDirKeyName = omMetadataManager.getOzoneDirKey(volumeName,
           bucketName, pathName);
 
-      if (omMetadataManager.getKeyTable().isExist(dbKeyName)) {
-        // Found a file in the given path.
-        // Check if this is actual file or a file in the given path
-        if (dbKeyName.equals(fileNameFromDetails)) {
-          result = OMDirectoryResult.FILE_EXISTS;
-        } else {
-          result = OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
-        }
-      } else if (omMetadataManager.getKeyTable().isExist(dbDirKeyName)) {
+      // Check first for dir. This is to handle leading "/" in path, which
+      // creates an entry in key table. Do we need to create this or skip
+      // creation totally. This is not a problem with filecreate, as the Path
+      // in FileSystem takes care and also we remove leading "/" in filesystem.
+      if (omMetadataManager.getKeyTable().isExist(dbDirKeyName)) {
         // Found a directory in the given path.
         // Check if this is actual directory or a directory in the given path
         if (dbDirKeyName.equals(dirNameFromDetails)) {
@@ -98,6 +94,14 @@ public final class OMFileRequest {
               .getAcls();
           LOG.trace("Acls inherited from parent " + dbDirKeyName + " are : "
               + inheritAcls);
+        }
+      } else if (omMetadataManager.getKeyTable().isExist(dbKeyName)) {
+        // Found a file in the given path.
+        // Check if this is actual file or a file in the given path
+        if (dbKeyName.equals(fileNameFromDetails)) {
+          result = OMDirectoryResult.FILE_EXISTS;
+        } else {
+          result = OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
         }
       } else {
         if (!dbDirKeyName.equals(dirNameFromDetails)) {
