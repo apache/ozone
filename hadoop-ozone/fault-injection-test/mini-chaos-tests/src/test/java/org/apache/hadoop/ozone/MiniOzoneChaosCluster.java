@@ -226,7 +226,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
           TimeUnit.SECONDS);
       conf.setInt(
           OzoneConfigKeys
-              .DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_DISK_KEY,
+              .DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_KEY,
           4);
       conf.setInt(
           OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY,
