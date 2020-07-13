@@ -157,12 +157,12 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           omKeyInfoList, trxnLogIndex, ozoneManager.isRatisEnabled());
       result = Result.SUCCESS;
     } catch (IOException ex) {
-        result = Result.FAILURE;
-        exception = ex;
+      result = Result.FAILURE;
+      exception = ex;
 
-        omClientResponse = new OMKeyDeleteResponse(
-            createOperationKeysErrorOMResponse(omResponse, exception,
-                unDeletedKeys));
+      omClientResponse = new OMKeyDeleteResponse(
+          createOperationKeysErrorOMResponse(omResponse, exception,
+              unDeletedKeys));
 
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
