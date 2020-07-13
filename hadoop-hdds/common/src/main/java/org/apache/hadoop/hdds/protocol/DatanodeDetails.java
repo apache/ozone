@@ -86,6 +86,7 @@ public class DatanodeDetails extends NodeImpl implements
     this.hostName = datanodeDetails.hostName;
     this.ports = datanodeDetails.ports;
     this.setNetworkName(datanodeDetails.getNetworkName());
+    this.setParent(datanodeDetails.getParent());
     this.version = datanodeDetails.version;
     this.setupTime = datanodeDetails.setupTime;
   }

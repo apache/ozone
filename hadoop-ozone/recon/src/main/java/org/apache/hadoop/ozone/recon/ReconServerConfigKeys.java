@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.ozone.recon;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_ROCKSDB;
-
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 
@@ -79,11 +77,6 @@ public final class ReconServerConfigKeys {
       "recon.om.snapshot.task.initial.delay";
   public static final String
       RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT = "1m";
-
-  public static final String OZONE_RECON_CONTAINER_DB_STORE_IMPL =
-      "ozone.recon.container.db.impl";
-  public static final String OZONE_RECON_CONTAINER_DB_STORE_IMPL_DEFAULT =
-      OZONE_METADATA_STORE_IMPL_ROCKSDB;
 
   public static final String RECON_OM_SNAPSHOT_TASK_INTERVAL =
       "recon.om.snapshot.task.interval.delay";
