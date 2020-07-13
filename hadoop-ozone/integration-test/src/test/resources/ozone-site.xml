@@ -27,7 +27,7 @@
   </property>
 
   <property>
-    <name>dfs.container.ratis.num.write.chunk.threads</name>
+    <name>dfs.container.ratis.num.write.chunk.threads.per.volume</name>
     <value>4</value>
   </property>
 
