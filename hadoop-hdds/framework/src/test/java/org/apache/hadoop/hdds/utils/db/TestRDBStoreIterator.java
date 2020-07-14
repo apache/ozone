@@ -38,6 +38,12 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * This test prescribe expected behaviour from the RDBStoreIterator which wraps
+ * RocksDB's own iterator. Ozone internally in TypedTableIterator uses, the
+ * RDBStoreIterator to provide iteration over table elements in a typed manner.
+ * The tests are to ensure we access RocksDB via the iterator properly.
+ */
 public class TestRDBStoreIterator {
 
   private RocksIterator rocksDBIteratorMock;
