@@ -18,15 +18,8 @@
 
 package org.apache.hadoop.ozone.om.request;
 
-import java.io.IOException;
-import java.net.InetAddress;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -36,22 +29,21 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .DeleteKeysResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import javax.annotation.Nonnull;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 
 /**
@@ -216,36 +208,6 @@ public abstract class OMClientRequest implements RequestAuditor {
     if (errorMsg != null) {
       omResponse.setMessage(errorMsg);
     }
-    omResponse.setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(ex));
-    return omResponse.build();
-  }
-
-  /**
-   * Set parameters needed for return error response to client.
-   *
-   * @param omResponse
-   * @param ex         - IOException
-   * @param unDeletedKeys    - Set<OmKeyInfo>
-   * @return error response need to be returned to client - OMResponse.
-   */
-  protected OMResponse createOperationKeysErrorOMResponse(
-      @Nonnull OMResponse.Builder omResponse,
-      @Nonnull IOException ex, @Nonnull Set<OmKeyInfo> unDeletedKeys) {
-    omResponse.setSuccess(false);
-    StringBuffer errorMsg = new StringBuffer();
-    DeleteKeysResponse.Builder resp = DeleteKeysResponse.newBuilder();
-    for (OmKeyInfo key : unDeletedKeys) {
-      if(key != null) {
-        resp.addUnDeletedKeys(key.getProtobuf());
-      }
-    }
-    if (errorMsg != null) {
-      omResponse.setMessage(errorMsg.toString());
-    }
-    // TODO: Currently all delete operations in OzoneBucket.java are void. Here
-    //  we put the List of unDeletedKeys into Response. These KeyInfo can be
-    //  used to continue deletion if client support delete retry.
-    omResponse.setDeleteKeysResponse(resp.build());
     omResponse.setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(ex));
     return omResponse.build();
   }

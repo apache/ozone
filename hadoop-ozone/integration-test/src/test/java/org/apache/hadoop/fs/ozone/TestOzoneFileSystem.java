@@ -72,8 +72,8 @@ import org.slf4j.LoggerFactory;
 public class TestOzoneFileSystem {
 
   /**
-    * Set a timeout for each test.
-    */
+   * Set a timeout for each test.
+   */
   @Rule
   public Timeout timeout = new Timeout(300000);
 
@@ -89,7 +89,7 @@ public class TestOzoneFileSystem {
 
   @Test(timeout = 300_000)
   public void testCreateFileShouldCheckExistenceOfDirWithSameName()
-          throws Exception {
+      throws Exception {
     /*
      * Op 1. create file -> /d1/d2/d3/d4/key2
      * Op 2. create dir -> /d1/d2/d3/d4/key2
@@ -195,11 +195,11 @@ public class TestOzoneFileSystem {
   }
 
   private void setupOzoneFileSystem()
-          throws IOException, TimeoutException, InterruptedException {
+      throws IOException, TimeoutException, InterruptedException {
     OzoneConfiguration conf = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(conf)
-            .setNumDatanodes(3)
-            .build();
+        .setNumDatanodes(3)
+        .build();
     cluster.waitForClusterToBeReady();
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
@@ -207,8 +207,8 @@ public class TestOzoneFileSystem {
     bucketName = bucket.getName();
 
     String rootPath = String.format("%s://%s.%s/",
-            OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
-            bucket.getVolumeName());
+        OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
+        bucket.getVolumeName());
 
     // Set the fs.defaultFS and start the filesystem
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);

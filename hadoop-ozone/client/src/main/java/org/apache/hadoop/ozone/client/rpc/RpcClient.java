@@ -76,6 +76,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
@@ -730,16 +731,9 @@ public class RpcClient implements ClientProtocol {
           throws IOException {
     HddsClientUtils.verifyResourceName(volumeName, bucketName);
     Preconditions.checkNotNull(keyNameList);
-    List<OmKeyArgs> keyArgsList = new ArrayList<>();
-    for (String keyName: keyNameList) {
-      OmKeyArgs keyArgs = new OmKeyArgs.Builder()
-          .setVolumeName(volumeName)
-          .setBucketName(bucketName)
-          .setKeyName(keyName)
-          .build();
-      keyArgsList.add(keyArgs);
-    }
-    ozoneManagerClient.deleteKeys(keyArgsList);
+    OmDeleteKeys omDeleteKeys = new OmDeleteKeys(volumeName, bucketName,
+        keyNameList);
+    ozoneManagerClient.deleteKeys(omDeleteKeys);
   }
 
   @Override
