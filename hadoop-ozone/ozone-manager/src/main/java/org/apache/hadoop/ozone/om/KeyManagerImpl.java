@@ -1701,13 +1701,15 @@ public class KeyManagerImpl implements KeyManager {
     String keyName = args.getKeyName();
 
     return getOzoneFileStatus(volumeName, bucketName, keyName,
-            args.getRefreshPipeline());
+            args.getRefreshPipeline(), false, null);
   }
 
   private OzoneFileStatus getOzoneFileStatus(String volumeName,
                                              String bucketName,
                                              String keyName,
-                                             boolean refreshPipeline)
+                                             boolean refreshPipeline,
+                                             boolean sortDatanodes,
+                                             String clientAddress)
       throws IOException {
     OmKeyInfo fileKeyInfo = null;
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
@@ -1742,6 +1744,9 @@ public class KeyManagerImpl implements KeyManager {
       if (fileKeyInfo != null) {
         if (refreshPipeline) {
           refreshPipeline(fileKeyInfo);
+        }
+        if (sortDatanodes) {
+          sortDatanodeInPipeline(fileKeyInfo, clientAddress);
         }
         return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
       }
@@ -1898,15 +1903,10 @@ public class KeyManagerImpl implements KeyManager {
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
     OzoneFileStatus fileStatus = getOzoneFileStatus(volumeName, bucketName,
-            keyName, false);
+            keyName, args.getRefreshPipeline(), args.getSortDatanodes(),
+            clientAddress);
       //if key is not of type file or if key is not found we throw an exception
-    if (fileStatus != null && fileStatus.isFile()) {
-      if (args.getRefreshPipeline()) {
-        refreshPipeline(fileStatus.getKeyInfo());
-      }
-      if (args.getSortDatanodes()) {
-        sortDatanodeInPipeline(fileStatus.getKeyInfo(), clientAddress);
-      }
+    if (fileStatus.isFile()) {
       return fileStatus.getKeyInfo();
     }
     throw new OMException("Can not write to directory: " + keyName,
