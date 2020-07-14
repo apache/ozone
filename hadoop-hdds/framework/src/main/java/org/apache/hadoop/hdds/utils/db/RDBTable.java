@@ -206,7 +206,7 @@ class RDBTable implements Table<byte[], byte[]> {
   public TableIterator<byte[], ByteArrayKeyValue> iterator() {
     ReadOptions readOptions = new ReadOptions();
     readOptions.setFillCache(false);
-    return new RDBStoreIterator(db.newIterator(handle, readOptions));
+    return new RDBStoreIterator(db.newIterator(handle, readOptions), this);
   }
 
   @Override
