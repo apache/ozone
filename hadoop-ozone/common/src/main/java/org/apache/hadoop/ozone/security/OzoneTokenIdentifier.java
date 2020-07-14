@@ -97,9 +97,7 @@ public class OzoneTokenIdentifier extends
         WritableUtils.writeString(buf, getStrToSign());
       } else {
         WritableUtils.writeString(buf, getOmCertSerialId());
-        if (getOmServiceId() != null) {
-          WritableUtils.writeString(buf, getOmServiceId());
-        }
+        WritableUtils.writeString(buf, getOmServiceId());
       }
     } catch (java.io.IOException e) {
       throw new IllegalArgumentException(
