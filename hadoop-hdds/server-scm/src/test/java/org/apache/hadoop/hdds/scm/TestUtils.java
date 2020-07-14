@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -457,6 +458,22 @@ public final class TestUtils {
 
   /**
    * Construct and returns StorageContainerManager instance using the given
+   * configuration.
+   *
+   * @param conf OzoneConfiguration
+   * @return StorageContainerManager instance
+   * @throws IOException
+   * @throws AuthenticationException
+   */
+  public static StorageContainerManager getScmSimple(OzoneConfiguration conf)
+      throws IOException, AuthenticationException {
+    SCMConfigurator configurator = new SCMConfigurator();
+    configurator.setSCMHAManager(MockSCMHAManager.getInstance());
+    return StorageContainerManager.createSCM(conf, configurator);
+  }
+
+  /**
+   * Construct and returns StorageContainerManager instance using the given
    * configuration. The ports used by this StorageContainerManager are
    * randomly selected from free ports available.
    *
@@ -467,7 +484,9 @@ public final class TestUtils {
    */
   public static StorageContainerManager getScm(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
-    return getScm(conf, new SCMConfigurator());
+    SCMConfigurator configurator = new SCMConfigurator();
+    configurator.setSCMHAManager(MockSCMHAManager.getInstance());
+    return getScm(conf, configurator);
   }
 
   /**

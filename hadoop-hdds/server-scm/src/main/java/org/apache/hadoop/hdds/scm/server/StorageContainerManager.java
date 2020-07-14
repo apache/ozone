@@ -51,6 +51,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.server.ratis.SCMRatisServer;
@@ -94,7 +96,7 @@ import org.apache.hadoop.hdds.scm.node.StaleNodeHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineActionHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineReportHandler;
-import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -170,6 +172,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private final SCMStorageConfig scmStorageConfig;
 
   private SCMMetadataStore scmMetadataStore;
+  private SCMHAManager scmHAManager;
 
   private final EventQueue eventQueue;
   /*
@@ -237,7 +240,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @param configurator - configurator
    */
   private StorageContainerManager(OzoneConfiguration conf,
-                                 SCMConfigurator configurator)
+                                  SCMConfigurator configurator)
       throws IOException, AuthenticationException  {
     super(HddsVersionInfo.HDDS_VERSION_INFO);
 
@@ -439,6 +442,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       clusterMap = new NetworkTopologyImpl(conf);
     }
 
+    if (configurator.getSCMHAManager() != null) {
+      scmHAManager = configurator.getSCMHAManager();
+    } else {
+      scmHAManager = new SCMHAManagerImpl(conf);
+    }
+
     if(configurator.getScmNodeManager() != null) {
       scmNodeManager = configurator.getScmNodeManager();
     } else {
@@ -455,7 +464,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       pipelineManager = configurator.getPipelineManager();
     } else {
       pipelineManager =
-          new SCMPipelineManager(conf, scmNodeManager,
+          PipelineManagerV2Impl.newPipelineManager(
+              conf,
+              scmHAManager,
+              scmNodeManager,
               scmMetadataStore.getPipelineTable(),
               eventQueue);
     }
@@ -825,6 +837,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmRatisServer.start();
     }
 
+    scmHAManager.start();
+
     ms = HddsServerUtil
         .initializeMetrics(configuration, "StorageContainerManager");
 
@@ -955,6 +969,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     if (ms != null) {
       ms.stop();
+    }
+
+    try {
+      scmHAManager.shutdown();
+    } catch (Exception ex) {
+      LOG.error("SCM HA Manager stop failed", ex);
     }
 
     scmSafeModeManager.stop();

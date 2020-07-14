@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
-import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
@@ -73,7 +72,7 @@ public class TestPipelineManagerImpl {
   public void init() throws Exception {
     conf = SCMTestUtils.getConf();
     testDir = GenericTestUtils.getTestDir(
-        TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
+        TestPipelineManagerImpl.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(conf, new SCMDBDefinition());
     nodeManager = new MockNodeManager(true, 20);
@@ -200,8 +199,8 @@ public class TestPipelineManagerImpl {
       pipelineManager.getPipeline(pipeline.getId());
       fail("Pipeline should not have been retrieved");
     } catch (PipelineNotFoundException e) {
-      // There should be no pipeline in pipelineManager.
-      Assert.assertEquals(0, pipelineManager.getPipelines().size());
+      // There may be pipelines created by BackgroundPipelineCreator
+      // exist in pipelineManager, just ignore them.
     }
 
     pipelineManager.close();
