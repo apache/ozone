@@ -65,6 +65,8 @@ import static org.apache.hadoop.hdds.security.x509.certificate.utils.Certificate
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
 import static org.apache.hadoop.util.ExitUtil.terminate;
+
+import org.apache.hadoop.util.Time;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -191,6 +193,9 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       datanodeDetails = initializeDatanodeDetails();
       datanodeDetails.setHostName(hostname);
       datanodeDetails.setIpAddress(ip);
+      datanodeDetails.setVersion(
+          HddsVersionInfo.HDDS_VERSION_INFO.getVersion());
+      datanodeDetails.setSetupTime(Time.now());
       TracingUtil.initTracing(
           "HddsDatanodeService." + datanodeDetails.getUuidString()
               .substring(0, 8), conf);

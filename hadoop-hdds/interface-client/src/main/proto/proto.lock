@@ -1531,6 +1531,16 @@
                 "type": "string"
               },
               {
+                "id": 8,
+                "name": "version",
+                "type": "string"
+              },
+              {
+                "id": 9,
+                "name": "setupTime",
+                "type": "int64"
+              },
+              {
                 "id": 100,
                 "name": "uuid128",
                 "type": "UUID"
