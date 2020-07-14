@@ -42,7 +42,8 @@ public class TokenIdentifierCodec implements Codec<OzoneTokenIdentifier> {
     Preconditions.checkNotNull(rawData,
         "Null byte array can't converted to real object.");
     try {
-      return OzoneTokenIdentifier.fromUniqueSerializedKey(rawData);
+      OzoneTokenIdentifier object = OzoneTokenIdentifier.newInstance();
+      return object.fromUniqueSerializedKey(rawData);
     } catch (BufferUnderflowException e) {
       throw new IllegalArgumentException(
           "Can't encode the the raw data from the byte array", e);
