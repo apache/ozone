@@ -238,8 +238,9 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
         // Check if a file or directory exists with same key name.
         if (omDirectoryResult == DIRECTORY_EXISTS) {
-          throw new OMException("Can not write to directory: " + keyName,
-              NOT_A_FILE);
+          throw new OMException("Cannot write to " +
+              "directory. createIntermediateDirs behavior is enabled and " +
+              "hence / has special interpretation: " + keyName, NOT_A_FILE);
         } else
           if (omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
             throw new OMException("Can not create file: " + keyName +
