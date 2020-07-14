@@ -53,7 +53,7 @@ public class SCMHAConfiguration {
   private String ratisBindHost = "0.0.0.0";
 
   @Config(key = "ratis.bind.port",
-      type = ConfigType.STRING,
+      type = ConfigType.INT,
       defaultValue = "9865",
       tags = {OZONE, SCM, HA, RATIS},
       description = "Port used by SCM for Ratis Server."
@@ -78,7 +78,7 @@ public class SCMHAConfiguration {
       description = "The size of the raft segment used by Apache Ratis on" +
           " SCM. (16 KB by default)"
   )
-  private long raftSegmentSize = 16L * 1024L;
+  private double raftSegmentSize = 16L * 1024L;
 
   @Config(key = "ratis.segment.preallocated.size",
       type = ConfigType.SIZE,
@@ -87,7 +87,7 @@ public class SCMHAConfiguration {
       description = "The size of the buffer which is preallocated for" +
           " raft segment used by Apache Ratis on SCM.(16 KB by default)"
   )
-  private long raftSegmentPreAllocatedSize = 16 * 1024;
+  private double raftSegmentPreAllocatedSize = 16 * 1024;
 
   @Config(key = "ratis.log.appender.queue.num-elements",
       type = ConfigType.INT,
@@ -103,7 +103,7 @@ public class SCMHAConfiguration {
       tags = {SCM, OZONE, HA, RATIS},
       description = "Byte limit for Raft's Log Worker queue."
   )
-  private int raftLogAppenderQueueByteLimit = 32 * 1024 * 1024;
+  private double raftLogAppenderQueueByteLimit = 32 * 1024 * 1024;
 
   @Config(key = "ratis.log.purge.gap",
       type = ConfigType.INT,
@@ -174,11 +174,11 @@ public class SCMHAConfiguration {
   }
 
   public long getRaftSegmentSize() {
-    return raftSegmentSize;
+    return (long)raftSegmentSize;
   }
 
   public long getRaftSegmentPreAllocatedSize() {
-    return raftSegmentPreAllocatedSize;
+    return (long)raftSegmentPreAllocatedSize;
   }
 
   public int getRaftLogAppenderQueueNum() {
@@ -186,7 +186,7 @@ public class SCMHAConfiguration {
   }
 
   public int getRaftLogAppenderQueueByteLimit() {
-    return raftLogAppenderQueueByteLimit;
+    return (int)raftLogAppenderQueueByteLimit;
   }
 
   public int getRaftLogPurgeGap() {

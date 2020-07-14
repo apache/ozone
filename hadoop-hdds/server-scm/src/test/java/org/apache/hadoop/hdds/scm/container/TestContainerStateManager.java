@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -107,7 +106,7 @@ public class TestContainerStateManager {
 
   private ContainerInfo allocateContainer() throws IOException {
 
-    PipelineManager pipelineManager = Mockito.mock(SCMPipelineManager.class);
+    PipelineManager pipelineManager = Mockito.mock(PipelineManager.class);
 
     Pipeline pipeline =
         Pipeline.newBuilder().setState(Pipeline.PipelineState.CLOSED)

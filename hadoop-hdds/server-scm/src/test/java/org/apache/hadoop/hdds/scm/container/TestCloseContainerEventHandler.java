@@ -28,11 +28,12 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
-import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
@@ -55,7 +56,7 @@ public class TestCloseContainerEventHandler {
 
   private static OzoneConfiguration configuration;
   private static MockNodeManager nodeManager;
-  private static SCMPipelineManager pipelineManager;
+  private static PipelineManagerV2Impl pipelineManager;
   private static SCMContainerManager containerManager;
   private static long size;
   private static File testDir;
@@ -77,8 +78,13 @@ public class TestCloseContainerEventHandler {
     scmMetadataStore = new SCMMetadataStoreImpl(configuration);
 
     pipelineManager =
-        new SCMPipelineManager(configuration, nodeManager,
-            scmMetadataStore.getPipelineTable(), eventQueue);
+        PipelineManagerV2Impl.newPipelineManager(
+            configuration,
+            MockSCMHAManager.getInstance(),
+            nodeManager,
+            scmMetadataStore.getPipelineTable(),
+            eventQueue);
+
     pipelineManager.allowPipelineCreation();
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,

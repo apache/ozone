@@ -41,12 +41,14 @@ import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
-import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerV2Impl;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -76,8 +78,9 @@ public class TestBlockManager {
   private StorageContainerManager scm;
   private SCMContainerManager mapping;
   private MockNodeManager nodeManager;
-  private SCMPipelineManager pipelineManager;
+  private PipelineManagerV2Impl pipelineManager;
   private BlockManagerImpl blockManager;
+  private SCMHAManager scmHAManager;
   private final static long DEFAULT_BLOCK_SIZE = 128 * MB;
   private static HddsProtos.ReplicationFactor factor;
   private static HddsProtos.ReplicationType type;
@@ -105,14 +108,20 @@ public class TestBlockManager {
     conf.setTimeDuration(HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL, 5,
         TimeUnit.SECONDS);
 
-    // Override the default Node Manager in SCM with this Mock Node Manager.
+    // Override the default Node Manager and SCMHAManager
+    // in SCM with the Mock one.
     nodeManager = new MockNodeManager(true, 10);
+    scmHAManager = MockSCMHAManager.getInstance();
+
     eventQueue = new EventQueue();
 
     scmMetadataStore = new SCMMetadataStoreImpl(conf);
     scmMetadataStore.start(conf);
     pipelineManager =
-        new SCMPipelineManager(conf, nodeManager,
+        PipelineManagerV2Impl.newPipelineManager(
+            conf,
+            scmHAManager,
+            nodeManager,
             scmMetadataStore.getPipelineTable(),
             eventQueue);
     pipelineManager.allowPipelineCreation();
@@ -140,6 +149,7 @@ public class TestBlockManager {
     configurator.setContainerManager(containerManager);
     configurator.setScmSafeModeManager(safeModeManager);
     configurator.setMetadataStore(scmMetadataStore);
+    configurator.setSCMHAManager(scmHAManager);
     scm = TestUtils.getScm(conf, configurator);
 
     // Initialize these fields so that the tests can pass.

@@ -160,7 +160,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
 
   @Override
   public Pipeline createPipeline(ReplicationType type, ReplicationFactor factor,
-                          List<DatanodeDetails> nodes) {
+                                 List<DatanodeDetails> nodes) {
     // This will mostly be used to create dummy pipeline for SimplePipelines.
     // We don't update the metrics for SimplePipelines.
     lock.writeLock().lock();
@@ -207,6 +207,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
 
   @Override
   public List<Pipeline> getPipelines(ReplicationType type) {
+    lock.readLock().lock();
     try {
       return stateManager.getPipelines(type);
     } finally {
@@ -580,6 +581,17 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @VisibleForTesting
   public void allowPipelineCreation() {
     this.pipelineCreationAllowed.set(true);
+  }
+
+  @VisibleForTesting
+  public void setPipelineProvider(ReplicationType replicationType,
+                                  PipelineProvider provider) {
+    pipelineFactory.setProvider(replicationType, provider);
+  }
+
+  @VisibleForTesting
+  public StateManager getStateManager() {
+    return stateManager;
   }
 
   private void setBackgroundPipelineCreator(

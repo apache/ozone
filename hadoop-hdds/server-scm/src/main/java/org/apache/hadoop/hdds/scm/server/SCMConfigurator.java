@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm.server;
 
 
 import org.apache.hadoop.hdds.scm.block.BlockManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -51,7 +52,8 @@ import org.apache.hadoop.hdds.security.x509.certificate.authority
  * ReplicationManager replicationManager;
  * SCMSafeModeManager scmSafeModeManager;
  * CertificateServer certificateServer;
- * SCMMetadata scmMetadataStore.
+ * SCMMetadata scmMetadataStore;
+ * SCMHAManager scmHAManager.
  *
  * If any of these are *not* specified then the default version of these
  * managers are used by SCM.
@@ -67,6 +69,7 @@ public final class SCMConfigurator {
   private CertificateServer certificateServer;
   private SCMMetadataStore metadataStore;
   private NetworkTopology networkTopology;
+  private SCMHAManager scmHAManager;
 
   /**
    * Allows user to specify a version of Node manager to use with this SCM.
@@ -149,6 +152,15 @@ public final class SCMConfigurator {
   }
 
   /**
+   * Allows user to specify a custom version of SCMHAManager to be
+   * used with this SCM.
+   * @param scmHaMgr - SCMHAManager.
+   */
+  public void setSCMHAManager(SCMHAManager scmHaMgr) {
+    this.scmHAManager = scmHaMgr;
+  }
+
+  /**
    * Gets SCM Node Manager.
    * @return Node Manager.
    */
@@ -218,5 +230,13 @@ public final class SCMConfigurator {
    */
   public NetworkTopology getNetworkTopology() {
     return networkTopology;
+  }
+
+  /**
+   * Get SCMHAManager.
+   * @return SCMHAManager.
+   */
+  public SCMHAManager getSCMHAManager() {
+    return scmHAManager;
   }
 }
