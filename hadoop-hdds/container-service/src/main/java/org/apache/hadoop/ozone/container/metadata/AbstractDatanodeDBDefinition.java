@@ -32,6 +32,9 @@ public abstract class AbstractDatanodeDBDefinition implements DBDefinition {
 
   private File dbDir;
 
+  /**
+   * @param dbPath The absolute path to the .db file corresponding to this {@link DBDefinition}.
+   */
   protected AbstractDatanodeDBDefinition(String dbPath) {
     this.dbDir = new File(dbPath);
   }
@@ -43,7 +46,7 @@ public abstract class AbstractDatanodeDBDefinition implements DBDefinition {
 
   @Override
   public File getDBLocation(ConfigurationSource conf) {
-    return dbDir.getParentFile().getParentFile();
+    return dbDir.getParentFile();
   }
 
   @Override

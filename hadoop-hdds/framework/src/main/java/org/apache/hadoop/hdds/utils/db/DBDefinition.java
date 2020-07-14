@@ -44,7 +44,7 @@ public interface DBDefinition {
 
   /**
    * @param conf The configuration for the DB.
-   * @return The absolute path to the DB.
+   * @return The parent directory for this definition's .db file.
    */
   default File getDBLocation(ConfigurationSource conf) {
     return ServerUtils.getDirectoryFromConfig(conf,
