@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.ozone;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
 import java.util.TreeSet;
@@ -41,11 +42,14 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import org.apache.commons.io.IOUtils;
 
+import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -163,6 +167,8 @@ public class TestOzoneFileSystem {
     testOzoneFsServiceLoader();
     o3fs = (OzoneFileSystem) fs;
 
+    testGetTrashRoots();
+    testGetTrashRoot();
     testGetDirectoryModificationTime();
 
     testListStatusOnRoot();
@@ -560,5 +566,55 @@ public class TestOzoneFileSystem {
       fileStatuses = o3fs.listStatus(mdir1);
       assertTrue(modificationTime <= fileStatuses[0].getModificationTime());
     }
+  }
+
+  public void testGetTrashRoot() throws IOException {
+    String username = UserGroupInformation.getCurrentUser().getShortUserName();
+    Path trashRoot = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
+    // Input path doesn't matter, o3fs.getTrashRoot() only cares about username
+    Path inPath1 = new Path("o3fs://bucket2.volume1/path/to/key");
+    // Test with current user
+    Path outPath1 = o3fs.getTrashRoot(inPath1);
+    Path expectedOutPath1 = new Path(trashRoot, username);
+    Assert.assertEquals(expectedOutPath1, outPath1);
+  }
+
+  public void testGetTrashRoots() throws IOException {
+    String username = UserGroupInformation.getCurrentUser().getShortUserName();
+    Path trashRoot = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
+    Path userTrash = new Path(trashRoot, username);
+
+    Collection<FileStatus> res = o3fs.getTrashRoots(false);
+    Assert.assertEquals(0, res.size());
+
+    fs.mkdirs(userTrash);
+    res = o3fs.getTrashRoots(false);
+    Assert.assertEquals(1, res.size());
+    res.forEach(e -> Assert.assertEquals(
+        userTrash.toString(), e.getPath().toUri().getPath()));
+    // Only have one user trash for now
+    res = o3fs.getTrashRoots(true);
+    Assert.assertEquals(1, res.size());
+
+    // Create a few more random user trash dir
+    for (int i = 1; i <= 5; i++) {
+      Path moreUserTrash = new Path(trashRoot, "trashuser" + i);
+      fs.mkdirs(moreUserTrash);
+    }
+
+    // And create a file, which should be ignored
+    fs.create(new Path(trashRoot, "trashuser99"));
+
+    // allUsers = false should still return current user trash
+    res = o3fs.getTrashRoots(false);
+    Assert.assertEquals(1, res.size());
+    res.forEach(e -> Assert.assertEquals(
+        userTrash.toString(), e.getPath().toUri().getPath()));
+    // allUsers = true should return all user trash
+    res = o3fs.getTrashRoots(true);
+    Assert.assertEquals(6, res.size());
+
+    // Clean up
+    o3fs.delete(trashRoot, true);
   }
 }

@@ -19,6 +19,6 @@
     <Package name="org.apache.hadoop.ozone.protocol.proto"/>
   </Match>
   <Match>
-    <Package name="org.apache.hadoop.security.proto"/>
+    <Package name="org.apache.hadoop.ozone.security.proto"/>
   </Match>
 </FindBugsFilter>

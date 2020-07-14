@@ -40,7 +40,7 @@ import static org.mockito.Mockito.when;
 public class TestOMPrefixAclRequest extends TestOMKeyRequest {
 
   @Test
-  public void testReplayRequest() throws Exception {
+  public void testAclRequest() throws Exception {
     PrefixManager prefixManager = new PrefixManagerImpl(
         ozoneManager.getMetadataManager(), true);
     when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
@@ -66,15 +66,8 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
             ozoneManagerDoubleBufferHelper);
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
-
-    // Replay the original request
-    OMClientResponse replayResponse = omKeyPrefixAclRequest
-        .validateAndUpdateCache(ozoneManager, 2,
-            ozoneManagerDoubleBufferHelper);
-
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
-        replayResponse.getOMResponse().getStatus());
   }
+
 
   /**
    * Create OMRequest which encapsulates OMKeyAddAclRequest.

@@ -39,18 +39,9 @@ public class OMKeyPurgeResponse extends OMClientResponse {
   private List<String> purgeKeyList;
 
   public OMKeyPurgeResponse(@Nonnull OMResponse omResponse,
-      List<String> keyList) {
+      @Nonnull List<String> keyList) {
     super(omResponse);
     this.purgeKeyList = keyList;
-  }
-
-  /**
-   * For when the request is not successful or it is a replay transaction.
-   * For a successful request, the other constructor should be used.
-   */
-  public OMKeyPurgeResponse(@Nonnull OMResponse omResponse) {
-    super(omResponse);
-    checkStatusNotOK();
   }
 
   @Override

@@ -25,12 +25,10 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.volume.OMVolumeAclOpResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -46,7 +44,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_L
 /**
  * Base class for OMVolumeAcl Request.
  */
-public abstract class OMVolumeAclRequest extends OMClientRequest {
+public abstract class OMVolumeAclRequest extends OMVolumeRequest {
 
   private CheckedBiFunction<List<OzoneAcl>, OmVolumeArgs, IOException>
       omVolumeAclOp;
@@ -84,19 +82,7 @@ public abstract class OMVolumeAclRequest extends OMClientRequest {
       }
       lockAcquired = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume);
-      String dbVolumeKey = omMetadataManager.getVolumeKey(volume);
-      omVolumeArgs = omMetadataManager.getVolumeTable().get(dbVolumeKey);
-      if (omVolumeArgs == null) {
-        throw new OMException(OMException.ResultCodes.VOLUME_NOT_FOUND);
-      }
-
-      // Check if this transaction is a replay of ratis logs.
-      // If this is a replay, then the response has already been returned to
-      // the client. So take no further action and return a dummy
-      // OMClientResponse.
-      if (isReplay(ozoneManager, omVolumeArgs, trxnLogIndex)) {
-        throw new OMReplayException();
-      }
+      omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
 
       // result is false upon add existing acl or remove non-existing acl
       boolean applyAcl = true;
@@ -106,27 +92,23 @@ public abstract class OMVolumeAclRequest extends OMClientRequest {
         applyAcl = false;
       }
 
-      // We set the updateID even if applyAcl = false to catch the replay
-      // transactions.
-      omVolumeArgs.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+      // Update only when
+      if (applyAcl) {
+        omVolumeArgs.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
-      // update cache.
-      omMetadataManager.getVolumeTable().addCacheEntry(
-          new CacheKey<>(dbVolumeKey),
-          new CacheValue<>(Optional.of(omVolumeArgs), trxnLogIndex));
+        // update cache.
+        omMetadataManager.getVolumeTable().addCacheEntry(
+            new CacheKey<>(omMetadataManager.getVolumeKey(volume)),
+            new CacheValue<>(Optional.of(omVolumeArgs), trxnLogIndex));
+      }
 
       omClientResponse = onSuccess(omResponse, omVolumeArgs, applyAcl);
       result = Result.SUCCESS;
     } catch (IOException ex) {
-      if (ex instanceof OMReplayException) {
-        result = Result.REPLAY;
-        omClientResponse = onReplay(omResponse);
-      } else {
-        result = Result.FAILURE;
-        exception = ex;
-        omMetrics.incNumVolumeUpdateFails();
-        omClientResponse = onFailure(omResponse, ex);
-      }
+      result = Result.FAILURE;
+      exception = ex;
+      omMetrics.incNumVolumeUpdateFails();
+      omClientResponse = onFailure(omResponse, ex);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
@@ -182,10 +164,6 @@ public abstract class OMVolumeAclRequest extends OMClientRequest {
    */
   abstract OMClientResponse onFailure(OMResponse.Builder omResponse,
       IOException ex);
-
-  OMClientResponse onReplay(OMResponse.Builder omResonse) {
-    return new OMVolumeAclOpResponse(createReplayOMResponse(omResonse));
-  }
 
   /**
    * Completion hook for final processing before return without lock.

@@ -30,8 +30,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import static org.apache.hadoop.ozone.security.OzoneTokenIdentifier.KIND_NAME;
+
+import org.apache.hadoop.ozone.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.io.Text;
 import org.mockito.Mockito;

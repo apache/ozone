@@ -30,7 +30,6 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -314,7 +313,7 @@ public final class RatisHelper {
    * ---------------------------------------------------------------------------
    */
   public static RetryPolicy createRetryPolicy(ConfigurationSource conf) {
-    RatisClientConfig ratisClientConfig = OzoneConfiguration.of(conf)
+    RatisClientConfig ratisClientConfig = conf
         .getObject(RatisClientConfig.class);
     ExponentialBackoffRetry exponentialBackoffRetry =
         createExponentialBackoffPolicy(ratisClientConfig);
