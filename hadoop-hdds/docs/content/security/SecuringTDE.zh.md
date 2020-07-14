@@ -1,7 +1,7 @@
 ---
 title: "透明数据加密"
 date: "2019-April-03"
-summary: 透明数据加密（Transparent Data Encryption，TDE）以密文形式在磁盘上保存数据，但可以在用户访问的时候自动进行解密。TDE 以键或桶为单位进行加密。
+summary: 透明数据加密（Transparent Data Encryption，TDE）以密文形式在磁盘上保存数据，但可以在用户访问的时候自动进行解密。
 weight: 3
 icon: lock
 ---
