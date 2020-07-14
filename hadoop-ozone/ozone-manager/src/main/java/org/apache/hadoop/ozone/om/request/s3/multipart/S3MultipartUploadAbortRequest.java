@@ -122,26 +122,6 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       }
 
-      // We do not check if this transaction is a replay. If OmKeyInfo
-      // exists, then we should delete it from OpenKeyTable irrespective of
-      // whether this transaction is a replay. There are 3 scenarios:
-      //   Trxn 1 : Initiate Multipart Upload request for key1
-      //            (openKey = openKey1)
-      //   Trxn 2 : Abort Multipart Upload request for opneKey1
-      //
-      // Scenario 1 : This is not a replay transaction.
-      //      omKeyInfo is not null and we proceed with the abort request to
-      //      deleted openKey1 from openKeyTable.
-      // Scenario 2 : Trxn 1 and 2 are replayed.
-      //      Replay of Trxn 1 would create openKey1 in openKeyTable as we do
-      //      not check for replay in S3InitiateMultipartUploadRequest.
-      //      Hence, we should replay Trxn 2 also to maintain consistency.
-      // Scenario 3 : Trxn 2 is replayed and not Trxn 1.
-      //      This will result in omKeyInfo == null as openKey1 would already
-      //      have been deleted from openKeyTable.
-      // So in both scenarios 1 and 2 (omKeyInfo not null), we should go
-      // ahead with this request irrespective of whether it is a replay or not.
-
       multipartKeyInfo = omMetadataManager.getMultipartInfoTable()
           .get(multipartKey);
       multipartKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());

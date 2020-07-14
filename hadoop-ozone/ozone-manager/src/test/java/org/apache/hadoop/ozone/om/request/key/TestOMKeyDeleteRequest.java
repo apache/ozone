@@ -136,43 +136,6 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
             omClientResponse.getOMResponse().getStatus());
   }
 
-  @Test
-  public void testReplayRequest() throws Exception {
-    OMRequest modifiedOmRequest =
-        doPreExecute(createDeleteKeyRequest());
-
-    OMKeyDeleteRequest omKeyDeleteRequest =
-        new OMKeyDeleteRequest(modifiedOmRequest);
-
-    // Add volume, bucket and key entries to OM DB.
-    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager);
-
-    TestOMRequestUtils.addKeyToTableAndCache(volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, 1L, omMetadataManager);
-
-    // Delete the key manually. Lets say the Delete Requests
-    // TransactionLogIndex is 10.
-    long deleteTrxnLogIndex = 10L;
-    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-        keyName);
-    TestOMRequestUtils.deleteKey(ozoneKey, omMetadataManager, 10L);
-
-    // Create the same key again with TransactionLogIndex > Delete requests
-    // TransactionLogIndex
-    TestOMRequestUtils.addKeyToTableAndCache(volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, 20L, omMetadataManager);
-
-    // Replay the original DeleteRequest.
-    OMClientResponse omClientResponse = omKeyDeleteRequest
-        .validateAndUpdateCache(ozoneManager, deleteTrxnLogIndex,
-            ozoneManagerDoubleBufferHelper);
-
-    // Replay should result in Replay response
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
-        omClientResponse.getOMResponse().getStatus());
-  }
-
   /**
    * This method calls preExecute and verify the modified request.
    * @param originalOmRequest

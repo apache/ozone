@@ -302,9 +302,6 @@ enum Status {
     DIRECTORY_ALREADY_EXISTS = 60;
 
     INVALID_VOLUME_NAME = 61;
-
-    // When transactions are replayed
-    REPLAY = 100;
 }
 
 /**
