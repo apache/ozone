@@ -103,12 +103,6 @@ public class OMPrefixRemoveAclRequest extends OMPrefixAclRequest {
         }
       }
       break;
-    case REPLAY:
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-            getOmRequest());
-      }
-      break;
     case FAILURE:
       omMetrics.incNumBucketUpdateFails();
       LOG.error("Remove acl {} to path {} failed!", ozoneAcls,

@@ -222,7 +222,5 @@ public class OMException extends IOException {
     DIRECTORY_ALREADY_EXISTS,
 
     INVALID_VOLUME_NAME,
-
-    REPLAY // When ratis logs are replayed.
   }
 }

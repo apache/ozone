@@ -58,8 +58,8 @@ public class OMVolumeSetOwnerResponse extends OMClientResponse {
   }
 
   /**
-   * For when the request is not successful or it is a replay transaction.
-   * Or when newOwner is the same as oldOwner.
+   * For when the request is not successful or when newOwner is the same as
+   * oldOwner.
    * For other successful requests, the other constructor should be used.
    */
   public OMVolumeSetOwnerResponse(@Nonnull OMResponse omResponse) {
