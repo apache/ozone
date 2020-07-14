@@ -240,8 +240,8 @@ public final class OMConfigKeys {
   public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =
           false;
 
-  // This config needs to be enabled, when S3G created objects will be used
-  // FileSystem.
+  // This config needs to be enabled, when S3G created objects used via
+  // FileSystem API.
   public static final String OZONE_OM_CREATE_INTERMEDIATE_DIRECTORY =
       "ozone.om.create.intermediate.directories";
   public static final boolean OZONE_OM_CREATE_INTERMEDIATE_DIRECTORY_DEFAULT =
