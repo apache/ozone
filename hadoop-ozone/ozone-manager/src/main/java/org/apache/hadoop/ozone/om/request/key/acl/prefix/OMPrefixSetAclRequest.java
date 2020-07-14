@@ -99,12 +99,6 @@ public class OMPrefixSetAclRequest extends OMPrefixAclRequest {
             ozoneObj.getPath());
       }
       break;
-    case REPLAY:
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-            getOmRequest());
-      }
-      break;
     case FAILURE:
       omMetrics.incNumBucketUpdateFails();
       LOG.error("Set acl {} to path {} failed!", ozoneAcls,

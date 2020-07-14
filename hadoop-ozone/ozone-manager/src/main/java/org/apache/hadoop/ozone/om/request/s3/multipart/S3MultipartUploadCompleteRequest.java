@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -67,13 +66,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(S3MultipartUploadCompleteRequest.class);
-
-  private enum Result {
-    SUCCESS,
-    REPLAY,
-    DELETE_OPEN_KEY_ONLY,
-    FAILURE
-  }
 
   public S3MultipartUploadCompleteRequest(OMRequest omRequest) {
     super(omRequest);
@@ -138,36 +130,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
       String ozoneKey = omMetadataManager.getOzoneKey(
           keyArgs.getVolumeName(), keyArgs.getBucketName(), keyName);
-
-      OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
-
-      if (omKeyInfo != null) {
-        // Check if this transaction is a replay of ratis logs.
-        if (isReplay(ozoneManager, omKeyInfo, trxnLogIndex)) {
-          // During S3InitiateMultipartUpload or KeyCreate, we do not check
-          // the OpenKey Table for replay. This is so as to avoid an extra
-          // DB read during KeyCreate.
-          // If this transaction is a replay, the S3InitiateMultipartUpload
-          // and part key KeyCreate request could also have been replayed.
-          // And since we do not check for replay there, we should scrub
-          // the key from OpenKey table and MultipartInfo table now, if it
-          // exists.
-
-          OmKeyInfo openMultipartKeyInfo = omMetadataManager
-              .getOpenKeyTable().get(multipartKey);
-          if (openMultipartKeyInfo != null) {
-            omMetadataManager.getOpenKeyTable().addCacheEntry(
-                new CacheKey<>(multipartKey),
-                new CacheValue<>(Optional.absent(), trxnLogIndex));
-            omMetadataManager.getMultipartInfoTable().addCacheEntry(
-                new CacheKey<>(multipartKey),
-                new CacheValue<>(Optional.absent(), trxnLogIndex));
-
-            throw new OMReplayException(true);
-          }
-          throw new OMReplayException(false);
-        }
-      }
 
       OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
           .getMultipartInfoTable().get(multipartKey);
@@ -266,6 +228,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         HddsProtos.ReplicationFactor factor =
             partKeyInfoMap.lastEntry().getValue().getPartKeyInfo().getFactor();
 
+        OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
         if (omKeyInfo == null) {
           // This is a newly added key, it does not have any versions.
           OmKeyLocationInfoGroup keyLocationInfoGroup = new
@@ -336,22 +299,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       }
 
     } catch (IOException ex) {
-      if (ex instanceof OMReplayException) {
-        if (((OMReplayException) ex).isDBOperationNeeded()) {
-          result = Result.DELETE_OPEN_KEY_ONLY;
-          omClientResponse = new S3MultipartUploadCompleteResponse(
-              omResponse.build(), multipartKey);
-        } else {
-          result = Result.REPLAY;
-          omClientResponse = new S3MultipartUploadCompleteResponse(
-              createReplayOMResponse(omResponse));
-        }
-      } else {
-        result = Result.FAILURE;
-        exception = ex;
-        omClientResponse = new S3MultipartUploadCompleteResponse(
-            createErrorOMResponse(omResponse, exception));
-      }
+      result = Result.FAILURE;
+      exception = ex;
+      omClientResponse = new S3MultipartUploadCompleteResponse(
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
@@ -361,28 +312,17 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       }
     }
 
-    if (result != Result.REPLAY && result != Result.DELETE_OPEN_KEY_ONLY) {
-      auditMap.put(OzoneConsts.MULTIPART_LIST, partsList.toString());
+    auditMap.put(OzoneConsts.MULTIPART_LIST, partsList.toString());
 
-      // audit log
-      auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
-          OMAction.COMPLETE_MULTIPART_UPLOAD, auditMap, exception,
-          getOmRequest().getUserInfo()));
-    }
+    // audit log
+    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+        OMAction.COMPLETE_MULTIPART_UPLOAD, auditMap, exception,
+        getOmRequest().getUserInfo()));
 
     switch (result) {
     case SUCCESS:
       LOG.debug("MultipartUpload Complete request is successfull for Key: {} " +
           "in Volume/Bucket {}/{}", keyName, requestedVolume, requestedBucket);
-      break;
-    case REPLAY:
-      LOG.debug("Replayed Transaction {} ignored. Request: {}",
-          trxnLogIndex, multipartUploadCompleteRequest);
-      break;
-    case DELETE_OPEN_KEY_ONLY:
-      LOG.debug("Replayed Transaction {}. Deleting old key {} from OpenKey " +
-          "table and MultipartInfo table. Request: {}", trxnLogIndex,
-          multipartKey, multipartUploadCompleteRequest);
       break;
     case FAILURE:
       ozoneManager.getMetrics().incNumCompleteMultipartUploadFails();

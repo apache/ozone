@@ -50,21 +50,7 @@ public class OMKeyCommitResponse extends OMClientResponse {
   }
 
   /**
-   * When the KeyCommit request is a replay but the openKey should be deleted
-   * from the OpenKey table.
-   * Note that this response will result in openKey deletion only. Key will
-   * not be added to Key table.
-   * @param openKeyName openKey to be deleted from OpenKey table
-   */
-  public OMKeyCommitResponse(@Nonnull OMResponse omResponse,
-      String openKeyName) {
-    super(omResponse);
-    this.omKeyInfo = null;
-    this.openKeyName = openKeyName;
-  }
-
-  /**
-   * For when the request is not successful or it is a replay transaction.
+   * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
   public OMKeyCommitResponse(@Nonnull OMResponse omResponse) {
@@ -80,12 +66,8 @@ public class OMKeyCommitResponse extends OMClientResponse {
     omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
         openKeyName);
 
-    // Add entry to Key table if omKeyInfo is available i.e. it is not a
-    // replayed transaction.
-    if (omKeyInfo != null) {
-      omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKeyName,
-          omKeyInfo);
-    }
+    omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKeyName,
+        omKeyInfo);
   }
 
 }

@@ -922,7 +922,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         System.out.println(
             "OM initialization succeeded.Current cluster id for sd="
                 + omStorage.getStorageDir() + ";cid=" + omStorage
-                .getClusterID());
+                .getClusterID() + ";layoutVersion=" + omStorage
+                .getLayoutVersion());
 
         return true;
       } catch (IOException ioe) {
@@ -939,7 +940,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       System.out.println(
           "OM already initialized.Reusing existing cluster id for sd="
               + omStorage.getStorageDir() + ";cid=" + omStorage
-              .getClusterID());
+              .getClusterID() + ";layoutVersion=" + omStorage
+              .getLayoutVersion());
       return true;
     }
   }

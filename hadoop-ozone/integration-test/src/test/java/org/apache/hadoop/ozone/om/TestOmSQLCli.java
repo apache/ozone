@@ -26,7 +26,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
@@ -34,7 +33,6 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.scm.cli.SQLCLI;
@@ -51,13 +49,10 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 
 /**
  * This class tests the CLI that transforms om.db into SQLite DB files.
  */
-@RunWith(Parameterized.class)
 public class TestOmSQLCli {
 
   /**
@@ -81,21 +76,6 @@ public class TestOmSQLCli {
   private String keyName1 = "key1";
   private String keyName2 = "key2";
   private String keyName3 = "key3";
-
-  @Parameterized.Parameters
-  public static Collection<Object[]> data() {
-    return Arrays.asList(new Object[][] {
-        // Uncomment the below line if we support leveldb in future.
-        //{OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_LEVELDB},
-        {OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_ROCKSDB}
-    });
-  }
-
-  private String metaStoreType;
-
-  public TestOmSQLCli(String type) {
-    metaStoreType = type;
-  }
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -123,7 +103,6 @@ public class TestOmSQLCli {
 
     cluster.getOzoneManager().stop();
     cluster.getStorageContainerManager().stop();
-    conf.set(OzoneConfigKeys.OZONE_METADATA_STORE_IMPL, metaStoreType);
     cli = new SQLCLI(conf);
   }
 

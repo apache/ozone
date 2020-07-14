@@ -56,7 +56,7 @@ public class OMKeyCreateResponse extends OMClientResponse {
   }
 
   /**
-   * For when the request is not successful or it is a replay transaction.
+   * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
   public OMKeyCreateResponse(@Nonnull OMResponse omResponse) {
