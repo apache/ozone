@@ -50,7 +50,7 @@ import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOU
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PARTIAL_DELETE;
 import static org.junit.Assert.fail;
 
 /**
@@ -187,8 +187,9 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
       ozoneBucket.deleteKeys(keyList2);
       fail("testFilesDelete");
     } catch (OMException ex) {
-      // The expected exception KEY_NOT_FOUND.
-      Assert.assertEquals(KEY_NOT_FOUND, ex.getResult());
+      // The expected exception PARTIAL_DELETE, as if not able to delete, we
+      // return error codee PARTIAL_DElETE.
+      Assert.assertEquals(PARTIAL_DELETE, ex.getResult());
     }
   }
 
