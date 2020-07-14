@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeSetQuotaResponse;
@@ -127,23 +126,8 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
 
       acquireVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume);
-      String dbVolumeKey = omMetadataManager.getVolumeKey(volume);
-      omVolumeArgs = omMetadataManager.getVolumeTable().get(dbVolumeKey);
 
-      if (omVolumeArgs == null) {
-        LOG.debug("volume:{} does not exist", volume);
-        throw new OMException(OMException.ResultCodes.VOLUME_NOT_FOUND);
-      }
-
-      // Check if this transaction is a replay of ratis logs.
-      // If this is a replay, then the response has already been returned to
-      // the client. So take no further action and return a dummy
-      // OMClientResponse.
-      if (isReplay(ozoneManager, omVolumeArgs, transactionLogIndex)) {
-        LOG.debug("Replayed Transaction {} ignored. Request: {}",
-            transactionLogIndex, setVolumePropertyRequest);
-        return new OMVolumeSetQuotaResponse(createReplayOMResponse(omResponse));
-      }
+      omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
 
       omVolumeArgs.setQuotaInBytes(setVolumePropertyRequest.getQuotaInBytes());
       omVolumeArgs.setUpdateID(transactionLogIndex,
@@ -153,7 +137,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
 
       // update cache.
       omMetadataManager.getVolumeTable().addCacheEntry(
-          new CacheKey<>(dbVolumeKey),
+          new CacheKey<>(omMetadataManager.getVolumeKey(volume)),
           new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
 
       omResponse.setSetVolumePropertyResponse(

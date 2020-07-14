@@ -61,7 +61,7 @@ public class S3MultipartUploadAbortResponse extends OMClientResponse {
   }
 
   /**
-   * For when the request is not successful or it is a replay transaction.
+   * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
   public S3MultipartUploadAbortResponse(@Nonnull OMResponse omResponse) {

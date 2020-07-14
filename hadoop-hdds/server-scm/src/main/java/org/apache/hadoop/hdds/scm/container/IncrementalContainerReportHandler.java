@@ -54,16 +54,23 @@ public class IncrementalContainerReportHandler extends
   @Override
   public void onMessage(final IncrementalContainerReportFromDatanode report,
                         final EventPublisher publisher) {
+    final DatanodeDetails dnFromReport = report.getDatanodeDetails();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Processing incremental container report from data node {}",
-          report.getDatanodeDetails().getUuid());
+          dnFromReport.getUuid());
+    }
+    DatanodeDetails dd =
+        nodeManager.getNodeByUuid(dnFromReport.getUuidString());
+    if (dd == null) {
+      LOG.warn("Received container report from unknown datanode {}",
+          dnFromReport);
+      return;
     }
 
     boolean success = true;
     for (ContainerReplicaProto replicaProto :
         report.getReport().getReportList()) {
       try {
-        final DatanodeDetails dd = report.getDatanodeDetails();
         final ContainerID id = ContainerID.valueof(
             replicaProto.getContainerID());
         if (!replicaProto.getState().equals(
@@ -81,7 +88,7 @@ public class IncrementalContainerReportHandler extends
       } catch (IOException e) {
         success = false;
         LOG.error("Exception while processing ICR for container {}",
-            replicaProto.getContainerID());
+            replicaProto.getContainerID(), e);
       }
     }
 
