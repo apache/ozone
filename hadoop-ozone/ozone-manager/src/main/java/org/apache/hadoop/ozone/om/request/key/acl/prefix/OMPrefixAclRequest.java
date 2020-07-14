@@ -26,12 +26,10 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl.OMPrefixAclOpResult;
-import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.key.acl.prefix.OMPrefixAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -86,14 +84,6 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
 
       omPrefixInfo = omMetadataManager.getPrefixTable().get(prefixPath);
 
-      // Check if this transaction is a replay of ratis logs.
-      if (omPrefixInfo != null) {
-        if (isReplay(ozoneManager, omPrefixInfo, trxnLogIndex)) {
-          // This is a replayed transaction. Return dummy response.
-          throw new OMReplayException();
-        }
-      }
-
       try {
         operationResult = apply(prefixManager, omPrefixInfo, trxnLogIndex);
       } catch (IOException ex) {
@@ -129,14 +119,9 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
       result = Result.SUCCESS;
 
     } catch (IOException ex) {
-      if (ex instanceof OMReplayException) {
-        result = Result.REPLAY;
-        omClientResponse = onReplay(omResponse);
-      } else {
-        result = Result.FAILURE;
-        exception = ex;
-        omClientResponse = onFailure(omResponse, ex);
-      }
+      result = Result.FAILURE;
+      exception = ex;
+      omClientResponse = onFailure(omResponse, ex);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
@@ -185,15 +170,6 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
    */
   abstract OMClientResponse onFailure(OMResponse.Builder omResponse,
       IOException exception);
-
-  /**
-   * Get the OM Client Response on replayed transactions.
-   * @param omResonse
-   * @return OMClientResponse
-   */
-  OMClientResponse onReplay(OMResponse.Builder omResonse) {
-    return new OMPrefixAclResponse(createReplayOMResponse(omResonse));
-  }
 
   /**
    * Completion hook for final processing before return without lock.

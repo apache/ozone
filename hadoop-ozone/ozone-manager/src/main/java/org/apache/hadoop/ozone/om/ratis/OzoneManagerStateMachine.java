@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.ratis;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
@@ -64,7 +63,6 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.METADATA_ERROR;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.REPLAY;
 
 /**
  * The OM StateMachine is the state machine for OM Ratis server. It is
@@ -258,12 +256,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
             terminate(omResponse, OMException.ResultCodes.INTERNAL_ERROR);
           } else if (omResponse.getStatus() == METADATA_ERROR) {
             terminate(omResponse, OMException.ResultCodes.METADATA_ERROR);
-          } else if (omResponse.getStatus() == REPLAY) {
-            // For replay we do not add response to double buffer, so update
-            // LastAppliedIndex for the replay transactions here.
-            computeAndUpdateLastAppliedIndex(trxLogIndex,
-                trx.getLogEntry().getTerm(), Lists.newArrayList(trxLogIndex),
-                true);
           }
         }
 
