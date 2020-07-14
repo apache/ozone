@@ -309,9 +309,14 @@ public final class DBStoreBuilder {
     for (DBColumnFamilyDefinition<KEY, VALUE> columnFamily :
             definition.getColumnFamilies()) {
 
-      addTable(columnFamily.getName())
-              .addCodec(columnFamily.getKeyType(), columnFamily.getKeyCodec())
-              .addCodec(columnFamily.getValueType(), columnFamily.getValueCodec());
+      if (!columnFamily.getTableName().equals(DEFAULT_COLUMN_FAMILY_NAME)) {
+        // The default column family is always added.
+        // If it is present in the DB Definition, ignore it so we don't get an error about adding
+        // it twice.
+        addTable(columnFamily.getName())
+                .addCodec(columnFamily.getKeyType(), columnFamily.getKeyCodec())
+                .addCodec(columnFamily.getValueType(), columnFamily.getValueCodec());
+      }
     }
 
     return this;
