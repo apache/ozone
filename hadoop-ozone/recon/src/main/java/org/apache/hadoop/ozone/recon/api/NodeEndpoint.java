@@ -121,6 +121,8 @@ public class NodeEndpoint {
           .withPipelines(pipelines)
           .withLeaderCount(leaderCount.get())
           .withUUid(datanode.getUuidString())
+          .withVersion(datanode.getVersion())
+          .withSetupTime(datanode.getSetupTime())
           .build());
     });
 
