@@ -42,7 +42,7 @@ public abstract class OMClientResponse {
   }
 
   /**
-   * For error or replay cases, check that the status of omResponse is not OK.
+   * For error case, check that the status of omResponse is not OK.
    */
   public void checkStatusNotOK() {
     Preconditions.checkArgument(!omResponse.getStatus().equals(

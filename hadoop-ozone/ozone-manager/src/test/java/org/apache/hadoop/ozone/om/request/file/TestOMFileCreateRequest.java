@@ -38,8 +38,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 
-import static org.apache.hadoop.ozone.om.request.TestOMRequestUtils.addKeyToTable;
-import static org.apache.hadoop.ozone.om.request.TestOMRequestUtils.addVolumeAndBucketToDB;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS;
@@ -400,32 +398,5 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
         .setClientId(UUID.randomUUID().toString())
         .setCreateFileRequest(createFileRequest).build();
 
-  }
-
-  @Test
-  public void testReplayRequest() throws Exception {
-
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
-
-    OMRequest originalRequest = createFileRequest(volumeName, bucketName,
-        keyName, replicationFactor, replicationType, false, false);
-    OMFileCreateRequest omFileCreateRequest = new OMFileCreateRequest(
-        originalRequest);
-
-    // Manually add volume, bucket and key to DB table
-    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager);
-    addKeyToTable(false, false, volumeName, bucketName, keyName, clientID,
-        replicationType, replicationFactor, 1L, omMetadataManager);
-
-    // Replay the transaction - Execute the createFile request again
-    OMClientResponse omClientResponse =
-        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
-
-    // Replay should result in Replay response
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
-        omClientResponse.getOMResponse().getStatus());
   }
 }

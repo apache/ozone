@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -151,13 +150,6 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           throw new OMException("Key not found: " + keyName, KEY_NOT_FOUND);
         }
 
-        // Check if this transaction is a replay of ratis logs.
-        if (isReplay(ozoneManager, omKeyInfo, trxnLogIndex)) {
-          // Replay implies the response has already been returned to
-          // the client. So take no further action and return a dummy
-          // OMClientResponse.
-          throw new OMReplayException();
-        }
       }
 
       omClientResponse = new OMKeysDeleteResponse(omResponse
@@ -165,39 +157,26 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           omKeyInfoList, trxnLogIndex, ozoneManager.isRatisEnabled());
       result = Result.SUCCESS;
     } catch (IOException ex) {
-      if (ex instanceof OMReplayException) {
-        result = Result.REPLAY;
-        omClientResponse = new OMKeyDeleteResponse(createReplayOMResponse(
-            omResponse));
-      } else {
-        result = Result.FAILURE;
-        exception = ex;
+      result = Result.FAILURE;
+      exception = ex;
 
-        omClientResponse = new OMKeyDeleteResponse(
-            createOperationKeysErrorOMResponse(omResponse, exception,
-                unDeletedKeys));
-      }
+      omClientResponse = new OMKeyDeleteResponse(
+          createOperationKeysErrorOMResponse(omResponse, exception,
+              unDeletedKeys));
 
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
     }
 
-    // Performing audit logging outside of the lock.
-    if (result != Result.REPLAY) {
-      auditLog(auditLogger, buildAuditMessage(
-          OMAction.DELETE_KEY, auditMap, exception, userInfo));
-    }
+    auditLog(auditLogger, buildAuditMessage(
+        OMAction.DELETE_KEY, auditMap, exception, userInfo));
 
     switch (result) {
     case SUCCESS:
       omMetrics.decNumKeys();
       LOG.debug("Key deleted. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);
-      break;
-    case REPLAY:
-      LOG.debug("Replayed Transaction {} ignored. Request: {}",
-          trxnLogIndex, deleteKeyRequest);
       break;
     case FAILURE:
       omMetrics.incNumKeyDeleteFails();

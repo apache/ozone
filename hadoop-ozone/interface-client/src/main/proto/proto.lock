@@ -415,10 +415,6 @@
               {
                 "name": "INVALID_VOLUME_NAME",
                 "integer": 61
-              },
-              {
-                "name": "REPLAY",
-                "integer": 100
               }
             ]
           },
