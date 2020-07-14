@@ -40,6 +40,8 @@ import org.junit.rules.Timeout;
 import java.net.URI;
 import java.util.Arrays;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
+
 /**
  * Class tests create with object store and getFileStatus.
  */
@@ -86,7 +88,7 @@ public class TestOzoneFSWithObjectStoreCreate {
     OzoneBucket bucket =
         TestDataUtil.createVolumeAndBucket(cluster, volumeName, bucketName);
 
-    rootPath = String.format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucketName,
+    rootPath = String.format("%s://%s.%s/", OZONE_URI_SCHEME, bucketName,
         volumeName);
     fs = FileSystem.get(new URI(rootPath), conf);
     o3fs = (OzoneFileSystem) fs;
