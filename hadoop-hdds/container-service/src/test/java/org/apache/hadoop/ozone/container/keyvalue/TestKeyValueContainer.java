@@ -211,15 +211,16 @@ public class TestKeyValueContainer {
     //write one few keys to check the key count after import
     try(ReferenceCountedDB metadataStore =
         BlockUtils.getDB(keyValueContainerData, conf)) {
-      Table<String, Long> metadataTable = metadataStore.getStore().getMetadataTable();
+      Table<String, BlockData> blockDataTable = metadataStore.getStore().getBlockDataTable();
 
       for (long i = 0; i < numberOfKeysToWrite; i++) {
-        metadataTable.put("test" + i, i);
+        blockDataTable.put("test" + i, new BlockData(new BlockID(i, i)));
       }
 
       // As now when we put blocks, we increment block count and update in DB.
       // As for test, we are doing manually so adding key count to DB.
-      metadataTable.put(OzoneConsts.BLOCK_COUNT, numberOfKeysToWrite);
+      metadataStore.getStore().getMetadataTable()
+              .put(OzoneConsts.BLOCK_COUNT, numberOfKeysToWrite);
     }
     BlockUtils.removeDB(keyValueContainerData, conf);
 
