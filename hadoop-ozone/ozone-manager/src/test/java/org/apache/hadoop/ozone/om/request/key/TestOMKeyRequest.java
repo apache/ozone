@@ -120,8 +120,6 @@ public class TestOMKeyRequest {
     when(ozoneManager.getPreallocateBlocksMax()).thenReturn(2);
     when(ozoneManager.isGrpcBlockTokenEnabled()).thenReturn(false);
     when(ozoneManager.getOMNodeId()).thenReturn(UUID.randomUUID().toString());
-    when(ozoneManager.resolveBucketLink(any(KeyArgs.class)))
-        .thenReturn(new ResolvedBucket(Pair.of("", ""), Pair.of("", "")));
     when(scmClient.getBlockClient()).thenReturn(scmBlockLocationProtocol);
 
     Pipeline pipeline = Pipeline.newBuilder()
@@ -155,6 +153,11 @@ public class TestOMKeyRequest {
     clientID = Time.now();
     dataSize = 1000L;
 
+    Pair<String, String> volumeAndBucket = Pair.of(volumeName, bucketName);
+    when(ozoneManager.resolveBucketLink(any(KeyArgs.class)))
+        .thenReturn(new ResolvedBucket(volumeAndBucket, volumeAndBucket));
+    when(ozoneManager.resolveBucketLink(any(Pair.class)))
+        .thenReturn(new ResolvedBucket(volumeAndBucket, volumeAndBucket));
   }
 
   @After
