@@ -32,10 +32,16 @@ public class RDBStoreIterator
     implements TableIterator<byte[], ByteArrayKeyValue> {
 
   private RocksIterator rocksDBIterator;
+  private RDBTable rocksDBTable;
 
   public RDBStoreIterator(RocksIterator iterator) {
     this.rocksDBIterator = iterator;
     rocksDBIterator.seekToFirst();
+  }
+
+  public RDBStoreIterator(RocksIterator iterator, RDBTable table) {
+    this(iterator);
+    this.rocksDBTable = table;
   }
 
   @Override
@@ -98,6 +104,16 @@ public class RDBStoreIterator
           rocksDBIterator.value());
     }
     return null;
+  }
+
+  @Override
+  public void removeFromDB() throws IOException {
+    if (rocksDBTable == null) {
+      throw new UnsupportedOperationException("remove");
+    }
+    if (rocksDBIterator.isValid()) {
+      rocksDBTable.delete(rocksDBIterator.key());
+    }
   }
 
   @Override
