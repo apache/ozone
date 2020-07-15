@@ -27,6 +27,8 @@ import {DatanodeStatus, IStorageReport} from 'types/datanode.types';
 import './datanodes.less';
 import {AutoReloadHelper} from 'utils/autoReloadHelper';
 import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
+import {MultiSelect, IOption} from 'components/multiSelect/multiSelect';
+import {ActionMeta, ValueType} from 'react-select';
 import {showDataFetchError} from 'utils/common';
 
 interface IDatanodeResponse {
@@ -38,6 +40,8 @@ interface IDatanodeResponse {
   containers: number;
   leaderCount: number;
   uuid: string;
+  version: string;
+  setupTime: number;
 }
 
 interface IDatanodesResponse {
@@ -56,6 +60,8 @@ interface IDatanode {
   containers: number;
   leaderCount: number;
   uuid: string;
+  version: string;
+  setupTime: number;
 }
 
 interface IPipeline {
@@ -70,6 +76,8 @@ interface IDatanodesState {
   dataSource: IDatanode[];
   totalCount: number;
   lastUpdated: number;
+  selectedColumns: IOption[];
+  columnOptions: IOption[];
 }
 
 const renderDatanodeStatus = (status: DatanodeStatus) => {
@@ -89,6 +97,7 @@ const COLUMNS = [
     title: 'Status',
     dataIndex: 'state',
     key: 'state',
+    isVisible: true,
     render: (text: DatanodeStatus) => renderDatanodeStatus(text),
     sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state)
   },
@@ -96,6 +105,7 @@ const COLUMNS = [
     title: 'Uuid',
     dataIndex: 'uuid',
     key: 'uuid',
+    isVisible: true,
     sorter: (a: IDatanode, b: IDatanode) => a.uuid.localeCompare(b.uuid),
     defaultSortOrder: 'ascend' as const
   },
@@ -103,6 +113,7 @@ const COLUMNS = [
     title: 'Hostname',
     dataIndex: 'hostname',
     key: 'hostname',
+    isVisible: true,
     sorter: (a: IDatanode, b: IDatanode) => a.hostname.localeCompare(b.hostname),
     defaultSortOrder: 'ascend' as const
   },
@@ -110,6 +121,7 @@ const COLUMNS = [
     title: 'Storage Capacity',
     dataIndex: 'storageUsed',
     key: 'storageUsed',
+    isVisible: true,
     sorter: (a: IDatanode, b: IDatanode) => a.storageRemaining - b.storageRemaining,
     render: (text: string, record: IDatanode) => (
       <StorageBar
@@ -120,6 +132,7 @@ const COLUMNS = [
     title: 'Last Heartbeat',
     dataIndex: 'lastHeartbeat',
     key: 'lastHeartbeat',
+    isVisible: true,
     sorter: (a: IDatanode, b: IDatanode) => a.lastHeartbeat - b.lastHeartbeat,
     render: (heartbeat: number) => {
       return heartbeat > 0 ? moment(heartbeat).format('lll') : 'NA';
@@ -129,6 +142,7 @@ const COLUMNS = [
     title: 'Pipeline ID(s)',
     dataIndex: 'pipelines',
     key: 'pipelines',
+    isVisible: true,
     render: (pipelines: IPipeline[], record: IDatanode) => {
       return (
         <div>
@@ -158,15 +172,45 @@ const COLUMNS = [
   </span>,
     dataIndex: 'leaderCount',
     key: 'leaderCount',
+    isVisible: true,
     sorter: (a: IDatanode, b: IDatanode) => a.leaderCount - b.leaderCount
   },
   {
     title: 'Containers',
     dataIndex: 'containers',
     key: 'containers',
+    isVisible: true,
     sorter: (a: IDatanode, b: IDatanode) => a.containers - b.containers
+  },
+  {
+    title: 'Version',
+    dataIndex: 'version',
+    key: 'version',
+    isVisible: false,
+    sorter: (a: IDatanode, b: IDatanode) => a.version.localeCompare(b.version),
+    defaultSortOrder: 'ascend' as const
+  },
+  {
+    title: 'SetupTime',
+    dataIndex: 'setupTime',
+    key: 'setupTime',
+    isVisible: false,
+    sorter: (a: IDatanode, b: IDatanode) => a.setupTime - b.setupTime,
+    render: (uptime: number) => {
+      return uptime > 0 ? moment(uptime).format('lll') : 'NA';
+    }
   }
 ];
+
+const allColumnsOption: IOption = {
+  label: 'Select all',
+  value: '*'
+};
+
+const defaultColumns: IOption[] = COLUMNS.map(column => ({
+  label: column.key,
+  value: column.key
+}));
 
 export class Datanodes extends React.Component<Record<string, object>, IDatanodesState> {
   autoReload: AutoReloadHelper;
@@ -177,10 +221,19 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       loading: false,
       dataSource: [],
       totalCount: 0,
-      lastUpdated: 0
+      lastUpdated: 0,
+      selectedColumns: [],
+      columnOptions: defaultColumns
     };
     this.autoReload = new AutoReloadHelper(this._loadData);
   }
+
+  _handleColumnChange = (selected: ValueType<IOption>, _action: ActionMeta<IOption>) => {
+    const selectedColumns = (selected as IOption[]);
+    this.setState({
+      selectedColumns
+    });
+  };
 
   _loadData = () => {
     this.setState({
@@ -201,14 +254,23 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
           storageRemaining: datanode.storageReport.remaining,
           pipelines: datanode.pipelines,
           containers: datanode.containers,
-          leaderCount: datanode.leaderCount
+          leaderCount: datanode.leaderCount,
+          version: datanode.version,
+          setupTime: datanode.setupTime
         };
       });
+      const selectedColumns: IOption[] = COLUMNS.filter(column => column.isVisible).map(column => ({
+        label: column.key,
+        value: column.key
+      }));
+
       this.setState({
         loading: false,
         dataSource,
         totalCount,
         lastUpdated: Number(moment())
+      }, () => {
+        this._handleColumnChange(selectedColumns, {action: 'select-option'});
       });
     }).catch(error => {
       this.setState({
@@ -233,7 +295,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
   };
 
   render() {
-    const {dataSource, loading, totalCount, lastUpdated} = this.state;
+    const {dataSource, loading, totalCount, lastUpdated, selectedColumns, columnOptions} = this.state;
     const paginationConfig: PaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} datanodes`,
       showSizeChanger: true,
@@ -243,10 +305,38 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       <div className='datanodes-container'>
         <div className='page-header'>
           Datanodes ({totalCount})
-          <AutoReloadPanel isLoading={loading} lastUpdated={lastUpdated} togglePolling={this.autoReload.handleAutoReloadToggle} onReload={this._loadData}/>
+          <div className='filter-block'>
+            <MultiSelect
+              allowSelectAll
+              isMulti
+              maxShowValues={3}
+              className='multi-select-container'
+              options={columnOptions}
+              closeMenuOnSelect={false}
+              hideSelectedOptions={false}
+              value={selectedColumns}
+              allOption={allColumnsOption}
+              onChange={this._handleColumnChange}
+            /> Columns
+          </div>
+          <AutoReloadPanel
+            isLoading={loading}
+            lastUpdated={lastUpdated}
+            togglePolling={this.autoReload.handleAutoReloadToggle}
+            onReload={this._loadData}
+          />
         </div>
+
         <div className='content-div'>
-          <Table dataSource={dataSource} columns={COLUMNS} loading={loading} pagination={paginationConfig} rowKey='hostname'/>
+          <Table
+            dataSource={dataSource}
+            columns={COLUMNS.filter(column =>
+              selectedColumns.some(e => e.value === column.key)
+            )}
+            loading={loading}
+            pagination={paginationConfig}
+            rowKey='hostname'
+          />
         </div>
       </div>
     );

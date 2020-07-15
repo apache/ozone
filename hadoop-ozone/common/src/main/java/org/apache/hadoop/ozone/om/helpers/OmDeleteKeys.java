@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,24 +16,36 @@
  * limitations under the License.
  */
 
-.datanodes-container {
-  .content-div {
-    .pipeline-container {
-      margin-bottom: 5px;
-    }
+package org.apache.hadoop.ozone.om.helpers;
+
+import java.util.List;
+
+/**
+ * Represent class which has info of Keys to be deleted from Client.
+ */
+public class OmDeleteKeys {
+
+  private String volume;
+  private String bucket;
+
+  private List<String> keyNames;
+
+
+  public OmDeleteKeys(String volume, String bucket, List<String> keyNames) {
+    this.volume = volume;
+    this.bucket = bucket;
+    this.keyNames = keyNames;
   }
 
-  .filter-block { 
-    font-size: 14px;
-    font-weight: normal;
-    display: inline-block;
-    margin-left: 20px;
+  public String getVolume() {
+    return volume;
   }
-  
-  .multi-select-container {
-    padding-left: 5px;
-    margin-right: 5px;
-    display: inline-block;
-    min-width: 200px;
+
+  public String getBucket() {
+    return bucket;
+  }
+
+  public List< String > getKeyNames() {
+    return keyNames;
   }
 }
