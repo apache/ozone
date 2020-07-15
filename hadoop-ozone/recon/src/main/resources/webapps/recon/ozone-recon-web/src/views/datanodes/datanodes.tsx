@@ -135,7 +135,7 @@ const COLUMNS = [
     isVisible: true,
     sorter: (a: IDatanode, b: IDatanode) => a.lastHeartbeat - b.lastHeartbeat,
     render: (heartbeat: number) => {
-      return heartbeat > 0 ? moment(heartbeat).format('lll') : 'NA';
+      return heartbeat > 0 ? moment(heartbeat).format('ll LTS') : 'NA';
     }
   },
   {
@@ -197,7 +197,7 @@ const COLUMNS = [
     isVisible: false,
     sorter: (a: IDatanode, b: IDatanode) => a.setupTime - b.setupTime,
     render: (uptime: number) => {
-      return uptime > 0 ? moment(uptime).format('lll') : 'NA';
+      return uptime > 0 ? moment(uptime).format('ll LTS') : 'NA';
     }
   }
 ];
