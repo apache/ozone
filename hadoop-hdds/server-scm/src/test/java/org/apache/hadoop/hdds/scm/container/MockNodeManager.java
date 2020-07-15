@@ -616,12 +616,6 @@ public class MockNodeManager implements NodeManager {
       this.currentState = currentState;
     }
 
-    NodeData(long capacity, long used, long currentState, long healthyVolumes) {
-      this.capacity = capacity;
-      this.used = used;
-      this.currentState = currentState;
-    }
-
     public long getCapacity() {
       return capacity;
     }
