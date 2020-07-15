@@ -28,7 +28,7 @@ when a bucket is created.
 
 ### Setting up the Key Management Server
 
-To use TDE, clients must setup a Key Management Server and provide that URI to
+To use TDE, admin must setup a Key Management Server and provide that URI to
 Ozone/HDFS. Since Ozone and HDFS can use the same Key Management Server, this
  configuration can be provided via *hdfs-site.xml*.
 

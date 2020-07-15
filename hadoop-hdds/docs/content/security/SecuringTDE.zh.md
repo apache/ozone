@@ -24,9 +24,9 @@ icon: lock
 
 Ozone TDE 的配置和使用和 HDFS TDE 十分相似，主要的区别是，Ozone 中桶级别的 TDE 必须在创建桶时启用。
 
-### 搭建密钥管理服务器
+### 配置密钥管理服务器
 
-必须要搭建密钥管理服务器（Key Management Server, KMS）并把它的 URI 提供给 Ozone/HDFS 才能使用 TDE。因为 Ozone 和 HDFS 可以使用相同的 KMS，所以可以在 *hdfs-site.xml* 中进行配置：
+使用 TDE 之前，管理员必须要提前配置密钥管理服务 KMS，并且把 KMS 的 URI 通过 core-site.xml 提供给 Ozone。
 
 参数名 |  值
 -----------------------------------|-----------------------------------------
@@ -36,10 +36,6 @@ hadoop.security.key.provider.path  | KMS uri. <br> 比如 kms://http@kms-host:96
 如果你的集群已经配置好了 TDE，那么你只需要创建加密密钥并启用桶加密即可。
 
 创建加密密钥的方法为：
-    * 使用 hadoop 密钥命令创建桶加密密钥，和
-    ```bash
-    hadoop key cra
-    ```
    * 使用 hadoop key 命令创建桶加密密钥，和 HDFS 加密区域的使用方法类似。
 
   ```bash
