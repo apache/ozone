@@ -30,7 +30,7 @@ import static org.apache.hadoop.ozone.om.request.OMClientRequest.getNormalizedKe
 public class TestNormalizePaths {
 
   @Test
-  public void testNormalizePaths() {
+  public void testNormalizePathsEnabled() {
 
     Assert.assertEquals("a/b/c/d",
         getNormalizedKey(true, "/a/b/c/d"));
@@ -44,5 +44,24 @@ public class TestNormalizePaths {
         getNormalizedKey(true, "/a/b/c/../d"));
     Assert.assertEquals("a/d",
         getNormalizedKey(true, "/a/b/c/../../d"));
+  }
+
+
+
+  @Test
+  public void testNormalizePathsDisable() {
+
+    Assert.assertEquals("/a/b/c/d",
+        getNormalizedKey(false, "/a/b/c/d"));
+    Assert.assertEquals("////a/b/c/d",
+        getNormalizedKey(false, "////a/b/c/d"));
+    Assert.assertEquals("////a/b/////c/d",
+        getNormalizedKey(false, "////a/b/////c/d"));
+    Assert.assertEquals("////a/b/////c/...../d",
+        getNormalizedKey(false, "////a/b/////c/...../d"));
+    Assert.assertEquals("/a/b/c/../d",
+        getNormalizedKey(false, "/a/b/c/../d"));
+    Assert.assertEquals("/a/b/c/../../d",
+        getNormalizedKey(false, "/a/b/c/../../d"));
   }
 }
