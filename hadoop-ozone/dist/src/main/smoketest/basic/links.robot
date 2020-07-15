@@ -137,7 +137,7 @@ Loop in link chain is detected
                         Execute                     ozone sh bucket link ${target}/loop2 ${target}/loop3
                         Execute                     ozone sh bucket link ${target}/loop3 ${target}/loop1
     ${result} =         Execute And Ignore Error    ozone sh key list ${target}/loop2
-                        Should Contain              ${result}    INTERNAL_ERROR
+                        Should Contain              ${result}    DETECTED_LOOP
 
 Multiple links to same bucket are allowed
     Execute                         ozone sh bucket link ${source}/bucket1 ${target}/link3
