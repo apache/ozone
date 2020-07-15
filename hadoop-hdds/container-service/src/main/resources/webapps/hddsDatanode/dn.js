@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,25 +15,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+(function () {
+    "use strict";
+    angular.module('dn', ['ozone', 'nvd3']);
 
-.datanodes-container {
-  .content-div {
-    .pipeline-container {
-      margin-bottom: 5px;
-    }
-  }
-
-  .filter-block { 
-    font-size: 14px;
-    font-weight: normal;
-    display: inline-block;
-    margin-left: 20px;
-  }
-  
-  .multi-select-container {
-    padding-left: 5px;
-    margin-right: 5px;
-    display: inline-block;
-    min-width: 200px;
-  }
-}
+    angular.module('dn').component('dnOverview', {
+        templateUrl: 'dn-overview.html',
+        require: {
+            overview: "^overview"
+        },
+        controller: function ($http) {
+            var ctrl = this;
+            $http.get("jmx?qry=Hadoop:service=HddsDatanode,name=StorageContainerMetrics")
+                .then(function (result) {
+                    ctrl.dnmetrics = result.data.beans[0];
+                });
+        }
+    });
+})();

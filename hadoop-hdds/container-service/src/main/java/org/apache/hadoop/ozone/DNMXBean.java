@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,24 +16,14 @@
  * limitations under the License.
  */
 
-.datanodes-container {
-  .content-div {
-    .pipeline-container {
-      margin-bottom: 5px;
-    }
-  }
+package org.apache.hadoop.ozone;
 
-  .filter-block { 
-    font-size: 14px;
-    font-weight: normal;
-    display: inline-block;
-    margin-left: 20px;
-  }
-  
-  .multi-select-container {
-    padding-left: 5px;
-    margin-right: 5px;
-    display: inline-block;
-    min-width: 200px;
-  }
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.server.ServiceRuntimeInfo;
+
+/**
+ * This is the JMX management interface for DN information.
+ */
+@InterfaceAudience.Private
+public interface DNMXBean extends ServiceRuntimeInfo {
 }
