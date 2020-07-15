@@ -91,8 +91,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     KeyArgs keyArgs = multipartCommitUploadPartRequest.getKeyArgs();
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
 
-    final String requestedVolume = keyArgs.getVolumeName();
-    final String requestedBucket = keyArgs.getBucketName();
+    String volumeName = keyArgs.getVolumeName();
+    String bucketName = keyArgs.getBucketName();
     String keyName = keyArgs.getKeyName();
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
@@ -113,17 +113,17 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     Result result = null;
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
 
       // TODO to support S3 ACL later.
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          keyArgs.getVolumeName(), keyArgs.getBucketName());
+          volumeName, bucketName);
 
-      validateBucketAndVolume(omMetadataManager,
-          keyArgs.getVolumeName(), keyArgs.getBucketName());
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       String uploadID = keyArgs.getMultipartUploadID();
-      multipartKey = omMetadataManager.getMultipartKey(
-          keyArgs.getVolumeName(), keyArgs.getBucketName(),
+      multipartKey = omMetadataManager.getMultipartKey(volumeName, bucketName,
           keyName, uploadID);
 
       multipartKeyInfo = omMetadataManager.getMultipartInfoTable()
@@ -132,10 +132,10 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       long clientID = multipartCommitUploadPartRequest.getClientID();
 
       openKey = omMetadataManager.getOpenKey(
-          keyArgs.getVolumeName(), keyArgs.getBucketName(), keyName, clientID);
+          volumeName, bucketName, keyName, clientID);
 
       String ozoneKey = omMetadataManager.getOzoneKey(
-          keyArgs.getVolumeName(), keyArgs.getBucketName(), keyName);
+          volumeName, bucketName, keyName);
 
       omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
 
@@ -225,7 +225,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           omDoubleBufferHelper);
       if (acquiredLock) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
-            keyArgs.getVolumeName(), keyArgs.getBucketName());
+            volumeName, bucketName);
       }
     }
 
@@ -242,12 +242,12 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     switch (result) {
     case SUCCESS:
       LOG.debug("MultipartUpload Commit is successfully for Key:{} in " +
-          "Volume/Bucket {}/{}", keyName, requestedVolume, requestedBucket);
+          "Volume/Bucket {}/{}", keyName, volumeName, bucketName);
       break;
     case FAILURE:
       ozoneManager.getMetrics().incNumCommitMultipartUploadPartFails();
       LOG.error("MultipartUpload Commit is failed for Key:{} in " +
-          "Volume/Bucket {}/{}", keyName, requestedVolume, requestedBucket,
+          "Volume/Bucket {}/{}", keyName, volumeName, bucketName,
           exception);
       break;
     default:

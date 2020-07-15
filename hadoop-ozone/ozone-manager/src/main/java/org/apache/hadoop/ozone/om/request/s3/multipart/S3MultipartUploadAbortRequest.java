@@ -88,8 +88,10 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
         .getKeyArgs();
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
 
-    final String requestedVolume = keyArgs.getVolumeName();
-    final String requestedBucket = keyArgs.getBucketName();
+    String volumeName = keyArgs.getVolumeName();
+    String bucketName = keyArgs.getBucketName();
+    final String requestedVolume = volumeName;
+    final String requestedBucket = bucketName;
     String keyName = keyArgs.getKeyName();
 
     ozoneManager.getMetrics().incNumAbortMultipartUploads();
@@ -104,18 +106,18 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     Result result = null;
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
 
       // TODO to support S3 ACL later.
       acquiredLock =
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-              keyArgs.getVolumeName(), keyArgs.getBucketName());
+              volumeName, bucketName);
 
-      validateBucketAndVolume(omMetadataManager,
-          keyArgs.getVolumeName(), keyArgs.getBucketName());
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       multipartKey = omMetadataManager.getMultipartKey(
-          keyArgs.getVolumeName(), keyArgs.getBucketName(),
-          keyName, keyArgs.getMultipartUploadID());
+          volumeName, bucketName, keyName, keyArgs.getMultipartUploadID());
 
       OmKeyInfo omKeyInfo =
           omMetadataManager.getOpenKeyTable().get(multipartKey);
@@ -159,7 +161,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
           omDoubleBufferHelper);
       if (acquiredLock) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
-            keyArgs.getVolumeName(), keyArgs.getBucketName());
+            volumeName, bucketName);
       }
     }
 
@@ -171,14 +173,13 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     switch (result) {
     case SUCCESS:
       LOG.debug("Abort Multipart request is successfully completed for " +
-              "KeyName {} in VolumeName/Bucket {}/{}", keyName, requestedVolume,
-          requestedBucket);
+              "KeyName {} in VolumeName/Bucket {}/{}", keyName, volumeName,
+          bucketName);
       break;
     case FAILURE:
       ozoneManager.getMetrics().incNumAbortMultipartUploadFails();
       LOG.error("Abort Multipart request is failed for KeyName {} in " +
-              "VolumeName/Bucket {}/{}", keyName, requestedVolume,
-          requestedBucket,
+              "VolumeName/Bucket {}/{}", keyName, volumeName, bucketName,
           exception);
       break;
     default:

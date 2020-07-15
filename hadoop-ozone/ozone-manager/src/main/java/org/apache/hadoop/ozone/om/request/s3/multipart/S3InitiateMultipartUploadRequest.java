@@ -99,8 +99,10 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
 
-    final String volumeName = keyArgs.getVolumeName();
-    final String bucketName = keyArgs.getBucketName();
+    String volumeName = keyArgs.getVolumeName();
+    String bucketName = keyArgs.getBucketName();
+    final String requestedVolume = volumeName;
+    final String requestedBucket = bucketName;
     String keyName = keyArgs.getKeyName();
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
@@ -118,14 +120,15 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
 
       // TODO to support S3 ACL later.
       acquiredBucketLock =
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-              keyArgs.getVolumeName(), keyArgs.getBucketName());
+              volumeName, bucketName);
 
-      validateBucketAndVolume(omMetadataManager,
-          keyArgs.getVolumeName(), keyArgs.getBucketName());
+      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       // We are adding uploadId to key, because if multiple users try to
       // perform multipart upload on the same key, each will try to upload, who
@@ -143,7 +146,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
       // for the key.
 
       String multipartKey = omMetadataManager.getMultipartKey(
-          keyArgs.getVolumeName(), keyArgs.getBucketName(), keyName,
+          volumeName, bucketName, keyName,
           keyArgs.getMultipartUploadID());
 
       // Even if this key already exists in the KeyTable, it would be taken
@@ -161,8 +164,8 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .build();
 
       omKeyInfo = new OmKeyInfo.Builder()
-          .setVolumeName(keyArgs.getVolumeName())
-          .setBucketName(keyArgs.getBucketName())
+          .setVolumeName(volumeName)
+          .setBucketName(bucketName)
           .setKeyName(keyArgs.getKeyName())
           .setCreationTime(keyArgs.getModificationTime())
           .setModificationTime(keyArgs.getModificationTime())
@@ -187,8 +190,8 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           new S3InitiateMultipartUploadResponse(
               omResponse.setInitiateMultiPartUploadResponse(
                   MultipartInfoInitiateResponse.newBuilder()
-                      .setVolumeName(volumeName)
-                      .setBucketName(bucketName)
+                      .setVolumeName(requestedVolume)
+                      .setBucketName(requestedBucket)
                       .setKeyName(keyName)
                       .setMultipartUploadID(keyArgs.getMultipartUploadID()))
                   .build(), multipartKeyInfo, omKeyInfo);
@@ -204,7 +207,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
-            keyArgs.getVolumeName(), keyArgs.getBucketName());
+            volumeName, bucketName);
       }
     }
 
