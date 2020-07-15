@@ -242,8 +242,8 @@ public final class OMConfigKeys {
 
   // This config needs to be enabled, when S3G created objects used via
   // FileSystem API.
-  public static final String OZONE_OM_CREATE_INTERMEDIATE_DIRECTORY =
-      "ozone.om.create.intermediate.directories";
-  public static final boolean OZONE_OM_CREATE_INTERMEDIATE_DIRECTORY_DEFAULT =
+  public static final String OZONE_OM_ENABLE_FILESYSTEM_PATHS =
+      "ozone.om.enable.filesystem.paths";
+  public static final boolean OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT =
       false;
 }

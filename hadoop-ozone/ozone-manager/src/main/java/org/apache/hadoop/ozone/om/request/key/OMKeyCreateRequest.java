@@ -68,8 +68,6 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.UniqueId;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CREATE_INTERMEDIATE_DIRECTORY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CREATE_INTERMEDIATE_DIRECTORY_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
@@ -160,6 +158,10 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     }
 
     generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
+
+    newKeyArgs.setKeyName(getNormalizedKey(
+        ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
+
     newCreateKeyRequest =
         createKeyRequest.toBuilder().setKeyArgs(newKeyArgs)
             .setClientID(UniqueId.next());
@@ -221,14 +223,9 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
           omMetadataManager.getBucketKey(volumeName, bucketName));
 
-      boolean createIntermediateDir =
-          ozoneManager.getConfiguration().getBoolean(
-              OZONE_OM_CREATE_INTERMEDIATE_DIRECTORY,
-              OZONE_OM_CREATE_INTERMEDIATE_DIRECTORY_DEFAULT);
-
       // If FILE_EXISTS we just override like how we used to do for Key Create.
       List< OzoneAcl > inheritAcls;
-      if (createIntermediateDir) {
+      if (ozoneManager.getEnableFileSystemPaths()) {
         OMFileRequest.OMPathInfo pathInfo =
             OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
                 bucketName, keyName, Paths.get(keyName));

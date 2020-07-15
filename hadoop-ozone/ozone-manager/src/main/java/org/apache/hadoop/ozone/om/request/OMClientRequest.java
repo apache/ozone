@@ -38,10 +38,13 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.nio.file.Paths;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -52,6 +55,8 @@ import java.util.Map;
  */
 public abstract class OMClientRequest implements RequestAuditor {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMClientRequest.class);
   private OMRequest omRequest;
 
   /**
@@ -264,5 +269,23 @@ public abstract class OMClientRequest implements RequestAuditor {
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.VOLUME, volume);
     return auditMap;
+  }
+
+  public static String getNormalizedKey(boolean enableFileSystemPaths,
+      String keyName) {
+    if (enableFileSystemPaths) {
+      String normalizedKeyName;
+      if (keyName.startsWith("/")) {
+        normalizedKeyName = Paths.get(keyName).toUri().normalize().getPath();
+      } else {
+        normalizedKeyName = Paths.get("/", keyName).toUri().normalize().getPath();
+      }
+      if (!keyName.equals(normalizedKeyName)) {
+        LOG.debug("Normalized key {} to {} ", keyName, normalizedKeyName);
+      }
+      return normalizedKeyName.substring(1);
+    } else {
+      return keyName;
+    }
   }
 }

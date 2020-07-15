@@ -2480,15 +2480,16 @@
   </property>
 
   <property>
-    <name>ozone.om.create.intermediate.directories</name>
+    <name>ozone.om.enable.filesystem.paths</name>
     <tag>OZONE, OM</tag>
     <value>false</value>
-    <description>If true, then intermediate directories will be created
-      during Key/MPU create requests. This flag will be helpful when objects
+    <description>If true, OM will normalize the key paths and also create
+      intermediate directories. This flag will be helpful when objects
       created by S3G need to be accessed using OFS/O3Fs.
       If false, it will fallback to default behavior of Key/MPU create
-      requests where any intermediate directories will not be created or any
-      file checks happens to check filesystem semantics.
+      requests where key paths are not normalized and any intermediate
+      directories will not be created or any file checks happens to check
+      filesystem semantics.
     </description>
   </property>
 </configuration>

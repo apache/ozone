@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3InitiateMultipartUploadResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartInfoInitiateRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartInfoInitiateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -46,6 +47,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.security.Key;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
@@ -72,10 +74,12 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
         getOmRequest().getInitiateMultiPartUploadRequest();
     Preconditions.checkNotNull(multipartInfoInitiateRequest);
 
-    OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs =
-        multipartInfoInitiateRequest.getKeyArgs().toBuilder()
+    KeyArgs keyArgs = multipartInfoInitiateRequest.getKeyArgs();
+    KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
             .setMultipartUploadID(UUID.randomUUID().toString() + "-" +
-                UniqueId.next()).setModificationTime(Time.now());
+                UniqueId.next()).setModificationTime(Time.now())
+            .setKeyName(getNormalizedKey(
+                ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
 
     return getOmRequest().toBuilder()
         .setUserInfo(getUserInfo())
@@ -92,7 +96,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
     MultipartInfoInitiateRequest multipartInfoInitiateRequest =
         getOmRequest().getInitiateMultiPartUploadRequest();
 
-    OzoneManagerProtocolProtos.KeyArgs keyArgs =
+    KeyArgs keyArgs =
         multipartInfoInitiateRequest.getKeyArgs();
 
     Preconditions.checkNotNull(keyArgs.getMultipartUploadID());

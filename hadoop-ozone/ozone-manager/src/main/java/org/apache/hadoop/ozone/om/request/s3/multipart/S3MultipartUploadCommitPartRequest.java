@@ -74,10 +74,13 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     MultipartCommitUploadPartRequest multipartCommitUploadPartRequest =
         getOmRequest().getCommitMultiPartUploadRequest();
 
+    KeyArgs keyArgs = multipartCommitUploadPartRequest.getKeyArgs();
     return getOmRequest().toBuilder().setCommitMultiPartUploadRequest(
         multipartCommitUploadPartRequest.toBuilder()
-            .setKeyArgs(multipartCommitUploadPartRequest.getKeyArgs()
-                .toBuilder().setModificationTime(Time.now())))
+            .setKeyArgs(keyArgs.toBuilder().setModificationTime(Time.now())
+                .setKeyName(getNormalizedKey(
+                    ozoneManager.getEnableFileSystemPaths(),
+                    keyArgs.getKeyName()))))
         .setUserInfo(getUserInfo()).build();
   }
 

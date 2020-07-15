@@ -29,7 +29,6 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OMMetrics;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -50,15 +49,8 @@ public class TestOzoneFSWithObjectStoreCreate {
   public Timeout timeout = new Timeout(300000);
 
   private String rootPath;
-  private String userName;
-
-  private boolean setDefaultFs;
-
-  private boolean useAbsolutePath;
 
   private MiniOzoneCluster cluster = null;
-
-  private FileSystem fs;
 
   private OzoneFileSystem o3fs;
 
@@ -66,9 +58,6 @@ public class TestOzoneFSWithObjectStoreCreate {
 
   private String bucketName;
 
-  private OzoneFSStorageStatistics statistics;
-
-  private OMMetrics omMetrics;
 
   @Before
   public void init() throws Exception {
@@ -77,7 +66,7 @@ public class TestOzoneFSWithObjectStoreCreate {
 
     OzoneConfiguration conf = new OzoneConfiguration();
 
-    conf.setBoolean(OMConfigKeys.OZONE_OM_CREATE_INTERMEDIATE_DIRECTORY, true);
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
@@ -89,8 +78,7 @@ public class TestOzoneFSWithObjectStoreCreate {
 
     rootPath = String.format("%s://%s.%s/", OZONE_URI_SCHEME, bucketName,
         volumeName);
-    fs = FileSystem.get(new URI(rootPath), conf);
-    o3fs = (OzoneFileSystem) fs;
+    o3fs = (OzoneFileSystem) FileSystem.get(new URI(rootPath), conf);
   }
 
 
@@ -102,8 +90,8 @@ public class TestOzoneFSWithObjectStoreCreate {
 
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
 
-    String key1 = "dir1/dir2/file1";
-    String key2 = "dir1/dir2/file2";
+    String key1 = "///dir1/dir2/file1";
+    String key2 = "///dir1/dir2/file2";
     int length = 10;
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(key1, length);
     byte[] b = new byte[10];
@@ -117,17 +105,17 @@ public class TestOzoneFSWithObjectStoreCreate {
 
     // Adding "/" here otherwise Path will be considered as relative path and
     // workingDir will be added.
-    key1 = "/dir1/dir2/file1";
+    key1 = "///dir1/dir2/file1";
     Path p = new Path(key1);
-    Assert.assertTrue(fs.getFileStatus(p).isFile());
+    Assert.assertTrue(o3fs.getFileStatus(p).isFile());
 
     p = p.getParent();
     checkAncestors(p);
 
 
-    key2 = "/dir1/dir2/file2";
+    key2 = "///dir1/dir2/file2";
     p = new Path(key2);
-    Assert.assertTrue(fs.getFileStatus(p).isFile());
+    Assert.assertTrue(o3fs.getFileStatus(p).isFile());
     checkAncestors(p);
 
   }
@@ -135,7 +123,7 @@ public class TestOzoneFSWithObjectStoreCreate {
   private void checkAncestors(Path p) throws Exception {
     p = p.getParent();
     while(p.getParent() != null) {
-      FileStatus fileStatus = fs.getFileStatus(p);
+      FileStatus fileStatus = o3fs.getFileStatus(p);
       Assert.assertTrue(fileStatus.isDirectory());
       p = p.getParent();
     }
