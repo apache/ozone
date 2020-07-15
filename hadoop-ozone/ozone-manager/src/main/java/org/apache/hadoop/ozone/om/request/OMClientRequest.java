@@ -273,23 +273,29 @@ public abstract class OMClientRequest implements RequestAuditor {
     return auditMap;
   }
 
-  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
+
   public static String getNormalizedKey(boolean enableFileSystemPaths,
       String keyName) {
     if (enableFileSystemPaths) {
-      String normalizedKeyName;
-      if (keyName.startsWith(OM_KEY_PREFIX)) {
-        normalizedKeyName = Paths.get(keyName).toUri().normalize().getPath();
-      } else {
-        normalizedKeyName = Paths.get(OM_KEY_PREFIX, keyName).toUri()
-            .normalize().getPath();
-      }
-      if (!keyName.equals(normalizedKeyName)) {
-        LOG.debug("Normalized key {} to {} ", keyName, normalizedKeyName);
-      }
-      return normalizedKeyName.substring(1);
+      return getNormalizedKey(keyName);
     } else {
       return keyName;
     }
+  }
+
+  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
+  public static String getNormalizedKey(String keyName) {
+    String normalizedKeyName;
+    if (keyName.startsWith(OM_KEY_PREFIX)) {
+      normalizedKeyName = Paths.get(keyName).toUri().normalize().getPath();
+    } else {
+      normalizedKeyName = Paths.get(OM_KEY_PREFIX, keyName).toUri()
+          .normalize().getPath();
+    }
+    if (!keyName.equals(normalizedKeyName)) {
+      LOG.debug("Normalized key {} to {} ", keyName,
+          normalizedKeyName.substring(1));
+    }
+    return normalizedKeyName.substring(1);
   }
 }

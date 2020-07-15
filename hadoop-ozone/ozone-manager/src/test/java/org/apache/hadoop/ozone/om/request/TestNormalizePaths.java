@@ -44,8 +44,16 @@ public class TestNormalizePaths {
         getNormalizedKey(true, "////a/b/////c/...../d"));
     Assert.assertEquals("a/b/d",
         getNormalizedKey(true, "/a/b/c/../d"));
-    Assert.assertEquals("a/d",
-        getNormalizedKey(true, "/a/b/c/../../d"));
+    Assert.assertEquals("../../d",
+        getNormalizedKey(true, "/a/b/c/../../../../../d"));
+    Assert.assertEquals("../a/b/c",
+        getNormalizedKey(true, "../a/b/c/"));
+    Assert.assertEquals("../a/b/c",
+        getNormalizedKey(true, "/../a/b/c/"));
+    Assert.assertEquals("a",
+        getNormalizedKey(true, "a"));
+    Assert.assertEquals("",
+        getNormalizedKey(true, ""));
   }
 
 

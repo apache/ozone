@@ -379,9 +379,18 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     createAndCheck(keyName);
 
 
+    // Empty keyName.
+    keyName = "";
+    checkNotAFile(keyName);
+
     // Create a file, where a file already exists in the path.
     // Now try with a file exists in path. Should fail.
     keyName = "/a/b/c/file1/file3";
+    createAndCheck(keyName);
+
+  }
+
+  private void checkNotAFile(String keyName) throws Exception {
     OMRequest omRequest = createKeyRequest(false, 0, keyName);
 
     OMKeyCreateRequest omKeyCreateRequest = new OMKeyCreateRequest(omRequest);
@@ -396,7 +405,6 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     Assert.assertEquals(NOT_A_FILE,
         omClientResponse.getOMResponse().getStatus());
-
   }
 
 

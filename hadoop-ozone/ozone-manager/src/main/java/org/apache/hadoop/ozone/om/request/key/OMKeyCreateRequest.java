@@ -203,6 +203,14 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
 
+      if (ozoneManager.getEnableFileSystemPaths()) {
+        if (keyName.length() == 0) {
+          // Check if this is the root of the filesystem.
+          throw new OMException("Can not write to directory: " + keyName,
+              OMException.ResultCodes.NOT_A_FILE);
+        }
+      }
+
       // check Acl
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
