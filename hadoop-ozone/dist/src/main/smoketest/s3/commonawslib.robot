@@ -105,4 +105,9 @@ Setup links for S3 tests
     Return From Keyword If    ${exists}
     Execute            ozone sh volume create o3://${OM_SERVICE_ID}/legacy
     Execute            ozone sh bucket create o3://${OM_SERVICE_ID}/legacy/source-bucket
-    Execute            ozone sh bucket link o3://${OM_SERVICE_ID}/legacy/source-bucket o3://${OM_SERVICE_ID}/s3v/link
+    Create link        link
+
+Create link
+    [arguments]       ${bucket}
+    Execute           ozone sh bucket link o3://${OM_SERVICE_ID}/legacy/source-bucket o3://${OM_SERVICE_ID}/s3v/${bucket}
+    [return]          ${bucket}
