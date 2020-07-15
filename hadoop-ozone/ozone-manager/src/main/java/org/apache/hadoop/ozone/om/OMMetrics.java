@@ -214,6 +214,10 @@ public class OMMetrics {
     this.numKeys.incr(val- oldVal);
   }
 
+  public void decNumKeys(long val) {
+    this.numKeys.incr(-val);
+  }
+
   public long getNumVolumes() {
     return numVolumes.value();
   }

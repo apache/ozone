@@ -310,7 +310,7 @@ public class TestPipelinePlacementPolicy {
   private DatanodeDetails overwriteLocationInNode(
       DatanodeDetails datanode, Node node) {
     DatanodeDetails result = DatanodeDetails.newBuilder()
-        .setUuid(datanode.getUuidString())
+        .setUuid(datanode.getUuid())
         .setHostName(datanode.getHostName())
         .setIpAddress(datanode.getIpAddress())
         .addPort(datanode.getPort(DatanodeDetails.Port.Name.STANDALONE))

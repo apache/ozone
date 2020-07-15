@@ -303,8 +303,7 @@ enum Status {
 
     INVALID_VOLUME_NAME = 61;
 
-    // When transactions are replayed
-    REPLAY = 100;
+    PARTIAL_DELETE = 62;
 }
 
 /**
@@ -848,7 +847,18 @@ message DeleteKeyRequest {
 }
 
 message DeleteKeysRequest {
-    repeated KeyArgs keyArgs = 1;
+    optional DeleteKeyArgs deleteKeys = 1;
+}
+
+message DeleteKeyArgs {
+    required string volumeName = 1;
+    required string bucketName = 2;
+    repeated string keys = 3;
+}
+
+message DeleteKeysResponse {
+    optional DeleteKeyArgs unDeletedKeys = 1;
+    optional bool status = 2;
 }
 
 message DeleteKeyResponse {
@@ -866,10 +876,7 @@ message DeletedKeys {
     repeated string keys = 3;
 }
 
-message DeleteKeysResponse {
-    repeated KeyInfo deletedKeys = 1;
-    repeated KeyInfo unDeletedKeys = 2;
-}
+
 
 message PurgeKeysRequest {
     repeated DeletedKeys deletedKeys = 1;

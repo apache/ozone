@@ -31,7 +31,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -71,7 +71,7 @@ public class OzoneManagerSnapshotProvider {
 
   private static final String OM_SNAPSHOT_DB = "om.snapshot.db";
 
-  public OzoneManagerSnapshotProvider(ConfigurationSource conf,
+  public OzoneManagerSnapshotProvider(MutableConfigurationSource conf,
       File omRatisSnapshotDir, List<OMNodeDetails> peerNodes) {
 
     LOG.info("Initializing OM Snapshot Provider");

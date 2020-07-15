@@ -50,9 +50,18 @@ public class ReconIncrementalContainerReportHandler
   @Override
   public void onMessage(final IncrementalContainerReportFromDatanode report,
                         final EventPublisher publisher) {
+    final DatanodeDetails dnFromReport = report.getDatanodeDetails();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Processing incremental container report from data node {}",
-          report.getDatanodeDetails());
+          dnFromReport);
+    }
+
+    DatanodeDetails dd =
+        getNodeManager().getNodeByUuid(dnFromReport.getUuidString());
+    if (dd == null) {
+      LOG.warn("Received container report from unknown datanode {}",
+          dnFromReport);
+      return;
     }
 
     ReconContainerManager containerManager =
@@ -61,7 +70,6 @@ public class ReconIncrementalContainerReportHandler
     for (ContainerReplicaProto replicaProto :
         report.getReport().getReportList()) {
       try {
-        final DatanodeDetails dd = report.getDatanodeDetails();
         final ContainerID id = ContainerID.valueof(
             replicaProto.getContainerID());
         try {

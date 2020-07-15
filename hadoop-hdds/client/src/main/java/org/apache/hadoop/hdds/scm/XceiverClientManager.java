@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
@@ -86,8 +85,7 @@ public class XceiverClientManager implements Closeable {
    * @param conf configuration
    */
   public XceiverClientManager(ConfigurationSource conf) throws IOException {
-    this(conf, OzoneConfiguration.of(conf).getObject(ScmClientConfig.class),
-        null);
+    this(conf, conf.getObject(ScmClientConfig.class), null);
   }
 
   public XceiverClientManager(ConfigurationSource conf,

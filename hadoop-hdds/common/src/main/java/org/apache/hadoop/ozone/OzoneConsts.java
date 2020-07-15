@@ -24,6 +24,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.thirdparty.io.grpc.Context;
 import org.apache.ratis.thirdparty.io.grpc.Metadata;
 
+import java.util.regex.Pattern;
+
 import static org.apache.ratis.thirdparty.io.grpc.Metadata.ASCII_STRING_MARSHALLER;
 
 /**
@@ -294,6 +296,8 @@ public final class OzoneConsts {
   public static final String MULTIPART_UPLOAD_PART_NUMBER = "partNumber";
   public static final String MULTIPART_UPLOAD_PART_NAME = "partName";
   public static final String BUCKET_ENCRYPTION_KEY = "bucketEncryptionKey";
+  public static final String DELETED_KEYS_LIST = "deletedKeysList";
+  public static final String UNDELETED_KEYS_LIST = "unDeletedKeysList";
 
 
 
@@ -337,10 +341,29 @@ public final class OzoneConsts {
   public static final String GDPR_LENGTH = "length";
   public static final String GDPR_SECRET = "secret";
   public static final String GDPR_ALGORITHM = "algorithm";
-  
+
+  /**
+   * Block key name as illegal characters
+   *
+   * This regular expression is used to check if key name
+   * contains illegal characters when creating/renaming key.
+   *
+   * Avoid the following characters in a key name:
+   * "\", "{", "}", "^", "<", ">", "#", "|", "%", "`", "[", "]", "~", "?"
+   * and Non-printable ASCII characters (128–255 decimal characters).
+   * https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html
+   */
+  public static final Pattern KEYNAME_ILLEGAL_CHARACTER_CHECK_REGEX  =
+          Pattern.compile("^[^^{}<>^?%~#`\\[\\]\\|\\\\(\\x80-\\xff)]+$");
+
+  public static final String FS_FILE_COPYING_TEMP_SUFFIX= "._COPYING_";
+
   // Transaction Info
   public static final String TRANSACTION_INFO_KEY = "#TRANSACTIONINFO";
   public static final String TRANSACTION_INFO_SPLIT_KEY = "#";
+
+  public static final String CONTAINER_DB_TYPE_ROCKSDB = "RocksDB";
+  public static final String CONTAINER_DB_TYPE_LEVELDB = "LevelDB";
 
   // SCM HA
   public static final String SCM_SERVICE_ID_DEFAULT = "scmServiceIdDefault";

@@ -417,8 +417,8 @@
                 "integer": 61
               },
               {
-                "name": "REPLAY",
-                "integer": 100
+                "name": "PARTIAL_DELETE",
+                "integer": 62
               }
             ]
           },
@@ -2434,9 +2434,44 @@
             "fields": [
               {
                 "id": 1,
-                "name": "keyArgs",
-                "type": "KeyArgs",
+                "name": "deleteKeys",
+                "type": "DeleteKeyArgs"
+              }
+            ]
+          },
+          {
+            "name": "DeleteKeyArgs",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "keys",
+                "type": "string",
                 "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "DeleteKeysResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "unDeletedKeys",
+                "type": "DeleteKeyArgs"
+              },
+              {
+                "id": 2,
+                "name": "status",
+                "type": "bool"
               }
             ]
           },
@@ -2477,23 +2512,6 @@
                 "id": 3,
                 "name": "keys",
                 "type": "string",
-                "is_repeated": true
-              }
-            ]
-          },
-          {
-            "name": "DeleteKeysResponse",
-            "fields": [
-              {
-                "id": 1,
-                "name": "deletedKeys",
-                "type": "KeyInfo",
-                "is_repeated": true
-              },
-              {
-                "id": 2,
-                "name": "unDeletedKeys",
-                "type": "KeyInfo",
                 "is_repeated": true
               }
             ]
@@ -3419,7 +3437,7 @@
         "options": [
           {
             "name": "java_package",
-            "value": "org.apache.hadoop.security.proto"
+            "value": "org.apache.hadoop.ozone.security.proto"
           },
           {
             "name": "java_outer_classname",

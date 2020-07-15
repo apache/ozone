@@ -23,7 +23,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 
-import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -171,7 +170,7 @@ public final class KeyValueContainerUtil {
           containerDB.getStore().get(DB_PENDING_DELETE_BLOCK_COUNT_KEY);
       if (pendingDeleteBlockCount != null) {
         kvContainerData.incrPendingDeletionBlocks(
-            Ints.fromByteArray(pendingDeleteBlockCount));
+            Longs.fromByteArray(pendingDeleteBlockCount));
       } else {
         // Set pending deleted block count.
         MetadataKeyFilters.KeyPrefixFilter filter =

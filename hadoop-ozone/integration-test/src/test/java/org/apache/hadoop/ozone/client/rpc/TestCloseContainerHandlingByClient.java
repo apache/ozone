@@ -289,6 +289,7 @@ public class TestCloseContainerHandlingByClient {
     validateData(keyName, dataCommitted.getBytes(UTF_8));
   }
 
+  @Ignore("HDDS-3151")
   @Test
   public void testMultiBlockWrites3() throws Exception {
 
