@@ -119,26 +119,26 @@ public final class StorageLocationReport implements
   }
 
   public static StorageType getStorageType(StorageTypeProto proto) throws
-      IOException {
+          IOException {
     StorageType storageType;
     switch (proto) {
-    case SSD:
-      storageType = StorageType.SSD;
-      break;
-    case DISK:
-      storageType = StorageType.DISK;
-      break;
-    case ARCHIVE:
-      storageType = StorageType.ARCHIVE;
-      break;
-    case PROVIDED:
-      storageType = StorageType.PROVIDED;
-      break;
-    case RAM_DISK:
-      storageType = StorageType.RAM_DISK;
-      break;
-    default:
-      throw new IOException("Illegal Storage Type specified");
+      case SSD:
+        storageType = StorageType.SSD;
+        break;
+      case DISK:
+        storageType = StorageType.DISK;
+        break;
+      case ARCHIVE:
+        storageType = StorageType.ARCHIVE;
+        break;
+      case PROVIDED:
+        storageType = StorageType.PROVIDED;
+        break;
+      case RAM_DISK:
+        storageType = StorageType.RAM_DISK;
+        break;
+      default:
+        throw new IOException("Illegal Storage Type specified");
     }
     return storageType;
   }
@@ -146,33 +146,35 @@ public final class StorageLocationReport implements
   /**
    * Returns the SCMStorageReport protoBuf message for the Storage Location
    * report.
+   *
    * @return SCMStorageReport
    * @throws IOException In case, the storage type specified is invalid.
    */
-  public StorageReportProto getProtoBufMessage() throws IOException{
+  public StorageReportProto getProtoBufMessage() throws IOException {
     StorageReportProto.Builder srb = StorageReportProto.newBuilder();
     return srb.setStorageUuid(getId())
-        .setCapacity(getCapacity())
-        .setScmUsed(getScmUsed())
-        .setRemaining(getRemaining())
-        .setStorageType(getStorageTypeProto())
-        .setStorageLocation(getStorageLocation())
-        .setFailed(isFailed())
-        .build();
+            .setCapacity(getCapacity())
+            .setScmUsed(getScmUsed())
+            .setRemaining(getRemaining())
+            .setStorageType(getStorageTypeProto())
+            .setStorageLocation(getStorageLocation())
+            .setFailed(isFailed())
+            .build();
   }
 
   /**
    * Returns the StorageLocationReport from the protoBuf message.
+   *
    * @param report SCMStorageReport
    * @return StorageLocationReport
    * @throws IOException in case of invalid storage type
    */
 
   public static StorageLocationReport getFromProtobuf(StorageReportProto report)
-      throws IOException {
+          throws IOException {
     StorageLocationReport.Builder builder = StorageLocationReport.newBuilder();
     builder.setId(report.getStorageUuid())
-        .setStorageLocation(report.getStorageLocation());
+            .setStorageLocation(report.getStorageLocation());
     if (report.hasCapacity()) {
       builder.setCapacity(report.getCapacity());
     }
@@ -245,6 +247,7 @@ public final class StorageLocationReport implements
       this.capacity = capacityValue;
       return this;
     }
+
     /**
      * Sets the scmUsed Value.
      *
@@ -296,7 +299,7 @@ public final class StorageLocationReport implements
      */
     public StorageLocationReport build() {
       return new StorageLocationReport(id, failed, capacity, scmUsed,
-          remaining, storageType, storageLocation);
+              remaining, storageType, storageLocation);
     }
 
   }

@@ -559,19 +559,20 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     }
   }
 
-    @Override
-    public List<MetadataStorageReportProto> getStorageReport() throws IOException {
+  @Override
+  public List<MetadataStorageReportProto> getStorageReport() throws IOException {
     List<MetadataStorageReportProto> reportProto = new ArrayList<>();
-      for (StorageType storageType : ratisVolumeMap.keySet()) {
-        for (String path : ratisVolumeMap.get(storageType)) {
-          MetadataStorageReportProto.Builder builder = MetadataStorageReportProto.
-                  newBuilder();
-          builder.setStorageLocation(path);
-          builder.setStorageType(StorageLocationReport.getStorageTypeProto(storageType));
-          reportProto.add(builder.build());
-        };
+    for (StorageType storageType : ratisVolumeMap.keySet()) {
+      for (String path : ratisVolumeMap.get(storageType)) {
+        MetadataStorageReportProto.Builder builder = MetadataStorageReportProto.
+                newBuilder();
+        builder.setStorageLocation(path);
+        builder.setStorageType(StorageLocationReport.
+                getStorageTypeProto(storageType));
+        reportProto.add(builder.build());
       }
-      return reportProto;
+    }
+    return reportProto;
   }
 
   private RaftClientRequest createRaftClientRequest(

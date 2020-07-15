@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto
@@ -90,7 +89,8 @@ public interface XceiverServerSpi {
    * Get storage report for the XceiverServer instance.
    * @return list of report for each storage location.
    */
-  default List<MetadataStorageReportProto> getStorageReport() throws IOException {
+  default List<MetadataStorageReportProto> getStorageReport() throws
+          IOException {
     return null;
   }
 }

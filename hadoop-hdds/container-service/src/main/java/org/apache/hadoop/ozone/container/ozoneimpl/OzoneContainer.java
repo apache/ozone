@@ -295,16 +295,18 @@ public class OzoneContainer {
    * Returns node report of container storage usage.
    */
   public StorageContainerDatanodeProtocolProtos.NodeReportProto getNodeReport()
-      throws IOException {
+          throws IOException {
     StorageLocationReport[] reports = volumeSet.getStorageReport();
     StorageContainerDatanodeProtocolProtos.NodeReportProto.Builder nrb
-            = StorageContainerDatanodeProtocolProtos.NodeReportProto.newBuilder();
+            = StorageContainerDatanodeProtocolProtos.
+            NodeReportProto.newBuilder();
     for (int i = 0; i < reports.length; i++) {
       nrb.addStorageReport(reports[i].getProtoBufMessage());
     }
     List<StorageContainerDatanodeProtocolProtos.
-            MetadataStorageReportProto> metadataReport = writeChannel.getStorageReport();
-    if (metadataReport !=  null) {
+            MetadataStorageReportProto> metadataReport =
+            writeChannel.getStorageReport();
+    if (metadataReport != null) {
       nrb.addAllMetadataStorageReport(metadataReport);
     }
     return nrb.build();
