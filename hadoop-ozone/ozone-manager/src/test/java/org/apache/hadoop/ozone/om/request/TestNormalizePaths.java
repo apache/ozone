@@ -54,6 +54,8 @@ public class TestNormalizePaths {
         getNormalizedKey(true, "a"));
     Assert.assertEquals("",
         getNormalizedKey(true, ""));
+    Assert.assertEquals("",
+        getNormalizedKey(true, "/"));
   }
 
 
