@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -48,6 +49,7 @@ import java.nio.file.Paths;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
  * OMClientRequest provides methods which every write OM request should
@@ -271,15 +273,15 @@ public abstract class OMClientRequest implements RequestAuditor {
     return auditMap;
   }
 
-  @SuppressWarnings("HardcodedFileSeparator")
+  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   public static String getNormalizedKey(boolean enableFileSystemPaths,
       String keyName) {
     if (enableFileSystemPaths) {
       String normalizedKeyName;
-      if (keyName.startsWith("/")) {
+      if (keyName.startsWith(OM_KEY_PREFIX)) {
         normalizedKeyName = Paths.get(keyName).toUri().normalize().getPath();
       } else {
-        normalizedKeyName = Paths.get("/", keyName).toUri()
+        normalizedKeyName = Paths.get(OM_KEY_PREFIX, keyName).toUri()
             .normalize().getPath();
       }
       if (!keyName.equals(normalizedKeyName)) {
