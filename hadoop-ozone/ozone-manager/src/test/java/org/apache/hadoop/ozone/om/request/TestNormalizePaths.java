@@ -33,6 +33,8 @@ public class TestNormalizePaths {
   public void testNormalizePathsEnabled() {
 
     Assert.assertEquals("a/b/c/d",
+        getNormalizedKey(true, "a/b/c/d"));
+    Assert.assertEquals("a/b/c/d",
         getNormalizedKey(true, "/a/b/c/d"));
     Assert.assertEquals("a/b/c/d",
         getNormalizedKey(true, "////a/b/c/d"));

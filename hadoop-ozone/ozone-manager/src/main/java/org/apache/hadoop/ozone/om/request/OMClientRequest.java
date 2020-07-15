@@ -271,6 +271,7 @@ public abstract class OMClientRequest implements RequestAuditor {
     return auditMap;
   }
 
+  @SuppressWarnings("HardcodedFileSeparator")
   public static String getNormalizedKey(boolean enableFileSystemPaths,
       String keyName) {
     if (enableFileSystemPaths) {
@@ -278,7 +279,8 @@ public abstract class OMClientRequest implements RequestAuditor {
       if (keyName.startsWith("/")) {
         normalizedKeyName = Paths.get(keyName).toUri().normalize().getPath();
       } else {
-        normalizedKeyName = Paths.get("/", keyName).toUri().normalize().getPath();
+        normalizedKeyName = Paths.get("/", keyName).toUri()
+            .normalize().getPath();
       }
       if (!keyName.equals(normalizedKeyName)) {
         LOG.debug("Normalized key {} to {} ", keyName, normalizedKeyName);

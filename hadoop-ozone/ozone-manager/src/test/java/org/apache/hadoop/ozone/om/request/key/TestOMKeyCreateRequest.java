@@ -355,6 +355,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
+
+    keyName = "dir1/dir2/dir3/file1";
+    createAndCheck(keyName);
+
     // Key with leading '/'.
     String keyName = "/a/b/c/file1";
     createAndCheck(keyName);
@@ -424,7 +428,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     // Check open key entry
     String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
         keyName, omRequest.getCreateKeyRequest().getClientID());
-   OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
     Assert.assertNotNull(omKeyInfo);
   }
 
