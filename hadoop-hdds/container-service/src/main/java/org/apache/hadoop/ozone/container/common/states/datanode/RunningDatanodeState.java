@@ -30,9 +30,9 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -42,7 +42,8 @@ import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Class that implements handshake with SCM.
@@ -57,6 +58,7 @@ public class RunningDatanodeState implements DatanodeState {
   /** Cache the end point task per end point per end point state. */
   private Map<EndpointStateMachine, Map<EndPointStates,
       Callable<EndPointStates>>> endpointTasks;
+  private List<Future<EndPointStates>> futures = new ArrayList<>();
 
   public RunningDatanodeState(ConfigurationSource conf,
       SCMConnectionManager connectionManager,
@@ -137,10 +139,28 @@ public class RunningDatanodeState implements DatanodeState {
   @Override
   public void execute(ExecutorService executor) {
     ecs = new ExecutorCompletionService<>(executor);
+
+    boolean poolAvailable = false;
+    if (futures.size() == 0) {
+      poolAvailable = true;
+    } else {
+      for (Future<EndPointStates> future : futures) {
+        if (future != null && future.isDone()) {
+          poolAvailable = true;
+          break;
+        }
+      }
+    }
+
+    if (!poolAvailable) {
+      return;
+    }
+
+    futures.clear();
     for (EndpointStateMachine endpoint : connectionManager.getValues()) {
       Callable<EndPointStates> endpointTask = getEndPointTask(endpoint);
       if (endpointTask != null) {
-        ecs.submit(endpointTask);
+        futures.add(ecs.submit(endpointTask));
       } else {
         // This can happen if a task is taking more time than the timeOut
         // specified for the task in await, and when it is completed the task
@@ -174,7 +194,7 @@ public class RunningDatanodeState implements DatanodeState {
    */
   private DatanodeStateMachine.DatanodeStates
       computeNextContainerState(
-      List<Future<EndPointStates>> results) {
+      Set<Future<EndPointStates>> results) {
     for (Future<EndPointStates> state : results) {
       try {
         if (state.get() == EndPointStates.SHUTDOWN) {
@@ -200,22 +220,25 @@ public class RunningDatanodeState implements DatanodeState {
   @Override
   public DatanodeStateMachine.DatanodeStates
       await(long duration, TimeUnit timeUnit)
-      throws InterruptedException, ExecutionException, TimeoutException {
+      throws InterruptedException {
     int count = connectionManager.getValues().size();
     int returned = 0;
-    long timeLeft = timeUnit.toMillis(duration);
+    long durationMS = timeUnit.toMillis(duration);
     long startTime = Time.monotonicNow();
-    List<Future<EndPointStates>> results = new LinkedList<>();
+    Set<Future<EndPointStates>> results = new HashSet<>();
 
-    while (returned < count && timeLeft > 0) {
-      Future<EndPointStates> result =
-          ecs.poll(timeLeft, TimeUnit.MILLISECONDS);
-      if (result != null) {
-        results.add(result);
-        returned++;
+    while (returned < count
+        && (durationMS - (Time.monotonicNow() - startTime))> 0) {
+      for (Future<EndPointStates> future : futures) {
+        if (future != null && future.isDone() && !results.contains(future)) {
+          results.add(future);
+          returned++;
+        }
       }
-      timeLeft = timeLeft - (Time.monotonicNow() - startTime);
+
+      Thread.sleep(durationMS / 10);
     }
+
     return computeNextContainerState(results);
   }
 }

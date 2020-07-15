@@ -30,6 +30,10 @@ public final class HddsConfigKeys {
       "hdds.node.report.interval";
   public static final String HDDS_NODE_REPORT_INTERVAL_DEFAULT =
       "60s";
+  public static final String HDDS_STATEMACHINE_ENDPOINT_TASK_THREAD_COUNT =
+      "hdds.statemachine.endpoint.task.thread.count";
+  public static final int HDDS_STATEMACHINE_ENDPOINT_TASK_THREAD_COUNT_DEFAULT
+      = 2;
   public static final String HDDS_CONTAINER_REPORT_INTERVAL =
       "hdds.container.report.interval";
   public static final String HDDS_CONTAINER_REPORT_INTERVAL_DEFAULT =
