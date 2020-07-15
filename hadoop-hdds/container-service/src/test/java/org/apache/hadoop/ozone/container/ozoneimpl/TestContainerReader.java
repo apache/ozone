@@ -127,10 +127,8 @@ public class TestContainerReader {
         String blk = Long.toString(blockNames.get(i));
         BlockData blkInfo = blockDataTable.get(blk);
 
-        String deletingKey = OzoneConsts.DELETING_KEY_PREFIX + blockNames.get(i);
-
         blockDataTable.delete(blk);
-        blockDataTable.put(deletingKey, blkInfo);
+        blockDataTable.put(OzoneConsts.DELETING_KEY_PREFIX + blk, blkInfo);
       }
 
       if (setMetaData) {
