@@ -161,8 +161,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     auditMap.put(OzoneConsts.CLIENT_ID, String.valueOf(clientID));
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    String openKeyName = omMetadataManager.getOpenKey(volumeName, bucketName,
-        keyName, clientID);
+    String openKeyName = null;
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -186,6 +185,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       // Here we don't acquire bucket/volume lock because for a single client
       // allocateBlock is called in serial fashion.
 
+      openKeyName = omMetadataManager.getOpenKey(volumeName, bucketName,
+          keyName, clientID);
       openKeyInfo = omMetadataManager.getOpenKeyTable().get(openKeyName);
       if (openKeyInfo == null) {
         throw new OMException("Open Key not found " + openKeyName,
