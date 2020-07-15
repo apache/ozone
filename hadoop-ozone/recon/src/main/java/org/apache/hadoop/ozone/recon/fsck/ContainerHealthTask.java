@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -66,8 +65,7 @@ public class ContainerHealthTask extends ReconScmTask {
     this.containerSchemaManager = containerSchemaManager;
     this.placementPolicy = placementPolicy;
     this.containerManager = containerManager;
-    this.interval = TimeUnit.SECONDS.toMillis(
-        reconTaskConfig.getMissingContainerTaskInterval());
+    interval = reconTaskConfig.getMissingContainerTaskInterval().toMillis();
   }
 
   public synchronized void run() {

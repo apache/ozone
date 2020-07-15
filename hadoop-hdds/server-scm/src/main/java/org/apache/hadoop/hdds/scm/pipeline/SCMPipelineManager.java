@@ -160,9 +160,61 @@ public class SCMPipelineManager implements PipelineManager {
     TableIterator<PipelineID, ? extends KeyValue<PipelineID, Pipeline>>
         iterator = pipelineStore.iterator();
     while (iterator.hasNext()) {
-      Pipeline pipeline = iterator.next().getValue();
+      Pipeline pipeline = nextPipelineFromIterator(iterator);
       stateManager.addPipeline(pipeline);
       nodeManager.addPipeline(pipeline);
+    }
+  }
+
+  private Pipeline nextPipelineFromIterator(
+      TableIterator<PipelineID, ? extends KeyValue<PipelineID, Pipeline>> it
+  ) throws IOException {
+    KeyValue<PipelineID, Pipeline> actual = it.next();
+    Pipeline pipeline = actual.getValue();
+    PipelineID pipelineID = actual.getKey();
+    checkKeyAndReplaceIfObsolete(it, pipeline, pipelineID);
+    return pipeline;
+  }
+
+  /**
+   * This method is part of the change that happens in HDDS-3925, and we can
+   * and should remove this on later on.
+   * The purpose of the change is to get rid of protobuf serialization in the
+   * SCM database Pipeline table keys. The keys are not used anywhere, and the
+   * PipelineID that is used as a key is in the value as well, so we can detect
+   * a change in the key translation to byte[] and if we have the old format
+   * we refresh the table contents during SCM startup.
+   *
+   * If this fails in the remove, then there is an IOException coming from
+   * RocksDB itself, in this case in memory structures will still be fine and
+   * SCM should be operational, however we will attempt to replace the old key
+   * at next startup. In this case removing of the pipeline will leave the
+   * pipeline in RocksDB, and during next startup we will attempt to delete it
+   * again. This does not affect any runtime operations.
+   * If a Pipeline should have been deleted but remained in RocksDB, then at
+   * next startup it will be replaced and added with the new key, then SCM will
+   * detect that it is an invalid Pipeline and successfully delete it with the
+   * new key.
+   * For further info check the JIRA.
+   *
+   * @param it the iterator used to iterate the Pipeline table
+   * @param pipeline the pipeline read already from the iterator
+   * @param pipelineID the pipeline ID read from the raw data via the iterator
+   */
+  private void checkKeyAndReplaceIfObsolete(
+      TableIterator<PipelineID, ? extends KeyValue<PipelineID, Pipeline>> it,
+      Pipeline pipeline,
+      PipelineID pipelineID
+  ) {
+    if (!pipelineID.equals(pipeline.getId())) {
+      try {
+        it.removeFromDB();
+        pipelineStore.put(pipeline.getId(), pipeline);
+      } catch (IOException e) {
+        LOG.info("Pipeline table in RocksDB has an old key format, and "
+            + "removing the pipeline with the old key was unsuccessful."
+            + "Pipeline: {}", pipeline);
+      }
     }
   }
 

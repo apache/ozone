@@ -26,6 +26,8 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +40,6 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -83,6 +84,13 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
 
+    // Verify key name
+    final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
+         .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
+                 OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
+    if(checkKeyNameEnabled){
+      OmUtils.validateKeyName(keyArgs.getKeyName());
+    }
     // We cannot allocate block for multipart upload part when
     // createMultipartKey is called, as we will not know type and factor with
     // which initiateMultipartUpload has started for this key. When
@@ -192,22 +200,6 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           keyName);
       OmKeyInfo dbKeyInfo =
           omMetadataManager.getKeyTable().getIfExist(dbKeyName);
-      if (dbKeyInfo != null) {
-        // Check if this transaction is a replay of ratis logs.
-        // We check only the KeyTable here and not the OpenKeyTable. In case
-        // this transaction is a replay but the transaction was not committed
-        // to the KeyTable, then we recreate the key in OpenKey table. This is
-        // okay as all the subsequent transactions would also be replayed and
-        // the openKey table would eventually reach the same state.
-        // The reason we do not check the OpenKey table is to avoid a DB read
-        // in regular non-replay scenario.
-        if (isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
-          // Replay implies the response has already been returned to
-          // the client. So take no further action and return a dummy
-          // OMClientResponse.
-          throw new OMReplayException();
-        }
-      }
 
       OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
           omMetadataManager.getBucketKey(volumeName, bucketName));
@@ -245,18 +237,12 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
-      if (ex instanceof OMReplayException) {
-        result = Result.REPLAY;
-        omClientResponse = new OMKeyCreateResponse(createReplayOMResponse(
-            omResponse));
-      } else {
-        result = Result.FAILURE;
-        exception = ex;
-        omMetrics.incNumKeyAllocateFails();
-        omResponse.setCmdType(Type.CreateKey);
-        omClientResponse = new OMKeyCreateResponse(createErrorOMResponse(
-            omResponse, exception));
-      }
+      result = Result.FAILURE;
+      exception = ex;
+      omMetrics.incNumKeyAllocateFails();
+      omResponse.setCmdType(Type.CreateKey);
+      omClientResponse = new OMKeyCreateResponse(
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
@@ -267,21 +253,17 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     }
 
     // Audit Log outside the lock
-    if (result != Result.REPLAY) {
-      Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
-      auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
-          OMAction.ALLOCATE_KEY, auditMap, exception,
-          getOmRequest().getUserInfo()));
-    }
+
+    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
+    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+        OMAction.ALLOCATE_KEY, auditMap, exception,
+        getOmRequest().getUserInfo()));
+
 
     switch (result) {
     case SUCCESS:
       LOG.debug("Key created. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);
-      break;
-    case REPLAY:
-      LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-          createKeyRequest);
       break;
     case FAILURE:
       LOG.error("Key creation failed. Volume:{}, Bucket:{}, Key{}. " +

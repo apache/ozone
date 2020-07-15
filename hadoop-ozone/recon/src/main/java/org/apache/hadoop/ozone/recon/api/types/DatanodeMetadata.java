@@ -55,6 +55,12 @@ public final class DatanodeMetadata {
   @XmlElement(name = "leaderCount")
   private int leaderCount;
 
+  @XmlElement(name = "version")
+  private String version;
+
+  @XmlElement(name = "setupTime")
+  private long setupTime;
+
   private DatanodeMetadata(Builder builder) {
     this.hostname = builder.hostname;
     this.uuid = builder.uuid;
@@ -64,6 +70,8 @@ public final class DatanodeMetadata {
     this.pipelines = builder.pipelines;
     this.containers = builder.containers;
     this.leaderCount = builder.leaderCount;
+    this.version = builder.version;
+    this.setupTime = builder.setupTime;
   }
 
   public String getHostname() {
@@ -98,6 +106,14 @@ public final class DatanodeMetadata {
     return uuid;
   }
 
+  public String getVersion() {
+    return version;
+  }
+
+  public long getSetupTime() {
+    return  setupTime;
+  }
+
   /**
    * Returns new builder class that builds a DatanodeMetadata.
    *
@@ -120,6 +136,8 @@ public final class DatanodeMetadata {
     private List<DatanodePipeline> pipelines;
     private int containers;
     private int leaderCount;
+    private String version;
+    private long setupTime;
 
     public Builder() {
       this.containers = 0;
@@ -164,6 +182,16 @@ public final class DatanodeMetadata {
 
     public Builder withUUid(String uuid) {
       this.uuid = uuid;
+      return this;
+    }
+
+    public Builder withVersion(String version) {
+      this.version = version;
+      return this;
+    }
+
+    public Builder withSetupTime(long setupTime) {
+      this.setupTime = setupTime;
       return this;
     }
 

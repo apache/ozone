@@ -260,8 +260,6 @@ public class TestOzoneContainer {
         random.nextInt(256) + "." + random.nextInt(256) + "." + random
             .nextInt(256) + "." + random.nextInt(256);
 
-    String uuid = UUID.randomUUID().toString();
-    String hostName = uuid;
     DatanodeDetails.Port containerPort = DatanodeDetails.newPort(
         DatanodeDetails.Port.Name.STANDALONE, 0);
     DatanodeDetails.Port ratisPort = DatanodeDetails.newPort(
@@ -269,7 +267,7 @@ public class TestOzoneContainer {
     DatanodeDetails.Port restPort = DatanodeDetails.newPort(
         DatanodeDetails.Port.Name.REST, 0);
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
-    builder.setUuid(uuid)
+    builder.setUuid(UUID.randomUUID())
         .setHostName("localhost")
         .setIpAddress(ipAddress)
         .addPort(containerPort)

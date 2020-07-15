@@ -107,8 +107,8 @@ public class ContainerOperationClient implements ScmClient {
       String caCertificate =
           scmSecurityProtocolClient.getCACertificate();
       manager = new XceiverClientManager(conf,
-          OzoneConfiguration.of(conf).getObject(XceiverClientManager
-              .ScmClientConfig.class), caCertificate);
+          conf.getObject(XceiverClientManager.ScmClientConfig.class),
+          caCertificate);
     } else {
       manager = new XceiverClientManager(conf);
     }

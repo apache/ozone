@@ -26,4 +26,4 @@ OZONE-SITE.XML_ozone.scm.client.address=scm
 OZONE-SITE.XML_ozone.replication=1
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 
-no_proxy=om,scm,s3g,kdc,localhost,127.0.0.1
+no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1

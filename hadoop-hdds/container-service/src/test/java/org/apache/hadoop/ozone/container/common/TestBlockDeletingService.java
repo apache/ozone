@@ -27,12 +27,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import com.google.common.collect.Lists;
-import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -127,7 +127,7 @@ public class TestBlockDeletingService {
    * creates some fake chunk files for testing.
    */
   private void createToDeleteBlocks(ContainerSet containerSet,
-      ConfigurationSource conf, int numOfContainers,
+      MutableConfigurationSource conf, int numOfContainers,
       int numOfBlocksPerContainer,
       int numOfChunksPerBlock) throws IOException {
     for (int x = 0; x < numOfContainers; x++) {
@@ -179,7 +179,7 @@ public class TestBlockDeletingService {
         metadata.getStore().put(OzoneConsts.DB_CONTAINER_BYTES_USED_KEY,
             Longs.toByteArray(blockLength * numOfBlocksPerContainer));
         metadata.getStore().put(DB_PENDING_DELETE_BLOCK_COUNT_KEY,
-            Ints.toByteArray(numOfBlocksPerContainer));
+            Longs.toByteArray(numOfBlocksPerContainer));
       }
     }
   }
@@ -250,6 +250,8 @@ public class TestBlockDeletingService {
 
       // Ensure there are 3 blocks under deletion and 0 deleted blocks
       Assert.assertEquals(3, getUnderDeletionBlocksCount(meta));
+      Assert.assertEquals(3, Longs.fromByteArray(
+          meta.getStore().get(DB_PENDING_DELETE_BLOCK_COUNT_KEY)));
       Assert.assertEquals(0, getDeletedBlocksCount(meta));
 
       // An interval will delete 1 * 2 blocks
@@ -268,7 +270,7 @@ public class TestBlockDeletingService {
 
       // Check finally DB counters.
       // Not checking bytes used, as handler is a mock call.
-      Assert.assertEquals(0, Ints.fromByteArray(
+      Assert.assertEquals(0, Longs.fromByteArray(
           meta.getStore().get(DB_PENDING_DELETE_BLOCK_COUNT_KEY)));
       Assert.assertEquals(0, Longs.fromByteArray(
           meta.getStore().get(DB_BLOCK_COUNT_KEY)));

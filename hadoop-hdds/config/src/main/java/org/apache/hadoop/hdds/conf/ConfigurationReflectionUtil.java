@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -21,6 +21,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.Deque;
+import java.util.LinkedList;
 
 /**
  * Reflection utilities for configuration injection.
@@ -161,6 +163,82 @@ public final class ConfigurationReflectionUtil {
                 "@PostConstruct can't be executed on " + configurationClass
                     + " after configObject "
                     + "injection", e);
+          }
+        }
+      }
+    }
+  }
+
+  public static <T> void updateConfiguration(ConfigurationTarget config,
+      T object, String prefix) {
+
+    Class<?> configClass = object.getClass();
+    Deque<Class<?>> classes = new LinkedList<>();
+    classes.addLast(configClass);
+    Class<?> superclass = configClass.getSuperclass();
+    while (superclass != null) {
+      classes.addFirst(superclass);
+      superclass = superclass.getSuperclass();
+    }
+
+    for (Class<?> cl : classes) {
+      updateConfigurationFromObject(config, cl, object, prefix);
+    }
+  }
+
+  private static <T> void updateConfigurationFromObject(
+      ConfigurationTarget config, Class<?> configClass, T configObject,
+      String prefix) {
+
+    for (Field field : configClass.getDeclaredFields()) {
+      if (field.isAnnotationPresent(Config.class)) {
+        Config configAnnotation = field.getAnnotation(Config.class);
+        String fieldLocation = configClass + "." + field.getName();
+        String key = prefix + "." + configAnnotation.key();
+        ConfigType type = configAnnotation.type();
+
+        if (type == ConfigType.AUTO) {
+          type = detectConfigType(field.getType(), fieldLocation);
+        }
+
+        //Note: default value is handled by ozone-default.xml. Here we can
+        //use any default.
+        boolean accessChanged = false;
+        try {
+          if (!field.isAccessible()) {
+            field.setAccessible(true);
+            accessChanged = true;
+          }
+          switch (type) {
+          case STRING:
+            Object value = field.get(configObject);
+            if (value != null) {
+              config.set(key, String.valueOf(value));
+            }
+            break;
+          case INT:
+            config.setInt(key, field.getInt(configObject));
+            break;
+          case BOOLEAN:
+            config.setBoolean(key, field.getBoolean(configObject));
+            break;
+          case LONG:
+            config.setLong(key, field.getLong(configObject));
+            break;
+          case TIME:
+            config.setTimeDuration(key, field.getLong(configObject),
+                configAnnotation.timeUnit());
+            break;
+          default:
+            throw new ConfigurationException(
+                "Unsupported ConfigType " + type + " on " + fieldLocation);
+          }
+        } catch (IllegalAccessException e) {
+          throw new ConfigurationException(
+              "Can't inject configuration to " + fieldLocation, e);
+        } finally {
+          if (accessChanged) {
+            field.setAccessible(false);
           }
         }
       }
