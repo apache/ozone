@@ -74,16 +74,6 @@ public class OMKeysRenameRequest extends OMKeyRequest {
     super(omRequest);
   }
 
-  /**
-   * Stores the result of request execution for Rename Requests.
-   */
-  private enum Result {
-    SUCCESS,
-    DELETE_FROM_KEY_ONLY,
-    REPLAY,
-    FAILURE,
-  }
-
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
@@ -197,76 +187,43 @@ public class OMKeysRenameRequest extends OMKeyRequest {
 
         if (toKeyValue != null) {
 
-          // Check if this transaction is a replay of ratis logs.
-          if (isReplay(ozoneManager, toKeyValue, trxnLogIndex)) {
-
-            // Check if fromKey is still in the DB and created before this
-            // replay.
-            // For example, lets say we have the following sequence of
-            // transactions.
-            //   Trxn 1 : Create Key1
-            //   Trnx 2 : Rename Key1 to Key2 -> Deletes Key1 and Creates Key2
-            // Now if these transactions are replayed:
-            //   Replay Trxn 1 : Creates Key1 again it does not exist in DB
-            //   Replay Trxn 2 : Key2 is not created as it exists in DB and
-            //                   the request would be deemed a replay. But
-            //                   Key1 is still in the DB and needs to be
-            //                   deleted.
-            fromKeyValue = omMetadataManager.getKeyTable().get(fromKey);
-            if (fromKeyValue != null) {
-              // Check if this replay transaction was after the fromKey was
-              // created. If so, we have to delete the fromKey.
-              if (ozoneManager.isRatisEnabled() &&
-                  trxnLogIndex > fromKeyValue.getUpdateID()) {
-                acquiredLock =
-                    omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-                        volumeName, bucketName);
-                // Add to cache. Only fromKey should be deleted. ToKey already
-                // exists in DB as this transaction is a replay.
-                Table<String, OmKeyInfo> keyTable = omMetadataManager
-                    .getKeyTable();
-                keyTable.addCacheEntry(new CacheKey<>(fromKey),
-                    new CacheValue<>(Optional.absent(), trxnLogIndex));
-                renameKeyInfoList.add(new OmRenameKeyInfo(
-                    null, fromKeyValue));
-              }
-            }
-          } else {
-            renameStatus = false;
-            unRenamedKeys.add(renameKeyArgs);
-            LOG.error("Received a request name of new key {} already exists",
-                toKeyName);
-          }
-        } else {
-          // fromKeyName should exist
-          fromKeyValue = omMetadataManager.getKeyTable().get(fromKey);
-          if (fromKeyValue == null) {
-            renameStatus = false;
-            unRenamedKeys.add(renameKeyArgs);
-            LOG.error("Received a request to rename a Key does not exist {}",
-                fromKey);
-            continue;
-          }
-
-          fromKeyValue.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
-          fromKeyValue.setKeyName(toKeyName);
-          //Set modification time
-          fromKeyValue.setModificationTime(keyArgs.getModificationTime());
-
-          acquiredLock =
-              omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-                  volumeName, bucketName);
-          // Add to cache.
-          // fromKey should be deleted, toKey should be added with newly updated
-          // omKeyInfo.
-          Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable();
-          keyTable.addCacheEntry(new CacheKey<>(fromKey),
-              new CacheValue<>(Optional.absent(), trxnLogIndex));
-          keyTable.addCacheEntry(new CacheKey<>(toKey),
-              new CacheValue<>(Optional.of(fromKeyValue), trxnLogIndex));
-          renameKeyInfoList
-              .add(new OmRenameKeyInfo(fromKeyName, fromKeyValue));
+          renameStatus = false;
+          unRenamedKeys.add(renameKeyArgs);
+          LOG.error("Received a request name of new key {} already exists",
+              toKeyName);
         }
+
+        // fromKeyName should exist
+        fromKeyValue = omMetadataManager.getKeyTable().get(fromKey);
+        if (fromKeyValue == null) {
+          renameStatus = false;
+          unRenamedKeys.add(renameKeyArgs);
+          LOG.error("Received a request to rename a Key does not exist {}",
+              fromKey);
+          continue;
+        }
+
+        fromKeyValue.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+
+        fromKeyValue.setKeyName(toKeyName);
+
+        //Set modification time
+        fromKeyValue.setModificationTime(keyArgs.getModificationTime());
+
+        acquiredLock =
+            omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
+                volumeName, bucketName);
+        // Add to cache.
+        // fromKey should be deleted, toKey should be added with newly updated
+        // omKeyInfo.
+        Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable();
+        keyTable.addCacheEntry(new CacheKey<>(fromKey),
+            new CacheValue<>(Optional.absent(), trxnLogIndex));
+        keyTable.addCacheEntry(new CacheKey<>(toKey),
+            new CacheValue<>(Optional.of(fromKeyValue), trxnLogIndex));
+        renameKeyInfoList
+            .add(new OmRenameKeyInfo(fromKeyName, fromKeyValue));
+
         if (acquiredLock) {
           omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
               bucketName);
@@ -278,7 +235,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
               volumeName, bucketName);
       omClientResponse = new OMKeysRenameResponse(omResponse
           .setRenameKeysResponse(RenameKeysResponse.newBuilder()
-          .setStatus(renameStatus).addAllUnRenamedKeys(unRenamedKeys))
+              .setStatus(renameStatus).addAllUnRenamedKeys(unRenamedKeys))
           .setStatus(renameStatus ? OK : PARTIAL_RENAME)
           .setSuccess(renameStatus).build(),
           renameKeyInfoList);
@@ -294,12 +251,12 @@ public class OMKeysRenameRequest extends OMKeyRequest {
       omClientResponse = new OMKeysRenameResponse(omResponse.build());
 
     } finally {
+      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
+          omDoubleBufferHelper);
       if (acquiredLock) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
             bucketName);
       }
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
     }
 
     auditMap = buildAuditMap(volumeName, bucketName, renameKeyInfoList,
@@ -311,10 +268,6 @@ public class OMKeysRenameRequest extends OMKeyRequest {
     case SUCCESS:
       LOG.debug("Rename Keys is successfully completed for auditMap:{}.",
           auditMap.toString());
-      break;
-    case REPLAY:
-      LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-          renameRequest);
       break;
     case FAILURE:
       ozoneManager.getMetrics().incNumKeyRenameFails();
@@ -330,6 +283,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
 
   /**
    * Build audit map for RenameKeys request.
+   *
    * @param volumeName
    * @param bucketName
    * @param renameKeys
@@ -337,17 +291,18 @@ public class OMKeysRenameRequest extends OMKeyRequest {
    * @return
    */
   private Map<String, String> buildAuditMap(String volumeName,
-      String bucketName, List<OmRenameKeyInfo> renameKeys,
-      List<RenameKeyArgs> unRenameKeys) {
+                                            String bucketName,
+                                            List<OmRenameKeyInfo> renameKeys,
+                                            List<RenameKeyArgs> unRenameKeys) {
     Map<String, String> renameKeysMap = new HashMap<>();
     Map<String, String> unRenameKeysMap = new HashMap<>();
     Map<String, String> auditMap = new HashMap<>();
 
-    for(OmRenameKeyInfo keyInfo : renameKeys) {
+    for (OmRenameKeyInfo keyInfo : renameKeys) {
       renameKeysMap.put(keyInfo.getFromKeyName(),
           keyInfo.getNewKeyInfo().getKeyName());
     }
-    for(RenameKeyArgs keyArgs : unRenameKeys) {
+    for (RenameKeyArgs keyArgs : unRenameKeys) {
       unRenameKeysMap.put(keyArgs.getFromKeyName(), keyArgs.getToKeyName());
     }
 

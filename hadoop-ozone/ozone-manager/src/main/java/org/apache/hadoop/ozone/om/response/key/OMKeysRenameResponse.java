@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmRenameKeyInfo;
@@ -68,32 +67,15 @@ public class OMKeysRenameResponse extends OMClientResponse {
       fromKeyName = omRenameKeyInfo.getFromKeyName();
       OmKeyInfo newKeyInfo = omRenameKeyInfo.getNewKeyInfo();
       toKeyName = newKeyInfo.getKeyName();
-      // If toKeyName is null, then we need to only delete the fromKeyName
-      // from KeyTable. This is the case of replay where toKey exists but
-      // fromKey has not been deleted.
-      if (deleteFromKeyOnly()) {
-        omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
-            omMetadataManager
-                .getOzoneKey(volumeName, bucketName, fromKeyName));
-      } else if (createToKeyAndDeleteFromKey()) {
-        omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
-            omMetadataManager
-                .getOzoneKey(volumeName, bucketName, fromKeyName));
-        omMetadataManager.getKeyTable().putWithBatch(batchOperation,
-            omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName),
-            newKeyInfo);
-      }
+
+      omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
+          omMetadataManager
+              .getOzoneKey(volumeName, bucketName, fromKeyName));
+      omMetadataManager.getKeyTable().putWithBatch(batchOperation,
+          omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName),
+          newKeyInfo);
 
     }
   }
 
-  @VisibleForTesting
-  public boolean deleteFromKeyOnly() {
-    return toKeyName == null && fromKeyName != null;
-  }
-
-  @VisibleForTesting
-  public boolean createToKeyAndDeleteFromKey() {
-    return toKeyName != null && !toKeyName.equals(fromKeyName);
-  }
 }
