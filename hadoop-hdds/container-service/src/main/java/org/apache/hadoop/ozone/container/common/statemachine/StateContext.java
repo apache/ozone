@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -35,6 +36,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
@@ -393,6 +395,20 @@ public class StateContext {
     }
   }
 
+  @VisibleForTesting
+  public boolean isThreadPoolAvailable(ExecutorService executor) {
+    if (!(executor instanceof ThreadPoolExecutor)) {
+      return true;
+    }
+
+    ThreadPoolExecutor ex = (ThreadPoolExecutor) executor;
+    if (ex.getQueue().size() == 0) {
+      return true;
+    }
+
+    return false;
+  }
+
   /**
    * Executes the required state function.
    *
@@ -415,7 +431,14 @@ public class StateContext {
       if (this.isEntering()) {
         task.onEnter();
       }
-      task.execute(service);
+
+      if (isThreadPoolAvailable(service)) {
+        task.execute(service);
+      } else {
+        LOG.warn("No available thread in pool, duration:" +
+            unit.toMillis(time));
+      }
+
       DatanodeStateMachine.DatanodeStates newState = task.await(time, unit);
       if (this.state != newState) {
         if (LOG.isDebugEnabled()) {

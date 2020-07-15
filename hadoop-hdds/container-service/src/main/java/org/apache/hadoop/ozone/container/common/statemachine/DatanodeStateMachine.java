@@ -25,8 +25,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
@@ -104,10 +104,8 @@ public class DatanodeStateMachine implements Closeable {
     this.hddsDatanodeStopService = hddsDatanodeStopService;
     this.conf = conf;
     this.datanodeDetails = datanodeDetails;
-    int taskThreadPoolSize = conf.getInt(
-        HddsConfigKeys.HDDS_STATEMACHINE_ENDPOINT_TASK_THREAD_COUNT,
-        HddsConfigKeys.HDDS_STATEMACHINE_ENDPOINT_TASK_THREAD_COUNT_DEFAULT);
-    executorService = Executors.newFixedThreadPool(taskThreadPoolSize,
+    executorService = Executors.newFixedThreadPool(
+        getEndPointTaskThreadPoolSize(),
         new ThreadFactoryBuilder()
             .setNameFormat("Datanode State Machine Task Thread - %d").build());
     connectionManager = new SCMConnectionManager(conf);
@@ -157,6 +155,21 @@ public class DatanodeStateMachine implements Closeable {
         .addPublisherFor(CommandStatusReportsProto.class)
         .addPublisherFor(PipelineReportsProto.class)
         .build();
+  }
+
+  private int getEndPointTaskThreadPoolSize() {
+    // TODO(runzhiwang): current only support one recon, if support multiple
+    //  recon in future reconServerCount should be the real number of recon
+    int reconServerCount = 1;
+    int totalServerCount = reconServerCount;
+
+    try {
+      totalServerCount += HddsUtils.getSCMAddresses(conf).size();
+    } catch (Exception e) {
+      LOG.error("Fail to get scm addresses", e);
+    }
+
+    return totalServerCount;
   }
 
   /**
