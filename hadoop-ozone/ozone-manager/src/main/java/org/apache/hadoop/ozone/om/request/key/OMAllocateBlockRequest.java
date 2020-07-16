@@ -113,8 +113,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     // Set modification time and normalize key if required.
     KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
         .setModificationTime(Time.now())
-        .setKeyName(getNormalizedKey(ozoneManager.getEnableFileSystemPaths(),
-            keyArgs.getKeyName()));
+        .setKeyName(validateAndNormalizeKey(
+            ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
 
     AllocateBlockRequest.Builder newAllocatedBlockRequest =
         AllocateBlockRequest.newBuilder()

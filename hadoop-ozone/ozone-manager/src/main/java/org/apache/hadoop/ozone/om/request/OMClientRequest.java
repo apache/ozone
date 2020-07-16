@@ -50,6 +50,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 
 /**
  * OMClientRequest provides methods which every write OM request should
@@ -274,17 +275,18 @@ public abstract class OMClientRequest implements RequestAuditor {
   }
 
 
-  public static String getNormalizedKey(boolean enableFileSystemPaths,
-      String keyName) {
+  public static String validateAndNormalizeKey(boolean enableFileSystemPaths,
+      String keyName) throws OMException {
     if (enableFileSystemPaths) {
-      return getNormalizedKey(keyName);
+      return validateAndNormalizeKey(keyName);
     } else {
       return keyName;
     }
   }
 
   @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
-  public static String getNormalizedKey(String keyName) {
+  public static String validateAndNormalizeKey(String keyName)
+      throws OMException {
     String normalizedKeyName;
     if (keyName.startsWith(OM_KEY_PREFIX)) {
       normalizedKeyName = Paths.get(keyName).toUri().normalize().getPath();
@@ -296,6 +298,47 @@ public abstract class OMClientRequest implements RequestAuditor {
       LOG.debug("Normalized key {} to {} ", keyName,
           normalizedKeyName.substring(1));
     }
-    return normalizedKeyName.substring(1);
+    return isValidKeyPath(normalizedKeyName.substring(1));
+  }
+
+  /**
+   * Whether the pathname is valid.  Check key names which contain a
+   * ":", ".", "..", "//", "". If it has any of these characters throws
+   * OMException, else return the path.
+   */
+  private static String isValidKeyPath(String path) throws OMException {
+    boolean isValid = true;
+
+    // If keyName is empty string throw error.
+    if (path.length() == 0) {
+      throw new OMException("Invalid KeyPath, empty keyName" + path,
+          INVALID_KEY_NAME);
+    } else if(path.startsWith("/")) {
+      isValid = false;
+    } else {
+      // Check for ".." "." ":" "/"
+      String[] components = StringUtils.split(path, '/');
+      for (int i = 0; i < components.length; i++) {
+        String element = components[i];
+        if (element.equals(".") ||
+            (element.contains(":")) ||
+            (element.contains("/") || element.equals(".."))) {
+          isValid = false;
+          break;
+        }
+
+        // The string may end with a /, but not have
+        // "//" in the middle.
+        if (element.isEmpty() && i != components.length - 1) {
+          isValid = false;
+        }
+      }
+    }
+
+    if (isValid) {
+      return path;
+    } else {
+      throw new OMException("Invalid KeyPath " + path, INVALID_KEY_NAME);
+    }
   }
 }

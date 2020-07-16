@@ -67,7 +67,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
   }
 
   @Override
-  public OMRequest preExecute(OzoneManager ozoneManager) {
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     MultipartInfoInitiateRequest multipartInfoInitiateRequest =
         getOmRequest().getInitiateMultiPartUploadRequest();
     Preconditions.checkNotNull(multipartInfoInitiateRequest);
@@ -76,7 +76,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
     KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
             .setMultipartUploadID(UUID.randomUUID().toString() + "-" +
                 UniqueId.next()).setModificationTime(Time.now())
-            .setKeyName(getNormalizedKey(
+            .setKeyName(validateAndNormalizeKey(
                 ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
 
     return getOmRequest().toBuilder()

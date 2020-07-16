@@ -141,7 +141,6 @@ public class OMFileCreateRequest extends OMKeyRequest {
               ozoneManager.getPreallocateBlocksMax(),
               ozoneManager.isGrpcBlockTokenEnabled(),
               ozoneManager.getOMNodeId());
-
     KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
         .setModificationTime(Time.now()).setType(type).setFactor(factor)
         .setDataSize(requestedSize);

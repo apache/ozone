@@ -92,7 +92,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
     KeyArgs.Builder newKeyArgs =
         keyArgs.toBuilder().setModificationTime(Time.now())
-            .setKeyName(getNormalizedKey(
+            .setKeyName(validateAndNormalizeKey(
                 ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
 
     return getOmRequest().toBuilder()

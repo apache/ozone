@@ -99,6 +99,19 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     if(checkKeyNameEnabled){
       OmUtils.validateKeyName(keyArgs.getKeyName());
     }
+
+    String keyPath = keyArgs.getKeyName();
+    if (ozoneManager.getEnableFileSystemPaths()) {
+      // If enabled, disallow keys with trailing /. As in fs semantics
+      // directories end with trailing /.
+      keyPath = validateAndNormalizeKey(
+          ozoneManager.getEnableFileSystemPaths(), keyPath);
+      if (keyPath.endsWith("/")) {
+        throw new OMException("Invalid KeyPath: " + keyPath,
+            OMException.ResultCodes.INVALID_KEY_NAME);
+      }
+    }
+
     // We cannot allocate block for multipart upload part when
     // createMultipartKey is called, as we will not know type and factor with
     // which initiateMultipartUpload has started for this key. When
@@ -139,7 +152,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       //  As for a client for the first time this can be executed on any OM,
       //  till leader is identified.
 
-      List< OmKeyLocationInfo > omKeyLocationInfoList =
+      List<OmKeyLocationInfo> omKeyLocationInfoList =
           allocateBlock(ozoneManager.getScmClient(),
               ozoneManager.getBlockTokenSecretManager(), type, factor,
               new ExcludeList(), requestedSize, scmBlockSize,
@@ -157,10 +170,9 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now());
     }
 
-    generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
+    newKeyArgs.setKeyName(keyPath);
 
-    newKeyArgs.setKeyName(getNormalizedKey(
-        ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
+    generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
 
     newCreateKeyRequest =
         createKeyRequest.toBuilder().setKeyArgs(newKeyArgs)
@@ -202,12 +214,6 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
-
-      if (keyName.length() == 0) {
-        // Check if this is the root of the filesystem.
-        throw new OMException("Provided KeyName is empty string. Can not " +
-            "write to directory", OMException.ResultCodes.NOT_A_FILE);
-      }
 
       // check Acl
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,

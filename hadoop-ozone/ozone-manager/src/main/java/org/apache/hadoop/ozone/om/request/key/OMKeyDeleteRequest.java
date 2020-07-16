@@ -76,7 +76,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
     OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs =
         keyArgs.toBuilder().setModificationTime(Time.now())
-            .setKeyName(getNormalizedKey(
+            .setKeyName(validateAndNormalizeKey(
                 ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
 
     return getOmRequest().toBuilder()

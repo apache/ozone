@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
@@ -25,6 +26,7 @@ import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -46,6 +48,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM
 import static org.apache.hadoop.ozone.om.request.TestOMRequestUtils.addVolumeAndBucketToDB;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.when;
 
 /**
@@ -372,24 +375,72 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     createAndCheck(keyName);
 
     // Create key with multiple /'s
-    keyName = "///a/b///c///file2";
+    // converted to a/b/c/file5
+    keyName = "///a/b///c///file5";
     createAndCheck(keyName);
 
+    // converted to a/b/c/.../file3
     keyName = "///a/b///c//.../file3";
     createAndCheck(keyName);
 
+    // converted to r1/r2
+    keyName = "././r1/r2/";
+    createAndCheck(keyName);
 
-    // Empty keyName.
-    keyName = "";
-    checkNotAFile(keyName);
+    // converted to ..d1/d2/d3
+    keyName = "..d1/d2/d3/";
+    createAndCheck(keyName);
 
     // Create a file, where a file already exists in the path.
     // Now try with a file exists in path. Should fail.
     keyName = "/a/b/c/file1/file3";
-    createAndCheck(keyName);
+    checkNotAFile(keyName);
+
+    // Empty keyName.
+    keyName = "";
+    checkNotAValidPath(keyName);
+
+    // Key name ends with /
+    keyName = "/a/./";
+    checkNotAValidPath(keyName);
+
+    keyName = "/////";
+    checkNotAValidPath(keyName);
+
+    keyName = "../../b/c";
+    checkNotAValidPath(keyName);
+
+    keyName = "../../b/c/";
+    checkNotAValidPath(keyName);
+
+    keyName = "../../b:/c/";
+    checkNotAValidPath(keyName);
+
+    keyName = ":/c/";
+    checkNotAValidPath(keyName);
+
+    keyName = "";
+    checkNotAValidPath(keyName);
 
   }
 
+
+  private void checkNotAValidPath(String keyName) {
+    OMRequest omRequest = createKeyRequest(false, 0, keyName);
+    OMKeyCreateRequest omKeyCreateRequest = new OMKeyCreateRequest(omRequest);
+
+    try {
+      omKeyCreateRequest.preExecute(ozoneManager);
+      fail("checkNotAValidPath failed for path" + keyName);
+    } catch (IOException ex) {
+      Assert.assertTrue(ex instanceof OMException);
+      OMException omException = (OMException) ex;
+      Assert.assertEquals(OMException.ResultCodes.INVALID_KEY_NAME,
+          omException.getResult());
+    }
+
+
+  }
   private void checkNotAFile(String keyName) throws Exception {
     OMRequest omRequest = createKeyRequest(false, 0, keyName);
 
@@ -428,7 +479,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   private void checkCreatedPaths(OMKeyCreateRequest omKeyCreateRequest,
       OMRequest omRequest, String keyName) throws Exception {
-    keyName = omKeyCreateRequest.getNormalizedKey(true, keyName);
+    keyName = omKeyCreateRequest.validateAndNormalizeKey(true, keyName);
     // Check intermediate directories created or not.
     Path keyPath = Paths.get(keyName);
     checkIntermediatePaths(keyPath);
