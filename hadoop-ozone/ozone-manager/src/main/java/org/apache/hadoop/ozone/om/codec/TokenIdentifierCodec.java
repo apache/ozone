@@ -19,10 +19,12 @@ package org.apache.hadoop.ozone.om.codec;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.InvalidProtocolBufferException;
+
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.hdds.utils.db.Codec;
 
 import java.io.IOException;
+import java.nio.BufferUnderflowException;
 
 /**
  * Codec to encode TokenIdentifierCodec as byte array.
@@ -33,7 +35,7 @@ public class TokenIdentifierCodec implements Codec<OzoneTokenIdentifier> {
   public byte[] toPersistedFormat(OzoneTokenIdentifier object) {
     Preconditions
         .checkNotNull(object, "Null object can't be converted to byte array.");
-    return object.getBytes();
+    return object.toUniqueSerializedKey();
   }
 
   @Override
@@ -42,8 +44,16 @@ public class TokenIdentifierCodec implements Codec<OzoneTokenIdentifier> {
     Preconditions.checkNotNull(rawData,
         "Null byte array can't converted to real object.");
     try {
-      return OzoneTokenIdentifier.readProtoBuf(rawData);
-    } catch (InvalidProtocolBufferException e) {
+      OzoneTokenIdentifier object = OzoneTokenIdentifier.newInstance();
+      return object.fromUniqueSerializedKey(rawData);
+    } catch (IOException ex) {
+      try {
+        return OzoneTokenIdentifier.readProtoBuf(rawData);
+      } catch (InvalidProtocolBufferException e) {
+        throw new IllegalArgumentException(
+            "Can't encode the the raw data from the byte array", e);
+      }
+    } catch (BufferUnderflowException e) {
       throw new IllegalArgumentException(
           "Can't encode the the raw data from the byte array", e);
     }
