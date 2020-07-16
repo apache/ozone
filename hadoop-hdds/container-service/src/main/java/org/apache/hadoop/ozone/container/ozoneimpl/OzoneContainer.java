@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
+import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -294,8 +295,21 @@ public class OzoneContainer {
    * Returns node report of container storage usage.
    */
   public StorageContainerDatanodeProtocolProtos.NodeReportProto getNodeReport()
-      throws IOException {
-    return volumeSet.getNodeReport();
+          throws IOException {
+    StorageLocationReport[] reports = volumeSet.getStorageReport();
+    StorageContainerDatanodeProtocolProtos.NodeReportProto.Builder nrb
+            = StorageContainerDatanodeProtocolProtos.
+            NodeReportProto.newBuilder();
+    for (int i = 0; i < reports.length; i++) {
+      nrb.addStorageReport(reports[i].getProtoBufMessage());
+    }
+    List<StorageContainerDatanodeProtocolProtos.
+            MetadataStorageReportProto> metadataReport =
+            writeChannel.getStorageReport();
+    if (metadataReport != null) {
+      nrb.addAllMetadataStorageReport(metadataReport);
+    }
+    return nrb.build();
   }
 
   @VisibleForTesting
