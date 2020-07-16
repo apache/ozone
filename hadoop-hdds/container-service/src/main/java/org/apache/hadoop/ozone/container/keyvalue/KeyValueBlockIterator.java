@@ -62,6 +62,9 @@ public class KeyValueBlockIterator implements BlockIterator<BlockData>,
   private KeyPrefixFilter blockFilter;
   private BlockData nextBlock;
   private long containerId;
+  // If true, indicates that the internal iterator position was moved using seek, and our queued
+  // up default block is no longer valid.
+  private boolean wasReset;
 
   /**
    * KeyValueBlockIterator to iterate blocks in a container.
@@ -98,6 +101,7 @@ public class KeyValueBlockIterator implements BlockIterator<BlockData>,
         OzoneConfiguration());
     blockIterator = db.getStore().iterator();
     blockFilter = filter;
+    wasReset = true;
   }
 
   /**
@@ -107,47 +111,61 @@ public class KeyValueBlockIterator implements BlockIterator<BlockData>,
    */
   @Override
   public BlockData nextBlock() throws IOException, NoSuchElementException {
-    if (nextBlock != null) {
-      BlockData currentBlock = nextBlock;
-      nextBlock = null;
-      return currentBlock;
+    if (wasReset) {
+      nextBlock = findNextBlock();
+      wasReset = false;
     }
-    if(hasNext()) {
-      return nextBlock();
+
+    if (nextBlock == null) {
+      throw new NoSuchElementException("Block Iterator reached end for " +
+              "ContainerID " + containerId);
     }
-    throw new NoSuchElementException("Block Iterator reached end for " +
-        "ContainerID " + containerId);
+
+    BlockData result = nextBlock;
+    nextBlock = findNextBlock();
+
+    return result;
+  }
+
+  private BlockData findNextBlock() throws IOException {
+    BlockData foundBlock = null;
+
+    while (blockIterator.hasNext() && foundBlock == null) {
+      KeyValue blockKV = blockIterator.next();
+      if (blockFilter.filterKey(null, blockKV.getKey(), null)) {
+        foundBlock = BlockUtils.getBlockData(blockKV.getValue());
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("Block matching with filter found: blockID is : {} for " +
+                  "containerID {}", foundBlock.getLocalID(), containerId);
+        }
+      }
+    }
+
+    return foundBlock;
   }
 
   @Override
   public boolean hasNext() throws IOException {
-    if (nextBlock != null) {
-      return true;
+    if (wasReset) {
+      nextBlock = findNextBlock();
+      wasReset = false;
     }
-    while (blockIterator.hasNext()) {
-      KeyValue block = blockIterator.next();
-      if (blockFilter.filterKey(null, block.getKey(), null)) {
-        nextBlock = BlockUtils.getBlockData(block.getValue());
-        if (LOG.isTraceEnabled()) {
-          LOG.trace("Block matching with filter found: blockID is : {} for " +
-              "containerID {}", nextBlock.getLocalID(), containerId);
-        }
-        return true;
-      }
-    }
-    return false;
+
+    return (nextBlock != null);
   }
 
   @Override
   public void seekToFirst() {
-    nextBlock = null;
+    // Cannot call findNextBlock() here, as the IOException would break the interface.
     blockIterator.seekToFirst();
+    wasReset = true;
   }
 
   @Override
   public void seekToLast() {
-    nextBlock = null;
+    // Cannot call findNextBlock() here, as the IOException would break the interface.
     blockIterator.seekToLast();
+    wasReset = true;
   }
 
   public void close() {
