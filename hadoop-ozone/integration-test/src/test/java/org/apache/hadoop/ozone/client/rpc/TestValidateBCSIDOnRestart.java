@@ -231,13 +231,10 @@ public class TestValidateBCSIDOnRestart {
     keyValueContainerData = (KeyValueContainerData) containerData;
     ReferenceCountedDB db = BlockUtils.
             getDB(keyValueContainerData, conf);
-    byte[] blockCommitSequenceIdKey =
-            StringUtils.
-                    string2Bytes(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
 
     // modify the bcsid for the container in the ROCKS DB thereby inducing
     // corruption
-    db.getStore().put(blockCommitSequenceIdKey, Longs.toByteArray(0));
+    db.getStore().getMetadataTable().put(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX, 0L);
     db.decrementReference();
     // after the restart, there will be a mismatch in BCSID of what is recorded
     // in the and what is there in RockSDB and hence the container would be
