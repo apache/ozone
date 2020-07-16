@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
@@ -191,8 +192,9 @@ public class TestBlockManager {
         .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor, OzoneConsts.OZONE,
             excludeList);
     Assert.assertNotNull(block);
-    Assert.assertNotEquals(block.getPipeline().getId(),
-        excludeList.getPipelineIds().get(0));
+    for (PipelineID id : excludeList.getPipelineIds()) {
+      Assert.assertNotEquals(block.getPipeline().getId(), id);
+    }
 
     for (Pipeline pipeline : pipelineManager.getPipelines(type, factor)) {
       excludeList.addPipeline(pipeline.getId());

@@ -47,8 +47,8 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_LEVELDB;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_ROCKSDB;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_LEVELDB;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
 
 /**
  * Class to run integrity checks on Datanode Containers.
@@ -186,8 +186,8 @@ public class KeyValueContainerCheck {
     }
 
     dbType = onDiskContainerData.getContainerDBType();
-    if (!dbType.equals(OZONE_METADATA_STORE_IMPL_ROCKSDB) &&
-        !dbType.equals(OZONE_METADATA_STORE_IMPL_LEVELDB)) {
+    if (!dbType.equals(CONTAINER_DB_TYPE_ROCKSDB) &&
+        !dbType.equals(CONTAINER_DB_TYPE_LEVELDB)) {
       String errStr = "Unknown DBType [" + dbType
           + "] in Container File for  [" + containerID + "]";
       throw new IOException(errStr);

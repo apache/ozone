@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -34,6 +35,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -59,6 +62,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
 
@@ -514,6 +518,63 @@ public class BasicRootedOzoneClientAdapterImpl
       }
       throw e;
     }
+  }
+
+  /**
+   * Get trash roots for current user or all users.
+   *
+   * Note:
+   * 1. When allUsers flag is false, this only returns the trash roots for
+   * those that the current user has access to.
+   * 2. Also it is not particularly efficient to use this API when there are
+   * a lot of volumes and buckets as the client has to iterate through all
+   * buckets in all volumes.
+   *
+   * @param allUsers return trashRoots of all users if true, used by emptier
+   * @param fs Pointer to the current OFS FileSystem
+   * @return
+   */
+  public Collection<FileStatus> getTrashRoots(boolean allUsers,
+      BasicRootedOzoneFileSystem fs) {
+    List<FileStatus> ret = new ArrayList<>();
+    try {
+      Iterator<? extends OzoneVolume> iterVol;
+      String username = UserGroupInformation.getCurrentUser().getUserName();
+      if (allUsers) {
+        iterVol = objectStore.listVolumes("");
+      } else {
+        iterVol = objectStore.listVolumesByUser(username, "", "");
+      }
+      while (iterVol.hasNext()) {
+        OzoneVolume volume = iterVol.next();
+        Path volumePath = new Path(OZONE_URI_DELIMITER, volume.getName());
+        Iterator<? extends OzoneBucket> bucketIter = volume.listBuckets("");
+        while (bucketIter.hasNext()) {
+          OzoneBucket bucket = bucketIter.next();
+          Path bucketPath = new Path(volumePath, bucket.getName());
+          Path trashRoot = new Path(bucketPath, FileSystem.TRASH_PREFIX);
+          if (allUsers) {
+            if (fs.exists(trashRoot)) {
+              for (FileStatus candidate : fs.listStatus(trashRoot)) {
+                if (fs.exists(candidate.getPath()) && candidate.isDirectory()) {
+                  ret.add(candidate);
+                }
+              }
+            }
+          } else {
+            Path userTrash = new Path(trashRoot, username);
+            if (fs.exists(userTrash) &&
+                fs.getFileStatus(userTrash).isDirectory()) {
+              ret.add(fs.getFileStatus(userTrash));
+            }
+          }
+        }
+      }
+    } catch (IOException ex) {
+      LOG.warn("Can't get all trash roots", ex);
+      return Collections.emptyList();
+    }
+    return ret;
   }
 
   @Override

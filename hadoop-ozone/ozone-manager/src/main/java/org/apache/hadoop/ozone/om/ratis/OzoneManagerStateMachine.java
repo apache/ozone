@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.ratis;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
@@ -64,7 +63,6 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.METADATA_ERROR;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.REPLAY;
 
 /**
  * The OM StateMachine is the state machine for OM Ratis server. It is
@@ -107,13 +105,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     this.snapshotInfo = ozoneManager.getSnapshotInfo();
     loadSnapshotInfoFromDB();
 
-    this.ozoneManagerDoubleBuffer = new OzoneManagerDoubleBuffer.Builder()
-        .setOmMetadataManager(ozoneManager.getMetadataManager())
-        .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
-        .enableRatis(true)
-        .enableTracing(isTracingEnabled)
-        .setIndexToTerm(this::getTermForIndex)
-        .build();
+    this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
 
     this.handler = new OzoneManagerRequestHandler(ozoneManager,
         ozoneManagerDoubleBuffer);
@@ -144,7 +136,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   @Override
   public SnapshotInfo getLatestSnapshot() {
-    LOG.info("Latest Snapshot Info {}", snapshotInfo);
+    LOG.debug("Latest Snapshot Info {}", snapshotInfo);
     return snapshotInfo;
   }
 
@@ -264,12 +256,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
             terminate(omResponse, OMException.ResultCodes.INTERNAL_ERROR);
           } else if (omResponse.getStatus() == METADATA_ERROR) {
             terminate(omResponse, OMException.ResultCodes.METADATA_ERROR);
-          } else if (omResponse.getStatus() == REPLAY) {
-            // For replay we do not add response to double buffer, so update
-            // LastAppliedIndex for the replay transactions here.
-            computeAndUpdateLastAppliedIndex(trxLogIndex,
-                trx.getLogEntry().getTerm(), Lists.newArrayList(trxLogIndex),
-                true);
           }
         }
 
@@ -329,17 +315,21 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   public void unpause(long newLastAppliedSnaphsotIndex,
       long newLastAppliedSnapShotTermIndex) {
     getLifeCycle().startAndTransition(() -> {
-      this.ozoneManagerDoubleBuffer =
-          new OzoneManagerDoubleBuffer.Builder()
-              .setOmMetadataManager(ozoneManager.getMetadataManager())
-              .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
-              .enableRatis(true)
-              .enableTracing(isTracingEnabled)
-              .build();
+      this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
       handler.updateDoubleBuffer(ozoneManagerDoubleBuffer);
       this.setLastAppliedTermIndex(TermIndex.newTermIndex(
           newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
     });
+  }
+
+  public OzoneManagerDoubleBuffer buildDoubleBufferForRatis() {
+    return new OzoneManagerDoubleBuffer.Builder()
+        .setOmMetadataManager(ozoneManager.getMetadataManager())
+        .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
+        .setIndexToTerm(this::getTermForIndex)
+        .enableRatis(true)
+        .enableTracing(isTracingEnabled)
+        .build();
   }
 
   /**

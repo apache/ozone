@@ -37,7 +37,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenewDe
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpdateRenewDelegationTokenRequest;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
-import org.apache.hadoop.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
+import org.apache.hadoop.ozone.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -67,7 +67,8 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
     RenewDelegationTokenResponseProto.Builder renewResponse =
         RenewDelegationTokenResponseProto.newBuilder();
 
-    renewResponse.setResponse(org.apache.hadoop.security.proto.SecurityProtos
+    renewResponse.setResponse(
+            org.apache.hadoop.ozone.security.proto.SecurityProtos
         .RenewDelegationTokenResponseProto.newBuilder()
         .setNewExpiryTime(renewTime));
 

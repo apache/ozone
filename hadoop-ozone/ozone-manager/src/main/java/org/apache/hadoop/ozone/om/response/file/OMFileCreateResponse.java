@@ -34,12 +34,12 @@ public class OMFileCreateResponse extends OMKeyCreateResponse {
 
   public OMFileCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo,
-      List<OmKeyInfo> parentKeyInfos, long openKeySessionID) {
+      @Nonnull List<OmKeyInfo> parentKeyInfos, long openKeySessionID) {
     super(omResponse, omKeyInfo, parentKeyInfos, openKeySessionID);
   }
 
   /**
-   * For when the request is not successful or it is a replay transaction.
+   * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
   public OMFileCreateResponse(@Nonnull OMResponse omResponse) {

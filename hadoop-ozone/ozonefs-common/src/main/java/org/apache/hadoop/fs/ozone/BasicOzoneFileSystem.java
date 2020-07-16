@@ -51,6 +51,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -604,6 +605,52 @@ public class BasicOzoneFileSystem extends FileSystem {
    */
   public String getUsername() {
     return userName;
+  }
+
+  /**
+   * Get the root directory of Trash for a path.
+   * Returns /.Trash/<username>
+   * Caller appends either Current or checkpoint timestamp for trash destination
+   * @param path the trash root of the path to be determined.
+   * @return trash root
+   */
+  @Override
+  public Path getTrashRoot(Path path) {
+    final Path pathToTrash = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
+    return new Path(pathToTrash, getUsername());
+  }
+
+  /**
+   * Get all the trash roots for current user or all users.
+   *
+   * @param allUsers return trash roots for all users if true.
+   * @return all the trash root directories.
+   *         Returns .Trash of users if {@code /.Trash/$USER} exists.
+   */
+  @Override
+  public Collection<FileStatus> getTrashRoots(boolean allUsers) {
+    Path trashRoot = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
+    List<FileStatus> ret = new ArrayList<>();
+    try {
+      if (!allUsers) {
+        Path userTrash = new Path(trashRoot, userName);
+        if (exists(userTrash) && getFileStatus(userTrash).isDirectory()) {
+          ret.add(getFileStatus(userTrash));
+        }
+      } else {
+        if (exists(trashRoot)) {
+          FileStatus[] candidates = listStatus(trashRoot);
+          for (FileStatus candidate : candidates) {
+            if (candidate.isDirectory()) {
+              ret.add(candidate);
+            }
+          }
+        }
+      }
+    } catch (IOException ex) {
+      LOG.warn("Can't get all trash roots", ex);
+    }
+    return ret;
   }
 
   /**

@@ -27,7 +27,6 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -151,122 +150,6 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
     // The keys should not exist in the DeletedKeys table
     for (String deletedKey : deletedKeyNames) {
       Assert.assertFalse(omMetadataManager.getDeletedTable().isExist(
-          deletedKey));
-    }
-  }
-
-  @Test
-  public void testPurgeKeysAcrossBuckets() throws Exception {
-    String bucket1 = bucketName;
-    String bucket2 = UUID.randomUUID().toString();
-
-    // bucket1 is created during setup. Create bucket2 manually.
-    TestOMRequestUtils.addBucketToDB(volumeName, bucket2, omMetadataManager);
-
-    // Create and Delete keys in Bucket1 and Bucket2.
-    List<String> deletedKeyInBucket1 = createAndDeleteKeys(1, bucket1);
-    List<String> deletedKeyInBucket2 = createAndDeleteKeys(1, bucket2);
-    List<String> deletedKeyNames = new ArrayList<>();
-    deletedKeyNames.addAll(deletedKeyInBucket1);
-    deletedKeyNames.addAll(deletedKeyInBucket2);
-
-    // The keys should be present in the DeletedKeys table before purging
-    for (String deletedKey : deletedKeyNames) {
-      Assert.assertTrue(omMetadataManager.getDeletedTable().isExist(
-          deletedKey));
-    }
-
-    // Create PurgeKeysRequest to purge the deleted keys
-    DeletedKeys deletedKeysInBucket1 = DeletedKeys.newBuilder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucket1)
-        .addAllKeys(deletedKeyInBucket1)
-        .build();
-    DeletedKeys deletedKeysInBucket2 = DeletedKeys.newBuilder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucket2)
-        .addAllKeys(deletedKeyInBucket1)
-        .build();
-    PurgeKeysRequest purgeKeysRequest = PurgeKeysRequest.newBuilder()
-        .addDeletedKeys(deletedKeysInBucket1)
-        .addDeletedKeys(deletedKeysInBucket2)
-        .build();
-
-    OMRequest omRequest = OMRequest.newBuilder()
-        .setPurgeKeysRequest(purgeKeysRequest)
-        .setCmdType(Type.PurgeKeys)
-        .setClientId(UUID.randomUUID().toString())
-        .build();
-
-    OMRequest preExecutedRequest = preExecute(omRequest);
-    OMKeyPurgeRequest omKeyPurgeRequest =
-        new OMKeyPurgeRequest(preExecutedRequest);
-
-    omKeyPurgeRequest.validateAndUpdateCache(ozoneManager, 100L,
-        ozoneManagerDoubleBufferHelper);
-
-    OMResponse omResponse = OMResponse.newBuilder()
-        .setPurgeKeysResponse(PurgeKeysResponse.getDefaultInstance())
-        .setCmdType(Type.PurgeKeys)
-        .setStatus(Status.OK)
-        .build();
-
-    BatchOperation batchOperation =
-        omMetadataManager.getStore().initBatchOperation();
-
-    OMKeyPurgeResponse omKeyPurgeResponse = new OMKeyPurgeResponse(
-        omResponse, deletedKeyNames);
-    omKeyPurgeResponse.addToDBBatch(omMetadataManager, batchOperation);
-
-    // Do manual commit and see whether addToBatch is successful or not.
-    omMetadataManager.getStore().commitBatchOperation(batchOperation);
-
-    // The keys should not exist in the DeletedKeys table
-    for (String deletedKey : deletedKeyNames) {
-      Assert.assertFalse(omMetadataManager.getDeletedTable().isExist(
-          deletedKey));
-    }
-  }
-
-  @Test
-  public void testReplayRequest() throws Exception {
-
-    // Create and Delete keys. The keys should be moved to DeletedKeys table
-    Integer trxnLogIndex = new Integer(1);
-    List<String> deletedKeyNames = createAndDeleteKeys(trxnLogIndex, null);
-    int purgeRequestTrxnLogIndex = ++trxnLogIndex;
-
-    // The keys should be present in the DeletedKeys table before purging
-    for (String deletedKey : deletedKeyNames) {
-      Assert.assertTrue(omMetadataManager.getDeletedTable().isExist(
-          deletedKey));
-    }
-
-    // Execute PurgeKeys request to purge the keys from Deleted table.
-    // Create PurgeKeysRequest to replay the purge request
-    OMRequest omRequest = createPurgeKeysRequest(deletedKeyNames);
-    OMRequest preExecutedRequest = preExecute(omRequest);
-    OMKeyPurgeRequest omKeyPurgeRequest =
-        new OMKeyPurgeRequest(preExecutedRequest);
-    OMClientResponse omClientResponse = omKeyPurgeRequest
-        .validateAndUpdateCache(ozoneManager, purgeRequestTrxnLogIndex,
-            ozoneManagerDoubleBufferHelper);
-
-    Assert.assertTrue(omClientResponse.getOMResponse().getStatus().equals(
-        Status.OK));
-
-    // Create and delete the same keys again
-    createAndDeleteKeys(++trxnLogIndex, null);
-
-    // Replay the PurgeKeys request. It should not purge the keys deleted
-    // after the original request was played.
-    OMClientResponse replayResponse = omKeyPurgeRequest
-        .validateAndUpdateCache(ozoneManager, purgeRequestTrxnLogIndex,
-            ozoneManagerDoubleBufferHelper);
-
-    // Verify that the new deletedKeys exist in the DeletedKeys table
-    for (String deletedKey : deletedKeyNames) {
-      Assert.assertTrue(omMetadataManager.getDeletedTable().isExist(
           deletedKey));
     }
   }

@@ -32,7 +32,6 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.io.retry.RetryPolicies;
@@ -197,6 +196,23 @@ public final class HddsClientUtils {
   }
 
   /**
+   * verifies that key name is a valid name.
+   *
+   * @param keyName key name to be validated
+   *
+   * @throws IllegalArgumentException
+   */
+  public static void verifyKeyName(String keyName) {
+    if (keyName == null) {
+      throw new IllegalArgumentException("Key name is null");
+    }
+    if(!OzoneConsts.KEYNAME_ILLEGAL_CHARACTER_CHECK_REGEX
+            .matcher(keyName).matches()){
+      throw new IllegalArgumentException("Invalid key name: " + keyName);
+    }
+  }
+
+  /**
    * Checks that object parameters passed as reference is not null.
    *
    * @param references Array of object references to be checked.
@@ -233,7 +249,7 @@ public final class HddsClientUtils {
    * Standalone and Ratis client.
    */
   public static int getMaxOutstandingRequests(ConfigurationSource config) {
-    return OzoneConfiguration.of(config)
+    return config
         .getObject(RatisClientConfig.RaftConfig.class)
         .getMaxOutstandingRequests();
   }

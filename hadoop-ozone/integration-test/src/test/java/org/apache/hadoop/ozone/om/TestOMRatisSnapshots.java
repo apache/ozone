@@ -49,7 +49,7 @@ import org.junit.rules.Timeout;
 /**
  * Tests the Ratis snaphsots feature in OM.
  */
-@Ignore
+@Ignore("HDDS-3966")
 public class TestOMRatisSnapshots {
 
   private MiniOzoneHAClusterImpl cluster = null;

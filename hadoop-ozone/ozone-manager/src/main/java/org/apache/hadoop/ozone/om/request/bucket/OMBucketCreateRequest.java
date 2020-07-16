@@ -69,6 +69,8 @@ import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -167,27 +169,13 @@ public class OMBucketCreateRequest extends OMClientRequest {
       //Check if the volume exists
       if (omVolumeArgs == null) {
         LOG.debug("volume: {} not found ", volumeName);
-        throw new OMException("Volume doesn't exist",
-            OMException.ResultCodes.VOLUME_NOT_FOUND);
+        throw new OMException("Volume doesn't exist", VOLUME_NOT_FOUND);
       }
 
       //Check if bucket already exists
-      OmBucketInfo dbBucketInfo = metadataManager.getBucketTable()
-          .getReadCopy(bucketKey);
-      if (dbBucketInfo != null) {
-        // Check if this transaction is a replay of ratis logs.
-        if (isReplay(ozoneManager, dbBucketInfo, transactionLogIndex)) {
-          // Replay implies the response has already been returned to
-          // the client. So take no further action and return a dummy
-          // OMClientResponse.
-          LOG.debug("Replayed Transaction {} ignored. Request: {}",
-              transactionLogIndex, createBucketRequest);
-          return new OMBucketCreateResponse(createReplayOMResponse(omResponse));
-        } else {
-          LOG.debug("bucket: {} already exists ", bucketName);
-          throw new OMException("Bucket already exist",
-              OMException.ResultCodes.BUCKET_ALREADY_EXISTS);
-        }
+      if (metadataManager.getBucketTable().isExist(bucketKey)) {
+        LOG.debug("bucket: {} already exists ", bucketName);
+        throw new OMException("Bucket already exist", BUCKET_ALREADY_EXISTS);
       }
 
       // Add objectID and updateID
@@ -211,7 +199,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
     } catch (IOException ex) {
       exception = ex;
       omClientResponse = new OMBucketCreateResponse(
-          createErrorOMResponse(omResponse, exception), omBucketInfo);
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);
