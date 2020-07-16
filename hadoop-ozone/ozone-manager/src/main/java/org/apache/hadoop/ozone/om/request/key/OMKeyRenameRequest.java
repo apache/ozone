@@ -90,7 +90,8 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     // Set modification time and normalize key if needed.
     KeyArgs.Builder newKeyArgs = renameKeyArgs.toBuilder()
             .setModificationTime(Time.now())
-        .setKeyName(validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
+        .setKeyName(validateAndNormalizeKey(
+            ozoneManager.getEnableFileSystemPaths(),
             renameKeyArgs.getKeyName()));
 
     return getOmRequest().toBuilder()
