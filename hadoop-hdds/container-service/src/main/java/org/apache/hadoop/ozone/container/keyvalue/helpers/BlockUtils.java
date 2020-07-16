@@ -41,7 +41,6 @@ public final class BlockUtils {
   private BlockUtils() {
 
   }
-
   /**
    * Get a DB handler for a given container.
    * If the handler doesn't exist in cache yet, first create one and
@@ -54,24 +53,7 @@ public final class BlockUtils {
    * @throws StorageContainerException
    */
   public static ReferenceCountedDB getDB(KeyValueContainerData containerData,
-      ConfigurationSource conf) throws
-      StorageContainerException {
-    return getDB(containerData, conf, true);
-  }
-  /**
-   * Get a DB handler for a given container.
-   * If the handler doesn't exist in cache yet, first create one and
-   * add into cache. This function is called with containerManager
-   * ReadLock held.
-   *
-   * @param containerData containerData.
-   * @param conf configuration.
-   * @param acquireLock carefully set this to false
-   * @return MetadataStore handle.
-   * @throws StorageContainerException
-   */
-  public static ReferenceCountedDB getDB(KeyValueContainerData containerData,
-      ConfigurationSource conf, boolean acquireLock) throws
+                                    ConfigurationSource conf) throws
       StorageContainerException {
     Preconditions.checkNotNull(containerData);
     ContainerCache cache = ContainerCache.getInstance(conf);
@@ -80,7 +62,7 @@ public final class BlockUtils {
     try {
       return cache.getDB(containerData.getContainerID(), containerData
           .getContainerDBType(), containerData.getDbFile().getAbsolutePath(),
-          conf, acquireLock);
+          conf);
     } catch (IOException ex) {
       String message = String.format("Error opening DB. Container:%s " +
           "ContainerPath:%s", containerData.getContainerID(), containerData

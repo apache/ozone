@@ -142,21 +142,7 @@ public final class KeyValueContainerUtil {
    * @throws IOException
    */
   public static void parseKVContainerData(KeyValueContainerData kvContainerData,
-     ConfigurationSource config) throws IOException {
-    parseKVContainerData(kvContainerData, config, true);
-  }
-  /**
-   * Parse KeyValueContainerData and verify checksum. Set block related
-   * metadata like block commit sequence id, block count, bytes used and
-   * pending delete block count and delete transaction id.
-   * @param kvContainerData
-   * @param config
-   * @param acquireContainerCacheLock carefully set this to false
-   * @throws IOException
-   */
-  public static void parseKVContainerData(KeyValueContainerData kvContainerData,
-      ConfigurationSource config, boolean acquireContainerCacheLock)
-      throws IOException {
+      ConfigurationSource config) throws IOException {
 
     long containerID = kvContainerData.getContainerID();
     File metadataPath = new File(kvContainerData.getMetadataPath());
@@ -178,7 +164,7 @@ public final class KeyValueContainerUtil {
     boolean isBlockMetadataSet = false;
 
     try(ReferenceCountedDB containerDB = BlockUtils.getDB(kvContainerData,
-        config, acquireContainerCacheLock)) {
+        config)) {
 
       // Set pending deleted block count.
       byte[] pendingDeleteBlockCount =

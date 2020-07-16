@@ -113,55 +113,55 @@ public final class ContainerCache extends LRUMap {
    * @return ReferenceCountedDB.
    */
   public ReferenceCountedDB getDB(long containerID, String containerDBType,
-      String containerDBPath, ConfigurationSource conf)
-      throws IOException {
-    return getDB(containerID, containerDBType, containerDBPath, conf, true);
-  }
-  /**
-   * Returns a DB handle if available, create the handler otherwise.
-   *
-   * @param containerID - ID of the container.
-   * @param containerDBType - DB type of the container.
-   * @param containerDBPath - DB path of the container.
-   * @param acquireLock - false only for one-time ContainerReader execution
-   *                    during datanode initialization. Don't set it to false
-   *                    in other cases.
-   * @param conf - Hadoop Configuration.
-   * @return ReferenceCountedDB.
-   */
-  public ReferenceCountedDB getDB(long containerID, String containerDBType,
-      String containerDBPath, ConfigurationSource conf, boolean acquireLock)
+                             String containerDBPath, ConfigurationSource conf)
       throws IOException {
     Preconditions.checkState(containerID >= 0,
         "Container ID cannot be negative.");
     ReferenceCountedDB db;
-    if (acquireLock) {
-      lock.lock();
-    }
+    lock.lock();
     try {
       db = (ReferenceCountedDB) this.get(containerDBPath);
-      if (db == null) {
-        MetadataStore metadataStore =
-            MetadataStoreBuilder.newBuilder()
-                .setDbFile(new File(containerDBPath))
-                .setCreateIfMissing(false)
-                .setConf(conf)
-                .setDBType(containerDBType)
-                .build();
-        db = new ReferenceCountedDB(metadataStore, containerDBPath);
-        this.put(containerDBPath, db);
+      if (db != null) {
+        db.incrementReference();
+        return db;
       }
-      // increment the reference before returning the object
-      db.incrementReference();
-      return db;
+    } finally {
+      lock.unlock();
+    }
+
+    try {
+      MetadataStore metadataStore =
+          MetadataStoreBuilder.newBuilder()
+              .setDbFile(new File(containerDBPath))
+              .setCreateIfMissing(false)
+              .setConf(conf)
+              .setDBType(containerDBType)
+              .build();
+      db = new ReferenceCountedDB(metadataStore, containerDBPath);
     } catch (Exception e) {
       LOG.error("Error opening DB. Container:{} ContainerPath:{}",
           containerID, containerDBPath, e);
       throw e;
-    } finally {
-      if (acquireLock) {
-        lock.unlock();
+    }
+
+    lock.lock();
+    try {
+      ReferenceCountedDB currentDB =
+          (ReferenceCountedDB) this.get(containerDBPath);
+      if (currentDB != null) {
+        // increment the reference before returning the object
+        currentDB.incrementReference();
+        // clean the db created in previous step
+        db.cleanup();
+        return currentDB;
+      } else {
+        this.put(containerDBPath, db);
+        // increment the reference before returning the object
+        db.incrementReference();
+        return db;
       }
+    } finally {
+      lock.unlock();
     }
   }
 
