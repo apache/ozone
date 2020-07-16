@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.om.codec;
 
 import com.google.common.base.Preconditions;
+import com.google.protobuf.InvalidProtocolBufferException;
+
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.hdds.utils.db.Codec;
 
@@ -44,6 +46,13 @@ public class TokenIdentifierCodec implements Codec<OzoneTokenIdentifier> {
     try {
       OzoneTokenIdentifier object = OzoneTokenIdentifier.newInstance();
       return object.fromUniqueSerializedKey(rawData);
+    } catch (IOException ex) {
+      try {
+        return OzoneTokenIdentifier.readProtoBuf(rawData);
+      } catch (InvalidProtocolBufferException e) {
+        throw new IllegalArgumentException(
+            "Can't encode the the raw data from the byte array", e);
+      }
     } catch (BufferUnderflowException e) {
       throw new IllegalArgumentException(
           "Can't encode the the raw data from the byte array", e);
