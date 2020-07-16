@@ -117,10 +117,11 @@ public class TestBlockOutputStreamWithFailures {
 
     conf.setBoolean(OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY, false);
 
-    RatisClientConfig clientConfig = conf.getObject(RatisClientConfig.class);
-    clientConfig.setWriteRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(30));
-    clientConfig.setWatchRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(30));
-    conf.setFromObject(clientConfig);
+    RatisClientConfig ratisClientConfig =
+        conf.getObject(RatisClientConfig.class);
+    ratisClientConfig.setWriteRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(30));
+    ratisClientConfig.setWatchRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(30));
+    conf.setFromObject(ratisClientConfig);
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(7)
         .setTotalPipelineNumLimit(10).setBlockSize(blockSize)

@@ -96,10 +96,11 @@ public class TestFailureHandlingByClientFlushDelay {
     blockSize = 4 * chunkSize;
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 100, TimeUnit.SECONDS);
 
-    RatisClientConfig clientConfig = conf.getObject(RatisClientConfig.class);
-    clientConfig.setWriteRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(30));
-    clientConfig.setWatchRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(30));
-    conf.setFromObject(clientConfig);
+    RatisClientConfig ratisClientConfig =
+        conf.getObject(RatisClientConfig.class);
+    ratisClientConfig.setWriteRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(30));
+    ratisClientConfig.setWatchRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(30));
+    conf.setFromObject(ratisClientConfig);
 
     conf.setTimeDuration(
         OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,

@@ -130,10 +130,11 @@ public class TestDeleteWithSlowFollower {
     conf.setTimeDuration(OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
         1, TimeUnit.SECONDS);
 
-    RatisClientConfig clientConfig = conf.getObject(RatisClientConfig.class);
-    clientConfig.setWriteRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(30));
-    clientConfig.setWatchRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(30));
-    conf.setFromObject(clientConfig);
+    RatisClientConfig ratisClientConfig =
+        conf.getObject(RatisClientConfig.class);
+    ratisClientConfig.setWriteRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(30));
+    ratisClientConfig.setWatchRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(30));
+    conf.setFromObject(ratisClientConfig);
 
     conf.setQuietMode(false);
     int numOfDatanodes = 3;

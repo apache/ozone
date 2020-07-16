@@ -121,10 +121,11 @@ public class TestContainerStateMachineFailures {
     conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 1,
         TimeUnit.SECONDS);
 
-    RatisClientConfig clientConfig = conf.getObject(RatisClientConfig.class);
-    clientConfig.setWriteRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(10));
-    clientConfig.setWatchRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(10));
-    conf.setFromObject(clientConfig);
+    RatisClientConfig ratisClientConfig =
+        conf.getObject(RatisClientConfig.class);
+    ratisClientConfig.setWriteRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(10));
+    ratisClientConfig.setWatchRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(10));
+    conf.setFromObject(ratisClientConfig);
 
     DatanodeRatisServerConfig ratisServerConfig =
         conf.getObject(DatanodeRatisServerConfig.class);

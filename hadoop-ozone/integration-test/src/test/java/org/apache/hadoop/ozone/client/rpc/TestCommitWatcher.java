@@ -119,10 +119,11 @@ public class TestCommitWatcher {
     raftClientConfig.setRpcWatchRequestTimeout(TimeUnit.SECONDS.toMillis(3));
     conf.setFromObject(raftClientConfig);
 
-    RatisClientConfig clientConfig = conf.getObject(RatisClientConfig.class);
-    clientConfig.setWriteRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(30));
-    clientConfig.setWatchRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(30));
-    conf.setFromObject(clientConfig);
+    RatisClientConfig ratisClientConfig =
+        conf.getObject(RatisClientConfig.class);
+    ratisClientConfig.setWriteRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(30));
+    ratisClientConfig.setWatchRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(30));
+    conf.setFromObject(ratisClientConfig);
 
     conf.set(OzoneConfigKeys.OZONE_CLIENT_CHECKSUM_TYPE, "NONE");
     conf.setQuietMode(false);
