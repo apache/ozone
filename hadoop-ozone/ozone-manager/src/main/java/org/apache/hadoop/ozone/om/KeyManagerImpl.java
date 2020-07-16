@@ -638,48 +638,53 @@ public class KeyManagerImpl implements KeyManager {
     String keyName = args.getKeyName();
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
+    OmKeyInfo value = null;
     try {
       String keyBytes = metadataManager.getOzoneKey(
           volumeName, bucketName, keyName);
-      OmKeyInfo value = metadataManager.getKeyTable().get(keyBytes);
-      if (value == null) {
-        LOG.debug("volume:{} bucket:{} Key:{} not found",
-            volumeName, bucketName, keyName);
-        throw new OMException("Key not found",
-            KEY_NOT_FOUND);
-      }
-      if (grpcBlockTokenEnabled) {
-        String remoteUser = getRemoteUser().getShortUserName();
-        for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
-          key.getLocationList().forEach(k -> {
-            k.setToken(secretManager.generateToken(remoteUser,
-                k.getBlockID().getContainerBlockID().toString(),
-                getAclForUser(remoteUser),
-                k.getLength()));
-          });
-        }
-      }
-      // Refresh container pipeline info from SCM
-      // based on OmKeyArgs.refreshPipeline flag
-      if (args.getRefreshPipeline()) {
-        refreshPipeline(value);
-      }
-      if (args.getSortDatanodes()) {
-        sortDatanodeInPipeline(value, clientAddress);
-      }
-      return value;
+      value = metadataManager.getKeyTable().get(keyBytes);
     } catch (IOException ex) {
       if (ex instanceof OMException) {
         throw ex;
       }
-      LOG.debug("Get key failed for volume:{} bucket:{} key:{}",
-          volumeName, bucketName, keyName, ex);
-      throw new OMException(ex.getMessage(),
-          KEY_NOT_FOUND);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Get key failed for volume:{} bucket:{} key:{}", volumeName,
+                bucketName, keyName, ex);
+      }
+      throw new OMException(ex.getMessage(), KEY_NOT_FOUND);
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
     }
+
+    if (value == null) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("volume:{} bucket:{} Key:{} not found", volumeName,
+                bucketName, keyName);
+      }
+      throw new OMException("Key not found", KEY_NOT_FOUND);
+    }
+    if (grpcBlockTokenEnabled) {
+      String remoteUser = getRemoteUser().getShortUserName();
+      for (OmKeyLocationInfoGroup key : value.getKeyLocationVersions()) {
+        key.getLocationList().forEach(k -> {
+          k.setToken(secretManager.generateToken(remoteUser,
+                  k.getBlockID().getContainerBlockID().toString(),
+                  getAclForUser(remoteUser), k.getLength()));
+        });
+      }
+    }
+
+    // Refresh container pipeline info from SCM
+    // based on OmKeyArgs.refreshPipeline flag
+    // value won't be null as the check is done inside try/catch block.
+    if (args.getRefreshPipeline()) {
+      refreshPipeline(value);
+    }
+    if (args.getSortDatanodes()) {
+      sortDatanodeInPipeline(value, clientAddress);
+    }
+    return value;
   }
 
   /**
@@ -1695,6 +1700,18 @@ public class KeyManagerImpl implements KeyManager {
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
 
+    return getOzoneFileStatus(volumeName, bucketName, keyName,
+            args.getRefreshPipeline(), false, null);
+  }
+
+  private OzoneFileStatus getOzoneFileStatus(String volumeName,
+                                             String bucketName,
+                                             String keyName,
+                                             boolean refreshPipeline,
+                                             boolean sortDatanodes,
+                                             String clientAddress)
+      throws IOException {
+    OmKeyInfo fileKeyInfo = null;
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
@@ -1706,36 +1723,44 @@ public class KeyManagerImpl implements KeyManager {
 
       // Check if the key is a file.
       String fileKeyBytes = metadataManager.getOzoneKey(
-          volumeName, bucketName, keyName);
-      OmKeyInfo fileKeyInfo = metadataManager.getKeyTable().get(fileKeyBytes);
-      if (fileKeyInfo != null) {
-        if (args.getRefreshPipeline()) {
-          refreshPipeline(fileKeyInfo);
+              volumeName, bucketName, keyName);
+      fileKeyInfo = metadataManager.getKeyTable().get(fileKeyBytes);
+
+      // Check if the key is a directory.
+      if (fileKeyInfo == null) {
+        String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
+        String dirKeyBytes = metadataManager.getOzoneKey(
+                volumeName, bucketName, dirKey);
+        OmKeyInfo dirKeyInfo = metadataManager.getKeyTable().get(dirKeyBytes);
+        if (dirKeyInfo != null) {
+          return new OzoneFileStatus(dirKeyInfo, scmBlockSize, true);
         }
-        // this is a file
-        return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
       }
-
-      String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
-      String dirKeyBytes = metadataManager.getOzoneKey(
-          volumeName, bucketName, dirKey);
-      OmKeyInfo dirKeyInfo = metadataManager.getKeyTable().get(dirKeyBytes);
-      if (dirKeyInfo != null) {
-        return new OzoneFileStatus(dirKeyInfo, scmBlockSize, true);
-      }
-
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Unable to get file status for the key: volume: {}, bucket:" +
-                " {}, key: {}, with error: No such file exists.", volumeName,
-            bucketName, keyName);
-      }
-      throw new OMException("Unable to get file status: volume: " +
-          volumeName + " bucket: " + bucketName + " key: " + keyName,
-          FILE_NOT_FOUND);
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
-          bucketName);
+              bucketName);
+
+      // if the key is a file then do refresh pipeline info in OM by asking SCM
+      if (fileKeyInfo != null) {
+        if (refreshPipeline) {
+          refreshPipeline(fileKeyInfo);
+        }
+        if (sortDatanodes) {
+          sortDatanodeInPipeline(fileKeyInfo, clientAddress);
+        }
+        return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
+      }
     }
+
+    // Key is not found, throws exception
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Unable to get file status for the key: volume: {}, bucket:" +
+                      " {}, key: {}, with error: No such file exists.",
+              volumeName, bucketName, keyName);
+    }
+    throw new OMException("Unable to get file status: volume: " +
+            volumeName + " bucket: " + bucketName + " key: " + keyName,
+            FILE_NOT_FOUND);
   }
 
   /**
@@ -1877,26 +1902,13 @@ public class KeyManagerImpl implements KeyManager {
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
-
-    metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
-        bucketName);
-    try {
-      OzoneFileStatus fileStatus = getFileStatus(args);
-      if (fileStatus.isFile()) {
-        if (args.getRefreshPipeline()) {
-          refreshPipeline(fileStatus.getKeyInfo());
-        }
-        if (args.getSortDatanodes()) {
-          sortDatanodeInPipeline(fileStatus.getKeyInfo(), clientAddress);
-        }
-        return fileStatus.getKeyInfo();
-      }
+    OzoneFileStatus fileStatus = getOzoneFileStatus(volumeName, bucketName,
+            keyName, args.getRefreshPipeline(), args.getSortDatanodes(),
+            clientAddress);
       //if key is not of type file or if key is not found we throw an exception
-    } finally {
-      metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
-          bucketName);
+    if (fileStatus.isFile()) {
+      return fileStatus.getKeyInfo();
     }
-
     throw new OMException("Can not write to directory: " + keyName,
         ResultCodes.NOT_A_FILE);
   }
@@ -2067,9 +2079,6 @@ public class KeyManagerImpl implements KeyManager {
       for (Map.Entry<String, OzoneFileStatus> entry : cacheKeyMap.entrySet()) {
         // No need to check if a key is deleted or not here, this is handled
         // when adding entries to cacheKeyMap from DB.
-        if (args.getRefreshPipeline()) {
-          refreshPipeline(entry.getValue().getKeyInfo());
-        }
         fileStatusList.add(entry.getValue());
         countEntries++;
         if (countEntries >= numEntries) {
@@ -2082,6 +2091,11 @@ public class KeyManagerImpl implements KeyManager {
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
+    }
+    if (args.getRefreshPipeline()) {
+      for(OzoneFileStatus fileStatus : fileStatusList){
+        refreshPipeline(fileStatus.getKeyInfo());
+      }
     }
     return fileStatusList;
   }
