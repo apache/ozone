@@ -2895,6 +2895,11 @@
                 "id": 7,
                 "name": "updateID",
                 "type": "uint64"
+              },
+              {
+                "id": 8,
+                "name": "storageClass",
+                "type": "string"
               }
             ]
           },
@@ -3075,6 +3080,11 @@
                 "name": "partsList",
                 "type": "PartInfo",
                 "is_repeated": true
+              },
+              {
+                "id": 7,
+                "name": "storageClass",
+                "type": "string"
               }
             ]
           },
@@ -3151,6 +3161,11 @@
                 "id": 7,
                 "name": "factor",
                 "type": "hadoop.hdds.ReplicationFactor"
+              },
+              {
+                "id": 8,
+                "name": "storageClass",
+                "type": "string"
               }
             ]
           },

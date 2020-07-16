@@ -169,6 +169,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     return stateEnterTime;
   }
 
+  @Deprecated
   public ReplicationFactor getReplicationFactor() {
     return replicationFactor;
   }
@@ -223,6 +224,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     return lastUsed;
   }
 
+  @Deprecated
   public ReplicationType getReplicationType() {
     return replicationType;
   }
@@ -248,6 +250,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
         .setPipelineID(getPipelineID().getProtobuf())
         .setReplicationFactor(getReplicationFactor())
         .setReplicationType(getReplicationType())
+        .setStorageClass(getStorageClass())
         .setOwner(getOwner())
         .build();
   }
@@ -397,6 +400,10 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   public void readExternal(ObjectInput in)
       throws IOException, ClassNotFoundException {
     throw new IOException(SERIALIZATION_ERROR_MSG);
+  }
+
+  public void setStorageClass(String sc) {
+    this.storageClass = sc;
   }
 
   /**

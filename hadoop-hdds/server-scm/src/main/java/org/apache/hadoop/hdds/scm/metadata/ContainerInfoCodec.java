@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.metadata;
 
 import java.io.IOException;
 
+import org.apache.hadoop.hdds.StorageClassConverter;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.utils.db.Codec;
@@ -36,12 +37,20 @@ public class ContainerInfoCodec implements Codec<ContainerInfo> {
 
   @Override
   public ContainerInfo fromPersistedFormat(byte[] rawData) throws IOException {
-    return ContainerInfo.fromProtobuf(
+    ContainerInfo info = ContainerInfo.fromProtobuf(
         ContainerInfoProto.PARSER.parseFrom(rawData));
+    if (info.getStorageClass() == null) {
+      final String calculatedStorageClass =
+          StorageClassConverter.convert(null, info.getReplicationFactor(),
+              info.getReplicationType());
+      info.setStorageClass(calculatedStorageClass);
+    }
+    return info;
   }
 
   @Override
   public ContainerInfo copyObject(ContainerInfo object) {
     throw new UnsupportedOperationException();
   }
+
 }

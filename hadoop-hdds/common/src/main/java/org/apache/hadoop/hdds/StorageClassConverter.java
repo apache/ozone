@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
@@ -29,11 +30,14 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLE
  * StorageClassConverter utility class.
  */
 public final class StorageClassConverter {
-  private StorageClassConverter() {}
+  private StorageClassConverter() {
+  }
 
-  public static String convert(OzoneConfiguration conf,
-                               ReplicationFactor factor,
-                               ReplicationType type) {
+  public static String convert(
+      ConfigurationSource conf,
+      ReplicationFactor factor,
+      ReplicationType type
+  ) {
     if (conf != null) {
       boolean useRatis = conf.getBoolean(DFS_CONTAINER_RATIS_ENABLED_KEY,
           DFS_CONTAINER_RATIS_ENABLED_DEFAULT);
