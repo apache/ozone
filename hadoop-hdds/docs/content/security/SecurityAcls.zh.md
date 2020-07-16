@@ -43,7 +43,7 @@ _角色_ 可选的值包括:
 4. **匿名** - 完全忽略用户字段，这是对 Posix 语义的扩展，使用 S3 协议时会用到，用于表达无法获取用户的身份或者不在乎用户的身份。
 
 <div class="alert alert-success" role="alert">
-  S3 用户通过 AWS v4 签名协议访问 Ozone 时，OM 会将其转化为对应的用户。
+  S3 用户通过 AWS v4 签名协议访问 Ozone 时，OM 会将其转化为对应的 Kerberos 用户。
 </div>
 
 _权限_ 可选的值包括：:
