@@ -41,103 +41,18 @@
             <id>copy-classpath-files</id>
             <phase>prepare-package</phase>
             <goals>
-              <goal>copy</goal>
+              <goal>unpack-dependencies</goal>
             </goals>
             <configuration>
               <outputDirectory>
                 target/ozone-${ozone.version}/share/ozone/classpath
               </outputDirectory>
-              <artifactItems>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-hdds-server-scm</artifactId>
-                  <version>${hdds.version}</version>
-                  <classifier>classpath</classifier>
-                  <type>cp</type>
-                  <destFileName>hadoop-hdds-server-scm.classpath</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-hdds-tools</artifactId>
-                  <version>${hdds.version}</version>
-                  <classifier>classpath</classifier>
-                  <type>cp</type>
-                  <destFileName>hadoop-hdds-tools.classpath</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-ozone-s3gateway</artifactId>
-                  <version>${ozone.version}</version>
-                  <classifier>classpath</classifier>
-                  <type>cp</type>
-                  <destFileName>hadoop-ozone-s3gateway.classpath</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-ozone-csi</artifactId>
-                  <version>${ozone.version}</version>
-                  <classifier>classpath</classifier>
-                  <type>cp</type>
-                  <destFileName>hadoop-ozone-csi.classpath</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-ozone-ozone-manager</artifactId>
-                  <version>${ozone.version}</version>
-                  <classifier>classpath</classifier>
-                  <type>cp</type>
-                  <destFileName>hadoop-ozone-ozone-manager.classpath
-                  </destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-ozone-tools</artifactId>
-                  <version>${ozone.version}</version>
-                  <classifier>classpath</classifier>
-                  <type>cp</type>
-                  <destFileName>hadoop-ozone-tools.classpath</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-ozone-filesystem</artifactId>
-                  <version>${ozone.version}</version>
-                  <classifier>classpath</classifier>
-                  <type>cp</type>
-                  <destFileName>hadoop-ozone-filesystem.classpath</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-ozone-common</artifactId>
-                  <version>${ozone.version}</version>
-                  <classifier>classpath</classifier>
-                  <type>cp</type>
-                  <destFileName>hadoop-ozone-common.classpath</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-ozone-datanode</artifactId>
-                  <version>${ozone.version}</version>
-                  <classifier>classpath</classifier>
-                  <type>cp</type>
-                  <destFileName>hadoop-ozone-datanode.classpath</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-ozone-upgrade</artifactId>
-                  <version>${ozone.version}</version>
-                  <classifier>classpath</classifier>
-                  <type>cp</type>
-                  <destFileName>hadoop-ozone-upgrade.classpath</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-ozone-insight</artifactId>
-                  <version>${ozone.version}</version>
-                  <classifier>classpath</classifier>
-                  <type>cp</type>
-                  <destFileName>hadoop-ozone-insight.classpath</destFileName>
-                </artifactItem>
-              </artifactItems>
+              <includes>*.classpath</includes>
+              <includeArtifactIds>
+                hadoop-hdds-server-scm,hadoop-ozone-common,hadoop-ozone-csi,hadoop-ozone-datanode,hadoop-ozone-insight,
+                hadoop-ozone-ozone-manager,hadoop-ozone-recon,hadoop-ozone-s3gateway,hadoop-ozone-tools,
+                hadoop-ozone-upgrade
+              </includeArtifactIds>
             </configuration>
           </execution>
           <execution>
@@ -339,39 +254,6 @@
           <name>!skipRecon</name>
         </property>
       </activation>
-
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-dependency-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>copy-recon-classpath-file</id>
-                <phase>prepare-package</phase>
-                <goals>
-                  <goal>copy</goal>
-                </goals>
-                <configuration>
-                  <outputDirectory>
-                    target/ozone-${ozone.version}/share/ozone/classpath
-                  </outputDirectory>
-                  <artifactItems>
-                    <artifactItem>
-                      <groupId>org.apache.hadoop</groupId>
-                      <artifactId>hadoop-ozone-recon</artifactId>
-                      <version>${ozone.version}</version>
-                      <classifier>classpath</classifier>
-                      <type>cp</type>
-                      <destFileName>hadoop-ozone-recon.classpath</destFileName>
-                    </artifactItem>
-                  </artifactItems>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
 
       <dependencies>
         <dependency>

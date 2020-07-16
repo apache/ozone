@@ -16,20 +16,29 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import org.apache.commons.lang3.RandomStringUtils;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Set;
 
 import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.client.*;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+
+import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.AfterClass;
+import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
@@ -37,9 +46,6 @@ import org.junit.rules.ExpectedException;
 import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.HashMap;
 
 /**
  * This class tests container report with DN container state info.
@@ -121,6 +127,12 @@ public class TestContainerReportWithKeys {
 
 
     ContainerInfo cinfo = scm.getContainerInfo(keyInfo.getContainerID());
+    Set<ContainerReplica> replicas =
+        scm.getContainerManager().getContainerReplicas(
+            new ContainerID(keyInfo.getContainerID()));
+    Assert.assertTrue(replicas.size() == 1);
+    replicas.stream().forEach(rp ->
+        Assert.assertTrue(rp.getDatanodeDetails().getParent() != null));
 
     LOG.info("SCM Container Info keyCount: {} usedBytes: {}",
         cinfo.getNumberOfKeys(), cinfo.getUsedBytes());

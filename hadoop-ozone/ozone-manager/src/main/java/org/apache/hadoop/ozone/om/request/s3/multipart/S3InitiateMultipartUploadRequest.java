@@ -121,11 +121,6 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
-      // We do not check if this transaction is a replay here to avoid extra
-      // DB reads. Even if this transaction is replayed, in
-      // S3MultipartUploadComplete request, we would delete this entry from
-      // the openKeyTable. Hence, it is safe to replay this transaction here.
-
       // We are adding uploadId to key, because if multiple users try to
       // perform multipart upload on the same key, each will try to upload, who
       // ever finally commit the key, we see that key in ozone. Suppose if we

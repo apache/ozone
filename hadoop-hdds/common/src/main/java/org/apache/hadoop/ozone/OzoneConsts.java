@@ -297,6 +297,8 @@ public final class OzoneConsts {
   public static final String MULTIPART_UPLOAD_PART_NUMBER = "partNumber";
   public static final String MULTIPART_UPLOAD_PART_NAME = "partName";
   public static final String BUCKET_ENCRYPTION_KEY = "bucketEncryptionKey";
+  public static final String DELETED_KEYS_LIST = "deletedKeysList";
+  public static final String UNDELETED_KEYS_LIST = "unDeletedKeysList";
 
 
 
@@ -361,4 +363,6 @@ public final class OzoneConsts {
   public static final String TRANSACTION_INFO_KEY = "#TRANSACTIONINFO";
   public static final String TRANSACTION_INFO_SPLIT_KEY = "#";
 
+  public static final String CONTAINER_DB_TYPE_ROCKSDB = "RocksDB";
+  public static final String CONTAINER_DB_TYPE_LEVELDB = "LevelDB";
 }

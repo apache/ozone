@@ -1477,6 +1477,21 @@
         ],
         "messages": [
           {
+            "name": "UUID",
+            "fields": [
+              {
+                "id": 1,
+                "name": "mostSigBits",
+                "type": "int64"
+              },
+              {
+                "id": 2,
+                "name": "leastSigBits",
+                "type": "int64"
+              }
+            ]
+          },
+          {
             "name": "DatanodeDetailsProto",
             "fields": [
               {
@@ -1514,6 +1529,21 @@
                 "id": 7,
                 "name": "networkLocation",
                 "type": "string"
+              },
+              {
+                "id": 8,
+                "name": "version",
+                "type": "string"
+              },
+              {
+                "id": 9,
+                "name": "setupTime",
+                "type": "int64"
+              },
+              {
+                "id": 100,
+                "name": "uuid128",
+                "type": "UUID"
               }
             ]
           },
@@ -1565,6 +1595,11 @@
                 "id": 1,
                 "name": "id",
                 "type": "string"
+              },
+              {
+                "id": 100,
+                "name": "uuid128",
+                "type": "UUID"
               }
             ]
           },
@@ -1630,6 +1665,11 @@
                 "id": 8,
                 "name": "creationTimeStamp",
                 "type": "uint64"
+              },
+              {
+                "id": 100,
+                "name": "leaderID128",
+                "type": "UUID"
               }
             ]
           },

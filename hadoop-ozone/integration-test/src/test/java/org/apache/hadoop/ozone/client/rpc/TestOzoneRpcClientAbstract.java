@@ -120,7 +120,6 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -1246,9 +1245,6 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(toKeyName, key.getName());
   }
 
-  // Listing all volumes in the cluster feature has to be fixed after HDDS-357.
-  // TODO: fix this
-  @Ignore
   @Test
   public void testListVolume() throws IOException {
     String volBase = "vol-" + RandomStringUtils.randomNumeric(3);
@@ -2709,7 +2705,6 @@ public abstract class TestOzoneRpcClientAbstract {
    * GDPR encryption details (flag, secret, algorithm).
    * @throws Exception
    */
-  @Ignore
   @Test
   public void testDeletedKeyForGDPR() throws Exception {
     //Step 1

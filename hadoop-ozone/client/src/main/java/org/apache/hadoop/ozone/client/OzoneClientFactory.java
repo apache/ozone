@@ -24,6 +24,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -82,7 +83,7 @@ public final class OzoneClientFactory {
    * @throws IOException
    */
   public static OzoneClient getRpcClient(String omHost, Integer omRpcPort,
-      ConfigurationSource config)
+      MutableConfigurationSource config)
       throws IOException {
     Preconditions.checkNotNull(omHost);
     Preconditions.checkNotNull(omRpcPort);

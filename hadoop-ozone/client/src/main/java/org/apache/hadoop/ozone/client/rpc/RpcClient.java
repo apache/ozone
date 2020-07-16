@@ -39,7 +39,6 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
@@ -75,6 +74,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
@@ -177,8 +177,7 @@ public class RpcClient implements ClientProtocol {
     }
 
     this.xceiverClientManager = new XceiverClientManager(conf,
-        OzoneConfiguration.of(conf).getObject(XceiverClientManager.
-            ScmClientConfig.class), caCertPem);
+        conf.getObject(XceiverClientManager.ScmClientConfig.class), caCertPem);
 
     int configuredChunkSize = (int) conf
         .getStorageSize(ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY,
@@ -728,16 +727,9 @@ public class RpcClient implements ClientProtocol {
           throws IOException {
     HddsClientUtils.verifyResourceName(volumeName, bucketName);
     Preconditions.checkNotNull(keyNameList);
-    List<OmKeyArgs> keyArgsList = new ArrayList<>();
-    for (String keyName: keyNameList) {
-      OmKeyArgs keyArgs = new OmKeyArgs.Builder()
-          .setVolumeName(volumeName)
-          .setBucketName(bucketName)
-          .setKeyName(keyName)
-          .build();
-      keyArgsList.add(keyArgs);
-    }
-    ozoneManagerClient.deleteKeys(keyArgsList);
+    OmDeleteKeys omDeleteKeys = new OmDeleteKeys(volumeName, bucketName,
+        keyNameList);
+    ozoneManagerClient.deleteKeys(omDeleteKeys);
   }
 
   @Override

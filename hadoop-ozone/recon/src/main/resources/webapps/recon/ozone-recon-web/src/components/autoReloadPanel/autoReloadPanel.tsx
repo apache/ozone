@@ -42,9 +42,9 @@ class AutoReloadPanel extends React.Component<IAutoReloadPanelProps> {
     const lastUpdatedText = lastUpdated === 0 ? 'NA' :
       (
         <Tooltip
-          placement='bottom' title={moment(lastUpdated).format('lll')}
+          placement='bottom' title={moment(lastUpdated).format('ll LTS')}
         >
-          {moment(lastUpdated).format('LT')}
+          {moment(lastUpdated).format('LTS')}
         </Tooltip>
       );
     return (

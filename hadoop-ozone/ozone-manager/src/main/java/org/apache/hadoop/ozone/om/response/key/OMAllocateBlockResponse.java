@@ -48,7 +48,7 @@ public class OMAllocateBlockResponse extends OMClientResponse {
   }
 
   /**
-   * For when the request is not successful or it is a replay transaction.
+   * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
   public OMAllocateBlockResponse(@Nonnull OMResponse omResponse) {
