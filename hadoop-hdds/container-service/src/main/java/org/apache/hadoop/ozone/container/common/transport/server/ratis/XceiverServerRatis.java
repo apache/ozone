@@ -560,7 +560,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   @Override
-  public List<MetadataStorageReportProto> getStorageReport() throws IOException {
+  public List<MetadataStorageReportProto> getStorageReport()
+      throws IOException {
     List<MetadataStorageReportProto> reportProto = new ArrayList<>();
     for (StorageType storageType : ratisVolumeMap.keySet()) {
       for (String path : ratisVolumeMap.get(storageType)) {
