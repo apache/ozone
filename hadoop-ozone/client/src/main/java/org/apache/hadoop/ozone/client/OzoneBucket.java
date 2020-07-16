@@ -18,17 +18,22 @@
 
 package org.apache.hadoop.ozone.client;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
-import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
@@ -38,13 +43,9 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.util.Time;
 
-import java.io.IOException;
-import java.time.Instant;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 
 /**
  * A class that encapsulates OzoneBucket.
@@ -345,14 +346,15 @@ public class OzoneBucket extends WithMetadata {
    *
    * @param key    Name of the key to be created.
    * @param size   Size of the data the key will point to.
+   * @param storageClass     storage class
    * @return OzoneOutputStream to which the data has to be written.
    * @throws IOException
    */
   @Deprecated
   public OzoneOutputStream createKey(String key, long size,
-      String sc, Map<String, String> keyMetadata)
+      String storageClass, Map<String, String> keyMetadata)
       throws IOException {
-    return proxy.createKey(volumeName, name, key, size, sc,
+    return proxy.createKey(volumeName, name, key, size, storageClass,
         keyMetadata);
   }
 

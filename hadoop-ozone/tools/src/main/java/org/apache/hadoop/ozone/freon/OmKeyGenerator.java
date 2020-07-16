@@ -30,13 +30,12 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs.Builder;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.security.UserGroupInformation;
 
 import com.codahale.metrics.Timer;
-import org.apache.hadoop.security.UserGroupInformation;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 
 /**
  * Data generator tool test om performance.

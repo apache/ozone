@@ -54,7 +54,7 @@ public class PutKeyHandler extends KeyHandler {
   @Parameters(index = "1", arity = "1..1", description = "File to upload")
   private String fileName;
 
-  @Option(names = {"-sc", "--storageClass"},
+  @Option(names = {"-sc", "--storage-class"},
       description = "StorageClass")
   private String storageClass;
 
