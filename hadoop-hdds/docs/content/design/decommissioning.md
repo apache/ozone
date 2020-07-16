@@ -3,7 +3,7 @@ title: Decommissioning in Ozone
 summary: Formal process to shut down machines in a safe way after the required replications.
 date: 2019-07-31
 jira: HDDS-1881
-status: implementing
+status: implemented
 author: Anu Engineer, Marton Elek, Stephen O'Donnell
 ---
 <!--
