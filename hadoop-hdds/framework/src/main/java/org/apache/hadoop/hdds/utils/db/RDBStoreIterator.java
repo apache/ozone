@@ -74,8 +74,8 @@ public class RDBStoreIterator
 
   @Override
   public ByteArrayKeyValue next() {
-    if (rocksDBIterator.isValid()) {
-      setCurrentEntry();
+    setCurrentEntry();
+    if (currentEntry != null) {
       rocksDBIterator.next();
       return currentEntry;
     }
@@ -97,11 +97,8 @@ public class RDBStoreIterator
   @Override
   public ByteArrayKeyValue seek(byte[] key) {
     rocksDBIterator.seek(key);
-    if (rocksDBIterator.isValid()) {
-      return ByteArrayKeyValue.create(rocksDBIterator.key(),
-          rocksDBIterator.value());
-    }
-    return null;
+    setCurrentEntry();
+    return currentEntry;
   }
 
   @Override

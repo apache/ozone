@@ -702,4 +702,9 @@ public class SCMPipelineManager implements PipelineManager {
       startPipelineCreator();
     }
   }
+
+  @VisibleForTesting
+  protected static Logger getLog() {
+    return LOG;
+  }
 }
