@@ -126,12 +126,11 @@ public class KeyValueBlockIterator implements BlockIterator<BlockData>,
       return true;
     }
     while (blockIterator.hasNext()) {
-      KeyValue block = blockIterator.next();
-      if (blockFilter.filterKey(null, block.getKey(), null)) {
-        nextBlock = BlockUtils.getBlockData(block.getValue());
+      Table.KeyValue<String, BlockData> block = blockIterator.next();
+      if (blockFilter.filterKey(null, block.getKey().getBytes(), null)) {
         if (LOG.isTraceEnabled()) {
           LOG.trace("Block matching with filter found: blockID is : {} for " +
-              "containerID {}", nextBlock.getLocalID(), containerId);
+              "containerID {}", block.getValue().getLocalID(), containerId);
         }
         return true;
       }
