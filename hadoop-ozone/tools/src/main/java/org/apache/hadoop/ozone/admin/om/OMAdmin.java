@@ -20,13 +20,21 @@ package org.apache.hadoop.ozone.admin.om;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
+import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory;
+import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
+import org.apache.hadoop.security.UserGroupInformation;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+import org.apache.ratis.protocol.ClientId;
 import picocli.CommandLine;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
@@ -71,6 +79,27 @@ public class OMAdmin extends GenericCli {
           " with " + OZONE_OM_SERVICE_IDS_KEY + " defined in the " +
               "configuration. Configured " + OZONE_OM_SERVICE_IDS_KEY + " are" +
               conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY));
+    }
+  }
+
+  public OzoneManagerProtocolClientSideTranslatorPB createOmClient(
+      String omServiceID) throws Exception {
+    OzoneConfiguration conf = parent.getOzoneConf();
+    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    RPC.setProtocolEngine(conf, OzoneManagerProtocolPB.class,
+        ProtobufRpcEngine.class);
+    String clientId = ClientId.randomId().toString();
+    if (OmUtils.isOmHAServiceId(conf, omServiceID)) {
+      OmTransport omTransport = new Hadoop3OmTransportFactory()
+          .createOmTransport(conf, ugi, omServiceID);
+      return new OzoneManagerProtocolClientSideTranslatorPB(omTransport,
+          clientId);
+    } else {
+      throw new OzoneClientException("This command works only on OzoneManager" +
+          " HA cluster. Service ID specified does not match" +
+          " with " + OZONE_OM_SERVICE_IDS_KEY + " defined in the " +
+          "configuration. Configured " + OZONE_OM_SERVICE_IDS_KEY + " are" +
+          conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY));
     }
   }
 }

@@ -19,6 +19,7 @@
 package org.apache.hadoop.fs.ozone;
 
 import com.google.common.base.Preconditions;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CreateFlag;
@@ -49,6 +50,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -61,6 +64,8 @@ import java.util.stream.Collectors;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_USER_DIR;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 
@@ -269,9 +274,12 @@ public class BasicOzoneFileSystem extends FileSystem {
     }
 
     @Override
-    boolean processKey(String key) throws IOException {
-      String newKeyName = dstKey.concat(key.substring(srcKey.length()));
-      adapter.renameKey(key, newKeyName);
+    boolean processKey(List<String> keyList) throws IOException {
+      // TODO RenameKey needs to be changed to batch operation
+      for(String key : keyList) {
+        String newKeyName = dstKey.concat(key.substring(srcKey.length()));
+        adapter.renameKey(key, newKeyName);
+      }
       return true;
     }
   }
@@ -404,17 +412,12 @@ public class BasicOzoneFileSystem extends FileSystem {
     }
 
     @Override
-    boolean processKey(String key) throws IOException {
-      if (key.equals("")) {
-        LOG.trace("Skipping deleting root directory");
-        return true;
-      } else {
-        LOG.trace("deleting key:{}", key);
-        boolean succeed = adapter.deleteObject(key);
-        // if recursive delete is requested ignore the return value of
-        // deleteObject and issue deletes for other keys.
-        return recursive || succeed;
-      }
+    boolean processKey(List<String> key) throws IOException {
+      LOG.trace("deleting key:{}", key);
+      boolean succeed = adapter.deleteObjects(key);
+      // if recursive delete is requested ignore the return value of
+      // deleteObject and issue deletes for other keys.
+      return recursive || succeed;
     }
   }
 
@@ -474,7 +477,9 @@ public class BasicOzoneFileSystem extends FileSystem {
       result = innerDelete(f, recursive);
     } else {
       LOG.debug("delete: Path is a file: {}", f);
-      result = adapter.deleteObject(key);
+      List<String> keyList = new ArrayList<>();
+      keyList.add(key);
+      result = adapter.deleteObjects(keyList);
     }
 
     if (result) {
@@ -600,6 +605,52 @@ public class BasicOzoneFileSystem extends FileSystem {
    */
   public String getUsername() {
     return userName;
+  }
+
+  /**
+   * Get the root directory of Trash for a path.
+   * Returns /.Trash/<username>
+   * Caller appends either Current or checkpoint timestamp for trash destination
+   * @param path the trash root of the path to be determined.
+   * @return trash root
+   */
+  @Override
+  public Path getTrashRoot(Path path) {
+    final Path pathToTrash = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
+    return new Path(pathToTrash, getUsername());
+  }
+
+  /**
+   * Get all the trash roots for current user or all users.
+   *
+   * @param allUsers return trash roots for all users if true.
+   * @return all the trash root directories.
+   *         Returns .Trash of users if {@code /.Trash/$USER} exists.
+   */
+  @Override
+  public Collection<FileStatus> getTrashRoots(boolean allUsers) {
+    Path trashRoot = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
+    List<FileStatus> ret = new ArrayList<>();
+    try {
+      if (!allUsers) {
+        Path userTrash = new Path(trashRoot, userName);
+        if (exists(userTrash) && getFileStatus(userTrash).isDirectory()) {
+          ret.add(getFileStatus(userTrash));
+        }
+      } else {
+        if (exists(trashRoot)) {
+          FileStatus[] candidates = listStatus(trashRoot);
+          for (FileStatus candidate : candidates) {
+            if (candidate.isDirectory()) {
+              ret.add(candidate);
+            }
+          }
+        }
+      }
+    } catch (IOException ex) {
+      LOG.warn("Can't get all trash roots", ex);
+    }
+    return ret;
   }
 
   /**
@@ -729,7 +780,7 @@ public class BasicOzoneFileSystem extends FileSystem {
      * @return true if we should continue iteration of keys, false otherwise.
      * @throws IOException
      */
-    abstract boolean processKey(String key) throws IOException;
+    abstract boolean processKey(List<String> key) throws IOException;
 
     /**
      * Iterates thorugh all the keys prefixed with the input path's key and
@@ -743,19 +794,35 @@ public class BasicOzoneFileSystem extends FileSystem {
      */
     boolean iterate() throws IOException {
       LOG.trace("Iterating path {}", path);
+      List<String> keyList = new ArrayList<>();
+      int batchSize = getConf().getInt(OZONE_FS_ITERATE_BATCH_SIZE,
+          OZONE_FS_ITERATE_BATCH_SIZE_DEFAULT);
       if (status.isDirectory()) {
         LOG.trace("Iterating directory:{}", pathKey);
         while (keyIterator.hasNext()) {
           BasicKeyInfo key = keyIterator.next();
           LOG.trace("iterating key:{}", key.getName());
-          if (!processKey(key.getName())) {
+          if (!key.getName().equals("")) {
+            keyList.add(key.getName());
+          }
+          if (keyList.size() >= batchSize) {
+            if (!processKey(keyList)) {
+              return false;
+            } else {
+              keyList.clear();
+            }
+          }
+        }
+        if (keyList.size() > 0) {
+          if (!processKey(keyList)) {
             return false;
           }
         }
         return true;
       } else {
         LOG.trace("iterating file:{}", path);
-        return processKey(pathKey);
+        keyList.add(pathKey);
+        return processKey(keyList);
       }
     }
 

@@ -21,8 +21,10 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -37,12 +39,15 @@ import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.metadata.PipelineIDCodec;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.test.GenericTestUtils;
 
@@ -57,7 +62,14 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.InOrder;
 
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Test cases to verify PipelineManager.
@@ -66,7 +78,7 @@ public class TestSCMPipelineManager {
   private static MockNodeManager nodeManager;
   private static File testDir;
   private static OzoneConfiguration conf;
-  private DBStore store;
+  private static SCMMetadataStore scmMetadataStore;
 
   @Before
   public void setUp() throws Exception {
@@ -82,13 +94,12 @@ public class TestSCMPipelineManager {
     }
     nodeManager = new MockNodeManager(true, 20);
 
-    store = DBStoreBuilder.createDBStore(conf, new SCMDBDefinition());
-    
+    scmMetadataStore = new SCMMetadataStoreImpl(conf);
   }
 
   @After
   public void cleanup() throws Exception {
-    store.close();
+    scmMetadataStore.getStore().close();
     FileUtil.fullyDelete(testDir);
   }
 
@@ -97,7 +108,7 @@ public class TestSCMPipelineManager {
     SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf,
             nodeManager,
-            SCMDBDefinition.PIPELINES.getTable(store),
+            scmMetadataStore.getPipelineTable(),
             new EventQueue());
     pipelineManager.allowPipelineCreation();
     PipelineProvider mockRatisProvider =
@@ -119,7 +130,7 @@ public class TestSCMPipelineManager {
     // new pipeline manager should be able to load the pipelines from the db
     pipelineManager =
         new SCMPipelineManager(conf, nodeManager,
-            SCMDBDefinition.PIPELINES.getTable(store), new EventQueue());
+            scmMetadataStore.getPipelineTable(), new EventQueue());
     pipelineManager.allowPipelineCreation();
     mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
@@ -151,7 +162,7 @@ public class TestSCMPipelineManager {
   public void testRemovePipeline() throws IOException {
     SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf, nodeManager,
-            SCMDBDefinition.PIPELINES.getTable(store), new EventQueue());
+            scmMetadataStore.getPipelineTable(), new EventQueue());
     pipelineManager.allowPipelineCreation();
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
@@ -171,7 +182,7 @@ public class TestSCMPipelineManager {
     // new pipeline manager should not be able to load removed pipelines
     pipelineManager =
         new SCMPipelineManager(conf, nodeManager,
-            SCMDBDefinition.PIPELINES.getTable(store), new EventQueue());
+            scmMetadataStore.getPipelineTable(), new EventQueue());
     try {
       pipelineManager.getPipeline(pipeline.getId());
       fail("Pipeline should not have been retrieved");
@@ -188,7 +199,7 @@ public class TestSCMPipelineManager {
     EventQueue eventQueue = new EventQueue();
     SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf, nodeManager,
-            SCMDBDefinition.PIPELINES.getTable(store), eventQueue);
+            scmMetadataStore.getPipelineTable(), eventQueue);
     pipelineManager.allowPipelineCreation();
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
@@ -255,7 +266,7 @@ public class TestSCMPipelineManager {
         20);
     SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf, nodeManagerMock,
-            SCMDBDefinition.PIPELINES.getTable(store), new EventQueue());
+            scmMetadataStore.getPipelineTable(), new EventQueue());
     pipelineManager.allowPipelineCreation();
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManagerMock,
@@ -315,7 +326,7 @@ public class TestSCMPipelineManager {
   public void testActivateDeactivatePipeline() throws IOException {
     final SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf, nodeManager,
-            SCMDBDefinition.PIPELINES.getTable(store), new EventQueue());
+            scmMetadataStore.getPipelineTable(), new EventQueue());
     pipelineManager.allowPipelineCreation();
     final PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
@@ -364,7 +375,7 @@ public class TestSCMPipelineManager {
     EventQueue eventQueue = new EventQueue();
     SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf, nodeManager,
-            SCMDBDefinition.PIPELINES.getTable(store), eventQueue);
+            scmMetadataStore.getPipelineTable(), eventQueue);
     pipelineManager.allowPipelineCreation();
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
@@ -381,7 +392,7 @@ public class TestSCMPipelineManager {
     // new pipeline manager loads the pipelines from the db in ALLOCATED state
     pipelineManager =
         new SCMPipelineManager(conf, nodeManager,
-            SCMDBDefinition.PIPELINES.getTable(store), eventQueue);
+            scmMetadataStore.getPipelineTable(), eventQueue);
     mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
@@ -427,7 +438,7 @@ public class TestSCMPipelineManager {
     EventQueue eventQueue = new EventQueue();
     final SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf, nodeManager,
-            SCMDBDefinition.PIPELINES.getTable(store), eventQueue);
+            scmMetadataStore.getPipelineTable(), eventQueue);
     pipelineManager.allowPipelineCreation();
     final PipelineProvider ratisProvider = new MockRatisPipelineProvider(
         nodeManager, pipelineManager.getStateManager(), conf, eventQueue,
@@ -471,7 +482,7 @@ public class TestSCMPipelineManager {
     EventQueue eventQueue = new EventQueue();
     SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf, nodeManager,
-            SCMDBDefinition.PIPELINES.getTable(store), eventQueue);
+            scmMetadataStore.getPipelineTable(), eventQueue);
     final PipelineProvider ratisProvider = new MockRatisPipelineProvider(
         nodeManager, pipelineManager.getStateManager(), conf, eventQueue,
         false);
@@ -517,7 +528,7 @@ public class TestSCMPipelineManager {
     EventQueue eventQueue = new EventQueue();
     SCMPipelineManager pipelineManager =
         new SCMPipelineManager(conf, nodeManager,
-            SCMDBDefinition.PIPELINES.getTable(store), eventQueue);
+            scmMetadataStore.getPipelineTable(), eventQueue);
     final PipelineProvider ratisProvider = new MockRatisPipelineProvider(
         nodeManager, pipelineManager.getStateManager(), conf, eventQueue,
         false);
@@ -539,6 +550,108 @@ public class TestSCMPipelineManager {
     assertEquals(false, pipelineManager.getSafeModeStatus());
     assertEquals(true, pipelineManager.isPipelineCreationAllowed());
     pipelineManager.close();
+  }
+
+  /**
+   * This test was created for HDDS-3925 to check whether the db handling is
+   * proper at the SCMPipelineManager level. We should remove this test
+   * when we remove the key swap from the SCMPipelineManager code.
+   *
+   * The test emulates internally the values that the iterator will provide
+   * back to the check-fix code path. The iterator internally deserialize the
+   * key stored in RocksDB using the PipelineIDCodec. The older version of the
+   * codec serialized the PipelineIDs by taking the byte[] representation of
+   * the protobuf representation of the PipelineID, and deserialization was not
+   * implemented.
+   *
+   * In order to be able to check and fix the change, the deserialization was
+   * introduced, and deserialisation of the old protobuf byte representation
+   * with the new deserialization logic of the keys are
+   * checked against the PipelineID serialized in the value as well via
+   * protobuf.
+   * The DB is storing the keys now based on a byte[] serialized from the UUID
+   * inside the PipelineID.
+   * For this we emulate the getKey of the KeyValue returned by the
+   * iterator to return a PipelineID that is deserialized from the byte[]
+   * representation of the protobuf representation of the PipelineID in the
+   * test, as that would be the value we get from the iterator when iterating
+   * through a table with the old key format.
+   *
+   * @throws Exception when something goes wrong
+   */
+  @Test
+  public void testPipelineDBKeyFormatChange() throws Exception {
+    Pipeline p1 = pipelineStub();
+    Pipeline p2 = pipelineStub();
+    Pipeline p3 = pipelineStub();
+
+    TableIterator<PipelineID, KeyValue<PipelineID, Pipeline>> iteratorMock =
+        mock(TableIterator.class);
+
+    KeyValue<PipelineID, Pipeline> kv1 =
+        mockKeyValueToProvideOldKeyFormat(p1);
+    KeyValue<PipelineID, Pipeline> kv2 =
+        mockKeyValueToProvideNormalFormat(p2);
+    KeyValue<PipelineID, Pipeline> kv3 =
+        mockKeyValueToProvideOldKeyFormat(p3);
+
+    when(iteratorMock.next())
+        .thenReturn(kv1, kv2, kv3)
+        .thenThrow(new NoSuchElementException());
+    when(iteratorMock.hasNext())
+        .thenReturn(true, true, true, false);
+
+    Table<PipelineID, Pipeline> pipelineStore = mock(Table.class);
+    doReturn(iteratorMock).when(pipelineStore).iterator();
+    when(pipelineStore.isEmpty()).thenReturn(false);
+
+    InOrder inorderVerifier = inOrder(pipelineStore, iteratorMock);
+
+    new SCMPipelineManager(conf, nodeManager, pipelineStore, new EventQueue());
+
+    inorderVerifier.verify(iteratorMock).removeFromDB();
+    inorderVerifier.verify(pipelineStore).put(p1.getId(), p1);
+    inorderVerifier.verify(iteratorMock).removeFromDB();
+    inorderVerifier.verify(pipelineStore).put(p3.getId(), p3);
+
+    verify(pipelineStore, never()).put(p2.getId(), p2);
+  }
+
+  private Pipeline pipelineStub() {
+    return Pipeline.newBuilder()
+        .setId(PipelineID.randomId())
+        .setType(HddsProtos.ReplicationType.RATIS)
+        .setFactor(HddsProtos.ReplicationFactor.ONE)
+        .setState(Pipeline.PipelineState.OPEN)
+        .setNodes(
+            Arrays.asList(
+                nodeManager.getNodes(HddsProtos.NodeState.HEALTHY).get(0)
+            )
+        )
+        .setNodesInOrder(Arrays.asList(0))
+        .build();
+  }
+
+  private KeyValue<PipelineID, Pipeline>
+      mockKeyValueToProvideOldKeyFormat(Pipeline pipeline)
+      throws IOException {
+    KeyValue<PipelineID, Pipeline> kv = mock(KeyValue.class);
+    when(kv.getValue()).thenReturn(pipeline);
+    when(kv.getKey())
+        .thenReturn(
+            new PipelineIDCodec().fromPersistedFormat(
+                pipeline.getId().getProtobuf().toByteArray()
+            ));
+    return kv;
+  }
+
+  private KeyValue<PipelineID, Pipeline>
+      mockKeyValueToProvideNormalFormat(Pipeline pipeline)
+      throws IOException {
+    KeyValue<PipelineID, Pipeline> kv = mock(KeyValue.class);
+    when(kv.getValue()).thenReturn(pipeline);
+    when(kv.getKey()).thenReturn(pipeline.getId());
+    return kv;
   }
 
   private void sendPipelineReport(DatanodeDetails dn,

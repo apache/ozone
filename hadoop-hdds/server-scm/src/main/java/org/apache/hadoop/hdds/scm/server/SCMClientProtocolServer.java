@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -516,6 +517,12 @@ public class SCMClientProtocolServer implements
         buildAuditMessageForSuccess(SCMAction.IN_SAFE_MODE, null)
     );
     return scm.isInSafeMode();
+  }
+
+  @Override
+  public Map<String, Pair<Boolean, String>> getSafeModeRuleStatuses()
+      throws IOException {
+    return scm.getRuleStatus();
   }
 
   /**

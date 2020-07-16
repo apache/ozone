@@ -552,6 +552,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       msg = datanode + " is in candidate state for " +
           roleInfoProto.getCandidateInfo().getLastLeaderElapsedTimeMs() + "ms";
       break;
+    case FOLLOWER:
+      msg = datanode + " closes pipeline when installSnapshot from leader " +
+          "because leader snapshot doesn't contain any data to replay, " +
+          "all the log entries prior to the snapshot might have been purged." +
+          "So follower should not try to install snapshot from leader but" +
+          "can close the pipeline here. It's in follower state for " +
+          roleInfoProto.getRoleElapsedTimeMs() + "ms";
+      break;
     case LEADER:
       StringBuilder sb = new StringBuilder();
       sb.append(datanode).append(" has not seen follower/s");
@@ -771,17 +779,21 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private void sendPipelineReport() {
-    // TODO: Send IncrementalPipelineReport instead of full PipelineReport
-    context.addReport(context.getParent().getContainer().getPipelineReport());
-    context.getParent().triggerHeartbeat();
+    if (context !=  null) {
+      // TODO: Send IncrementalPipelineReport instead of full PipelineReport
+      context.addReport(context.getParent().getContainer().getPipelineReport());
+      context.getParent().triggerHeartbeat();
+    }
   }
 
   private static List<ThreadPoolExecutor> createChunkExecutors(
       ConfigurationSource conf) {
     // TODO create single pool with N threads if using non-incremental chunks
     final int threadCountPerDisk = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT);
+        OzoneConfigKeys
+            .DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_KEY,
+        OzoneConfigKeys
+            .DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT);
 
     final int numberOfDisks =
         MutableVolumeSet.getDatanodeStorageDirs(conf).size();

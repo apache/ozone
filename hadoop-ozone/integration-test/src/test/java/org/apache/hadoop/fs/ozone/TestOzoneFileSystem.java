@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.ozone;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
 import java.util.TreeSet;
@@ -41,10 +42,14 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import org.apache.commons.io.IOUtils;
 
+import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -67,8 +72,8 @@ import org.slf4j.LoggerFactory;
 public class TestOzoneFileSystem {
 
   /**
-    * Set a timeout for each test.
-    */
+   * Set a timeout for each test.
+   */
   @Rule
   public Timeout timeout = new Timeout(300000);
 
@@ -84,7 +89,7 @@ public class TestOzoneFileSystem {
 
   @Test(timeout = 300_000)
   public void testCreateFileShouldCheckExistenceOfDirWithSameName()
-          throws Exception {
+      throws Exception {
     /*
      * Op 1. create file -> /d1/d2/d3/d4/key2
      * Op 2. create dir -> /d1/d2/d3/d4/key2
@@ -162,6 +167,8 @@ public class TestOzoneFileSystem {
     testOzoneFsServiceLoader();
     o3fs = (OzoneFileSystem) fs;
 
+    testGetTrashRoots();
+    testGetTrashRoot();
     testGetDirectoryModificationTime();
 
     testListStatusOnRoot();
@@ -171,6 +178,7 @@ public class TestOzoneFileSystem {
 
     testCreateDoesNotAddParentDirKeys();
     testDeleteCreatesFakeParentDir();
+    testFileDelete();
     testNonExplicitlyCreatedPathExistsAfterItsLeafsWereRemoved();
 
     testRenameDir();
@@ -187,11 +195,11 @@ public class TestOzoneFileSystem {
   }
 
   private void setupOzoneFileSystem()
-          throws IOException, TimeoutException, InterruptedException {
+      throws IOException, TimeoutException, InterruptedException {
     OzoneConfiguration conf = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(conf)
-            .setNumDatanodes(3)
-            .build();
+        .setNumDatanodes(3)
+        .build();
     cluster.waitForClusterToBeReady();
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
@@ -199,11 +207,13 @@ public class TestOzoneFileSystem {
     bucketName = bucket.getName();
 
     String rootPath = String.format("%s://%s.%s/",
-            OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
-            bucket.getVolumeName());
+        OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
+        bucket.getVolumeName());
 
     // Set the fs.defaultFS and start the filesystem
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    // Set the number of keys to be processed during batch operate.
+    conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
     fs = FileSystem.get(conf);
   }
 
@@ -260,6 +270,44 @@ public class TestOzoneFileSystem {
     String parentKey = o3fs.pathToKey(parent) + "/";
     OzoneKeyDetails parentKeyInfo = getKey(parent, true);
     assertEquals(parentKey, parentKeyInfo.getName());
+  }
+
+  private void testFileDelete() throws Exception {
+    Path grandparent = new Path("/testBatchDelete");
+    Path parent = new Path(grandparent, "parent");
+    Path childFolder = new Path(parent, "childFolder");
+    // BatchSize is 5, so we're going to set a number that's not a
+    // multiple of 5. In order to test the final number of keys less than
+    // batchSize can also be deleted.
+    for (int i = 0; i < 8; i++) {
+      Path childFile = new Path(parent, "child" + i);
+      Path childFolderFile = new Path(childFolder, "child" + i);
+      ContractTestUtils.touch(fs, childFile);
+      ContractTestUtils.touch(fs, childFolderFile);
+    }
+
+    assertTrue(fs.listStatus(grandparent).length == 1);
+    assertTrue(fs.listStatus(parent).length == 9);
+    assertTrue(fs.listStatus(childFolder).length == 8);
+
+    Boolean successResult = fs.delete(grandparent, true);
+    assertTrue(successResult);
+    assertTrue(!o3fs.exists(grandparent));
+    for (int i = 0; i < 8; i++) {
+      Path childFile = new Path(parent, "child" + i);
+      // Make sure all keys under testBatchDelete/parent should be deleted
+      assertTrue(!o3fs.exists(childFile));
+
+      // Test to recursively delete child folder, make sure all keys under
+      // testBatchDelete/parent/childFolder should be deleted.
+      Path childFolderFile = new Path(childFolder, "child" + i);
+      assertTrue(!o3fs.exists(childFolderFile));
+    }
+    // Will get: WARN  ozone.BasicOzoneFileSystem delete: Path does not exist.
+    // This will return false.
+    Boolean falseResult = fs.delete(parent, true);
+    assertFalse(falseResult);
+
   }
 
   private void testListStatus() throws Exception {
@@ -518,5 +566,55 @@ public class TestOzoneFileSystem {
       fileStatuses = o3fs.listStatus(mdir1);
       assertTrue(modificationTime <= fileStatuses[0].getModificationTime());
     }
+  }
+
+  public void testGetTrashRoot() throws IOException {
+    String username = UserGroupInformation.getCurrentUser().getShortUserName();
+    Path trashRoot = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
+    // Input path doesn't matter, o3fs.getTrashRoot() only cares about username
+    Path inPath1 = new Path("o3fs://bucket2.volume1/path/to/key");
+    // Test with current user
+    Path outPath1 = o3fs.getTrashRoot(inPath1);
+    Path expectedOutPath1 = new Path(trashRoot, username);
+    Assert.assertEquals(expectedOutPath1, outPath1);
+  }
+
+  public void testGetTrashRoots() throws IOException {
+    String username = UserGroupInformation.getCurrentUser().getShortUserName();
+    Path trashRoot = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
+    Path userTrash = new Path(trashRoot, username);
+
+    Collection<FileStatus> res = o3fs.getTrashRoots(false);
+    Assert.assertEquals(0, res.size());
+
+    fs.mkdirs(userTrash);
+    res = o3fs.getTrashRoots(false);
+    Assert.assertEquals(1, res.size());
+    res.forEach(e -> Assert.assertEquals(
+        userTrash.toString(), e.getPath().toUri().getPath()));
+    // Only have one user trash for now
+    res = o3fs.getTrashRoots(true);
+    Assert.assertEquals(1, res.size());
+
+    // Create a few more random user trash dir
+    for (int i = 1; i <= 5; i++) {
+      Path moreUserTrash = new Path(trashRoot, "trashuser" + i);
+      fs.mkdirs(moreUserTrash);
+    }
+
+    // And create a file, which should be ignored
+    fs.create(new Path(trashRoot, "trashuser99"));
+
+    // allUsers = false should still return current user trash
+    res = o3fs.getTrashRoots(false);
+    Assert.assertEquals(1, res.size());
+    res.forEach(e -> Assert.assertEquals(
+        userTrash.toString(), e.getPath().toUri().getPath()));
+    // allUsers = true should return all user trash
+    res = o3fs.getTrashRoots(true);
+    Assert.assertEquals(6, res.size());
+
+    // Clean up
+    o3fs.delete(trashRoot, true);
   }
 }

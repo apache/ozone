@@ -32,11 +32,14 @@ start_docker_env
 #Disabling for now, audit parser tool during parse getting exception.
 #execute_robot_test om auditparser
 
+execute_robot_test scm lib
+
 execute_robot_test scm basic
 
 execute_robot_test scm gdpr
 
-execute_robot_test scm ozonefs/ozonefs.robot
+execute_robot_test scm -v SCHEME:ofs ozonefs/ozonefs.robot
+execute_robot_test scm -v SCHEME:o3fs ozonefs/ozonefs.robot
 
 execute_robot_test scm security/ozone-secure-token.robot
 

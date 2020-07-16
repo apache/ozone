@@ -29,7 +29,6 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
-import static org.hadoop.ozone.recon.codegen.ReconSqlDbConfig.ConfigKeys.OZONE_RECON_SQL_DB_JDBC_URL;
 
 import java.io.File;
 import java.io.IOException;
@@ -80,6 +79,7 @@ import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
 import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -804,8 +804,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           .getAbsolutePath());
       conf.set(OZONE_RECON_SCM_DB_DIR,
           tempNewFolder.getAbsolutePath());
-      conf.set(OZONE_RECON_SQL_DB_JDBC_URL, "jdbc:derby:" +
-          tempNewFolder.getAbsolutePath() + "/ozone_recon_derby.db");
+
+      ReconSqlDbConfig dbConfig = conf.getObject(ReconSqlDbConfig.class);
+      dbConfig.setJdbcUrl("jdbc:derby:" + tempNewFolder.getAbsolutePath()
+          + "/ozone_recon_derby.db");
+      conf.setFromObject(dbConfig);
 
       conf.set(OZONE_RECON_HTTP_ADDRESS_KEY, "0.0.0.0:0");
       conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, "0.0.0.0:0");

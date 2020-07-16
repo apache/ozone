@@ -53,6 +53,8 @@ public interface OzoneClientAdapter {
 
   boolean deleteObject(String keyName);
 
+  boolean deleteObjects(List<String> keyName);
+
   Iterator<BasicKeyInfo> listKeys(String pathKey);
 
   List<FileStatusAdapter> listStatus(String keyName, boolean recursive,

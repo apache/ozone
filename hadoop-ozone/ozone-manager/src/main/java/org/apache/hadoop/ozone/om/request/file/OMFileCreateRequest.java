@@ -27,8 +27,11 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.slf4j.Logger;
@@ -88,6 +91,15 @@ public class OMFileCreateRequest extends OMKeyRequest {
     Preconditions.checkNotNull(createFileRequest);
 
     KeyArgs keyArgs = createFileRequest.getKeyArgs();
+
+    // Verify key name
+    final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
+         .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
+                 OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
+    if(checkKeyNameEnabled){
+      OmUtils.validateKeyName(StringUtils.removeEnd(keyArgs.getKeyName(),
+              OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
+    }
 
     if (keyArgs.getKeyName().length() == 0) {
       // Check if this is the root of the filesystem.
@@ -203,27 +215,10 @@ public class OMFileCreateRequest extends OMKeyRequest {
             OMException.ResultCodes.NOT_A_FILE);
       }
 
-      // Check if Key already exists in KeyTable and this transaction is a
-      // replay.
       String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
           keyName);
       OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable()
           .getIfExist(ozoneKey);
-      if (dbKeyInfo != null) {
-        // Check if this transaction is a replay of ratis logs.
-        // We check only the KeyTable here and not the OpenKeyTable. In case
-        // this transaction is a replay but the transaction was not committed
-        // to the KeyTable, then we recreate the key in OpenKey table. This is
-        // okay as all the subsequent transactions would also be replayed and
-        // the openKey table would eventually reach the same state.
-        // The reason we do not check the OpenKey table is to avoid a DB read
-        // in regular non-replay scenario.
-        if (isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
-          // Replay implies the response has already been returned to
-          // the client. So take no further action and return a dummy response.
-          throw new OMReplayException();
-        }
-      }
 
       OMFileRequest.OMPathInfo pathInfo =
           OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
@@ -299,18 +294,12 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
-      if (ex instanceof OMReplayException) {
-        result = Result.REPLAY;
-        omClientResponse = new OMFileCreateResponse(createReplayOMResponse(
-            omResponse));
-      } else {
-        result = Result.FAILURE;
-        exception = ex;
-        omMetrics.incNumCreateFileFails();
-        omResponse.setCmdType(Type.CreateFile);
-        omClientResponse = new OMFileCreateResponse(createErrorOMResponse(
+      result = Result.FAILURE;
+      exception = ex;
+      omMetrics.incNumCreateFileFails();
+      omResponse.setCmdType(Type.CreateFile);
+      omClientResponse = new OMFileCreateResponse(createErrorOMResponse(
             omResponse, exception));
-      }
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
@@ -321,18 +310,12 @@ public class OMFileCreateRequest extends OMKeyRequest {
     }
 
     // Audit Log outside the lock
-    if (result != Result.REPLAY) {
-      Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
-      auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
-          OMAction.CREATE_FILE, auditMap, exception,
-          getOmRequest().getUserInfo()));
-    }
+    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
+    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+        OMAction.CREATE_FILE, auditMap, exception,
+        getOmRequest().getUserInfo()));
 
     switch (result) {
-    case REPLAY:
-      LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-          createFileRequest);
-      break;
     case SUCCESS:
       LOG.debug("File created. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);

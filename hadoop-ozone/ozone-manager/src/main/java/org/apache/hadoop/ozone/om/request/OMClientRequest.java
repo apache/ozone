@@ -18,14 +18,8 @@
 
 package org.apache.hadoop.ozone.om.request;
 
-import java.io.IOException;
-import java.net.InetAddress;
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -35,22 +29,22 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import javax.annotation.Nonnull;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.REPLAY;
 
 /**
  * OMClientRequest provides methods which every write OM request should
@@ -66,8 +60,6 @@ public abstract class OMClientRequest implements RequestAuditor {
    */
   public enum Result {
     SUCCESS, // The request was executed successfully
-
-    REPLAY, // The request is a replay and was ignored
 
     FAILURE // The request failed and exception was thrown
   }
@@ -222,7 +214,6 @@ public abstract class OMClientRequest implements RequestAuditor {
 
   /**
    * Add the client response to double buffer and set the flush future.
-   * For responses which has status set to REPLAY it is a no-op.
    * @param trxIndex
    * @param omClientResponse
    * @param omDoubleBufferHelper
@@ -231,13 +222,8 @@ public abstract class OMClientRequest implements RequestAuditor {
       OMClientResponse omClientResponse,
       OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
     if (omClientResponse != null) {
-      // For replay transaction we do not need to add to double buffer, as
-      // for these transactions there is nothing needs to be done for
-      // addDBToBatch.
-      if (omClientResponse.getOMResponse().getStatus() != REPLAY) {
-        omClientResponse.setFlushFuture(
-            omDoubleBufferHelper.add(omClientResponse, trxIndex));
-      }
+      omClientResponse.setFlushFuture(
+          omDoubleBufferHelper.add(omClientResponse, trxIndex));
     }
   }
 
@@ -278,30 +264,5 @@ public abstract class OMClientRequest implements RequestAuditor {
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.VOLUME, volume);
     return auditMap;
-  }
-
-  /**
-   * Check if the transaction is a replay.
-   * @param ozoneObj OMVolumeArgs or OMBucketInfo or OMKeyInfo object whose 
-   *                 updateID needs to be compared with
-   * @param transactionID the current transaction ID
-   * @return true if transactionID is less than or equal to updateID, false
-   * otherwise.
-   */
-  protected boolean isReplay(OzoneManager om, WithObjectID ozoneObj,
-      long transactionID) {
-    return om.isRatisEnabled() && ozoneObj.isUpdateIDset() &&
-        transactionID <= ozoneObj.getUpdateID();
-  }
-
-  /**
-   * Return a dummy OMClientResponse for when the transactions are replayed.
-   */
-  protected OMResponse createReplayOMResponse(
-      @Nonnull OMResponse.Builder omResponse) {
-
-    omResponse.setSuccess(false);
-    omResponse.setStatus(REPLAY);
-    return omResponse.build();
   }
 }

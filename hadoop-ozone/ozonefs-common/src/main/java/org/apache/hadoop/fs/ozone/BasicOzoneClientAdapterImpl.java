@@ -273,6 +273,25 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     }
   }
 
+  /**
+   * Helper method to delete an object specified by key name in bucket.
+   *
+   * @param keyNameList key name list to be deleted
+   * @return true if the key is deleted, false otherwise
+   */
+  @Override
+  public boolean deleteObjects(List<String> keyNameList) {
+    LOG.trace("issuing delete for key {}", keyNameList);
+    try {
+      incrementCounter(Statistic.OBJECTS_DELETED);
+      bucket.deleteKeys(keyNameList);
+      return true;
+    } catch (IOException ioe) {
+      LOG.error("delete key failed {}", ioe.getMessage());
+      return false;
+    }
+  }
+
   public FileStatusAdapter getFileStatus(String key, URI uri,
       Path qualifiedPath, String userName)
       throws IOException {

@@ -28,8 +28,14 @@ option java_generic_services = true;
 option java_generate_equals_and_hash = true;
 package hadoop.hdds;
 
+message UUID {
+   required int64 mostSigBits = 1;
+   required int64 leastSigBits = 2;
+}
+
 message DatanodeDetailsProto {
-    required string uuid = 1;  // UUID assigned to the Datanode.
+    // deprecated, please use uuid128 instead
+    optional string uuid = 1;  // UUID assigned to the Datanode.
     required string ipAddress = 2;     // IP address
     required string hostName = 3;      // hostname
     repeated Port ports = 4;
@@ -37,6 +43,10 @@ message DatanodeDetailsProto {
     // network name, can be Ip address or host name, depends
     optional string networkName = 6;
     optional string networkLocation = 7; // Network topology location
+    optional string version = 8;         // Datanode version
+    optional int64 setupTime = 9;
+    // TODO(runzhiwang): when uuid is gone, specify 1 as the index of uuid128 and mark as required
+    optional UUID uuid128 = 100; // UUID with 128 bits assigned to the Datanode.
 }
 
 /**
@@ -56,7 +66,10 @@ message Port {
 }
 
 message PipelineID {
-  required string id = 1;
+  // deprecated, please use uuid128 instead
+  optional string id = 1;
+  // TODO(runzhiwang): when id is gone, specify 1 as the index of uuid128 and mark as required
+  optional UUID uuid128 = 100;
 }
 
 enum PipelineState {
@@ -76,6 +89,8 @@ message Pipeline {
     optional string leaderID = 6;
     repeated uint32 memberOrders = 7;
     optional uint64 creationTimeStamp = 8;
+    // TODO(runzhiwang): when leaderID is gone, specify 6 as the index of leaderID128
+    optional UUID leaderID128 = 100;
 }
 
 message KeyValue {

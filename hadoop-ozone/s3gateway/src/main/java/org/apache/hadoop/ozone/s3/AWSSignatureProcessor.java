@@ -104,13 +104,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
 
 
     this.queryMap = context.getUriInfo().getQueryParameters();
-    try {
-      this.uri = new URI(context.getUriInfo().getRequestUri()
-          .getPath().replaceAll("\\/+",
-              "/")).normalize().getPath();
-    } catch (URISyntaxException e) {
-      throw S3_AUTHINFO_CREATION_ERROR;
-    }
+    this.uri = context.getUriInfo().getRequestUri().getPath();
 
     this.method = context.getMethod();
     String authHeader = headers.get(AUTHORIZATION_HEADER);

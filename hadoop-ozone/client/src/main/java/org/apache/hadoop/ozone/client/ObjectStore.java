@@ -185,10 +185,15 @@ public class ObjectStore {
   }
 
   /**
-   * Returns Iterator to iterate over the list of volumes after prevVolume owned
-   * by a specific user. The result can be restricted using volume prefix, will
-   * return all volumes if volume prefix is null. If user is not null, returns
-   * the volume of current user.
+   * Returns Iterator to iterate over the list of volumes after prevVolume
+   * accessible by a specific user. The result can be restricted using volume
+   * prefix, will return all volumes if volume prefix is null. If user is not
+   * null, returns the volume of current user.
+   *
+   * Definition of accessible:
+   * When ACL is enabled, accessible means the user has LIST permission.
+   * When ACL is disabled, accessible means the user is the owner of the volume.
+   * See {@code OzoneManager#listVolumeByUser}.
    *
    * @param user User Name
    * @param volumePrefix Volume prefix to match
