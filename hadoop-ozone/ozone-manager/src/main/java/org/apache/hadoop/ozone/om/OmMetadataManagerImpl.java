@@ -18,7 +18,6 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -256,7 +255,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       // marker indicates that the DB is in an inconsistent state and hence
       // the OM process should be terminated.
       File markerFile = new File(metaDir, DB_TRANSIENT_MARKER);
-      if (Files.exists(markerFile.toPath())) {
+      if (markerFile.exists()) {
         LOG.error("File {} marks that OM DB is in an inconsistent state.");
         // Note - The marker file should be deleted only after fixing the DB.
         // In an HA setup, this can be done by replacing this DB with a
