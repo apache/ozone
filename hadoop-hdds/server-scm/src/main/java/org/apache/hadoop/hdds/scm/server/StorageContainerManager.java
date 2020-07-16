@@ -1122,4 +1122,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public Map<String, Pair<Boolean, String>> getRuleStatus() {
     return scmSafeModeManager.getRuleStatus();
   }
+
+  @Override
+  public Map<String, String> getRuleStatusMetrics() {
+    Map<String, String> map = new HashMap<>();
+    for (Map.Entry<String, Pair<Boolean, String>> entry :
+        scmSafeModeManager.getRuleStatus().entrySet()) {
+      map.put(entry.getKey(), entry.getValue().getRight());
+    }
+    return map;
+  }
 }
