@@ -41,6 +41,10 @@ public class RDBParser extends GenericCli {
     return dbPath;
   }
 
+  public void setDbPath(String dbPath) {
+    this.dbPath = dbPath;
+  }
+
   @Override
   public void execute(String[] argv) {
     new RDBParser().run(argv);
