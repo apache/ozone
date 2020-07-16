@@ -251,8 +251,9 @@ public class TestBlockDeletingService {
 
       // Ensure there are 3 blocks under deletion and 0 deleted blocks
       Assert.assertEquals(3, getUnderDeletionBlocksCount(meta));
-      Assert.assertEquals(3, Longs.fromByteArray(
-          meta.getStore().get(DB_PENDING_DELETE_BLOCK_COUNT_KEY)));
+      Assert.assertEquals(3,
+          meta.getStore().getMetadataTable()
+                  .get(OzoneConsts.PENDING_DELETE_BLOCK_COUNT).longValue());
       Assert.assertEquals(0, getDeletedBlocksCount(meta));
 
       // An interval will delete 1 * 2 blocks
