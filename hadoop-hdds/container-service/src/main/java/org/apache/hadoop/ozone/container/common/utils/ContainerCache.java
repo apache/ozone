@@ -124,6 +124,7 @@ public final class ContainerCache extends LRUMap {
    */
   public ReferenceCountedDB getDB(long containerID, String containerDBType,
                                   String containerDBPath,
+                                  String schemaVersion,
                                   ConfigurationSource conf)
       throws IOException {
     Preconditions.checkState(containerID >= 0,
@@ -133,8 +134,19 @@ public final class ContainerCache extends LRUMap {
       ReferenceCountedDB db = (ReferenceCountedDB) this.get(containerDBPath);
 
       if (db == null) {
-        // All newly created datanode stores will be in the new format.
-        DatanodeStore store = new DatanodeStoreTwoTableImpl(conf, containerDBPath);
+        DatanodeStore store;
+
+        if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
+          store = new DatanodeStoreOneTableImpl(conf, containerDBPath);
+        }
+        else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
+          store = new DatanodeStoreTwoTableImpl(conf, containerDBPath);
+        }
+        else {
+          throw new IllegalArgumentException("Unrecognized database schema version: " +
+                  schemaVersion);
+        }
+
         db = new ReferenceCountedDB(store, containerDBPath);
         this.put(containerDBPath, db);
       }
