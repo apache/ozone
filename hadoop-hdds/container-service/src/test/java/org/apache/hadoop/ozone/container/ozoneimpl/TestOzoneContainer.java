@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -45,10 +46,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.test.LambdaTestUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.*;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -168,6 +166,51 @@ public class TestOzoneContainer {
 
     verifyCommittedSpace(ozoneContainer);
   }
+
+  @Test
+  public void testBuildNodeReport() throws Exception {
+    String path = folder.getRoot()
+            .getAbsolutePath();
+    conf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
+            String.join(",",
+            path + "/ratis1", path + "/ratis2", path + "ratis3"));
+    DatanodeStateMachine stateMachine = Mockito.mock(
+            DatanodeStateMachine.class);
+    StateContext context = Mockito.mock(StateContext.class);
+    Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
+    Mockito.when(context.getParent()).thenReturn(stateMachine);
+    // When OzoneContainer is started, the containers from disk should be
+    // loaded into the containerSet.
+    // Also expected to initialize committed space for each volume.
+    OzoneContainer ozoneContainer = new
+            OzoneContainer(datanodeDetails, conf, context, null);
+    Assert.assertEquals(volumeSet.getVolumesList().size(),
+            ozoneContainer.getNodeReport().getStorageReportList().size());
+    Assert.assertEquals(3,
+            ozoneContainer.getNodeReport().getMetadataStorageReportList()
+                    .size());
+
+  }
+
+  @Test
+  public void testBuildNodeReportWithDefaultRatisLogDir() throws Exception {
+    DatanodeStateMachine stateMachine = Mockito.mock(
+            DatanodeStateMachine.class);
+    StateContext context = Mockito.mock(StateContext.class);
+    Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
+    Mockito.when(context.getParent()).thenReturn(stateMachine);
+    // When OzoneContainer is started, the containers from disk should be
+    // loaded into the containerSet.
+    // Also expected to initialize committed space for each volume.
+    OzoneContainer ozoneContainer = new
+            OzoneContainer(datanodeDetails, conf, context, null);
+    Assert.assertEquals(volumeSet.getVolumesList().size(),
+            ozoneContainer.getNodeReport().getStorageReportList().size());
+    Assert.assertEquals(1,
+            ozoneContainer.getNodeReport().getMetadataStorageReportList()
+                    .size());
+  }
+
 
   @Test
   public void testContainerCreateDiskFull() throws Exception {
