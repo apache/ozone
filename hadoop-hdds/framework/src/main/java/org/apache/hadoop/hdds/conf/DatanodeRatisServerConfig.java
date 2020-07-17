@@ -18,36 +18,24 @@
 
 package org.apache.hadoop.hdds.conf;
 
+import org.apache.ratis.server.RaftServerConfigKeys;
+
 import java.time.Duration;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.RATIS;
-import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY;
+import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY;
 
 /**
  * Datanode Ratis server Configuration.
  */
-@ConfigGroup(prefix = HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY)
+@ConfigGroup(prefix = HDDS_DATANODE_RATIS_PREFIX_KEY + "."
+    + RaftServerConfigKeys.PREFIX)
 public class DatanodeRatisServerConfig {
 
-  private static final String RATIS_SERVER_REQUEST_TIMEOUT_KEY =
-      "rpc.request.timeout";
-
-  private static final String RATIS_SERVER_WATCH_REQUEST_TIMEOUT_KEY =
-      "watch.timeout";
-
-  private static final String RATIS_SERVER_NO_LEADER_TIMEOUT_KEY =
-      "Notification.no-leader.timeout";
-
-  private static final String RATIS_FOLLOWER_SLOWNESS_TIMEOUT_KEY =
-      "rpcslowness.timeout";
-
-  private static final String RATIS_LEADER_NUM_PENDING_REQUESTS_KEY =
-      "write.element-limit";
-
-  @Config(key = RATIS_SERVER_REQUEST_TIMEOUT_KEY,
+  @Config(key = "rpc.request.timeout",
       defaultValue = "60s",
       type = ConfigType.TIME,
       tags = {OZONE, DATANODE, RATIS},
@@ -64,7 +52,7 @@ public class DatanodeRatisServerConfig {
     this.requestTimeOut = duration.toMillis();
   }
 
-  @Config(key = RATIS_SERVER_WATCH_REQUEST_TIMEOUT_KEY,
+  @Config(key = "watch.timeout",
       defaultValue = "180s",
       type = ConfigType.TIME,
       tags = {OZONE, DATANODE, RATIS},
@@ -82,7 +70,7 @@ public class DatanodeRatisServerConfig {
     this.watchTimeOut = duration.toMillis();
   }
 
-  @Config(key = RATIS_SERVER_NO_LEADER_TIMEOUT_KEY,
+  @Config(key = "notification.no-leader.timeout",
       defaultValue = "300s",
       type = ConfigType.TIME,
       tags = {OZONE, DATANODE, RATIS},
@@ -100,7 +88,7 @@ public class DatanodeRatisServerConfig {
     this.noLeaderTimeout = duration.toMillis();
   }
 
-  @Config(key = RATIS_FOLLOWER_SLOWNESS_TIMEOUT_KEY,
+  @Config(key = "rpcslowness.timeout",
       defaultValue = "300s",
       type = ConfigType.TIME,
       tags = {OZONE, DATANODE, RATIS},
@@ -118,7 +106,7 @@ public class DatanodeRatisServerConfig {
     this.followerSlownessTimeout = duration.toMillis();
   }
 
-  @Config(key = RATIS_LEADER_NUM_PENDING_REQUESTS_KEY,
+  @Config(key = "write.element-limit",
       defaultValue = "1024",
       type = ConfigType.INT,
       tags = {OZONE, DATANODE, RATIS, PERFORMANCE},
