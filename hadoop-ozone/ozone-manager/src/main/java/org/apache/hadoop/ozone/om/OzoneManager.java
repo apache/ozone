@@ -3495,6 +3495,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   void setExitManagerForTesting(ExitManager exitManagerForTesting) {
     this.exitManager = exitManagerForTesting;
+  }
 
 
   public boolean getEnableFileSystemPaths() {
