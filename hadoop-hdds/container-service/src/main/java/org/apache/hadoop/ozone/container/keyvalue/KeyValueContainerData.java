@@ -70,6 +70,8 @@ public class KeyValueContainerData extends ContainerData {
 
   private File dbFile = null;
 
+  private String schemaVersion;
+
   /**
    * Number of pending deletion blocks in KeyValueContainer.
    */
@@ -86,6 +88,7 @@ public class KeyValueContainerData extends ContainerData {
     KV_YAML_FIELDS.add(METADATA_PATH);
     KV_YAML_FIELDS.add(CHUNKS_PATH);
     KV_YAML_FIELDS.add(CONTAINER_DB_TYPE);
+    KV_YAML_FIELDS.add(SCHEMA_VERSION);
   }
 
   /**
@@ -110,6 +113,19 @@ public class KeyValueContainerData extends ContainerData {
     this.deleteTransactionId = 0;
   }
 
+  /**
+   * @param version The schema version indicating the table layout of the container's database.
+   */
+  public void setSchemaVersion(String version) {
+    schemaVersion = version;
+  }
+
+  /**
+   * @return The schema version describing the container database's table layout.
+   */
+  public String getSchemaVersion() {
+    return schemaVersion;
+  }
 
   /**
    * Sets Container dbFile. This should be called only during creation of

@@ -293,18 +293,20 @@ public final class DBStoreBuilder {
       DBDefinition definition)
       throws IOException {
     DBStoreBuilder builder = createDBStoreBuilder(configuration, definition);
-    for (DBColumnFamilyDefinition columnTableDefinition : definition
-        .getColumnFamilies()) {
-      builder.registerTable(columnTableDefinition);
-    }
+    builder.registerTables(definition);
+
     return builder.build();
   }
 
-  private <KEY, VALUE> void registerTable(
-      DBColumnFamilyDefinition<KEY, VALUE> definition) {
-    addTable(definition.getName())
-        .addCodec(definition.getKeyType(), definition.getKeyCodec())
-        .addCodec(definition.getValueType(), definition.getValueCodec());
-  }
+  public <KEY, VALUE> DBStoreBuilder registerTables(DBDefinition definition) {
+    for (DBColumnFamilyDefinition<KEY, VALUE> cfDefinition :
+            definition.getColumnFamilies()) {
 
+      addTable(definition.getName())
+              .addCodec(cfDefinition.getKeyType(), cfDefinition.getKeyCodec())
+              .addCodec(cfDefinition.getValueType(), cfDefinition.getValueCodec());
+    }
+
+    return this;
+  }
 }

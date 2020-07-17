@@ -125,8 +125,12 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
       //Create Metadata path chunks path and metadata db
       File dbFile = getContainerDBFile();
+
+      // This method is only called when creating new containers.
+      // Therefore, always use the new schema version (two column families).
+      containerData.setSchemaVersion(OzoneConsts.SCHEMA_V2);
       KeyValueContainerUtil.createContainerMetaData(containerMetaDataPath,
-          chunksPath, dbFile, config);
+          chunksPath, dbFile, containerData.getSchemaVersion(), config);
 
       //Set containerData for the KeyValueContainer.
       containerData.setChunksPath(chunksPath.getPath());

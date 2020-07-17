@@ -27,6 +27,8 @@ import com.google.common.primitives.Longs;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -39,6 +41,11 @@ import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreOneTableImpl;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreTwoTableImpl;
+import org.rocksdb.DBOptions;
+import org.rocksdb.Options;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,7 +77,7 @@ public final class KeyValueContainerUtil {
    * @throws IOException
    */
   public static void createContainerMetaData(File containerMetaDataPath, File
-      chunksPath, File dbFile, ConfigurationSource conf) throws IOException {
+      chunksPath, File dbFile, String schemaVersion, ConfigurationSource conf) throws IOException {
     Preconditions.checkNotNull(containerMetaDataPath);
     Preconditions.checkNotNull(conf);
 
@@ -91,8 +98,18 @@ public final class KeyValueContainerUtil {
           " Path: " + chunksPath);
     }
 
-    MetadataStore store = MetadataStoreBuilder.newBuilder().setConf(conf)
-        .setCreateIfMissing(true).setDbFile(dbFile).build();
+    DatanodeStore store;
+    if (schemaVersion == OzoneConsts.SCHEMA_V1) {
+      store = new DatanodeStoreOneTableImpl(conf, dbFile.getAbsolutePath());
+    }
+    else if (schemaVersion == OzoneConsts.SCHEMA_V2) {
+      store = new DatanodeStoreTwoTableImpl(conf, dbFile.getAbsolutePath());
+    }
+    else {
+      throw new IllegalArgumentException("Unrecognized schema version for container: " +
+              schemaVersion);
+    }
+
     ReferenceCountedDB db =
         new ReferenceCountedDB(store, dbFile.getAbsolutePath());
     //add db handler into cache
@@ -158,6 +175,12 @@ public final class KeyValueContainerUtil {
       return;
     }
     kvContainerData.setDbFile(dbFile);
+
+    if (kvContainerData.getSchemaVersion() == null) {
+      // If this container has not specified a schema version, it is in the old format with one
+      // default column family.
+      kvContainerData.setSchemaVersion(OzoneConsts.SCHEMA_V1);
+    }
 
 
     boolean isBlockMetadataSet = false;
