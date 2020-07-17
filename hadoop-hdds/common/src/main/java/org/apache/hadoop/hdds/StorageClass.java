@@ -42,7 +42,8 @@ public interface StorageClass {
 
     public OpenStateConfiguration(
         HddsProtos.ReplicationType replicationType,
-        HddsProtos.ReplicationFactor replicationFactor) {
+        HddsProtos.ReplicationFactor replicationFactor
+    ) {
       this.replicationType = replicationType;
       this.replicationFactor = replicationFactor;
     }
@@ -61,16 +62,14 @@ public interface StorageClass {
    */
   class ClosedStateConfiguration {
 
-    private final HddsProtos.ReplicationFactor replicationFactor;
+    private final int replicationFactor;
 
-    public ClosedStateConfiguration(
-        HddsProtos.ReplicationFactor replicationFactor) {
+    public ClosedStateConfiguration(int replicationFactor) {
       this.replicationFactor = replicationFactor;
     }
 
-    public HddsProtos.ReplicationFactor getReplicationFactor() {
+    public int getReplicationFactor() {
       return replicationFactor;
     }
   }
-
 }

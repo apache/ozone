@@ -37,8 +37,7 @@ public class StaticStorageClassRegistry implements StorageClassRegistry {
 
     @Override
     public ClosedStateConfiguration getClosedStateConfiguration() {
-      return new ClosedStateConfiguration(
-          HddsProtos.ReplicationFactor.ONE);
+      return new ClosedStateConfiguration(1);
     }
 
     @Override
@@ -58,8 +57,7 @@ public class StaticStorageClassRegistry implements StorageClassRegistry {
 
     @Override
     public ClosedStateConfiguration getClosedStateConfiguration() {
-      return new ClosedStateConfiguration(
-          HddsProtos.ReplicationFactor.THREE);
+      return new ClosedStateConfiguration(3);
     }
 
     @Override
@@ -79,8 +77,7 @@ public class StaticStorageClassRegistry implements StorageClassRegistry {
 
     @Override
     public ClosedStateConfiguration getClosedStateConfiguration() {
-      return new ClosedStateConfiguration(
-          HddsProtos.ReplicationFactor.ONE);
+      return new ClosedStateConfiguration(1);
     }
 
     @Override

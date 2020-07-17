@@ -35,6 +35,9 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
+import org.apache.hadoop.hdds.StorageClass;
+import org.apache.hadoop.hdds.StorageClassRegistry;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
@@ -139,15 +142,19 @@ public class ReplicationManager
    */
   private final NodeManager nodeManager;
 
+  private StorageClassRegistry storageClassRegistry =
+      new StaticStorageClassRegistry();
+
   /**
    * Constructs ReplicationManager instance with the given configuration.
    *
-   * @param conf OzoneConfiguration
-   * @param containerManager ContainerManager
+   * @param conf               OzoneConfiguration
+   * @param containerManager   ContainerManager
    * @param containerPlacement PlacementPolicy
-   * @param eventPublisher EventPublisher
+   * @param eventPublisher     EventPublisher
    */
-  public ReplicationManager(final ReplicationManagerConfiguration conf,
+  public ReplicationManager(
+      final ReplicationManagerConfiguration conf,
                             final ContainerManager containerManager,
                             final PlacementPolicy containerPlacement,
                             final EventPublisher eventPublisher,
@@ -264,13 +271,16 @@ public class ReplicationManager
           .getContainerReplicas(container.containerID());
       final LifeCycleState state = container.getState();
 
+      StorageClass storageClass =
+          storageClassRegistry.getStorageClass(container.getStorageClass());
+
       /*
        * We don't take any action if the container is in OPEN state and
        * the container is healthy. If the container is not healthy, i.e.
        * the replicas are not in OPEN state, send CLOSE_CONTAINER command.
        */
       if (state == LifeCycleState.OPEN) {
-        if (!isContainerHealthy(container, replicas)) {
+        if (!isContainerHealthy(container, replicas, storageClass)) {
           eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, id);
         }
         return;
@@ -320,7 +330,7 @@ public class ReplicationManager
        * the container is either in QUASI_CLOSED or in CLOSED state and has
        * exact number of replicas in the same state.
        */
-      if (isContainerHealthy(container, replicas)) {
+      if (isContainerHealthy(container, replicas, storageClass)) {
         return;
       }
 
@@ -328,7 +338,7 @@ public class ReplicationManager
        * Check if the container is under replicated and take appropriate
        * action.
        */
-      if (isContainerUnderReplicated(container, replicas)) {
+      if (isContainerUnderReplicated(container, replicas, storageClass)) {
         handleUnderReplicatedContainer(container, replicas);
         return;
       }
@@ -337,7 +347,7 @@ public class ReplicationManager
        * Check if the container is over replicated and take appropriate
        * action.
        */
-      if (isContainerOverReplicated(container, replicas)) {
+      if (isContainerOverReplicated(container, replicas, storageClass)) {
         handleOverReplicatedContainer(container, replicas);
         return;
       }
@@ -385,18 +395,21 @@ public class ReplicationManager
 
   /**
    * Returns true if the container is healthy according to ReplicationMonitor.
-   *
+   * <p>
    * According to ReplicationMonitor container is considered healthy if
    * it has exact number of replicas in the same state as the container.
    *
    * @param container Container to check
-   * @param replicas Set of ContainerReplicas
+   * @param replicas  Set of ContainerReplicas
    * @return true if the container is healthy, false otherwise
    */
-  private boolean isContainerHealthy(final ContainerInfo container,
-                                     final Set<ContainerReplica> replicas) {
-    return !isContainerUnderReplicated(container, replicas) &&
-        !isContainerOverReplicated(container, replicas) &&
+  private boolean isContainerHealthy(
+      final ContainerInfo container,
+      final Set<ContainerReplica> replicas,
+      final StorageClass storageClass
+  ) {
+    return !isContainerUnderReplicated(container, replicas, storageClass) &&
+        !isContainerOverReplicated(container, replicas, storageClass) &&
         replicas.stream().allMatch(
             r -> compareState(container.getState(), r.getState()));
   }
@@ -405,13 +418,17 @@ public class ReplicationManager
    * Checks if the container is under replicated or not.
    *
    * @param container Container to check
-   * @param replicas Set of ContainerReplicas
+   * @param replicas  Set of ContainerReplicas
    * @return true if the container is under replicated, false otherwise
    */
-  private boolean isContainerUnderReplicated(final ContainerInfo container,
-      final Set<ContainerReplica> replicas) {
+  private boolean isContainerUnderReplicated(
+      final ContainerInfo container,
+      final Set<ContainerReplica> replicas,
+      StorageClass storageClass
+  ) {
     boolean misReplicated = !getPlacementStatus(
-        replicas, container.getReplicationFactor().getNumber())
+        replicas,
+        storageClass.getClosedStateConfiguration().getReplicationFactor())
         .isPolicySatisfied();
     return container.getReplicationFactor().getNumber() >
         getReplicaCount(container.containerID(), replicas) || misReplicated;
@@ -421,12 +438,15 @@ public class ReplicationManager
    * Checks if the container is over replicated or not.
    *
    * @param container Container to check
-   * @param replicas Set of ContainerReplicas
+   * @param replicas  Set of ContainerReplicas
    * @return true if the container if over replicated, false otherwise
    */
-  private boolean isContainerOverReplicated(final ContainerInfo container,
-      final Set<ContainerReplica> replicas) {
-    return container.getReplicationFactor().getNumber() <
+  private boolean isContainerOverReplicated(
+      final ContainerInfo container,
+      final Set<ContainerReplica> replicas,
+      StorageClass storageClass
+  ) {
+    return storageClass.getClosedStateConfiguration().getReplicationFactor() <
         getReplicaCount(container.containerID(), replicas);
   }
 
