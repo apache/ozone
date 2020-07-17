@@ -44,7 +44,7 @@ public final class ContainerCache extends LRUMap {
   private final Lock lock = new ReentrantLock();
   private static ContainerCache cache;
   private static final float LOAD_FACTOR = 0.75f;
-  private final static Striped<Lock> rocksDBLock = Striped.lazyWeakLock(1024);
+  private final Striped<Lock> rocksDBLock = Striped.lazyWeakLock(1024);
   /**
    * Constructs a cache that holds DBHandle references.
    */
