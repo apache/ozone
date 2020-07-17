@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -19,11 +19,11 @@ package org.apache.hadoop.ozone.om;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyLong;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.client.BlockID;
@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.junit.After;
@@ -44,7 +45,6 @@ import org.mockito.Mockito;
 /**
  * Test for OM metrics.
  */
-@SuppressWarnings("deprecation")
 public class TestOmMetrics {
 
   /**
@@ -62,8 +62,6 @@ public class TestOmMetrics {
 
   /**
    * Create a MiniDFSCluster for testing.
-   *
-   * @throws IOException
    */
   @Before
   public void setup() throws Exception {
@@ -233,20 +231,28 @@ public class TestOmMetrics {
     KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
         .getInternalState(ozoneManager, "keyManager");
     KeyManager mockKm = Mockito.spy(keyManager);
+    BucketManager mockBm = Mockito.mock(BucketManager.class);
 
-    Mockito.doReturn(null).when(mockKm).openKey(null);
-    Mockito.doNothing().when(mockKm).deleteKey(null);
-    Mockito.doReturn(null).when(mockKm).lookupKey(null, "");
-    Mockito.doReturn(null).when(mockKm).listKeys(null, null, null, null, 0);
-    Mockito.doReturn(null).when(mockKm).listTrash(
-        null, null, null, null, 0);
-    Mockito.doNothing().when(mockKm).commitKey(any(OmKeyArgs.class), anyLong());
-    Mockito.doReturn(null).when(mockKm).initiateMultipartUpload(
-        any(OmKeyArgs.class));
+    OmBucketInfo mockBucket = OmBucketInfo.newBuilder()
+        .setVolumeName("").setBucketName("")
+        .build();
+    Mockito.when(mockBm.getBucketInfo(any(), any())).thenReturn(mockBucket);
+    Mockito.doReturn(null).when(mockKm).openKey(any());
+    Mockito.doNothing().when(mockKm).deleteKey(any());
+    Mockito.doReturn(null).when(mockKm).lookupKey(any(), any());
+    Mockito.doReturn(null).when(mockKm).listKeys(any(), any(), any(), any(),
+        anyInt());
+    Mockito.doReturn(null).when(mockKm).listTrash(any(), any(), any(), any(),
+        anyInt());
+    Mockito.doNothing().when(mockKm).commitKey(any(), anyLong());
+    Mockito.doReturn(null).when(mockKm).initiateMultipartUpload(any());
 
     HddsWhiteboxTestUtils.setInternalState(
+        ozoneManager, "bucketManager", mockBm);
+    HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "keyManager", mockKm);
-    doKeyOps();
+    OmKeyArgs keyArgs = createKeyArgs();
+    doKeyOps(keyArgs);
 
     MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
     assertCounter("NumKeyOps", 7L, omMetrics);
@@ -259,34 +265,32 @@ public class TestOmMetrics {
     assertCounter("NumInitiateMultipartUploads", 1L, omMetrics);
 
 
-    ozoneManager.openKey(null);
-    ozoneManager.commitKey(createKeyArgs(), 0);
-    ozoneManager.openKey(null);
-    ozoneManager.commitKey(createKeyArgs(), 0);
-    ozoneManager.openKey(null);
-    ozoneManager.commitKey(createKeyArgs(), 0);
-    ozoneManager.deleteKey(null);
+    ozoneManager.openKey(keyArgs);
+    ozoneManager.commitKey(keyArgs, 0);
+    ozoneManager.openKey(keyArgs);
+    ozoneManager.commitKey(keyArgs, 0);
+    ozoneManager.openKey(keyArgs);
+    ozoneManager.commitKey(keyArgs, 0);
+    ozoneManager.deleteKey(keyArgs);
 
 
     omMetrics = getMetrics("OMMetrics");
     assertCounter("NumKeys", 2L, omMetrics);
 
     // inject exception to test for Failure Metrics
-    Mockito.doThrow(exception).when(mockKm).openKey(null);
-    Mockito.doThrow(exception).when(mockKm).deleteKey(null);
-    Mockito.doThrow(exception).when(mockKm).lookupKey(null, "");
+    Mockito.doThrow(exception).when(mockKm).openKey(any());
+    Mockito.doThrow(exception).when(mockKm).deleteKey(any());
+    Mockito.doThrow(exception).when(mockKm).lookupKey(any(), any());
     Mockito.doThrow(exception).when(mockKm).listKeys(
-        null, null, null, null, 0);
+        any(), any(), any(), any(), anyInt());
     Mockito.doThrow(exception).when(mockKm).listTrash(
-        null, null, null, null, 0);
-    Mockito.doThrow(exception).when(mockKm).commitKey(any(OmKeyArgs.class),
-        anyLong());
-    Mockito.doThrow(exception).when(mockKm).initiateMultipartUpload(
-        any(OmKeyArgs.class));
+        any(), any(), any(), any(), anyInt());
+    Mockito.doThrow(exception).when(mockKm).commitKey(any(), anyLong());
+    Mockito.doThrow(exception).when(mockKm).initiateMultipartUpload(any());
 
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "keyManager", mockKm);
-    doKeyOps();
+    doKeyOps(keyArgs);
 
     omMetrics = getMetrics("OMMetrics");
     assertCounter("NumKeyOps", 21L, omMetrics);
@@ -380,39 +384,39 @@ public class TestOmMetrics {
   /**
    * Test key operations with ignoring thrown exception.
    */
-  private void doKeyOps() {
+  private void doKeyOps(OmKeyArgs keyArgs) {
     try {
-      ozoneManager.openKey(null);
+      ozoneManager.openKey(keyArgs);
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.deleteKey(null);
+      ozoneManager.deleteKey(keyArgs);
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.lookupKey(null);
+      ozoneManager.lookupKey(keyArgs);
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.listKeys(null, null, null, null, 0);
+      ozoneManager.listKeys("", "", null, null, 0);
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.listTrash(null, null, null, null, 0);
+      ozoneManager.listTrash("", "", null, null, 0);
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.commitKey(createKeyArgs(), 0);
+      ozoneManager.commitKey(keyArgs, 0);
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.initiateMultipartUpload(null);
+      ozoneManager.initiateMultipartUpload(keyArgs);
     } catch (IOException ignored) {
     }
 
@@ -420,12 +424,12 @@ public class TestOmMetrics {
 
   private OmKeyArgs createKeyArgs() {
     OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
-        .setBlockID(new BlockID(new ContainerBlockID(1, 1))).build();
+        .setBlockID(new BlockID(new ContainerBlockID(1, 1)))
+        .build();
     keyLocationInfo.setCreateVersion(0);
-    List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
-    omKeyLocationInfoList.add(keyLocationInfo);
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setLocationInfoList(
-        omKeyLocationInfoList).build();
-    return keyArgs;
+
+    return new OmKeyArgs.Builder()
+        .setLocationInfoList(Collections.singletonList(keyLocationInfo))
+        .build();
   }
 }

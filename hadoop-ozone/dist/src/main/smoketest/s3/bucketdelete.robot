@@ -23,14 +23,20 @@ Test Timeout        5 minutes
 Suite Setup         Setup s3 tests
 
 *** Variables ***
-${ENDPOINT_URL}       http://s3g:9878
 ${BUCKET}             generated
+${ENDPOINT_URL}       http://s3g:9878
+
+*** Keywords ***
+Create bucket to be deleted
+    ${bucket} =    Run Keyword if    '${BUCKET}' == 'link'    Create link    to-be-deleted
+    ...            ELSE              Run Keyword              Create bucket
+    [return]       ${bucket}
 
 *** Test Cases ***
 
 Delete existing bucket
-# Bucket already is created in Test Setup.
-                   Execute AWSS3APICli                delete-bucket --bucket ${BUCKET}
+    ${bucket} =                Create bucket to be deleted
+    Execute AWSS3APICli        delete-bucket --bucket ${bucket}
 
 Delete non-existent bucket
     ${result} =    Execute AWSS3APICli and checkrc    delete-bucket --bucket nosuchbucket    255

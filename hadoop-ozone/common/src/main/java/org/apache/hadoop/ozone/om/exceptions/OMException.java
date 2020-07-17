@@ -223,6 +223,8 @@ public class OMException extends IOException {
 
     INVALID_VOLUME_NAME,
 
-    PARTIAL_DELETE
+    PARTIAL_DELETE,
+
+    DETECTED_LOOP_IN_BUCKET_LINKS,
   }
 }
