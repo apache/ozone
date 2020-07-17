@@ -19,7 +19,7 @@ ALL_RESULT_DIR="$SCRIPT_DIR/result"
 RESULT=0
 IFS=$'\n'
 # shellcheck disable=SC2044
-for test in $(find "$SCRIPT_DIR" -maxdepth 2 -name test.sh | grep "${OZONE_TEST_SELECTOR:-""}" |sort); do
+for test in $(find "$SCRIPT_DIR" -mindepth 2 -maxdepth 2 -name test.sh | grep "${OZONE_TEST_SELECTOR:-""}" |sort); do
   TEST_DIR="$(dirname "$test")"
   echo "Executing test in $TEST_DIR"
 
