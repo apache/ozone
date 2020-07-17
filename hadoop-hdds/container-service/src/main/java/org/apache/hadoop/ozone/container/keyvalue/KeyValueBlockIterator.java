@@ -158,9 +158,9 @@ public class KeyValueBlockIterator implements BlockIterator<BlockData>,
     BlockData foundBlock = null;
 
     while (blockIterator.hasNext() && foundBlock == null) {
-      KeyValue blockKV = blockIterator.next();
-      if (blockFilter.filterKey(null, blockKV.getKey(), null)) {
-        foundBlock = BlockUtils.getBlockData(blockKV.getValue());
+      Table.KeyValue<String, BlockData> blockKV = blockIterator.next();
+      if (blockFilter.filterKey(null, blockKV.getKey().getBytes(), null)) {
+        foundBlock = blockKV.getValue();
         if (LOG.isTraceEnabled()) {
           LOG.trace("Block matching with filter found: blockID is : {} for " +
                   "containerID {}", foundBlock.getLocalID(), containerId);

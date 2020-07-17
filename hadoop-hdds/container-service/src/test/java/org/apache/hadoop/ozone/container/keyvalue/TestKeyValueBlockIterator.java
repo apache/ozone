@@ -355,7 +355,8 @@ public class TestKeyValueBlockIterator {
       ChunkInfo info = new ChunkInfo("chunkfile", 0, 1024);
       chunkList.add(info.getProtoBufMessage());
 
-      Table<String, BlockData> blockDataTable = metadataStore.getStore().getBlockDataTable();
+      Table<String, BlockData> blockDataTable =
+              metadataStore.getStore().getBlockDataTable();
 
       int blockIndex = 0;
       for (int i = 0; i < normalBlocks; i++) {
@@ -380,9 +381,8 @@ public class TestKeyValueBlockIterator {
         blockIndex++;
         BlockData blockData = new BlockData(blockID);
         blockData.setChunks(chunkList);
-        metadataStore.getStore().put(StringUtils.string2Bytes(OzoneConsts
-                .DELETED_KEY_PREFIX + blockID.getLocalID()), blockData
-                .getProtoBufMessage().toByteArray());
+        String localID = OzoneConsts.DELETED_KEY_PREFIX + blockID.getLocalID();
+        blockDataTable.put(localID, blockData);
       }
     }
   }
