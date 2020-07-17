@@ -43,7 +43,6 @@ import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
@@ -291,66 +290,6 @@ public class TestKeyInputStream {
     // indices.
     for (int i = 0; i < chunkSize; i++) {
       Assert.assertEquals(inputData[chunkSize + 50 + i], readData[i]);
-    }
-  }
-
-  @Test
-  public void testCopyLarge() throws Exception {
-    String keyName = getKeyName();
-    OzoneOutputStream key = TestHelper.createKey(keyName,
-        ReplicationType.RATIS, 0, objectStore, volumeName, bucketName);
-
-    // write data spanning 3 blocks
-    int dataLength = (2 * blockSize) + (blockSize / 2);
-
-    byte[] inputData = new byte[dataLength];
-    Random rand = new Random();
-    for (int i = 0; i < dataLength; i++) {
-      inputData[i] = (byte) rand.nextInt(127);
-    }
-    key.write(inputData);
-    key.close();
-
-    // test with random start and random length
-    for (int i = 0; i < 100; i++) {
-      int inputOffset = rand.nextInt(dataLength - 1);
-      int length = rand.nextInt(dataLength - inputOffset);
-
-      KeyInputStream keyInputStream = (KeyInputStream) objectStore
-          .getVolume(volumeName).getBucket(bucketName).readKey(keyName)
-          .getInputStream();
-      ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-
-      keyInputStream.copyLarge(outputStream, inputOffset, length,
-          new byte[4096]);
-      byte[] readData = outputStream.toByteArray();
-      keyInputStream.close();
-      outputStream.close();
-
-      for (int j = inputOffset; j < inputOffset + length; j++) {
-        Assert.assertEquals(readData[j - inputOffset], inputData[j]);
-      }
-    }
-
-    // test with random start and -ve length
-    for (int i = 0; i < 10; i++) {
-      int inputOffset = rand.nextInt(dataLength - 1);
-      int length = -1;
-
-      KeyInputStream keyInputStream = (KeyInputStream) objectStore
-          .getVolume(volumeName).getBucket(bucketName).readKey(keyName)
-          .getInputStream();
-      ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-
-      keyInputStream.copyLarge(outputStream, inputOffset, length,
-          new byte[4096]);
-      byte[] readData = outputStream.toByteArray();
-      keyInputStream.close();
-      outputStream.close();
-
-      for (int j = inputOffset; j < dataLength; j++) {
-        Assert.assertEquals(readData[j - inputOffset], inputData[j]);
-      }
     }
   }
 
