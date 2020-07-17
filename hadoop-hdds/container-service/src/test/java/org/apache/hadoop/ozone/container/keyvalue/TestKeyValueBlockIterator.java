@@ -55,6 +55,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import sun.util.resources.cldr.en.CurrencyNames_en_TT;
 
 /**
  * This class is used to test KeyValue container block iterator.
@@ -201,21 +202,21 @@ public class TestKeyValueBlockIterator {
   @Test
   public void testKeyValueBlockIteratorWithFilter() throws Exception {
     long containerId = 103L;
-    int deletedBlocks = 10;
     int normalBlocks = 5;
+    int deletedBlocks = 5;
     createContainerWithBlocks(containerId, normalBlocks, deletedBlocks);
     String containerPath = new File(containerData.getMetadataPath())
         .getParent();
     try(KeyValueBlockIterator keyValueBlockIterator = new KeyValueBlockIterator(
         containerId, new File(containerPath), MetadataKeyFilters
-        .getDeletingKeyFilter())) {
+        .getDeletedKeyFilter())) {
 
-      int counter = 5;
+      int counter = normalBlocks;
       while (keyValueBlockIterator.hasNext()) {
         BlockData blockData = keyValueBlockIterator.nextBlock();
         assertEquals(blockData.getLocalID(), counter++);
       }
-      assertEquals(10, counter);
+      assertEquals(normalBlocks + deletedBlocks, counter);
     }
   }
 
@@ -244,7 +245,24 @@ public class TestKeyValueBlockIterator {
    * @throws Exception
    */
   private void createContainerWithBlocks(long containerId, int
-      normalBlocks, int deletedBlocks) throws
+          normalBlocks, int deletedBlocks) throws
+          Exception {
+
+    createContainerWithBlocks(containerId, normalBlocks, 0, deletedBlocks);
+  }
+
+  /**
+   * Creates a container with specified number of normal blocks and deleted
+   * blocks. First it will insert normal blocks, then it will insert
+   * deleting blocks, then it will insert deleted blocks.
+   * @param containerId
+   * @param normalBlocks
+   * @param deletingBlocks
+   * @param deletedBlocks
+   * @throws Exception
+   */
+  private void createContainerWithBlocks(long containerId, int
+      normalBlocks, int deletingBlocks, int deletedBlocks) throws
       Exception {
     containerData = new KeyValueContainerData(containerId,
         layout,
@@ -260,8 +278,10 @@ public class TestKeyValueBlockIterator {
       ChunkInfo info = new ChunkInfo("chunkfile", 0, 1024);
       chunkList.add(info.getProtoBufMessage());
 
+      int blockIndex = 0;
       for (int i = 0; i < normalBlocks; i++) {
-        BlockID blockID = new BlockID(containerId, i);
+        BlockID blockID = new BlockID(containerId, blockIndex);
+        blockIndex++;
         BlockData blockData = new BlockData(blockID);
         blockData.setChunks(chunkList);
         metadataStore.getStore().put(Longs.toByteArray(blockID.getLocalID()),
@@ -269,15 +289,25 @@ public class TestKeyValueBlockIterator {
             .getProtoBufMessage().toByteArray());
       }
 
-      for (int i = normalBlocks; i < deletedBlocks; i++) {
-        BlockID blockID = new BlockID(containerId, i);
+      for (int i = 0; i < deletingBlocks; i++) {
+        BlockID blockID = new BlockID(containerId, blockIndex);
+        blockIndex++;
         BlockData blockData = new BlockData(blockID);
         blockData.setChunks(chunkList);
         metadataStore.getStore().put(StringUtils.string2Bytes(OzoneConsts
             .DELETING_KEY_PREFIX + blockID.getLocalID()), blockData
             .getProtoBufMessage().toByteArray());
       }
+
+      for (int i = 0; i < deletedBlocks; i++) {
+        BlockID blockID = new BlockID(containerId, blockIndex);
+        blockIndex++;
+        BlockData blockData = new BlockData(blockID);
+        blockData.setChunks(chunkList);
+        metadataStore.getStore().put(StringUtils.string2Bytes(OzoneConsts
+                .DELETED_KEY_PREFIX + blockID.getLocalID()), blockData
+                .getProtoBufMessage().toByteArray());
+      }
     }
   }
-
 }
