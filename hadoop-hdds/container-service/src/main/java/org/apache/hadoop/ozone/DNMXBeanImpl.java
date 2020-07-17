@@ -15,3 +15,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+package org.apache.hadoop.ozone;
+
+import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
+import org.apache.hadoop.hdds.utils.VersionInfo;
+
+/**
+ * This is the JMX management class for DN information.
+ */
+public class DNMXBeanImpl extends ServiceRuntimeInfoImpl implements DNMXBean {
+  public DNMXBeanImpl(
+      VersionInfo versionInfo) {
+    super(versionInfo);
+  }
+}

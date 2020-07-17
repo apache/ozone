@@ -40,6 +40,7 @@ import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -48,6 +49,7 @@ import org.junit.rules.Timeout;
 /**
  * Tests the Ratis snaphsots feature in OM.
  */
+@Ignore("HDDS-3966")
 public class TestOMRatisSnapshots {
 
   private MiniOzoneHAClusterImpl cluster = null;

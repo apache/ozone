@@ -23,12 +23,14 @@ import java.net.InetAddress;
 import java.security.KeyPair;
 import java.security.cert.CertificateException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.sun.jmx.mbeanserver.Introspector;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -49,6 +51,7 @@ import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRe
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
+import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
@@ -71,6 +74,8 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
+
+import javax.management.ObjectName;
 
 /**
  * Datanode service plugin to start the HDDS container services.
@@ -97,6 +102,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private volatile AtomicBoolean isStopped = new AtomicBoolean(false);
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
+  private DNMXBeanImpl serviceRuntimeInfo =
+      new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) {};
+  private ObjectName dnInfoBeanName;
+
   //Constructor for DataNode PluginService
   public HddsDatanodeService(){}
 
@@ -134,6 +143,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   public static void main(String[] args) {
     try {
+      Introspector.checkCompliance(DNMXBeanImpl.class);
       HddsDatanodeService hddsDatanodeService =
           createHddsDatanodeService(args, true);
       hddsDatanodeService.run(args);
@@ -182,6 +192,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   public void start() {
+    serviceRuntimeInfo.setStartTime();
+
     RatisDropwizardExports.
         registerRatisMetricReporters(ratisMetricsMap);
 
@@ -250,7 +262,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           .equalsIgnoreCase(System.getenv("OZONE_DATANODE_STANDALONE_TEST"))) {
         startRatisForTest();
       }
-
+      registerMXBean();
     } catch (IOException e) {
       throw new RuntimeException("Can't start the HDDS datanode plugin", e);
     } catch (AuthenticationException ex) {
@@ -347,6 +359,21 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     } catch (IOException | CertificateException e) {
       LOG.error("Error while storing SCM signed certificate.", e);
       throw new RuntimeException(e);
+    }
+  }
+
+  private void registerMXBean() {
+    Map<String, String> jmxProperties = new HashMap<>();
+    jmxProperties.put("component", "ServerRuntime");
+    this.dnInfoBeanName = HddsUtils.registerWithJmxProperties(
+        "HddsDatanodeService",
+        "HddsDatanodeServiceInfo", jmxProperties, this.serviceRuntimeInfo);
+  }
+
+  private void unregisterMXBean() {
+    if (this.dnInfoBeanName != null) {
+      MBeans.unregister(this.dnInfoBeanName);
+      this.dnInfoBeanName = null;
     }
   }
 
@@ -517,6 +544,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           LOG.error("Stopping HttpServer is failed.", e);
         }
       }
+      unregisterMXBean();
     }
   }
 

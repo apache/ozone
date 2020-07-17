@@ -107,6 +107,37 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml</excludeFilterFile>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>copy-common-html</id>
+            <phase>prepare-package</phase>
+            <goals>
+              <goal>unpack</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>org.apache.hadoop</groupId>
+                  <artifactId>hadoop-hdds-server-framework</artifactId>
+                  <outputDirectory>${project.build.outputDirectory}
+                  </outputDirectory>
+                  <includes>webapps/static/**/*.*</includes>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>org.apache.hadoop</groupId>
+                  <artifactId>hadoop-hdds-docs</artifactId>
+                  <outputDirectory>${project.build.outputDirectory}/webapps/hddsDatanode</outputDirectory>
+                  <includes>docs/**/*.*</includes>
+                </artifactItem>
+              </artifactItems>
+              <overWriteSnapshots>true</overWriteSnapshots>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 </project>
