@@ -55,7 +55,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import sun.util.resources.cldr.en.CurrencyNames_en_TT;
 
 /**
  * This class is used to test KeyValue container block iterator.
@@ -232,12 +231,14 @@ public class TestKeyValueBlockIterator {
   }
 
   /**
-   * Due to RocksDB internals, prefixed keys may be grouped all at the beginning or end of the
-   * key iteration, depending on the serialization used. Keys of the same prefix are grouped
-   * together. This method runs the same set of tests on the iterator first positively filtering
-   * deleting keys, and then positively filtering deleted keys.
-   * If the sets of keys with deleting prefixes, deleted prefixes, and no prefixes
-   * are not empty, it follows that the filter will encounter both of the following cases:
+   * Due to RocksDB internals, prefixed keys may be grouped all at the
+   * beginning or end of the key iteration, depending on the serialization
+   * used. Keys of the same prefix are grouped
+   * together. This method runs the same set of tests on the iterator first
+   * positively filtering deleting keys, and then positively filtering
+   * deleted keys. If the sets of keys with deleting prefixes, deleted
+   * prefixes, and no prefixes are not empty, it follows that the filter will
+   * encounter both of the following cases:
    *
    * 1. A failing key followed by a passing key.
    * 2. A passing key followed by a failing key.
@@ -255,19 +256,22 @@ public class TestKeyValueBlockIterator {
     int deletingBlocks = 3;
     // IDs 6 - 8
     int deletedBlocks = 3;
-    createContainerWithBlocks(containerId, normalBlocks, deletingBlocks, deletedBlocks);
+    createContainerWithBlocks(containerId, normalBlocks, deletingBlocks,
+            deletedBlocks);
     String containerPath = new File(containerData.getMetadataPath())
             .getParent();
 
     // Test deleting filter.
     final boolean negativeFilter = false;
-    MetadataKeyFilters.KeyPrefixFilter deletingOnly = new MetadataKeyFilters.KeyPrefixFilter(true);
+    MetadataKeyFilters.KeyPrefixFilter deletingOnly =
+            new MetadataKeyFilters.KeyPrefixFilter(true);
     deletingOnly.addFilter(OzoneConsts.DELETING_KEY_PREFIX, negativeFilter);
 
     testWithFilter(containerPath, deletingOnly, Arrays.asList(3L, 4L, 5L));
 
     // Test deleted filter.
-    MetadataKeyFilters.KeyPrefixFilter deletedOnly = new MetadataKeyFilters.KeyPrefixFilter(true);
+    MetadataKeyFilters.KeyPrefixFilter deletedOnly =
+            new MetadataKeyFilters.KeyPrefixFilter(true);
     deletedOnly.addFilter(OzoneConsts.DELETED_KEY_PREFIX, negativeFilter);
 
     testWithFilter(containerPath, deletedOnly, Arrays.asList(6L, 7L, 8L));
@@ -276,7 +280,8 @@ public class TestKeyValueBlockIterator {
   /**
    * Helper method to run some iterator tests with a provided filter.
    */
-  private void testWithFilter(String containerPath, MetadataKeyFilters.KeyPrefixFilter filter,
+  private void testWithFilter(String containerPath,
+                              MetadataKeyFilters.KeyPrefixFilter filter,
                               List<Long> expectedIDs) throws Exception {
     long containerId = 105L;
 

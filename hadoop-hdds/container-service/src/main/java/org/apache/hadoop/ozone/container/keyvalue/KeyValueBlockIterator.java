@@ -62,8 +62,8 @@ public class KeyValueBlockIterator implements BlockIterator<BlockData>,
   private KeyPrefixFilter blockFilter;
   private BlockData nextBlock;
   private long containerId;
-  // If true, indicates that the internal iterator position was moved using seek, and our queued
-  // up default block is no longer valid.
+  // If true, indicates that the internal iterator position was moved using
+  // seek, and our queued up default block is no longer valid.
   private boolean wasReset;
 
   /**
@@ -139,7 +139,8 @@ public class KeyValueBlockIterator implements BlockIterator<BlockData>,
 
   @Override
   public void seekToFirst() {
-    // Cannot call findNextBlock() here, as the IOException would break the interface.
+    // Cannot call findNextBlock() here, as the IOException would break the
+    // interface.
     blockIterator.seekToFirst();
     wasReset = true;
   }
