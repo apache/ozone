@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.shell.volume;
 
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
@@ -40,10 +41,15 @@ public class CreateVolumeHandler extends VolumeHandler {
       description = "Owner of the volume")
   private String ownerName;
 
-  @Option(names = {"--quota", "-q"},
+  @Option(names = {"--ssQuota", "-ssq"},
       description =
-          "Quota of the newly created volume (eg. 1G)")
-  private String quota;
+          "Quota Bytes of the newly created volume (eg. 1G)")
+  private String ssQuota;
+
+  @Option(names = {"--nsQuota", "-nsq"},
+      description =
+          "Quota count of the newly created volume (eg. 5)")
+  private long nsQuota = OzoneConsts.QUOTA_COUNT_RESET;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
@@ -58,9 +64,12 @@ public class CreateVolumeHandler extends VolumeHandler {
     VolumeArgs.Builder volumeArgsBuilder = VolumeArgs.newBuilder()
         .setAdmin(adminName)
         .setOwner(ownerName);
-    if (quota != null) {
-      volumeArgsBuilder.setQuota(quota);
+    if (ssQuota!= null) {
+      volumeArgsBuilder.setSsQuota(ssQuota);
     }
+
+    volumeArgsBuilder.setNsQuota(nsQuota);
+
     client.getObjectStore().createVolume(volumeName,
         volumeArgsBuilder.build());
 

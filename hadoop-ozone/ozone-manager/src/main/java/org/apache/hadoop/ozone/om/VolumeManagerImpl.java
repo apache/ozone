@@ -244,7 +244,6 @@ public class VolumeManagerImpl implements VolumeManager {
     }
   }
 
-
   private void setOwnerCommitToDB(UserVolumeInfo oldOwnerVolumeList,
       UserVolumeInfo newOwnerVolumeList, OmVolumeArgs newOwnerVolumeArgs,
       String oldOwner) throws IOException {
@@ -273,12 +272,14 @@ public class VolumeManagerImpl implements VolumeManager {
    * Changes the Quota on a volume.
    *
    * @param volume - Name of the volume.
-   * @param quota - Quota in bytes.
+   * @param namespaceQuota - Quota in count for bucket.
+   * @param storagespaceQuota - Quota in bytes.
    *
    * @throws IOException
    */
   @Override
-  public void setQuota(String volume, long quota) throws IOException {
+  public void setQuota(String volume, long namespaceQuota,
+                       long storagespaceQuota) throws IOException {
     Preconditions.checkNotNull(volume);
     metadataManager.getLock().acquireLock(VOLUME_LOCK, volume);
     try {
@@ -292,13 +293,15 @@ public class VolumeManagerImpl implements VolumeManager {
 
       Preconditions.checkState(volume.equals(volumeArgs.getVolume()));
 
-      volumeArgs.setQuotaInBytes(quota);
+      volumeArgs.setQuotaInBytes(storagespaceQuota);
+      volumeArgs.setQuotaInCounts(namespaceQuota);
 
       metadataManager.getVolumeTable().put(dbVolumeKey, volumeArgs);
     } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
-        LOG.error("Changing volume quota failed for volume:{} quota:{}", volume,
-            quota, ex);
+        LOG.error("Changing volume quota failed for volume:{} " +
+                "storagespace quota:{}, namespace quota:{}", volume,
+                storagespaceQuota, namespaceQuota, ex);
       }
       throw ex;
     } finally {

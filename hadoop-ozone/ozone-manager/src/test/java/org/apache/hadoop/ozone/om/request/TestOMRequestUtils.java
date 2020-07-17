@@ -361,14 +361,17 @@ public final class TestOMRequestUtils {
   /**
    * Create OMRequest for set volume property request with quota set.
    * @param volumeName
-   * @param quota
+   * @param quotaInBytes
+   * @param quotaInCounts
    * @return OMRequest
    */
   public static OMRequest createSetVolumePropertyRequest(String volumeName,
-      long quota) {
+      long quotaInBytes, long quotaInCounts) {
     SetVolumePropertyRequest setVolumePropertyRequest =
         SetVolumePropertyRequest.newBuilder().setVolumeName(volumeName)
-            .setQuotaInBytes(quota).setModificationTime(Time.now()).build();
+            .setQuotaInBytes(quotaInBytes)
+            .setQuotaInCounts(quotaInCounts)
+            .setModificationTime(Time.now()).build();
 
     return OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
         .setCmdType(OzoneManagerProtocolProtos.Type.SetVolumeProperty)

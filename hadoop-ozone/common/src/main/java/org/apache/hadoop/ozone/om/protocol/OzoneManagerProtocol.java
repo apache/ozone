@@ -88,10 +88,12 @@ public interface OzoneManagerProtocol
   /**
    * Changes the Quota on a volume.
    * @param volume - Name of the volume.
-   * @param quota - Quota in bytes.
+   * @param namespaceQuota- Quota in counts.
+   * @param storageSpaceQuota - Quota in bytes.
    * @throws IOException
    */
-  void setQuota(String volume, long quota) throws IOException;
+  void setQuota(String volume, long namespaceQuota, long storageSpaceQuota)
+      throws IOException;
 
   /**
    * Checks if the specified user can access this volume.

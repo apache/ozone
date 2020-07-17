@@ -1741,21 +1741,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Changes the Quota on a volume.
    *
    * @param volume - Name of the volume.
-   * @param quota  - Quota in bytes.
+   * @param storagespceQuota - Quota in bytes.
+   * @param namespaceQuota - Quota in counts.
    * @throws IOException
    */
   @Override
-  public void setQuota(String volume, long quota) throws IOException {
-    if (isAclEnabled) {
+  public void setQuota(String volume, long namespaceQuota,
+                       long storagespceQuota) throws IOException {
+    if(isAclEnabled) {
       checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.WRITE, volume,
           null, null);
     }
 
     Map<String, String> auditMap = buildAuditMap(volume);
-    auditMap.put(OzoneConsts.QUOTA_IN_BYTES, String.valueOf(quota));
+    auditMap.put(OzoneConsts.QUOTA_IN_BYTES, String.valueOf(storagespceQuota));
+    auditMap.put(OzoneConsts.QUOTA_IN_COUNTS, String.valueOf(namespaceQuota));
     try {
       metrics.incNumVolumeUpdates();
-      volumeManager.setQuota(volume, quota);
+      volumeManager.setQuota(volume, namespaceQuota, storagespceQuota);
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.SET_QUOTA,
           auditMap));
     } catch (Exception ex) {

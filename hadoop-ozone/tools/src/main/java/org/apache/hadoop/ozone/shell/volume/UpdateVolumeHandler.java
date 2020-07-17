@@ -19,10 +19,12 @@
 package org.apache.hadoop.ozone.shell.volume;
 
 import org.apache.hadoop.hdds.client.OzoneQuota;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -39,21 +41,52 @@ public class UpdateVolumeHandler extends VolumeHandler {
       description = "Owner of the volume to set")
   private String ownerName;
 
-  @Option(names = {"--quota"},
-      description = "Quota of the volume to set"
-          + "(eg. 1G)")
-  private String quota;
+  @CommandLine.Mixin
+  private VolumeQuota quota;
+
+  @CommandLine.Option(names = {"--clrSsQuota", "-clrssq"},
+      arity = "0",
+      description = "Reset Storage " + "space quota for a volume.")
+  private boolean clrSsQuota = false;
+
+  @CommandLine.Option(names = {"--clrNsQuota", "-clrnsq"},
+      arity = "0",
+      description = "Reset Namespace quota for a volume.")
+  private boolean clrNsQuota = false;
+
+  @CommandLine.Option(names = {"--clrQuota", "-clrq"},
+      arity = "0",
+      description = "Reset all quota for a volume.")
+  private boolean clrAllQuota = false;
+
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
-
     String volumeName = address.getVolumeName();
-
     OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
-    if (quota != null && !quota.isEmpty()) {
-      volume.setQuota(OzoneQuota.parseQuota(quota));
+    long storagespaceQuota = volume.getStoragespaceQuota();
+    long namespaceQuota = volume.getNamespaceQuota();
+    if (clrAllQuota) {
+      storagespaceQuota = OzoneConsts.MAX_QUOTA_IN_BYTES;
+      namespaceQuota = OzoneConsts.QUOTA_COUNT_RESET;
     }
+    if (clrNsQuota) {
+      namespaceQuota = OzoneConsts.QUOTA_COUNT_RESET;
+    }
+    if (clrSsQuota) {
+      storagespaceQuota = OzoneConsts.MAX_QUOTA_IN_BYTES;
+    }
+    if (quota.getSsQuota() != null && !quota.getSsQuota().isEmpty()) {
+      storagespaceQuota = OzoneQuota.parseQuota(quota.getSsQuota(),
+          quota.getNsQuota()).getStoragespaceQuota();
+    }
+    if (quota.getNsQuota() >= 0) {
+      namespaceQuota = quota.getNsQuota();
+    }
+
+    volume.setQuota(
+        OzoneQuota.getOzoneQuota(storagespaceQuota, namespaceQuota));
 
     if (ownerName != null && !ownerName.isEmpty()) {
       boolean result = volume.setOwner(ownerName);

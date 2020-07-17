@@ -280,9 +280,11 @@ public class RpcClient implements ClientProtocol {
         ugi.getUserName() : volArgs.getAdmin();
     String owner = volArgs.getOwner() == null ?
         ugi.getUserName() : volArgs.getOwner();
-    long quota = volArgs.getQuota() == null ?
+    long nsQuota = volArgs.getNsQuota();
+    long ssQuota = volArgs.getSsQuota() == null ?
         OzoneConsts.MAX_QUOTA_IN_BYTES :
-        OzoneQuota.parseQuota(volArgs.getQuota()).sizeInBytes();
+        OzoneQuota.parseQuota(volArgs.getSsQuota(), nsQuota)
+            .getStoragespaceQuota();
     List<OzoneAcl> listOfAcls = new ArrayList<>();
     //User ACL
     listOfAcls.add(new OzoneAcl(ACLIdentityType.USER,
@@ -301,7 +303,8 @@ public class RpcClient implements ClientProtocol {
     builder.setVolume(volumeName);
     builder.setAdminName(admin);
     builder.setOwnerName(owner);
-    builder.setQuotaInBytes(quota);
+    builder.setQuotaInBytes(ssQuota);
+    builder.setQuotaInCounts(nsQuota);
     builder.addAllMetadata(volArgs.getMetadata());
 
     //Remove duplicates and add ACLs
@@ -310,11 +313,12 @@ public class RpcClient implements ClientProtocol {
       builder.addOzoneAcls(OzoneAcl.toProtobuf(ozoneAcl));
     }
 
-    if (volArgs.getQuota() == null) {
+    if (volArgs.getSsQuota() == null) {
       LOG.info("Creating Volume: {}, with {} as owner.", volumeName, owner);
     } else {
       LOG.info("Creating Volume: {}, with {} as owner "
-              + "and quota set to {} bytes.", volumeName, owner, quota);
+              + "and ssQuota set to {} bytes, nsQuota set to {}",
+          volumeName, owner, ssQuota, nsQuota);
     }
     ozoneManagerClient.createVolume(builder.build());
   }
@@ -328,12 +332,18 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public void setVolumeQuota(String volumeName, OzoneQuota quota)
+  public void setVolumeQuota(String volumeName,
+                             long namespaceQuota, long storageSpaceQuota)
       throws IOException {
-    verifyVolumeName(volumeName);
-    Preconditions.checkNotNull(quota);
-    long quotaInBytes = quota.sizeInBytes();
-    ozoneManagerClient.setQuota(volumeName, quotaInBytes);
+    HddsClientUtils.verifyResourceName(volumeName);
+    if ((namespaceQuota < 0 && namespaceQuota != OzoneConsts.QUOTA_COUNT_RESET)
+        || storageSpaceQuota <= 0) {
+      throw new IllegalArgumentException("Invalid values for quota : " +
+          "namespace quota is :" + namespaceQuota + " and " +
+          "storagespace quota is :" + storageSpaceQuota);
+    }
+    ozoneManagerClient.setQuota(volumeName, namespaceQuota, storageSpaceQuota);
+
   }
 
   @Override
@@ -348,6 +358,7 @@ public class RpcClient implements ClientProtocol {
         volume.getAdminName(),
         volume.getOwnerName(),
         volume.getQuotaInBytes(),
+        volume.getQuotaInCounts(),
         volume.getCreationTime(),
         volume.getModificationTime(),
         volume.getAclMap().ozoneAclGetProtobuf().stream().
@@ -381,6 +392,7 @@ public class RpcClient implements ClientProtocol {
         volume.getAdminName(),
         volume.getOwnerName(),
         volume.getQuotaInBytes(),
+        volume.getQuotaInCounts(),
         volume.getCreationTime(),
         volume.getModificationTime(),
         volume.getAclMap().ozoneAclGetProtobuf().stream().
@@ -402,6 +414,7 @@ public class RpcClient implements ClientProtocol {
         volume.getAdminName(),
         volume.getOwnerName(),
         volume.getQuotaInBytes(),
+        volume.getQuotaInCounts(),
         volume.getCreationTime(),
         volume.getModificationTime(),
         volume.getAclMap().ozoneAclGetProtobuf().stream().

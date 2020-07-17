@@ -271,10 +271,9 @@ public abstract class TestOzoneRpcClientAbstract {
       throws IOException {
     String volumeName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
-    store.getVolume(volumeName).setQuota(
-        OzoneQuota.parseQuota("100000000 BYTES"));
+    store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota("1GB", 0L));
     OzoneVolume volume = store.getVolume(volumeName);
-    Assert.assertEquals(100000000L, volume.getQuota());
+    Assert.assertEquals(1073741824L, volume.getStoragespaceQuota());
   }
 
   @Test

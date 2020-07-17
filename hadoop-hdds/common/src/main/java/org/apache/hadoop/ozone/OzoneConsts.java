@@ -205,6 +205,16 @@ public final class OzoneConsts {
   public static final long MAX_QUOTA_IN_BYTES = 1024L * 1024 * TB;
 
   /**
+   * Quota value.
+   */
+  public static final long QUOTA_COUNT_RESET = -1;
+
+  /**
+   * Quota Units.
+   */
+  public enum Units {TB, GB, MB, KB, BYTES}
+
+  /**
    * Max number of keys returned per list buckets operation.
    */
   public static final int MAX_LISTBUCKETS_SIZE  = 1024;
@@ -260,6 +270,7 @@ public final class OzoneConsts {
   public static final String SRC_KEY = "srcKey";
   public static final String DST_KEY = "dstKey";
   public static final String QUOTA_IN_BYTES = "quotaInBytes";
+  public static final String QUOTA_IN_COUNTS = "quotaInCounts";
   public static final String OBJECT_ID = "objectID";
   public static final String UPDATE_ID = "updateID";
   public static final String CLIENT_ID = "clientID";

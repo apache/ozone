@@ -21,6 +21,7 @@ import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Locale;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.SystemUtils;
@@ -147,6 +148,13 @@ public final class StringUtils {
             + " ; compiled by '" + versionInfo.getUser()
             + "' on " + versionInfo.getDate(),
         "  java = " + System.getProperty("java.version"));
+  }
+
+  /**
+   * The same as String.format(Locale.ENGLISH, format, objects).
+   */
+  public static String format(final String format, final Object... objects) {
+    return String.format(Locale.ENGLISH, format, objects);
   }
 
   public static String appendIfNotPresent(String str, char c) {

@@ -419,6 +419,10 @@
               {
                 "name": "PARTIAL_DELETE",
                 "integer": 62
+              },
+              {
+                "name": "DETECTED_LOOP_IN_BUCKET_LINKS",
+                "integer": 63
               }
             ]
           },
@@ -1234,6 +1238,21 @@
                 "id": 10,
                 "name": "modificationTime",
                 "type": "uint64"
+              },
+              {
+                "id": 11,
+                "name": "quotaUsageInBytes",
+                "type": "uint64"
+              },
+              {
+                "id": 12,
+                "name": "quotaInCounts",
+                "type": "uint64"
+              },
+              {
+                "id": 13,
+                "name": "quotaUsageInCounts",
+                "type": "uint64"
               }
             ]
           },
@@ -1342,6 +1361,11 @@
               {
                 "id": 4,
                 "name": "modificationTime",
+                "type": "uint64"
+              },
+              {
+                "id": 5,
+                "name": "quotaInCounts",
                 "type": "uint64"
               }
             ]
@@ -1519,6 +1543,36 @@
                 "id": 11,
                 "name": "modificationTime",
                 "type": "uint64"
+              },
+              {
+                "id": 12,
+                "name": "sourceVolume",
+                "type": "string"
+              },
+              {
+                "id": 13,
+                "name": "sourceBucket",
+                "type": "string"
+              },
+              {
+                "id": 14,
+                "name": "quotaInBytes",
+                "type": "uint64"
+              },
+              {
+                "id": 15,
+                "name": "quotaUsageInBytes",
+                "type": "uint64"
+              },
+              {
+                "id": 16,
+                "name": "quotaInCounts",
+                "type": "uint64"
+              },
+              {
+                "id": 17,
+                "name": "quotaUsageInCount",
+                "type": "uint64"
               }
             ]
           },
@@ -1655,6 +1709,16 @@
                 "name": "metadata",
                 "type": "hadoop.hdds.KeyValue",
                 "is_repeated": true
+              },
+              {
+                "id": 8,
+                "name": "quotaInBytes",
+                "type": "uint64"
+              },
+              {
+                "id": 9,
+                "name": "quotaInCounts",
+                "type": "uint64"
               }
             ]
           },
