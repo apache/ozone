@@ -150,6 +150,7 @@ jobs:
         env:
           KEEP_IMAGE: false
           OZONE_WITH_COVERAGE: true
+          OZONE_VOLUME_OWNER: 1000
       - uses: actions/upload-artifact@master
         if: always()
         with:

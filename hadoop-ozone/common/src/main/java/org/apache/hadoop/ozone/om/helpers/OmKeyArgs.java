@@ -162,6 +162,24 @@ public final class OmKeyArgs implements Auditable {
     locationInfoList.add(locationInfo);
   }
 
+  public OmKeyArgs.Builder toBuilder() {
+    return new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setDataSize(dataSize)
+        .setType(type)
+        .setFactor(factor)
+        .setLocationInfoList(locationInfoList)
+        .setIsMultipartKey(isMultipartKey)
+        .setMultipartUploadID(multipartUploadID)
+        .setMultipartUploadPartNumber(multipartUploadPartNumber)
+        .addAllMetadata(metadata)
+        .setRefreshPipeline(refreshPipeline)
+        .setSortDatanodesInPipeline(sortDatanodesInPipeline)
+        .setAcls(acls);
+  }
+
   /**
    * Builder class of OmKeyArgs.
    */

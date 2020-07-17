@@ -22,7 +22,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -150,6 +153,11 @@ public class TestOMKeyRequest {
     clientID = Time.now();
     dataSize = 1000L;
 
+    Pair<String, String> volumeAndBucket = Pair.of(volumeName, bucketName);
+    when(ozoneManager.resolveBucketLink(any(KeyArgs.class)))
+        .thenReturn(new ResolvedBucket(volumeAndBucket, volumeAndBucket));
+    when(ozoneManager.resolveBucketLink(any(Pair.class)))
+        .thenReturn(new ResolvedBucket(volumeAndBucket, volumeAndBucket));
   }
 
   @After

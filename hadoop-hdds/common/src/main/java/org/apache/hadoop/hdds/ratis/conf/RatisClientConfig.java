@@ -29,7 +29,7 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
 
 /**
  * Configuration related to Ratis Client. This is the config used in creating
- * RaftClient creation.
+ * RaftClient.
  */
 @ConfigGroup(prefix = RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY)
 public class RatisClientConfig {
@@ -38,7 +38,9 @@ public class RatisClientConfig {
    * Configurations which will be set in RaftProperties. RaftProperties is a
    * configuration object for Ratis client.
    */
-  @ConfigGroup(prefix = RaftClientConfigKeys.PREFIX)
+  @ConfigGroup(prefix =
+      RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY + "." +
+      RaftClientConfigKeys.PREFIX)
   public static class RaftConfig {
     @Config(key = "async.outstanding-requests.max",
         defaultValue = "32",

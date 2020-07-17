@@ -18,15 +18,18 @@
 
 package org.apache.hadoop.hdds.conf;
 
+import org.apache.ratis.grpc.GrpcConfigKeys;
+
 import static org.apache.hadoop.hdds.conf.ConfigTag.CLIENT;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
-import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_GRPC_PREFIX_KEY;
+import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY;
 
 /**
  * Ratis Grpc Config Keys.
  */
-@ConfigGroup(prefix = HDDS_DATANODE_RATIS_GRPC_PREFIX_KEY)
+@ConfigGroup(prefix = HDDS_DATANODE_RATIS_PREFIX_KEY + "."
+    + GrpcConfigKeys.PREFIX)
 public class DatanodeRatisGrpcConfig {
   @Config(key = "message.size.max",
       defaultValue = "32MB",
