@@ -22,10 +22,13 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -56,12 +59,15 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_L
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+
+import org.apache.hadoop.test.GenericTestUtils.LogCapturer;
 import org.junit.After;
 import org.junit.Assert;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.mockito.InOrder;
 
 import static org.mockito.Mockito.doReturn;
@@ -615,6 +621,80 @@ public class TestSCMPipelineManager {
     inorderVerifier.verify(pipelineStore).put(p3.getId(), p3);
 
     verify(pipelineStore, never()).put(p2.getId(), p2);
+  }
+
+  @Test
+  public void testScmWithPipelineDBKeyFormatChange() throws Exception {
+    TemporaryFolder tempDir = new TemporaryFolder();
+    tempDir.create();
+    File dir = tempDir.newFolder();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.getAbsolutePath());
+
+    SCMMetadataStore scmDbWithOldKeyFormat = null;
+    Map<UUID, Pipeline> oldPipelines = new HashMap<>();
+    try {
+      scmDbWithOldKeyFormat =
+          new TestSCMStoreImplWithOldPipelineIDKeyFormat(conf);
+      // Create 3 pipelines.
+      for (int i = 0; i < 3; i++) {
+        Pipeline pipeline = pipelineStub();
+        scmDbWithOldKeyFormat.getPipelineTable()
+            .put(pipeline.getId(), pipeline);
+        oldPipelines.put(pipeline.getId().getId(), pipeline);
+      }
+    } finally {
+      if (scmDbWithOldKeyFormat != null) {
+        scmDbWithOldKeyFormat.stop();
+      }
+    }
+
+    LogCapturer logCapturer =
+        LogCapturer.captureLogs(SCMPipelineManager.getLog());
+
+    // Create SCMPipelineManager with new DBDefinition.
+    SCMMetadataStore newScmMetadataStore = null;
+    try {
+      newScmMetadataStore = new SCMMetadataStoreImpl(conf);
+      SCMPipelineManager pipelineManager = new SCMPipelineManager(conf,
+          nodeManager,
+          newScmMetadataStore.getPipelineTable(),
+          new EventQueue());
+
+      waitForLog(logCapturer);
+      assertEquals(3, pipelineManager.getPipelines().size());
+      oldPipelines.values().forEach(p ->
+          pipelineManager.containsPipeline(p.getId()));
+    } finally {
+      newScmMetadataStore.stop();
+    }
+
+    // Mimicking another restart.
+    try {
+      logCapturer.clearOutput();
+      newScmMetadataStore = new SCMMetadataStoreImpl(conf);
+      SCMPipelineManager pipelineManager = new SCMPipelineManager(conf,
+          nodeManager,
+          newScmMetadataStore.getPipelineTable(),
+          new EventQueue());
+      try {
+        waitForLog(logCapturer);
+        Assert.fail("Unexpected log: " + logCapturer.getOutput());
+      } catch (TimeoutException ex) {
+        Assert.assertTrue(ex.getMessage().contains("Timed out"));
+      }
+      assertEquals(3, pipelineManager.getPipelines().size());
+      oldPipelines.values().forEach(p ->
+          pipelineManager.containsPipeline(p.getId()));
+    } finally {
+      newScmMetadataStore.stop();
+    }
+  }
+
+  private static void waitForLog(LogCapturer logCapturer)
+      throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> logCapturer.getOutput()
+            .contains("Found pipeline in old format key"),
+        1000, 5000);
   }
 
   private Pipeline pipelineStub() {
