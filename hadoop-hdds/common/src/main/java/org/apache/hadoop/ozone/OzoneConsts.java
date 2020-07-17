@@ -298,6 +298,8 @@ public final class OzoneConsts {
   public static final String BUCKET_ENCRYPTION_KEY = "bucketEncryptionKey";
   public static final String DELETED_KEYS_LIST = "deletedKeysList";
   public static final String UNDELETED_KEYS_LIST = "unDeletedKeysList";
+  public static final String SOURCE_VOLUME = "sourceVolume";
+  public static final String SOURCE_BUCKET = "sourceBucket";
 
 
 
