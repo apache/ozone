@@ -161,13 +161,6 @@ public class KeyValueBlockIterator implements BlockIterator<BlockData>,
     wasReset = true;
   }
 
-  @Override
-  public void seekToLast() {
-    // Cannot call findNextBlock() here, as the IOException would break the interface.
-    blockIterator.seekToLast();
-    wasReset = true;
-  }
-
   public void close() {
     db.close();
   }

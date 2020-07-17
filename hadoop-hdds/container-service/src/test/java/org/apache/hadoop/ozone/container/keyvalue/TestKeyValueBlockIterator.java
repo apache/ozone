@@ -181,10 +181,6 @@ public class TestKeyValueBlockIterator {
       assertTrue(keyValueBlockIterator.hasNext());
       assertEquals(blockID, keyValueBlockIterator.nextBlock().getLocalID());
 
-      keyValueBlockIterator.seekToLast();
-      assertTrue(keyValueBlockIterator.hasNext());
-      assertEquals(blockID, keyValueBlockIterator.nextBlock().getLocalID());
-
       keyValueBlockIterator.seekToFirst();
       blockID = 0L;
       assertEquals(blockID++, keyValueBlockIterator.nextBlock().getLocalID());
@@ -283,12 +279,6 @@ public class TestKeyValueBlockIterator {
 
     try (KeyValueBlockIterator iterator = new KeyValueBlockIterator(
             containerId, new File(containerPath), filter)) {
-
-      // Test seeking.
-//      iterator.seekToLast();
-//      long lastID = iterator.nextBlock().getLocalID();
-//      assertEquals(expectedIDs.get(expectedIDs.size() - 1).longValue(), lastID);
-//      assertFalse(iterator.hasNext());
 
       iterator.seekToFirst();
       long firstID = iterator.nextBlock().getLocalID();
