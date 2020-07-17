@@ -58,6 +58,7 @@ import com.google.common.base.Preconditions;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
@@ -329,8 +330,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       }
     }
 
+    int index = -1;
     for (DatanodeDetails dn : datanodeList) {
+      index++;
       try {
+        long startTime = Time.monotonicNow();
         if (LOG.isDebugEnabled()) {
           LOG.debug("Executing command {} on datanode {}", request, dn);
         }
@@ -339,6 +343,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         // in case these don't exist for the specific datanode.
         reply.addDatanode(dn);
         responseProto = sendCommandAsync(request, dn).getResponse().get();
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Executed command {} on datanode {}, cost = {}, "
+                  + "retryCount = {}" + ", cmdType = {}", request, dn,
+              Time.monotonicNow() - startTime, index, request.getCmdType());
+        }
         if (validators != null && !validators.isEmpty()) {
           for (CheckedBiFunction validator : validators) {
             validator.apply(request, responseProto);
@@ -354,7 +363,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         responseProto = null;
       } catch (ExecutionException e) {
         LOG.debug("Failed to execute command {} on datanode {}",
-            request, dn.getUuid(), e);
+            request, dn, e);
         if (Status.fromThrowable(e.getCause()).getCode()
             == Status.UNAUTHENTICATED.getCode()) {
           throw new SCMSecurityException("Failed to authenticate with "
@@ -433,7 +442,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     UUID dnId = dn.getUuid();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Send command {} to datanode {}",
-          request.getCmdType(), dn.getNetworkFullPath());
+          request.getCmdType(), dn);
     }
     final CompletableFuture<ContainerCommandResponseProto> replyFuture =
         new CompletableFuture<>();
