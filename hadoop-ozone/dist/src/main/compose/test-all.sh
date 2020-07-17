@@ -34,20 +34,24 @@ fi
 RESULT=0
 IFS=$'\n'
 # shellcheck disable=SC2044
-for test in $(find "$SCRIPT_DIR" -name test.sh | grep "${OZONE_TEST_SELECTOR:-""}" |sort); do
-  echo "Executing test in $(dirname "$test")"
+for test in $(find "$SCRIPT_DIR" -mindepth 2 -maxdepth 2 -name test.sh | grep "${OZONE_TEST_SELECTOR:-""}" |sort); do
+  TEST_DIR="$(dirname "$test")"
+  echo "Executing test in $TEST_DIR"
 
   #required to read the .env file from the right location
-  cd "$(dirname "$test")" || continue
-  ./test.sh
+  cd "$TEST_DIR" || continue
+  ./test.sh ||
   ret=$?
   if [[ $ret -ne 0 ]]; then
       RESULT=1
-      echo "ERROR: Test execution of $(dirname "$test") is FAILED!!!!"
+      echo "ERROR: Test execution of $TEST_DIR is FAILED!!!!"
   fi
-  RESULT_DIR="$(dirname "$test")/result"
-  cp "$RESULT_DIR"/robot-*.xml "$RESULT_DIR"/docker-*.log "$RESULT_DIR"/*.out* "$ALL_RESULT_DIR"/
+  RESULT_DIR="$TEST_DIR"/result
+  rebot -N $(basename $TEST_DIR) -o "$ALL_RESULT_DIR"/$(basename $TEST_DIR).xml "$RESULT_DIR"/*.xml
+  cp "$RESULT_DIR"/docker-*.log "$RESULT_DIR"/*.out* "$ALL_RESULT_DIR"/
 done
+
+rebot -N acceptance -d "$ALL_RESULT_DIR" "$ALL_RESULT_DIR"/*.xml
 
 rebot -N "smoketests" -d "$SCRIPT_DIR/result" "$SCRIPT_DIR/result/robot-*.xml"
 if [ "$OZONE_WITH_COVERAGE" ]; then
