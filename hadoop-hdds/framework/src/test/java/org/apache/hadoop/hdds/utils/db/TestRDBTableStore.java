@@ -364,4 +364,65 @@ public class TestRDBTableStore {
       Assert.assertTrue(keyCount > 0 && keyCount <= numKeys);
     }
   }
+
+  @Test
+  public void testIteratorRemoveFromDB() throws Exception {
+
+    // Remove without next removes first entry.
+    try (Table<byte[], byte[]> testTable = rdbStore.getTable("Fifth")) {
+      writeToTable(testTable, 3);
+      TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iterator =
+          testTable.iterator();
+      iterator.removeFromDB();
+      Assert.assertNull(testTable.get("1".getBytes(StandardCharsets.UTF_8)));
+      Assert.assertNotNull(testTable.get("2".getBytes(StandardCharsets.UTF_8)));
+      Assert.assertNotNull(testTable.get("3".getBytes(StandardCharsets.UTF_8)));
+    }
+
+    // Remove after seekToLast removes lastEntry
+    try (Table<byte[], byte[]> testTable = rdbStore.getTable("Sixth")) {
+      writeToTable(testTable, 3);
+      TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iterator =
+          testTable.iterator();
+      iterator.seekToLast();
+      iterator.removeFromDB();
+      Assert.assertNotNull(testTable.get("1".getBytes(StandardCharsets.UTF_8)));
+      Assert.assertNotNull(testTable.get("2".getBytes(StandardCharsets.UTF_8)));
+      Assert.assertNull(testTable.get("3".getBytes(StandardCharsets.UTF_8)));
+    }
+
+    // Remove after seek deletes that entry.
+    try (Table<byte[], byte[]> testTable = rdbStore.getTable("Sixth")) {
+      writeToTable(testTable, 3);
+      TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iterator =
+          testTable.iterator();
+      iterator.seek("3".getBytes(StandardCharsets.UTF_8));
+      iterator.removeFromDB();
+      Assert.assertNotNull(testTable.get("1".getBytes(StandardCharsets.UTF_8)));
+      Assert.assertNotNull(testTable.get("2".getBytes(StandardCharsets.UTF_8)));
+      Assert.assertNull(testTable.get("3".getBytes(StandardCharsets.UTF_8)));
+    }
+
+    // Remove after next() deletes entry that was returned by next.
+    try (Table<byte[], byte[]> testTable = rdbStore.getTable("Sixth")) {
+      writeToTable(testTable, 3);
+      TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iterator =
+          testTable.iterator();
+      iterator.seek("2".getBytes(StandardCharsets.UTF_8));
+      iterator.next();
+      iterator.removeFromDB();
+      Assert.assertNotNull(testTable.get("1".getBytes(StandardCharsets.UTF_8)));
+      Assert.assertNull(testTable.get("2".getBytes(StandardCharsets.UTF_8)));
+      Assert.assertNotNull(testTable.get("3".getBytes(StandardCharsets.UTF_8)));
+    }
+  }
+
+  private void writeToTable(Table testTable, int num) throws IOException {
+    for (int i = 1; i <= num; i++) {
+      byte[] key = (i + "").getBytes(StandardCharsets.UTF_8);
+      byte[] value =
+          RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
+      testTable.put(key, value);
+    }
+  }
 }
