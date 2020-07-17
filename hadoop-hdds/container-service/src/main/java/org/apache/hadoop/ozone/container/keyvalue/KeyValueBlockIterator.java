@@ -127,23 +127,6 @@ public class KeyValueBlockIterator implements BlockIterator<BlockData>,
     return result;
   }
 
-  private BlockData findNextBlock() throws IOException {
-    BlockData foundBlock = null;
-
-    while (blockIterator.hasNext() && foundBlock == null) {
-      KeyValue blockKV = blockIterator.next();
-      if (blockFilter.filterKey(null, blockKV.getKey(), null)) {
-        foundBlock = BlockUtils.getBlockData(blockKV.getValue());
-        if (LOG.isTraceEnabled()) {
-          LOG.trace("Block matching with filter found: blockID is : {} for " +
-                  "containerID {}", foundBlock.getLocalID(), containerId);
-        }
-      }
-    }
-
-    return foundBlock;
-  }
-
   @Override
   public boolean hasNext() throws IOException {
     if (wasReset) {
@@ -163,5 +146,26 @@ public class KeyValueBlockIterator implements BlockIterator<BlockData>,
 
   public void close() {
     db.close();
+  }
+
+  /**
+   * @return The next block in the iterator that passes the filter.
+   * @throws IOException
+   */
+  private BlockData findNextBlock() throws IOException {
+    BlockData foundBlock = null;
+
+    while (blockIterator.hasNext() && foundBlock == null) {
+      KeyValue blockKV = blockIterator.next();
+      if (blockFilter.filterKey(null, blockKV.getKey(), null)) {
+        foundBlock = BlockUtils.getBlockData(blockKV.getValue());
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("Block matching with filter found: blockID is : {} for " +
+                  "containerID {}", foundBlock.getLocalID(), containerId);
+        }
+      }
+    }
+
+    return foundBlock;
   }
 }
