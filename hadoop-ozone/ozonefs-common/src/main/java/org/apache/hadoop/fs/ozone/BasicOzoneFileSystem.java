@@ -477,9 +477,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       result = innerDelete(f, recursive);
     } else {
       LOG.debug("delete: Path is a file: {}", f);
-      List<String> keyList = new ArrayList<>();
-      keyList.add(key);
-      result = adapter.deleteObjects(keyList);
+      result = adapter.deleteObject(key);
     }
 
     if (result) {

@@ -31,10 +31,15 @@ execute_robot_test scm basic
 
 execute_robot_test scm security
 
-execute_robot_test scm -v SCHEME:ofs ozonefs/ozonefs.robot
-execute_robot_test scm -v SCHEME:o3fs ozonefs/ozonefs.robot
+for scheme in ofs o3fs; do
+  for bucket in link bucket; do
+    execute_robot_test scm -v SCHEME:${scheme} -v BUCKET_TYPE:${bucket} ozonefs/ozonefs.robot
+  done
+done
 
-execute_robot_test s3g s3
+for bucket in link generated; do
+  execute_robot_test s3g -v BUCKET:${bucket} s3
+done
 
 #expects 4 pipelines, should be run before 
 #admincli which creates STANDALONE pipeline

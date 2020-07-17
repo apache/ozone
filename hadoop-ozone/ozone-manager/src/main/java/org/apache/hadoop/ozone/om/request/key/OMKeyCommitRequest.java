@@ -125,37 +125,42 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     OmKeyInfo omKeyInfo = null;
     OMClientResponse omClientResponse = null;
     boolean bucketLockAcquired = false;
-    Result result = null;
+    Result result;
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    String dbOzoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-        keyName);
-    String dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName,
-        keyName, commitKeyRequest.getClientID());
 
     try {
+      commitKeyArgs = resolveBucketLink(ozoneManager, commitKeyArgs, auditMap);
+      volumeName = commitKeyArgs.getVolumeName();
+      bucketName = commitKeyArgs.getBucketName();
+
       // check Acl
       checkKeyAclsInOpenKeyTable(ozoneManager, volumeName, bucketName,
           keyName, IAccessAuthorizer.ACLType.WRITE,
           commitKeyRequest.getClientID());
+
+      String dbOzoneKey =
+          omMetadataManager.getOzoneKey(volumeName, bucketName,
+              keyName);
+      String dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName,
+          keyName, commitKeyRequest.getClientID());
 
       List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
       for (KeyLocation keyLocation : commitKeyArgs.getKeyLocationsList()) {
         locationInfoList.add(OmKeyLocationInfo.getFromProtobuf(keyLocation));
       }
 
-      bucketLockAcquired = omMetadataManager.getLock().acquireWriteLock(
-          BUCKET_LOCK, volumeName, bucketName);
+      bucketLockAcquired =
+          omMetadataManager.getLock().acquireLock(BUCKET_LOCK,
+              volumeName, bucketName);
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       omKeyInfo = omMetadataManager.getOpenKeyTable().get(dbOpenKey);
-
       if (omKeyInfo == null) {
         throw new OMException("Failed to commit key, as " + dbOpenKey +
             "entry is not found in the OpenKey table", KEY_NOT_FOUND);
       }
-
       omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
 
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
@@ -183,7 +188,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new OMKeyCommitResponse(createErrorOMResponse(
-            omResponse, exception));
+          omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
@@ -207,7 +212,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       if (omKeyInfo.getKeyLocationVersions().size() == 1) {
         omMetrics.incNumKeys();
       }
-      LOG.debug("Key commited. Volume:{}, Bucket:{}, Key:{}", volumeName,
+      LOG.debug("Key committed. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);
       break;
     case FAILURE:

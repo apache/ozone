@@ -304,6 +304,8 @@ enum Status {
     INVALID_VOLUME_NAME = 61;
 
     PARTIAL_DELETE = 62;
+
+    DETECTED_LOOP_IN_BUCKET_LINKS = 63;
 }
 
 /**
@@ -483,6 +485,8 @@ message BucketInfo {
     optional uint64 objectID = 9;
     optional uint64 updateID = 10;
     optional uint64 modificationTime = 11;
+    optional string sourceVolume = 12;
+    optional string sourceBucket = 13;
 }
 
 enum StorageTypeProto {
