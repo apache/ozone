@@ -181,10 +181,6 @@ public class TestKeyValueBlockIterator {
       assertTrue(keyValueBlockIterator.hasNext());
       assertEquals(blockID, keyValueBlockIterator.nextBlock().getLocalID());
 
-      keyValueBlockIterator.seekToLast();
-      assertTrue(keyValueBlockIterator.hasNext());
-      assertEquals(blockID, keyValueBlockIterator.nextBlock().getLocalID());
-
       keyValueBlockIterator.seekToFirst();
       blockID = 0L;
       assertEquals(blockID++, keyValueBlockIterator.nextBlock().getLocalID());
@@ -202,21 +198,21 @@ public class TestKeyValueBlockIterator {
   @Test
   public void testKeyValueBlockIteratorWithFilter() throws Exception {
     long containerId = 103L;
-    int deletedBlocks = 10;
     int normalBlocks = 5;
+    int deletedBlocks = 5;
     createContainerWithBlocks(containerId, normalBlocks, deletedBlocks);
     String containerPath = new File(containerData.getMetadataPath())
         .getParent();
     try(KeyValueBlockIterator keyValueBlockIterator = new KeyValueBlockIterator(
         containerId, new File(containerPath), MetadataKeyFilters
-        .getDeletingKeyFilter())) {
+        .getDeletedKeyFilter())) {
 
-      int counter = 5;
+      int counter = normalBlocks;
       while (keyValueBlockIterator.hasNext()) {
         BlockData blockData = keyValueBlockIterator.nextBlock();
         assertEquals(blockData.getLocalID(), counter++);
       }
-      assertEquals(10, counter);
+      assertEquals(normalBlocks + deletedBlocks, counter);
     }
   }
 
@@ -236,6 +232,87 @@ public class TestKeyValueBlockIterator {
   }
 
   /**
+   * Due to RocksDB internals, prefixed keys may be grouped all at the
+   * beginning or end of the key iteration, depending on the serialization
+   * used. Keys of the same prefix are grouped
+   * together. This method runs the same set of tests on the iterator first
+   * positively filtering deleting keys, and then positively filtering
+   * deleted keys. If the sets of keys with deleting prefixes, deleted
+   * prefixes, and no prefixes are not empty, it follows that the filter will
+   * encounter both of the following cases:
+   *
+   * 1. A failing key followed by a passing key.
+   * 2. A passing key followed by a failing key.
+   *
+   * @throws Exception
+   */
+  @Test
+  public void testKeyValueBlockIteratorWithAdvancedFilter() throws
+          Exception {
+    long containerId = 105L;
+
+    // IDs 0 - 2
+    int normalBlocks = 3;
+    // IDs 3 - 5
+    int deletingBlocks = 3;
+    // IDs 6 - 8
+    int deletedBlocks = 3;
+    createContainerWithBlocks(containerId, normalBlocks, deletingBlocks,
+            deletedBlocks);
+    String containerPath = new File(containerData.getMetadataPath())
+            .getParent();
+
+    // Test deleting filter.
+    final boolean negativeFilter = false;
+    MetadataKeyFilters.KeyPrefixFilter deletingOnly =
+            new MetadataKeyFilters.KeyPrefixFilter(true);
+    deletingOnly.addFilter(OzoneConsts.DELETING_KEY_PREFIX, negativeFilter);
+
+    testWithFilter(containerPath, deletingOnly, Arrays.asList(3L, 4L, 5L));
+
+    // Test deleted filter.
+    MetadataKeyFilters.KeyPrefixFilter deletedOnly =
+            new MetadataKeyFilters.KeyPrefixFilter(true);
+    deletedOnly.addFilter(OzoneConsts.DELETED_KEY_PREFIX, negativeFilter);
+
+    testWithFilter(containerPath, deletedOnly, Arrays.asList(6L, 7L, 8L));
+  }
+
+  /**
+   * Helper method to run some iterator tests with a provided filter.
+   */
+  private void testWithFilter(String containerPath,
+                              MetadataKeyFilters.KeyPrefixFilter filter,
+                              List<Long> expectedIDs) throws Exception {
+    long containerId = 105L;
+
+    try (KeyValueBlockIterator iterator = new KeyValueBlockIterator(
+            containerId, new File(containerPath), filter)) {
+
+      // Test seek.
+      iterator.seekToFirst();
+      long firstID = iterator.nextBlock().getLocalID();
+      assertEquals(expectedIDs.get(0).longValue(), firstID);
+      assertTrue(iterator.hasNext());
+
+      // Test atypical iteration use.
+      iterator.seekToFirst();
+      int numIDsSeen = 0;
+      for (long id: expectedIDs) {
+        assertEquals(iterator.nextBlock().getLocalID(), id);
+        numIDsSeen++;
+
+        // Test that iterator can handle sporadic hasNext() calls.
+        if (id % 2 == 0 && numIDsSeen < expectedIDs.size()) {
+          assertTrue(iterator.hasNext());
+        }
+      }
+
+      assertFalse(iterator.hasNext());
+    }
+  }
+
+  /**
    * Creates a container with specified number of normal blocks and deleted
    * blocks. First it will insert normal blocks, and then it will insert
    * deleted blocks.
@@ -245,7 +322,24 @@ public class TestKeyValueBlockIterator {
    * @throws Exception
    */
   private void createContainerWithBlocks(long containerId, int
-      normalBlocks, int deletedBlocks) throws
+          normalBlocks, int deletedBlocks) throws
+          Exception {
+
+    createContainerWithBlocks(containerId, normalBlocks, 0, deletedBlocks);
+  }
+
+  /**
+   * Creates a container with specified number of normal blocks and deleted
+   * blocks. First it will insert normal blocks, then it will insert
+   * deleting blocks, then it will insert deleted blocks.
+   * @param containerId
+   * @param normalBlocks
+   * @param deletingBlocks
+   * @param deletedBlocks
+   * @throws Exception
+   */
+  private void createContainerWithBlocks(long containerId, int
+      normalBlocks, int deletingBlocks, int deletedBlocks) throws
       Exception {
     containerData = new KeyValueContainerData(containerId,
         layout,
@@ -263,21 +357,33 @@ public class TestKeyValueBlockIterator {
 
       Table<String, BlockData> blockDataTable = metadataStore.getStore().getBlockDataTable();
 
+      int blockIndex = 0;
       for (int i = 0; i < normalBlocks; i++) {
-        BlockID blockID = new BlockID(containerId, i);
+        BlockID blockID = new BlockID(containerId, blockIndex);
+        blockIndex++;
         BlockData blockData = new BlockData(blockID);
         blockData.setChunks(chunkList);
         blockDataTable.put(Long.toString(blockID.getLocalID()), blockData);
       }
 
-      for (int i = normalBlocks; i < deletedBlocks; i++) {
-        BlockID blockID = new BlockID(containerId, i);
+      for (int i = 0; i < deletingBlocks; i++) {
+        BlockID blockID = new BlockID(containerId, blockIndex);
+        blockIndex++;
         BlockData blockData = new BlockData(blockID);
         blockData.setChunks(chunkList);
         String localID = OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID();
         blockDataTable.put(localID, blockData);
       }
+
+      for (int i = 0; i < deletedBlocks; i++) {
+        BlockID blockID = new BlockID(containerId, blockIndex);
+        blockIndex++;
+        BlockData blockData = new BlockData(blockID);
+        blockData.setChunks(chunkList);
+        metadataStore.getStore().put(StringUtils.string2Bytes(OzoneConsts
+                .DELETED_KEY_PREFIX + blockID.getLocalID()), blockData
+                .getProtoBufMessage().toByteArray());
+      }
     }
   }
-
 }
