@@ -107,7 +107,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       keyPath = validateAndNormalizeKey(
           ozoneManager.getEnableFileSystemPaths(), keyPath);
       if (keyPath.endsWith("/")) {
-        throw new OMException("Invalid KeyPath: " + keyPath,
+        throw new OMException("Invalid KeyPath, key names with trailing / " +
+            "are not allowed." + keyPath,
             OMException.ResultCodes.INVALID_KEY_NAME);
       }
     }

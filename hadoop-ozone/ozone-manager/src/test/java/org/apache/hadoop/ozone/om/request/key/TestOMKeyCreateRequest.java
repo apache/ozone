@@ -422,6 +422,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     keyName = "";
     checkNotAValidPath(keyName);
 
+    keyName = "../a/b";
+    checkNotAValidPath(keyName);
+
+    keyName = "/../a/b";
+    checkNotAValidPath(keyName);
+
   }
 
 
