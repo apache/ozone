@@ -29,7 +29,6 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.time.Duration;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Tests Freon, with MiniOzoneCluster and validate data.
@@ -47,8 +46,8 @@ public abstract class TestDataValidate {
 
     RatisClientConfig.RaftConfig raftClientConfig =
         conf.getObject(RatisClientConfig.RaftConfig.class);
-    raftClientConfig.setRpcRequestTimeout(TimeUnit.SECONDS.toMillis(3));
-    raftClientConfig.setRpcWatchRequestTimeout(TimeUnit.SECONDS.toMillis(10));
+    raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
+    raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(10));
     conf.setFromObject(raftClientConfig);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
