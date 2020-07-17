@@ -273,6 +273,9 @@ public class TestKeyValueBlockIterator {
     testWithFilter(containerPath, deletedOnly, Arrays.asList(6L, 7L, 8L));
   }
 
+  /**
+   * Helper method to run some iterator tests with a provided filter.
+   */
   private void testWithFilter(String containerPath, MetadataKeyFilters.KeyPrefixFilter filter,
                               List<Long> expectedIDs) throws Exception {
     long containerId = 105L;
@@ -280,6 +283,7 @@ public class TestKeyValueBlockIterator {
     try (KeyValueBlockIterator iterator = new KeyValueBlockIterator(
             containerId, new File(containerPath), filter)) {
 
+      // Test seek.
       iterator.seekToFirst();
       long firstID = iterator.nextBlock().getLocalID();
       assertEquals(expectedIDs.get(0).longValue(), firstID);
