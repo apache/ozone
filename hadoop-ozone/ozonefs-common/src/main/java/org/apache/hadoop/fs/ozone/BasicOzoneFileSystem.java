@@ -726,12 +726,12 @@ public class BasicOzoneFileSystem extends FileSystem {
     String key = path.toUri().getPath();
 
     if (OzoneFSUtils.isValidName(key)) {
-      key = path.toUri().getPath().substring(1);
+      key = path.toUri().getPath();
     } else {
       throw new InvalidPathException("Invalid path Name" + key);
     }
     LOG.trace("path for key:{} is:{}", key, path);
-    return key;
+    return key.substring(1);
   }
 
   /**
