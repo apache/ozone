@@ -162,6 +162,7 @@ public class OzoneContainer {
     Iterator<HddsVolume> volumeSetIterator = volumeSet.getVolumesList()
         .iterator();
     ArrayList<Thread> volumeThreads = new ArrayList<Thread>();
+    long startTime = System.currentTimeMillis();
 
     //TODO: diskchecker should be run before this, to see how disks are.
     // And also handle disk failure tolerance need to be added
@@ -182,6 +183,8 @@ public class OzoneContainer {
       Thread.currentThread().interrupt();
     }
 
+    LOG.info("Build ContainerSet costs {}s",
+        (System.currentTimeMillis() - startTime) / 1000);
   }
 
   /**
