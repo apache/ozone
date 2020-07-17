@@ -161,8 +161,8 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
         impl.allocateBlock(
             request.getSize(),
             request.getNumBlocks(),
-            request.getOwner(),
             request.getStorageClass(),
+            request.getOwner(),
             ExcludeList.getFromProtoBuf(request.getExcludeList()));
 
     AllocateScmBlockResponseProto.Builder builder =

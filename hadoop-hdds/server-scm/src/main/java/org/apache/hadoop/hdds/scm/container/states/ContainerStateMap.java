@@ -113,8 +113,6 @@ public class ContainerStateMap {
   public void addContainer(final ContainerInfo info)
       throws SCMException {
     Preconditions.checkNotNull(info, "Container Info cannot be null");
-    Preconditions.checkArgument(info.getReplicationFactor().getNumber() > 0,
-        "ExpectedReplicaCount should be greater than 0");
 
     lock.writeLock().lock();
     try {

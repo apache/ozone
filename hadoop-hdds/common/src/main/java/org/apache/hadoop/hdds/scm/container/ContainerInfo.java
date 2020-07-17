@@ -248,8 +248,6 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
         .setContainerID(getContainerID())
         .setDeleteTransactionId(getDeleteTransactionId())
         .setPipelineID(getPipelineID().getProtobuf())
-        .setReplicationFactor(getReplicationFactor())
-        .setReplicationType(getReplicationType())
         .setStorageClass(getStorageClass())
         .setOwner(getOwner())
         .build();
