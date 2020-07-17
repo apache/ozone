@@ -74,7 +74,7 @@ public final class TestDataUtil {
       String content) throws IOException {
     try (OutputStream stream = bucket
         .createKey(keyName, content.length(),
-            StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+            StaticStorageClassRegistry.LEGACY.getName(),
             new HashMap<>())) {
       stream.write(content.getBytes());
     }

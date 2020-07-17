@@ -59,7 +59,7 @@ public final class StorageClassConverter {
 
     if (factor == ReplicationFactor.ONE
         && type == ReplicationType.STAND_ALONE) {
-      return StaticStorageClassRegistry.STAND_ALONE_ONE.getName();
+      return StaticStorageClassRegistry.LEGACY.getName();
     }
 
     return StaticStorageClassRegistry.STANDARD.getName();

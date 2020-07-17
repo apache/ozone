@@ -105,7 +105,7 @@ public class TestContainerReportWithKeys {
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
             .createKey(keyName, keySize,
-                StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+                StaticStorageClassRegistry.LEGACY.getName(),
                 new HashMap<>());
     String dataString = RandomStringUtils.randomAlphabetic(keySize);
     key.write(dataString.getBytes());
@@ -115,7 +115,7 @@ public class TestContainerReportWithKeys {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setStorageClass(StaticStorageClassRegistry.STAND_ALONE_ONE.getName())
+        .setStorageClass(StaticStorageClassRegistry.LEGACY.getName())
         .setDataSize(keySize)
         .setRefreshPipeline(true)
         .build();

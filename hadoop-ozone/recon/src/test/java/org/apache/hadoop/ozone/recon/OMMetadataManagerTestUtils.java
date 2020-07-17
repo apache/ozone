@@ -145,7 +145,7 @@ public final class OMMetadataManagerTestUtils {
             .setVolumeName("sampleVol")
             .setKeyName(key)
             .setStorageClass(
-                StaticStorageClassRegistry.STAND_ALONE_ONE.getName())
+                StaticStorageClassRegistry.LEGACY.getName())
             .build());
   }
 
@@ -170,7 +170,7 @@ public final class OMMetadataManagerTestUtils {
             .setVolumeName(volume)
             .setKeyName(key)
             .setStorageClass(
-                StaticStorageClassRegistry.STAND_ALONE_ONE.getName())
+                StaticStorageClassRegistry.LEGACY.getName())
             .setOmKeyLocationInfos(omKeyLocationInfoGroupList)
             .build());
   }

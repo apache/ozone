@@ -321,7 +321,7 @@ public class TestBucketManagerImpl {
             .setVolumeName("sampleVol")
             .setKeyName("key_one")
             .setStorageClass(
-                StaticStorageClassRegistry.STAND_ALONE_ONE.getName())
+                StaticStorageClassRegistry.LEGACY.getName())
             .build());
     metaMgr.getKeyTable().put("/sampleVol/bucketOne/key_two",
         new OmKeyInfo.Builder()
@@ -329,7 +329,7 @@ public class TestBucketManagerImpl {
             .setVolumeName("sampleVol")
             .setKeyName("key_two")
             .setStorageClass(
-                StaticStorageClassRegistry.STAND_ALONE_ONE.getName())
+                StaticStorageClassRegistry.LEGACY.getName())
             .build());
     try {
       bucketManager.deleteBucket("sampleVol", "bucketOne");

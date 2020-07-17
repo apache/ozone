@@ -66,7 +66,7 @@ public class StaticStorageClassRegistry implements StorageClassRegistry {
     }
   };
 
-  public static final StorageClass STAND_ALONE_ONE = new StorageClass() {
+  public static final StorageClass LEGACY = new StorageClass() {
 
     @Override
     public OpenStateConfiguration getOpenStateConfiguration() {
@@ -82,7 +82,7 @@ public class StaticStorageClassRegistry implements StorageClassRegistry {
 
     @Override
     public String getName() {
-      return "STAND_ALONE_ONE";
+      return "LEGACY";
     }
   };
 
@@ -92,8 +92,8 @@ public class StaticStorageClassRegistry implements StorageClassRegistry {
       return STANDARD;
     } else if (name.equals("REDUCED")) {
       return REDUCED_REDUNDANCY;
-    } else if (name.equals("STAND_ALONE_ONE")) {
-      return STAND_ALONE_ONE;
+    } else if (name.equals("LEGACY")) {
+      return LEGACY;
     } else {
       throw new UnsupportedOperationException("Storage class " + name
           + " is not supported. Use STANDARD or REDUCED");

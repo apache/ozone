@@ -179,7 +179,7 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
 
       try (OzoneOutputStream out = bucket.createKey(keyName,
           value.getBytes("UTF-8").length,
-          StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+          StaticStorageClassRegistry.LEGACY.getName(),
           new HashMap<>())) {
         out.write(value.getBytes("UTF-8"));
       }
@@ -238,7 +238,7 @@ public class TestOzoneAtRestEncryption extends TestOzoneRpcClient {
     keyMetadata.put(OzoneConsts.GDPR_FLAG, "true");
     try (OzoneOutputStream out = bucket.createKey(keyName,
         value.getBytes("UTF-8").length,
-        StaticStorageClassRegistry.STAND_ALONE_ONE.getName(), keyMetadata)) {
+        StaticStorageClassRegistry.LEGACY.getName(), keyMetadata)) {
       out.write(value.getBytes("UTF-8"));
     }
 

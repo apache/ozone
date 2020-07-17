@@ -165,7 +165,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
   @Option(names = {"-sc", "--storageClass"},
       description = "StorageClass")
   private String storageClass =
-      StaticStorageClassRegistry.STAND_ALONE_ONE.getName();
+      StaticStorageClassRegistry.LEGACY.getName();
 
   @Option(
       names = "--om-service-id",

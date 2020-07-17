@@ -391,7 +391,7 @@ public class TestReconWithOzoneManager {
             .setVolumeName(volume)
             .setKeyName(key)
             .setStorageClass(
-                StaticStorageClassRegistry.STAND_ALONE_ONE.getName())
+                StaticStorageClassRegistry.LEGACY.getName())
             .setOmKeyLocationInfos(omKeyLocationInfoGroupList)
             .build());
   }

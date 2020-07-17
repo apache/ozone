@@ -88,7 +88,7 @@ public class TestCloseContainerHandler {
     objectStore.getVolume("test").createBucket("test");
     OzoneOutputStream key = objectStore.getVolume("test").getBucket("test")
         .createKey("test", 1024,
-            StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+            StaticStorageClassRegistry.LEGACY.getName(),
             new HashMap<>());
     key.write("test".getBytes());
     key.close();
@@ -97,7 +97,7 @@ public class TestCloseContainerHandler {
     OmKeyArgs keyArgs =
         new OmKeyArgs.Builder().setVolumeName("test").setBucketName("test")
             .setStorageClass(
-                StaticStorageClassRegistry.STAND_ALONE_ONE.getName())
+                StaticStorageClassRegistry.LEGACY.getName())
             .setDataSize(1024)
             .setKeyName("test")
             .setRefreshPipeline(true)

@@ -226,7 +226,7 @@ public class TestOMDBUpdatesHandler {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setStorageClass(
-            StaticStorageClassRegistry.STAND_ALONE_ONE.getName())
+            StaticStorageClassRegistry.LEGACY.getName())
         .setDataSize(new Random().nextLong())
         .build();
   }

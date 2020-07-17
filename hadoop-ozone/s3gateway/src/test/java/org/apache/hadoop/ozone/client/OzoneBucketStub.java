@@ -72,7 +72,7 @@ public class OzoneBucketStub extends OzoneBucket {
       long creationTime) {
     super(volumeName,
         bucketName,
-        StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+        StaticStorageClassRegistry.LEGACY.getName(),
         storageType,
         versioning,
         creationTime);
@@ -81,7 +81,7 @@ public class OzoneBucketStub extends OzoneBucket {
   @Override
   public OzoneOutputStream createKey(String key, long size) throws IOException {
     return createKey(key, size,
-        StaticStorageClassRegistry.STAND_ALONE_ONE.getName(), new HashMap<>());
+        StaticStorageClassRegistry.LEGACY.getName(), new HashMap<>());
   }
 
   @Override

@@ -225,7 +225,7 @@ public class TestDeleteContainerHandler {
     OzoneOutputStream key = objectStore.getVolume(volumeName)
         .getBucket(bucketName)
         .createKey(keyName, 1024,
-            StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+            StaticStorageClassRegistry.LEGACY.getName(),
             new HashMap<>());
     key.write("test".getBytes());
     key.close();
@@ -242,7 +242,7 @@ public class TestDeleteContainerHandler {
         new OmKeyArgs.Builder().setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setStorageClass(
-                StaticStorageClassRegistry.STAND_ALONE_ONE.getName())
+                StaticStorageClassRegistry.LEGACY.getName())
             .setKeyName(keyName)
             .setRefreshPipeline(true)
             .build();

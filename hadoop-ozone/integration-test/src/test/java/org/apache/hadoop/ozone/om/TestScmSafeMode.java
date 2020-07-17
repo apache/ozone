@@ -297,7 +297,7 @@ public class TestScmSafeMode {
         "SafeModePrecheck failed for allocateContainer", () -> {
           scm.getClientProtocolServer()
               .allocateContainer(
-                  StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+                  StaticStorageClassRegistry.LEGACY.getName(),
                   "");
         });
 

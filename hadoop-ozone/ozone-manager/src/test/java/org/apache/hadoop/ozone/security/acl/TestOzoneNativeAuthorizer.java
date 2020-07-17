@@ -173,7 +173,7 @@ public class TestOzoneNativeAuthorizer {
         .setBucketName(bucket)
         .setKeyName(keyName)
         .setDataSize(0)
-        .setStorageClass(StaticStorageClassRegistry.STAND_ALONE_ONE.getName())
+        .setStorageClass(StaticStorageClassRegistry.LEGACY.getName())
         .setAcls(OzoneAclUtil.getAclList(testUgi.getUserName(),
             testUgi.getGroupNames(), ALL, ALL))
         .build();

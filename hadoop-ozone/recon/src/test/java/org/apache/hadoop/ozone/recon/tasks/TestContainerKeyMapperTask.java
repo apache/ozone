@@ -276,7 +276,7 @@ public class TestContainerKeyMapperTask {
         .setVolumeName(volume)
         .setKeyName(key)
         .setStorageClass(
-            StaticStorageClassRegistry.STAND_ALONE_ONE.getName())
+            StaticStorageClassRegistry.LEGACY.getName())
         .setOmKeyLocationInfos(Collections.singletonList(
             omKeyLocationInfoGroup))
         .build();

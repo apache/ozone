@@ -67,7 +67,7 @@ public class TestObjectHead {
     String value = RandomStringUtils.randomAlphanumeric(32);
     OzoneOutputStream out = bucket.createKey("key1",
         value.getBytes(UTF_8).length,
-        StaticStorageClassRegistry.STAND_ALONE_ONE.getName(), new HashMap<>());
+        StaticStorageClassRegistry.LEGACY.getName(), new HashMap<>());
     out.write(value.getBytes(UTF_8));
     out.close();
 

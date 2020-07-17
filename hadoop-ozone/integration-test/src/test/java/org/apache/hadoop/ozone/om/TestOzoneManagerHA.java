@@ -167,7 +167,7 @@ public abstract class TestOzoneManagerHA {
     String keyName = "key" + RandomStringUtils.randomNumeric(5);
     String data = "data" + RandomStringUtils.randomNumeric(5);
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName,
-        data.length(), StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+        data.length(), StaticStorageClassRegistry.LEGACY.getName(),
         new HashMap<>());
     ozoneOutputStream.write(data.getBytes(), 0, data.length());
     ozoneOutputStream.close();

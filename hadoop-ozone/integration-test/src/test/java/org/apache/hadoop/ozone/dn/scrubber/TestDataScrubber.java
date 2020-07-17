@@ -136,7 +136,7 @@ public class TestDataScrubber {
 
       OzoneOutputStream out = bucket.createKey(keyName,
           value.getBytes().length,
-          StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+          StaticStorageClassRegistry.LEGACY.getName(),
           new HashMap<>());
       out.write(value.getBytes());
       out.close();

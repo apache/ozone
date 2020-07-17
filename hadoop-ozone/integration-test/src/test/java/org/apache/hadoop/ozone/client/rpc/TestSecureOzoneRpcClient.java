@@ -164,7 +164,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
 
       try (OzoneOutputStream out = bucket.createKey(keyName,
           value.getBytes().length,
-          StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+          StaticStorageClassRegistry.LEGACY.getName(),
           new HashMap<>())) {
         out.write(value.getBytes());
       }
@@ -209,7 +209,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
 
       try (OzoneOutputStream out = bucket.createKey(keyName,
           value.getBytes().length,
-          StaticStorageClassRegistry.STAND_ALONE_ONE.getName(),
+          StaticStorageClassRegistry.LEGACY.getName(),
           new HashMap<>())) {
         LambdaTestUtils.intercept(IOException.class, "UNAUTHENTICATED: Fail " +
                 "to find any token ",
