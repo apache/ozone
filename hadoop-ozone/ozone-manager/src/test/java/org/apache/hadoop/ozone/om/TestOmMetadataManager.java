@@ -76,7 +76,7 @@ public class TestOmMetadataManager {
     OMTransactionInfo omTransactionInfo =
         omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
 
-    Assert.assertEquals(3, omTransactionInfo.getCurrentTerm());
+    Assert.assertEquals(3, omTransactionInfo.getTerm());
     Assert.assertEquals(250, omTransactionInfo.getTransactionIndex());
 
 
