@@ -19,12 +19,14 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import com.google.common.base.Optional;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -42,7 +44,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -85,10 +87,11 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumKeyDeletes();
-    Map<String, String> auditMap = null;
     String volumeName = deleteKeyArgs.getVolumeName();
     String bucketName = deleteKeyArgs.getBucketName();
-    String keyName = "";
+    Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put(VOLUME, volumeName);
+    auditMap.put(BUCKET, bucketName);
     List<OmKeyInfo> omKeyInfoList = new ArrayList<>();
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
@@ -99,10 +102,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         getOmRequest());
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
-
-    boolean acquiredLock =
-        omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+    boolean acquiredLock = false;
 
     int indexFailed = 0;
     int length = deleteKeys.size();
@@ -112,12 +112,19 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
     boolean deleteStatus = true;
     try {
+      ResolvedBucket bucket = ozoneManager.resolveBucketLink(
+          Pair.of(volumeName, bucketName));
+      bucket.audit(auditMap);
+      volumeName = bucket.realVolume();
+      bucketName = bucket.realBucket();
 
+      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
+          volumeName, bucketName);
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       for (indexFailed = 0; indexFailed < length; indexFailed++) {
-        keyName = deleteKeyArgs.getKeys(indexFailed);
+        String keyName = deleteKeyArgs.getKeys(indexFailed);
         String objectKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
             keyName);
         OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(objectKey);
@@ -187,8 +194,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           omDoubleBufferHelper);
     }
 
-    auditMap = buildDeleteKeysAuditMap(volumeName, bucketName, deleteKeys,
-        unDeletedKeys.getKeysList());
+    addDeletedKeys(auditMap, deleteKeys, unDeletedKeys.getKeysList());
 
     auditLog(auditLogger, buildAuditMessage(DELETE_KEYS, auditMap, exception,
         userInfo));
@@ -221,21 +227,13 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
   }
 
   /**
-   * Build audit map for DeleteKeys request.
-   * @param volumeName
-   * @param bucketName
-   * @param deletedKeys
-   * @param unDeletedKeys
-   * @return
+   * Add key info to audit map for DeleteKeys request.
    */
-  private Map<String, String> buildDeleteKeysAuditMap(String volumeName,
-      String bucketName, List<String> deletedKeys, List<String> unDeletedKeys) {
-    Map< String, String > auditMap = new HashMap<>();
-    auditMap.put(VOLUME, volumeName);
-    auditMap.put(BUCKET, bucketName);
+  private static void addDeletedKeys(
+      Map<String, String> auditMap, List<String> deletedKeys,
+      List<String> unDeletedKeys) {
     auditMap.put(DELETED_KEYS_LIST, String.join(",", deletedKeys));
-    auditMap.put(UNDELETED_KEYS_LIST, String.join(",",
-        unDeletedKeys));
-    return auditMap;
+    auditMap.put(UNDELETED_KEYS_LIST, String.join(",", unDeletedKeys));
   }
+
 }
