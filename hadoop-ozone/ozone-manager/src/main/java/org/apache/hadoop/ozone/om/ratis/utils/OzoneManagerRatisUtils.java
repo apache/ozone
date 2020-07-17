@@ -232,17 +232,17 @@ public final class OzoneManagerRatisUtils {
    */
   public static OMTransactionInfo getTrxnInfoFromCheckpoint(
       OzoneConfiguration conf, Path dbPath) throws Exception {
-    Path dbDir = dbPath.getParent();
-    if (dbDir != null && dbPath.getFileName() != null) {
-      String dbName = dbPath.getFileName().toString();
-      OMTransactionInfo checkpointTrxnInfo = getTransactionInfoFromDB(conf, dbDir,
-          dbName);
 
-      return checkpointTrxnInfo;
-    } else {
-      throw new IOException("Checkpoint " + dbPath + " does not have proper " +
-          "DB location");
+    if (dbPath != null) {
+      Path dbDir = dbPath.getParent();
+      Path dbFile = dbPath.getFileName();
+      if (dbDir != null && dbFile != null) {
+        return getTransactionInfoFromDB(conf, dbDir, dbFile.toString());
+      }
     }
+    
+    throw new IOException("Checkpoint " + dbPath + " does not have proper " +
+        "DB location");
   }
 
   /**
