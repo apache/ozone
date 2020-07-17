@@ -89,6 +89,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         getOmRequest().getCommitMultiPartUploadRequest();
 
     KeyArgs keyArgs = multipartCommitUploadPartRequest.getKeyArgs();
+    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -111,6 +112,10 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     OmMultipartKeyInfo multipartKeyInfo = null;
     Result result = null;
     try {
+      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+
       // TODO to support S3 ACL later.
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);
@@ -118,16 +123,19 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       String uploadID = keyArgs.getMultipartUploadID();
-      multipartKey = omMetadataManager.getMultipartKey(volumeName,
-          bucketName, keyName, uploadID);
+      multipartKey = omMetadataManager.getMultipartKey(volumeName, bucketName,
+          keyName, uploadID);
 
       multipartKeyInfo = omMetadataManager.getMultipartInfoTable()
           .get(multipartKey);
 
       long clientID = multipartCommitUploadPartRequest.getClientID();
 
-      openKey = omMetadataManager.getOpenKey(volumeName, bucketName, keyName,
-          clientID);
+      openKey = omMetadataManager.getOpenKey(
+          volumeName, bucketName, keyName, clientID);
+
+      String ozoneKey = omMetadataManager.getOzoneKey(
+          volumeName, bucketName, keyName);
 
       omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
 
@@ -147,8 +155,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
-      partName = omMetadataManager.getOzoneKey(volumeName, bucketName,
-          keyName) + clientID;
+      partName = ozoneKey + clientID;
 
       if (multipartKeyInfo == null) {
         // This can occur when user started uploading part by the time commit
@@ -217,15 +224,19 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
+            volumeName, bucketName);
       }
     }
 
     // audit log
+    // Add MPU related information.
+    auditMap.put(OzoneConsts.MULTIPART_UPLOAD_PART_NUMBER,
+        String.valueOf(keyArgs.getMultipartNumber()));
+    auditMap.put(OzoneConsts.MULTIPART_UPLOAD_PART_NAME, partName);
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.COMMIT_MULTIPART_UPLOAD_PARTKEY,
-        buildAuditMap(keyArgs, partName), exception,
+        auditMap, exception,
         getOmRequest().getUserInfo()));
 
     switch (result) {
@@ -236,7 +247,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     case FAILURE:
       ozoneManager.getMetrics().incNumCommitMultipartUploadPartFails();
       LOG.error("MultipartUpload Commit is failed for Key:{} in " +
-          "Volume/Bucket {}/{}", keyName, volumeName, bucketName, exception);
+          "Volume/Bucket {}/{}", keyName, volumeName, bucketName,
+          exception);
       break;
     default:
       LOG.error("Unrecognized Result for S3MultipartUploadCommitPartRequest: " +
@@ -246,15 +258,5 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
-  private Map<String, String> buildAuditMap(KeyArgs keyArgs, String partName) {
-    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
-
-    // Add MPU related information.
-    auditMap.put(OzoneConsts.MULTIPART_UPLOAD_PART_NUMBER,
-        String.valueOf(keyArgs.getMultipartNumber()));
-    auditMap.put(OzoneConsts.MULTIPART_UPLOAD_PART_NAME, partName);
-
-    return auditMap;
-  }
 }
 
