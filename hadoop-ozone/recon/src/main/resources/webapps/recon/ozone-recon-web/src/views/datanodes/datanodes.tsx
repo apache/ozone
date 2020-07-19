@@ -30,7 +30,7 @@ import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
 import {MultiSelect, IOption} from 'components/multiSelect/multiSelect';
 import {ActionMeta, ValueType} from 'react-select';
 import {showDataFetchError} from 'utils/common';
-import {ColumnSearch} from 'components/columnSearch/columnSearch';
+import {ColumnSearch} from 'utils/columnSearch';
 
 interface IDatanodeResponse {
   hostname: string;
@@ -344,7 +344,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
                 if (column.isSearchable) {
                   const newColumn = {
                     ...column,
-                    ...new ColumnSearch({}).getColumnSearchProps(column.dataIndex)
+                    ...new ColumnSearch(column).getColumnSearchProps(column.dataIndex)
                   };
                   filtered.push(newColumn);
                 } else {

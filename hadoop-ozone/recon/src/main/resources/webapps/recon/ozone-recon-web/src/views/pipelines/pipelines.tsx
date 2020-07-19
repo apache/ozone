@@ -28,7 +28,7 @@ import {AutoReloadHelper} from 'utils/autoReloadHelper';
 import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
 import {showDataFetchError} from 'utils/common';
 import {IAxiosResponse} from 'types/axios.types';
-import {ColumnSearch} from 'components/columnSearch/columnSearch';
+import {ColumnSearch} from 'utils/columnSearch';
 
 const {TabPane} = Tabs;
 const PipelineStatusList = ['OPEN', 'CLOSING', 'QUASI_CLOSED', 'CLOSED', 'UNHEALTHY', 'INVALID', 'DELETED'] as const;
@@ -222,7 +222,7 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
                   if (column.isSearchable) {
                     const newColumn = {
                       ...column,
-                      ...new ColumnSearch({}).getColumnSearchProps(column.dataIndex)
+                      ...new ColumnSearch(column).getColumnSearchProps(column.dataIndex)
                     };
                     filtered.push(newColumn);
                   } else {

@@ -18,55 +18,75 @@
 
 import React from 'react';
 import {Input, Button, Icon} from 'antd';
+import './columnSearch.less';
 
-class ColumnSearch extends React.Component {
+class ColumnSearch extends React.PureComponent {
+  searchInput: Input | null = null;
+
   getColumnSearchProps = (dataIndex: string) => ({
-    filterDropdown: ({setSelectedKeys, selectedKeys, confirm, clearFilters}) => (
-      <div style={{padding: 8}}>
+    filterDropdown: ({
+      setSelectedKeys,
+      selectedKeys,
+      confirm,
+      clearFilters
+    }: {
+      setSelectedKeys: (keys: string[]) => void;
+      selectedKeys: string[];
+      confirm: () => void;
+      clearFilters: () => void;
+    }) => (
+      <div className='column-search-container'>
         <Input
           ref={node => {
             this.searchInput = node;
           }}
+          className='input-block'
           placeholder={`Search ${dataIndex}`}
           value={selectedKeys[0]}
-          style={{width: 188, marginBottom: 8, display: 'block'}}
-          onChange={e => setSelectedKeys(e.target.value ? [e.target.value] : [])}
-          onPressEnter={() => this.handleSearch(selectedKeys, confirm)}
+          onChange={e =>
+            setSelectedKeys(e.target.value ? [e.target.value] : [])}
+          onPressEnter={() => this.handleSearch(confirm)}
         />
         <Button
+          className='search-button'
           type='primary'
           icon='search'
           size='small'
-          style={{width: 90, marginRight: 8}}
-          onClick={() => this.handleSearch(selectedKeys, confirm)}
+          onClick={() => this.handleSearch(confirm)}
         >
           Search
         </Button>
-        <Button size='small' style={{width: 90}} onClick={() => this.handleReset(clearFilters)}>
+        <Button
+          size='small'
+          icon='reset'
+          className='reset-button'
+          onClick={() => this.handleReset(clearFilters)}
+        >
           Reset
         </Button>
       </div>
     ),
-    filterIcon: filtered => (
+    filterIcon: (filtered: boolean) => (
       <Icon type='search' style={{color: filtered ? '#1890ff' : undefined}}/>
     ),
-    onFilter: (value, record) =>
-      record[dataIndex]
-        .toString()
-        .toLowerCase()
-        .includes(value.toLowerCase()),
-    onFilterDropdownVisibleChange: visible => {
+    onFilter: (value: string, record: any) =>
+      record[dataIndex].toString().toLowerCase().includes(value.toLowerCase()),
+    onFilterDropdownVisibleChange: (visible: boolean) => {
       if (visible) {
-        setTimeout(() => this.searchInput.select());
+        setTimeout(() => {
+          if (this.searchInput) {
+            this.searchInput.select();
+          }
+        });
       }
     }
   });
 
-  handleSearch = (selectedKeys, confirm) => {
+  handleSearch = (confirm: () => void) => {
     confirm();
   };
 
-  handleReset = clearFilters => {
+  handleReset = (clearFilters: () => void) => {
     clearFilters();
   };
 }
