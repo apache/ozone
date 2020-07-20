@@ -165,3 +165,6 @@ hdfs dfs -put /etc/hosts /volume1/bucket1/test
 
 For more usage, see: https://issues.apache.org/jira/secure/attachment/12987636/Design%20ofs%20v1.pdf
 
+## Special note
+
+Trash is disabled even if `fs.trash.interval` is set on purpose. (HDDS-3982)
