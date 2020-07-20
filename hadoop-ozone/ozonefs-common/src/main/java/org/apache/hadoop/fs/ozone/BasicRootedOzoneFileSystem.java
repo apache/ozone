@@ -394,7 +394,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       super.rename(src, dst, options);
     } else {
       // intercept when TO_TRASH is found
-      LOG.info("Move to trash is disabled for ofs, deleting instead: {}", src);
+      LOG.info("Move to trash is disabled for ofs, deleting instead: {}. "
+          + "Files or directories will NOT be retained in trash. "
+          + "Ignore the following TrashPolicyDefault message.", src);
       delete(src, true);
     }
   }
