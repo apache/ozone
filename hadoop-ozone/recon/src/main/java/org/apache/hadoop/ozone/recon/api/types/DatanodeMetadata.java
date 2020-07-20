@@ -122,6 +122,14 @@ public final class DatanodeMetadata {
     return  setupTime;
   }
 
+  public String getRevision() {
+    return revision;
+  }
+
+  public String getBuildDate() {
+    return buildDate;
+  }
+
   /**
    * Returns new builder class that builds a DatanodeMetadata.
    *
