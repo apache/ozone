@@ -379,7 +379,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     }
 
     CompletableFuture<TermIndex> future = CompletableFuture.supplyAsync(
-        () -> ozoneManager.installSnapshot(leaderNodeId),
+        () -> ozoneManager.installSnapshotFromLeader(leaderNodeId),
         installSnapshotExecutor);
     return future;
   }
@@ -521,9 +521,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
             ozoneManager.getMetadataManager());
     if (omTransactionInfo != null) {
       setLastAppliedTermIndex(TermIndex.newTermIndex(
-          omTransactionInfo.getCurrentTerm(),
+          omTransactionInfo.getTerm(),
           omTransactionInfo.getTransactionIndex()));
-      snapshotInfo.updateTermIndex(omTransactionInfo.getCurrentTerm(),
+      snapshotInfo.updateTermIndex(omTransactionInfo.getTerm(),
           omTransactionInfo.getTransactionIndex());
     }
     LOG.info("LastAppliedIndex is set from TransactionInfo from OM DB as {}",

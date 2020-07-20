@@ -66,7 +66,11 @@ public class OzoneBucket extends WithMetadata {
    */
   private final String name;
 
+  /**
+   * Default storage class for keys.
+   */
   private final String storageClass;
+
   /**
    * Type of storage to be used for this bucket.
    * [RAM_DISK, SSD, DISK, ARCHIVE]
@@ -100,6 +104,8 @@ public class OzoneBucket extends WithMetadata {
 
   private OzoneObj ozoneObj;
 
+  private String sourceVolume;
+  private String sourceBucket;
 
   private OzoneBucket(ConfigurationSource conf, String volumeName,
       String bucketName, String storageClass, ClientProtocol proxy) {
@@ -121,11 +127,13 @@ public class OzoneBucket extends WithMetadata {
         .setResType(OzoneObj.ResourceType.BUCKET)
         .setStoreType(OzoneObj.StoreType.OZONE).build();
   }
+
   @SuppressWarnings("parameternumber")
   public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
       String volumeName, String bucketName, StorageType storageType,
       Boolean versioning, long creationTime, Map<String, String> metadata,
-      String encryptionKeyName) {
+      String encryptionKeyName,
+      String sourceVolume, String sourceBucket) {
     this(conf, volumeName, bucketName, null, proxy);
     this.storageType = storageType;
     this.versioning = versioning;
@@ -133,6 +141,8 @@ public class OzoneBucket extends WithMetadata {
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.metadata = metadata;
     this.encryptionKeyName = encryptionKeyName;
+    this.sourceVolume = sourceVolume;
+    this.sourceBucket = sourceBucket;
     modificationTime = Instant.now();
     if (modificationTime.isBefore(this.creationTime)) {
       modificationTime = Instant.ofEpochSecond(
@@ -144,9 +154,10 @@ public class OzoneBucket extends WithMetadata {
   public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
       String volumeName, String bucketName, StorageType storageType,
       Boolean versioning, long creationTime, long modificationTime,
-      Map<String, String> metadata, String encryptionKeyName) {
+      Map<String, String> metadata, String encryptionKeyName,
+      String sourceVolume, String sourceBucket) {
     this(conf, proxy, volumeName, bucketName, storageType, versioning,
-        creationTime, metadata, encryptionKeyName);
+        creationTime, metadata, encryptionKeyName, sourceVolume, sourceBucket);
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
   }
 
@@ -193,12 +204,13 @@ public class OzoneBucket extends WithMetadata {
   @VisibleForTesting
   @SuppressWarnings("parameternumber")
   OzoneBucket(String volumeName, String name,
-      String storageClass, StorageType storageType,
+      String storageClassName,
+      StorageType storageType,
       Boolean versioning, long creationTime) {
     this.proxy = null;
     this.volumeName = volumeName;
     this.name = name;
-    this.storageClass = storageClass;
+    this.storageClass = storageClassName;
     this.storageType = storageType;
     this.versioning = versioning;
     this.creationTime = Instant.ofEpochMilli(creationTime);
@@ -287,6 +299,16 @@ public class OzoneBucket extends WithMetadata {
     return encryptionKeyName;
   }
 
+  public String getSourceVolume() {
+    return sourceVolume;
+  }
+
+  public String getSourceBucket() {
+    return sourceBucket;
+  }
+
+  /**
+   * Builder for OmBucketInfo.
   /**
    * Adds ACLs to the Bucket.
    * @param addAcl ACL to be added
@@ -338,24 +360,24 @@ public class OzoneBucket extends WithMetadata {
    */
   public OzoneOutputStream createKey(String key, long size)
       throws IOException {
-    return createKey(key, size, storageClass, new HashMap<>());
+    return createKey(key, size, null,
+        new HashMap<>());
   }
 
   /**
    * Creates a new key in the bucket.
-   *
-   * @param key    Name of the key to be created.
-   * @param size   Size of the data the key will point to.
-   * @param storageClass     storage class
+   * @param key Name of the key to be created.
+   * @param size Size of the data the key will point to.
+   * @param storageClass storage class name
    * @return OzoneOutputStream to which the data has to be written.
    * @throws IOException
    */
-  @Deprecated
   public OzoneOutputStream createKey(String key, long size,
-      String storageClass, Map<String, String> keyMetadata)
+                                     String storageClass,
+                                     Map<String, String> keyMetadata)
       throws IOException {
-    return proxy.createKey(volumeName, name, key, size, storageClass,
-        keyMetadata);
+    return proxy
+        .createKey(volumeName, name, key, size, storageClass, keyMetadata);
   }
 
   /**
@@ -437,7 +459,8 @@ public class OzoneBucket extends WithMetadata {
   /**
    * Initiate multipart upload for a specified key.
    * @param keyName
-   * @param sc storageClass
+   * @param type
+   * @param factor
    * @return OmMultipartInfo
    * @throws IOException
    */

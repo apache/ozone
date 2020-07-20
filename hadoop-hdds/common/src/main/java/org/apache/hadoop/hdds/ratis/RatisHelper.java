@@ -75,13 +75,6 @@ public final class RatisHelper {
 
   // Prefix for Ratis Server GRPC and Ratis client conf.
   public static final String HDDS_DATANODE_RATIS_PREFIX_KEY = "hdds.ratis";
-  private static final String RAFT_SERVER_PREFIX_KEY = "raft.server";
-  public static final String HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY =
-      HDDS_DATANODE_RATIS_PREFIX_KEY + "." + RAFT_SERVER_PREFIX_KEY;
-  public static final String HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY =
-      HDDS_DATANODE_RATIS_PREFIX_KEY + "." + RaftClientConfigKeys.PREFIX;
-  public static final String HDDS_DATANODE_RATIS_GRPC_PREFIX_KEY =
-      HDDS_DATANODE_RATIS_PREFIX_KEY + "." + GrpcConfigKeys.PREFIX;
 
   private static final Class[] NO_RETRY_EXCEPTIONS =
       new Class[] {NotReplicatedException.class, GroupMismatchException.class,
@@ -227,7 +220,7 @@ public final class RatisHelper {
   }
 
   /**
-   * Set all the properties matching with regex
+   * Set all client properties matching with regex
    * {@link RatisHelper#HDDS_DATANODE_RATIS_PREFIX_KEY} in
    * ozone configuration object and configure it to RaftProperties.
    * @param ozoneConf
@@ -237,14 +230,17 @@ public final class RatisHelper {
       RaftProperties raftProperties) {
 
     // As for client we do not require server and grpc server/tls. exclude them.
-    Map<String, String> ratisClientConf = ozoneConf.getPropsWithPrefix(
-        StringUtils.appendIfNotPresent(HDDS_DATANODE_RATIS_PREFIX_KEY, '.'));
+    Map<String, String> ratisClientConf =
+        getDatanodeRatisPrefixProps(ozoneConf);
     ratisClientConf.forEach((key, val) -> {
-      if (key.startsWith(RaftClientConfigKeys.PREFIX) || isGrpcClientConfig(
-          key)) {
+      if (isClientConfig(key) || isGrpcClientConfig(key)) {
         raftProperties.set(key, val);
       }
     });
+  }
+
+  private static boolean isClientConfig(String key) {
+    return key.startsWith(RaftClientConfigKeys.PREFIX);
   }
 
   private static boolean isGrpcClientConfig(String key) {
@@ -253,7 +249,7 @@ public final class RatisHelper {
         .startsWith(GrpcConfigKeys.Server.PREFIX);
   }
   /**
-   * Set all the properties matching with prefix
+   * Set all server properties matching with prefix
    * {@link RatisHelper#HDDS_DATANODE_RATIS_PREFIX_KEY} in
    * ozone configuration object and configure it to RaftProperties.
    * @param ozoneConf
@@ -266,7 +262,7 @@ public final class RatisHelper {
         getDatanodeRatisPrefixProps(ozoneConf);
     ratisServerConf.forEach((key, val) -> {
       // Exclude ratis client configuration.
-      if (!key.startsWith(RaftClientConfigKeys.PREFIX)) {
+      if (!isClientConfig(key)) {
         raftProperties.set(key, val);
       }
     });

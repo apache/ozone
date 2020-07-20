@@ -26,24 +26,24 @@ source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env
 
-#Due to the limitation of the current auditparser test, it should be the
-#first test in a clean cluster.
-
-#Disabling for now, audit parser tool during parse getting exception.
-#execute_robot_test om auditparser
-
 execute_robot_test scm lib
+execute_robot_test scm ozone-lib
 
 execute_robot_test scm basic
 
 execute_robot_test scm gdpr
 
-execute_robot_test scm -v SCHEME:ofs ozonefs/ozonefs.robot
-execute_robot_test scm -v SCHEME:o3fs ozonefs/ozonefs.robot
+for scheme in ofs o3fs; do
+  for bucket in link bucket; do
+    execute_robot_test scm -v SCHEME:${scheme} -v BUCKET_TYPE:${bucket} ozonefs/ozonefs.robot
+  done
+done
 
 execute_robot_test scm security/ozone-secure-token.robot
 
-execute_robot_test scm s3
+for bucket in link generated; do
+  execute_robot_test scm -v BUCKET:${bucket} s3
+done
 
 execute_robot_test scm recon
 

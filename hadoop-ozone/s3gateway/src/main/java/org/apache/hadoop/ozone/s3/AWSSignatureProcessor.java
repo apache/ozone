@@ -43,6 +43,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.header.AuthorizationHeaderV2;
 import org.apache.hadoop.ozone.s3.header.AuthorizationHeaderV4;
 import org.apache.hadoop.ozone.s3.header.Credential;
 
@@ -54,15 +55,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Parser to process AWS v4 auth request. Creates string to sign and auth
+ * Parser to process AWS V2 & V4 auth request. Creates string to sign and auth
  * header. For more details refer to AWS documentation https://docs.aws
  * .amazon.com/general/latest/gr/sigv4-create-canonical-request.html.
  **/
 @RequestScoped
-public class AWSV4SignatureProcessor implements SignatureProcessor {
+public class AWSSignatureProcessor implements SignatureProcessor {
 
   private final static Logger LOG =
-      LoggerFactory.getLogger(AWSV4SignatureProcessor.class);
+      LoggerFactory.getLogger(AWSSignatureProcessor.class);
 
   @Context
   private ContainerRequestContext context;
@@ -72,13 +73,12 @@ public class AWSV4SignatureProcessor implements SignatureProcessor {
   private String uri;
   private String method;
   private AuthorizationHeaderV4 v4Header;
+  private AuthorizationHeaderV2 v2Header;
   private String stringToSign;
 
   @PostConstruct
   public void init()
       throws Exception {
-    LOG.info("Initializing request header parser");
-
     //header map is MUTABLE. It's better to save it here. (with lower case
     // keys!!!)
     this.headers = new LowerCaseKeyStringMap(new HashMap<>());
@@ -107,10 +107,18 @@ public class AWSV4SignatureProcessor implements SignatureProcessor {
     this.uri = context.getUriInfo().getRequestUri().getPath();
 
     this.method = context.getMethod();
-    if (v4Header == null) {
-      v4Header = new AuthorizationHeaderV4(headers.get(AUTHORIZATION_HEADER));
+    String authHeader = headers.get(AUTHORIZATION_HEADER);
+    String[] split = authHeader.split(" ");
+    if (split[0].equals(AuthorizationHeaderV2.IDENTIFIER)) {
+      if (v2Header == null) {
+        v2Header = new AuthorizationHeaderV2(authHeader);
+      }
+    } else {
+      if (v4Header == null) {
+        v4Header = new AuthorizationHeaderV4(authHeader);
+      }
+      parse();
     }
-    parse();
   }
 
 
@@ -320,11 +328,13 @@ public class AWSV4SignatureProcessor implements SignatureProcessor {
   }
 
   public String getAwsAccessId() {
-    return v4Header.getAccessKeyID();
+    return (v4Header != null ? v4Header.getAccessKeyID() :
+        v2Header != null ? v2Header.getAccessKeyID() : "");
   }
 
   public String getSignature() {
-    return v4Header.getSignature();
+    return (v4Header != null ? v4Header.getSignature() :
+        v2Header != null ? v2Header.getSignature() : "");
   }
 
   public String getStringToSign() throws Exception {
@@ -340,6 +350,11 @@ public class AWSV4SignatureProcessor implements SignatureProcessor {
   public void setV4Header(
       AuthorizationHeaderV4 v4Header) {
     this.v4Header = v4Header;
+  }
+
+  @VisibleForTesting
+  public void setV2Header(AuthorizationHeaderV2 v2Header) {
+    this.v2Header = v2Header;
   }
 
   /**

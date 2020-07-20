@@ -446,6 +446,8 @@ public class RpcClient implements ClientProtocol {
         .setIsVersionEnabled(isVersionEnabled)
         .addAllMetadata(bucketArgs.getMetadata())
         .setStorageType(storageType)
+        .setSourceVolume(bucketArgs.getSourceVolume())
+        .setSourceBucket(bucketArgs.getSourceBucket())
         .setAcls(listOfAcls.stream().distinct().collect(Collectors.toList()));
 
     if (bek != null) {
@@ -612,7 +614,10 @@ public class RpcClient implements ClientProtocol {
         bucketInfo.getModificationTime(),
         bucketInfo.getMetadata(),
         bucketInfo.getEncryptionKeyInfo() != null ? bucketInfo
-            .getEncryptionKeyInfo().getKeyName() : null);
+            .getEncryptionKeyInfo().getKeyName() : null,
+        bucketInfo.getSourceVolume(),
+        bucketInfo.getSourceBucket()
+    );
   }
 
   @Override
@@ -633,7 +638,9 @@ public class RpcClient implements ClientProtocol {
         bucket.getModificationTime(),
         bucket.getMetadata(),
         bucket.getEncryptionKeyInfo() != null ? bucket
-            .getEncryptionKeyInfo().getKeyName() : null))
+            .getEncryptionKeyInfo().getKeyName() : null,
+        bucket.getSourceVolume(),
+        bucket.getSourceBucket()))
         .collect(Collectors.toList());
   }
 

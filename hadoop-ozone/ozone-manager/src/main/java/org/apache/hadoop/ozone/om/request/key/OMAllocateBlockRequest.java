@@ -111,9 +111,11 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
             ozoneManager.getPreallocateBlocksMax(),
             ozoneManager.isGrpcBlockTokenEnabled(), ozoneManager.getOMNodeId());
 
-    // Set modification time
+    // Set modification time and normalize key if required.
     KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
-        .setModificationTime(Time.now());
+        .setModificationTime(Time.now())
+        .setKeyName(validateAndNormalizeKey(
+            ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
 
     AllocateBlockRequest.Builder newAllocatedBlockRequest =
         AllocateBlockRequest.newBuilder()
@@ -162,8 +164,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     auditMap.put(OzoneConsts.CLIENT_ID, String.valueOf(clientID));
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    String openKeyName = omMetadataManager.getOpenKey(volumeName, bucketName,
-        keyName, clientID);
+    String openKeyName = null;
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -173,6 +174,10 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     IOException exception = null;
 
     try {
+      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+
       // check Acl
       checkKeyAclsInOpenKeyTable(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.WRITE, allocateBlockRequest.getClientID());
@@ -183,6 +188,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       // Here we don't acquire bucket/volume lock because for a single client
       // allocateBlock is called in serial fashion.
 
+      openKeyName = omMetadataManager.getOpenKey(volumeName, bucketName,
+          keyName, clientID);
       openKeyInfo = omMetadataManager.getOpenKeyTable().get(openKeyName);
       if (openKeyInfo == null) {
         throw new OMException("Open Key not found " + openKeyName,

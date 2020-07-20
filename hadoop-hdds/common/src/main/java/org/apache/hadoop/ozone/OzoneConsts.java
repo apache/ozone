@@ -299,6 +299,8 @@ public final class OzoneConsts {
   public static final String BUCKET_ENCRYPTION_KEY = "bucketEncryptionKey";
   public static final String DELETED_KEYS_LIST = "deletedKeysList";
   public static final String UNDELETED_KEYS_LIST = "unDeletedKeysList";
+  public static final String SOURCE_VOLUME = "sourceVolume";
+  public static final String SOURCE_BUCKET = "sourceBucket";
 
 
 
@@ -365,4 +367,7 @@ public final class OzoneConsts {
 
   public static final String CONTAINER_DB_TYPE_ROCKSDB = "RocksDB";
   public static final String CONTAINER_DB_TYPE_LEVELDB = "LevelDB";
+
+  // An on-disk transient marker file used when replacing DB with checkpoint
+  public static final String DB_TRANSIENT_MARKER = "dbInconsistentMarker";
 }
