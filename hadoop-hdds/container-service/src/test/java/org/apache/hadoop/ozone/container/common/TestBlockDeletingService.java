@@ -210,7 +210,7 @@ public class TestBlockDeletingService {
   }
 
   private int getDeletedBlocksCount(ReferenceCountedDB db) throws IOException {
-      return db.getStore().getBlockDataTable()
+      return db.getStore().getMetadataTable()
             .getRangeKVs(null, 100,
             new MetadataKeyFilters.KeyPrefixFilter()
             .addFilter(OzoneConsts.DELETED_KEY_PREFIX)).size();
