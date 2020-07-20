@@ -91,7 +91,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     }
 
     KeyArgs.Builder newKeyArgs =
-        keyArgs.toBuilder().setModificationTime(Time.now());
+        keyArgs.toBuilder().setModificationTime(Time.now())
+            .setKeyName(validateAndNormalizeKey(
+                ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
 
     return getOmRequest().toBuilder()
         .setCommitKeyRequest(commitKeyRequest.toBuilder()

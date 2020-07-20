@@ -24,6 +24,7 @@ import javax.ws.rs.core.UriInfo;
 import java.net.URI;
 
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.header.AuthorizationHeaderV2;
 import org.apache.hadoop.ozone.s3.header.AuthorizationHeaderV4;
 
 import org.junit.Assert;
@@ -33,10 +34,10 @@ import org.mockito.Mockito;
 /**
  * Test the Auth parser.
  */
-public class TestAWSV4SignatureProcessor {
+public class TestAWSSignatureProcessor {
 
   @Test
-  public void testInitialization() throws Exception {
+  public void testV4Initialization() throws Exception {
 
     MultivaluedMap<String, String> headers = new MultivaluedHashMap<>();
     headers.putSingle("Content-Length", "123");
@@ -76,7 +77,7 @@ public class TestAWSV4SignatureProcessor {
     Mockito.when(mock.getMethod()).thenReturn("GET");
     Mockito.when(mock.getUriInfo()).thenReturn(uriInfo);
 
-    AWSV4SignatureProcessor parser = new AWSV4SignatureProcessor() {
+    AWSSignatureProcessor parser = new AWSSignatureProcessor() {
       @Override
       void validateSignedHeader(String header, String headerValue)
           throws OS3Exception {
@@ -99,5 +100,42 @@ public class TestAWSV4SignatureProcessor {
             +
             "f20d4de80af2271545385e8d4c7df608cae70a791c69b97aab1527ed93a0d665",
         parser.getStringToSign());
+  }
+
+  @Test
+  public void testV2Initialization() throws Exception {
+
+    MultivaluedMap<String, String> headers = new MultivaluedHashMap<>();
+    String authHeader = "AWS root:ixWQAgWvJDuqLUqgDG9o4b2HF7c=";
+    headers.putSingle("Authorization", authHeader);
+
+    AuthorizationHeaderV2 parserAuthHeader =
+        new AuthorizationHeaderV2(authHeader);
+
+    MultivaluedMap<String, String> queryParameters = new MultivaluedHashMap<>();
+
+    UriInfo uriInfo = Mockito.mock(UriInfo.class);
+    Mockito.when(uriInfo.getQueryParameters()).thenReturn(queryParameters);
+    Mockito.when(uriInfo.getRequestUri())
+        .thenReturn(new URI("http://localhost/buckets"));
+
+    ContainerRequestContext mock = Mockito.mock(ContainerRequestContext.class);
+    Mockito.when(mock.getHeaders()).thenReturn(headers);
+    Mockito.when(mock.getMethod()).thenReturn("GET");
+    Mockito.when(mock.getUriInfo()).thenReturn(uriInfo);
+
+    AWSSignatureProcessor parser = new AWSSignatureProcessor() {
+      @Override
+      void validateSignedHeader(String header, String headerValue)
+          throws OS3Exception {
+        super.validateSignedHeader(header, headerValue);
+      }
+    };
+    parser.setV2Header(parserAuthHeader);
+    parser.setContext(mock);
+    parser.init();
+
+    Assert.assertEquals("root", parser.getAwsAccessId());
+    Assert.assertEquals("ixWQAgWvJDuqLUqgDG9o4b2HF7c=", parser.getSignature());
   }
 }

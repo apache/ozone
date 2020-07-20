@@ -107,7 +107,7 @@ public class TestS3MultipartRequest {
    * @return OMRequest - returned from preExecute.
    */
   protected OMRequest doPreExecuteInitiateMPU(
-      String volumeName, String bucketName, String keyName) {
+      String volumeName, String bucketName, String keyName) throws Exception {
     OMRequest omRequest =
         TestOMRequestUtils.createInitiateMPURequest(volumeName, bucketName,
             keyName);
@@ -141,7 +141,8 @@ public class TestS3MultipartRequest {
    */
   protected OMRequest doPreExecuteCommitMPU(
       String volumeName, String bucketName, String keyName,
-      long clientID, String multipartUploadID, int partNumber) {
+      long clientID, String multipartUploadID, int partNumber)
+      throws Exception {
 
     // Just set dummy size
     long dataSize = 100L;
