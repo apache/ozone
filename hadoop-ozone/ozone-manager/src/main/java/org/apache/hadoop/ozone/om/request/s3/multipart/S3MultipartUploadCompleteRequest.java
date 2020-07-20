@@ -81,7 +81,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     return getOmRequest().toBuilder()
         .setCompleteMultiPartUploadRequest(multipartUploadCompleteRequest
             .toBuilder().setKeyArgs(keyArgs.toBuilder()
-                .setModificationTime(Time.now())))
+                .setModificationTime(Time.now())
+                .setKeyName(validateAndNormalizeKey(
+                    ozoneManager.getEnableFileSystemPaths(),
+                    keyArgs.getKeyName()))))
         .setUserInfo(getUserInfo()).build();
   }
 

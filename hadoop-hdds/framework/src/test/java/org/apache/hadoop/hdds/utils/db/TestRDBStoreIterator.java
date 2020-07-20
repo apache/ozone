@@ -58,12 +58,14 @@ public class TestRDBStoreIterator {
   @Test
   public void testForeachRemainingCallsConsumerWithAllElements() {
     when(rocksDBIteratorMock.isValid())
-        .thenReturn(true, true, true, true, true, true, false);
+        .thenReturn(true, true, true, true, true, true, true, false);
     when(rocksDBIteratorMock.key())
-        .thenReturn(new byte[]{0x00}, new byte[]{0x01}, new byte[]{0x02})
+        .thenReturn(new byte[]{0x00}, new byte[]{0x00}, new byte[]{0x01},
+            new byte[]{0x02})
         .thenThrow(new NoSuchElementException());
     when(rocksDBIteratorMock.value())
-        .thenReturn(new byte[]{0x7f}, new byte[]{0x7e}, new byte[]{0x7d})
+        .thenReturn(new byte[]{0x7f}, new byte[]{0x7f}, new byte[]{0x7e},
+            new byte[]{0x7d})
         .thenThrow(new NoSuchElementException());
 
 
@@ -91,7 +93,7 @@ public class TestRDBStoreIterator {
 
   @Test
   public void testHasNextDependsOnIsvalid(){
-    when(rocksDBIteratorMock.isValid()).thenReturn(true, false);
+    when(rocksDBIteratorMock.isValid()).thenReturn(true, true, false);
 
     RDBStoreIterator iter = new RDBStoreIterator(rocksDBIteratorMock);
 

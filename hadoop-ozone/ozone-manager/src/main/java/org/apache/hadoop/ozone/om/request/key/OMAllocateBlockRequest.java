@@ -110,9 +110,11 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
             ozoneManager.getPreallocateBlocksMax(),
             ozoneManager.isGrpcBlockTokenEnabled(), ozoneManager.getOMNodeId());
 
-    // Set modification time
+    // Set modification time and normalize key if required.
     KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
-        .setModificationTime(Time.now());
+        .setModificationTime(Time.now())
+        .setKeyName(validateAndNormalizeKey(
+            ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
 
     AllocateBlockRequest.Builder newAllocatedBlockRequest =
         AllocateBlockRequest.newBuilder()

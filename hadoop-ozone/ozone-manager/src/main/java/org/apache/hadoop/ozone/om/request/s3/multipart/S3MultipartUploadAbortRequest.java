@@ -73,7 +73,10 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
 
     return getOmRequest().toBuilder().setAbortMultiPartUploadRequest(
         getOmRequest().getAbortMultiPartUploadRequest().toBuilder()
-            .setKeyArgs(keyArgs.toBuilder().setModificationTime(Time.now())))
+            .setKeyArgs(keyArgs.toBuilder().setModificationTime(Time.now())
+                .setKeyName(validateAndNormalizeKey(
+                    ozoneManager.getEnableFileSystemPaths(),
+                    keyArgs.getKeyName()))))
         .setUserInfo(getUserInfo()).build();
 
   }

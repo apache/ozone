@@ -113,8 +113,10 @@ public class OzoneManagerSnapshotProvider {
   public DBCheckpoint getOzoneManagerDBSnapshot(String leaderOMNodeID)
       throws IOException {
     String snapshotTime = Long.toString(System.currentTimeMillis());
-    String snapshotFileName = Paths.get(omSnapshotDir.getAbsolutePath(),
-        snapshotTime, OM_DB_NAME).toFile().getAbsolutePath();
+    String snapshotFileName = OM_DB_NAME + "-" + leaderOMNodeID
+        + "-" + snapshotTime;
+    String snapshotFilePath = Paths.get(omSnapshotDir.getAbsolutePath(),
+        snapshotFileName).toFile().getAbsolutePath();
     File targetFile = new File(snapshotFileName + ".tar.gz");
 
     String omCheckpointUrl = peerNodesMap.get(leaderOMNodeID)
@@ -141,11 +143,11 @@ public class OzoneManagerSnapshotProvider {
     });
 
     // Untar the checkpoint file.
-    Path untarredDbDir = Paths.get(snapshotFileName);
+    Path untarredDbDir = Paths.get(snapshotFilePath);
     FileUtil.unTar(targetFile, untarredDbDir.toFile());
     FileUtils.deleteQuietly(targetFile);
 
-    LOG.info("Sucessfully downloaded latest checkpoint from leader OM: {}",
+    LOG.info("Successfully downloaded latest checkpoint from leader OM: {}",
         leaderOMNodeID);
 
     RocksDBCheckpoint omCheckpoint = new RocksDBCheckpoint(untarredDbDir);
