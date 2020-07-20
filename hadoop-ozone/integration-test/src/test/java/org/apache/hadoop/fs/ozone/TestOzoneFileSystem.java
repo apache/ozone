@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -47,6 +48,7 @@ import org.apache.hadoop.test.GenericTestUtils;
 
 import org.apache.commons.io.IOUtils;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -86,6 +88,7 @@ public class TestOzoneFileSystem {
   private String volumeName;
   private String bucketName;
   private int rootItemCount;
+  private Trash trash;
 
   @Test(timeout = 300_000)
   public void testCreateFileShouldCheckExistenceOfDirWithSameName()
@@ -167,6 +170,8 @@ public class TestOzoneFileSystem {
     testOzoneFsServiceLoader();
     o3fs = (OzoneFileSystem) fs;
 
+    testRenameToTrashDisabled();
+
     testGetTrashRoots();
     testGetTrashRoot();
     testGetDirectoryModificationTime();
@@ -197,6 +202,7 @@ public class TestOzoneFileSystem {
   private void setupOzoneFileSystem()
       throws IOException, TimeoutException, InterruptedException {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
@@ -215,6 +221,7 @@ public class TestOzoneFileSystem {
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
     fs = FileSystem.get(conf);
+    trash = new Trash(conf);
   }
 
   private void testOzoneFsServiceLoader() throws IOException {
@@ -615,6 +622,37 @@ public class TestOzoneFileSystem {
     Assert.assertEquals(6, res.size());
 
     // Clean up
+    o3fs.delete(trashRoot, true);
+  }
+
+  /**
+   * Check that no files are actually moved to trash since it is disabled by
+   * fs.rename(src, dst, options).
+   */
+  public void testRenameToTrashDisabled() throws IOException {
+    // Create a file
+    String testKeyName = "testKey1";
+    Path path = new Path(OZONE_URI_DELIMITER, testKeyName);
+    try (FSDataOutputStream stream = fs.create(path)) {
+      stream.write(1);
+    }
+
+    // Call moveToTrash. We can't call protected fs.rename() directly
+    trash.moveToTrash(path);
+
+    // Construct paths
+    String username = UserGroupInformation.getCurrentUser().getShortUserName();
+    Path trashRoot = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
+    Path userTrash = new Path(trashRoot, username);
+    Path userTrashCurrent = new Path(userTrash, "Current");
+    Path trashPath = new Path(userTrashCurrent, testKeyName);
+
+    // Trash Current directory should still have been created.
+    Assert.assertTrue(o3fs.exists(userTrashCurrent));
+    // Check under trash, the key should be deleted instead
+    Assert.assertFalse(o3fs.exists(trashPath));
+
+    // Cleanup
     o3fs.delete(trashRoot, true);
   }
 }
