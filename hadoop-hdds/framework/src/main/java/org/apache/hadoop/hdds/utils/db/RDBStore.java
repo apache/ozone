@@ -319,7 +319,7 @@ public class RDBStore implements DBStore {
   }
 
   @Override
-  public void flush() throws IOException {
+  public void flushDB() throws IOException {
     try (FlushOptions flushOptions = new FlushOptions()) {
       flushOptions.setWaitForFlush(true);
       db.flush(flushOptions);
@@ -329,9 +329,22 @@ public class RDBStore implements DBStore {
   }
 
   @Override
+  public void flushLog(boolean sync) throws IOException {
+    if (db != null) {
+      try {
+        // for RocksDB it is sufficient to flush the WAL as entire db can
+        // be reconstructed using it.
+        db.flushWal(sync);
+      } catch (RocksDBException e) {
+        throw toIOException("Failed to flush db", e);
+      }
+    }
+  }
+
+  @Override
   public DBCheckpoint getCheckpoint(boolean flush) throws IOException {
     if (flush) {
-      this.flush();
+      this.flushDB();
     }
     return checkPointManager.createCheckpoint(checkpointsParentDir);
   }

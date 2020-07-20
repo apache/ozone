@@ -248,6 +248,13 @@ public final class OzoneConsts {
   public static final String DATA_SCAN_TIMESTAMP = "dataScanTimestamp";
   public static final String ORIGIN_PIPELINE_ID = "originPipelineId";
   public static final String ORIGIN_NODE_ID = "originNodeId";
+  public static final String SCHEMA_VERSION = "schemaVersion";
+
+  // Supported .container database schema versions
+  // V1: All data in default column family.
+  public static final String SCHEMA_V1 = "1";
+  // V2: Metadata and block data in their own column families.
+  public static final String SCHEMA_V2 = "2";
 
   // Supported store types.
   public static final String OZONE = "ozone";

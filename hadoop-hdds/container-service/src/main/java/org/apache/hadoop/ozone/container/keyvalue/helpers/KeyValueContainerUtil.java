@@ -27,6 +27,9 @@ import com.google.common.primitives.Longs;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -39,14 +42,15 @@ import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreOneTableImpl;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreTwoTableImpl;
+import org.rocksdb.DBOptions;
+import org.rocksdb.Options;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.OzoneConsts.DB_BLOCK_COMMIT_SEQUENCE_ID_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_BLOCK_COUNT_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_CONTAINER_BYTES_USED_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_CONTAINER_DELETE_TRANSACTION_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_PENDING_DELETE_BLOCK_COUNT_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.*;
 
 /**
  * Class which defines utility methods for KeyValueContainer.
@@ -70,7 +74,7 @@ public final class KeyValueContainerUtil {
    * @throws IOException
    */
   public static void createContainerMetaData(File containerMetaDataPath, File
-      chunksPath, File dbFile, ConfigurationSource conf) throws IOException {
+      chunksPath, File dbFile, String schemaVersion, ConfigurationSource conf) throws IOException {
     Preconditions.checkNotNull(containerMetaDataPath);
     Preconditions.checkNotNull(conf);
 
@@ -91,8 +95,18 @@ public final class KeyValueContainerUtil {
           " Path: " + chunksPath);
     }
 
-    MetadataStore store = MetadataStoreBuilder.newBuilder().setConf(conf)
-        .setCreateIfMissing(true).setDbFile(dbFile).build();
+    DatanodeStore store;
+    if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
+      store = new DatanodeStoreOneTableImpl(conf, dbFile.getAbsolutePath());
+    }
+    else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
+      store = new DatanodeStoreTwoTableImpl(conf, dbFile.getAbsolutePath());
+    }
+    else {
+      throw new IllegalArgumentException("Unrecognized schema version for container: " +
+              schemaVersion);
+    }
+
     ReferenceCountedDB db =
         new ReferenceCountedDB(store, dbFile.getAbsolutePath());
     //add db handler into cache
@@ -159,60 +173,67 @@ public final class KeyValueContainerUtil {
     }
     kvContainerData.setDbFile(dbFile);
 
+    if (kvContainerData.getSchemaVersion() == null) {
+      // If this container has not specified a schema version, it is in the old format with one
+      // default column family.
+      kvContainerData.setSchemaVersion(OzoneConsts.SCHEMA_V1);
+    }
+
 
     boolean isBlockMetadataSet = false;
 
     try(ReferenceCountedDB containerDB = BlockUtils.getDB(kvContainerData,
         config)) {
 
+      Table<String, Long> metadataTable = containerDB.getStore().getMetadataTable();
+
       // Set pending deleted block count.
-      byte[] pendingDeleteBlockCount =
-          containerDB.getStore().get(DB_PENDING_DELETE_BLOCK_COUNT_KEY);
+      Long pendingDeleteBlockCount =
+          metadataTable.get(OzoneConsts.PENDING_DELETE_BLOCK_COUNT);
       if (pendingDeleteBlockCount != null) {
-        kvContainerData.incrPendingDeletionBlocks(
-            Longs.fromByteArray(pendingDeleteBlockCount));
+        kvContainerData.incrPendingDeletionBlocks(pendingDeleteBlockCount.intValue());
       } else {
         // Set pending deleted block count.
         MetadataKeyFilters.KeyPrefixFilter filter =
             new MetadataKeyFilters.KeyPrefixFilter()
                 .addFilter(OzoneConsts.DELETING_KEY_PREFIX);
         int numPendingDeletionBlocks =
-            containerDB.getStore().getSequentialRangeKVs(null,
-                Integer.MAX_VALUE, filter)
-                .size();
+            containerDB.getStore().getBlockDataTable()
+            .getSequentialRangeKVs(null, Integer.MAX_VALUE, filter)
+            .size();
         kvContainerData.incrPendingDeletionBlocks(numPendingDeletionBlocks);
       }
 
       // Set delete transaction id.
-      byte[] delTxnId =
-          containerDB.getStore().get(DB_CONTAINER_DELETE_TRANSACTION_KEY);
+      Long delTxnId =
+          metadataTable.get(OzoneConsts.DELETE_TRANSACTION_KEY_PREFIX);
       if (delTxnId != null) {
         kvContainerData
-            .updateDeleteTransactionId(Longs.fromByteArray(delTxnId));
+            .updateDeleteTransactionId(delTxnId);
       }
 
       // Set BlockCommitSequenceId.
-      byte[] bcsId = containerDB.getStore().get(
-          DB_BLOCK_COMMIT_SEQUENCE_ID_KEY);
+      Long bcsId = metadataTable.get(
+          OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
       if (bcsId != null) {
         kvContainerData
-            .updateBlockCommitSequenceId(Longs.fromByteArray(bcsId));
+            .updateBlockCommitSequenceId(bcsId);
       }
 
       // Set bytes used.
       // commitSpace for Open Containers relies on usedBytes
-      byte[] bytesUsed =
-          containerDB.getStore().get(DB_CONTAINER_BYTES_USED_KEY);
+      Long bytesUsed =
+          metadataTable.get(CONTAINER_BYTES_USED);
       if (bytesUsed != null) {
         isBlockMetadataSet = true;
-        kvContainerData.setBytesUsed(Longs.fromByteArray(bytesUsed));
+        kvContainerData.setBytesUsed(bytesUsed);
       }
 
       // Set block count.
-      byte[] blockCount = containerDB.getStore().get(DB_BLOCK_COUNT_KEY);
+      Long blockCount = metadataTable.get(BLOCK_COUNT);
       if (blockCount != null) {
         isBlockMetadataSet = true;
-        kvContainerData.setKeyCount(Longs.fromByteArray(blockCount));
+        kvContainerData.setKeyCount(blockCount);
       }
     }
 

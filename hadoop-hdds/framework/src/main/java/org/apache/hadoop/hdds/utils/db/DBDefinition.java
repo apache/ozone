@@ -18,8 +18,12 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.File;
 
 /**
  * Simple interface to provide information to create a DBStore..
@@ -37,6 +41,15 @@ public interface DBDefinition {
    * Configuration key defines the location of the DB.
    */
   String getLocationConfigKey();
+
+  /**
+   * @param conf The configuration for the DB.
+   * @return The parent directory for this definition's .db file.
+   */
+  default File getDBLocation(ConfigurationSource conf) {
+    return ServerUtils.getDirectoryFromConfig(conf,
+            getLocationConfigKey(), getName());
+  }
 
   /**
    * Create a new DB store instance based on the configuration.

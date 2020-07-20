@@ -106,6 +106,14 @@ public final class DBStoreBuilder {
     return new DBStoreBuilder(configuration, rocksDBConfiguration);
   }
 
+  public static DBStoreBuilder newBuilder(ConfigurationSource configuration,
+                                          DBDefinition definition) {
+    DBStoreBuilder builder = createDBStoreBuilder(configuration, definition);
+    builder.registerTables(definition);
+
+    return builder;
+  }
+
   public DBStoreBuilder setProfile(DBProfile profile) {
     dbProfile = profile;
     return this;
@@ -269,8 +277,7 @@ public final class DBStoreBuilder {
   private static DBStoreBuilder createDBStoreBuilder(
       ConfigurationSource configuration, DBDefinition definition) {
 
-    File metadataDir = getDirectoryFromConfig(configuration,
-        definition.getLocationConfigKey(), definition.getName());
+    File metadataDir = definition.getDBLocation(configuration);
 
     if (metadataDir == null) {
 
@@ -293,18 +300,25 @@ public final class DBStoreBuilder {
       DBDefinition definition)
       throws IOException {
     DBStoreBuilder builder = createDBStoreBuilder(configuration, definition);
-    for (DBColumnFamilyDefinition columnTableDefinition : definition
-        .getColumnFamilies()) {
-      builder.registerTable(columnTableDefinition);
-    }
+    builder.registerTables(definition);
+
     return builder.build();
   }
 
-  private <KEY, VALUE> void registerTable(
-      DBColumnFamilyDefinition<KEY, VALUE> definition) {
-    addTable(definition.getName())
-        .addCodec(definition.getKeyType(), definition.getKeyCodec())
-        .addCodec(definition.getValueType(), definition.getValueCodec());
-  }
+  public <KEY, VALUE> DBStoreBuilder registerTables(DBDefinition definition) {
+    for (DBColumnFamilyDefinition<KEY, VALUE> columnFamily :
+            definition.getColumnFamilies()) {
 
+      if (!columnFamily.getTableName().equals(DEFAULT_COLUMN_FAMILY_NAME)) {
+        // The default column family is always added.
+        // If it is present in the DB Definition, ignore it so we don't get an error about adding
+        // it twice.
+        addTable(columnFamily.getName())
+                .addCodec(columnFamily.getKeyType(), columnFamily.getKeyCodec())
+                .addCodec(columnFamily.getValueType(), columnFamily.getValueCodec());
+      }
+    }
+
+    return this;
+  }
 }

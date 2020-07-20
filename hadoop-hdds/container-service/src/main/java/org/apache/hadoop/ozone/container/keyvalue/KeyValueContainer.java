@@ -125,8 +125,12 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
       //Create Metadata path chunks path and metadata db
       File dbFile = getContainerDBFile();
+
+      // This method is only called when creating new containers.
+      // Therefore, always use the new schema version (two column families).
+      containerData.setSchemaVersion(OzoneConsts.SCHEMA_V2);
       KeyValueContainerUtil.createContainerMetaData(containerMetaDataPath,
-          chunksPath, dbFile, config);
+          chunksPath, dbFile, containerData.getSchemaVersion(), config);
 
       //Set containerData for the KeyValueContainer.
       containerData.setChunksPath(chunksPath.getPath());
@@ -378,7 +382,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   private void flushAndSyncDB() throws StorageContainerException {
     try {
       try (ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
-        db.getStore().flushDB(true);
+        db.getStore().flushLog(true);
         LOG.info("Container {} is synced with bcsId {}.",
             containerData.getContainerID(),
             containerData.getBlockCommitSequenceId());
@@ -487,6 +491,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       containerData.setState(originalContainerData.getState());
       containerData
           .setContainerDBType(originalContainerData.getContainerDBType());
+      containerData.setSchemaVersion(originalContainerData.getSchemaVersion());
 
       //rewriting the yaml file with new checksum calculation.
       update(originalContainerData.getMetadata(), true);

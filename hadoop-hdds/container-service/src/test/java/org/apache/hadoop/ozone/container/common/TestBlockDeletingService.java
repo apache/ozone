@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common;
 
 
+import java.awt.image.DataBuffer;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -165,8 +166,8 @@ public class TestBlockDeletingService {
             chunks.add(info);
           }
           kd.setChunks(chunks);
-          metadata.getStore().put(StringUtils.string2Bytes(deleteStateName),
-              kd.getProtoBufMessage().toByteArray());
+          metadata.getStore().getBlockDataTable().put(
+                  deleteStateName, kd);
           container.getContainerData().incrPendingDeletionBlocks(1);
         }
 
@@ -174,12 +175,14 @@ public class TestBlockDeletingService {
         container.getContainerData().setBytesUsed(
             blockLength * numOfBlocksPerContainer);
         // Set block count, bytes used and pending delete block count.
-        metadata.getStore().put(DB_BLOCK_COUNT_KEY,
-            Longs.toByteArray(numOfBlocksPerContainer));
-        metadata.getStore().put(OzoneConsts.DB_CONTAINER_BYTES_USED_KEY,
-            Longs.toByteArray(blockLength * numOfBlocksPerContainer));
-        metadata.getStore().put(DB_PENDING_DELETE_BLOCK_COUNT_KEY,
-            Longs.toByteArray(numOfBlocksPerContainer));
+        metadata.getStore().getMetadataTable().put(
+                OzoneConsts.BLOCK_COUNT, (long)numOfBlocksPerContainer);
+        metadata.getStore().getMetadataTable().put(
+                OzoneConsts.CONTAINER_BYTES_USED,
+                blockLength * numOfBlocksPerContainer);
+        metadata.getStore().getMetadataTable().put(
+                OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
+                (long)numOfBlocksPerContainer);
       }
     }
   }
@@ -200,19 +203,17 @@ public class TestBlockDeletingService {
    */
   private int getUnderDeletionBlocksCount(ReferenceCountedDB meta)
       throws IOException {
-    List<Map.Entry<byte[], byte[]>> underDeletionBlocks =
-        meta.getStore().getRangeKVs(null, 100,
-            new MetadataKeyFilters.KeyPrefixFilter()
-                .addFilter(OzoneConsts.DELETING_KEY_PREFIX));
-    return underDeletionBlocks.size();
+      return meta.getStore().getBlockDataTable()
+        .getRangeKVs(null, 100,
+        new MetadataKeyFilters.KeyPrefixFilter()
+        .addFilter(OzoneConsts.DELETING_KEY_PREFIX)).size();
   }
 
   private int getDeletedBlocksCount(ReferenceCountedDB db) throws IOException {
-    List<Map.Entry<byte[], byte[]>> underDeletionBlocks =
-        db.getStore().getRangeKVs(null, 100,
+      return db.getStore().getMetadataTable()
+            .getRangeKVs(null, 100,
             new MetadataKeyFilters.KeyPrefixFilter()
-            .addFilter(OzoneConsts.DELETED_KEY_PREFIX));
-    return underDeletionBlocks.size();
+            .addFilter(OzoneConsts.DELETED_KEY_PREFIX)).size();
   }
 
   @Test
@@ -250,8 +251,9 @@ public class TestBlockDeletingService {
 
       // Ensure there are 3 blocks under deletion and 0 deleted blocks
       Assert.assertEquals(3, getUnderDeletionBlocksCount(meta));
-      Assert.assertEquals(3, Longs.fromByteArray(
-          meta.getStore().get(DB_PENDING_DELETE_BLOCK_COUNT_KEY)));
+      Assert.assertEquals(3,
+          meta.getStore().getMetadataTable()
+                  .get(OzoneConsts.PENDING_DELETE_BLOCK_COUNT).longValue());
       Assert.assertEquals(0, getDeletedBlocksCount(meta));
 
       // An interval will delete 1 * 2 blocks
@@ -270,10 +272,10 @@ public class TestBlockDeletingService {
 
       // Check finally DB counters.
       // Not checking bytes used, as handler is a mock call.
-      Assert.assertEquals(0, Longs.fromByteArray(
-          meta.getStore().get(DB_PENDING_DELETE_BLOCK_COUNT_KEY)));
-      Assert.assertEquals(0, Longs.fromByteArray(
-          meta.getStore().get(DB_BLOCK_COUNT_KEY)));
+      Assert.assertEquals(0,
+              meta.getStore().getMetadataTable().get(OzoneConsts.PENDING_DELETE_BLOCK_COUNT).longValue());
+      Assert.assertEquals(0,
+              meta.getStore().getMetadataTable().get(OzoneConsts.BLOCK_COUNT).longValue());
     }
 
     svc.shutdown();

@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
 import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -165,9 +166,8 @@ public class TestKeyValueContainer {
             .getLocalID(), 0), 0, 1024);
         chunkList.add(info.getProtoBufMessage());
         blockData.setChunks(chunkList);
-        metadataStore.getStore().put(Longs.toByteArray(blockID.getLocalID()),
-            blockData
-            .getProtoBufMessage().toByteArray());
+        metadataStore.getStore().getBlockDataTable()
+                .put(Long.toString(blockID.getLocalID()), blockData);
       }
     }
   }
@@ -207,19 +207,20 @@ public class TestKeyValueContainer {
     keyValueContainerData.setState(
         ContainerProtos.ContainerDataProto.State.CLOSED);
 
-    int numberOfKeysToWrite = 12;
+    long numberOfKeysToWrite = 12;
     //write one few keys to check the key count after import
     try(ReferenceCountedDB metadataStore =
         BlockUtils.getDB(keyValueContainerData, conf)) {
-      for (int i = 0; i < numberOfKeysToWrite; i++) {
-        metadataStore.getStore().put(("test" + i).getBytes(UTF_8),
-            "test".getBytes(UTF_8));
+      Table<String, BlockData> blockDataTable = metadataStore.getStore().getBlockDataTable();
+
+      for (long i = 0; i < numberOfKeysToWrite; i++) {
+        blockDataTable.put("test" + i, new BlockData(new BlockID(i, i)));
       }
 
       // As now when we put blocks, we increment block count and update in DB.
       // As for test, we are doing manually so adding key count to DB.
-      metadataStore.getStore().put(OzoneConsts.DB_BLOCK_COUNT_KEY,
-          Longs.toByteArray(numberOfKeysToWrite));
+      metadataStore.getStore().getMetadataTable()
+              .put(OzoneConsts.BLOCK_COUNT, numberOfKeysToWrite);
     }
     BlockUtils.removeDB(keyValueContainerData, conf);
 

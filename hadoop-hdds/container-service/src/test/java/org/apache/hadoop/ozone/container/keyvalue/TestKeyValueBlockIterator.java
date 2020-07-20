@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -354,15 +355,16 @@ public class TestKeyValueBlockIterator {
       ChunkInfo info = new ChunkInfo("chunkfile", 0, 1024);
       chunkList.add(info.getProtoBufMessage());
 
+      Table<String, BlockData> blockDataTable =
+              metadataStore.getStore().getBlockDataTable();
+
       int blockIndex = 0;
       for (int i = 0; i < normalBlocks; i++) {
         BlockID blockID = new BlockID(containerId, blockIndex);
         blockIndex++;
         BlockData blockData = new BlockData(blockID);
         blockData.setChunks(chunkList);
-        metadataStore.getStore().put(Longs.toByteArray(blockID.getLocalID()),
-            blockData
-            .getProtoBufMessage().toByteArray());
+        blockDataTable.put(Long.toString(blockID.getLocalID()), blockData);
       }
 
       for (int i = 0; i < deletingBlocks; i++) {
@@ -370,9 +372,8 @@ public class TestKeyValueBlockIterator {
         blockIndex++;
         BlockData blockData = new BlockData(blockID);
         blockData.setChunks(chunkList);
-        metadataStore.getStore().put(StringUtils.string2Bytes(OzoneConsts
-            .DELETING_KEY_PREFIX + blockID.getLocalID()), blockData
-            .getProtoBufMessage().toByteArray());
+        String localID = OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID();
+        blockDataTable.put(localID, blockData);
       }
 
       for (int i = 0; i < deletedBlocks; i++) {
@@ -380,9 +381,8 @@ public class TestKeyValueBlockIterator {
         blockIndex++;
         BlockData blockData = new BlockData(blockID);
         blockData.setChunks(chunkList);
-        metadataStore.getStore().put(StringUtils.string2Bytes(OzoneConsts
-                .DELETED_KEY_PREFIX + blockID.getLocalID()), blockData
-                .getProtoBufMessage().toByteArray());
+        String localID = OzoneConsts.DELETED_KEY_PREFIX + blockID.getLocalID();
+        blockDataTable.put(localID, blockData);
       }
     }
   }
