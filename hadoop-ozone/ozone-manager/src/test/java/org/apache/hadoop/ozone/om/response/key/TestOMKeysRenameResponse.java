@@ -103,7 +103,6 @@ public class TestOMKeysRenameResponse extends TestOMKeyResponse {
       Assert.assertFalse(omMetadataManager.getKeyTable().isExist(toKey));
     }
 
-
   }
 
   private void createPreRequisities() throws Exception {

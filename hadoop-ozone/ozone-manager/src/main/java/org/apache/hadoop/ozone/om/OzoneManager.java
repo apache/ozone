@@ -181,7 +181,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
-import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -2227,8 +2226,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public void renameKeys(Map<OmKeyArgs, String> omKeyArgsMap)
       throws IOException {
-    throw new NotImplementedException("OzoneManager does not require this to " +
-        "be implemented. As write requests use a new approach");
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As write requests use a new approach");
   }
 
   @Override

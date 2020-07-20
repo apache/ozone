@@ -140,7 +140,6 @@ import org.apache.hadoop.ozone.security.proto.SecurityProtos.CancelDelegationTok
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -688,8 +687,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       KeyArgs keyArgs = KeyArgs.newBuilder()
           .setVolumeName(args.getVolumeName())
           .setBucketName(args.getBucketName())
-          .setKeyName(args.getKeyName())
-          .setModificationTime(Time.now()).build();
+          .setKeyName(args.getKeyName()).build();
       reqKey.setKeyArgs(keyArgs);
       reqKey.setToKeyName(entry.getValue());
       renameKeyRequestList.add(reqKey.build());

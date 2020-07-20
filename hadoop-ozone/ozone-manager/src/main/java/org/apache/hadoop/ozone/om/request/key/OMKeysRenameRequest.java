@@ -82,7 +82,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
 
     List<RenameKeyRequest> renameKeyList = new ArrayList<>();
     for (RenameKeyRequest renameKey : renameKeys.getRenameKeyRequestList()) {
-      // Set modification time.
+      // Set modification time in preExecute.
       KeyArgs.Builder newKeyArgs = renameKey.getKeyArgs().toBuilder()
           .setModificationTime(Time.now());
       renameKey.toBuilder().setKeyArgs(newKeyArgs);
@@ -101,7 +101,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
 
     RenameKeysRequest renameKeysRequest = getOmRequest().getRenameKeysRequest();
     OMClientResponse omClientResponse = null;
-    // fromKeyName -> toKeyNmae
+    // fromKeyName -> toKeyName
     List<RenameKeyArgs> unRenamedKeys = new ArrayList<>();
 
     List<OmRenameKeyInfo> renameKeyInfoList = new ArrayList<>();
@@ -133,7 +133,9 @@ public class OMKeysRenameRequest extends OMKeyRequest {
           .getRenameKeyRequestList()) {
         OzoneManagerProtocolProtos.KeyArgs keyArgs =
             renameKeyRequest.getKeyArgs();
-
+        auditMap = buildAuditMap(volumeName, bucketName, renameKeyInfoList,
+            unRenamedKeys);
+        keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
         volumeName = keyArgs.getVolumeName();
         bucketName = keyArgs.getBucketName();
         fromKeyName = keyArgs.getKeyName();
@@ -143,17 +145,6 @@ public class OMKeysRenameRequest extends OMKeyRequest {
         RenameKeyArgs renameKeyArgs = RenameKeyArgs.newBuilder()
             .setVolumeName(volumeName).setBucketName(bucketName)
             .setFromKeyName(fromKeyName).setToKeyName(toKeyName).build();
-
-        try {
-          // Validate bucket and volume exists or not.
-          validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-        } catch (Exception ex) {
-          renameStatus = false;
-          unRenamedKeys.add(renameKeyArgs);
-          LOG.error("Validate bucket and volume exists failed" +
-              "volumeName {} bucketName {}", volumeName, bucketName, ex);
-          continue;
-        }
 
         if (toKeyName.length() == 0 || fromKeyName.length() == 0) {
           renameStatus = false;
@@ -259,8 +250,6 @@ public class OMKeysRenameRequest extends OMKeyRequest {
       }
     }
 
-    auditMap = buildAuditMap(volumeName, bucketName, renameKeyInfoList,
-        unRenamedKeys);
     auditLog(auditLogger, buildAuditMessage(OMAction.RENAME_KEYS, auditMap,
         exception, getOmRequest().getUserInfo()));
 
