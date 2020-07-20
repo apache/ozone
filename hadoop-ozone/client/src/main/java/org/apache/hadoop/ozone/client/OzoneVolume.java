@@ -127,7 +127,7 @@ public class OzoneVolume extends WithMetadata {
       long quotaInCounts, long creationTime, long modificationTime,
       List<OzoneAcl> acls, Map<String, String> metadata) {
     this(conf, proxy, name, admin, owner, quotaInBytes, quotaInCounts,
-        creationTime, acls, new HashMap<>());
+        creationTime, acls, metadata);
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
   }
 
@@ -174,6 +174,7 @@ public class OzoneVolume extends WithMetadata {
     }
   }
 
+  @SuppressWarnings("parameternumber")
   @VisibleForTesting
   protected OzoneVolume(String name, String admin, String owner,
       long quotaInBytes, long quotaInCounts, long creationTime,

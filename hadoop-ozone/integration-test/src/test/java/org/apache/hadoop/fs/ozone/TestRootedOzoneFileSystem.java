@@ -735,7 +735,7 @@ public class TestRootedOzoneFileSystem {
     Assert.assertNull(volumeArgs.getOwner());
     Assert.assertNull(volumeArgs.getAdmin());
     Assert.assertNull(volumeArgs.getSsQuota());
-    Assert.assertNull(volumeArgs.getNsQuota());
+    Assert.assertEquals(0, volumeArgs.getNsQuota());
     Assert.assertEquals(0, volumeArgs.getMetadata().size());
     Assert.assertEquals(1, volumeArgs.getAcls().size());
     // Create volume "tmp" with world access. allow non-admin to create buckets
