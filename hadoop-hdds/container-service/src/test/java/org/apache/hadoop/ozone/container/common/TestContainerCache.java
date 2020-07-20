@@ -71,7 +71,7 @@ public class TestContainerCache {
 
     ContainerCache cache = ContainerCache.getInstance(conf);
     cache.clear();
-    Assert.assertTrue(cache.size() == 0);
+    Assert.assertEquals(0, cache.size());
     File containerDir1 = new File(root, "cont1");
     File containerDir2 = new File(root, "cont2");
     File containerDir3 = new File(root, "cont3");
@@ -143,7 +143,7 @@ public class TestContainerCache {
     conf.setInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE, 2);
     ContainerCache cache = ContainerCache.getInstance(conf);
     cache.clear();
-    Assert.assertTrue(cache.size() == 0);
+    Assert.assertEquals(0, cache.size());
     File containerDir = new File(root, "cont1");
     createContainerDB(conf, containerDir);
     ExecutorService executorService = Executors.newFixedThreadPool(2);
@@ -151,7 +151,7 @@ public class TestContainerCache {
       try {
         ReferenceCountedDB db1 = cache.getDB(1, "RocksDB",
             containerDir.getPath(), conf);
-        Assert.assertTrue(db1 != null);
+        Assert.assertNotNull(db1);
       } catch (IOException e) {
         Assert.fail("Should get the DB instance");
       }
@@ -172,7 +172,7 @@ public class TestContainerCache {
     db.close();
     db.close();
     db.close();
-    Assert.assertTrue(cache.size() == 1);
+    Assert.assertEquals(1, cache.size());
     db.cleanup();
   }
 }

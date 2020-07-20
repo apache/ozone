@@ -280,8 +280,8 @@ public class TestContainerReader {
     }
     System.out.println("Open " + volumeNum + " Volume with " + containerCount +
         " costs " + (System.currentTimeMillis() - startTime) / 1000 + "s");
-    Assert.assertTrue(
-        containerSet.getContainerMap().entrySet().size() == containerCount);
-    Assert.assertTrue(cache.size() == containerCount);
+    Assert.assertEquals(containerCount,
+        containerSet.getContainerMap().entrySet().size());
+    Assert.assertEquals(containerCount, cache.size());
   }
 }
