@@ -421,7 +421,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       // intercept when TO_TRASH is found
       LOG.info("Move to trash is disabled for o3fs, deleting instead: {}. "
           + "Files or directories will NOT be retained in trash. "
-          + "Ignore the following TrashPolicyDefault message.", src);
+          + "Ignore the following TrashPolicyDefault message, if any.", src);
       delete(src, true);
     }
   }
