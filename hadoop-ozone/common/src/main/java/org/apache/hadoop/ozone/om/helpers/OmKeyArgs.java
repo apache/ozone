@@ -158,8 +158,6 @@ public final class OmKeyArgs implements Auditable {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setDataSize(dataSize)
-        .setType(type)
-        .setFactor(factor)
         .setLocationInfoList(locationInfoList)
         .setIsMultipartKey(isMultipartKey)
         .setMultipartUploadID(multipartUploadID)
