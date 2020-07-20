@@ -115,6 +115,20 @@ public class OMBucketCreateRequest extends OMClientRequest {
       newBucketInfo.setBeinfo(getBeinfo(kmsProvider, bucketInfo));
     }
 
+    boolean hasSourceVolume = bucketInfo.getSourceVolume() != null;
+    boolean hasSourceBucket = bucketInfo.getSourceBucket() != null;
+
+    if (hasSourceBucket != hasSourceVolume) {
+      throw new OMException("Both source volume and source bucket are " +
+          "required for bucket links",
+          OMException.ResultCodes.INVALID_REQUEST);
+    }
+
+    if (hasSourceBucket && bucketInfo.hasBeinfo()) {
+      throw new OMException("Encryption cannot be set for bucket links",
+          OMException.ResultCodes.INVALID_REQUEST);
+    }
+
     newCreateBucketRequest.setBucketInfo(newBucketInfo.build());
 
     return getOmRequest().toBuilder().setUserInfo(getUserInfo())

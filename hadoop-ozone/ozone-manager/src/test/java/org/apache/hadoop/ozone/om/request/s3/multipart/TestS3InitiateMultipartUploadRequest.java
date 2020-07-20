@@ -36,7 +36,7 @@ public class TestS3InitiateMultipartUploadRequest
     extends TestS3MultipartRequest {
 
   @Test
-  public void testPreExecute() {
+  public void testPreExecute() throws Exception {
     doPreExecuteInitiateMPU(UUID.randomUUID().toString(),
         UUID.randomUUID().toString(), UUID.randomUUID().toString());
   }
