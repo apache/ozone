@@ -115,8 +115,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
       newBucketInfo.setBeinfo(getBeinfo(kmsProvider, bucketInfo));
     }
 
-    boolean hasSourceVolume = bucketInfo.getSourceVolume() != null;
-    boolean hasSourceBucket = bucketInfo.getSourceBucket() != null;
+    boolean hasSourceVolume = bucketInfo.hasSourceVolume();
+    boolean hasSourceBucket = bucketInfo.hasSourceBucket();
 
     if (hasSourceBucket != hasSourceVolume) {
       throw new OMException("Both source volume and source bucket are " +
