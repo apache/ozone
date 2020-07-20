@@ -301,7 +301,7 @@ public class BlockDeletingService extends BackgroundService {
           String deletedEntry = OzoneConsts.DELETED_KEY_PREFIX + blockId;
 
           meta.getStore().getMetadataTable().putWithBatch(batch, deletedEntry, blockId);
-          meta.getStore().getMetadataTable().deleteWithBatch(batch, entry);
+          meta.getStore().getBlockDataTable().deleteWithBatch(batch, entry);
         }
 
 
