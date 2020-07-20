@@ -40,7 +40,7 @@ for test in $(find "$SCRIPT_DIR" -mindepth 2 -maxdepth 2 -name test.sh | grep "$
 
   #required to read the .env file from the right location
   cd "$TEST_DIR" || continue
-  ./test.sh ||
+  ./test.sh
   ret=$?
   if [[ $ret -ne 0 ]]; then
       RESULT=1
