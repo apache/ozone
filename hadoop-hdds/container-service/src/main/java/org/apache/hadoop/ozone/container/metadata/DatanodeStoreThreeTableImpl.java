@@ -21,7 +21,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 
 import java.io.IOException;
 
-public class DatanodeStoreTwoTableImpl extends AbstractDatanodeStore {
+public class DatanodeStoreThreeTableImpl extends AbstractDatanodeStore {
 
   /**
    * Constructs the metadata store and starts the DB Services.
@@ -29,8 +29,8 @@ public class DatanodeStoreTwoTableImpl extends AbstractDatanodeStore {
    * @param config - Ozone Configuration.
    * @throws IOException - on Failure.
    */
-  public DatanodeStoreTwoTableImpl(ConfigurationSource config, String dbPath)
+  public DatanodeStoreThreeTableImpl(ConfigurationSource config, String dbPath)
           throws IOException {
-    super(config, new DatanodeTwoTableDBDefinition(dbPath));
+    super(config, new DatanodeThreeTableDBDefinition(dbPath));
   }
 }

@@ -18,28 +18,20 @@
 
 package org.apache.hadoop.ozone.container.common.utils;
 
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Paths;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.utils.MetadataStore;
-import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
-import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.collections.MapIterator;
 import org.apache.commons.collections.map.LRUMap;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreOneTableImpl;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStoreTwoTableImpl;
-import org.rocksdb.DBOptions;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreThreeTableImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -140,7 +132,7 @@ public final class ContainerCache extends LRUMap {
           store = new DatanodeStoreOneTableImpl(conf, containerDBPath);
         }
         else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
-          store = new DatanodeStoreTwoTableImpl(conf, containerDBPath);
+          store = new DatanodeStoreThreeTableImpl(conf, containerDBPath);
         }
         else {
           throw new IllegalArgumentException("Unrecognized database schema version: " +

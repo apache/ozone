@@ -32,6 +32,8 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   private Table<String, BlockData> blockDataTable;
 
+  private Table<Long, Long> deletedBlocksTable;
+
   private static final Logger LOG =
           LoggerFactory.getLogger(AbstractDatanodeStore.class);
   private DBStore store;
@@ -64,12 +66,14 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
               .build();
 
       metadataTable = dbDef.getMetadataColumnFamily().getTable(this.store);
-
       checkTableStatus(metadataTable, metadataTable.getName());
 
       blockDataTable = dbDef.getBlockDataColumnFamily().getTable(this.store);
+      checkTableStatus(blockDataTable, blockDataTable.getName());
 
-      checkTableStatus(metadataTable, blockDataTable.getName());
+      deletedBlocksTable =
+              dbDef.getDeletedBlocksColumnFamily().getTable(this.store);
+      checkTableStatus(deletedBlocksTable, deletedBlocksTable.getName());
     }
   }
 
@@ -99,6 +103,11 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   @Override
   public Table<String, BlockData> getBlockDataTable() {
     return blockDataTable;
+  }
+
+  @Override
+  public Table<Long, Long> getDeletedBlocksTable() {
+    return deletedBlocksTable;
   }
 
   @Override

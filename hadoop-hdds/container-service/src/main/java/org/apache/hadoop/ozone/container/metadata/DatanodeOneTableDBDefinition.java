@@ -53,6 +53,15 @@ public class DatanodeOneTableDBDefinition extends AbstractDatanodeDBDefinition {
                   Long.class,
                   new LongCodec());
 
+  public static final DBColumnFamilyDefinition<Long, Long>
+          DELETED_BLOCKS =
+          new DBColumnFamilyDefinition<>(
+                  StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+                  Long.class,
+                  new LongCodec(),
+                  Long.class,
+                  new LongCodec());
+
   protected DatanodeOneTableDBDefinition(String dbPath) {
     super(dbPath);
   }
@@ -65,5 +74,10 @@ public class DatanodeOneTableDBDefinition extends AbstractDatanodeDBDefinition {
   @Override
   public DBColumnFamilyDefinition<String, Long> getMetadataColumnFamily() {
     return METADATA;
+  }
+
+  @Override
+  public DBColumnFamilyDefinition<Long, Long> getDeletedBlocksColumnFamily() {
+    return DELETED_BLOCKS;
   }
 }

@@ -17,17 +17,19 @@
  */
 package org.apache.hadoop.ozone.container.metadata;
 
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.rocksdb.RocksDB;
 
 /**
  * This class defines the new RocksDB structure for datanodes, where the block data and metadata
  * are put in their own separate column families. In the old format, everything was placed in teh
  * default column family.
  */
-public class DatanodeTwoTableDBDefinition extends AbstractDatanodeDBDefinition {
+public class DatanodeThreeTableDBDefinition extends AbstractDatanodeDBDefinition {
 
   public static final DBColumnFamilyDefinition<String, BlockData>
           BLOCK_DATA =
@@ -47,7 +49,16 @@ public class DatanodeTwoTableDBDefinition extends AbstractDatanodeDBDefinition {
           Long.class,
           new LongCodec());
 
-  protected DatanodeTwoTableDBDefinition(String dbPath) {
+  public static final DBColumnFamilyDefinition<Long, Long>
+          DELETED_BLOCKS =
+          new DBColumnFamilyDefinition<>(
+                  "deleted_blocks",
+                  Long.class,
+                  new LongCodec(),
+                  Long.class,
+                  new LongCodec());
+
+  protected DatanodeThreeTableDBDefinition(String dbPath) {
     super(dbPath);
   }
 
@@ -59,5 +70,10 @@ public class DatanodeTwoTableDBDefinition extends AbstractDatanodeDBDefinition {
   @Override
   public DBColumnFamilyDefinition<String, Long> getMetadataColumnFamily() {
     return METADATA;
+  }
+
+  @Override
+  public DBColumnFamilyDefinition<Long, Long> getDeletedBlocksColumnFamily() {
+    return DELETED_BLOCKS;
   }
 }
