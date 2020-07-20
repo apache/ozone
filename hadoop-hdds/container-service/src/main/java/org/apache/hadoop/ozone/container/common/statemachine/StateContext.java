@@ -53,6 +53,8 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.GeneratedMessage;
 import static java.lang.Math.min;
 import org.apache.commons.collections.CollectionUtils;
+
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getLogWarnInterval;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,6 +78,7 @@ public class StateContext {
   private DatanodeStateMachine.DatanodeStates state;
   private boolean shutdownOnError = false;
   private boolean shutdownGracefully = false;
+  private final AtomicLong threadPoolNotAvailableCount;
 
   /**
    * Starting with a 2 sec heartbeat frequency which will be updated to the
@@ -105,6 +108,7 @@ public class StateContext {
     pipelineActions = new HashMap<>();
     lock = new ReentrantLock();
     stateExecutionCount = new AtomicLong(0);
+    threadPoolNotAvailableCount = new AtomicLong(0);
   }
 
   /**
@@ -434,9 +438,14 @@ public class StateContext {
 
       if (isThreadPoolAvailable(service)) {
         task.execute(service);
+        threadPoolNotAvailableCount.set(0);
       } else {
-        LOG.warn("No available thread in pool, duration:" +
-            unit.toMillis(time));
+        threadPoolNotAvailableCount.incrementAndGet();
+        if (threadPoolNotAvailableCount.get()
+            % getLogWarnInterval(conf) == 0) {
+          LOG.warn("No available thread in pool, duration:" +
+              unit.toMillis(time));
+        }
       }
 
       DatanodeStateMachine.DatanodeStates newState = task.await(time, unit);
