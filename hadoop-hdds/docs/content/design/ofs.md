@@ -155,6 +155,10 @@ This feature wouldn't degrade server performance as the loop is on the client.
 Think it as a client is issuing multiple requests to the server to get all the
 information.
 
+# Special note
+
+Trash is disabled even if `fs.trash.interval` is set on purpose. (HDDS-3982)
+
 # Link
 
 Design doc is uploaded to the JIRA HDDS-2665:

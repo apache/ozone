@@ -29,6 +29,7 @@ import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -395,6 +396,34 @@ public class BasicOzoneFileSystem extends FileSystem {
       createFakeParentDirectory(src);
     }
     return result;
+  }
+
+  /**
+   * Intercept rename to trash calls from TrashPolicyDefault,
+   * convert them to delete calls instead.
+   */
+  @Deprecated
+  protected void rename(final Path src, final Path dst,
+      final Rename... options) throws IOException {
+    boolean hasMoveToTrash = false;
+    if (options != null) {
+      for (Rename option : options) {
+        if (option == Rename.TO_TRASH) {
+          hasMoveToTrash = true;
+          break;
+        }
+      }
+    }
+    if (!hasMoveToTrash) {
+      // if doesn't have TO_TRASH option, just pass the call to super
+      super.rename(src, dst, options);
+    } else {
+      // intercept when TO_TRASH is found
+      LOG.info("Move to trash is disabled for o3fs, deleting instead: {}. "
+          + "Files or directories will NOT be retained in trash. "
+          + "Ignore the following TrashPolicyDefault message, if any.", src);
+      delete(src, true);
+    }
   }
 
   private class DeleteIterator extends OzoneListingIterator {
