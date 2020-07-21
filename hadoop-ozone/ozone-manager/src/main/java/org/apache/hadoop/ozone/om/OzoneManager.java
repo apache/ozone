@@ -48,6 +48,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Optional;
+import com.google.common.primitives.UnsignedLong;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -3531,7 +3532,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           "configured by S3Gateway");
     }
     if (!metadataManager.getVolumeTable().isExist(dbVolumeKey)) {
-      long transactionID = 1L;
+      long transactionID = (Long.MAX_VALUE - 1) >> 8;
       long objectID = OMFileRequest.getObjIDFromTxId(transactionID);
       String userName =
           UserGroupInformation.getCurrentUser().getShortUserName();
