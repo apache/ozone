@@ -51,6 +51,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -69,6 +70,8 @@ public class OMKeysRenameRequest extends OMKeyRequest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeysRenameRequest.class);
+  private String volumeName = null;
+  private String bucketName = null;
 
   public OMKeysRenameRequest(OMRequest omRequest) {
     super(omRequest);
@@ -87,6 +90,12 @@ public class OMKeysRenameRequest extends OMKeyRequest {
           .setModificationTime(Time.now());
       renameKey.toBuilder().setKeyArgs(newKeyArgs);
       renameKeyList.add(renameKey);
+      if (volumeName == null) {
+        volumeName = renameKey.getKeyArgs().getVolumeName();
+      }
+      if (bucketName == null) {
+        bucketName = renameKey.getKeyArgs().getBucketName();
+      }
     }
     RenameKeysRequest renameKeysRequest = RenameKeysRequest
         .newBuilder().addAllRenameKeyRequest(renameKeyList).build();
@@ -111,7 +120,6 @@ public class OMKeysRenameRequest extends OMKeyRequest {
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
 
-
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
 
@@ -120,27 +128,25 @@ public class OMKeysRenameRequest extends OMKeyRequest {
     OmKeyInfo fromKeyValue = null;
 
     Result result = null;
-    Map<String, String> auditMap = null;
-    RenameKeyRequest renameRequest = null;
-    String volumeName = null;
-    String bucketName = null;
+    Map<String, String> auditMap = new LinkedHashMap<>();
+    auditMap.put(VOLUME, volumeName);
+    auditMap.put(BUCKET, bucketName);
     String fromKeyName = null;
     String toKeyName = null;
     boolean acquiredLock = false;
     boolean renameStatus = true;
+
     try {
       for (RenameKeyRequest renameKeyRequest : renameKeysRequest
           .getRenameKeyRequestList()) {
         OzoneManagerProtocolProtos.KeyArgs keyArgs =
             renameKeyRequest.getKeyArgs();
-        auditMap = buildAuditMap(volumeName, bucketName, renameKeyInfoList,
-            unRenamedKeys);
+
         keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
         volumeName = keyArgs.getVolumeName();
         bucketName = keyArgs.getBucketName();
         fromKeyName = keyArgs.getKeyName();
         toKeyName = renameKeyRequest.getToKeyName();
-        renameRequest = renameKeyRequest;
 
         RenameKeyArgs renameKeyArgs = RenameKeyArgs.newBuilder()
             .setVolumeName(volumeName).setBucketName(bucketName)
@@ -250,6 +256,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
       }
     }
 
+    auditMap = buildAuditMap(auditMap, renameKeyInfoList, unRenamedKeys);
     auditLog(auditLogger, buildAuditMessage(OMAction.RENAME_KEYS, auditMap,
         exception, getOmRequest().getUserInfo()));
 
@@ -263,8 +270,8 @@ public class OMKeysRenameRequest extends OMKeyRequest {
       LOG.error("Rename keys failed for auditMap:{}.", auditMap.toString());
       break;
     default:
-      LOG.error("Unrecognized Result for OMKeyRenameRequest: {}",
-          renameRequest);
+      LOG.error("Unrecognized Result for OMKeysRenameRequest: {}",
+          renameKeysRequest);
     }
 
     return omClientResponse;
@@ -273,19 +280,15 @@ public class OMKeysRenameRequest extends OMKeyRequest {
   /**
    * Build audit map for RenameKeys request.
    *
-   * @param volumeName
-   * @param bucketName
    * @param renameKeys
    * @param unRenameKeys
    * @return
    */
-  private Map<String, String> buildAuditMap(String volumeName,
-                                            String bucketName,
+  private Map<String, String> buildAuditMap(Map<String, String> auditMap,
                                             List<OmRenameKeyInfo> renameKeys,
                                             List<RenameKeyArgs> unRenameKeys) {
     Map<String, String> renameKeysMap = new HashMap<>();
     Map<String, String> unRenameKeysMap = new HashMap<>();
-    Map<String, String> auditMap = new HashMap<>();
 
     for (OmRenameKeyInfo keyInfo : renameKeys) {
       renameKeysMap.put(keyInfo.getFromKeyName(),
@@ -295,8 +298,6 @@ public class OMKeysRenameRequest extends OMKeyRequest {
       unRenameKeysMap.put(keyArgs.getFromKeyName(), keyArgs.getToKeyName());
     }
 
-    auditMap.put(VOLUME, volumeName);
-    auditMap.put(BUCKET, bucketName);
     auditMap.put(RENAMED_KEYS_MAP, renameKeysMap.toString());
     auditMap.put(UNRENAMED_KEYS_MAP, unRenameKeysMap.toString());
     return auditMap;
