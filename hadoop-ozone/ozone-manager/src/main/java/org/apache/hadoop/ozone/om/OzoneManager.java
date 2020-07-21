@@ -48,7 +48,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Optional;
-import com.google.common.primitives.UnsignedLong;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -3567,8 +3566,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       metadataManager.getUserTable().addCacheEntry(
           new CacheKey<>(dbUserKey),
           new CacheValue<>(Optional.of(userVolumeInfo), transactionID));
-      LOG.info("Created Volume {} required for S3Gateway operations.",
-          s3VolumeName);
+      LOG.info("Created Volume {} With Owner {} required for S3Gateway " +
+              "operations.", s3VolumeName, userName);
     }
   }
 
