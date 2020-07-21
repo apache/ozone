@@ -31,11 +31,14 @@ import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
+import org.apache.hadoop.hdds.ratis.retrypolicy.RequestTypeDependentRetryPolicyCreator;
+import org.apache.hadoop.hdds.ratis.retrypolicy.RetryPolicyCreator;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -97,6 +100,10 @@ public class TestContainerStateMachineFailureOnRead {
     ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
     ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(3));
     conf.setFromObject(ratisServerConfig);
+
+    conf.setClass(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_RETRY_POLICY,
+        RequestTypeDependentRetryPolicyCreator.class,
+        RetryPolicyCreator.class);
 
     RatisClientConfig.RaftConfig raftClientConfig =
         conf.getObject(RatisClientConfig.RaftConfig.class);

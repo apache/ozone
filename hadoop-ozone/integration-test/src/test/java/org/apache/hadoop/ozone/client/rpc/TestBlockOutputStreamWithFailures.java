@@ -22,6 +22,8 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
+import org.apache.hadoop.hdds.ratis.retrypolicy.RequestTypeDependentRetryPolicyCreator;
+import org.apache.hadoop.hdds.ratis.retrypolicy.RetryPolicyCreator;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -116,6 +118,10 @@ public class TestBlockOutputStreamWithFailures {
     conf.setFromObject(raftClientConfig);
 
     conf.setBoolean(OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY, false);
+
+    conf.setClass(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_RETRY_POLICY,
+        RequestTypeDependentRetryPolicyCreator.class,
+        RetryPolicyCreator.class);
 
     RatisClientConfig ratisClientConfig =
         conf.getObject(RatisClientConfig.class);

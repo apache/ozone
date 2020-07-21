@@ -2503,4 +2503,26 @@
       filesystem semantics.
     </description>
   </property>
+  <property>
+    <name>dfs.ratis.client.request.max.retries</name>
+    <value>180</value>
+    <tag>OZONE, RATIS, MANAGEMENT</tag>
+    <description>Number of retries for ratis client request.</description>
+  </property>
+  <property>
+    <name>dfs.ratis.client.request.retry.interval</name>
+    <value>1000ms</value>
+    <tag>OZONE, RATIS, MANAGEMENT</tag>
+    <description>Interval between successive retries for a ratis client request.
+    </description>
+  </property>
+  <property>
+    <name>dfs.ratis.client.request.retry.policy</name>
+    <value/>
+    <tag>OZONE, RATIS, MANAGEMENT</tag>
+    <description>
+      The class name of the policy for retry. Defaults to
+      org.apache.hadoop.hdds.ratis.retrypolicy.RetryLimitedPolicyCreator.
+    </description>
+  </property>
 </configuration>

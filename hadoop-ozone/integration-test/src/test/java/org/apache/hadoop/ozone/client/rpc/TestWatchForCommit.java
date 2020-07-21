@@ -23,6 +23,8 @@ import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
+import org.apache.hadoop.hdds.ratis.retrypolicy.RequestTypeDependentRetryPolicyCreator;
+import org.apache.hadoop.hdds.ratis.retrypolicy.RetryPolicyCreator;
 import org.apache.hadoop.hdds.scm.*;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -112,6 +114,10 @@ public class TestWatchForCommit {
     ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
     ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(3));
     conf.setFromObject(ratisServerConfig);
+
+    conf.setClass(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_RETRY_POLICY,
+        RequestTypeDependentRetryPolicyCreator.class,
+        RetryPolicyCreator.class);
 
     RatisClientConfig.RaftConfig raftClientConfig =
         conf.getObject(RatisClientConfig.RaftConfig.class);
