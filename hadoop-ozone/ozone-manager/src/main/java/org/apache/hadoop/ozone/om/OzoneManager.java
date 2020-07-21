@@ -3566,6 +3566,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       metadataManager.getUserTable().addCacheEntry(
           new CacheKey<>(dbUserKey),
           new CacheValue<>(Optional.of(userVolumeInfo), transactionID));
+      LOG.info("Created Volume {} required for S3Gateway operations.",
+          s3VolumeName);
     }
   }
 
