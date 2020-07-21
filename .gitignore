@@ -65,7 +65,3 @@ hadoop-hdds/docs/public
 hadoop-ozone/recon/node_modules
 
 .mvn
-
-# Protolock files should be updated manually after every release
-# See: https://github.com/nilslice/protolock
-*/proto/*.lock
