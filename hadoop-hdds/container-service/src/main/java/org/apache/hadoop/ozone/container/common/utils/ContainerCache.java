@@ -48,10 +48,10 @@ public final class ContainerCache extends LRUMap {
   /**
    * Constructs a cache that holds DBHandle references.
    */
-  private ContainerCache(int maxSize, int strips, float loadFactor, boolean
+  private ContainerCache(int maxSize, int stripes, float loadFactor, boolean
       scanUntilRemovable) {
     super(maxSize, loadFactor, scanUntilRemovable);
-    rocksDBLock = Striped.lazyWeakLock(strips);
+    rocksDBLock = Striped.lazyWeakLock(stripes);
   }
 
   /**
@@ -66,10 +66,10 @@ public final class ContainerCache extends LRUMap {
     if (cache == null) {
       int cacheSize = conf.getInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE,
           OzoneConfigKeys.OZONE_CONTAINER_CACHE_DEFAULT);
-      int strips = conf.getInt(
-          OzoneConfigKeys.OZONE_CONTAINER_CACHE_LOCK_STRIPS,
-          OzoneConfigKeys.OZONE_CONTAINER_CACHE_LOCK_STRIPS_DEFAULT);
-      cache = new ContainerCache(cacheSize, strips, LOAD_FACTOR, true);
+      int stripes = conf.getInt(
+          OzoneConfigKeys.OZONE_CONTAINER_CACHE_LOCK_STRIPES,
+          OzoneConfigKeys.OZONE_CONTAINER_CACHE_LOCK_STRIPES_DEFAULT);
+      cache = new ContainerCache(cacheSize, stripes, LOAD_FACTOR, true);
     }
     return cache;
   }
