@@ -1241,17 +1241,7 @@
               },
               {
                 "id": 11,
-                "name": "quotaUsageInBytes",
-                "type": "uint64"
-              },
-              {
-                "id": 12,
                 "name": "quotaInCounts",
-                "type": "uint64"
-              },
-              {
-                "id": 13,
-                "name": "quotaUsageInCounts",
                 "type": "uint64"
               }
             ]
@@ -1553,26 +1543,6 @@
                 "id": 13,
                 "name": "sourceBucket",
                 "type": "string"
-              },
-              {
-                "id": 14,
-                "name": "quotaInBytes",
-                "type": "uint64"
-              },
-              {
-                "id": 15,
-                "name": "quotaUsageInBytes",
-                "type": "uint64"
-              },
-              {
-                "id": 16,
-                "name": "quotaInCounts",
-                "type": "uint64"
-              },
-              {
-                "id": 17,
-                "name": "quotaUsageInCount",
-                "type": "uint64"
               }
             ]
           },
@@ -1709,16 +1679,6 @@
                 "name": "metadata",
                 "type": "hadoop.hdds.KeyValue",
                 "is_repeated": true
-              },
-              {
-                "id": 8,
-                "name": "quotaInBytes",
-                "type": "uint64"
-              },
-              {
-                "id": 9,
-                "name": "quotaInCounts",
-                "type": "uint64"
               }
             ]
           },

@@ -41,15 +41,15 @@ public class CreateVolumeHandler extends VolumeHandler {
       description = "Owner of the volume")
   private String ownerName;
 
-  @Option(names = {"--ssQuota", "-ssq"},
+  @Option(names = {"--spaceQuota", "-sq"},
       description =
-          "Quota Bytes of the newly created volume (eg. 1G)")
-  private String ssQuota;
+          "Quota Bytes of the newly created volume (eg. 1GB)")
+  private String storagespaceQuota;
 
-  @Option(names = {"--nsQuota", "-nsq"},
+  @Option(names = {"--quota", "-q"},
       description =
           "Quota count of the newly created volume (eg. 5)")
-  private long nsQuota = OzoneConsts.QUOTA_COUNT_RESET;
+  private long namespaceQuota = OzoneConsts.QUOTA_COUNT_RESET;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
@@ -64,11 +64,11 @@ public class CreateVolumeHandler extends VolumeHandler {
     VolumeArgs.Builder volumeArgsBuilder = VolumeArgs.newBuilder()
         .setAdmin(adminName)
         .setOwner(ownerName);
-    if (ssQuota!= null) {
-      volumeArgsBuilder.setSsQuota(ssQuota);
+    if (storagespaceQuota!= null) {
+      volumeArgsBuilder.setStoragespaceQuota(storagespaceQuota);
     }
 
-    volumeArgsBuilder.setNsQuota(nsQuota);
+    volumeArgsBuilder.setNamespaceQuotaQuota(namespaceQuota);
 
     client.getObjectStore().createVolume(volumeName,
         volumeArgsBuilder.build());

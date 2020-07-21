@@ -42,19 +42,21 @@ public final class VolumeArgs {
    * Private constructor, constructed via builder.
    * @param admin Administrator's name.
    * @param owner Volume owner's name
-   * @param ssQuota Volume Quota.
+   * @param storagespaceQuota Volume Quota.
+   * @param namespaceQuota Volume Quota.
    * @param acls User to access rights map.
+   * @param metadata Metadata of volume.
    */
   private VolumeArgs(String admin,
       String owner,
-      String ssQuota,
-      long nsQuota,
+      String storagespaceQuota,
+      long namespaceQuota,
       List<OzoneAcl> acls,
       Map<String, String> metadata) {
     this.admin = admin;
     this.owner = owner;
-    this.storagespaceQuota = ssQuota;
-    this.namespaceQuota = nsQuota;
+    this.storagespaceQuota = storagespaceQuota;
+    this.namespaceQuota = namespaceQuota;
     this.acls = acls;
     this.metadata = metadata;
   }
@@ -77,17 +79,17 @@ public final class VolumeArgs {
 
   /**
    * Returns Volume Quota in bytes.
-   * @return ssQuota.
+   * @return storagespaceQuota.
    */
-  public String getSsQuota() {
+  public String getStoragespaceQuota() {
     return storagespaceQuota;
   }
 
   /**
    * Returns Volume Quota in counts.
-   * @return nsQuota.
+   * @return namespaceQuota.
    */
-  public long getNsQuota() {
+  public long getNamespaceQuota() {
     return namespaceQuota;
   }
 
@@ -118,8 +120,8 @@ public final class VolumeArgs {
   public static class Builder {
     private String adminName;
     private String ownerName;
-    private String volumeSsQuota;
-    private long volumeNsQuota;
+    private String storagespaceQuota;
+    private long namespaceQuota;
     private List<OzoneAcl> listOfAcls;
     private Map<String, String> metadata = new HashMap<>();
 
@@ -134,13 +136,13 @@ public final class VolumeArgs {
       return this;
     }
 
-    public VolumeArgs.Builder setSsQuota(String quota) {
-      this.volumeSsQuota = quota;
+    public VolumeArgs.Builder setStoragespaceQuota(String quota) {
+      this.storagespaceQuota = quota;
       return this;
     }
 
-    public VolumeArgs.Builder setNsQuota(long nsQuota) {
-      this.volumeNsQuota = nsQuota;
+    public VolumeArgs.Builder setNamespaceQuotaQuota(long quota) {
+      this.namespaceQuota = quota;
       return this;
     }
 
@@ -159,9 +161,8 @@ public final class VolumeArgs {
      * @return CreateVolumeArgs.
      */
     public VolumeArgs build() {
-      return new VolumeArgs(adminName, ownerName,
-          volumeSsQuota, volumeNsQuota, listOfAcls,
-          metadata);
+      return new VolumeArgs(adminName, ownerName, storagespaceQuota,
+          namespaceQuota, listOfAcls, metadata);
     }
   }
 

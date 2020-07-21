@@ -353,9 +353,7 @@ message VolumeInfo {
     optional uint64 objectID = 8;
     optional uint64 updateID = 9;
     optional uint64 modificationTime = 10;
-    optional uint64 quotaUsageInBytes = 11;
-    optional uint64 quotaInCounts = 12;
-    optional uint64 quotaUsageInCounts = 13;
+    optional uint64 quotaInCounts = 11;
 }
 
 /**
@@ -493,10 +491,6 @@ message BucketInfo {
     optional uint64 modificationTime = 11;
     optional string sourceVolume = 12;
     optional string sourceBucket = 13;
-    optional uint64 quotaInBytes = 14;
-    optional uint64 quotaUsageInBytes = 15;
-    optional uint64 quotaInCounts = 16;
-    optional uint64 quotaUsageInCount = 17;
 }
 
 enum StorageTypeProto {
@@ -566,8 +560,6 @@ message BucketArgs {
     optional bool isVersionEnabled = 5;
     optional StorageTypeProto storageType = 6;
     repeated hadoop.hdds.KeyValue metadata = 7;
-    optional uint64 quotaInBytes = 8;
-    optional uint64 quotaInCounts = 9;
 }
 
 message PrefixInfo {

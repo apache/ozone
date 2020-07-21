@@ -280,10 +280,10 @@ public class RpcClient implements ClientProtocol {
         ugi.getUserName() : volArgs.getAdmin();
     String owner = volArgs.getOwner() == null ?
         ugi.getUserName() : volArgs.getOwner();
-    long nsQuota = volArgs.getNsQuota();
-    long ssQuota = volArgs.getSsQuota() == null ?
+    long namespaceQuota = volArgs.getNamespaceQuota();
+    long storagespaceQuota = volArgs.getStoragespaceQuota() == null ?
         OzoneConsts.MAX_QUOTA_IN_BYTES :
-        OzoneQuota.parseQuota(volArgs.getSsQuota(), nsQuota)
+        OzoneQuota.parseQuota(volArgs.getStoragespaceQuota(), namespaceQuota)
             .getStoragespaceQuota();
     List<OzoneAcl> listOfAcls = new ArrayList<>();
     //User ACL
@@ -303,8 +303,8 @@ public class RpcClient implements ClientProtocol {
     builder.setVolume(volumeName);
     builder.setAdminName(admin);
     builder.setOwnerName(owner);
-    builder.setQuotaInBytes(ssQuota);
-    builder.setQuotaInCounts(nsQuota);
+    builder.setQuotaInBytes(storagespaceQuota);
+    builder.setQuotaInCounts(namespaceQuota);
     builder.addAllMetadata(volArgs.getMetadata());
 
     //Remove duplicates and add ACLs
@@ -313,12 +313,12 @@ public class RpcClient implements ClientProtocol {
       builder.addOzoneAcls(OzoneAcl.toProtobuf(ozoneAcl));
     }
 
-    if (volArgs.getSsQuota() == null) {
+    if (volArgs.getStoragespaceQuota() == null) {
       LOG.info("Creating Volume: {}, with {} as owner.", volumeName, owner);
     } else {
       LOG.info("Creating Volume: {}, with {} as owner "
               + "and ssQuota set to {} bytes, nsQuota set to {}",
-          volumeName, owner, ssQuota, nsQuota);
+          volumeName, owner, storagespaceQuota, namespaceQuota);
     }
     ozoneManagerClient.createVolume(builder.build());
   }

@@ -273,7 +273,8 @@ public abstract class TestOzoneRpcClientAbstract {
     store.createVolume(volumeName);
     store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota("1GB", 0L));
     OzoneVolume volume = store.getVolume(volumeName);
-    Assert.assertEquals(1073741824L, volume.getStoragespaceQuota());
+    Assert.assertEquals(1024 * 1024 * 1024,
+        volume.getStoragespaceQuota());
   }
 
   @Test
