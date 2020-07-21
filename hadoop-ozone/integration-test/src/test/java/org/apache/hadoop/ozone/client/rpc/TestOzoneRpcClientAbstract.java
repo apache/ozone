@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -231,6 +232,13 @@ public abstract class TestOzoneRpcClientAbstract {
     // should match the OM's RPC address.
     Assert.assertTrue(omProxies.get(0).getAddress().equals(
         ozoneManager.getOmRpcServerAddr()));
+  }
+
+  @Test
+  public void testDefaultS3GVolumeExists() throws Exception {
+    String s3VolumeName = HddsClientUtils.getS3VolumeName(cluster.getConf());
+    OzoneVolume ozoneVolume = store.getVolume(s3VolumeName);
+    Assert.assertEquals(ozoneVolume.getName(), s3VolumeName);
   }
 
   @Test
