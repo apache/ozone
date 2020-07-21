@@ -23,3 +23,8 @@ author: Matthew Sharp
 The design doc is uploaded to the JIRA: 
 
 https://issues.apache.org/jira/secure/attachment/12985273/Ozone_Trash_Feature.docx
+
+## Special note
+
+Trash is disabled for both o3fs and ofs even if `fs.trash.interval` is set
+on purpose. (HDDS-3982)
