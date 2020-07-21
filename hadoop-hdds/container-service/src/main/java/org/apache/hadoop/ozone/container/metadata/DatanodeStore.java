@@ -64,6 +64,13 @@ public interface DatanodeStore {
   Table<String, Long> getMetadataTable();
 
   /**
+   * A Table that keeps IDs of blocks deleted from the block data table.
+   *
+   * @return Table
+   */
+  Table<Long, Long> getDeletedBlocksTable();
+
+  /**
    * Helper to create and write batch transactions.
    */
   BatchOperationHandler getBatchHandler();

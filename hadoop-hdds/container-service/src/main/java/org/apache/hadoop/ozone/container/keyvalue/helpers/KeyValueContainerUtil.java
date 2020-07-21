@@ -23,12 +23,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 
-import com.google.common.primitives.Longs;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
-import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -36,17 +33,13 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueBlockIterator;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.hdds.utils.MetadataStore;
-import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreOneTableImpl;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStoreTwoTableImpl;
-import org.rocksdb.DBOptions;
-import org.rocksdb.Options;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreThreeTableImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,7 +93,7 @@ public final class KeyValueContainerUtil {
       store = new DatanodeStoreOneTableImpl(conf, dbFile.getAbsolutePath());
     }
     else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
-      store = new DatanodeStoreTwoTableImpl(conf, dbFile.getAbsolutePath());
+      store = new DatanodeStoreThreeTableImpl(conf, dbFile.getAbsolutePath());
     }
     else {
       throw new IllegalArgumentException("Unrecognized schema version for container: " +

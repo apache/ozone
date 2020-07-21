@@ -46,8 +46,11 @@ Verify ACL
     [arguments]         ${object_type}   ${object}    ${type}   ${name}    ${acls}
     ${actual_acls} =    Execute          ozone sh ${object_type} getacl ${object} | jq -r '.[] | select(.type == "${type}") | select(.name == "${name}") | .aclList[]' | xargs
                         Should Be Equal    ${acls}    ${actual_acls}
+<<<<<<< HEAD
 
 Create Random Volume
     ${random} =    Generate Random String  5  [LOWER]
     Execute        ozone sh volume create o3://${OM_SERVICE_ID}/vol-${random}
     [return]       vol-${random}
+=======
+>>>>>>> add-deleted-block-table

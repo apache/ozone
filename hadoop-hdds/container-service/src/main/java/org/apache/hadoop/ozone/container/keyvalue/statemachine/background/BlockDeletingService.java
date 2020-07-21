@@ -298,12 +298,11 @@ public class BlockDeletingService extends BackgroundService {
         for (String entry: succeedBlocks) {
           long blockId =
               Long.parseLong(entry.substring(OzoneConsts.DELETING_KEY_PREFIX.length()));
-          String deletedEntry = OzoneConsts.DELETED_KEY_PREFIX + blockId;
 
-          meta.getStore().getMetadataTable().putWithBatch(batch, deletedEntry, blockId);
+          meta.getStore().getDeletedBlocksTable().putWithBatch(batch, blockId,
+                  blockId);
           meta.getStore().getBlockDataTable().deleteWithBatch(batch, entry);
         }
-
 
         int deleteBlockCount = succeedBlocks.size();
         containerData.updateAndCommitDBCounters(meta, batch, deleteBlockCount);
