@@ -568,7 +568,8 @@ public class TestRootedOzoneFileSystem {
     // listStatus("/")
     Path root = new Path(OZONE_URI_DELIMITER);
     FileStatus[] fileStatusRoot = ofs.listStatus(root);
-    Assert.assertEquals(2, fileStatusRoot.length);
+    // Default volume "s3v" is created by OM during start up.
+    Assert.assertEquals(2 + 1, fileStatusRoot.length);
   }
 
   /**
@@ -682,7 +683,8 @@ public class TestRootedOzoneFileSystem {
     FileStatus[] fileStatusesOver = customListStatus(new Path("/"),
         false, "", 8);
     // There are only 5 volumes
-    Assert.assertEquals(5, fileStatusesOver.length);
+    // Default volume "s3v" is created during startup.
+    Assert.assertEquals(5 + 1, fileStatusesOver.length);
 
     // numEntries = 5
     FileStatus[] fileStatusesExact = customListStatus(new Path("/"),
