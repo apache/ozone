@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
+import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -64,6 +65,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
@@ -87,6 +89,7 @@ public class TestRootedOzoneFileSystem {
   private RootedOzoneFileSystem ofs;
   private ObjectStore objectStore;
   private static BasicRootedOzoneClientAdapterImpl adapter;
+  private Trash trash;
 
   private String volumeName;
   private Path volumePath;
@@ -98,6 +101,7 @@ public class TestRootedOzoneFileSystem {
   @Before
   public void init() throws Exception {
     conf = new OzoneConfiguration();
+    conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
@@ -122,6 +126,7 @@ public class TestRootedOzoneFileSystem {
     //  hence this workaround.
     conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
     fs = FileSystem.get(conf);
+    trash = new Trash(conf);
     ofs = (RootedOzoneFileSystem) fs;
     adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
   }
@@ -997,6 +1002,38 @@ public class TestRootedOzoneFileSystem {
     Assert.assertEquals(0, fs.getTrashRoots(true).size());
     // Restore owner
     Assert.assertTrue(volume1.setOwner(prevOwner));
+  }
+
+  /**
+   * Check that no files are actually moved to trash since it is disabled by
+   * fs.rename(src, dst, options).
+   */
+  @Test
+  public void testRenameToTrashDisabled() throws IOException {
+    // Create a file
+    String testKeyName = "testKey1";
+    Path path = new Path(bucketPath, testKeyName);
+    try (FSDataOutputStream stream = fs.create(path)) {
+      stream.write(1);
+    }
+
+    // Call moveToTrash. We can't call protected fs.rename() directly
+    trash.moveToTrash(path);
+
+    // Construct paths
+    String username = UserGroupInformation.getCurrentUser().getShortUserName();
+    Path trashRoot = new Path(bucketPath, TRASH_PREFIX);
+    Path userTrash = new Path(trashRoot, username);
+    Path userTrashCurrent = new Path(userTrash, "Current");
+    Path trashPath = new Path(userTrashCurrent, testKeyName);
+
+    // Trash Current directory should still have been created.
+    Assert.assertTrue(ofs.exists(userTrashCurrent));
+    // Check under trash, the key should be deleted instead
+    Assert.assertFalse(ofs.exists(trashPath));
+
+    // Cleanup
+    ofs.delete(trashRoot, true);
   }
 
 }
