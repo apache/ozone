@@ -457,12 +457,6 @@
                 "name": "storageReport",
                 "type": "StorageReportProto",
                 "is_repeated": true
-              },
-              {
-                "id": 2,
-                "name": "metadataStorageReport",
-                "type": "MetadataStorageReportProto",
-                "is_repeated": true
               }
             ]
           },
@@ -531,27 +525,6 @@
                   {
                     "name": "default",
                     "value": "false"
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "name": "MetadataStorageReportProto",
-            "fields": [
-              {
-                "id": 1,
-                "name": "storageLocation",
-                "type": "string"
-              },
-              {
-                "id": 2,
-                "name": "storageType",
-                "type": "StorageTypeProto",
-                "options": [
-                  {
-                    "name": "default",
-                    "value": "DISK"
                   }
                 ]
               }
