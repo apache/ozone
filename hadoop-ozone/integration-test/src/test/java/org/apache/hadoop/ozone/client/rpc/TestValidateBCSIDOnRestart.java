@@ -17,9 +17,7 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-import com.google.common.primitives.Longs;
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
@@ -234,7 +232,8 @@ public class TestValidateBCSIDOnRestart {
 
     // modify the bcsid for the container in the ROCKS DB thereby inducing
     // corruption
-    db.getStore().getMetadataTable().put(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX, 0L);
+    db.getStore().getMetadataTable()
+            .put(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX, 0L);
     db.decrementReference();
     // after the restart, there will be a mismatch in BCSID of what is recorded
     // in the and what is there in RockSDB and hence the container would be

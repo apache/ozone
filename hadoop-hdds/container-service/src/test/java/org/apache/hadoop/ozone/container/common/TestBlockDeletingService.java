@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.common;
 
 
-import java.awt.image.DataBuffer;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -28,9 +27,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import com.google.common.collect.Lists;
-import com.google.common.primitives.Longs;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
@@ -76,8 +73,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 
-import static org.apache.hadoop.ozone.OzoneConsts.DB_BLOCK_COUNT_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_PENDING_DELETE_BLOCK_COUNT_KEY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -203,7 +198,7 @@ public class TestBlockDeletingService {
    */
   private int getUnderDeletionBlocksCount(ReferenceCountedDB meta)
       throws IOException {
-      return meta.getStore().getBlockDataTable()
+    return meta.getStore().getBlockDataTable()
         .getRangeKVs(null, 100,
         new MetadataKeyFilters.KeyPrefixFilter()
         .addFilter(OzoneConsts.DELETING_KEY_PREFIX)).size();
@@ -274,9 +269,11 @@ public class TestBlockDeletingService {
       // Check finally DB counters.
       // Not checking bytes used, as handler is a mock call.
       Assert.assertEquals(0,
-              meta.getStore().getMetadataTable().get(OzoneConsts.PENDING_DELETE_BLOCK_COUNT).longValue());
+              meta.getStore().getMetadataTable()
+                      .get(OzoneConsts.PENDING_DELETE_BLOCK_COUNT).longValue());
       Assert.assertEquals(0,
-              meta.getStore().getMetadataTable().get(OzoneConsts.BLOCK_COUNT).longValue());
+              meta.getStore().getMetadataTable()
+                      .get(OzoneConsts.BLOCK_COUNT).longValue());
     }
 
     svc.shutdown();

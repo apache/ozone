@@ -56,7 +56,8 @@ public class KeyValueBlockIterator implements BlockIterator<BlockData>,
   private static final Logger LOG = LoggerFactory.getLogger(
       KeyValueBlockIterator.class);
 
-  private TableIterator<String, ? extends Table.KeyValue<String, BlockData>> blockIterator;
+  private TableIterator<String, ? extends Table.KeyValue<String, BlockData>>
+          blockIterator;
   private final ReferenceCountedDB db;
   private static KeyPrefixFilter defaultBlockFilter = MetadataKeyFilters
       .getNormalKeyFilter();
@@ -159,7 +160,8 @@ public class KeyValueBlockIterator implements BlockIterator<BlockData>,
 
     while (blockIterator.hasNext() && foundBlock == null) {
       Table.KeyValue<String, BlockData> blockKV = blockIterator.next();
-      if (blockFilter.filterKey(null, blockKV.getKey().getBytes(), null)) {
+      if (blockFilter.filterKey(null,
+              StringUtils.string2Bytes(blockKV.getKey()), null)) {
         foundBlock = blockKV.getValue();
         if (LOG.isTraceEnabled()) {
           LOG.trace("Block matching with filter found: blockID is : {} for " +

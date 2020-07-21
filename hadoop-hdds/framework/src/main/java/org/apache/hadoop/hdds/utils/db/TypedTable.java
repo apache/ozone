@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheImpl;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheImpl.CacheCleanupPolicy;
-import org.apache.hadoop.hdfs.util.ByteArray;
 
 import static org.apache.hadoop.hdds.utils.db.cache.CacheResult.CacheStatus.EXISTS;
 import static org.apache.hadoop.hdds.utils.db.cache.CacheResult.CacheStatus.NOT_EXIST;
@@ -322,7 +321,8 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public List<TypedKeyValue> getSequentialRangeKVs(
-          KEY startKey, int count, MetadataKeyFilters.MetadataKeyFilter... filters)
+          KEY startKey, int count,
+          MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
 
     // A null start key means to start from the beginning of the table.

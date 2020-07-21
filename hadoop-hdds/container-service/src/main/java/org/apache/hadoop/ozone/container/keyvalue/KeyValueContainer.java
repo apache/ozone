@@ -86,10 +86,10 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   public KeyValueContainer(KeyValueContainerData containerData,
       ConfigurationSource
       ozoneConfig) {
-    Preconditions.checkNotNull(containerData, "KeyValueContainerData cannot " +
-        "be null");
-    Preconditions.checkNotNull(ozoneConfig, "Ozone configuration cannot " +
-        "be null");
+    Preconditions.checkNotNull(containerData,
+            "KeyValueContainerData cannot be null");
+    Preconditions.checkNotNull(ozoneConfig,
+            "Ozone configuration cannot be null");
     this.config = ozoneConfig;
     this.containerData = containerData;
   }

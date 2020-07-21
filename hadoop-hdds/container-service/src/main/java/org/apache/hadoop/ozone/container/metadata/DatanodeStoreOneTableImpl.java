@@ -21,6 +21,10 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 
 import java.io.IOException;
 
+/**
+ * Constructs a datanode store that places all data in the default column
+ * family.
+ */
 public class DatanodeStoreOneTableImpl extends AbstractDatanodeStore {
 
   /**

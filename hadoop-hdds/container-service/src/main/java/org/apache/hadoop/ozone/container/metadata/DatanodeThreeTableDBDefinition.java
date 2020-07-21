@@ -17,19 +17,18 @@
  */
 package org.apache.hadoop.ozone.container.metadata;
 
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.rocksdb.RocksDB;
 
 /**
- * This class defines the new RocksDB structure for datanodes, where the block data and metadata
- * are put in their own separate column families. In the old format, everything was placed in teh
- * default column family.
+ * This class defines a RocksDB structure for datanodes, where the block
+ * data, metadata, and deleted block ids are put in their own separate column
+ * families.
  */
-public class DatanodeThreeTableDBDefinition extends AbstractDatanodeDBDefinition {
+public class DatanodeThreeTableDBDefinition extends
+        AbstractDatanodeDBDefinition {
 
   public static final DBColumnFamilyDefinition<String, BlockData>
           BLOCK_DATA =
@@ -63,7 +62,8 @@ public class DatanodeThreeTableDBDefinition extends AbstractDatanodeDBDefinition
   }
 
   @Override
-  public DBColumnFamilyDefinition<String, BlockData> getBlockDataColumnFamily() {
+  public DBColumnFamilyDefinition<String, BlockData>
+      getBlockDataColumnFamily() {
     return BLOCK_DATA;
   }
 

@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
-import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
@@ -311,11 +310,12 @@ public final class DBStoreBuilder {
 
       if (!columnFamily.getTableName().equals(DEFAULT_COLUMN_FAMILY_NAME)) {
         // The default column family is always added.
-        // If it is present in the DB Definition, ignore it so we don't get an error about adding
-        // it twice.
+        // If it is present in the DB Definition, ignore it so we don't get an
+        // error about adding it twice.
         addTable(columnFamily.getName())
                 .addCodec(columnFamily.getKeyType(), columnFamily.getKeyCodec())
-                .addCodec(columnFamily.getValueType(), columnFamily.getValueCodec());
+                .addCodec(columnFamily.getValueType(),
+                        columnFamily.getValueCodec());
       }
     }
 

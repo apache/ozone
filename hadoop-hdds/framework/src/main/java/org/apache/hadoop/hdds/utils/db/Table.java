@@ -193,8 +193,9 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
 
   /**
    * Returns a certain range of key value pairs as a list based on a
-   * startKey or count. Further a {@link MetadataKeyFilters.MetadataKeyFilter} can be added to
-   * filter keys if necessary. To prevent race conditions while listing
+   * startKey or count. Further a {@link MetadataKeyFilters.MetadataKeyFilter}
+   * can be added to * filter keys if necessary.
+   * To prevent race conditions while listing
    * entries, this implementation takes a snapshot and lists the entries from
    * the snapshot. This may, on the other hand, cause the range result slight
    * different with actual data if data is updating concurrently.
@@ -207,20 +208,22 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    * The count argument is to limit number of total entries to return,
    * the value for count must be an integer greater than 0.
    * <p>
-   * This method allows to specify one or more {@link MetadataKeyFilters.MetadataKeyFilter}
+   * This method allows to specify one or more
+   * {@link MetadataKeyFilters.MetadataKeyFilter}
    * to filter keys by certain condition. Once given, only the entries
    * whose key passes all the filters will be included in the result.
    *
    * @param startKey a start key.
    * @param count max number of entries to return.
-   * @param filters customized one or more {@link MetadataKeyFilters.MetadataKeyFilter}.
+   * @param filters customized one or more
+   * {@link MetadataKeyFilters.MetadataKeyFilter}.
    * @return a list of entries found in the database or an empty list if the
    * startKey is invalid.
    * @throws IOException if there are I/O errors.
    * @throws IllegalArgumentException if count is less than 0.
    */
   List<? extends KeyValue<KEY, VALUE>> getRangeKVs(KEY startKey,
-                                              int count, MetadataKeyFilters.MetadataKeyFilter... filters)
+          int count, MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException;
 
   /**
@@ -233,13 +236,14 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    *
    * @param startKey a start key.
    * @param count max number of entries to return.
-   * @param filters customized one or more {@link MetadataKeyFilters.MetadataKeyFilter}.
+   * @param filters customized one or more
+   * {@link MetadataKeyFilters.MetadataKeyFilter}.
    * @return a list of entries found in the database.
    * @throws IOException
    * @throws IllegalArgumentException
    */
   List<? extends KeyValue<KEY, VALUE>> getSequentialRangeKVs(KEY startKey,
-                                                        int count, MetadataKeyFilters.MetadataKeyFilter... filters)
+          int count, MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException;
 
   /**

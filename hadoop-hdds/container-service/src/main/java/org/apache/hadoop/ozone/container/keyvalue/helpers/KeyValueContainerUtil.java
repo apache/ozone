@@ -67,7 +67,8 @@ public final class KeyValueContainerUtil {
    * @throws IOException
    */
   public static void createContainerMetaData(File containerMetaDataPath, File
-      chunksPath, File dbFile, String schemaVersion, ConfigurationSource conf) throws IOException {
+      chunksPath, File dbFile, String schemaVersion, ConfigurationSource conf)
+          throws IOException {
     Preconditions.checkNotNull(containerMetaDataPath);
     Preconditions.checkNotNull(conf);
 
@@ -91,13 +92,11 @@ public final class KeyValueContainerUtil {
     DatanodeStore store;
     if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
       store = new DatanodeStoreOneTableImpl(conf, dbFile.getAbsolutePath());
-    }
-    else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
+    } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
       store = new DatanodeStoreThreeTableImpl(conf, dbFile.getAbsolutePath());
-    }
-    else {
-      throw new IllegalArgumentException("Unrecognized schema version for container: " +
-              schemaVersion);
+    } else {
+      throw new IllegalArgumentException(
+              "Unrecognized schema version for container: " + schemaVersion);
     }
 
     ReferenceCountedDB db =
@@ -167,8 +166,8 @@ public final class KeyValueContainerUtil {
     kvContainerData.setDbFile(dbFile);
 
     if (kvContainerData.getSchemaVersion() == null) {
-      // If this container has not specified a schema version, it is in the old format with one
-      // default column family.
+      // If this container has not specified a schema version, it is in the old
+      // format with one default column family.
       kvContainerData.setSchemaVersion(OzoneConsts.SCHEMA_V1);
     }
 
@@ -178,13 +177,15 @@ public final class KeyValueContainerUtil {
     try(ReferenceCountedDB containerDB = BlockUtils.getDB(kvContainerData,
         config)) {
 
-      Table<String, Long> metadataTable = containerDB.getStore().getMetadataTable();
+      Table<String, Long> metadataTable =
+              containerDB.getStore().getMetadataTable();
 
       // Set pending deleted block count.
       Long pendingDeleteBlockCount =
           metadataTable.get(OzoneConsts.PENDING_DELETE_BLOCK_COUNT);
       if (pendingDeleteBlockCount != null) {
-        kvContainerData.incrPendingDeletionBlocks(pendingDeleteBlockCount.intValue());
+        kvContainerData.incrPendingDeletionBlocks(
+                pendingDeleteBlockCount.intValue());
       } else {
         // Set pending deleted block count.
         MetadataKeyFilters.KeyPrefixFilter filter =

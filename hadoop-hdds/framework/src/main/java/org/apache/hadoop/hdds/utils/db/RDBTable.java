@@ -245,13 +245,14 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   private List<ByteArrayKeyValue> getRangeKVs(byte[] startKey,
-      int count, boolean sequential, MetadataKeyFilters.MetadataKeyFilter... filters)
+      int count, boolean sequential,
+      MetadataKeyFilters.MetadataKeyFilter... filters)
       throws IOException, IllegalArgumentException {
     List<ByteArrayKeyValue> result = new ArrayList<>();
     long start = System.currentTimeMillis();
     if (count < 0) {
       throw new IllegalArgumentException(
-              "Invalid count given " + count + ", count must be greater than 0");
+            "Invalid count given " + count + ", count must be greater than 0");
     }
     try (RocksIterator it = db.newIterator(handle)) {
       if (startKey == null) {
@@ -303,9 +304,9 @@ class RDBTable implements Table<byte[], byte[]> {
             int hinted = filter.getKeysHintedNum();
             if (scanned > 0 || hinted > 0) {
               LOG.debug(
-                      "getRangeKVs ({}) numOfKeysScanned={}, numOfKeysHinted={}",
-                      filter.getClass().getSimpleName(), filter.getKeysScannedNum(),
-                      filter.getKeysHintedNum());
+                  "getRangeKVs ({}) numOfKeysScanned={}, numOfKeysHinted={}",
+                  filter.getClass().getSimpleName(), filter.getKeysScannedNum(),
+                  filter.getKeysHintedNum());
             }
           }
         }

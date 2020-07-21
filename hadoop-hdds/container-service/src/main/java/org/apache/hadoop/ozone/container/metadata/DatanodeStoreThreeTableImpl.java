@@ -21,10 +21,16 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 
 import java.io.IOException;
 
+/**
+ * Constructs a datanode store that uses three column families/tables:
+ * 1. A block data table.
+ * 2. A metadata table.
+ * 3. A deleted blocks table.
+ */
 public class DatanodeStoreThreeTableImpl extends AbstractDatanodeStore {
 
   /**
-   * Constructs the metadata store and starts the DB Services.
+   * Constructs the datanode store and starts the DB Services.
    *
    * @param config - Ozone Configuration.
    * @throws IOException - on Failure.

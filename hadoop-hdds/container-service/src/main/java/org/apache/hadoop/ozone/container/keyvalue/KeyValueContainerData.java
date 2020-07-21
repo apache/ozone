@@ -24,7 +24,6 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.Collections;
 
-import com.google.common.primitives.Longs;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto;
@@ -113,14 +112,16 @@ public class KeyValueContainerData extends ContainerData {
   }
 
   /**
-   * @param version The schema version indicating the table layout of the container's database.
+   * @param version The schema version indicating the table layout of the
+   * container's database.
    */
   public void setSchemaVersion(String version) {
     schemaVersion = version;
   }
 
   /**
-   * @return The schema version describing the container database's table layout.
+   * @return The schema version describing the container database's table
+   * layout.
    */
   public String getSchemaVersion() {
     return schemaVersion;
@@ -285,7 +286,8 @@ public class KeyValueContainerData extends ContainerData {
     Table<String, Long> metadataTable = db.getStore().getMetadataTable();
 
     // Set Bytes used and block count key.
-    metadataTable.putWithBatch(batchOperation, CONTAINER_BYTES_USED, getBytesUsed());
+    metadataTable.putWithBatch(batchOperation, CONTAINER_BYTES_USED,
+            getBytesUsed());
     metadataTable.putWithBatch(batchOperation, BLOCK_COUNT,
             getKeyCount() - deletedBlockCount);
     metadataTable.putWithBatch(batchOperation, PENDING_DELETE_BLOCK_COUNT,

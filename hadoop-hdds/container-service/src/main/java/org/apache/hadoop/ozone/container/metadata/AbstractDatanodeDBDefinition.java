@@ -25,15 +25,17 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import java.io.File;
 
 /**
- * This class serves as an intermediate format for all possible database layouts for datanodes.
- * It is used to support the old (one column family) and the new (two  column family) formats.
+ * This class serves as an intermediate format for all possible database
+ * layouts for datanodes. It is used to support the old (one column family) and
+ * the new (three column family) formats.
  */
 public abstract class AbstractDatanodeDBDefinition implements DBDefinition {
 
   private File dbDir;
 
   /**
-   * @param dbPath The absolute path to the .db file corresponding to this {@link DBDefinition}.
+   * @param dbPath The absolute path to the .db file corresponding to this
+   * {@link DBDefinition}.
    */
   protected AbstractDatanodeDBDefinition(String dbPath) {
     this.dbDir = new File(dbPath);
@@ -51,8 +53,8 @@ public abstract class AbstractDatanodeDBDefinition implements DBDefinition {
 
   @Override
   public String getLocationConfigKey() {
-    throw new UnsupportedOperationException("No location config key available for datanode " +
-          "databases.");
+    throw new UnsupportedOperationException(
+            "No location config key available for datanode databases.");
   }
 
   @Override
@@ -61,9 +63,12 @@ public abstract class AbstractDatanodeDBDefinition implements DBDefinition {
             getMetadataColumnFamily(), getDeletedBlocksColumnFamily()};
   }
 
-  public abstract DBColumnFamilyDefinition<String, BlockData> getBlockDataColumnFamily();
+  public abstract DBColumnFamilyDefinition<String, BlockData>
+      getBlockDataColumnFamily();
 
-  public abstract DBColumnFamilyDefinition<String, Long> getMetadataColumnFamily();
+  public abstract DBColumnFamilyDefinition<String, Long>
+      getMetadataColumnFamily();
 
-  public abstract DBColumnFamilyDefinition<Long, Long> getDeletedBlocksColumnFamily();
+  public abstract DBColumnFamilyDefinition<Long, Long>
+      getDeletedBlocksColumnFamily();
 }

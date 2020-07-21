@@ -16,8 +16,6 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
-import com.google.common.primitives.Longs;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto
@@ -210,7 +208,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     int newDeletionBlocks = 0;
     try(ReferenceCountedDB containerDB =
             BlockUtils.getDB(containerData, conf)) {
-      Table<String, BlockData> blockDataTable = containerDB.getStore().getBlockDataTable();
+      Table<String, BlockData> blockDataTable =
+              containerDB.getStore().getBlockDataTable();
       Table<Long, Long> deletedBlocksTable =
               containerDB.getStore().getDeletedBlocksTable();
 
@@ -236,7 +235,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           blockDataTable.putWithBatch(batch, deletingKey, blkInfo);
           blockDataTable.deleteWithBatch(batch, blk);
           try {
-            containerDB.getStore().getBatchHandler().commitBatchOperation(batch);
+            containerDB.getStore().getBatchHandler()
+                    .commitBatchOperation(batch);
             newDeletionBlocks++;
             if (LOG.isDebugEnabled()) {
               LOG.debug("Transited Block {} to DELETING state in container {}",
@@ -258,8 +258,10 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       }
 
       // Finally commit the DB counters.
-      BatchOperation batchOperation = containerDB.getStore().getBatchHandler().initBatchOperation();
-      Table<String, Long> metadataTable = containerDB.getStore().getMetadataTable();
+      BatchOperation batchOperation = containerDB.getStore().getBatchHandler()
+              .initBatchOperation();
+      Table<String, Long> metadataTable = containerDB.getStore()
+              .getMetadataTable();
 
       // In memory is updated only when existing delete transactionID is
       // greater.
@@ -269,11 +271,13 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
                 DELETE_TRANSACTION_KEY_PREFIX, delTX.getTxID());
       }
 
-      long pendingDeleteBlocks = containerData.getNumPendingDeletionBlocks() + newDeletionBlocks;
+      long pendingDeleteBlocks = containerData.getNumPendingDeletionBlocks() +
+              newDeletionBlocks;
       metadataTable.putWithBatch(batchOperation,
               PENDING_DELETE_BLOCK_COUNT, pendingDeleteBlocks);
 
-      containerDB.getStore().getBatchHandler().commitBatchOperation(batchOperation);
+      containerDB.getStore().getBatchHandler()
+              .commitBatchOperation(batchOperation);
 
 
       // update pending deletion blocks count and delete transaction ID in

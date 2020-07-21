@@ -122,7 +122,8 @@ public class TestContainerReader {
         .getContainerData(), conf)) {
 
       for (int i = 0; i < count; i++) {
-        Table<String, BlockData> blockDataTable = metadataStore.getStore().getBlockDataTable();
+        Table<String, BlockData> blockDataTable =
+                metadataStore.getStore().getBlockDataTable();
 
         String blk = Long.toString(blockNames.get(i));
         BlockData blkInfo = blockDataTable.get(blk);
@@ -132,7 +133,8 @@ public class TestContainerReader {
       }
 
       if (setMetaData) {
-        Table<String, Long> metadataTable = metadataStore.getStore().getMetadataTable();
+        Table<String, Long> metadataTable =
+                metadataStore.getStore().getMetadataTable();
 
         metadataTable.put(OzoneConsts.PENDING_DELETE_BLOCK_COUNT, (long)count);
         long blkCount = metadataTable.get(OzoneConsts.BLOCK_COUNT);

@@ -26,6 +26,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
+/**
+ * Implementation of the {@link DatanodeStore} interface that contains
+ * functionality common to all more derived datanode store implementations.
+ */
 public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   private Table<String, Long> metadataTable;
@@ -46,7 +50,8 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
    * @param config - Ozone Configuration.
    * @throws IOException - on Failure.
    */
-  protected AbstractDatanodeStore(ConfigurationSource config, AbstractDatanodeDBDefinition dbDef)
+  protected AbstractDatanodeStore(ConfigurationSource config,
+                                  AbstractDatanodeDBDefinition dbDef)
           throws IOException {
     this.configuration = config;
     this.dbDef = dbDef;

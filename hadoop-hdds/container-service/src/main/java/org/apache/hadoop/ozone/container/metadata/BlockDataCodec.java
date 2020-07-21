@@ -23,6 +23,9 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 
 import java.io.IOException;
 
+/**
+ * Supports encoding and decoding {@link BlockData} objects.
+ */
 public class BlockDataCodec implements Codec<BlockData> {
 
   @Override
@@ -32,8 +35,9 @@ public class BlockDataCodec implements Codec<BlockData> {
 
   @Override
   public BlockData fromPersistedFormat(byte[] rawData) throws IOException {
-    // Convert raw bytes to protobuf version of BlockData to container version of BlockData.
-    return BlockData.getFromProtoBuf(ContainerProtos.BlockData.parseFrom(rawData));
+    // Convert raw bytes -> protobuf version of BlockData -> BlockData object.
+    return BlockData.getFromProtoBuf(
+            ContainerProtos.BlockData.parseFrom(rawData));
   }
 
   @Override

@@ -26,6 +26,9 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 
 import java.io.IOException;
 
+/**
+ * Interface for interacting with datanode databases.
+ */
 public interface DatanodeStore {
 
   /**

@@ -17,9 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
-import com.google.common.primitives.Longs;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -343,7 +341,8 @@ public class TestBlockDeletion {
         Assert.assertNotNull(
                 db.getStore().getBlockDataTable()
                 .get(Long.toString(blockID.getLocalID())));
-        String deletingKey = OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID();
+        String deletingKey = OzoneConsts.DELETING_KEY_PREFIX +
+                blockID.getLocalID();
         Assert.assertNull(db.getStore().getBlockDataTable().get(deletingKey));
         Assert.assertNotNull(db.getStore().getDeletedBlocksTable()
             .get(blockID.getLocalID()));

@@ -110,7 +110,8 @@ public class BlockManagerImpl implements BlockManager {
         return data.getSize();
       }
       // update the blockData as well as BlockCommitSequenceId here
-      BatchOperation batch = db.getStore().getBatchHandler().initBatchOperation();
+      BatchOperation batch = db.getStore().getBatchHandler()
+              .initBatchOperation();
       db.getStore().getBlockDataTable().putWithBatch(
               batch, Long.toString(data.getLocalID()), data);
       db.getStore().getMetadataTable().putWithBatch(
@@ -243,14 +244,16 @@ public class BlockManagerImpl implements BlockManager {
       getBlockByID(db, blockID);
 
       // Update DB to delete block and set block count and bytes used.
-      BatchOperation batch = db.getStore().getBatchHandler().initBatchOperation();
+      BatchOperation batch = db.getStore().getBatchHandler()
+              .initBatchOperation();
       String localID = Long.toString(blockID.getLocalID());
       db.getStore().getBlockDataTable().deleteWithBatch(batch, localID);
       // Update DB to delete block and set block count.
       // No need to set bytes used here, as bytes used is taken care during
       // delete chunk.
       long blockCount = container.getContainerData().getKeyCount() - 1;
-      db.getStore().getMetadataTable().putWithBatch(batch, OzoneConsts.BLOCK_COUNT, blockCount);
+      db.getStore().getMetadataTable()
+              .putWithBatch(batch, OzoneConsts.BLOCK_COUNT, blockCount);
       db.getStore().getBatchHandler().commitBatchOperation(batch);
 
       // Decrement block count here

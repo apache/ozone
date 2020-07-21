@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
-import com.google.common.primitives.Longs;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -65,7 +64,6 @@ import java.util.Map;
 import java.util.List;
 import java.util.UUID;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -211,7 +209,8 @@ public class TestKeyValueContainer {
     //write one few keys to check the key count after import
     try(ReferenceCountedDB metadataStore =
         BlockUtils.getDB(keyValueContainerData, conf)) {
-      Table<String, BlockData> blockDataTable = metadataStore.getStore().getBlockDataTable();
+      Table<String, BlockData> blockDataTable =
+              metadataStore.getStore().getBlockDataTable();
 
       for (long i = 0; i < numberOfKeysToWrite; i++) {
         blockDataTable.put("test" + i, new BlockData(new BlockID(i, i)));

@@ -25,16 +25,17 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.rocksdb.RocksDB;
 
 /**
- * This class allows support of the old RocksDB layout for datanode, where block data and
- * metadata were kept in the same default table. Clients can use this class as if the database is
- * in the new format (which has separate column families for block data and metadata), even
- * though they both map back to the default table in this implementation.
+ * This class allows support of the old RocksDB layout for datanode, where
+ * all data was kept in the same default table. Clients can use this class as
+ * if the database is in the new format (which has separate column families for
+ * block data, metadata and deleted block IDs), even
+ * though all tables map back to the default table in this implementation.
  */
 public class DatanodeOneTableDBDefinition extends AbstractDatanodeDBDefinition {
-  // In the underlying database, tables are retrieved by name, and then the codecs/classes are
-  // applied on top.
-  // By defining two different DBDefinitions with different codecs that both map to the default
-  // table, clients are unaware they are using the same table for both interpretations of the data.
+  // In the underlying database, tables are retrieved by name, and then the
+  // codecs/classes are applied on top. By defining different DBDefinitions
+  // with different codecs that all map to the default table, clients are
+  // unaware they are using the same table for both interpretations of the data.
   public static final DBColumnFamilyDefinition<String, BlockData>
           BLOCK_DATA =
           new DBColumnFamilyDefinition<>(
@@ -67,7 +68,8 @@ public class DatanodeOneTableDBDefinition extends AbstractDatanodeDBDefinition {
   }
 
   @Override
-  public DBColumnFamilyDefinition<String, BlockData> getBlockDataColumnFamily() {
+  public DBColumnFamilyDefinition<String, BlockData>
+      getBlockDataColumnFamily() {
     return BLOCK_DATA;
   }
 

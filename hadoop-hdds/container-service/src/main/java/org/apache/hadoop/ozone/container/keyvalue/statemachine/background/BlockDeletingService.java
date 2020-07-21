@@ -28,9 +28,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -41,7 +39,6 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
@@ -294,10 +291,12 @@ public class BlockDeletingService extends BackgroundService {
 
         // Once files are deleted... replace deleting entries with deleted
         // entries
-        BatchOperation batch = meta.getStore().getBatchHandler().initBatchOperation();
+        BatchOperation batch = meta.getStore().getBatchHandler()
+                .initBatchOperation();
         for (String entry: succeedBlocks) {
           long blockId =
-              Long.parseLong(entry.substring(OzoneConsts.DELETING_KEY_PREFIX.length()));
+              Long.parseLong(entry.substring(
+                      OzoneConsts.DELETING_KEY_PREFIX.length()));
 
           meta.getStore().getDeletedBlocksTable().putWithBatch(batch, blockId,
                   blockId);
