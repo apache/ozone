@@ -43,6 +43,8 @@ interface IDatanodeResponse {
   uuid: string;
   version: string;
   setupTime: number;
+  revision: string;
+  buildDate: string;
 }
 
 interface IDatanodesResponse {
@@ -63,6 +65,8 @@ interface IDatanode {
   uuid: string;
   version: string;
   setupTime: number;
+  revision: string;
+  buildDate: string;
 }
 
 interface IPipeline {
@@ -208,6 +212,24 @@ const COLUMNS = [
     render: (uptime: number) => {
       return uptime > 0 ? moment(uptime).format('ll LTS') : 'NA';
     }
+  },
+  {
+    title: 'Revision',
+    dataIndex: 'revision',
+    key: 'revision',
+    isVisible: false,
+    isSearchable: true,
+    sorter: (a: IDatanode, b: IDatanode) => a.revision.localeCompare(b.revision),
+    defaultSortOrder: 'ascend' as const
+  },
+  {
+    title: 'BuildDate',
+    dataIndex: 'buildDate',
+    key: 'buildDate',
+    isVisible: false,
+    isSearchable: true,
+    sorter: (a: IDatanode, b: IDatanode) => a.buildDate.localeCompare(b.buildDate),
+    defaultSortOrder: 'ascend' as const
   }
 ];
 
@@ -265,7 +287,9 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
           containers: datanode.containers,
           leaderCount: datanode.leaderCount,
           version: datanode.version,
-          setupTime: datanode.setupTime
+          setupTime: datanode.setupTime,
+          revision: datanode.revision,
+          buildDate: datanode.buildDate
         };
       });
       const selectedColumns: IOption[] = COLUMNS.filter(column => column.isVisible).map(column => ({

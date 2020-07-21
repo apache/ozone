@@ -43,7 +43,9 @@
         "containers": 80,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1574728775759
+        "setupTime": 1574728775759,
+        "revision": "caf471111cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-20T15:45Z"
       },
       {
         "hostname": "localhost2.storage.enterprise.com",
@@ -72,7 +74,9 @@
         "containers": 8192,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1574724805059
+        "setupTime": 1574724805059,
+        "revision": "caf471111cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-20T15:45Z"
       },
       {
         "hostname": "localhost3.storage.enterprise.com",
@@ -107,7 +111,9 @@
         "containers": 43,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1343544679543
+        "setupTime": 1343544679543,
+        "revision": "aaf470000cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-19T13:45Z"
       },
       {
         "hostname": "localhost4.storage.enterprise.com",
@@ -123,7 +129,9 @@
         "containers": 0,
         "leaderCount": 0,
         "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1074724802059
+        "setupTime": 1074724802059,
+        "revision": "aaf470000cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-19T13:45Z"
       },
       {
         "hostname": "localhost5.storage.enterprise.com",
@@ -152,7 +160,9 @@
         "containers": 643,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1574724816029
+        "setupTime": 1574724816029,
+        "revision": "aaf470000cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-19T13:45Z"
       },
       {
         "hostname": "localhost6.storage.enterprise.com",
@@ -181,7 +191,9 @@
         "containers": 5,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1574724802059
+        "setupTime": 1574724802059,
+        "revision": "aaf470000cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-19T13:45Z"
       },
       {
         "hostname": "localhost7.storage.enterprise.com",
@@ -216,7 +228,9 @@
         "containers": 64,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1574724676009
+        "setupTime": 1574724676009,
+        "revision": "aaf470000cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-19T13:45Z"
       },
       {
         "hostname": "localhost8.storage.enterprise.com",
@@ -245,7 +259,9 @@
         "containers": 21,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1574724276050
+        "setupTime": 1574724276050,
+        "revision": "caf471111cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-20T15:45Z"
       },
       {
         "hostname": "localhost9.storage.enterprise.com",
@@ -274,7 +290,9 @@
         "containers": 897,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1574724573011
+        "setupTime": 1574724573011,
+        "revision": "caf471111cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-20T15:45Z"
       },
       {
         "hostname": "localhost10.storage.enterprise.com",
@@ -309,7 +327,9 @@
         "containers": 6754,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1574723756059
+        "setupTime": 1574723756059,
+        "revision": "caf471111cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-20T15:45Z"
       },
       {
         "hostname": "localhost11.storage.enterprise.com",
@@ -338,7 +358,9 @@
         "containers": 78,
         "leaderCount": 2,
         "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1474724705783
+        "setupTime": 1474724705783,
+        "revision": "ace991111cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-20T10:45Z"
       },
       {
         "hostname": "localhost12.storage.enterprise.com",
@@ -367,7 +389,9 @@
         "containers": 543,
         "leaderCount": 1,
         "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1574724706232
+        "setupTime": 1574724706232,
+        "revision": "ace991111cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-20T10:45Z"
       }
     ]
   },
