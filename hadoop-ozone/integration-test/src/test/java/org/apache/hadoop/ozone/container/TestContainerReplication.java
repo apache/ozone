@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -45,6 +46,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.test.GenericTestUtils;
 
@@ -54,15 +56,14 @@ import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
+import org.mockito.Mockito;
 
 /**
  * Tests ozone containers replication.
  */
-@Ignore
 public class TestContainerReplication {
   /**
    * Set the timeout for every test.
@@ -72,12 +73,14 @@ public class TestContainerReplication {
 
   private OzoneConfiguration conf;
   private MiniOzoneCluster cluster;
+  private EventPublisher eventPublisher;
 
   @Before
   public void setup() throws Exception {
     conf = newOzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
-        .setRandomContainerPort(true).build();
+            .setRandomContainerPort(true).build();
+    eventPublisher = Mockito.mock(EventPublisher.class);
   }
 
   @After
@@ -137,11 +140,12 @@ public class TestContainerReplication {
     Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
 
     //WHEN: send the order to replicate the container
+    ReplicateContainerCommand containerCommand = new ReplicateContainerCommand(
+            containerId, sourceDatanodes);
     cluster.getStorageContainerManager().getScmNodeManager()
-        .addDatanodeCommand(destinationDatanode.getDatanodeDetails().getUuid(),
-            new ReplicateContainerCommand(containerId,
-                sourcePipelines.getNodes()));
-
+        .onMessage(new CommandForDatanode(destinationDatanode.
+           getDatanodeDetails().getUuid(),
+                    containerCommand), eventPublisher);
     DatanodeStateMachine destinationDatanodeDatanodeStateMachine =
         destinationDatanode.getDatanodeStateMachine();
 
@@ -150,6 +154,8 @@ public class TestContainerReplication {
         -> destinationDatanodeDatanodeStateMachine.getSupervisor()
         .getReplicationRequestCount() > 0, 1000, 20_000);
 
+    Assert.assertEquals(1, destinationDatanodeDatanodeStateMachine.
+            getSupervisor().getReplicationSuccessCount());
     OzoneContainer ozoneContainer =
         destinationDatanodeDatanodeStateMachine.getContainer();
 
@@ -191,5 +197,4 @@ public class TestContainerReplication {
   private static OzoneConfiguration newOzoneConfiguration() {
     return new OzoneConfiguration();
   }
-
 }
