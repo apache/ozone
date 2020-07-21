@@ -562,13 +562,18 @@ public class ObjectEndpoint extends EndpointBase {
 
       OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
           ozoneOutputStream.getCommitUploadPartInfo();
-      String eTag = omMultipartCommitUploadPartInfo.getPartName();
+      if (omMultipartCommitUploadPartInfo != null) {
+        String eTag = omMultipartCommitUploadPartInfo.getPartName();
 
-      if (copyHeader != null) {
-        return Response.ok(new CopyPartResult(eTag)).build();
+        if (copyHeader != null) {
+          return Response.ok(new CopyPartResult(eTag)).build();
+        } else {
+          return Response.ok().header("ETag",
+              eTag).build();
+        }
       } else {
-        return Response.ok().header("ETag",
-            eTag).build();
+        throw S3ErrorTable.newError(NO_SUCH_UPLOAD,
+            uploadID);
       }
 
     } catch (OMException ex) {
@@ -578,7 +583,6 @@ public class ObjectEndpoint extends EndpointBase {
       }
       throw ex;
     }
-
   }
 
   /**
