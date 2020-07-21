@@ -38,6 +38,16 @@
     </description>
   </property>
   <property>
+    <name>ozone.container.cache.lock.stripes</name>
+    <value>1024</value>
+    <tag>PERFORMANCE, CONTAINER, STORAGE</tag>
+    <description>Container DB open is an exclusive operation. We use a stripe
+      lock to guarantee that different threads can open different container DBs
+      concurrently, while for one container DB, only one thread can open it at
+      the same time. This setting controls the lock stripes.
+    </description>
+  </property>
+  <property>
     <name>dfs.container.ipc</name>
     <value>9859</value>
     <tag>OZONE, CONTAINER, MANAGEMENT</tag>
