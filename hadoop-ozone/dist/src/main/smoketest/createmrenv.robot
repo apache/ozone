@@ -27,7 +27,7 @@ ${bucket}       bucket1
 
 *** Keywords ***
 Create volume
-    ${result} =     Execute             ozone sh volume create /${volume} --user hadoop --spaceQuota 100TB
+    ${result} =     Execute             ozone sh volume create /${volume} --user hadoop --spaceQuota 100TB --quota 100
                     Should not contain  ${result}       Failed
 Create bucket
                     Execute             ozone sh bucket create /${volume}/${bucket}
