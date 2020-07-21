@@ -46,7 +46,6 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 import org.apache.commons.lang3.tuple.Pair;
@@ -3598,8 +3597,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         new OzoneAcl(ACLIdentityType.GROUP, group, ACLType.ALL, ACCESS)));
 
     // Add ACLs
-    for (OzoneAcl ozoneAcl :
-        listOfAcls.stream().collect(Collectors.toList())) {
+    for (OzoneAcl ozoneAcl : listOfAcls) {
       omVolumeArgs.addOzoneAcls(OzoneAcl.toProtobuf(ozoneAcl));
     }
 
