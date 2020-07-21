@@ -373,11 +373,11 @@ public class OzoneBucket extends WithMetadata {
    * @throws IOException
    */
   public OzoneOutputStream createKey(String key, long size,
-                                     String storageClass,
+                                     String sc,
                                      Map<String, String> keyMetadata)
       throws IOException {
     return proxy
-        .createKey(volumeName, name, key, size, storageClass, keyMetadata);
+        .createKey(volumeName, name, key, size, sc, keyMetadata);
   }
 
   /**

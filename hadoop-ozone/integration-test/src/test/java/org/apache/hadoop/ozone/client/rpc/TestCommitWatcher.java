@@ -64,8 +64,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
 
-;
-
 /**
  * Class to test CommitWatcher functionality.
  */
