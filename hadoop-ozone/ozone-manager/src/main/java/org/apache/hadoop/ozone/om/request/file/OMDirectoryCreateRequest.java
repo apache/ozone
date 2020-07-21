@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -143,7 +144,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     IOException exception = null;
     OMClientResponse omClientResponse = null;
     Result result = Result.FAILURE;
-    List<OmKeyInfo> missingParentInfos;
+    List<OmPrefixInfo> missingParentInfos;
 
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
@@ -170,13 +171,13 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
       // Need to check if any files exist in the given path, if they exist we
       // cannot create a directory with the given key.
+      // Verify the path against prefix table
       OMFileRequest.OMPathInfo omPathInfo =
-          OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
-              bucketName, keyName, keyPath);
+              OMFileRequest.verifyPrefixKeysInPath(omMetadataManager,
+              volumeName, bucketName, keyName, keyPath);
       OMFileRequest.OMDirectoryResult omDirectoryResult =
           omPathInfo.getDirectoryResult();
 
-      OmKeyInfo dirKeyInfo = null;
       if (omDirectoryResult == FILE_EXISTS ||
           omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
         throw new OMException("Unable to create directory: " +keyName
@@ -184,23 +185,23 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
             FILE_ALREADY_EXISTS);
       } else if (omDirectoryResult == DIRECTORY_EXISTS_IN_GIVENPATH ||
           omDirectoryResult == NONE) {
-        List<String> missingParents = omPathInfo.getMissingParents();
-        long baseObjId = OMFileRequest.getObjIDFromTxId(trxnLogIndex);
-        List<OzoneAcl> inheritAcls = omPathInfo.getAcls();
 
-        dirKeyInfo = createDirectoryKeyInfoWithACL(keyName,
-            keyArgs, baseObjId,
-            OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()), trxnLogIndex);
-
-        missingParentInfos = getAllParentInfo(ozoneManager, keyArgs,
-            missingParents, inheritAcls, trxnLogIndex);
-
-        OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
-            bucketName, Optional.of(dirKeyInfo),
-            Optional.of(missingParentInfos), trxnLogIndex);
+        // prepare all missing parents
+        missingParentInfos = OMDirectoryCreateRequest.getAllParentDirInfo(
+                ozoneManager, keyArgs, omPathInfo, trxnLogIndex);
+        // prepare leafNode dir
+        OmPrefixInfo dirInfo = createDirectoryInfoWithACL(
+                omPathInfo.getLeafNodeName(),
+                keyArgs, omPathInfo.getLeafNodeObjectId(),
+                omPathInfo.getLastKnownParentId(), trxnLogIndex,
+                OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
+        OMFileRequest.addPrefixTableCacheEntries(omMetadataManager,
+                volumeName,
+                bucketName, Optional.of(dirInfo),
+                Optional.of(missingParentInfos), trxnLogIndex);
         result = Result.SUCCESS;
         omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
-            dirKeyInfo, missingParentInfos, result);
+                dirInfo, missingParentInfos, result);
       } else {
         // omDirectoryResult == DIRECTORY_EXITS
         result = Result.DIRECTORY_ALREADY_EXISTS;
@@ -353,4 +354,94 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         .setUpdateID(objectId);
   }
 
+  /**
+   * Construct OmDirectoryInfo for every parent directory in missing list.
+   * @param ozoneManager
+   * @param keyArgs
+   * @param pathInfo list of parent directories to be created and its ACLs
+   * @param trxnLogIndex
+   * @return
+   * @throws IOException
+   */
+  public static List<OmPrefixInfo> getAllParentDirInfo(
+          OzoneManager ozoneManager, KeyArgs keyArgs,
+          OMFileRequest.OMPathInfo pathInfo, long trxnLogIndex)
+          throws IOException {
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    List<OmPrefixInfo> missingParentInfos = new ArrayList<>();
+
+    ImmutablePair<Long, Long> objIdRange = OMFileRequest
+            .getObjIdRangeFromTxId(trxnLogIndex);
+    long baseObjId = objIdRange.getLeft();
+    long maxObjId = objIdRange.getRight();
+    long maxLevels = maxObjId - baseObjId;
+    long objectCount = 1; // baseObjID is used by the leaf directory
+
+    String volumeName = keyArgs.getVolumeName();
+    String bucketName = keyArgs.getBucketName();
+    String keyName = keyArgs.getKeyName();
+
+    long lastKnownParentId = pathInfo.getLastKnownParentId();
+    List<String> missingParents = pathInfo.getMissingParents();
+    List<OzoneAcl> inheritAcls = pathInfo.getAcls();
+    for (String missingKey : missingParents) {
+      long nextObjId = baseObjId + objectCount;
+      if (nextObjId > maxObjId) {
+        throw new OMException("Too many directories in path. Exceeds limit of "
+                + maxLevels + ". Unable to create directory: " + keyName
+                + " in volume/bucket: " + volumeName + "/" + bucketName,
+                INVALID_KEY_NAME);
+      }
+
+      LOG.debug("missing parent {} getting added to KeyTable", missingKey);
+      // what about keyArgs for parent directories? TODO
+      OmPrefixInfo dirInfo = createDirectoryInfoWithACL(missingKey,
+              keyArgs, nextObjId, lastKnownParentId, trxnLogIndex, inheritAcls);
+      objectCount++;
+
+      missingParentInfos.add(dirInfo);
+
+      // add entry to directory table
+      omMetadataManager.getPrefixTable().addCacheEntry(
+              new CacheKey<>(omMetadataManager.getOzoneKey(volumeName,
+                      bucketName, dirInfo.getName())),
+              new CacheValue<>(Optional.of(dirInfo),
+                      trxnLogIndex));
+
+      // updating id for the next sub-dir
+      lastKnownParentId = nextObjId;
+    }
+    pathInfo.setLastKnownParentId(lastKnownParentId);
+    pathInfo.setLeafNodeObjectId(baseObjId + objectCount);
+    return missingParentInfos;
+  }
+
+  /**
+   * fill in a PrefixInfo for a new directory entry in OM database.
+   * without initializing ACLs from the KeyArgs - used for intermediate
+   * directories which get created internally/recursively during file
+   * and directory create.
+   * @param dirName
+   * @param keyArgs
+   * @param objectId
+   * @param parentObjectId
+   * @param inheritAcls
+   * @return the OmPrefixInfo structure
+   */
+  public static OmPrefixInfo createDirectoryInfoWithACL(
+          String dirName, KeyArgs keyArgs, long objectId,
+          long parentObjectId, long transactionIndex,
+          List<OzoneAcl> inheritAcls) {
+
+    return OmPrefixInfo.newBuilder()
+            .setName(dirName)
+            .setVolumeName(keyArgs.getVolumeName())
+            .setBucketName(keyArgs.getBucketName())
+            .setCreationTime(keyArgs.getModificationTime())
+            .setModificationTime(keyArgs.getModificationTime())
+            .setObjectID(objectId)
+            .setUpdateID(transactionIndex)
+            .setParentObjectID(parentObjectId)
+            .setAcls(inheritAcls).build();
+  }
 }

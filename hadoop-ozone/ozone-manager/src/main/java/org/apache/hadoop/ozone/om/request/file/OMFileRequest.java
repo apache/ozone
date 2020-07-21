@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.file;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import com.google.common.base.Optional;
@@ -29,8 +30,11 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,7 +74,7 @@ public final class OMFileRequest {
     List<String> missing = new ArrayList<>();
     List<OzoneAcl> inheritAcls = new ArrayList<>();
     OMDirectoryResult result = OMDirectoryResult.NONE;
-
+    long dummyParentId = 0;
     while (keyPath != null) {
       String pathName = keyPath.toString();
 
@@ -109,7 +113,7 @@ public final class OMFileRequest {
 
         LOG.trace("verifyFiles in Path : " + "/" + volumeName
             + "/" + bucketName + "/" + keyName + ":" + result);
-        return new OMPathInfo(missing, result, inheritAcls);
+        return new OMPathInfo("", dummyParentId, missing, result, inheritAcls);
       }
       keyPath = keyPath.getParent();
     }
@@ -126,7 +130,7 @@ public final class OMFileRequest {
     LOG.trace("verifyFiles in Path : " + volumeName + "/" + bucketName + "/"
         + keyName + ":" + result);
     // Found no files/ directories in the given path.
-    return new OMPathInfo(missing, OMDirectoryResult.NONE, inheritAcls);
+    return new OMPathInfo("", dummyParentId, missing, result, inheritAcls);
   }
 
   /**
@@ -163,15 +167,38 @@ public final class OMFileRequest {
    */
   public static class OMPathInfo {
     private OMDirectoryResult directoryResult;
+    private String leafNodeName;
+    private long lastKnownParentId;
+    private long leafNodeObjectId;
     private List<String> missingParents;
     private List<OzoneAcl> acls;
 
-    public OMPathInfo(List missingParents, OMDirectoryResult result,
-        List<OzoneAcl> aclList) {
+    public OMPathInfo(String leafNodeName, long lastKnownParentId,
+                      List missingParents,
+                      OMDirectoryResult result,
+                      List<OzoneAcl> aclList) {
+      this.leafNodeName = leafNodeName;
+      this.lastKnownParentId = lastKnownParentId;
       this.missingParents = missingParents;
       this.directoryResult = result;
       this.acls = aclList;
     }
+
+    public String getLeafNodeName() { return leafNodeName; }
+
+    public long getLeafNodeObjectId() {
+      return leafNodeObjectId;
+    }
+
+    public void setLeafNodeObjectId(long leafNodeObjectId) {
+      this.leafNodeObjectId = leafNodeObjectId;
+    }
+
+    public void setLastKnownParentId(long lastKnownParentId) {
+      this.lastKnownParentId = lastKnownParentId;
+    }
+
+    public long getLastKnownParentId() { return lastKnownParentId; }
 
     public List getMissingParents() {
       return missingParents;
@@ -253,5 +280,142 @@ public final class OMFileRequest {
                   keyInfo.get().getKeyName())),
           new CacheValue<>(keyInfo, index));
     }
+  }
+
+
+  public static void addPrefixTableCacheEntries(
+          OMMetadataManager omMetadataManager, String volumeName,
+          String bucketName, Optional<OmPrefixInfo> dirInfo,
+          Optional<List<OmPrefixInfo>> parentInfoList,
+          long index) {
+    for (OmPrefixInfo parentInfo : parentInfoList.get()) {
+      omMetadataManager.getPrefixTable().addCacheEntry(
+              new CacheKey<>(omMetadataManager.getOzonePrefixKey(parentInfo.getParentObjectID(), parentInfo.getName())),
+              new CacheValue<>(Optional.of(parentInfo), index));
+    }
+
+    if (dirInfo.isPresent()) {
+      omMetadataManager.getPrefixTable().addCacheEntry(
+              new CacheKey<>(omMetadataManager.getOzonePrefixKey(dirInfo.get().getParentObjectID(),
+                      dirInfo.get().getName())),
+              new CacheValue<>(dirInfo, index));
+    }
+  }
+
+
+  /**
+   * Verify any file/key exist in the given path in the specified
+   * volume/bucket by iterating through directory table and key table.
+   * @param omMetadataManager
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @param keyPath
+   * @return OMPathInfo - holds.
+   * @throws IOException
+   */
+  public static OMPathInfo verifyPrefixKeysInPath(
+          @Nonnull OMMetadataManager omMetadataManager,
+          @Nonnull String volumeName,
+          @Nonnull String bucketName, @Nonnull String keyName,
+          @Nonnull Path keyPath) throws IOException {
+
+    String leafNodeName = OzoneFSUtils.getFileName(keyName);
+    List<String> missing = new ArrayList<>();
+    List<OzoneAcl> inheritAcls = new ArrayList<>();
+    OMDirectoryResult result = OMDirectoryResult.NONE;
+
+    Iterator<Path> elements = keyPath.iterator();
+    // TODO: volume id and bucket id generation logic.
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    long bucketId =
+            omMetadataManager.getBucketTable().get(bucketKey).getObjectID();
+    long lastKnownParentId = bucketId;
+    OmPrefixInfo parentPrefixInfo = null;
+    String dbDirName = ""; // absolute path for trace logs
+    while (elements.hasNext()) {
+      String fileName = elements.next().toString();
+      if (missing.size() > 0) {
+        // Add all the sub-dirs to the missing list except the leaf element.
+        // For example, /vol1/buck1/a/b/c/d/e/f/file1.txt.
+        // Assume /vol1/buck1/a/b/c exists, then add d, e, f into missing list.
+        if(elements.hasNext()){
+          // skips leaf node.
+          missing.add(fileName);
+        }
+        continue;
+      }
+
+      // For example, /vol1/buck1/a/b/c/d/e/f/file1.txt
+      // 1. Do lookup on directoryTable. If not exists goto next step.
+      // 2. Do look on keyTable. If not exists goto next step.
+      // 3. Add 'sub-dir' to missing parents list
+      String dbNodeName = omMetadataManager.getOzonePrefixKey(lastKnownParentId,
+              fileName);
+      OmPrefixInfo omPrefixInfo = omMetadataManager.getPrefixTable().
+              get(dbNodeName);
+      if (omPrefixInfo != null) {
+        dbDirName += omPrefixInfo.getName() + OzoneConsts.OZONE_URI_DELIMITER;
+        if (elements.hasNext()) {
+          lastKnownParentId = omPrefixInfo.getObjectID();
+          parentPrefixInfo = omPrefixInfo;
+          continue;
+        } else {
+          // Checked all the sub-dirs till the leaf node.
+          // Found a directory in the given path.
+          result = OMDirectoryResult.DIRECTORY_EXISTS;
+        }
+      } else {
+        if (parentPrefixInfo != null) {
+          lastKnownParentId = parentPrefixInfo.getObjectID();
+          dbNodeName = omMetadataManager.getOzoneLeafNodeKey(lastKnownParentId,
+                  fileName);
+          if (omMetadataManager.getKeyTable().isExist(dbNodeName)) {
+            if (elements.hasNext()) {
+              // Found a file in the given key name.
+              result = OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
+            } else {
+              // Checked all the sub-dirs till the leaf file.
+              // Found a file with the given key name.
+              result = OMDirectoryResult.FILE_EXISTS;
+            }
+            break; // Skip directory traversal as it hits key.
+          }
+
+          result = OMDirectoryResult.DIRECTORY_EXISTS_IN_GIVENPATH;
+          inheritAcls = parentPrefixInfo.getAcls();
+
+          String dbDirKeyName = omMetadataManager.getOzoneDirKey(volumeName,
+                  bucketName, dbDirName);
+          LOG.trace("Acls inherited from parent " + dbDirKeyName + " are : "
+                  + inheritAcls);
+        }
+        // add to the missing list since this directory doesn't exist.
+        if(elements.hasNext()) {
+          // skips leaf node.
+          missing.add(fileName);
+        }
+      }
+    }
+
+    if (result != OMDirectoryResult.NONE) {
+      LOG.trace("verifyFiles in Path : " + "/" + volumeName
+              + "/" + bucketName + "/" + keyName + ":" + result);
+      return new OMPathInfo(leafNodeName, lastKnownParentId, missing, result,
+              inheritAcls);
+    }
+
+    if (inheritAcls.isEmpty()) {
+      inheritAcls = omMetadataManager.getBucketTable().get(bucketKey)
+              .getAcls();
+      LOG.trace("Acls inherited from bucket " + bucketName + " are : "
+              + inheritAcls);
+    }
+
+    LOG.trace("verifyFiles in Path : " + volumeName + "/" + bucketName + "/"
+            + keyName + ":" + result);
+    // Found no files/ directories in the given path.
+    return new OMPathInfo(leafNodeName, lastKnownParentId, missing,
+            OMDirectoryResult.NONE, inheritAcls);
   }
 }

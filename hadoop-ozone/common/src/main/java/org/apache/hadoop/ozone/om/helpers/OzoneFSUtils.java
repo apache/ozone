@@ -86,4 +86,14 @@ public final class OzoneFSUtils {
   public static boolean isFile(String keyName) {
     return !keyName.endsWith(OZONE_URI_DELIMITER);
   }
+
+  /**
+   * The function returns file name from the given absolute path. For
+   * example, the given key path '/a/b/c/d/e/file1' then it returns file name
+   * 'file1'.
+   */
+  public static String getFileName(String keyName) {
+    java.nio.file.Path keyPath = Paths.get(keyName);
+    return keyPath.getFileName().toString();
+  }
 }

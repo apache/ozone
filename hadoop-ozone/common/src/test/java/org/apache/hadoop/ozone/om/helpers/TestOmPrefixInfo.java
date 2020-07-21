@@ -35,10 +35,15 @@ public class TestOmPrefixInfo {
 
   @Test
   public void testCopyObject() {
-    OmPrefixInfo omPrefixInfo = new OmPrefixInfo("/path",
-        Collections.singletonList(new OzoneAcl(
-        IAccessAuthorizer.ACLIdentityType.USER, "user1",
-        IAccessAuthorizer.ACLType.WRITE, ACCESS)), new HashMap<>(), 10, 100);
+    OmPrefixInfo omPrefixInfo =
+            OmPrefixInfo.newBuilder()
+                    .setName("/path")
+                    .setAcls(Collections.singletonList(new OzoneAcl(
+                    IAccessAuthorizer.ACLIdentityType.USER, "user1",
+                    IAccessAuthorizer.ACLType.WRITE, ACCESS)))
+                    .addAllMetadata(new HashMap<>())
+                    .setObjectID(10)
+                    .setUpdateID(100).build();
 
     OmPrefixInfo clonePrefixInfo = omPrefixInfo.copyObject();
 

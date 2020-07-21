@@ -465,6 +465,22 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
+  public String getOzoneLeafNodeKey(long parentObjectId, String leafNodeName) {
+    StringBuilder builder = new StringBuilder();
+    builder.append(parentObjectId);
+    builder.append(OM_KEY_PREFIX).append(leafNodeName);
+    return builder.toString();
+  }
+
+  @Override
+  public String getOzonePrefixKey(long parentObjectId, String prefixName) {
+    StringBuilder builder = new StringBuilder();
+    builder.append(parentObjectId);
+    builder.append(OM_KEY_PREFIX).append(prefixName);
+    return builder.toString();
+  }
+
+  @Override
   public String getOpenKey(String volume, String bucket,
                            String key, long id) {
     String openKey = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket +

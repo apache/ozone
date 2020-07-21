@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone.om.response.file;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest.Result;
 
@@ -45,16 +45,16 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
   public static final Logger LOG =
       LoggerFactory.getLogger(OMDirectoryCreateResponse.class);
 
-  private OmKeyInfo dirKeyInfo;
-  private List<OmKeyInfo> parentKeyInfos;
+  private OmPrefixInfo prefixInfo;
+  private List<OmPrefixInfo> parentPrefixInfos;
   private Result result;
 
   public OMDirectoryCreateResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo dirKeyInfo,
-      @Nonnull List<OmKeyInfo> parentKeyInfos, @Nonnull Result result) {
+      @Nonnull OmPrefixInfo dirKeyInfo,
+      @Nonnull List<OmPrefixInfo> parentDirInfos, @Nonnull Result result) {
     super(omResponse);
-    this.dirKeyInfo = dirKeyInfo;
-    this.parentKeyInfos = parentKeyInfos;
+    this.prefixInfo = dirKeyInfo;
+    this.parentPrefixInfos = parentDirInfos;
     this.result = result;
   }
 
@@ -69,28 +69,36 @@ public class OMDirectoryCreateResponse extends OMClientResponse {
 
   @Override
   protected void addToDBBatch(OMMetadataManager omMetadataManager,
-      BatchOperation batchOperation) throws IOException {
+                              BatchOperation batchOperation)
+          throws IOException {
+    addToPrefixTable(omMetadataManager, batchOperation);
+  }
 
-    if (Result.SUCCESS == result) {
-      // Add all parent keys to batch.
-      for (OmKeyInfo parentKeyInfo : parentKeyInfos) {
-        String parentKey = omMetadataManager
-            .getOzoneDirKey(parentKeyInfo.getVolumeName(),
-                parentKeyInfo.getBucketName(), parentKeyInfo.getKeyName());
-        LOG.debug("putWithBatch parent : key {} info : {}", parentKey,
-            parentKeyInfo);
-        omMetadataManager.getKeyTable()
-            .putWithBatch(batchOperation, parentKey, parentKeyInfo);
+  private void addToPrefixTable(OMMetadataManager omMetadataManager,
+                                BatchOperation batchOperation)
+          throws IOException {
+    if (prefixInfo != null) {
+      if (parentPrefixInfos != null) {
+        for (OmPrefixInfo parentDirInfo : parentPrefixInfos) {
+          String parentKey = omMetadataManager
+                  .getOzonePrefixKey(parentDirInfo.getParentObjectID(),
+                          parentDirInfo.getName());
+          LOG.debug("putWithBatch parent : dir {} info : {}", parentKey,
+                  parentDirInfo);
+          omMetadataManager.getPrefixTable()
+                  .putWithBatch(batchOperation, parentKey, parentDirInfo);
+        }
       }
 
-      String dirKey = omMetadataManager.getOzoneKey(dirKeyInfo.getVolumeName(),
-          dirKeyInfo.getBucketName(), dirKeyInfo.getKeyName());
-      omMetadataManager.getKeyTable().putWithBatch(batchOperation, dirKey,
-          dirKeyInfo);
-    } else if (Result.DIRECTORY_ALREADY_EXISTS == result) {
+      String dirKey = omMetadataManager.getOzonePrefixKey(
+              prefixInfo.getParentObjectID(), prefixInfo.getName());
+      omMetadataManager.getPrefixTable().putWithBatch(batchOperation, dirKey,
+              prefixInfo);
+    } else {
       // When directory already exists, we don't add it to cache. And it is
       // not an error, in this case dirKeyInfo will be null.
-      LOG.debug("Directory already exists. addToDBBatch is a no-op");
+      LOG.debug("Response Status is OK, dirKeyInfo is null in " +
+              "OMDirectoryCreateResponse");
     }
   }
 }

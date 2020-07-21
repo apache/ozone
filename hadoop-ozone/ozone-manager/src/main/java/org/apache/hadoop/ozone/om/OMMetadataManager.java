@@ -116,6 +116,25 @@ public interface OMMetadataManager {
    */
   String getOzoneDirKey(String volume, String bucket, String key);
 
+  /**
+   * Given a volume, bucket and a key, return the corresponding DB key.
+   *
+   * @param parentObjectId - parent object Id
+   * @param leafNodeName - leaf node name
+   * @return DB key as String.
+   */
+
+  String getOzoneLeafNodeKey(long parentObjectId, String leafNodeName);
+
+  /**
+   * Given a volume, bucket and a key, return the corresponding DB prefixKey
+   * key.
+   *
+   * @param parentObjectId - parent object Id
+   * @param prefixName    - prefix name
+   * @return DB directory key as String.
+   */
+  String getOzonePrefixKey(long parentObjectId, String prefixName);
 
   /**
    * Returns the DB key name of a open key in OM metadata store. Should be

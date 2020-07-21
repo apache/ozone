@@ -37,7 +37,14 @@ import java.util.stream.Collectors;
 // TODO: support Auditable interface
 public final class OmPrefixInfo extends WithObjectID {
 
+  private long parentObjectID; // pointer to parent directory
+
   private String name;
+  private String volumeName;
+  private String bucketName;
+
+  private long creationTime;
+  private long modificationTime;
   private List<OzoneAcl> acls;
 
   public OmPrefixInfo(String name, List<OzoneAcl> acls,
@@ -47,6 +54,19 @@ public final class OmPrefixInfo extends WithObjectID {
     this.metadata = metadata;
     this.objectID = objectId;
     this.updateID = updateId;
+  }
+
+  public OmPrefixInfo(Builder builder) {
+    this.name = builder.name;
+    this.acls = builder.acls;
+    this.metadata = builder.metadata;
+    this.objectID = builder.objectID;
+    this.updateID = builder.updateID;
+    this.parentObjectID = builder.parentObjectID;
+    this.volumeName = builder.volumeName;
+    this.bucketName = builder.bucketName;
+    this.creationTime = builder.creationTime;
+    this.modificationTime = builder.modificationTime;
   }
 
   /**
@@ -77,6 +97,26 @@ public final class OmPrefixInfo extends WithObjectID {
     return name;
   }
 
+  public long getParentObjectID() {
+    return parentObjectID;
+  }
+
+  public long getCreationTime() {
+    return creationTime;
+  }
+
+  public long getModificationTime() {
+    return modificationTime;
+  }
+
+  public String getVolumeName() {
+    return volumeName;
+  }
+
+  public String getBucketName() {
+    return bucketName;
+  }
+
   /**
    * Returns new builder class that builds a OmPrefixInfo.
    *
@@ -95,6 +135,12 @@ public final class OmPrefixInfo extends WithObjectID {
     private Map<String, String> metadata;
     private long objectID;
     private long updateID;
+    private long parentObjectID; // pointer to parent directory
+    private String volumeName;
+    private String bucketName;
+
+    private long creationTime;
+    private long modificationTime;
 
     public Builder() {
       //Default values
@@ -111,6 +157,31 @@ public final class OmPrefixInfo extends WithObjectID {
 
     public Builder setName(String n) {
       this.name = n;
+      return this;
+    }
+
+    public Builder setParentObjectID(long parentObjectID) {
+      this.parentObjectID = parentObjectID;
+      return this;
+    }
+
+    public Builder setVolumeName(String volumeName) {
+      this.volumeName = volumeName;
+      return this;
+    }
+
+    public Builder setBucketName(String bucketName) {
+      this.bucketName = bucketName;
+      return this;
+    }
+
+    public Builder setCreationTime(long creationTime) {
+      this.creationTime = creationTime;
+      return this;
+    }
+
+    public Builder setModificationTime(long modificationTime) {
+      this.modificationTime = modificationTime;
       return this;
     }
 
@@ -143,7 +214,7 @@ public final class OmPrefixInfo extends WithObjectID {
      */
     public OmPrefixInfo build() {
       Preconditions.checkNotNull(name);
-      return new OmPrefixInfo(name, acls, metadata, objectID, updateID);
+      return new OmPrefixInfo(this);
     }
   }
 
@@ -187,13 +258,20 @@ public final class OmPrefixInfo extends WithObjectID {
     }
     OmPrefixInfo that = (OmPrefixInfo) o;
     return name.equals(that.name) &&
+        creationTime == that.creationTime &&
+        modificationTime == that.modificationTime &&
+        volumeName.equals(that.volumeName) &&
+        bucketName.equals(that.bucketName) &&
+        parentObjectID == that.parentObjectID &&
+        objectID == that.objectID &&
+        updateID == that.updateID &&
         Objects.equals(acls, that.acls) &&
         Objects.equals(metadata, that.metadata);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(name);
+    return Objects.hash(volumeName, bucketName, parentObjectID, name);
   }
 
   /**
@@ -209,7 +287,18 @@ public final class OmPrefixInfo extends WithObjectID {
     if (metadata != null) {
       metadata.forEach((k, v) -> metadataList.put(k, v));
     }
-    return new OmPrefixInfo(name, aclList, metadataList, objectID, updateID);
+    return OmPrefixInfo.newBuilder()
+            .setName(name)
+            .setAcls(aclList)
+            .addAllMetadata(metadataList)
+            .setObjectID(objectID)
+            .setUpdateID(updateID)
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setCreationTime(creationTime)
+            .setModificationTime(modificationTime)
+            .setParentObjectID(parentObjectID)
+            .build();
   }
 }
 
