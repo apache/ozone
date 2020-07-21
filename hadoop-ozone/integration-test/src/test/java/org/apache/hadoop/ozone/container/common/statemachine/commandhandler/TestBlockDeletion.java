@@ -343,10 +343,10 @@ public class TestBlockDeletion {
         Assert.assertNotNull(
                 db.getStore().getBlockDataTable()
                 .get(Long.toString(blockID.getLocalID())));
-        String idKey = OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID();
-        Assert.assertNull(db.getStore().getBlockDataTable().get(idKey));
-        Assert.assertNotNull(StringUtils.string2Bytes(
-            OzoneConsts.DELETED_KEY_PREFIX + blockID.getLocalID()));
+        String deletingKey = OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID();
+        Assert.assertNull(db.getStore().getBlockDataTable().get(deletingKey));
+        Assert.assertNotNull(db.getStore().getDeletedBlocksTable()
+            .get(blockID.getLocalID()));
       }
       containerIdsWithDeletedBlocks.add(blockID.getContainerID());
     }, omKeyLocationInfoGroups);

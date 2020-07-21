@@ -210,19 +210,21 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     int newDeletionBlocks = 0;
     try(ReferenceCountedDB containerDB =
             BlockUtils.getDB(containerData, conf)) {
+
+      Table<String, BlockData> blockDataTable = containerDB.getStore().getBlockDataTable();
+      Table<Long, Long> deletedBlocksTable =
+              containerDB.getStore().getDeletedBlocksTable();
+
       for (Long blkLong : delTX.getLocalIDList()) {
         String blk = blkLong.toString();
-        // TODO : Figure out the correct tables and types to use here.
         BatchOperation batch = containerDB.getStore()
                 .getBatchHandler().initBatchOperation();
-        Table<String, BlockData> blockDataTable = containerDB.getStore().getBlockDataTable();
         BlockData blkInfo = blockDataTable.get(blk);
         if (blkInfo != null) {
           String deletingKey = OzoneConsts.DELETING_KEY_PREFIX + blk;
-          String deletedKey = OzoneConsts.DELETED_KEY_PREFIX + blk;
 
           if (blockDataTable.get(deletingKey) != null
-              || blockDataTable.get(deletedKey) != null) {
+              || deletedBlocksTable.get(blkLong) != null) {
             if (LOG.isDebugEnabled()) {
               LOG.debug(String.format(
                   "Ignoring delete for block %s in container %d."
