@@ -854,7 +854,7 @@ public class KeyManagerImpl implements KeyManager {
   private boolean isKeyEmpty(OmKeyInfo keyInfo) {
     for (OmKeyLocationInfoGroup keyLocationList : keyInfo
         .getKeyLocationVersions()) {
-      if (keyLocationList.getLocationList().size() != 0) {
+      if (keyLocationList.getLocationListCount() != 0) {
         return false;
       }
     }
@@ -965,7 +965,7 @@ public class KeyManagerImpl implements KeyManager {
           .setReplicationFactor(keyArgs.getFactor())
           .setPartKeyInfoList(partKeyInfoMap)
           .build();
-      List<OmKeyLocationInfo> locations = new ArrayList<>();
+      Map<Long, List<OmKeyLocationInfo>> locations = new HashMap<>();
       OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
           .setVolumeName(keyArgs.getVolumeName())
           .setBucketName(keyArgs.getBucketName())
