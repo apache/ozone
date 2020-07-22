@@ -1541,16 +1541,6 @@
                 "type": "int64"
               },
               {
-                "id": 10,
-                "name": "revision",
-                "type": "string"
-              },
-              {
-                "id": 11,
-                "name": "buildDate",
-                "type": "string"
-              },
-              {
                 "id": 100,
                 "name": "uuid128",
                 "type": "UUID"
