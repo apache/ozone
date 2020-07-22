@@ -442,8 +442,8 @@ public class StateContext {
       } else {
         if (threadPoolNotAvailableCount.get()
             % getLogWarnInterval(conf) == 0) {
-          LOG.warn("No available thread in pool for past {} milliseconds." +
-              unit.toMillis(time));
+          LOG.warn("No available thread in pool for past {} seconds.",
+              unit.toSeconds(time) * threadPoolNotAvailableCount.get());
         }
         threadPoolNotAvailableCount.incrementAndGet();
       }
