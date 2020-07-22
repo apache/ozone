@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.recon;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -50,6 +52,7 @@ import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
@@ -57,6 +60,8 @@ import com.google.inject.Singleton;
 import com.google.inject.multibindings.Multibinder;
 import static org.apache.hadoop.hdds.scm.cli.ContainerOperationClient.newContainerRpcClient;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+
 import org.apache.ratis.protocol.ClientId;
 import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
 import org.hadoop.ozone.recon.schema.tables.daos.ClusterGrowthDailyDao;
@@ -152,16 +157,41 @@ public class ReconControllerModule extends AbstractModule {
     try {
       ClientId clientId = ClientId.randomId();
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+      String serviceId = getOzoneManagerServiceId(ozoneConfiguration);
       OmTransport transport =
-          OmTransportFactory.create(ozoneConfiguration, ugi,
-              ozoneConfiguration.get(OZONE_OM_INTERNAL_SERVICE_ID));
-      ozoneManagerClient = new
-          OzoneManagerProtocolClientSideTranslatorPB(
+          OmTransportFactory.create(ozoneConfiguration, ugi, serviceId);
+      ozoneManagerClient = new OzoneManagerProtocolClientSideTranslatorPB(
           transport, clientId.toString());
     } catch (IOException ioEx) {
       LOG.error("Error in provisioning OzoneManagerProtocol ", ioEx);
     }
     return ozoneManagerClient;
+  }
+
+  @VisibleForTesting
+  protected String getOzoneManagerServiceId(OzoneConfiguration configuration)
+      throws IOException {
+    Collection<String> omServiceIds;
+    String localOMServiceId = configuration.get(OZONE_OM_INTERNAL_SERVICE_ID);
+    if (localOMServiceId == null) {
+      LOG.info("{} is not defined, falling back to {} to find serviceID for "
+              + "OzoneManager if it is HA enabled cluster",
+          OZONE_OM_INTERNAL_SERVICE_ID, OZONE_OM_SERVICE_IDS_KEY);
+      omServiceIds = configuration.getTrimmedStringCollection(
+          OZONE_OM_SERVICE_IDS_KEY);
+    } else {
+      omServiceIds = Collections.singletonList(localOMServiceId);
+    }
+
+    String serviceId;
+    if (omServiceIds.isEmpty()) {
+      throw new IOException("No OzoneManager ServiceID configured to work "
+          + "with for Recon.");
+    } else {
+      serviceId = omServiceIds.iterator().next();
+      LOG.info("Using OzoneManager ServiceID '{}' for Recon", serviceId);
+    }
+    return serviceId;
   }
 
   @Provides
