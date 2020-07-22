@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
@@ -161,6 +162,31 @@ public class TestOzoneFileSystem {
     Path subdir = new Path("/d1/d2/");
     boolean status = fs.mkdirs(subdir);
     assertTrue("Shouldn't send error if dir exists", status);
+  }
+
+  @Test
+  public void testCreateWithInvalidPaths() throws Exception {
+    setupOzoneFileSystem();
+    Path parent = new Path("../../../../../d1/d2/");
+    Path file1 = new Path(parent, "key1");
+    checkInvalidPath(file1);
+
+    file1 = new Path("/:/:");
+    checkInvalidPath(file1);
+  }
+
+  private void checkInvalidPath(Path path) throws Exception {
+    FSDataOutputStream outputStream = null;
+    try  {
+      outputStream = fs.create(path, false);
+      fail("testCreateWithInvalidPaths failed for path" + path);
+    } catch (Exception ex) {
+      Assert.assertTrue(ex instanceof InvalidPathException);
+    } finally {
+      if (outputStream != null) {
+        outputStream.close();
+      }
+    }
   }
 
   @Test(timeout = 300_000)
