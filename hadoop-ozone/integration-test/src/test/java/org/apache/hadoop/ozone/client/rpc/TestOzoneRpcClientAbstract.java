@@ -108,6 +108,7 @@ import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
@@ -1752,7 +1753,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     String uploadID = "random";
     OzoneTestUtils
-        .expectOmException(ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR, () ->
+        .expectOmException(NO_SUCH_MULTIPART_UPLOAD_ERROR, () ->
             bucket
                 .createMultipartKey(keyName, sampleData.length(), 1, uploadID));
   }
@@ -1911,8 +1912,43 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
 
-    OzoneTestUtils.expectOmException(ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR,
+    OzoneTestUtils.expectOmException(NO_SUCH_MULTIPART_UPLOAD_ERROR,
         () -> bucket.abortMultipartUpload(keyName, "random"));
+  }
+
+  @Test
+  public void testAbortUploadFailWithInProgressPartUpload() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    OmMultipartInfo omMultipartInfo = bucket.initiateMultipartUpload(keyName,
+        STAND_ALONE, ONE);
+
+    Assert.assertNotNull(omMultipartInfo.getUploadID());
+
+    // Do not close output stream.
+    byte[] data = "data".getBytes(UTF_8);
+    OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
+        data.length, 1, omMultipartInfo.getUploadID());
+    ozoneOutputStream.write(data, 0, data.length);
+
+    // Abort before completing part upload.
+    bucket.abortMultipartUpload(keyName, omMultipartInfo.getUploadID());
+
+    try {
+      ozoneOutputStream.close();
+    } catch (IOException ex) {
+      assertTrue(ex instanceof OMException);
+      assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR,
+          ((OMException) ex).getResult());
+    }
+
   }
 
 
@@ -2142,7 +2178,7 @@ public abstract class TestOzoneRpcClientAbstract {
   @Test
   public void testListPartsWithInvalidUploadID() throws Exception {
     OzoneTestUtils
-        .expectOmException(ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR, () -> {
+        .expectOmException(NO_SUCH_MULTIPART_UPLOAD_ERROR, () -> {
           String volumeName = UUID.randomUUID().toString();
           String bucketName = UUID.randomUUID().toString();
           String keyName = UUID.randomUUID().toString();
