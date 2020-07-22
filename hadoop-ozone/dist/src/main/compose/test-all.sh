@@ -33,6 +33,15 @@ fi
 
 if [[ -n "${OZONE_ACCEPTANCE_SUITE}" ]]; then
   tests=$(find "$SCRIPT_DIR" -name test.sh | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$" | sort)
+
+  # 'misc' is default suite, add untagged tests, too
+  if [[ "misc" == "${OZONE_ACCEPTANCE_SUITE}" ]]; then
+    untagged="$(find "$SCRIPT_DIR" -name test.sh | xargs grep -L "^#suite:")"
+    if [[ -n "${untagged}" ]]; then
+      tests=$(echo ${tests} ${untagged} | xargs -n1 | sort)
+    fi
+  fi
+
   if [[ -z "${tests}" ]]; then
     echo "No tests found for suite ${OZONE_ACCEPTANCE_SUITE}"
     exit 1
