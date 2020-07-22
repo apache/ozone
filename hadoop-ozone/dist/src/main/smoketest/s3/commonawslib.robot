@@ -93,8 +93,6 @@ Create bucket with name
 Setup s3 tests
     Run Keyword        Install aws cli
     Run Keyword if    '${OZONE_S3_SET_CREDENTIALS}' == 'true'    Setup v4 headers
-    ${result} =        Execute And Ignore Error                  ozone sh volume create o3://${OM_SERVICE_ID}/s3v
-                       Should not contain                        ${result}          Failed
     ${BUCKET} =        Run Keyword if                            '${BUCKET}' == 'generated'            Create bucket
     ...                ELSE                                      Set Variable    ${BUCKET}
                        Set Suite Variable                        ${BUCKET}
