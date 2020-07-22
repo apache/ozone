@@ -334,4 +334,64 @@ public class TestKeyInputStream {
     }
     keyInputStream.close();
   }
+
+  @Test
+  public void testSkip() throws Exception {
+    {
+      XceiverClientManager.resetXceiverClientMetrics();
+      XceiverClientMetrics metrics = XceiverClientManager
+          .getXceiverClientMetrics();
+      long writeChunkCount = metrics.getContainerOpCountMetrics(
+          ContainerProtos.Type.WriteChunk);
+      long readChunkCount = metrics.getContainerOpCountMetrics(
+          ContainerProtos.Type.ReadChunk);
+
+      String keyName = getKeyName();
+      OzoneOutputStream key = TestHelper.createKey(keyName,
+          ReplicationType.RATIS, 0, objectStore, volumeName, bucketName);
+
+      // write data spanning 3 chunks
+      int dataLength = (2 * chunkSize) + (chunkSize / 2);
+      byte[] inputData = ContainerTestHelper.getFixedLengthString(
+          keyString, dataLength).getBytes(UTF_8);
+      key.write(inputData);
+      key.close();
+
+      Assert.assertEquals(writeChunkCount + 3,
+          metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
+
+      KeyInputStream keyInputStream = (KeyInputStream) objectStore
+          .getVolume(volumeName).getBucket(bucketName).readKey(keyName)
+          .getInputStream();
+
+      // skip 150
+      keyInputStream.skip(70);
+      Assert.assertEquals(70, keyInputStream.getPos());
+      keyInputStream.skip(0);
+      Assert.assertEquals(70, keyInputStream.getPos());
+      keyInputStream.skip(80);
+
+      Assert.assertEquals(150, keyInputStream.getPos());
+
+      // Skip operation should not result in any readChunk operation.
+      Assert.assertEquals(readChunkCount, metrics
+          .getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk));
+
+      byte[] readData = new byte[chunkSize];
+      keyInputStream.read(readData, 0, chunkSize);
+
+      // Since we reading data from index 150 to 250 and the chunk boundary is
+      // 100 bytes, we need to read 2 chunks.
+      Assert.assertEquals(readChunkCount + 2,
+          metrics.getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk));
+
+      keyInputStream.close();
+
+      // Verify that the data read matches with the input data at corresponding
+      // indices.
+      for (int i = 0; i < chunkSize; i++) {
+        Assert.assertEquals(inputData[chunkSize + 50 + i], readData[i]);
+      }
+    }
+  }
 }
