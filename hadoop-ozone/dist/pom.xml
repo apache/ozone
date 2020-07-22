@@ -50,8 +50,7 @@
               <includes>*.classpath</includes>
               <includeArtifactIds>
                 hadoop-hdds-server-scm,hadoop-ozone-common,hadoop-ozone-csi,hadoop-ozone-datanode,hadoop-ozone-insight,
-                hadoop-ozone-ozone-manager,hadoop-ozone-recon,hadoop-ozone-s3gateway,hadoop-ozone-tools,
-                hadoop-ozone-upgrade
+                hadoop-ozone-ozone-manager,hadoop-ozone-recon,hadoop-ozone-s3gateway,hadoop-ozone-tools
               </includeArtifactIds>
             </configuration>
           </execution>
@@ -218,10 +217,6 @@
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdds-docs</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-ozone-upgrade</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
