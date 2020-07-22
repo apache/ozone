@@ -144,7 +144,8 @@ public class TestKeyManagerUnit {
     Assert.assertNotNull(uploads.get(1));
     Instant creationTime = uploads.get(1).getCreationTime();
     Assert.assertNotNull(creationTime);
-    Assert.assertFalse("Creation date is too old: " + creationTime + " < " + startDate,
+    Assert.assertFalse("Creation date is too old: "
+            + creationTime + " < " + startDate,
         creationTime.isBefore(startDate));
   }
 
