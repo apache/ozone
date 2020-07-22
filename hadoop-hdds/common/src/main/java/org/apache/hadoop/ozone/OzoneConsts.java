@@ -148,20 +148,6 @@ public final class OzoneConsts {
   public static final String PENDING_DELETE_BLOCK_COUNT =
       "#PENDINGDELETEBLOCKCOUNT";
 
-
-  public static final byte[] DB_BLOCK_COUNT_KEY =
-      StringUtils.string2Bytes(OzoneConsts.BLOCK_COUNT);
-  public static final byte[] DB_CONTAINER_BYTES_USED_KEY =
-      StringUtils.string2Bytes(OzoneConsts.CONTAINER_BYTES_USED);
-  public static final byte[] DB_PENDING_DELETE_BLOCK_COUNT_KEY =
-      StringUtils.string2Bytes(PENDING_DELETE_BLOCK_COUNT);
-  public static final byte[] DB_CONTAINER_DELETE_TRANSACTION_KEY =
-      StringUtils.string2Bytes(DELETE_TRANSACTION_KEY_PREFIX);
-  public static final byte[] DB_BLOCK_COMMIT_SEQUENCE_ID_KEY =
-      StringUtils.string2Bytes(BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
-
-
-
   /**
    * OM LevelDB prefixes.
    *
