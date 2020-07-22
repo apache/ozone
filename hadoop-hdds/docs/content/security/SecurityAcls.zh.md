@@ -22,7 +22,7 @@ icon: transfer
   limitations under the License.
 -->
 
-Ozone 支持一系列原生 ACL，这些 ACL 可以单独用，也可以和 Ranger 协同使用。如果启用了 Apache Ranger，会先检查 Ranger 中的 ACL，再验证 Ozone 内部的 ACL。
+Ozone 既支持原生的 ACL，也支持类似 Ranger 这样的 ACL 插件，如果启用了 Ranger 插件，则以 Ranger 中的 ACL 为准。
 
 Ozone 的 ACL 是 Posix ACL 和 S3 ACL 的超集。
 

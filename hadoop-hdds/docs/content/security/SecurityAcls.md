@@ -22,9 +22,9 @@ icon: transfer
   limitations under the License.
 -->
 
-Ozone supports a set of native ACLs. These ACLs can be used independently or
-along with Ranger. If Apache Ranger is enabled, then ACL will be checked
-first with Ranger and then Ozone's internal ACLs will be evaluated.
+Ozone supports a set of native ACLs. These ACLs can be used independently 
+of ozone ACL plugin such as Ranger. If Apache Ranger plugin for Ozone is 
+enabled, then ACL will be checked with Ranger.
 
 Ozone ACLs are a super set of Posix and S3 ACLs.
 
