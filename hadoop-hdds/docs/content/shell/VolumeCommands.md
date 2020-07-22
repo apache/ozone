@@ -37,9 +37,9 @@ assign it to a user.
 
 | Arguments                      |  Comment                                |
 |--------------------------------|-----------------------------------------|
-| -sq, \-\-spaceQuota             | Optional, This argument that specifies the maximum size this volume can use in the Ozone cluster.                                        |
-| -q, \-\-quota                  | Optional, This argument that specifies the number of bucket in this volume can use in the Ozone cluster.                                        |
-| -u, \-\-user                   | Required, The name of the user who owns this volume. This user can create, buckets and keys on this volume.                                       |
+| -s, \-\-spaceQuota             | Optional, This argument that specifies the maximum size this volume can use in the Ozone cluster.                                        |
+| -q, \-\-quota                  | Optional, This argument that specifies the number of buckets in this volume can use in the Ozone cluster.                                        |
+| -u, \-\-user                   | Required, The name of the user who owns this volume. This user can create buckets and keys on this volume.                                       |
 |  Uri                           | The name of the volume.                                        |
 
 {{< highlight bash >}}
@@ -104,9 +104,9 @@ The volume update command allows changing of owner and quota on a given volume.
 
 | Arguments                      |  Comment                                |
 |--------------------------------|-----------------------------------------|
-| -sq, \-\-spaceQuota             | Optional, This argument that specifies the maximum size this volume can use in the Ozone cluster.                                        |
-| -q, \-\-quota                  | Optional, This argument that specifies the number of bucket in this volume can use in the Ozone cluster.                                        |
-| -u, \-\-user                   | Optional, The name of the user who owns this volume. This user can create, buckets and keys on this volume.                                       |
+| -s, \-\-spaceQuota             | Optional, This argument that specifies the maximum size this volume can use in the Ozone cluster.                                        |
+| -q, \-\-quota                  | Optional, This argument that specifies the number of buckets in this volume can use in the Ozone cluster.                                        |
+| -u, \-\-user                   | Optional, The name of the user who owns this volume. This user can create buckets and keys on this volume.                                       |
 |  Uri                           | The name of the volume.                                        |
 
 {{< highlight bash >}}

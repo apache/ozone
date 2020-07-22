@@ -419,10 +419,6 @@
               {
                 "name": "PARTIAL_DELETE",
                 "integer": 62
-              },
-              {
-                "name": "DETECTED_LOOP_IN_BUCKET_LINKS",
-                "integer": 63
               }
             ]
           },
@@ -1533,16 +1529,6 @@
                 "id": 11,
                 "name": "modificationTime",
                 "type": "uint64"
-              },
-              {
-                "id": 12,
-                "name": "sourceVolume",
-                "type": "string"
-              },
-              {
-                "id": 13,
-                "name": "sourceBucket",
-                "type": "string"
               }
             ]
           },

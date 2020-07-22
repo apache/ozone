@@ -61,11 +61,11 @@ public class OzoneVolume extends WithMetadata {
    */
   private String owner;
   /**
-   * Bytes Quota allocated for the Volume.
+   * Quota of bytes allocated for the Volume.
    */
   private long storagespaceQuota;
   /**
-   * Bucket Counts Quota allocated for the Volume.
+   * Quota of bucket count allocated for the Volume.
    * */
   private long namespaceQuota;
   /**
@@ -220,7 +220,7 @@ public class OzoneVolume extends WithMetadata {
   }
 
   /**
-   * Returns Bucket Quota count allocated for the Volume.
+   * Returns quota of bucket counts allocated for the Volume.
    *
    * @return quotaInCounts
    */
@@ -268,7 +268,8 @@ public class OzoneVolume extends WithMetadata {
   /**
    * Sets/Changes the quota of this Volume.
    *
-   * @param quota@throws IOException
+   * @param quota OzoneQuota Object that can be applied to storage volume.
+   * @throws IOException
    */
   public void setQuota(OzoneQuota quota) throws IOException {
     proxy.setVolumeQuota(name, quota.getNamespaceQuota(),

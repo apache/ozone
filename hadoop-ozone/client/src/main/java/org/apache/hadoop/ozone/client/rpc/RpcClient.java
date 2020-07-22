@@ -317,8 +317,8 @@ public class RpcClient implements ClientProtocol {
       LOG.info("Creating Volume: {}, with {} as owner.", volumeName, owner);
     } else {
       LOG.info("Creating Volume: {}, with {} as owner "
-              + "and ssQuota set to {} bytes, nsQuota set to {}",
-          volumeName, owner, storagespaceQuota, namespaceQuota);
+              + "and storagespace quota set to {} bytes, namespace quota set" +
+              " to {}", volumeName, owner, storagespaceQuota, namespaceQuota);
     }
     ozoneManagerClient.createVolume(builder.build());
   }
