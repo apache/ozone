@@ -153,7 +153,7 @@ public class OzoneContainer {
         new BlockDeletingService(this, svcInterval, serviceTimeout,
             TimeUnit.MILLISECONDS, config);
     tlsClientConfig = RatisHelper.createTlsClientConfig(
-        secConf, certClient.getCACertificate());
+        secConf, certClient != null ? certClient.getCACertificate() : null);
   }
 
   public GrpcTlsConfig getTlsClientConfig() {
