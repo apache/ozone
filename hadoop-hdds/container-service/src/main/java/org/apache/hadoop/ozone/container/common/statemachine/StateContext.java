@@ -443,7 +443,7 @@ public class StateContext {
         if (threadPoolNotAvailableCount.get()
             % getLogWarnInterval(conf) == 0) {
           LOG.warn("No available thread in pool for past {} seconds.",
-              unit.toSeconds(time) * threadPoolNotAvailableCount.get());
+              unit.toSeconds(time) * (threadPoolNotAvailableCount.get() + 1));
         }
         threadPoolNotAvailableCount.incrementAndGet();
       }
