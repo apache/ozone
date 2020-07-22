@@ -83,7 +83,7 @@ public class RangeHeader {
 
   public String toString() {
     return "startOffset - [" + startOffset + "]" + ", endOffset - ["
-        + endOffset + "]" + ", readFull - [ " + readFull + "]"
+        + endOffset + "]" + ", readFull - [" + readFull + "]"
         + ", invalidRange - [" + inValidRange + "]";
   }
 }
