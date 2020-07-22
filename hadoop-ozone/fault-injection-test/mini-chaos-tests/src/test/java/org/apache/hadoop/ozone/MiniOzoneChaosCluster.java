@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.HashSet;
@@ -32,6 +33,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.failure.FailureManager;
@@ -229,8 +231,11 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
           OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY,
           2);
       conf.setInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE, 2);
-      conf.setInt("hdds.scm.replication.thread.interval", 10 * 1000);
-      conf.setInt("hdds.scm.replication.event.timeout", 20 * 1000);
+      ReplicationManagerConfiguration replicationConf =
+          conf.getObject(ReplicationManagerConfiguration.class);
+      replicationConf.setInterval(Duration.ofSeconds(10));
+      replicationConf.setEventTimeout(Duration.ofSeconds(20));
+      conf.setFromObject(replicationConf);
       conf.setInt(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 100);
       conf.setInt(OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_PURGE_GAP, 100);
       conf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, 100);

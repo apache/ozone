@@ -33,6 +33,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -127,7 +128,7 @@ public class TestBlockDeletingService {
    * creates some fake chunk files for testing.
    */
   private void createToDeleteBlocks(ContainerSet containerSet,
-      ConfigurationSource conf, int numOfContainers,
+      MutableConfigurationSource conf, int numOfContainers,
       int numOfBlocksPerContainer,
       int numOfChunksPerBlock) throws IOException {
     for (int x = 0; x < numOfContainers; x++) {

@@ -135,7 +135,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
   private KeyValueHandler getDummyHandler() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeDetails dnDetails = DatanodeDetails.newBuilder()
-        .setUuid(DATANODE_UUID)
+        .setUuid(UUID.fromString(DATANODE_UUID))
         .setHostName("dummyHost")
         .setIpAddress("1.2.3.4")
         .build();

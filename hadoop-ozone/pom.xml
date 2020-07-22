@@ -313,37 +313,15 @@
         <executions>
           <execution>
             <id>add-classpath-descriptor</id>
-            <phase>package</phase>
+            <phase>prepare-package</phase>
             <goals>
               <goal>build-classpath</goal>
             </goals>
             <configuration>
-              <outputFile>${project.build.directory}/classpath</outputFile>
+              <outputFile>${project.build.outputDirectory}/${pom.artifactId}.classpath</outputFile>
               <prefix>$HDDS_LIB_JARS_DIR</prefix>
               <outputFilterFile>true</outputFilterFile>
               <includeScope>runtime</includeScope>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>build-helper-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>attach-classpath-artifact</id>
-            <phase>package</phase>
-            <goals>
-              <goal>attach-artifact</goal>
-            </goals>
-            <configuration>
-              <artifacts>
-                <artifact>
-                  <file>${project.build.directory}/classpath</file>
-                  <type>cp</type>
-                  <classifier>classpath</classifier>
-                </artifact>
-              </artifacts>
             </configuration>
           </execution>
         </executions>

@@ -142,7 +142,7 @@ public class BenchMarkContainerStateMap {
     Preconditions.checkArgument(numNodes >= 1);
     final List<DatanodeDetails> ids = new ArrayList<>(numNodes);
     for (int i = 0; i < numNodes; i++) {
-      ids.add(GenesisUtil.createDatanodeDetails(UUID.randomUUID().toString()));
+      ids.add(GenesisUtil.createDatanodeDetails(UUID.randomUUID()));
     }
     return createPipeline(containerName, ids);
   }

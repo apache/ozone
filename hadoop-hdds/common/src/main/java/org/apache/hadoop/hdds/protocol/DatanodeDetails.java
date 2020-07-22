@@ -44,7 +44,6 @@ public class DatanodeDetails extends NodeImpl implements
    * DataNode's unique identifier in the cluster.
    */
   private final UUID uuid;
-  private final String strUuid;
 
   private String ipAddress;
   private String hostName;
@@ -61,11 +60,10 @@ public class DatanodeDetails extends NodeImpl implements
    * @param ports Ports used by the DataNode
    * @param certSerialId serial id from SCM issued certificate.
    */
-  private DatanodeDetails(String uuid, String ipAddress, String hostName,
+  private DatanodeDetails(UUID uuid, String ipAddress, String hostName,
       String networkLocation, List<Port> ports, String certSerialId) {
     super(hostName, networkLocation, NetConstants.NODE_COST_DEFAULT);
-    this.uuid = UUID.fromString(uuid);
-    this.strUuid = uuid;
+    this.uuid = uuid;
     this.ipAddress = ipAddress;
     this.hostName = hostName;
     this.ports = ports;
@@ -76,7 +74,6 @@ public class DatanodeDetails extends NodeImpl implements
     super(datanodeDetails.getHostName(), datanodeDetails.getNetworkLocation(),
         datanodeDetails.getCost());
     this.uuid = datanodeDetails.uuid;
-    this.strUuid = datanodeDetails.uuid.toString();
     this.ipAddress = datanodeDetails.ipAddress;
     this.hostName = datanodeDetails.hostName;
     this.ports = datanodeDetails.ports;
@@ -98,7 +95,7 @@ public class DatanodeDetails extends NodeImpl implements
    * @return UUID of DataNode
    */
   public String getUuidString() {
-    return strUuid;
+    return uuid.toString();
   }
 
   /**
@@ -183,7 +180,13 @@ public class DatanodeDetails extends NodeImpl implements
   public static DatanodeDetails getFromProtoBuf(
       HddsProtos.DatanodeDetailsProto datanodeDetailsProto) {
     DatanodeDetails.Builder builder = newBuilder();
-    builder.setUuid(datanodeDetailsProto.getUuid());
+    if (datanodeDetailsProto.hasUuid128()) {
+      HddsProtos.UUID uuid = datanodeDetailsProto.getUuid128();
+      builder.setUuid(new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits()));
+    } else if (datanodeDetailsProto.hasUuid()) {
+      builder.setUuid(UUID.fromString(datanodeDetailsProto.getUuid()));
+    }
+
     if (datanodeDetailsProto.hasIpAddress()) {
       builder.setIpAddress(datanodeDetailsProto.getIpAddress());
     }
@@ -211,9 +214,17 @@ public class DatanodeDetails extends NodeImpl implements
    * @return HddsProtos.DatanodeDetailsProto
    */
   public HddsProtos.DatanodeDetailsProto getProtoBufMessage() {
+    HddsProtos.UUID uuid128 = HddsProtos.UUID.newBuilder()
+        .setMostSigBits(uuid.getMostSignificantBits())
+        .setLeastSigBits(uuid.getLeastSignificantBits())
+        .build();
+
     HddsProtos.DatanodeDetailsProto.Builder builder =
         HddsProtos.DatanodeDetailsProto.newBuilder()
-            .setUuid(getUuidString());
+            .setUuid128(uuid128);
+
+    builder.setUuid(getUuidString());
+
     if (ipAddress != null) {
       builder.setIpAddress(ipAddress);
     }
@@ -241,7 +252,7 @@ public class DatanodeDetails extends NodeImpl implements
 
   @Override
   public String toString() {
-    return strUuid + "{" +
+    return uuid.toString() + "{" +
         "ip: " +
         ipAddress +
         ", host: " +
@@ -281,7 +292,7 @@ public class DatanodeDetails extends NodeImpl implements
    * Builder class for building DatanodeDetails.
    */
   public static final class Builder {
-    private String id;
+    private UUID id;
     private String ipAddress;
     private String hostName;
     private String networkName;
@@ -303,7 +314,7 @@ public class DatanodeDetails extends NodeImpl implements
      * @param uuid DatanodeUuid
      * @return DatanodeDetails.Builder
      */
-    public Builder setUuid(String uuid) {
+    public Builder setUuid(UUID uuid) {
       this.id = uuid;
       return this;
     }

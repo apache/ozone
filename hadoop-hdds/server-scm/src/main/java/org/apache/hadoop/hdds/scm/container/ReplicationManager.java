@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -929,7 +930,7 @@ public class ReplicationManager
             "cluster. This property is used to configure the interval in " +
             "which that thread runs."
     )
-    private long interval = 5 * 60 * 1000;
+    private long interval = Duration.ofSeconds(300).toMillis();
 
     /**
      * Timeout for container replication & deletion command issued by
@@ -942,16 +943,14 @@ public class ReplicationManager
         description = "Timeout for the container replication/deletion commands "
             + "sent  to datanodes. After this timeout the command will be "
             + "retried.")
-    private long eventTimeout = 30 * 60 * 1000;
+    private long eventTimeout = Duration.ofMinutes(30).toMillis();
 
-
-    public void setInterval(long interval) {
-      this.interval = interval;
+    public void setInterval(Duration interval) {
+      this.interval = interval.toMillis();
     }
 
-
-    public void setEventTimeout(long eventTimeout) {
-      this.eventTimeout = eventTimeout;
+    public void setEventTimeout(Duration timeout) {
+      this.eventTimeout = timeout.toMillis();
     }
 
     public long getInterval() {

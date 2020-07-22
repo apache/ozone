@@ -412,10 +412,10 @@ public class TestContainerStateManagerIntegration {
   public void testReplicaMap() throws Exception {
     DatanodeDetails dn1 = DatanodeDetails.newBuilder().setHostName("host1")
         .setIpAddress("1.1.1.1")
-        .setUuid(UUID.randomUUID().toString()).build();
+        .setUuid(UUID.randomUUID()).build();
     DatanodeDetails dn2 = DatanodeDetails.newBuilder().setHostName("host2")
         .setIpAddress("2.2.2.2")
-        .setUuid(UUID.randomUUID().toString()).build();
+        .setUuid(UUID.randomUUID()).build();
 
     // Test 1: no replica's exist
     ContainerID containerID = ContainerID.valueof(RandomUtils.nextLong());

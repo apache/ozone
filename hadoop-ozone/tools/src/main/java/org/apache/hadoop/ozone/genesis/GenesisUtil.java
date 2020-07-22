@@ -99,7 +99,7 @@ public final class GenesisUtil {
     return builder.build();
   }
 
-  public static DatanodeDetails createDatanodeDetails(String uuid) {
+  public static DatanodeDetails createDatanodeDetails(UUID uuid) {
     String ipAddress =
         RANDOM.nextInt(256) + "." + RANDOM.nextInt(256) + "." + RANDOM
             .nextInt(256) + "." + RANDOM.nextInt(256);
@@ -157,7 +157,7 @@ public final class GenesisUtil {
     List<DatanodeDetails> nodes = new ArrayList<>();
     for (int i = 0; i < factor.getNumber(); i++) {
       nodes
-          .add(GenesisUtil.createDatanodeDetails(UUID.randomUUID().toString()));
+          .add(GenesisUtil.createDatanodeDetails(UUID.randomUUID()));
     }
     for (int i = 0; i < numPipelines; i++) {
       Pipeline pipeline =

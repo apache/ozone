@@ -18,19 +18,8 @@
 package org.apache.hadoop.hdds.conf;
 
 /**
- * Parent class for the example configuration.
+ * Configuration that can be both read and written.
  */
-public class SimpleConfigurationParent {
-
-  @Config(key = "enabled", defaultValue = "true", description = "Example "
-      + "boolean config.", tags = ConfigTag.MANAGEMENT)
-  private boolean enabled;
-
-  public boolean isEnabled() {
-    return enabled;
-  }
-
-  public void setEnabled(boolean enabled) {
-    this.enabled = enabled;
-  }
+public interface MutableConfigurationSource
+    extends ConfigurationSource, ConfigurationTarget {
 }

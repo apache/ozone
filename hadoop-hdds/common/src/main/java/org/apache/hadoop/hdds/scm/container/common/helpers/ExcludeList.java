@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * This class contains set of dns and containers which ozone client provides
@@ -94,7 +95,7 @@ public class ExcludeList {
     });
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
     excludeListProto.getDatanodesList().forEach(dn -> {
-      builder.setUuid(dn);
+      builder.setUuid(UUID.fromString(dn));
       excludeList.addDatanode(builder.build());
     });
     excludeListProto.getPipelineIdsList().forEach(pipelineID -> {
