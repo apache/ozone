@@ -113,8 +113,6 @@ public class TestKeyManagerUnit {
 
     Assert.assertEquals(0,
         omMultipartUploadListParts.getPartInfoList().size());
-
-    this.startDate = Instant.now();
   }
 
   @Test
@@ -144,9 +142,10 @@ public class TestKeyManagerUnit {
     Assert.assertEquals("dir/key2", uploads.get(1).getKeyName());
 
     Assert.assertNotNull(uploads.get(1));
-    Assert.assertNotNull(uploads.get(1).getCreationTime());
-    Assert.assertTrue("Creation date is too old",
-        uploads.get(1).getCreationTime().compareTo(startDate) > 0);
+    Instant creationTime = uploads.get(1).getCreationTime();
+    Assert.assertNotNull(creationTime);
+    Assert.assertFalse("Creation date is too old: " + creationTime + " < " + startDate,
+        creationTime.isBefore(startDate));
   }
 
   @Test
