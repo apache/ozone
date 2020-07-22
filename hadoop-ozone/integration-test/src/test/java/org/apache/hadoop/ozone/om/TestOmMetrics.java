@@ -111,7 +111,7 @@ public class TestOmMetrics {
     assertCounter("NumVolumeCheckAccesses", 1L, omMetrics);
     assertCounter("NumVolumeDeletes", 1L, omMetrics);
     assertCounter("NumVolumeLists", 1L, omMetrics);
-    assertCounter("NumVolumes", 0L, omMetrics);
+    assertCounter("NumVolumes", 1L, omMetrics);
 
     ozoneManager.createVolume(null);
     ozoneManager.createVolume(null);
@@ -119,7 +119,9 @@ public class TestOmMetrics {
     ozoneManager.deleteVolume(null);
 
     omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumVolumes", 2L, omMetrics);
+
+    // Accounting 's3v' volume which is created by default.
+    assertCounter("NumVolumes", 3L, omMetrics);
 
 
     // inject exception to test for Failure Metrics
@@ -152,10 +154,10 @@ public class TestOmMetrics {
 
     // As last call for volumesOps does not increment numVolumes as those are
     // failed.
-    assertCounter("NumVolumes", 2L, omMetrics);
+    assertCounter("NumVolumes", 3L, omMetrics);
 
     cluster.restartOzoneManager();
-    assertCounter("NumVolumes", 2L, omMetrics);
+    assertCounter("NumVolumes", 3L, omMetrics);
 
 
   }
