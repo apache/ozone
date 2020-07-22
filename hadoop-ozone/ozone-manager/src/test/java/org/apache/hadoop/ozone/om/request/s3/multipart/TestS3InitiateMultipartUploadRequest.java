@@ -22,8 +22,6 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 import java.util.UUID;
 
 import com.google.common.base.Optional;
-import org.apache.hadoop.crypto.CipherSuite;
-import org.apache.hadoop.crypto.CryptoProtocolVersion;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
