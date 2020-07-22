@@ -28,5 +28,5 @@ for test in $(find "$SCRIPT_DIR" -mindepth 2 -maxdepth 2 -name test.sh | grep "$
   ./test.sh || echo "ERROR: Test execution of $TEST_DIR is FAILED!!!!"
   RESULT_DIR="$TEST_DIR"/result
   rebot -N $(basename $TEST_DIR) -o "$ALL_RESULT_DIR"/$(basename $TEST_DIR).xml "$RESULT_DIR"/*.xml
-  cp "$RESULT_DIR"/docker-*.log "$RESULT_DIR"/*.out* "$ALL_RESULT_DIR"/
+  cp "$RESULT_DIR"/docker-*.log "$RESULT_DIR"/*.out* "$ALL_RESULT_DIR"/ || true
 done
