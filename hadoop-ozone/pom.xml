@@ -297,7 +297,7 @@
             <exclude>**/pnpm-lock.yaml</exclude>
             <exclude>**/ozone-recon-web/build/**</exclude>
             <exclude>src/main/license/**</exclude>
-            <exclude>src/main/proto/proto.lock</exclude>
+            <exclude>src/main/resources/proto.lock</exclude>
           </excludes>
         </configuration>
       </plugin>

@@ -269,7 +269,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             <exclude>src/test/resources/incorrect.checksum.container</exclude>
             <exclude>src/test/resources/incorrect.container</exclude>
             <exclude>src/test/resources/test.db.ini</exclude>
-            <exclude>src/main/proto/proto.lock</exclude>
+            <exclude>src/main/resources/proto.lock</exclude>
           </excludes>
         </configuration>
       </plugin>
