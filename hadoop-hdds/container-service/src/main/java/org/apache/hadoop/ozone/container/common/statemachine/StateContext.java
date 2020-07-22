@@ -440,12 +440,12 @@ public class StateContext {
         task.execute(service);
         threadPoolNotAvailableCount.set(0);
       } else {
-        threadPoolNotAvailableCount.incrementAndGet();
         if (threadPoolNotAvailableCount.get()
             % getLogWarnInterval(conf) == 0) {
-          LOG.warn("No available thread in pool, duration:" +
+          LOG.warn("No available thread in pool for past {} milliseconds." +
               unit.toMillis(time));
         }
+        threadPoolNotAvailableCount.incrementAndGet();
       }
 
       DatanodeStateMachine.DatanodeStates newState = task.await(time, unit);
