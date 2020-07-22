@@ -109,7 +109,7 @@ public class ObjectEndpoint extends EndpointBase {
   private HttpHeaders headers;
 
   private List<String> customizableGetHeaders = new ArrayList<>();
-  private int chunkSize;
+  private int bufferSize;
 
   public ObjectEndpoint() {
     customizableGetHeaders.add("Content-Type");
@@ -122,7 +122,7 @@ public class ObjectEndpoint extends EndpointBase {
 
   @PostConstruct
   public void init() {
-    chunkSize = (int) this.getClient().getConfiguration().getStorageSize(
+    bufferSize = (int) this.getClient().getConfiguration().getStorageSize(
         OZONE_CLIENT_BUFFER_SIZE_KEY,
         OZONE_CLIENT_BUFFER_SIZE_DEFAULT, StorageUnit.BYTES);
   }
@@ -273,7 +273,7 @@ public class ObjectEndpoint extends EndpointBase {
               new S3WrapperInputStream(
                   key.getInputStream())) {
             IOUtils.copyLarge(s3WrapperInputStream, dest, startOffset,
-                copyLength, new byte[chunkSize]);
+                copyLength, new byte[bufferSize]);
           }
         };
         responseBuilder = Response
