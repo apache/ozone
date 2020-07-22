@@ -28,6 +28,8 @@ import static org.mockito.Mockito.mock;
 
 import java.net.InetSocketAddress;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -39,6 +41,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
+import org.apache.hadoop.test.LambdaTestUtils;
+import org.junit.Assert;
 import org.junit.Test;
 
 import com.google.protobuf.GeneratedMessage;
@@ -182,4 +186,30 @@ public class TestStateContext {
     assertEquals(DatanodeStates.SHUTDOWN, subject.getState());
   }
 
+  @Test
+  public void testIsThreadPoolAvailable() throws Exception {
+    StateContext stateContext = new StateContext(null, null, null);
+
+    int threadPoolSize = 2;
+    ExecutorService executorService = Executors.newFixedThreadPool(
+        threadPoolSize);
+
+    CompletableFuture<String> futureOne = new CompletableFuture<>();
+    CompletableFuture<String> futureTwo = new CompletableFuture<>();
+
+    // task num greater than pool size
+    for (int i = 0; i < threadPoolSize; i++) {
+      executorService.submit(() -> futureOne.get());
+    }
+    executorService.submit(() -> futureTwo.get());
+
+    Assert.assertFalse(stateContext.isThreadPoolAvailable(executorService));
+
+    futureOne.complete("futureOne");
+    LambdaTestUtils.await(1000, 100, () ->
+        stateContext.isThreadPoolAvailable(executorService));
+
+    futureTwo.complete("futureTwo");
+    executorService.shutdown();
+  }
 }
