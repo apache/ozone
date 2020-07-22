@@ -172,10 +172,8 @@ public class BlockOutputStreamEntryPool {
     // server may return any number of blocks, (0 to any)
     // only the blocks allocated in this open session (block createVersion
     // equals to open session version)
-    for (OmKeyLocationInfo subKeyInfo : version.getLocationList()) {
-      if (subKeyInfo.getCreateVersion() == openVersion) {
-        addKeyLocationInfo(subKeyInfo);
-      }
+    for (OmKeyLocationInfo subKeyInfo : version.getLocationList(openVersion)) {
+      addKeyLocationInfo(subKeyInfo);
     }
   }
 
