@@ -19,11 +19,13 @@ package org.apache.hadoop.ozone.container.common.statemachine;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
@@ -50,7 +52,6 @@ import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.util.concurrent.HadoopExecutors;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -103,9 +104,10 @@ public class DatanodeStateMachine implements Closeable {
     this.hddsDatanodeStopService = hddsDatanodeStopService;
     this.conf = conf;
     this.datanodeDetails = datanodeDetails;
-    executorService = HadoopExecutors.newCachedThreadPool(
-                new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("Datanode State Machine Thread - %d").build());
+    executorService = Executors.newFixedThreadPool(
+        getEndPointTaskThreadPoolSize(),
+        new ThreadFactoryBuilder()
+            .setNameFormat("Datanode State Machine Task Thread - %d").build());
     connectionManager = new SCMConnectionManager(conf);
     context = new StateContext(this.conf, DatanodeStates.getInitState(), this);
     // OzoneContainer instance is used in a non-thread safe way by the context
@@ -153,6 +155,21 @@ public class DatanodeStateMachine implements Closeable {
         .addPublisherFor(CommandStatusReportsProto.class)
         .addPublisherFor(PipelineReportsProto.class)
         .build();
+  }
+
+  private int getEndPointTaskThreadPoolSize() {
+    // TODO(runzhiwang): current only support one recon, if support multiple
+    //  recon in future reconServerCount should be the real number of recon
+    int reconServerCount = 1;
+    int totalServerCount = reconServerCount;
+
+    try {
+      totalServerCount += HddsUtils.getSCMAddresses(conf).size();
+    } catch (Exception e) {
+      LOG.error("Fail to get scm addresses", e);
+    }
+
+    return totalServerCount;
   }
 
   /**
