@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine
     .SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.metadata.NoData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlockCommandStatus;
@@ -210,7 +211,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
             BlockUtils.getDB(containerData, conf)) {
       Table<String, BlockData> blockDataTable =
               containerDB.getStore().getBlockDataTable();
-      Table<Long, Long> deletedBlocksTable =
+      Table<Long, NoData> deletedBlocksTable =
               containerDB.getStore().getDeletedBlocksTable();
 
       for (Long blkLong : delTX.getLocalIDList()) {

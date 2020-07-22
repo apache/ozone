@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverSe
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.metadata.NoData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.util.Time;
 
@@ -299,7 +300,7 @@ public class BlockDeletingService extends BackgroundService {
                       OzoneConsts.DELETING_KEY_PREFIX.length()));
 
           meta.getStore().getDeletedBlocksTable().putWithBatch(batch, blockId,
-                  blockId);
+                  NoData.get());
           meta.getStore().getBlockDataTable().deleteWithBatch(batch, entry);
         }
 

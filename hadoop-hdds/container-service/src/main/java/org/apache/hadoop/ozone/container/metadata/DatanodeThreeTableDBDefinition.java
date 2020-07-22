@@ -48,14 +48,14 @@ public class DatanodeThreeTableDBDefinition extends
           Long.class,
           new LongCodec());
 
-  public static final DBColumnFamilyDefinition<Long, Long>
+  public static final DBColumnFamilyDefinition<Long, NoData>
           DELETED_BLOCKS =
           new DBColumnFamilyDefinition<>(
                   "deleted_blocks",
                   Long.class,
                   new LongCodec(),
-                  Long.class,
-                  new LongCodec());
+                  NoData.class,
+                  new NoDataCodec());
 
   protected DatanodeThreeTableDBDefinition(String dbPath) {
     super(dbPath);
@@ -73,7 +73,7 @@ public class DatanodeThreeTableDBDefinition extends
   }
 
   @Override
-  public DBColumnFamilyDefinition<Long, Long> getDeletedBlocksColumnFamily() {
+  public DBColumnFamilyDefinition<Long, NoData> getDeletedBlocksColumnFamily() {
     return DELETED_BLOCKS;
   }
 }

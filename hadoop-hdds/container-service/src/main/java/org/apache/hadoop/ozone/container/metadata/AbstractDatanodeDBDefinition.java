@@ -69,6 +69,6 @@ public abstract class AbstractDatanodeDBDefinition implements DBDefinition {
   public abstract DBColumnFamilyDefinition<String, Long>
       getMetadataColumnFamily();
 
-  public abstract DBColumnFamilyDefinition<Long, Long>
+  public abstract DBColumnFamilyDefinition<Long, NoData>
       getDeletedBlocksColumnFamily();
 }
