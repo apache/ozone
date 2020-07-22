@@ -223,10 +223,21 @@ public class TestOzoneFsHAURLs {
       Assert.assertEquals(0, res);
 
       // Test case 3: ozone fs -ls o3fs://bucket.volume/
-      // Expectation: Success. The service id can be learned from config.
+      // Expectation: Fail. Must have service id or host name when HA is enabled
       String unqualifiedPath1 = String.format("%s://%s.%s/",
           OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
-      Assert.assertEquals(0, res);
+      try (GenericTestUtils.SystemErrCapturer capture =
+          new GenericTestUtils.SystemErrCapturer()) {
+        res = ToolRunner.run(shell, new String[] {"-ls", unqualifiedPath1});
+        // Check stderr, inspired by testDFSWithInvalidCommmand
+        Assert.assertThat("Command did not print the error message " +
+                "correctly for test case: ozone fs -ls o3fs://bucket.volume/",
+            capture.getOutput(), StringContains.containsString(
+                "-ls: Service ID or host name must not"
+                    + " be omitted when ozone.om.service.ids is defined."));
+      }
+      // Check return value, should be -1 (failure)
+      Assert.assertEquals(res, -1);
 
       // Test case 4: ozone fs -ls o3fs://bucket.volume.om1/
       // Expectation: Success. The client should use the port number
@@ -283,7 +294,7 @@ public class TestOzoneFsHAURLs {
    * @param defaultFS Desired fs.defaultFS to be used in the test
    * @throws Exception
    */
-  private void assertLsFails(String defaultFS) throws Exception {
+  private void testWithDefaultFS(String defaultFS) throws Exception {
     OzoneConfiguration clientConf = new OzoneConfiguration(conf);
     clientConf.setQuietMode(false);
     clientConf.set(o3fsImplKey, o3fsImplValue);
@@ -311,16 +322,19 @@ public class TestOzoneFsHAURLs {
     // Test scenarios where fs.defaultFS isn't a fully qualified o3fs
 
     // fs.defaultFS = file:///
-    assertLsFails(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_DEFAULT);
+    testWithDefaultFS(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_DEFAULT);
 
     // fs.defaultFS = hdfs://ns1/
-    assertLsFails("hdfs://ns1/");
+    testWithDefaultFS("hdfs://ns1/");
 
     // fs.defaultFS = o3fs:///
     String unqualifiedFs1 = String.format(
         "%s:///", OzoneConsts.OZONE_URI_SCHEME);
-    assertLsFails(unqualifiedFs1);
+    testWithDefaultFS(unqualifiedFs1);
 
-
+    // fs.defaultFS = o3fs://bucketName.volumeName/
+    String unqualifiedFs2 = String.format("%s://%s.%s/",
+        OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
+    testWithDefaultFS(unqualifiedFs2);
   }
 }

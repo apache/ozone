@@ -27,6 +27,8 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
+import com.google.common.base.Preconditions;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -60,17 +62,19 @@ import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
 
-import com.google.common.base.Preconditions;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_ALREADY_EXISTS;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
+    .BUCKET_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
+    .VOLUME_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
+    .VOLUME_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes
+    .BUCKET_NOT_FOUND;
 
 /**
  * Basic Implementation of the RootedOzoneFileSystem calls.
@@ -128,17 +132,14 @@ public class BasicRootedOzoneClientAdapterImpl
     try {
       OzoneConfiguration conf = OzoneConfiguration.of(hadoopConf);
 
-      if (omHost == null) {
-        String[] omServiceIds =
-            conf.getTrimmedStrings(OZONE_OM_SERVICE_IDS_KEY);
+      if (omHost == null && OmUtils.isServiceIdsDefined(conf)) {
+        // When the host name or service id isn't given
+        // but ozone.om.service.ids is defined, declare failure.
 
-        // When host is not specified
-        if (omServiceIds.length > 1) {
-          throw new IllegalArgumentException("Service ID or host name must not"
-              + " be omitted when multiple ozone.om.service.ids is defined.");
-        } else if (omServiceIds.length == 1) {
-          omHost = omServiceIds[0];
-        }
+        // This is a safety precaution that prevents the client from
+        // accidentally failing over to an unintended OM.
+        throw new IllegalArgumentException("Service ID or host name must not"
+            + " be omitted when ozone.om.service.ids is defined.");
       }
 
       if (omPort != -1) {

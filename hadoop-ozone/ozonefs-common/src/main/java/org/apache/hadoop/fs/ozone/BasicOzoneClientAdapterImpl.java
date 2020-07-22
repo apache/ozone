@@ -59,7 +59,6 @@ import org.apache.hadoop.security.token.TokenRenewer;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -107,19 +106,14 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       throws IOException {
 
     OzoneConfiguration conf = OzoneConfiguration.of(hadoopConf);
-    if (omHost == null) {
-      String[] omServiceIds =
-          conf.getTrimmedStrings(OZONE_OM_SERVICE_IDS_KEY);
+    if (omHost == null && OmUtils.isServiceIdsDefined(conf)) {
+      // When the host name or service id isn't given
+      // but ozone.om.service.ids is defined, declare failure.
 
-      // When host is not specified
-      if (omServiceIds.length > 1) {
-        throw new IllegalArgumentException("Service ID or host name must not"
-            + " be omitted when multiple ozone.om.service.ids is defined.");
-      } else if (omServiceIds.length == 1) {
-        omHost = omServiceIds[0];
-      }
-
-
+      // This is a safety precaution that prevents the client from
+      // accidentally failing over to an unintended OM.
+      throw new IllegalArgumentException("Service ID or host name must not"
+          + " be omitted when ozone.om.service.ids is defined.");
     }
 
     if (omPort != -1) {
