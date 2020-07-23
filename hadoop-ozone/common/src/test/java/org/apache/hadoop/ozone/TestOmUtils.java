@@ -26,10 +26,16 @@ import java.util.Map;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
+import static org.apache.hadoop.ozone.OmUtils.getOzoneManagerServiceId;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeTrue;
+
+import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -98,6 +104,49 @@ public class TestOmUtils {
         a -> a.getAddress().getHostAddress().equals("1.1.1.2")));
     assertTrue(rpcAddrs.stream().anyMatch(
         a -> a.getAddress().getHostAddress().equals("1.1.1.3")));
+  }
+
+  @Test
+  public void testGetOzoneManagerServiceId() throws IOException {
+
+    // If the above is not configured, look at 'ozone.om.service.ids'.
+    // If no config is set, return null. (Non HA)
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    assertNull(getOzoneManagerServiceId(configuration));
+
+    // Verify 'ozone.om.internal.service.id' takes precedence
+    configuration.set(OZONE_OM_INTERNAL_SERVICE_ID, "om1");
+    configuration.set(OZONE_OM_SERVICE_IDS_KEY, "om2,om1");
+    String id = getOzoneManagerServiceId(configuration);
+    assertEquals("om1", id);
+
+    configuration.set(OZONE_OM_SERVICE_IDS_KEY, "om2,om3");
+    try {
+      getOzoneManagerServiceId(configuration);
+      Assert.fail();
+    } catch (IOException ioEx) {
+      assertTrue(ioEx.getMessage()
+          .contains("Cannot find the internal service id om1 in [om2, om3]"));
+    }
+
+    // When internal service ID is not defined.
+    // Verify if count(ozone.om.service.ids) == 1, return that id.
+    configuration = new OzoneConfiguration();
+    configuration.set(OZONE_OM_SERVICE_IDS_KEY, "om2");
+    id = getOzoneManagerServiceId(configuration);
+    assertEquals("om2", id);
+
+    // Verify if more than count(ozone.om.service.ids) > 1 and internal
+    // service id is not defined, throw exception
+    configuration.set(OZONE_OM_SERVICE_IDS_KEY, "om2,om1");
+    try {
+      getOzoneManagerServiceId(configuration);
+      Assert.fail();
+    } catch (IOException ioEx) {
+      assertTrue(ioEx.getMessage()
+          .contains("More than 1 OzoneManager ServiceID (ozone.om.service" +
+              ".ids) configured"));
+    }
   }
 }
 
