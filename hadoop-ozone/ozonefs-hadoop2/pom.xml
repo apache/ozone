@@ -22,7 +22,7 @@
     <version>0.6.0-SNAPSHOT</version>
   </parent>
   <artifactId>hadoop-ozone-filesystem-hadoop2</artifactId>
-  <name>Apache Hadoop Ozone FileSystem Hadoop 2.x compatibility</name>
+  <name>Apache Hadoop Ozone FS Hadoop 2.x compatibility</name>
   <packaging>jar</packaging>
   <version>0.6.0-SNAPSHOT</version>
   <properties>
