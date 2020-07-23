@@ -253,12 +253,7 @@ public class BucketEndpoint extends EndpointBase {
       getBucket(bucketName);
     } catch (OS3Exception ex) {
       LOG.error("Exception occurred in headBucket", ex);
-      //TODO: use a subclass fo OS3Exception and catch it here.
-      if (ex.getCode().contains("NoSuchBucket")) {
-        return Response.status(Status.BAD_REQUEST).build();
-      } else {
-        throw ex;
-      }
+      throw ex;
     }
     return Response.ok().build();
   }
