@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueBlockIterator;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
@@ -42,6 +43,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreOneTableImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreThreeTableImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.Yaml;
 
 import static org.apache.hadoop.ozone.OzoneConsts.*;
 

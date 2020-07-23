@@ -20,22 +20,30 @@ package org.apache.hadoop.ozone.container.common;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.metadata.NoData;
 import org.junit.Before;
 import org.junit.Test;
+import org.yaml.snakeyaml.Yaml;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
+import java.util.UUID;
 
 import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_CHUNK;
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.getChunkLayOutVersion;
 import static org.junit.Assert.*;
 
 /**
@@ -45,8 +53,9 @@ import static org.junit.Assert.*;
  * containers will be created using the latest schema version.
  */
 public class TestOldSchemaVersions {
-  public static final String CONTAINER_FILE_NAME = "schema-v1.container";
-  public static final String DB_NAME = "schema-v1-dn-container.db";
+  private static final long CONTAINER_ID = 123;
+  private static final String CONTAINER_FILE_NAME = CONTAINER_ID + ".container";
+  private static final String DB_NAME = CONTAINER_ID + "-dn-container.db";
 
   private OzoneConfiguration conf;
   private KeyValueContainerData kvData;
@@ -56,39 +65,68 @@ public class TestOldSchemaVersions {
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
 
-    // Convert container file to ContainerData.
-    ClassLoader classLoader = getClass().getClassLoader();
-    File file = new File(classLoader
-            .getResource(CONTAINER_FILE_NAME).getFile());
-    kvData = (KeyValueContainerData) ContainerDataYaml.readContainerFile(file);
-    ContainerUtils.verifyChecksum(kvData);
+    ChunkLayOutVersion clVersion =
+          ChunkLayOutVersion.getChunkLayOutVersion(1);
+    // TODO : set this with a legit value (max container size).
+    long size = 0;
+    String pipelineID = UUID.randomUUID().toString();
+    String nodeID = UUID.randomUUID().toString();
 
-    container = new KeyValueContainer(kvData, conf);
+    kvData = new KeyValueContainerData(CONTAINER_ID, clVersion, size,
+            pipelineID, nodeID);
+
+    String containerFilePath =
+            getClass().getClassLoader().getResource(CONTAINER_FILE_NAME)
+            .getFile();
+    kvData.setMetadataPath(new File(containerFilePath).getParent());
+
+    // Convert container file to ContainerData.
+//    ClassLoader classLoader = getClass().getClassLoader();
+//    File file = new File(classLoader
+//            .getResource(CONTAINER_FILE_NAME).getFile());
+//    kvData = (KeyValueContainerData) ContainerDataYaml.readContainerFile(file);
+//    ContainerUtils.verifyChecksum(kvData);
+//
+//    container = new KeyValueContainer(kvData, conf);
   }
 
   @Test
-  public void testSchemaVersion1() {
+  public void testSchemaVersion() {
     // test kvdata has schema version null
     assertNull(kvData.getSchemaVersion());
   }
 
   @Test
-  public void testKeyRead() throws Exception {
-    // Read values from guide.
-    try(ReferenceCountedDB db = BlockUtils.getDB(container.getContainerData(),
-            conf)) {
-      // Test metadata values.
-      Table<String, Long> metadataTable = db.getStore().getMetadataTable();
+  public void testRead() throws Exception {
+    // kvData should have no values set, so this call will fill in its
+    // information from the .db file.
+    Yaml yaml = ContainerDataYaml.getYamlForContainerType(
+            kvData.getContainerType());
+    kvData.computeAndSetChecksum(yaml);
+    KeyValueContainerUtil.parseKVContainerData(kvData, conf);
 
-      // Test block data values.
-      Table<String, BlockData> blockDataTable =
-              db.getStore().getBlockDataTable();
+    try (ReferenceCountedDB db = BlockUtils.getDB(kvData,
+            conf)) {
+
+      // TODO : set constants instead of magic numbers.
+      assertEquals("1", kvData.getSchemaVersion());
+      assertEquals(4, kvData.getKeyCount());
+      assertEquals(600, kvData.getBytesUsed());
+      assertEquals(2, kvData.getNumPendingDeletionBlocks());
 
       // Test deleted blocks values.
-      Table<Long, NoData> deletedBlocksTable =
-              db.getStore().getDeletedBlocksTable();
-
-
+      assertEquals(2, getDeletedBlocksCount(db));
     }
+  }
+
+  @Test
+  public void testDelete() {
+
+  }
+
+  private int getDeletedBlocksCount(ReferenceCountedDB db) throws IOException {
+    return db.getStore().getDeletedBlocksTable()
+            .getRangeKVs(null, 100,
+                    new MetadataKeyFilters.KeyPrefixFilter()).size();
   }
 }
