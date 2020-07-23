@@ -1943,12 +1943,12 @@ public abstract class TestOzoneRpcClientAbstract {
 
     try {
       ozoneOutputStream.close();
+      fail("testAbortUploadFailWithInProgressPartUpload failed");
     } catch (IOException ex) {
       assertTrue(ex instanceof OMException);
       assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR,
           ((OMException) ex).getResult());
     }
-
   }
 
 
