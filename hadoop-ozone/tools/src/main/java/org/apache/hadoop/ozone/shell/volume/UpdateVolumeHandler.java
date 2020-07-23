@@ -42,11 +42,11 @@ public class UpdateVolumeHandler extends VolumeHandler {
 
   @Option(names = {"--spaceQuota", "-s"},
       description = "Quota in bytes of the volume to set (eg. 1GB)")
-  private String storagespaceQuota;
+  private String quotaInBytes;
 
   @Option(names = {"--quota", "-q"},
       description = "Bucket counts of the volume to set (eg. 5)")
-  private long namespaceQuota = OzoneConsts.QUOTA_COUNT_RESET;
+  private long quotaInCounts = OzoneConsts.QUOTA_COUNT_RESET;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
@@ -54,19 +54,18 @@ public class UpdateVolumeHandler extends VolumeHandler {
     String volumeName = address.getVolumeName();
     OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
 
-    long spaceQuota = volume.getStoragespaceQuota();
-    long countQuota = volume.getNamespaceQuota();
+    long spaceQuota = volume.getQuotaInBytes();
+    long countQuota = volume.getQuotaInCounts();
 
-    if (storagespaceQuota != null && !storagespaceQuota.isEmpty()) {
-      spaceQuota = OzoneQuota.parseQuota(storagespaceQuota,
-          namespaceQuota).getStoragespaceQuota();
+    if (quotaInBytes != null && !quotaInBytes.isEmpty()) {
+      spaceQuota = OzoneQuota.parseQuota(quotaInBytes,
+          quotaInCounts).getQuotaInBytes();
     }
-    if (namespaceQuota >= 0) {
-      countQuota = namespaceQuota;
+    if (quotaInCounts >= 0) {
+      countQuota = quotaInCounts;
     }
 
-    volume.setQuota(
-        OzoneQuota.getOzoneQuota(spaceQuota, countQuota));
+    volume.setQuota(OzoneQuota.getOzoneQuota(spaceQuota, countQuota));
 
     if (ownerName != null && !ownerName.isEmpty()) {
       boolean result = volume.setOwner(ownerName);

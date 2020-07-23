@@ -63,11 +63,11 @@ public class OzoneVolume extends WithMetadata {
   /**
    * Quota of bytes allocated for the Volume.
    */
-  private long storagespaceQuota;
+  private long quotaInBytes;
   /**
    * Quota of bucket count allocated for the Volume.
-   * */
-  private long namespaceQuota;
+   */
+  private long quotaInCounts;
   /**
    * Creation time of the volume.
    */
@@ -105,8 +105,8 @@ public class OzoneVolume extends WithMetadata {
     this.name = name;
     this.admin = admin;
     this.owner = owner;
-    this.storagespaceQuota = quotaInBytes;
-    this.namespaceQuota = quotaInCounts;
+    this.quotaInBytes = quotaInBytes;
+    this.quotaInCounts = quotaInCounts;
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.acls = acls;
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
@@ -162,8 +162,8 @@ public class OzoneVolume extends WithMetadata {
     this.name = name;
     this.admin = admin;
     this.owner = owner;
-    this.storagespaceQuota = quotaInBytes;
-    this.namespaceQuota = quotaInCounts;
+    this.quotaInBytes = quotaInBytes;
+    this.quotaInCounts = quotaInCounts;
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.acls = acls;
     this.metadata = new HashMap<>();
@@ -215,8 +215,8 @@ public class OzoneVolume extends WithMetadata {
    *
    * @return quotaInBytes
    */
-  public long getStoragespaceQuota() {
-    return storagespaceQuota;
+  public long getQuotaInBytes() {
+    return quotaInBytes;
   }
 
   /**
@@ -224,8 +224,8 @@ public class OzoneVolume extends WithMetadata {
    *
    * @return quotaInCounts
    */
-  public long getNamespaceQuota() {
-    return namespaceQuota;
+  public long getQuotaInCounts() {
+    return quotaInCounts;
   }
   /**
    * Returns creation time of the volume.
@@ -272,10 +272,10 @@ public class OzoneVolume extends WithMetadata {
    * @throws IOException
    */
   public void setQuota(OzoneQuota quota) throws IOException {
-    proxy.setVolumeQuota(name, quota.getNamespaceQuota(),
-        quota.getStoragespaceQuota());
-    this.storagespaceQuota = quota.getStoragespaceQuota();
-    this.namespaceQuota = quota.getNamespaceQuota();
+    proxy.setVolumeQuota(name, quota.getQuotaInCounts(),
+        quota.getQuotaInBytes());
+    this.quotaInBytes = quota.getQuotaInBytes();
+    this.quotaInCounts = quota.getQuotaInCounts();
   }
 
   /**

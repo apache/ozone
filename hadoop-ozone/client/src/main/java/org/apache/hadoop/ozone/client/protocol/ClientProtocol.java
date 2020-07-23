@@ -100,12 +100,11 @@ public interface ClientProtocol {
   /**
    * Set Volume Quota.
    * @param volumeName Name of the Volume
-   * @param namespaceQuota namespace level quota
-   * @param storagespaceQuota storagespace level quota
+   * @param quotaInBytes The maximum size this volume can be used.
+   * @param quotaInCounts The maximum number of buckets in this volume.
    * @throws IOException
    */
-  void setVolumeQuota(String volumeName,
-                      long namespaceQuota, long storagespaceQuota)
+  void setVolumeQuota(String volumeName, long quotaInBytes, long quotaInCounts)
       throws IOException;
 
   /**

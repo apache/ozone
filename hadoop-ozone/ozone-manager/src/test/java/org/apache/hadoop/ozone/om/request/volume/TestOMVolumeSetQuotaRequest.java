@@ -37,11 +37,11 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
   @Test
   public void testPreExecute() throws Exception {
     String volumeName = UUID.randomUUID().toString();
-    long quotaBytes = 100L;
-    long quotaCount = 1000L;
+    long quotaInBytes = 100L;
+    long quotaInCounts = 1000L;
     OMRequest originalRequest =
         TestOMRequestUtils.createSetVolumePropertyRequest(volumeName,
-            quotaBytes, quotaCount);
+            quotaInBytes, quotaInCounts);
 
     OMVolumeSetQuotaRequest omVolumeSetQuotaRequest =
         new OMVolumeSetQuotaRequest(originalRequest);
@@ -111,12 +111,12 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
   public void testValidateAndUpdateCacheWithVolumeNotFound()
       throws Exception {
     String volumeName = UUID.randomUUID().toString();
-    long quotaBytes = 100L;
-    long quotaCounts= 100L;
+    long quotaInBytes = 100L;
+    long quotaInCounts= 100L;
 
     OMRequest originalRequest =
         TestOMRequestUtils.createSetVolumePropertyRequest(volumeName,
-            quotaBytes, quotaCounts);
+            quotaInBytes, quotaInCounts);
 
     OMVolumeSetQuotaRequest omVolumeSetQuotaRequest =
         new OMVolumeSetQuotaRequest(originalRequest);

@@ -43,11 +43,11 @@ public class CreateVolumeHandler extends VolumeHandler {
 
   @Option(names = {"--spaceQuota", "-s"},
       description = "Quota in bytes of the newly created volume (eg. 1GB)")
-  private String storagespaceQuota;
+  private String quotaInBytes;
 
   @Option(names = {"--quota", "-q"},
       description = "Bucket counts of the newly created volume (eg. 5)")
-  private long namespaceQuota = OzoneConsts.QUOTA_COUNT_RESET;
+  private long quotaInCounts = OzoneConsts.QUOTA_COUNT_RESET;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
@@ -62,11 +62,11 @@ public class CreateVolumeHandler extends VolumeHandler {
     VolumeArgs.Builder volumeArgsBuilder = VolumeArgs.newBuilder()
         .setAdmin(adminName)
         .setOwner(ownerName);
-    if (storagespaceQuota!= null) {
-      volumeArgsBuilder.setStoragespaceQuota(storagespaceQuota);
+    if (quotaInBytes != null) {
+      volumeArgsBuilder.setQuotaInBytes(quotaInBytes);
     }
 
-    volumeArgsBuilder.setNamespaceQuotaQuota(namespaceQuota);
+    volumeArgsBuilder.setQuotaInCounts(quotaInCounts);
 
     client.getObjectStore().createVolume(volumeName,
         volumeArgsBuilder.build());

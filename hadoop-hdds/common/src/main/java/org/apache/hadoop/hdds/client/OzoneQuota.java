@@ -36,17 +36,20 @@ public final class OzoneQuota {
   /** Quota Units.*/
   public enum Units {UNDEFINED, BYTES, KB, MB, GB, TB}
 
-  // Quota to decide how many buckets or keys can be created.
-  private long namespaceQuota;
+  // Quota to decide how many buckets can be created.
+  private long quotaInCounts;
   // Quota to decide how many storage space will be used in bytes.
-  private long storagespaceQuota;
-  private RawStorageSpaceQuota rawStoragespaceQuota;
+  private long quotaInBytes;
+  private RawQuotaInBytes rawQuotaInBytes;
 
-  private static class RawStorageSpaceQuota {
+  /**
+   * Used to convert user input values into bytes such as: 1MB-> 1048576.
+   */
+  private static class RawQuotaInBytes {
     private Units unit;
     private long size;
 
-    RawStorageSpaceQuota(Units unit, long size) {
+    RawQuotaInBytes(Units unit, long size) {
       this.unit = unit;
       this.size = size;
     }
@@ -93,7 +96,7 @@ public final class OzoneQuota {
    * @return long
    */
   public long getRawSize() {
-    return this.rawStoragespaceQuota.getSize();
+    return this.rawQuotaInBytes.getSize();
   }
 
   /**
@@ -102,28 +105,27 @@ public final class OzoneQuota {
    * @return Unit in MB, GB or TB
    */
   public Units getUnit() {
-    return this.rawStoragespaceQuota.getUnit();
+    return this.rawQuotaInBytes.getUnit();
   }
 
   /**
    * Constructs a default Quota object.
    */
   private OzoneQuota() {
-    this.namespaceQuota = OzoneConsts.QUOTA_COUNT_RESET;
-    this.storagespaceQuota = OzoneConsts.MAX_QUOTA_IN_BYTES;
+    this.quotaInCounts = OzoneConsts.QUOTA_COUNT_RESET;
+    this.quotaInBytes = OzoneConsts.MAX_QUOTA_IN_BYTES;
   }
 
   /**
    * Constructor for Ozone Quota.
    *
-   * @param namespaceQuota long value
-   * @param rawStoragespaceQuota RawStorageSpaceQuota value
+   * @param quotaInCounts Volume quota in counts
+   * @param rawQuotaInBytes RawQuotaInBytes value
    */
-  private OzoneQuota(long namespaceQuota,
-                     RawStorageSpaceQuota rawStoragespaceQuota) {
-    this.namespaceQuota = namespaceQuota;
-    this.rawStoragespaceQuota = rawStoragespaceQuota;
-    this.storagespaceQuota = rawStoragespaceQuota.sizeInBytes();
+  private OzoneQuota(long quotaInCounts, RawQuotaInBytes rawQuotaInBytes) {
+    this.quotaInCounts = quotaInCounts;
+    this.rawQuotaInBytes = rawQuotaInBytes;
+    this.quotaInBytes = rawQuotaInBytes.sizeInBytes();
   }
 
   /**
@@ -140,20 +142,20 @@ public final class OzoneQuota {
    * Parses a user provided string and returns the
    * Quota Object.
    *
-   * @param storagespaceQuotaStr Storage space Quota String
-   * @param namespaceQuota namespace Quota
+   * @param quotaInBytesStr Volume quota in bytes String
+   * @param quotaInCounts Volume quota in counts
    *
    * @return OzoneQuota object
    */
-  public static OzoneQuota parseQuota(String storagespaceQuotaStr,
-                                      long namespaceQuota) {
+  public static OzoneQuota parseQuota(String quotaInBytesStr,
+      long quotaInCounts) {
 
-    if ((storagespaceQuotaStr == null) || (storagespaceQuotaStr.isEmpty())) {
+    if ((quotaInBytesStr == null) || (quotaInBytesStr.isEmpty())) {
       throw new IllegalArgumentException(
           "Quota string cannot be null or empty.");
     }
 
-    String uppercase = storagespaceQuotaStr.toUpperCase()
+    String uppercase = quotaInBytesStr.toUpperCase()
         .replaceAll("\\s+", "");
     String size = "";
     int nSize;
@@ -204,8 +206,8 @@ public final class OzoneQuota {
       throw new IllegalArgumentException("Quota cannot be negative.");
     }
 
-    return new OzoneQuota(namespaceQuota,
-        new RawStorageSpaceQuota(currUnit, nSize));
+    return new OzoneQuota(quotaInCounts,
+        new RawQuotaInBytes(currUnit, nSize));
   }
 
 
@@ -218,7 +220,7 @@ public final class OzoneQuota {
    * @return OzoneQuota object
    */
   public static OzoneQuota getOzoneQuota(long quotaInBytes,
-                                         long quotaInCounts) {
+      long quotaInCounts) {
     long size;
     Units unit;
     if (quotaInBytes % OzoneConsts.TB == 0) {
@@ -237,20 +239,20 @@ public final class OzoneQuota {
       size = quotaInBytes;
       unit = Units.BYTES;
     }
-    return new OzoneQuota(quotaInCounts, new RawStorageSpaceQuota(unit, size));
+    return new OzoneQuota(quotaInCounts, new RawQuotaInBytes(unit, size));
   }
 
-  public long getNamespaceQuota() {
-    return namespaceQuota;
+  public long getQuotaInCounts() {
+    return quotaInCounts;
   }
 
-  public long getStoragespaceQuota() {
-    return storagespaceQuota;
+  public long getQuotaInBytes() {
+    return quotaInBytes;
   }
 
   @Override
   public String toString() {
-    return "Storagespace Quota: " + rawStoragespaceQuota.toString() + "\n" +
-        "Namespace Quota: " + namespaceQuota;
+    return "Bytes Quota: " + rawQuotaInBytes.toString() + "\n" +
+        "Counts Quota: " + quotaInCounts;
   }
 }

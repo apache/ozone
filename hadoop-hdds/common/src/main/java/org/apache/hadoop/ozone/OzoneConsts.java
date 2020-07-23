@@ -205,7 +205,7 @@ public final class OzoneConsts {
   public static final long MAX_QUOTA_IN_BYTES = 1024L * 1024 * TB;
 
   /**
-   * Quota value.
+   * Quota of bucket counts. default is -1, which means it does not take effect.
    */
   public static final long QUOTA_COUNT_RESET = -1;
 
