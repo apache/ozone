@@ -24,7 +24,11 @@ import static org.apache.hadoop.test.GenericTestUtils.waitFor;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.net.InetSocketAddress;
 import java.util.List;
@@ -34,6 +38,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -211,5 +216,59 @@ public class TestStateContext {
 
     futureTwo.complete("futureTwo");
     executorService.shutdown();
+  }
+
+  @Test
+  public void doesNotAwaitWithoutExecute() throws Exception {
+    final AtomicInteger executed = new AtomicInteger();
+    final AtomicInteger awaited = new AtomicInteger();
+
+    ExecutorService executorService = Executors.newFixedThreadPool(1);
+    CompletableFuture<String> future = new CompletableFuture<>();
+    executorService.submit(() -> future.get());
+    executorService.submit(() -> future.get());
+
+    StateContext subject = new StateContext(new OzoneConfiguration(),
+        DatanodeStates.INIT, mock(DatanodeStateMachine.class)) {
+      @Override
+      public DatanodeState<DatanodeStates> getTask() {
+        // this task counts the number of execute() and await() calls
+        return new DatanodeState<DatanodeStates>() {
+          @Override
+          public void onEnter() {
+            // no-op
+          }
+
+          @Override
+          public void onExit() {
+            // no-op
+          }
+
+          @Override
+          public void execute(ExecutorService executor) {
+            executed.incrementAndGet();
+          }
+
+          @Override
+          public DatanodeStates await(long time, TimeUnit timeUnit) {
+            awaited.incrementAndGet();
+            return DatanodeStates.INIT;
+          }
+        };
+      }
+    };
+
+    subject.execute(executorService, 2, TimeUnit.SECONDS);
+
+    assertEquals(0, awaited.get());
+    assertEquals(0, executed.get());
+
+    future.complete("any");
+    LambdaTestUtils.await(1000, 100, () ->
+        subject.isThreadPoolAvailable(executorService));
+
+    subject.execute(executorService, 2, TimeUnit.SECONDS);
+    assertEquals(1, awaited.get());
+    assertEquals(1, executed.get());
   }
 }
