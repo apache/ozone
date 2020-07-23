@@ -184,8 +184,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         datanodeStateMachine.getConnectionManager().getValues();
     for (EndpointStateMachine endpointStateMachine : endpointStateMachines) {
       try {
-        // Make sure the heartbeat is not sent
-        // after stop datanode request to scm.
+        // Make sure the heartbeat won't not be sent
+        // after a stopping datanode request to scm.
         datanodeStateMachine.getContext().setState(DatanodeStates.SHUTDOWN);
         endpointStateMachine.getEndPoint()
             .stopDataNode(datanodeDetails.getProtoBufMessage());
