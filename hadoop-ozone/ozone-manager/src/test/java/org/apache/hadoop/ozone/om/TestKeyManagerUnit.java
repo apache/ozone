@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -30,6 +31,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import com.google.common.base.Optional;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -65,6 +67,7 @@ import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import org.apache.hadoop.util.Time;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -80,12 +83,14 @@ public class TestKeyManagerUnit {
   private KeyManagerImpl keyManager;
 
   private Instant startDate;
+  private File testDir;
 
   @Before
   public void setup() throws IOException {
     configuration = new OzoneConfiguration();
+    testDir = GenericTestUtils.getRandomizedTestDir();
     configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        GenericTestUtils.getRandomizedTestDir().toString());
+        testDir.toString());
     metadataManager = new OmMetadataManagerImpl(configuration);
     keyManager = new KeyManagerImpl(
         Mockito.mock(ScmBlockLocationProtocol.class),
@@ -96,6 +101,12 @@ public class TestKeyManagerUnit {
     );
 
     startDate = Instant.now();
+  }
+
+  @After
+  public void cleanup() throws Exception {
+    metadataManager.stop();
+    FileUtils.deleteDirectory(testDir);
   }
 
   @Test
@@ -113,8 +124,6 @@ public class TestKeyManagerUnit {
 
     Assert.assertEquals(0,
         omMultipartUploadListParts.getPartInfoList().size());
-
-    this.startDate = Instant.now();
   }
 
   @Test
@@ -144,9 +153,11 @@ public class TestKeyManagerUnit {
     Assert.assertEquals("dir/key2", uploads.get(1).getKeyName());
 
     Assert.assertNotNull(uploads.get(1));
-    Assert.assertNotNull(uploads.get(1).getCreationTime());
-    Assert.assertTrue("Creation date is too old",
-        uploads.get(1).getCreationTime().compareTo(startDate) > 0);
+    Instant creationTime = uploads.get(1).getCreationTime();
+    Assert.assertNotNull(creationTime);
+    Assert.assertFalse("Creation date is too old: "
+            + creationTime + " < " + startDate,
+        creationTime.isBefore(startDate));
   }
 
   @Test
