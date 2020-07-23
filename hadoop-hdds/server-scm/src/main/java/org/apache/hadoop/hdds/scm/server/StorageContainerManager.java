@@ -241,7 +241,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmStorageConfig = new SCMStorageConfig(conf);
     if (scmStorageConfig.getState() != StorageState.INITIALIZED) {
       LOG.error("Please make sure you have run \'ozone scm --init\' " +
-          "command to generate all the required metadata.");
+          "command to generate all the required metadata to " +
+          scmStorageConfig.getStorageDir() + ".");
       throw new SCMException("SCM not initialized due to storage config " +
           "failure.", ResultCodes.SCM_NOT_INITIALIZED);
     }
