@@ -2688,11 +2688,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       keyManager.abortMultipartUpload(omKeyArgs);
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction
-          .COMPLETE_MULTIPART_UPLOAD, auditMap));
+          .ABORT_MULTIPART_UPLOAD, auditMap));
     } catch (IOException ex) {
       metrics.incNumAbortMultipartUploadFails();
       AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction
-          .COMPLETE_MULTIPART_UPLOAD, auditMap, ex));
+          .ABORT_MULTIPART_UPLOAD, auditMap, ex));
       throw ex;
     }
 
