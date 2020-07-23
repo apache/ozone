@@ -116,13 +116,20 @@ public class TestOmUtils {
 
     // Verify 'ozone.om.internal.service.id' takes precedence
     configuration.set(OZONE_OM_INTERNAL_SERVICE_ID, "om1");
+    configuration.set(OZONE_OM_SERVICE_IDS_KEY, "om2,om1");
     String id = getOzoneManagerServiceId(configuration);
     assertEquals("om1", id);
 
-    configuration.set(OZONE_OM_SERVICE_IDS_KEY, "om2,om1");
-    id = getOzoneManagerServiceId(configuration);
-    assertEquals("om1", id);
+    configuration.set(OZONE_OM_SERVICE_IDS_KEY, "om2,om3");
+    try {
+      getOzoneManagerServiceId(configuration);
+      Assert.fail();
+    } catch (IOException ioEx) {
+      assertTrue(ioEx.getMessage()
+          .contains("Cannot find the internal service id om1 in [om2, om3]"));
+    }
 
+    // When internal service ID is not defined.
     // Verify if count(ozone.om.service.ids) == 1, return that id.
     configuration = new OzoneConfiguration();
     configuration.set(OZONE_OM_SERVICE_IDS_KEY, "om2");
