@@ -39,12 +39,12 @@ import static org.apache.hadoop.ozone.insight.datanode.PipelineComponentUtil.wit
 /**
  * Insight definition for datanode/pipline metrics.
  */
-public class DatanodeClientInsight extends BaseInsightPoint
+public class DatanodeDispatcherInsight extends BaseInsightPoint
     implements InsightPoint {
 
   private OzoneConfiguration conf;
 
-  public DatanodeClientInsight(
+  public DatanodeDispatcherInsight(
       OzoneConfiguration conf) {
     this.conf = conf;
   }
@@ -62,8 +62,7 @@ public class DatanodeClientInsight extends BaseInsightPoint
             result
                 .add(new LoggerSource(dn,
                     HddsDispatcher.class.getCanonicalName(),
-                    defaultLevel(verbose),
-                    false));
+                    defaultLevel(verbose)));
             return null;
           });
     } catch (IOException e) {
@@ -85,5 +84,10 @@ public class DatanodeClientInsight extends BaseInsightPoint
   @Override
   public String getDescription() {
     return "Datanode client protocol";
+  }
+
+  @Override
+  public boolean filterLog(Map<String, String> filters, String logLine) {
+    return true;
   }
 }

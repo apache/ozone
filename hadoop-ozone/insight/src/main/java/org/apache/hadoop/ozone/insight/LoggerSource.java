@@ -39,23 +39,10 @@ public class LoggerSource {
    */
   private Level level;
 
-  /**
-   * If true, only the filtered messages will be printed out.
-   */
-  private boolean filtered = true;
-
   public LoggerSource(Component component, String loggerName, Level level) {
     this.component = component;
     this.loggerName = loggerName;
     this.level = level;
-  }
-
-  public LoggerSource(Component component, String loggerName,
-      Level level, boolean filtered) {
-    this.component = component;
-    this.loggerName = loggerName;
-    this.level = level;
-    this.filtered = filtered;
   }
 
   public LoggerSource(Type componentType, Class<?> loggerClass,

@@ -47,7 +47,7 @@ public interface InsightPoint {
   List<Class> getConfigurationClasses();
 
   /**
-   * Decide if the specific log should be displayed or not..
+   * Decide if the specific log should be displayed or not.
    */
   boolean filterLog(Map<String, String> filters, String logLine);
 
