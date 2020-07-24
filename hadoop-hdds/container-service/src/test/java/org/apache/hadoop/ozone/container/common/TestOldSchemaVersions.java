@@ -23,12 +23,16 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.testutils.BlockDeletingServiceTestImpl;
+import org.apache.hadoop.test.GenericTestUtils;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -48,14 +52,12 @@ import static org.junit.Assert.*;
  * containers will be created using the latest schema version.
  */
 public class TestOldSchemaVersions {
-  private static final long CONTAINER_ID = 123;
-  private static final String CONTAINER_FILE_NAME = CONTAINER_ID + ".container";
-  private static final String DB_NAME = CONTAINER_ID + "-dn-container.db";
-
   private OzoneConfiguration conf;
 
   private File metadataDir;
   private File dbFile;
+
+  private TestDB db;
 
   @Rule
   public TemporaryFolder tempFolder = new TemporaryFolder();
@@ -63,33 +65,28 @@ public class TestOldSchemaVersions {
   @Before
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
+    db = new TestDB();
 
     // Copy data to the temporary folder so it can be safely modified.
-    File tempMetadataDir = tempFolder.newFolder(Long.toString(CONTAINER_ID),
+    File tempMetadataDir =
+            tempFolder.newFolder(Long.toString(db.CONTAINER_ID),
                     OzoneConsts.CONTAINER_META_PATH);
 
-    ClassLoader loader = getClass().getClassLoader();
-    File containerFile = new File(loader.getResource(CONTAINER_FILE_NAME)
-            .getFile());
-    File dbDir = new File(loader.getResource(DB_NAME).getFile());
-
-    FileUtils.copyDirectoryToDirectory(dbDir, tempMetadataDir);
-    FileUtils.copyFileToDirectory(containerFile, tempMetadataDir);
+    FileUtils.copyDirectoryToDirectory(db.getDBDirectory(), tempMetadataDir);
+    FileUtils.copyFileToDirectory(db.getContainerFile(), tempMetadataDir);
 
     metadataDir = tempMetadataDir;
-    dbFile = metadataDir.listFiles((dir, name) -> name.equals(DB_NAME))[0];
+    dbFile = metadataDir.listFiles((dir, name) -> name.equals(db.DB_NAME))[0];
   }
 
   private KeyValueContainerData newKvData() throws IOException {
     ChunkLayOutVersion clVersion =
             ChunkLayOutVersion.getChunkLayOutVersion(1);
-    // TODO : set this with a legit value (max container size).
-    long size = 0;
     String pipelineID = UUID.randomUUID().toString();
     String nodeID = UUID.randomUUID().toString();
 
-    KeyValueContainerData kvData = new KeyValueContainerData(CONTAINER_ID,
-            clVersion, size,
+    KeyValueContainerData kvData = new KeyValueContainerData(db.CONTAINER_ID,
+            clVersion, ContainerTestHelper.CONTAINER_MAX_SIZE,
             pipelineID, nodeID);
     kvData.setMetadataPath(metadataDir.getAbsolutePath());
     kvData.setDbFile(dbFile);
@@ -143,8 +140,9 @@ public class TestOldSchemaVersions {
       assertNull(metadataTable.get(OzoneConsts.PENDING_DELETE_BLOCK_COUNT));
     }
 
-    // Re assign the kvData's metadata values by counting blocks in the
-    // database.
+    // Create a new container data object, and fill in its metadata by
+    // counting blocks from the database, since the metadata keys in the
+    // database are now gone.
     kvData = newKvData();
     KeyValueContainerUtil.parseKVContainerData(kvData, conf);
     checkContainerData(kvData);
@@ -155,27 +153,71 @@ public class TestOldSchemaVersions {
    * schema version 1.
    */
   @Test
-  public void testDelete() {
-
+  public void testDelete() throws Exception {
+//    BlockDeletingServiceTestImpl service = new BlockDeletingServiceTestImpl(,
+//            1000, conf);
+//    service.start();
+//    GenericTestUtils.waitFor(service::isStarted, 100, 3000);
+//    service.runDeletingTasks();
+//    GenericTestUtils.waitFor(()
+//            -> service.getTimesOfProcessed() == timesOfProcessed, 100, 3000);
+//
+//    try (ReferenceCountedDB db = BlockUtils.getDB(kvData, conf)) {
+//      Assert.assertEquals(1, getUnderDeletionBlocksCount(meta));
+//      Assert.assertEquals(2, getDeletedBlocksCount(meta));
+//    }
   }
 
   private void checkContainerData(KeyValueContainerData kvData)
           throws IOException {
-    // TODO : set constants instead of magic numbers.
     assertEquals(OzoneConsts.SCHEMA_V1, kvData.getSchemaVersion());
-    assertEquals(2, kvData.getKeyCount());
-    assertEquals(600, kvData.getBytesUsed());
-    assertEquals(2, kvData.getNumPendingDeletionBlocks());
+    assertEquals(db.KEY_COUNT, kvData.getKeyCount());
+    assertEquals(db.BYTES_USED, kvData.getBytesUsed());
+    assertEquals(db.NUM_PENDING_DELETION_BLOCKS,
+            kvData.getNumPendingDeletionBlocks());
 
-    try (ReferenceCountedDB db = BlockUtils.getDB(kvData, conf)) {
+    // Number of deleted blocks is not a property set for the key value
+    // container.
+    try (ReferenceCountedDB refCountedDB = BlockUtils.getDB(kvData, conf)) {
       // Test deleted blocks values. Returns 9 currently.
-      assertEquals(2, getDeletedBlocksCount(db));
+      assertEquals(db.NUM_DELETED_BLOCKS, getDeletedBlocksCount(refCountedDB));
     }
   }
 
-  private int getDeletedBlocksCount(ReferenceCountedDB db) throws IOException {
-    return db.getStore().getDeletedBlocksTable()
+  private int getDeletedBlocksCount(ReferenceCountedDB refCountedDB)
+          throws IOException {
+    return refCountedDB.getStore().getDeletedBlocksTable()
             .getRangeKVs(null, 100,
                     new MetadataKeyFilters.KeyPrefixFilter()).size();
+  }
+
+  /**
+   * Holds information about the database used for testing by this class.
+   */
+  private class TestDB {
+    // Non configurable properties of the files.
+    public static final long CONTAINER_ID = 123;
+    public static final String CONTAINER_FILE_NAME =
+            CONTAINER_ID + ".container";
+    public static final String DB_NAME = CONTAINER_ID + "-dn-container.db";
+    public static final long KEY_COUNT = 2;
+    public static final long BYTES_USED = 600;
+    public static final long NUM_PENDING_DELETION_BLOCKS = 2;
+    public static final long NUM_DELETED_BLOCKS = 2;
+
+    private final ClassLoader loader;
+
+    TestDB() {
+      loader = getClass().getClassLoader();
+    }
+
+    private File getContainerFile() {
+      return new File(loader.getResource(CONTAINER_FILE_NAME)
+              .getFile());
+    }
+
+    private File getDBDirectory() {
+      return new File(loader.getResource(DB_NAME).getFile());
+    }
   }
 }
