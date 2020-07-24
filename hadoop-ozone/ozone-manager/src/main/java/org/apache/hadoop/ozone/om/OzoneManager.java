@@ -47,6 +47,7 @@ import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
+import com.google.common.base.Optional;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -61,6 +62,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
@@ -79,9 +81,12 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.utils.RetriableTask;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBUpdatesWrapper;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc.Client;
@@ -133,6 +138,7 @@ import org.apache.hadoop.ozone.om.ratis.OMRatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.snapshot.OzoneManagerSnapshotProvider;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
@@ -140,6 +146,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserVolumeInfo;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
@@ -185,6 +192,7 @@ import static org.apache.hadoop.hdds.security.x509.certificates.utils.Certificat
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import static org.apache.hadoop.io.retry.RetryPolicies.retryUpToMaximumCountWithFixedSleep;
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
@@ -219,6 +227,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService.newReflectiveBlockingService;
 
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.ExitUtils;
@@ -426,6 +435,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     instantiateServices();
+
+    // Create special volume s3v which is required for S3G.
+    addS3GVolumeToDB();
+
     this.omRatisSnapshotInfo = new OMRatisSnapshotInfo();
     initializeRatisServer();
     if (isRatisEnabled) {
@@ -1146,6 +1159,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     startJVMPauseMonitor();
     setStartTime();
     omState = State.RUNNING;
+
   }
 
   /**
@@ -3502,4 +3516,95 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return configuration.getBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS,
         OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
   }
+
+  /**
+   * Create volume which is required for S3Gateway operations.
+   * @throws IOException
+   */
+  private void addS3GVolumeToDB() throws IOException {
+    String s3VolumeName = HddsClientUtils.getS3VolumeName(configuration);
+    String dbVolumeKey = metadataManager.getVolumeKey(s3VolumeName);
+
+    if (!s3VolumeName.equals(OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT)) {
+      LOG.warn("Make sure that all S3Gateway use same volume name." +
+          " Otherwise user need to manually create/configure Volume " +
+          "configured by S3Gateway");
+    }
+    if (!metadataManager.getVolumeTable().isExist(dbVolumeKey)) {
+      long transactionID = (Long.MAX_VALUE - 1) >> 8;
+      long objectID = OMFileRequest.getObjIDFromTxId(transactionID);
+      String userName =
+          UserGroupInformation.getCurrentUser().getShortUserName();
+
+      // Add volume and user info to DB and cache.
+
+      OmVolumeArgs omVolumeArgs = createS3VolumeInfo(s3VolumeName,
+          transactionID, objectID);
+
+      String dbUserKey = metadataManager.getUserKey(userName);
+      UserVolumeInfo userVolumeInfo = UserVolumeInfo.newBuilder()
+          .setObjectID(objectID)
+          .setUpdateID(transactionID)
+          .addVolumeNames(s3VolumeName).build();
+
+
+      // Commit to DB.
+      BatchOperation batchOperation =
+          metadataManager.getStore().initBatchOperation();
+
+      metadataManager.getVolumeTable().putWithBatch(batchOperation, dbVolumeKey,
+          omVolumeArgs);
+      metadataManager.getUserTable().putWithBatch(batchOperation, dbUserKey,
+          userVolumeInfo);
+
+      metadataManager.getStore().commitBatchOperation(batchOperation);
+
+      // Add to cache.
+      metadataManager.getVolumeTable().addCacheEntry(
+          new CacheKey<>(dbVolumeKey),
+          new CacheValue<>(Optional.of(omVolumeArgs), transactionID));
+      metadataManager.getUserTable().addCacheEntry(
+          new CacheKey<>(dbUserKey),
+          new CacheValue<>(Optional.of(userVolumeInfo), transactionID));
+      LOG.info("Created Volume {} With Owner {} required for S3Gateway " +
+              "operations.", s3VolumeName, userName);
+    }
+  }
+
+  private OmVolumeArgs createS3VolumeInfo(String s3Volume, long transactionID,
+      long objectID) throws IOException {
+    String userName = UserGroupInformation.getCurrentUser().getShortUserName();
+    long time = Time.now();
+
+    OmVolumeArgs.Builder omVolumeArgs = new OmVolumeArgs.Builder()
+        .setVolume(s3Volume)
+        .setUpdateID(transactionID)
+        .setObjectID(objectID)
+        .setCreationTime(time)
+        .setModificationTime(time)
+        .setOwnerName(userName)
+        .setAdminName(userName)
+        .setQuotaInBytes(OzoneConsts.MAX_QUOTA_IN_BYTES);
+
+    // Provide ACLType of ALL which is default acl rights for user and group.
+    List<OzoneAcl> listOfAcls = new ArrayList<>();
+    //User ACL
+    listOfAcls.add(new OzoneAcl(ACLIdentityType.USER,
+        userName, ACLType.ALL, ACCESS));
+    //Group ACLs of the User
+    List<String> userGroups = Arrays.asList(UserGroupInformation
+        .createRemoteUser(userName).getGroupNames());
+
+    userGroups.stream().forEach((group) -> listOfAcls.add(
+        new OzoneAcl(ACLIdentityType.GROUP, group, ACLType.ALL, ACCESS)));
+
+    // Add ACLs
+    for (OzoneAcl ozoneAcl : listOfAcls) {
+      omVolumeArgs.addOzoneAcls(OzoneAcl.toProtobuf(ozoneAcl));
+    }
+
+    return omVolumeArgs.build();
+
+  }
+
 }

@@ -87,6 +87,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
@@ -162,8 +163,6 @@ public abstract class TestOzoneRpcClientAbstract {
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);
     store = ozClient.getObjectStore();
-    String volumeName = HddsClientUtils.getS3VolumeName(conf);
-    store.createVolume(volumeName);
     storageContainerLocationClient =
         cluster.getStorageContainerLocationClient();
     ozoneManager = cluster.getOzoneManager();
@@ -234,6 +233,22 @@ public abstract class TestOzoneRpcClientAbstract {
     // should match the OM's RPC address.
     Assert.assertTrue(omProxies.get(0).getAddress().equals(
         ozoneManager.getOmRpcServerAddr()));
+  }
+
+  @Test
+  public void testDefaultS3GVolumeExists() throws Exception {
+    String s3VolumeName = HddsClientUtils.getS3VolumeName(cluster.getConf());
+    OzoneVolume ozoneVolume = store.getVolume(s3VolumeName);
+    Assert.assertEquals(ozoneVolume.getName(), s3VolumeName);
+    OMMetadataManager omMetadataManager =
+        cluster.getOzoneManager().getMetadataManager();
+    long transactionID = Long.MAX_VALUE -1 >> 8;
+    long objectID = transactionID << 8;
+    OmVolumeArgs omVolumeArgs =
+        cluster.getOzoneManager().getMetadataManager().getVolumeTable().get(
+            omMetadataManager.getVolumeKey(s3VolumeName));
+    Assert.assertEquals(objectID, omVolumeArgs.getObjectID());
+    Assert.assertEquals(transactionID, omVolumeArgs.getUpdateID());
   }
 
   @Test
