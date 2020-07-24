@@ -157,6 +157,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table prefixTable;
   private Table transactionInfoTable;
   private boolean isRatisEnabled;
+  private boolean ignorePipelineinKey;
 
   private Map<String, Table> tableMap = new HashMap<>();
 
@@ -172,6 +173,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     isRatisEnabled = conf.getBoolean(
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
+    // For test purpose only
+    ignorePipelineinKey = conf.getBoolean(
+        "ozone.om.ignore.pipeline", Boolean.TRUE);
     start(conf);
   }
 
@@ -317,8 +321,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(PREFIX_TABLE)
         .addTable(TRANSACTION_INFO_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
-        .addCodec(OmKeyInfo.class, new OmKeyInfoCodec())
-        .addCodec(RepeatedOmKeyInfo.class, new RepeatedOmKeyInfoCodec())
+        .addCodec(OmKeyInfo.class, new OmKeyInfoCodec(true))
+        .addCodec(RepeatedOmKeyInfo.class,
+            new RepeatedOmKeyInfoCodec(true))
         .addCodec(OmBucketInfo.class, new OmBucketInfoCodec())
         .addCodec(OmVolumeArgs.class, new OmVolumeArgsCodec())
         .addCodec(UserVolumeInfo.class, new UserVolumeInfoCodec())
