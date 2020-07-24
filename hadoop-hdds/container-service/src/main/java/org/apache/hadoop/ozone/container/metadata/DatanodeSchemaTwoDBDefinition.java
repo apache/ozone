@@ -17,29 +17,23 @@
  */
 package org.apache.hadoop.ozone.container.metadata;
 
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.rocksdb.RocksDB;
 
 /**
- * This class allows support of the old RocksDB layout for datanode, where
- * all data was kept in the same default table. Clients can use this class as
- * if the database is in the new format (which has separate column families for
- * block data, metadata and deleted block IDs), even
- * though all tables map back to the default table in this implementation.
+ * This class defines a RocksDB structure for datanodes, where the block
+ * data, metadata, and deleted block ids are put in their own separate column
+ * families.
  */
-public class DatanodeOneTableDBDefinition extends AbstractDatanodeDBDefinition {
-  // In the underlying database, tables are retrieved by name, and then the
-  // codecs/classes are applied on top. By defining different DBDefinitions
-  // with different codecs that all map to the default table, clients are
-  // unaware they are using the same table for both interpretations of the data.
+public class DatanodeSchemaTwoDBDefinition extends
+        AbstractDatanodeDBDefinition {
+
   public static final DBColumnFamilyDefinition<String, BlockData>
           BLOCK_DATA =
           new DBColumnFamilyDefinition<>(
-                  StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+                  "block_data",
                   String.class,
                   new StringCodec(),
                   BlockData.class,
@@ -48,22 +42,22 @@ public class DatanodeOneTableDBDefinition extends AbstractDatanodeDBDefinition {
   public static final DBColumnFamilyDefinition<String, Long>
           METADATA =
           new DBColumnFamilyDefinition<>(
-                  StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
-                  String.class,
-                  new StringCodec(),
-                  Long.class,
-                  new LongCodec());
+          "metadata",
+          String.class,
+          new StringCodec(),
+          Long.class,
+          new LongCodec());
 
   public static final DBColumnFamilyDefinition<Long, NoData>
           DELETED_BLOCKS =
           new DBColumnFamilyDefinition<>(
-                  StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+                  "deleted_blocks",
                   Long.class,
                   new LongCodec(),
                   NoData.class,
                   new NoDataCodec());
 
-  protected DatanodeOneTableDBDefinition(String dbPath) {
+  protected DatanodeSchemaTwoDBDefinition(String dbPath) {
     super(dbPath);
   }
 

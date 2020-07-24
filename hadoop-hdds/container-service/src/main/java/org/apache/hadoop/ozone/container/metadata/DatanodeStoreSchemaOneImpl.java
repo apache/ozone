@@ -22,21 +22,19 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import java.io.IOException;
 
 /**
- * Constructs a datanode store that uses three column families/tables:
- * 1. A block data table.
- * 2. A metadata table.
- * 3. A deleted blocks table.
+ * Constructs a datanode store that places all data in the default column
+ * family.
  */
-public class DatanodeStoreThreeTableImpl extends AbstractDatanodeStore {
+public class DatanodeStoreSchemaOneImpl extends AbstractDatanodeStore {
 
   /**
-   * Constructs the datanode store and starts the DB Services.
+   * Constructs the metadata store and starts the DB Services.
    *
    * @param config - Ozone Configuration.
    * @throws IOException - on Failure.
    */
-  public DatanodeStoreThreeTableImpl(ConfigurationSource config, String dbPath)
+  public DatanodeStoreSchemaOneImpl(ConfigurationSource config, String dbPath)
           throws IOException {
-    super(config, new DatanodeThreeTableDBDefinition(dbPath));
+    super(config, new DatanodeSchemaOneDBDefinition(dbPath));
   }
 }

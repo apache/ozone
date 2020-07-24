@@ -30,8 +30,8 @@ import org.apache.commons.collections.MapIterator;
 import org.apache.commons.collections.map.LRUMap;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStoreOneTableImpl;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStoreThreeTableImpl;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -129,9 +129,9 @@ public final class ContainerCache extends LRUMap {
         DatanodeStore store;
 
         if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
-          store = new DatanodeStoreOneTableImpl(conf, containerDBPath);
+          store = new DatanodeStoreSchemaOneImpl(conf, containerDBPath);
         } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
-          store = new DatanodeStoreThreeTableImpl(conf, containerDBPath);
+          store = new DatanodeStoreSchemaTwoImpl(conf, containerDBPath);
         } else {
           throw new IllegalArgumentException(
                   "Unrecognized database schema version: " + schemaVersion);
