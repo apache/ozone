@@ -21,16 +21,18 @@ import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Random choose policy that randomly chooses pipeline.
- * That is we just randomly place containers without any considerations of
+ * That are we just randomly place containers without any considerations of
  * utilization.
  */
 public class RandomPipelineChoosePolicy implements PipelineChoosePolicy {
 
   @Override
-  public Pipeline choosePipeline(List<Pipeline> pipelineList) {
+  public Pipeline choosePipeline(List<Pipeline> pipelineList,
+      Map<String, Object> params) {
     return pipelineList.get((int) (Math.random() * pipelineList.size()));
   }
 }

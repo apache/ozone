@@ -15,28 +15,32 @@
  * the License.
  */
 
-package org.apache.hadoop.hdds.scm;
+package org.apache.hadoop.hdds.scm.pipeline.choose.algorithms;
 
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * A {@link PipelineChoosePolicy} support choosing pipeline from exist list.
+ * The healthy pipeline choose policy that chooses pipeline
+ * until return healthy pipeline.
  */
-public interface PipelineChoosePolicy {
+public class HealthyPipelineChoosePolicy extends RandomPipelineChoosePolicy {
 
-  String PIPELINE_CHOOSE_POLICY_PARAM_SIZE =
-      "pipeline_choose_policy_param_size";
-
-  /**
-   * Given an initial list of pipelines, return one of the pipelines.
-   *
-   * @param pipelineList list of pipelines.
-   * @return one of the pipelines.
-   */
-  Pipeline choosePipeline(List<Pipeline> pipelineList,
-      Map<String, Object> params);
+  @Override
+  public Pipeline choosePipeline(List<Pipeline> pipelineList,
+      Map<String, Object> params) {
+    Pipeline fallback = null;
+    while (pipelineList.size() > 0) {
+      Pipeline pipeline = super.choosePipeline(pipelineList, params);
+      if (pipeline.isHealthy()) {
+        return pipeline;
+      } else {
+        fallback = pipeline;
+        pipelineList.remove(pipeline);
+      }
+    }
+    return fallback;
+  }
 }

@@ -224,7 +224,11 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
       }
 
       if (null == pipeline) {
-        pipeline = pipelineChoosePolicy.choosePipeline(availablePipelines);
+        Map<String, Object> params = new HashMap<>();
+        params.put(
+            PipelineChoosePolicy.PIPELINE_CHOOSE_POLICY_PARAM_SIZE, size);
+        pipeline = pipelineChoosePolicy.choosePipeline(
+            availablePipelines, params);
       }
 
       // look for OPEN containers that match the criteria.
