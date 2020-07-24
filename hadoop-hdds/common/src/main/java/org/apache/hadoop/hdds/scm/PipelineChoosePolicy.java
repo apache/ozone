@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm;
 
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
