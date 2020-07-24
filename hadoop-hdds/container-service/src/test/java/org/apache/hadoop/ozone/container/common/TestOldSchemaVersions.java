@@ -30,9 +30,9 @@ import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.testutils.BlockDeletingServiceTestImpl;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -57,6 +57,7 @@ public class TestOldSchemaVersions {
   private File metadataDir;
   private File dbFile;
 
+  // TODO : Rename this and access fields statically.
   private TestDB db;
 
   @Rule
@@ -79,23 +80,22 @@ public class TestOldSchemaVersions {
     dbFile = metadataDir.listFiles((dir, name) -> name.equals(db.DB_NAME))[0];
   }
 
-  private KeyValueContainerData newKvData() throws IOException {
-    ChunkLayOutVersion clVersion =
-            ChunkLayOutVersion.getChunkLayOutVersion(1);
-    String pipelineID = UUID.randomUUID().toString();
-    String nodeID = UUID.randomUUID().toString();
+  /**
+   * Counts the number of #deleted#, #deleting#, and unprefixed blocks in the
+   * database, and checks that they match the expected values.
+   * @throws IOException
+   */
+  @Test
+  public void testBlockIteration() throws IOException {
+    try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
+      assertEquals(db.NUM_DELETED_BLOCKS, countDeletedBlocks(refCountedDB));
 
-    KeyValueContainerData kvData = new KeyValueContainerData(db.CONTAINER_ID,
-            clVersion, ContainerTestHelper.CONTAINER_MAX_SIZE,
-            pipelineID, nodeID);
-    kvData.setMetadataPath(metadataDir.getAbsolutePath());
-    kvData.setDbFile(dbFile);
+      assertEquals(db.NUM_PENDING_DELETION_BLOCKS,
+              countDeletingBlocks(refCountedDB));
 
-    Yaml yaml = ContainerDataYaml.getYamlForContainerType(
-            kvData.getContainerType());
-    kvData.computeAndSetChecksum(yaml);
-
-    return kvData;
+      assertEquals(db.KEY_COUNT,
+              countUnprefixedBlocks(refCountedDB));
+    }
   }
 
   /**
@@ -116,17 +116,19 @@ public class TestOldSchemaVersions {
    * Tests reading of a container that was written in schema version 1, when
    * the container has no metadata keys present.
    * The {@link KeyValueContainerUtil} will scan the blocks in the database
-   * to fill these metadata values in the database and a
+   * to fill these metadata values into the database and into a
    * {@link KeyValueContainerData} object.
    * @throws Exception
    */
   @Test
   public void testReadWithoutMetadata() throws Exception {
-    // Init the kvData with values so we can get the db to modify.
+    // Init the kvData enough values so we can get the database to modify for
+    // testing and then read.
     KeyValueContainerData kvData = newKvData();
     KeyValueContainerUtil.parseKVContainerData(kvData, conf);
 
     // Delete metadata keys from our copy of the DB.
+    // This simulates them not being there to start with.
     try (ReferenceCountedDB db = BlockUtils.getDB(kvData, conf)) {
       Table<String, Long> metadataTable = db.getStore().getMetadataTable();
 
@@ -150,42 +152,100 @@ public class TestOldSchemaVersions {
 
   /**
    * Tests reading blocks marked for deletion from a container written in
-   * schema version 1.
+   * schema version 1. Because the block deleting service both reads for
+   * deleted blocks and deletes them, this test will modify its copy of the
+   * database.
    */
   @Test
   public void testDelete() throws Exception {
-//    BlockDeletingServiceTestImpl service = new BlockDeletingServiceTestImpl(,
-//            1000, conf);
-//    service.start();
-//    GenericTestUtils.waitFor(service::isStarted, 100, 3000);
-//    service.runDeletingTasks();
-//    GenericTestUtils.waitFor(()
-//            -> service.getTimesOfProcessed() == timesOfProcessed, 100, 3000);
-//
-//    try (ReferenceCountedDB db = BlockUtils.getDB(kvData, conf)) {
-//      Assert.assertEquals(1, getUnderDeletionBlocksCount(meta));
-//      Assert.assertEquals(2, getDeletedBlocksCount(meta));
-//    }
+    final int numBlocksToDelete = 2;
+
+    // TODO : Figure out how to construct this.
+    OzoneContainer container = new OzoneContainer();
+    BlockDeletingServiceTestImpl service =
+            new BlockDeletingServiceTestImpl(container,
+            1000, conf);
+    service.start();
+    GenericTestUtils.waitFor(service::isStarted, 100, 3000);
+    service.runDeletingTasks();
+    GenericTestUtils.waitFor(()
+        -> service.getTimesOfProcessed() == 1,
+        00, 3000);
+
+    try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
+      // Blocks marked with #deleting# prefix should be deleted.
+      assertEquals(db.NUM_PENDING_DELETION_BLOCKS - numBlocksToDelete,
+              countDeletingBlocks(refCountedDB));
+
+      // All other blocks should remain unchanged.
+      assertEquals(db.NUM_DELETED_BLOCKS, countDeletedBlocks(refCountedDB));
+      assertEquals(db.KEY_COUNT, countUnprefixedBlocks(refCountedDB));
+
+      // Since metadata is being stored in the same table, make sure it is not
+      // altered as well.
+      Table<String, Long> metadataTable =
+              refCountedDB.getStore().getMetadataTable();
+      assertEquals(db.KEY_COUNT,
+              (long)metadataTable.get(OzoneConsts.BLOCK_COUNT));
+      assertEquals(db.BYTES_USED,
+              (long)metadataTable.get(OzoneConsts.CONTAINER_BYTES_USED));
+    }
   }
 
-  private void checkContainerData(KeyValueContainerData kvData)
-          throws IOException {
+  /**
+   * @return A {@link KeyValueContainerData} object that has only its
+   * metadata path, db file, and checksum set to match the database under test.
+   * @throws IOException
+   */
+  private KeyValueContainerData newKvData() throws IOException {
+    ChunkLayOutVersion clVersion =
+            ChunkLayOutVersion.getChunkLayOutVersion(1);
+    String pipelineID = UUID.randomUUID().toString();
+    String nodeID = UUID.randomUUID().toString();
+
+    KeyValueContainerData kvData = new KeyValueContainerData(db.CONTAINER_ID,
+            clVersion, ContainerTestHelper.CONTAINER_MAX_SIZE,
+            pipelineID, nodeID);
+    kvData.setMetadataPath(metadataDir.getAbsolutePath());
+    kvData.setDbFile(dbFile);
+
+    Yaml yaml = ContainerDataYaml.getYamlForContainerType(
+            kvData.getContainerType());
+    kvData.computeAndSetChecksum(yaml);
+
+    return kvData;
+  }
+
+  /**
+   * @param kvData The container data that will be tested to see if it has
+   * metadata values matching those in the database under test.
+   */
+  private void checkContainerData(KeyValueContainerData kvData) {
     assertEquals(OzoneConsts.SCHEMA_V1, kvData.getSchemaVersion());
     assertEquals(db.KEY_COUNT, kvData.getKeyCount());
     assertEquals(db.BYTES_USED, kvData.getBytesUsed());
     assertEquals(db.NUM_PENDING_DELETION_BLOCKS,
             kvData.getNumPendingDeletionBlocks());
-
-    // Number of deleted blocks is not a property set for the key value
-    // container.
-    try (ReferenceCountedDB refCountedDB = BlockUtils.getDB(kvData, conf)) {
-      // Test deleted blocks values. Returns 9 currently.
-      assertEquals(db.NUM_DELETED_BLOCKS, getDeletedBlocksCount(refCountedDB));
-    }
   }
 
-  private int getDeletedBlocksCount(ReferenceCountedDB refCountedDB)
+  private int countDeletedBlocks(ReferenceCountedDB refCountedDB)
           throws IOException {
+    // TODO : Restore deleted block filter and use it here.
+    return refCountedDB.getStore().getDeletedBlocksTable()
+            .getRangeKVs(null, 100,
+                    new MetadataKeyFilters.KeyPrefixFilter()).size();
+  }
+
+  private int countDeletingBlocks(ReferenceCountedDB refCountedDB)
+          throws IOException {
+    return refCountedDB.getStore().getDeletedBlocksTable()
+            .getRangeKVs(null, 100,
+                    MetadataKeyFilters.getDeletingKeyFilter()).size();
+  }
+
+  private int countUnprefixedBlocks(ReferenceCountedDB refCountedDB)
+          throws IOException {
+    // TODO : Add normal block filter and use it here.
     return refCountedDB.getStore().getDeletedBlocksTable()
             .getRangeKVs(null, 100,
                     new MetadataKeyFilters.KeyPrefixFilter()).size();
@@ -200,8 +260,10 @@ public class TestOldSchemaVersions {
     public static final String CONTAINER_FILE_NAME =
             CONTAINER_ID + ".container";
     public static final String DB_NAME = CONTAINER_ID + "-dn-container.db";
+
     public static final long KEY_COUNT = 2;
     public static final long BYTES_USED = 600;
+
     public static final long NUM_PENDING_DELETION_BLOCKS = 2;
     public static final long NUM_DELETED_BLOCKS = 2;
 
