@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.container.common;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
@@ -52,7 +53,9 @@ public class TestOldSchemaVersions {
   private static final String DB_NAME = CONTAINER_ID + "-dn-container.db";
 
   private OzoneConfiguration conf;
-  private KeyValueContainerData kvData;
+
+  private File metadataDir;
+  private File dbFile;
 
   @Rule
   public TemporaryFolder tempFolder = new TemporaryFolder();
@@ -61,36 +64,9 @@ public class TestOldSchemaVersions {
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
 
-    ChunkLayOutVersion clVersion =
-          ChunkLayOutVersion.getChunkLayOutVersion(1);
-    // TODO : set this with a legit value (max container size).
-    long size = 0;
-    String pipelineID = UUID.randomUUID().toString();
-    String nodeID = UUID.randomUUID().toString();
-
-    kvData = new KeyValueContainerData(CONTAINER_ID, clVersion, size,
-            pipelineID, nodeID);
-
     // Copy data to the temporary folder so it can be safely modified.
-    File tempMetadataDir = constructTempResources();
-    kvData.setMetadataPath(tempMetadataDir.getAbsolutePath());
-    File dbFile =
-            tempMetadataDir.listFiles((dir, name) -> name.equals(DB_NAME))[0];
-    kvData.setDbFile(dbFile);
-
-    Yaml yaml = ContainerDataYaml.getYamlForContainerType(
-            kvData.getContainerType());
-    kvData.computeAndSetChecksum(yaml);
-  }
-
-  /**
-   * Copies test resources from the classpath to a temporary folder where
-   * they can be modified.
-   * @return The new temporary metadata folder.
-   */
-  private File constructTempResources() throws IOException {
-    File tempMetadataDir =
-            tempFolder.newFolder(OzoneConsts.CONTAINER_META_PATH);
+    File tempMetadataDir = tempFolder.newFolder(Long.toString(CONTAINER_ID),
+                    OzoneConsts.CONTAINER_META_PATH);
 
     ClassLoader loader = getClass().getClassLoader();
     File containerFile = new File(loader.getResource(CONTAINER_FILE_NAME)
@@ -100,15 +76,30 @@ public class TestOldSchemaVersions {
     FileUtils.copyDirectoryToDirectory(dbDir, tempMetadataDir);
     FileUtils.copyFileToDirectory(containerFile, tempMetadataDir);
 
-    return tempMetadataDir;
+    metadataDir = tempMetadataDir;
+    dbFile = metadataDir.listFiles((dir, name) -> name.equals(DB_NAME))[0];
   }
 
-  @Test
-  public void testSchemaVersion() {
-    // test kvdata has schema version null
-    assertNull(kvData.getSchemaVersion());
-  }
+  private KeyValueContainerData newKvData() throws IOException {
+    ChunkLayOutVersion clVersion =
+            ChunkLayOutVersion.getChunkLayOutVersion(1);
+    // TODO : set this with a legit value (max container size).
+    long size = 0;
+    String pipelineID = UUID.randomUUID().toString();
+    String nodeID = UUID.randomUUID().toString();
 
+    KeyValueContainerData kvData = new KeyValueContainerData(CONTAINER_ID,
+            clVersion, size,
+            pipelineID, nodeID);
+    kvData.setMetadataPath(metadataDir.getAbsolutePath());
+    kvData.setDbFile(dbFile);
+
+    Yaml yaml = ContainerDataYaml.getYamlForContainerType(
+            kvData.getContainerType());
+    kvData.computeAndSetChecksum(yaml);
+
+    return kvData;
+  }
 
   /**
    * Tests reading of a container that was written in schema version 1, when
@@ -119,7 +110,9 @@ public class TestOldSchemaVersions {
    */
   @Test
   public void testReadWithMetadata() throws Exception {
-    checkContainerData();
+    KeyValueContainerData kvData = newKvData();
+    KeyValueContainerUtil.parseKVContainerData(kvData, conf);
+    checkContainerData(kvData);
   }
 
   /**
@@ -132,7 +125,29 @@ public class TestOldSchemaVersions {
    */
   @Test
   public void testReadWithoutMetadata() throws Exception {
-//    try (ReferenceCountedDB db = BlockUtils.getDB(kvData, conf)) {
+    // Init the kvData with values so we can get the db to modify.
+    KeyValueContainerData kvData = newKvData();
+    KeyValueContainerUtil.parseKVContainerData(kvData, conf);
+
+    // Delete metadata keys from our copy of the DB.
+    try (ReferenceCountedDB db = BlockUtils.getDB(kvData, conf)) {
+      Table<String, Long> metadataTable = db.getStore().getMetadataTable();
+
+      metadataTable.delete(OzoneConsts.BLOCK_COUNT);
+      assertNull(metadataTable.get(OzoneConsts.BLOCK_COUNT));
+
+      metadataTable.delete(OzoneConsts.CONTAINER_BYTES_USED);
+      assertNull(metadataTable.get(OzoneConsts.CONTAINER_BYTES_USED));
+
+      metadataTable.delete(OzoneConsts.PENDING_DELETE_BLOCK_COUNT);
+      assertNull(metadataTable.get(OzoneConsts.PENDING_DELETE_BLOCK_COUNT));
+    }
+
+    // Re assign the kvData's metadata values by counting blocks in the
+    // database.
+    kvData = newKvData();
+    KeyValueContainerUtil.parseKVContainerData(kvData, conf);
+    checkContainerData(kvData);
   }
 
   /**
@@ -144,9 +159,8 @@ public class TestOldSchemaVersions {
 
   }
 
-  private void checkContainerData() throws IOException {
-    KeyValueContainerUtil.parseKVContainerData(kvData, conf);
-
+  private void checkContainerData(KeyValueContainerData kvData)
+          throws IOException {
     // TODO : set constants instead of magic numbers.
     assertEquals(OzoneConsts.SCHEMA_V1, kvData.getSchemaVersion());
     assertEquals(2, kvData.getKeyCount());
