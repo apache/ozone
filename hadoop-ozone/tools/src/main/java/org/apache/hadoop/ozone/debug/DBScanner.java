@@ -44,6 +44,16 @@ public class DBScanner implements Callable<Void> {
             description = "Table name")
   private String tableName;
 
+  @CommandLine.Option(names = {"--withKey"},
+      description = "List Key -> Value instead of just Value.",
+      defaultValue = "false",
+      showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
+  private boolean withKey;
+
+  @CommandLine.Option(names = {"--type"},
+      description = "Type name. (Pass in 'recon' for a Recon managed DB)")
+  private String dbType;
+
   @CommandLine.ParentCommand
   private RDBParser parent;
 
@@ -51,21 +61,29 @@ public class DBScanner implements Callable<Void> {
 
   private static void displayTable(RocksDB rocksDB,
         DBColumnFamilyDefinition dbColumnFamilyDefinition,
-        List<ColumnFamilyHandle> list) throws IOException {
+        List<ColumnFamilyHandle> list, boolean withKey) throws IOException {
     ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
             dbColumnFamilyDefinition.getTableName()
                     .getBytes(StandardCharsets.UTF_8), list);
-    if (columnFamilyHandle==null){
+    if (columnFamilyHandle == null) {
       throw new IllegalArgumentException("columnFamilyHandle is null");
     }
     RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle);
     iterator.seekToFirst();
     while (iterator.isValid()){
+      StringBuilder result = new StringBuilder();
+      if (withKey) {
+        Object key = dbColumnFamilyDefinition.getKeyCodec()
+            .fromPersistedFormat(iterator.key());
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        result.append(gson.toJson(key));
+        result.append(" -> ");
+      }
       Object o = dbColumnFamilyDefinition.getValueCodec()
               .fromPersistedFormat(iterator.value());
       Gson gson = new GsonBuilder().setPrettyPrinting().create();
-      String result = gson.toJson(o);
-      System.out.println(result);
+      result.append(gson.toJson(o));
+      System.out.println(result.toString());
       iterator.next();
     }
   }
@@ -125,14 +143,15 @@ public class DBScanner implements Callable<Void> {
           RocksDB rocksDB, String dbPath) throws IOException {
     dbPath = removeTrailingSlashIfNeeded(dbPath);
     this.constructColumnFamilyMap(DBDefinitionFactory.
-            getDefinition(new File(dbPath).getName()));
+            getDefinition(new File(dbPath).getName(), dbType));
     if (this.columnFamilyMap !=null) {
       if (!this.columnFamilyMap.containsKey(tableName)) {
         System.out.print("Table with specified name does not exist");
       } else {
         DBColumnFamilyDefinition columnFamilyDefinition =
                 this.columnFamilyMap.get(tableName);
-        displayTable(rocksDB, columnFamilyDefinition, columnFamilyHandleList);
+        displayTable(rocksDB, columnFamilyDefinition, columnFamilyHandleList,
+            withKey);
       }
     } else {
       System.out.println("Incorrect db Path");

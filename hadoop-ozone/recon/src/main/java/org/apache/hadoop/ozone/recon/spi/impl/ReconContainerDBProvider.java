@@ -18,20 +18,15 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
-import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_KEY_COUNT_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_CONTAINER_KEY_DB;
-import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_KEY_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 
 import java.io.File;
-import java.nio.file.Path;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.ReconUtils;
-import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.hdds.utils.db.IntegerCodec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,10 +64,10 @@ public class ReconContainerDBProvider implements Provider<DBStore> {
     if (lastKnownContainerKeyDb != null) {
       LOG.info("Last known container-key DB : {}",
           lastKnownContainerKeyDb.getAbsolutePath());
-      dbStore = initializeDBStore(configuration, reconUtils,
+      dbStore = initializeDBStore(configuration,
           lastKnownContainerKeyDb.getName());
     } else {
-      dbStore = getNewDBStore(configuration, reconUtils);
+      dbStore = getNewDBStore(configuration);
     }
     if (dbStore == null) {
       throw new ProvisionException("Unable to provide instance of DBStore " +
@@ -82,28 +77,19 @@ public class ReconContainerDBProvider implements Provider<DBStore> {
   }
 
   private static DBStore initializeDBStore(OzoneConfiguration configuration,
-      ReconUtils reconUtils, String dbName) {
+                                           String dbName) {
     DBStore dbStore = null;
     try {
-      Path metaDir = reconUtils.getReconDbDir(
-          configuration, OZONE_RECON_DB_DIR).toPath();
-      dbStore = DBStoreBuilder.newBuilder(configuration)
-          .setPath(metaDir)
-          .setName(dbName)
-          .addTable(CONTAINER_KEY_TABLE)
-          .addTable(CONTAINER_KEY_COUNT_TABLE)
-          .addCodec(ContainerKeyPrefix.class, new ContainerKeyPrefixCodec())
-          .addCodec(Integer.class, new IntegerCodec())
-          .build();
+      dbStore = DBStoreBuilder.createDBStore(configuration,
+          new ReconDBDefinition(dbName));
     } catch (Exception ex) {
       LOG.error("Unable to initialize Recon container metadata store.", ex);
     }
     return dbStore;
   }
 
-  static DBStore getNewDBStore(OzoneConfiguration configuration,
-                               ReconUtils reconUtils) {
+  static DBStore getNewDBStore(OzoneConfiguration configuration) {
     String dbName = RECON_CONTAINER_KEY_DB + "_" + System.currentTimeMillis();
-    return initializeDBStore(configuration, reconUtils, dbName);
+    return initializeDBStore(configuration, dbName);
   }
 }

@@ -19,28 +19,31 @@
 
 package org.apache.hadoop.ozone.recon.codec;
 
-import java.io.IOException;
-import java.util.UUID;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto.PARSER;
 
-import org.apache.hadoop.hdds.StringUtils;
+import java.io.IOException;
+
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.utils.db.Codec;
 
 /**
- * Codec for UUID.
+ * Codec for DatanodeDetails.
  */
-public class ReconNodeDBKeyCodec implements Codec<UUID> {
+public class DatanodeDetailsCodec implements Codec<DatanodeDetails> {
+
   @Override
-  public byte[] toPersistedFormat(UUID object) throws IOException {
-    return StringUtils.string2Bytes(object.toString());
+  public byte[] toPersistedFormat(DatanodeDetails object) throws IOException {
+    return object.getProtoBufMessage().toByteArray();
   }
 
   @Override
-  public UUID fromPersistedFormat(byte[] rawData) throws IOException {
-    return UUID.fromString(StringUtils.bytes2String(rawData));
+  public DatanodeDetails fromPersistedFormat(byte[] rawData)
+      throws IOException {
+    return DatanodeDetails.getFromProtoBuf(PARSER.parseFrom(rawData));
   }
 
   @Override
-  public UUID copyObject(UUID object) {
-    return null;
+  public DatanodeDetails copyObject(DatanodeDetails object) {
+    return object;
   }
 }
