@@ -233,6 +233,10 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       OmKeyInfo dbKeyInfo =
           omMetadataManager.getKeyTable().getIfExist(dbKeyName);
 
+      if (dbKeyInfo != null) {
+        ozoneManager.getKeyManager().refresh(dbKeyInfo);
+      }
+
       OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
           omMetadataManager.getBucketKey(volumeName, bucketName));
 

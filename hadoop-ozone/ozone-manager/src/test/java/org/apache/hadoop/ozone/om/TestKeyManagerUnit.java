@@ -417,26 +417,6 @@ public class TestKeyManagerUnit {
         .setBucketName("bucketOne")
         .setKeyName("keyOne");
 
-    keyArgs.setRefreshPipeline(false);
-    final OmKeyInfo oldKeyInfo = manager
-        .lookupFile(keyArgs.build(), "test");
-
-    final OmKeyLocationInfo oldBlockLocation = oldKeyInfo
-        .getLatestVersionLocations().getBlocksLatestVersionOnly().get(0);
-
-    Assert.assertEquals(1L, oldBlockLocation.getContainerID());
-    Assert.assertEquals(1L, oldBlockLocation
-        .getBlockID().getLocalID());
-    Assert.assertEquals(pipelineOne.getId(),
-        oldBlockLocation.getPipeline().getId());
-    Assert.assertTrue(oldBlockLocation.getPipeline()
-        .getNodes().contains(dnOne));
-    Assert.assertTrue(oldBlockLocation.getPipeline()
-        .getNodes().contains(dnTwo));
-    Assert.assertTrue(oldBlockLocation.getPipeline()
-        .getNodes().contains(dnThree));
-
-    keyArgs.setRefreshPipeline(true);
     final OmKeyInfo newKeyInfo = manager
         .lookupFile(keyArgs.build(), "test");
 

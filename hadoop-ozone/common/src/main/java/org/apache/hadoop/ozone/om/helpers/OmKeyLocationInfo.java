@@ -156,7 +156,15 @@ public final class OmKeyLocationInfo {
     }
   }
 
+  public KeyLocation getCompactProtobuf() {
+    return getProtobuf(true);
+  }
+
   public KeyLocation getProtobuf() {
+    return getProtobuf(false);
+  }
+
+  private KeyLocation getProtobuf(boolean ignorePipeline) {
     KeyLocation.Builder builder = KeyLocation.newBuilder()
         .setBlockID(blockID.getProtobuf())
         .setLength(length)
@@ -165,10 +173,12 @@ public final class OmKeyLocationInfo {
     if (this.token != null) {
       builder.setToken(OzonePBHelper.protoFromToken(token));
     }
-    try {
-      builder.setPipeline(pipeline.getProtobufMessage());
-    } catch (UnknownPipelineStateException e) {
-      //TODO: fix me: we should not return KeyLocation without pipeline.
+    if (!ignorePipeline) {
+      try {
+        builder.setPipeline(pipeline.getProtobufMessage());
+      } catch (UnknownPipelineStateException e) {
+        //TODO: fix me: we should not return KeyLocation without pipeline.
+      }
     }
     return builder.build();
   }
