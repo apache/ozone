@@ -417,7 +417,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         request.getMaxKeys());
 
     for (RepeatedOmKeyInfo key: deletedKeys) {
-      resp.addDeletedKeys(key.getProto());
+      resp.addDeletedKeys(key.getProto(false));
     }
 
     return resp.build();

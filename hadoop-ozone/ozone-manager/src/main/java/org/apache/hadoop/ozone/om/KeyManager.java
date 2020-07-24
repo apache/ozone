@@ -266,4 +266,10 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   OmMultipartUploadListParts listParts(String volumeName, String bucketName,
       String keyName, String uploadID, int partNumberMarker,
       int maxParts)  throws IOException;
+
+  /**
+   * Refresh the key block location information by get latest info from SCM.
+   * @param key
+   */
+  void refresh(OmKeyInfo key) throws IOException;
 }
