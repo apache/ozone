@@ -60,10 +60,15 @@ public class RepeatedOmKeyInfo {
     return new RepeatedOmKeyInfo.Builder().setOmKeyInfos(list).build();
   }
 
-  public RepeatedKeyInfo getProto() {
+  /**
+   *
+   * @param compact, true for persistence, false for network transmit
+   * @return
+   */
+  public RepeatedKeyInfo getProto(boolean compact) {
     List<KeyInfo> list = new ArrayList<>();
     for(OmKeyInfo k : omKeyInfoList) {
-      list.add(k.getProtobuf());
+      list.add(k.getProtobuf(compact));
     }
 
     RepeatedKeyInfo.Builder builder = RepeatedKeyInfo.newBuilder()

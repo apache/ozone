@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocationList;
 
 import java.util.ArrayList;
@@ -75,15 +76,18 @@ public class OmKeyLocationInfoGroup {
     return new ArrayList<>(locationVersionMap.get(versionToFetch));
   }
 
-  public KeyLocationList getProtobuf() {
-    return KeyLocationList.newBuilder()
-        .setVersion(version)
-        .addAllKeyLocations(
-            locationVersionMap.values().stream()
-                .flatMap(List::stream)
-                .map(OmKeyLocationInfo::getProtobuf)
-                .collect(Collectors.toList()))
-        .build();
+  public KeyLocationList getProtobuf(boolean ignorePipeline) {
+    KeyLocationList.Builder builder = KeyLocationList.newBuilder()
+        .setVersion(version);
+    List<OzoneManagerProtocolProtos.KeyLocation> keyLocationList =
+        new ArrayList<>();
+    for (List<OmKeyLocationInfo> locationList : locationVersionMap.values()) {
+      for (OmKeyLocationInfo keyInfo : locationList) {
+        keyLocationList.add(ignorePipeline ?
+            keyInfo.getCompactProtobuf() : keyInfo.getProtobuf());
+      }
+    }
+    return  builder.addAllKeyLocations(keyLocationList).build();
   }
 
   public static OmKeyLocationInfoGroup getFromProtobuf(
