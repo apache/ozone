@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.security.token.BlockTokenVerifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
@@ -59,6 +60,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
+import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,6 +84,7 @@ public class OzoneContainer {
   private ContainerMetadataScanner metadataScanner;
   private List<ContainerDataScanner> dataScanners;
   private final BlockDeletingService blockDeletingService;
+  private final GrpcTlsConfig tlsClientConfig;
 
   /**
    * Construct OzoneContainer object.
@@ -149,6 +152,12 @@ public class OzoneContainer {
     blockDeletingService =
         new BlockDeletingService(this, svcInterval, serviceTimeout,
             TimeUnit.MILLISECONDS, config);
+    tlsClientConfig = RatisHelper.createTlsClientConfig(
+        secConf, certClient != null ? certClient.getCACertificate() : null);
+  }
+
+  public GrpcTlsConfig getTlsClientConfig() {
+    return tlsClientConfig;
   }
 
   private GrpcReplicationService createReplicationService() {
