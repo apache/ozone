@@ -229,6 +229,7 @@ public class DatanodeStateMachine implements Closeable {
         // 1. Trigger heartbeat immediately
         // 2. Shutdown has be initiated.
         LOG.warn("Interrupt the execution.", e);
+        Thread.currentThread().interrupt();
       } catch (Exception e) {
         LOG.error("Unable to finish the execution.", e);
       }
