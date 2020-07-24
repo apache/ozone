@@ -21,10 +21,14 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.db.*;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.rocksdb.DBOptions;
+import org.rocksdb.Statistics;
+import org.rocksdb.StatsLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+
+import static org.apache.hadoop.ozone.OzoneConfigKeys.*;
 
 /**
  * Implementation of the {@link DatanodeStore} interface that contains
@@ -65,6 +69,16 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       DBOptions options = new DBOptions();
       options.setCreateIfMissing(true);
       options.setCreateMissingColumnFamilies(true);
+
+      String rocksDbStat = config.getTrimmed(
+              OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
+              OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
+
+      if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
+        Statistics statistics = new Statistics();
+        statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
+        options.setStatistics(statistics);
+      }
 
       this.store = DBStoreBuilder.newBuilder(config, dbDef)
               .setDBOption(options)
