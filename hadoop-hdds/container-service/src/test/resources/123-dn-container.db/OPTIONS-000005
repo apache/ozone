@@ -55,7 +55,7 @@
   new_table_reader_for_compaction_inputs=false
   skip_checking_sst_file_sizes_on_db_open=false
   skip_stats_update_on_db_open=false
-  wal_dir=/home/work/Files/hadoop-ozone/hadoop-hdds/container-service/target/test-dir/TestBlockDeletingService/hdds/ae2acf59-5572-475e-921b-fe0d6d584151/current/containerDir11/1595512854450/metadata/1595512854450-dn-container.db
+  wal_dir=/home/work/Files/hadoop-ozone/hadoop-hdds/container-service/target/test-dir/TestBlockDeletingService/hdds/05184016-bc9f-45ac-aca6-37f2041c23db/current/containerDir78/1595596643476/metadata/1595596643476-dn-container.db
   random_access_max_buffer_size=1048576
   skip_log_error_on_recovery=false
   paranoid_checks=true
