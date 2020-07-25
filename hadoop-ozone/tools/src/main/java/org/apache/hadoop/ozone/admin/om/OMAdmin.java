@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.admin.om;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
@@ -50,7 +51,7 @@ import picocli.CommandLine.Spec;
     subcommands = {
         GetServiceRolesSubcommand.class
     })
-public class OMAdmin extends GenericCli {
+public class OMAdmin extends GenericCli implements SubcommandWithParent {
 
   @CommandLine.ParentCommand
   private OzoneAdmin parent;
@@ -101,5 +102,10 @@ public class OMAdmin extends GenericCli {
           "configuration. Configured " + OZONE_OM_SERVICE_IDS_KEY + " are" +
           conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY));
     }
+  }
+
+  @Override
+  public Class<?> getParentType() {
+    return OzoneAdmin.class;
   }
 }

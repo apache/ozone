@@ -71,6 +71,10 @@ public class OzoneAdmin extends GenericCli implements WithScmClient {
   @Option(names = {"--scm"}, description = "The destination scm (host:port)")
   private String scm = "";
 
+  public OzoneAdmin() {
+    super(OzoneAdmin.class);
+  }
+
   public OzoneConfiguration getOzoneConf() {
     if (ozoneConf == null) {
       ozoneConf = createOzoneConfiguration();

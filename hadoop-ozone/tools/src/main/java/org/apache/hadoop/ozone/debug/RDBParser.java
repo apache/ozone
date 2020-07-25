@@ -19,6 +19,9 @@
 package org.apache.hadoop.ozone.debug;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
 /**
@@ -26,12 +29,9 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
         name = "ldb",
-        description = "Parse rocksdb file content",
-        subcommands = {
-                DBScanner.class,
-                ListTables.class
-        })
-public class RDBParser extends GenericCli {
+        description = "Parse rocksdb file content")
+@MetaInfServices(SubcommandWithParent.class)
+public class RDBParser extends GenericCli implements SubcommandWithParent {
 
   @CommandLine.Option(names = {"--db"},
             description = "Database File Path")
@@ -44,5 +44,10 @@ public class RDBParser extends GenericCli {
   @Override
   public void execute(String[] argv) {
     new RDBParser().run(argv);
+  }
+
+  @Override
+  public Class<?> getParentType() {
+    return OzoneDebug.class;
   }
 }
