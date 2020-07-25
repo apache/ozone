@@ -325,8 +325,10 @@ public class ContainerStateManager {
                                Pipeline pipeline) throws IOException {
     Preconditions.checkNotNull(containerInfo);
     containers.addContainer(containerInfo);
-    pipelineManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueof(containerID));
+    if (pipeline != null) {
+      pipelineManager.addContainerToPipeline(pipeline.getId(),
+          ContainerID.valueof(containerID));
+    }
     containerStateCount.incrementAndGet(containerInfo.getState());
   }
 
