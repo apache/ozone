@@ -481,36 +481,38 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     // If KMS is not enabled, follow the normal approach of execution of not
     // reading DB in pre-execute.
+
+    OmBucketInfo bucketInfo = null;
     if (ozoneManager.getKmsProvider() != null) {
       try {
         acquireLock = omMetadataManager.getLock().acquireReadLock(
             BUCKET_LOCK, volumeName, bucketName);
 
-
-        OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
+        bucketInfo = omMetadataManager.getBucketTable().get(
             omMetadataManager.getBucketKey(volumeName, bucketName));
 
-
-        // Don't throw exception of bucket not found when bucketinfo is not
-        // null. If bucketinfo is null, later when request
-        // is submitted and if bucket does not really exist it will fail in
-        // applyTransaction step. Why we are doing this is if OM thinks it is
-        // the leader, but it is not, we don't want to fail request in this
-        // case. As anyway when it submits request to ratis it will fail with
-        // not leader exception, and client will retry on correct leader and
-        // request will be executed.
-        if (bucketInfo != null) {
-          Optional< FileEncryptionInfo > encryptionInfo =
-              getFileEncryptionInfo(ozoneManager, bucketInfo);
-          if (encryptionInfo.isPresent()) {
-            newKeyArgs.setFileEncryptionInfo(
-                OMPBHelper.convert(encryptionInfo.get()));
-          }
-        }
       } finally {
         if (acquireLock) {
           omMetadataManager.getLock().releaseReadLock(
               BUCKET_LOCK, volumeName, bucketName);
+        }
+      }
+
+      // Don't throw exception of bucket not found when bucketinfo is
+      // null. If bucketinfo is null, later when request
+      // is submitted and if bucket does not really exist it will fail in
+      // applyTransaction step. Why we are doing this is if OM thinks it is
+      // the leader, but it is not, we don't want to fail request in this
+      // case. As anyway when it submits request to ratis it will fail with
+      // not leader exception, and client will retry on correct leader and
+      // request will be executed.
+
+      if (bucketInfo != null) {
+        Optional<FileEncryptionInfo> encryptionInfo =
+            getFileEncryptionInfo(ozoneManager, bucketInfo);
+        if (encryptionInfo.isPresent()) {
+          newKeyArgs.setFileEncryptionInfo(
+              OMPBHelper.convert(encryptionInfo.get()));
         }
       }
     }
