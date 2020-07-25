@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -33,7 +34,7 @@ import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3InitiateMultipartUploadResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartInfoInitiateRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartInfoInitiateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -51,6 +52,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
@@ -67,15 +69,17 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
   }
 
   @Override
-  public OMRequest preExecute(OzoneManager ozoneManager) {
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     MultipartInfoInitiateRequest multipartInfoInitiateRequest =
         getOmRequest().getInitiateMultiPartUploadRequest();
     Preconditions.checkNotNull(multipartInfoInitiateRequest);
 
-    OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs =
-        multipartInfoInitiateRequest.getKeyArgs().toBuilder()
+    KeyArgs keyArgs = multipartInfoInitiateRequest.getKeyArgs();
+    KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
             .setMultipartUploadID(UUID.randomUUID().toString() + "-" +
-                UniqueId.next()).setModificationTime(Time.now());
+                UniqueId.next()).setModificationTime(Time.now())
+            .setKeyName(validateAndNormalizeKey(
+                ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
 
     return getOmRequest().toBuilder()
         .setUserInfo(getUserInfo())
@@ -92,7 +96,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
     MultipartInfoInitiateRequest multipartInfoInitiateRequest =
         getOmRequest().getInitiateMultiPartUploadRequest();
 
-    OzoneManagerProtocolProtos.KeyArgs keyArgs =
+    KeyArgs keyArgs =
         multipartInfoInitiateRequest.getKeyArgs();
 
     Preconditions.checkNotNull(keyArgs.getMultipartUploadID());
@@ -129,6 +133,17 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
               volumeName, bucketName);
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+
+      // If KMS is configured and TDE is enabled on bucket, throw MPU not
+      // supported.
+      if (ozoneManager.getKmsProvider() != null) {
+        if (omMetadataManager.getBucketTable().get(
+            omMetadataManager.getBucketKey(volumeName, bucketName))
+            .getEncryptionKeyInfo() != null) {
+          throw new OMException("MultipartUpload is not yet supported on " +
+              "encrypted buckets", NOT_SUPPORTED_OPERATION);
+        }
+      }
 
       // We are adding uploadId to key, because if multiple users try to
       // perform multipart upload on the same key, each will try to upload, who

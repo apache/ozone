@@ -24,6 +24,8 @@ import java.util.NoSuchElementException;
 import java.util.function.Consumer;
 
 import org.rocksdb.RocksIterator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * RocksDB store iterator.
@@ -31,12 +33,16 @@ import org.rocksdb.RocksIterator;
 public class RDBStoreIterator
     implements TableIterator<byte[], ByteArrayKeyValue> {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(RDBStoreIterator.class);
+
   private RocksIterator rocksDBIterator;
   private RDBTable rocksDBTable;
+  private ByteArrayKeyValue currentEntry;
 
   public RDBStoreIterator(RocksIterator iterator) {
     this.rocksDBIterator = iterator;
-    rocksDBIterator.seekToFirst();
+    seekToFirst();
   }
 
   public RDBStoreIterator(RocksIterator iterator, RDBTable table) {
@@ -52,6 +58,15 @@ public class RDBStoreIterator
     }
   }
 
+  private void setCurrentEntry() {
+    if (rocksDBIterator.isValid()) {
+      currentEntry = ByteArrayKeyValue.create(rocksDBIterator.key(),
+          rocksDBIterator.value());
+    } else {
+      currentEntry = null;
+    }
+  }
+
   @Override
   public boolean hasNext() {
     return rocksDBIterator.isValid();
@@ -59,12 +74,10 @@ public class RDBStoreIterator
 
   @Override
   public ByteArrayKeyValue next() {
-    if (rocksDBIterator.isValid()) {
-      ByteArrayKeyValue value =
-          ByteArrayKeyValue.create(rocksDBIterator.key(), rocksDBIterator
-              .value());
+    setCurrentEntry();
+    if (currentEntry != null) {
       rocksDBIterator.next();
-      return value;
+      return currentEntry;
     }
     throw new NoSuchElementException("RocksDB Store has no more elements");
   }
@@ -72,21 +85,20 @@ public class RDBStoreIterator
   @Override
   public void seekToFirst() {
     rocksDBIterator.seekToFirst();
+    setCurrentEntry();
   }
 
   @Override
   public void seekToLast() {
     rocksDBIterator.seekToLast();
+    setCurrentEntry();
   }
 
   @Override
   public ByteArrayKeyValue seek(byte[] key) {
     rocksDBIterator.seek(key);
-    if (rocksDBIterator.isValid()) {
-      return ByteArrayKeyValue.create(rocksDBIterator.key(),
-          rocksDBIterator.value());
-    }
-    return null;
+    setCurrentEntry();
+    return currentEntry;
   }
 
   @Override
@@ -111,8 +123,10 @@ public class RDBStoreIterator
     if (rocksDBTable == null) {
       throw new UnsupportedOperationException("remove");
     }
-    if (rocksDBIterator.isValid()) {
-      rocksDBTable.delete(rocksDBIterator.key());
+    if (currentEntry != null) {
+      rocksDBTable.delete(currentEntry.getKey());
+    } else {
+      LOG.info("Unable to delete currentEntry as it does not exist.");
     }
   }
 

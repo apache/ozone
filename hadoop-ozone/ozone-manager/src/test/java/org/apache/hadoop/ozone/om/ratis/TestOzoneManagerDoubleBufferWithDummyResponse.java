@@ -139,7 +139,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
 
     Assert.assertEquals(lastAppliedIndex,
         omTransactionInfo.getTransactionIndex());
-    Assert.assertEquals(term, omTransactionInfo.getCurrentTerm());
+    Assert.assertEquals(term, omTransactionInfo.getTerm());
   }
 
   /**

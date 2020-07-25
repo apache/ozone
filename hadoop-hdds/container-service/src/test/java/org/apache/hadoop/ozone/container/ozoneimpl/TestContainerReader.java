@@ -22,15 +22,16 @@ import com.google.common.primitives.Longs;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -68,7 +69,7 @@ public class TestContainerReader {
   private MutableVolumeSet volumeSet;
   private HddsVolume hddsVolume;
   private ContainerSet containerSet;
-  private ConfigurationSource conf;
+  private OzoneConfiguration conf;
 
 
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
@@ -218,5 +219,69 @@ public class TestContainerReader {
       Assert.assertEquals(i,
           keyValueContainerData.getNumPendingDeletionBlocks());
     }
+  }
+
+  @Test
+  public void testMultipleContainerReader() throws Exception {
+    final int volumeNum = 10;
+    StringBuffer datanodeDirs = new StringBuffer();
+    File[] volumeDirs = new File[volumeNum];
+    for (int i = 0; i < volumeNum; i++) {
+      volumeDirs[i] = tempDir.newFolder();
+      datanodeDirs = datanodeDirs.append(volumeDirs[i]).append(",");
+    }
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
+        datanodeDirs.toString());
+    MutableVolumeSet volumeSets =
+        new MutableVolumeSet(datanodeId.toString(), conf);
+    ContainerCache cache = ContainerCache.getInstance(conf);
+    cache.clear();
+
+    RoundRobinVolumeChoosingPolicy policy =
+        new RoundRobinVolumeChoosingPolicy();
+
+    final int containerCount = 100;
+    blockCount = containerCount;
+    for (int i = 0; i < containerCount; i++) {
+      KeyValueContainerData keyValueContainerData =
+          new KeyValueContainerData(i, ChunkLayOutVersion.FILE_PER_BLOCK,
+              (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
+              datanodeId.toString());
+
+      KeyValueContainer keyValueContainer =
+          new KeyValueContainer(keyValueContainerData,
+              conf);
+      keyValueContainer.create(volumeSets, policy, scmId);
+
+      List<Long> blkNames;
+      if (i % 2 == 0) {
+        blkNames = addBlocks(keyValueContainer, true);
+        markBlocksForDelete(keyValueContainer, true, blkNames, i);
+      } else {
+        blkNames = addBlocks(keyValueContainer, false);
+        markBlocksForDelete(keyValueContainer, false, blkNames, i);
+      }
+    }
+
+    List<HddsVolume> hddsVolumes = volumeSets.getVolumesList();
+    ContainerReader[] containerReaders = new ContainerReader[volumeNum];
+    Thread[] threads = new Thread[volumeNum];
+    for (int i = 0; i < volumeNum; i++) {
+      containerReaders[i] = new ContainerReader(volumeSets,
+          hddsVolumes.get(i), containerSet, conf);
+      threads[i] = new Thread(containerReaders[i]);
+    }
+    long startTime = System.currentTimeMillis();
+    for (int i = 0; i < volumeNum; i++) {
+      threads[i].start();
+    }
+    for (int i = 0; i < volumeNum; i++) {
+      threads[i].join();
+    }
+    System.out.println("Open " + volumeNum + " Volume with " + containerCount +
+        " costs " + (System.currentTimeMillis() - startTime) / 1000 + "s");
+    Assert.assertEquals(containerCount,
+        containerSet.getContainerMap().entrySet().size());
+    Assert.assertEquals(containerCount, cache.size());
   }
 }
