@@ -1363,8 +1363,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setConfiguration(config)
         .setScmID(omStore.getScmId())
         .setClusterID(omStore.getClusterID())
-        .setSubject(subject)
-        .addIpAddress(ip);
+        .setSubject(subject);
 
     OMHANodeDetails haOMHANodeDetails = OMHANodeDetails.loadOMHAConfig(config);
     String serviceName =
