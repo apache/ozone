@@ -815,7 +815,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.scm.pipeline.choose.impl</name>
+    <name>ozone.scm.pipeline.choose.policy.impl</name>
     <value>
       org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy
     </value>
