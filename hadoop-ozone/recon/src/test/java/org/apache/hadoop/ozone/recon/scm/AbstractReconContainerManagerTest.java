@@ -113,7 +113,7 @@ public class AbstractReconContainerManagerTest {
     Pipeline pipeline = getRandomPipeline();
     getPipelineManager().addPipeline(pipeline);
 
-    ContainerID containerID = new ContainerID(1L);
+    ContainerID containerID = new ContainerID(100L);
     ContainerInfo containerInfo =
         new ContainerInfo.Builder()
             .setContainerID(containerID.getId())
@@ -128,7 +128,7 @@ public class AbstractReconContainerManagerTest {
         new ContainerWithPipeline(containerInfo, pipeline);
     StorageContainerServiceProvider scmServiceProviderMock = mock(
         StorageContainerServiceProvider.class);
-    when(scmServiceProviderMock.getContainerWithPipeline(1L))
+    when(scmServiceProviderMock.getContainerWithPipeline(100L))
         .thenReturn(containerWithPipeline);
     return scmServiceProviderMock;
   }
