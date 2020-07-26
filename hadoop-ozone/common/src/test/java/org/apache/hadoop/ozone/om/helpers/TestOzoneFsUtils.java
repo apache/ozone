@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,8 +16,24 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.upgrade;
+package org.apache.hadoop.ozone.om.helpers;
+
+import org.junit.Assert;
+import org.junit.Test;
 
 /**
- * In-Place upgrade utility to upgrade HDDS to Ozone cluster..
+ * Test OzoneFsUtils.
  */
+public class TestOzoneFsUtils {
+
+  @Test
+  public void testPaths() {
+    Assert.assertTrue(OzoneFSUtils.isValidName("/a/b"));
+    Assert.assertFalse(OzoneFSUtils.isValidName("../../../a/b"));
+    Assert.assertFalse(OzoneFSUtils.isValidName("/./."));
+    Assert.assertFalse(OzoneFSUtils.isValidName("/:/"));
+    Assert.assertFalse(OzoneFSUtils.isValidName("a/b"));
+    Assert.assertFalse(OzoneFSUtils.isValidName("/a:/b"));
+    Assert.assertFalse(OzoneFSUtils.isValidName("/a//b"));
+  }
+}

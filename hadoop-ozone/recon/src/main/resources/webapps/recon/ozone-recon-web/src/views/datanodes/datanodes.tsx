@@ -23,13 +23,14 @@ import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';
 import {ReplicationIcon} from 'utils/themeIcons';
 import StorageBar from 'components/storageBar/storageBar';
-import {DatanodeStatus, IStorageReport} from 'types/datanode.types';
+import {DatanodeStatus, DatanodeStatusList, IStorageReport} from 'types/datanode.types';
 import './datanodes.less';
 import {AutoReloadHelper} from 'utils/autoReloadHelper';
 import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
 import {MultiSelect, IOption} from 'components/multiSelect/multiSelect';
 import {ActionMeta, ValueType} from 'react-select';
 import {showDataFetchError} from 'utils/common';
+import {ColumnSearch} from 'utils/columnSearch';
 
 interface IDatanodeResponse {
   hostname: string;
@@ -42,6 +43,8 @@ interface IDatanodeResponse {
   uuid: string;
   version: string;
   setupTime: number;
+  revision: string;
+  buildDate: string;
 }
 
 interface IDatanodesResponse {
@@ -62,6 +65,8 @@ interface IDatanode {
   uuid: string;
   version: string;
   setupTime: number;
+  revision: string;
+  buildDate: string;
 }
 
 interface IPipeline {
@@ -98,6 +103,9 @@ const COLUMNS = [
     dataIndex: 'state',
     key: 'state',
     isVisible: true,
+    filterMultiple: true,
+    filters: DatanodeStatusList.map(status => ({text: status, value: status})),
+    onFilter: (value: DatanodeStatus, record: IDatanode) => record.state === value,
     render: (text: DatanodeStatus) => renderDatanodeStatus(text),
     sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state)
   },
@@ -106,6 +114,7 @@ const COLUMNS = [
     dataIndex: 'uuid',
     key: 'uuid',
     isVisible: true,
+    isSearchable: true,
     sorter: (a: IDatanode, b: IDatanode) => a.uuid.localeCompare(b.uuid),
     defaultSortOrder: 'ascend' as const
   },
@@ -114,6 +123,7 @@ const COLUMNS = [
     dataIndex: 'hostname',
     key: 'hostname',
     isVisible: true,
+    isSearchable: true,
     sorter: (a: IDatanode, b: IDatanode) => a.hostname.localeCompare(b.hostname),
     defaultSortOrder: 'ascend' as const
   },
@@ -173,6 +183,7 @@ const COLUMNS = [
     dataIndex: 'leaderCount',
     key: 'leaderCount',
     isVisible: true,
+    isSearchable: true,
     sorter: (a: IDatanode, b: IDatanode) => a.leaderCount - b.leaderCount
   },
   {
@@ -180,6 +191,7 @@ const COLUMNS = [
     dataIndex: 'containers',
     key: 'containers',
     isVisible: true,
+    isSearchable: true,
     sorter: (a: IDatanode, b: IDatanode) => a.containers - b.containers
   },
   {
@@ -187,6 +199,7 @@ const COLUMNS = [
     dataIndex: 'version',
     key: 'version',
     isVisible: false,
+    isSearchable: true,
     sorter: (a: IDatanode, b: IDatanode) => a.version.localeCompare(b.version),
     defaultSortOrder: 'ascend' as const
   },
@@ -199,6 +212,24 @@ const COLUMNS = [
     render: (uptime: number) => {
       return uptime > 0 ? moment(uptime).format('ll LTS') : 'NA';
     }
+  },
+  {
+    title: 'Revision',
+    dataIndex: 'revision',
+    key: 'revision',
+    isVisible: false,
+    isSearchable: true,
+    sorter: (a: IDatanode, b: IDatanode) => a.revision.localeCompare(b.revision),
+    defaultSortOrder: 'ascend' as const
+  },
+  {
+    title: 'BuildDate',
+    dataIndex: 'buildDate',
+    key: 'buildDate',
+    isVisible: false,
+    isSearchable: true,
+    sorter: (a: IDatanode, b: IDatanode) => a.buildDate.localeCompare(b.buildDate),
+    defaultSortOrder: 'ascend' as const
   }
 ];
 
@@ -256,7 +287,9 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
           containers: datanode.containers,
           leaderCount: datanode.leaderCount,
           version: datanode.version,
-          setupTime: datanode.setupTime
+          setupTime: datanode.setupTime,
+          revision: datanode.revision,
+          buildDate: datanode.buildDate
         };
       });
       const selectedColumns: IOption[] = COLUMNS.filter(column => column.isVisible).map(column => ({
@@ -330,9 +363,21 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
         <div className='content-div'>
           <Table
             dataSource={dataSource}
-            columns={COLUMNS.filter(column =>
-              selectedColumns.some(e => e.value === column.key)
-            )}
+            columns={COLUMNS.reduce<any[]>((filtered, column) => {
+              if (selectedColumns.some(e => e.value === column.key)) {
+                if (column.isSearchable) {
+                  const newColumn = {
+                    ...column,
+                    ...new ColumnSearch(column).getColumnSearchProps(column.dataIndex)
+                  };
+                  filtered.push(newColumn);
+                } else {
+                  filtered.push(column);
+                }
+              }
+
+              return filtered;
+            }, [])}
             loading={loading}
             pagination={paginationConfig}
             rowKey='hostname'

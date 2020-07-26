@@ -15,23 +15,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.upgrade;
+package org.apache.hadoop.ozone.util;
 
-import java.util.concurrent.Callable;
-
-import picocli.CommandLine.Command;
+import org.apache.ratis.util.ExitUtils;
+import org.slf4j.Logger;
 
 /**
- * Execute Ozone specific HDFS ballanced..
+ * An Exit Manager used to shutdown service in case of unrecoverable error.
+ * This class will be helpful to test exit functionality.
  */
-@Command(name = "execute",
-    description = "Start/restart upgrade from HDFS to Ozone cluster.")
-public class Execute implements Callable<Void> {
+public class ExitManager {
 
-  @Override
-  public Void call() throws Exception {
-    System.err.println("In-Place upgrade : execute] is not yet supported.");
-    return null;
+  public void exitSystem(int status, String message, Throwable throwable,
+      Logger log) {
+    ExitUtils.terminate(1, message, throwable, log);
   }
-
 }
