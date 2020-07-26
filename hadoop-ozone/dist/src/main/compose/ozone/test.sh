@@ -35,7 +35,7 @@ execute_robot_test scm gdpr
 
 for scheme in ofs o3fs; do
   for bucket in link bucket; do
-    execute_robot_test scm -v SCHEME:${scheme} -v BUCKET_TYPE:${bucket} -N ozonefs-${scheme}-${link} ozonefs/ozonefs.robot
+    execute_robot_test scm -v SCHEME:${scheme} -v BUCKET_TYPE:${bucket} -N ozonefs-${scheme}-${bucket} ozonefs/ozonefs.robot
   done
 done
 
