@@ -34,20 +34,19 @@ fi
 RESULT=0
 IFS=$'\n'
 # shellcheck disable=SC2044
-for test in $(find "$SCRIPT_DIR" -mindepth 2 -maxdepth 2 -name test.sh | grep "${OZONE_TEST_SELECTOR:-""}" |sort); do
-  TEST_DIR="$(dirname "$test")"
-  echo "Executing test in $TEST_DIR"
+for test in $(find "$SCRIPT_DIR" -name test.sh | grep "${OZONE_TEST_SELECTOR:-""}" |sort); do
+  echo "Executing test in $(dirname "$test")"
 
   #required to read the .env file from the right location
-  cd "$TEST_DIR" || continue
+  cd "$(dirname "$test")" || continue
   ./test.sh
   ret=$?
   if [[ $ret -ne 0 ]]; then
       RESULT=1
-      echo "ERROR: Test execution of $TEST_DIR is FAILED!!!!"
+      echo "ERROR: Test execution of $(dirname "$test") is FAILED!!!!"
   fi
-  RESULT_DIR="$TEST_DIR"/result
-  rebot -N $(basename $TEST_DIR) -o "$ALL_RESULT_DIR"/$(basename $TEST_DIR).xml "$RESULT_DIR"/*.xml
+  RESULT_DIR="$(dirname "$test")/result"
+  rebot -N $(basename $(dirname "$test")) -o "$ALL_RESULT_DIR"/$(basename $(dirname "$test")).xml "$RESULT_DIR"/*.xml
   cp "$RESULT_DIR"/docker-*.log "$RESULT_DIR"/*.out* "$ALL_RESULT_DIR"/
 done
 
