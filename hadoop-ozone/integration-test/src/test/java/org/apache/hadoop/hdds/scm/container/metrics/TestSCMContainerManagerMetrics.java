@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.hdds.scm.container.metrics;
 
-import org.apache.commons.lang3.RandomUtils;
+import java.io.IOException;
+import java.util.HashMap;
+
 import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -29,22 +31,19 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
 
-import java.io.IOException;
-import java.util.HashMap;
-
+import org.apache.commons.lang3.RandomUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys
-    .HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
-import org.junit.Rule;
-import org.junit.rules.Timeout;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import org.junit.After;
+import org.junit.Assert;
 import static org.junit.Assert.fail;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.Timeout;
 
 /**
  * Class used to test {@link SCMContainerManagerMetrics}.
@@ -85,7 +84,7 @@ public class TestSCMContainerManagerMetrics {
         "NumSuccessfulCreateContainers", metrics);
 
     ContainerInfo containerInfo = containerManager.allocateContainer(
-        StaticStorageClassRegistry.STANDARD.getName(), OzoneConsts.OZONE);
+        StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(), OzoneConsts.OZONE);
 
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
     Assert.assertEquals(getLongCounter("NumSuccessfulCreateContainers",

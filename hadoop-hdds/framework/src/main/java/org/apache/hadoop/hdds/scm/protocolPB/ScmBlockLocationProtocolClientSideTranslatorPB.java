@@ -134,8 +134,8 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
   public List<AllocatedBlock> allocateBlock(
       long size,
       int num,
-      String owner,
       String storageClassName,
+      String owner,
       ExcludeList excludeList
   ) throws IOException {
     Preconditions.checkArgument(size > 0, "block size must be greater than 0");

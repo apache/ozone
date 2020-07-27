@@ -189,7 +189,7 @@ public class SCMBlockProtocolServer implements
     try {
       for (int i = 0; i < num; i++) {
         AllocatedBlock block = scm.getScmBlockManager()
-            .allocateBlock(size, owner, storageClass, excludeList);
+            .allocateBlock(size, storageClass, owner, excludeList);
         if (block != null) {
           blocks.add(block);
         }

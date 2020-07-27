@@ -430,7 +430,7 @@ public class ReplicationManager
         replicas,
         storageClass.getClosedStateConfiguration().getReplicationFactor())
         .isPolicySatisfied();
-    return container.getReplicationFactor().getNumber() >
+    return storageClass.getClosedStateConfiguration().getReplicationFactor() >
         getReplicaCount(container.containerID(), replicas) || misReplicated;
   }
 

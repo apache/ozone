@@ -56,7 +56,7 @@ public interface ScmBlockLocationProtocol extends Closeable {
    * @throws IOException
    */
   List<AllocatedBlock> allocateBlock(long size, int numBlocks,
-      String owner, String storageClassName,
+      String storageClassName, String owner,
       ExcludeList excludeList) throws IOException;
 
   /**

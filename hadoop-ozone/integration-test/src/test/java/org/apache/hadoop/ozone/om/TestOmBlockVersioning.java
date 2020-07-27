@@ -100,6 +100,7 @@ public class TestOmBlockVersioning {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
+        .setStorageClass("REDUCED")
         .setDataSize(1000)
         .setRefreshPipeline(true)
         .setAcls(new ArrayList<>())

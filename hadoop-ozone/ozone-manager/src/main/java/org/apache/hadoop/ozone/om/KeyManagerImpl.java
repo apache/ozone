@@ -342,8 +342,8 @@ public class KeyManagerImpl implements KeyManager {
     List<AllocatedBlock> allocatedBlocks;
     try {
       allocatedBlocks = scmClient.getBlockClient()
-          .allocateBlock(scmBlockSize, numBlocks, keyInfo.getStorageClass(),
-              omId, excludeList);
+          .allocateBlock(scmBlockSize, numBlocks,
+              keyInfo.getStorageClass(), omId, excludeList);
     } catch (SCMException ex) {
       if (ex.getResult()
           .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
