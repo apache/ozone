@@ -18,8 +18,10 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
@@ -42,6 +44,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -66,14 +69,25 @@ import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Ozone file system tests that are not covered by contract tests.
  */
+@RunWith(Parameterized.class)
 public class TestOzoneFileSystem {
 
+  @Parameterized.Parameters
+  public static Collection<Object[]> data() {
+    return Arrays.asList(new Object[]{true}, new Object[]{false});
+  }
+
+  public TestOzoneFileSystem(boolean setDefaultFs) {
+    this.enabledFileSystemPaths = setDefaultFs;
+  }
   /**
    * Set a timeout for each test.
    */
@@ -82,6 +96,8 @@ public class TestOzoneFileSystem {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystem.class);
+
+  private boolean enabledFileSystemPaths;
 
   private MiniOzoneCluster cluster;
   private FileSystem fs;
@@ -215,6 +231,8 @@ public class TestOzoneFileSystem {
     testRenameDir();
     testSeekOnFileLength();
     testDeleteRoot();
+
+    testRecursiveDelete();
   }
 
   @After
@@ -229,6 +247,8 @@ public class TestOzoneFileSystem {
       throws IOException, TimeoutException, InterruptedException {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+        enabledFileSystemPaths);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
@@ -296,13 +316,85 @@ public class TestOzoneFileSystem {
     }
 
     // Delete the child key
-    fs.delete(child, false);
+    fs.delete(child, true);
 
     // Deleting the only child should create the parent dir key if it does
     // not exist
     String parentKey = o3fs.pathToKey(parent) + "/";
     OzoneKeyDetails parentKeyInfo = getKey(parent, true);
     assertEquals(parentKey, parentKeyInfo.getName());
+  }
+
+
+  private void testRecursiveDelete() throws Exception {
+    Path grandparent = new Path("/gdir1");
+
+    for (int i = 1; i <= 10; i++) {
+      Path parent = new Path(grandparent, "pdir" +i);
+      Path child = new Path(parent, "child");
+      ContractTestUtils.touch(fs, child);
+    }
+
+    // Delete the grandparent, which should delete all keys.
+    fs.delete(grandparent, true);
+
+    checkPath(grandparent);
+
+    for (int i = 1; i <= 10; i++) {
+      Path parent = new Path(grandparent, "dir" +i);
+      Path child = new Path(parent, "child");
+      checkPath(parent);
+      checkPath(child);
+    }
+
+
+    Path level0 = new Path("/level0");
+
+    for (int i = 1; i <= 3; i++) {
+      Path level1 = new Path(level0, "level" +i);
+      Path level2 = new Path(level1, "level" +i);
+      Path level1File = new Path(level1, "file1");
+      Path level2File = new Path(level2, "file1");
+      ContractTestUtils.touch(fs, level1File);
+      ContractTestUtils.touch(fs, level2File);
+    }
+
+    // Delete at sub directory level.
+    for (int i = 1; i <= 3; i++) {
+      Path level1 = new Path(level0, "level" +i);
+      Path level2 = new Path(level1, "level" +i);
+      fs.delete(level2, true);
+      fs.delete(level1, true);
+    }
+
+
+    // Delete level0 finally.
+    fs.delete(grandparent, true);
+
+    // Check if it exists or not.
+    checkPath(grandparent);
+
+    for (int i = 1; i <= 3; i++) {
+      Path level1 = new Path(level0, "level" +i);
+      Path level2 = new Path(level1, "level" +i);
+      Path level1File = new Path(level1, "file1");
+      Path level2File = new Path(level2, "file1");
+      checkPath(level1);
+      checkPath(level2);
+      checkPath(level1File);
+      checkPath(level2File);
+    }
+
+  }
+
+  private void checkPath(Path path) {
+    try {
+      fs.getFileStatus(path);
+      fail("testRecursiveDelete failed");
+    } catch (IOException ex) {
+      Assert.assertTrue(ex instanceof FileNotFoundException);
+      Assert.assertTrue(ex.getMessage().contains("No such file or directory"));
+    }
   }
 
   private void testFileDelete() throws Exception {
