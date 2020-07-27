@@ -23,7 +23,7 @@ jobs:
     name: compile
     runs-on: ubuntu-18.04
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@v2
       - uses: actions/cache@v2
         with:
           path: |
@@ -39,14 +39,14 @@ jobs:
     name: rat
     runs-on: ubuntu-18.04
     steps:
-        - uses: actions/checkout@master
+        - uses: actions/checkout@v2
         - uses: ./.github/buildenv
           with:
              args: ./hadoop-ozone/dev-support/checks/rat.sh
         - name: Summary of failures
           run: cat target/${{ github.job }}/summary.txt
           if: always()
-        - uses: actions/upload-artifact@master
+        - uses: actions/upload-artifact@v2
           if: always()
           with:
             name: rat
@@ -56,12 +56,12 @@ jobs:
     name: author
     runs-on: ubuntu-18.04
     steps:
-        - uses: actions/checkout@master
+        - uses: actions/checkout@v2
         - run: hadoop-ozone/dev-support/checks/author.sh
         - name: Summary of failures
           run: cat target/${{ github.job }}/summary.txt
           if: always()
-        - uses: actions/upload-artifact@master
+        - uses: actions/upload-artifact@v2
           if: always()
           with:
             name: author
@@ -71,14 +71,14 @@ jobs:
     name: unit
     runs-on: ubuntu-18.04
     steps:
-        - uses: actions/checkout@master
+        - uses: actions/checkout@v2
         - uses: ./.github/buildenv
           with:
              args: ./hadoop-ozone/dev-support/checks/unit.sh
         - name: Summary of failures
           run: cat target/${{ github.job }}/summary.txt
           if: always()
-        - uses: actions/upload-artifact@master
+        - uses: actions/upload-artifact@v2
           if: always()
           with:
             name: unit
@@ -88,14 +88,14 @@ jobs:
     name: checkstyle
     runs-on: ubuntu-18.04
     steps:
-        - uses: actions/checkout@master
+        - uses: actions/checkout@v2
         - uses: ./.github/buildenv
           with:
              args: ./hadoop-ozone/dev-support/checks/checkstyle.sh
         - name: Summary of failures
           run: cat target/${{ github.job }}/summary.txt
           if: always()
-        - uses: actions/upload-artifact@master
+        - uses: actions/upload-artifact@v2
           if: always()
           with:
             name: checkstyle
@@ -105,14 +105,14 @@ jobs:
     name: findbugs
     runs-on: ubuntu-18.04
     steps:
-        - uses: actions/checkout@master
+        - uses: actions/checkout@v2
         - uses: ./.github/buildenv
           with:
              args: ./hadoop-ozone/dev-support/checks/findbugs.sh
         - name: Summary of failures
           run: cat target/${{ github.job }}/summary.txt
           if: always()
-        - uses: actions/upload-artifact@master
+        - uses: actions/upload-artifact@v2
           if: always()
           with:
             name: findbugs
@@ -166,7 +166,7 @@ jobs:
           OZONE_ACCEPTANCE_SUITE: ${{ matrix.suite }}
           OZONE_WITH_COVERAGE: true
           OZONE_VOLUME_OWNER: 1000
-      - uses: actions/upload-artifact@master
+      - uses: actions/upload-artifact@v2
         if: always()
         with:
           name: acceptance-${{ matrix.suite }}
@@ -189,7 +189,7 @@ jobs:
       fail-fast: false
     steps:
         - run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
-        - uses: actions/checkout@master
+        - uses: actions/checkout@v2
           with:
             path: mnt/ozone
         - uses: ./mnt/ozone/.github/buildenv
@@ -198,7 +198,7 @@ jobs:
         - name: Summary of failures
           run: cat mnt/ozone/target/${{ github.job }}/summary.txt
           if: always()
-        - uses: actions/upload-artifact@master
+        - uses: actions/upload-artifact@v2
           if: always()
           with:
             name: it-${{ matrix.profile }}
@@ -233,7 +233,7 @@ jobs:
            file: ./target/coverage/all.xml
            name: codecov-umbrella
            fail_ci_if_error: true
-       - uses: actions/upload-artifact@master
+       - uses: actions/upload-artifact@v2
          with:
            name: coverage
            path: target/coverage
