@@ -121,8 +121,7 @@ public class TestReconContainerManager
     ContainerWithPipeline containerWithPipeline =
         getTestContainer(LifeCycleState.OPEN);
 
-    long id =
-        containerWithPipeline.getContainerInfo().getContainerID();
+    long id = containerWithPipeline.getContainerInfo().getContainerID();
     ContainerID containerID =
         containerWithPipeline.getContainerInfo().containerID();
 

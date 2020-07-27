@@ -155,4 +155,23 @@ public class AbstractReconContainerManagerTest {
             .build();
     return new ContainerWithPipeline(containerInfo, pipeline);
   }
+
+  protected ContainerWithPipeline getTestContainer(long id,
+                                                   LifeCycleState state)
+      throws IOException {
+    ContainerID containerID = new ContainerID(id);
+    Pipeline pipeline = getRandomPipeline();
+    pipelineManager.addPipeline(pipeline);
+    ContainerInfo containerInfo =
+        new ContainerInfo.Builder()
+            .setContainerID(containerID.getId())
+            .setNumberOfKeys(10)
+            .setPipelineID(pipeline.getId())
+            .setReplicationFactor(ONE)
+            .setOwner("test")
+            .setState(state)
+            .setReplicationType(STAND_ALONE)
+            .build();
+    return new ContainerWithPipeline(containerInfo, pipeline);
+  }
 }
