@@ -18,7 +18,7 @@
 
 #
 # Can be executed with bats (https://github.com/bats-core/bats-core)
-# bats gc_opts.bats (FROM THE CURRENT DIRECTORY)
+# bats k8s_testlib.bats (FROM THE CURRENT DIRECTORY)
 #
 
 export COUNTER=1
@@ -39,7 +39,8 @@ pass_never() {
    return 255
 }
 
-source testlib.sh
+source ../../main/k8s/examples/testlib.sh
+
 @test "Test retry with passing function" {
    retry pass_first
 }
