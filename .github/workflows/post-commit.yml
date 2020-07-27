@@ -146,9 +146,13 @@ jobs:
       - name: checkout to /mnt/ozone
         run: |
           sudo chmod 777 /mnt
-          git clone https://github.com/${GITHUB_REPOSITORY}.git /mnt/ozone
+          git clone 'https://github.com/${{ github.repository }}.git' /mnt/ozone
           cd /mnt/ozone
-          git fetch origin "${GITHUB_REF}"
+          if [[ '${{ github.event_name }}' == 'pull_request' ]]; then
+            git fetch --verbose origin '${{ github.ref }}'
+          else
+            git fetch --verbose origin '${{ github.sha }}'
+          fi
           git checkout FETCH_HEAD
           git reset --hard
       - name: run a full build
