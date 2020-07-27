@@ -27,6 +27,7 @@ export OZONE_VOLUME
 
 mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,om,recon,s3g,scm}
 mkdir -p "${OZONE_VOLUME}/debug"
+chmod -R 777 "${OZONE_VOLUME}"/{dn1,dn2,dn3,om,recon,s3g,scm,debug}
 
 if [[ -n "${OZONE_VOLUME_OWNER}" ]]; then
   current_user=$(whoami)
