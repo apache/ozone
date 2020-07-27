@@ -36,7 +36,6 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -84,11 +83,9 @@ public class TestHadoopNestedDirGenerator {
      */
     private void startCluster() throws Exception {
         conf = new OzoneConfiguration();
-
         cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
         cluster.waitForClusterToBeReady();
         cluster.waitTobeOutOfSafeMode();
-
         store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
     }
 
@@ -120,7 +117,6 @@ public class TestHadoopNestedDirGenerator {
     private void verifyDirTree(String volumeName, String bucketName,
                                int actualDepth, int span)
             throws IOException {
-
         store.createVolume(volumeName);
         OzoneVolume volume = store.getVolume(volumeName);
         volume.createBucket(bucketName);
