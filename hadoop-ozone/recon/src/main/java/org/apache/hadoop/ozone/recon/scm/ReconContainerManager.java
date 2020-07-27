@@ -97,11 +97,15 @@ public class ReconContainerManager extends SCMContainerManager {
         addNewContainer(containerID.getId(), containerWithPipeline);
       }
     } else {
+      // Check if container state is not open. In SCM, container state
+      // changes to CLOSING first, and then the close command is pushed down
+      // to Datanodes. Recon 'learns' this from DN, and hence replica state
+      // will move container state to 'CLOSING'.
       ContainerInfo containerInfo = getContainer(containerID);
       if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)
           && !replicaState.equals(ContainerReplicaProto.State.OPEN)
           && isHealthy(replicaState)) {
-        LOG.info("Container {} state is OPEN, but Replica has State {}.",
+        LOG.info("Container {} has state OPEN, but Replica has State {}.",
             containerID, replicaState);
         updateContainerState(containerID, FINALIZE);
       }
@@ -142,7 +146,8 @@ public class ReconContainerManager extends SCMContainerManager {
               pipelineID, containerInfo.containerID()));
         }
       } else {
-        // Non 'Open' Container. No need to worry about pipeline.
+        // Non 'Open' Container. No need to worry about pipeline since SCM
+        // returns a random pipelineID.
         getContainerStateManager().addContainerInfo(containerId,
             containerInfo, getPipelineManager(), null);
         success = true;
