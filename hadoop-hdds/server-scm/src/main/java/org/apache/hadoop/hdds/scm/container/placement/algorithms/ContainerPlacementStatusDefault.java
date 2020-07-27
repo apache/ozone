@@ -57,4 +57,14 @@ public class ContainerPlacementStatusDefault
     }
     return requiredRacks - currentRacks;
   }
+
+  @Override
+  public int expectedPlacementCount() {
+    return Math.min(requiredRacks, totalRacks);
+  }
+
+  @Override
+  public int actualPlacementCount() {
+    return currentRacks;
+  }
 }

@@ -56,15 +56,16 @@ import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.google.inject.multibindings.Multibinder;
 import static org.apache.hadoop.hdds.scm.cli.ContainerOperationClient.newContainerRpcClient;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
+import static org.apache.hadoop.ozone.OmUtils.getOzoneManagerServiceId;
+
 import org.apache.ratis.protocol.ClientId;
 import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
 import org.hadoop.ozone.recon.schema.tables.daos.ClusterGrowthDailyDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ContainerHistoryDao;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
-import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
+import org.hadoop.ozone.recon.schema.tables.daos.UnhealthyContainersDao;
 import org.jooq.Configuration;
 import org.jooq.DAO;
 import org.slf4j.Logger;
@@ -126,7 +127,7 @@ public class ReconControllerModule extends AbstractModule {
         ImmutableList.of(
             FileCountBySizeDao.class,
             ReconTaskStatusDao.class,
-            MissingContainersDao.class,
+            UnhealthyContainersDao.class,
             GlobalStatsDao.class,
             ClusterGrowthDailyDao.class,
             ContainerHistoryDao.class);
@@ -136,7 +137,8 @@ public class ReconControllerModule extends AbstractModule {
       RECON_DAO_LIST.forEach(aClass -> {
         try {
           bind(aClass).toConstructor(
-              (Constructor) aClass.getConstructor(Configuration.class));
+              (Constructor) aClass.getConstructor(Configuration.class))
+              .in(Singleton.class);
         } catch (NoSuchMethodException e) {
           LOG.error("Error creating DAO {} ", aClass.getSimpleName(), e);
         }
@@ -151,11 +153,10 @@ public class ReconControllerModule extends AbstractModule {
     try {
       ClientId clientId = ClientId.randomId();
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+      String serviceId = getOzoneManagerServiceId(ozoneConfiguration);
       OmTransport transport =
-          OmTransportFactory.create(ozoneConfiguration, ugi,
-              ozoneConfiguration.get(OZONE_OM_INTERNAL_SERVICE_ID));
-      ozoneManagerClient = new
-          OzoneManagerProtocolClientSideTranslatorPB(
+          OmTransportFactory.create(ozoneConfiguration, ugi, serviceId);
+      ozoneManagerClient = new OzoneManagerProtocolClientSideTranslatorPB(
           transport, clientId.toString());
     } catch (IOException ioEx) {
       LOG.error("Error in provisioning OzoneManagerProtocol ", ioEx);

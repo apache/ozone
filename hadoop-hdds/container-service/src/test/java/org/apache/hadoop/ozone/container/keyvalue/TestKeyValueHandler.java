@@ -20,11 +20,15 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -40,6 +44,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -47,6 +52,8 @@ import org.apache.hadoop.test.GenericTestUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.junit.Assert.assertEquals;
+
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -339,5 +346,55 @@ public class TestKeyValueHandler {
 
     assertEquals("Close container should return Invalid container error",
         ContainerProtos.Result.INVALID_CONTAINER_STATE, response.getResult());
+  }
+
+  @Test
+  public void testDeleteContainer() throws IOException {
+    final String testDir = GenericTestUtils.getTempPath(
+        TestKeyValueHandler.class.getSimpleName() +
+            "-" + UUID.randomUUID().toString());
+    try {
+      final long containerID = 1L;
+      final ConfigurationSource conf = new OzoneConfiguration();
+      final ContainerSet containerSet = new ContainerSet();
+      final VolumeSet volumeSet = Mockito.mock(VolumeSet.class);
+
+      Mockito.when(volumeSet.getVolumesList())
+          .thenReturn(Collections.singletonList(
+              new HddsVolume.Builder(testDir).conf(conf).build()));
+
+      final int[] interval = new int[1];
+      interval[0] = 2;
+      final ContainerMetrics metrics = new ContainerMetrics(interval);
+
+      final AtomicInteger icrReceived = new AtomicInteger(0);
+
+      final KeyValueHandler kvHandler = new KeyValueHandler(conf,
+          UUID.randomUUID().toString(), containerSet, volumeSet, metrics,
+          c -> icrReceived.incrementAndGet());
+      kvHandler.setScmID(UUID.randomUUID().toString());
+
+      final ContainerCommandRequestProto createContainer =
+          ContainerCommandRequestProto.newBuilder()
+              .setCmdType(ContainerProtos.Type.CreateContainer)
+              .setDatanodeUuid(UUID.randomUUID().toString())
+              .setCreateContainer(
+                  ContainerProtos.CreateContainerRequestProto.newBuilder()
+                      .setContainerType(ContainerType.KeyValueContainer)
+                      .build())
+              .setContainerID(containerID)
+              .setPipelineID(UUID.randomUUID().toString())
+              .build();
+
+      kvHandler.handleCreateContainer(createContainer, null);
+      Assert.assertEquals(1, icrReceived.get());
+      Assert.assertNotNull(containerSet.getContainer(containerID));
+
+      kvHandler.deleteContainer(containerSet.getContainer(containerID), true);
+      Assert.assertEquals(2, icrReceived.get());
+      Assert.assertNull(containerSet.getContainer(containerID));
+    } finally {
+      FileUtils.deleteDirectory(new File(testDir));
+    }
   }
 }

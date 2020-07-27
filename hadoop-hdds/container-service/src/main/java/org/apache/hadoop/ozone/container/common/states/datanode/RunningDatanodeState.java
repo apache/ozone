@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.container.common.states.datanode;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
@@ -42,7 +43,6 @@ import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * Class that implements handshake with SCM.
@@ -152,6 +152,11 @@ public class RunningDatanodeState implements DatanodeState {
     }
   }
 
+  @VisibleForTesting
+  public void setExecutorCompletionService(ExecutorCompletionService e) {
+    this.ecs = e;
+  }
+
   private Callable<EndPointStates> getEndPointTask(
       EndpointStateMachine endpoint) {
     if (endpointTasks.containsKey(endpoint)) {
@@ -200,10 +205,11 @@ public class RunningDatanodeState implements DatanodeState {
   @Override
   public DatanodeStateMachine.DatanodeStates
       await(long duration, TimeUnit timeUnit)
-      throws InterruptedException, ExecutionException, TimeoutException {
+      throws InterruptedException {
     int count = connectionManager.getValues().size();
     int returned = 0;
-    long timeLeft = timeUnit.toMillis(duration);
+    long durationMS = timeUnit.toMillis(duration);
+    long timeLeft = durationMS;
     long startTime = Time.monotonicNow();
     List<Future<EndPointStates>> results = new LinkedList<>();
 
@@ -214,7 +220,7 @@ public class RunningDatanodeState implements DatanodeState {
         results.add(result);
         returned++;
       }
-      timeLeft = timeLeft - (Time.monotonicNow() - startTime);
+      timeLeft = durationMS - (Time.monotonicNow() - startTime);
     }
     return computeNextContainerState(results);
   }

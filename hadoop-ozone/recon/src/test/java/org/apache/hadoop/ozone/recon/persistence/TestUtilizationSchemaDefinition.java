@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.persistence;
 import static org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition.CLUSTER_GROWTH_DAILY_TABLE_NAME;
 import static org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition.FILE_COUNT_BY_SIZE_TABLE_NAME;
 import static org.hadoop.ozone.recon.schema.tables.ClusterGrowthDailyTable.CLUSTER_GROWTH_DAILY;
+import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
 import static org.junit.Assert.assertEquals;
 
 import java.sql.Connection;
@@ -33,11 +34,13 @@ import java.util.List;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.ClusterGrowthDailyDao;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ClusterGrowthDaily;
 import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
 import org.hadoop.ozone.recon.schema.tables.records.FileCountBySizeRecord;
+import org.jooq.Record3;
 import org.jooq.Table;
 import org.jooq.UniqueKey;
 import org.junit.Assert;
@@ -82,6 +85,10 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
 
     List<Pair<String, Integer>> expectedPairsFileCount = new ArrayList<>();
     expectedPairsFileCount.add(
+        new ImmutablePair<>("volume", Types.VARCHAR));
+    expectedPairsFileCount.add(
+        new ImmutablePair<>("bucket", Types.VARCHAR));
+    expectedPairsFileCount.add(
         new ImmutablePair<>("file_size", Types.BIGINT));
     expectedPairsFileCount.add(
         new ImmutablePair<>("count", Types.BIGINT));
@@ -93,7 +100,7 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
               "DATA_TYPE")));
     }
     assertEquals("Unexpected number of columns",
-        2, actualPairsFileCount.size());
+        4, actualPairsFileCount.size());
     assertEquals("Columns Do not Match ",
         expectedPairsFileCount, actualPairsFileCount);
   }
@@ -182,20 +189,31 @@ public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
     }
 
     FileCountBySizeDao fileCountBySizeDao = getDao(FileCountBySizeDao.class);
+    UtilizationSchemaDefinition utilizationSchemaDefinition =
+        getSchemaDefinition(UtilizationSchemaDefinition.class);
 
     FileCountBySize newRecord = new FileCountBySize();
+    newRecord.setVolume("vol1");
+    newRecord.setBucket("bucket1");
     newRecord.setFileSize(1024L);
     newRecord.setCount(1L);
 
     fileCountBySizeDao.insert(newRecord);
 
-    FileCountBySize dbRecord = fileCountBySizeDao.findById(1024L);
+    Record3<String, String, Long> recordToFind = utilizationSchemaDefinition
+        .getDSLContext().newRecord(FILE_COUNT_BY_SIZE.VOLUME,
+            FILE_COUNT_BY_SIZE.BUCKET,
+            FILE_COUNT_BY_SIZE.FILE_SIZE)
+        .value1("vol1")
+        .value2("bucket1")
+        .value3(1024L);
+    FileCountBySize dbRecord = fileCountBySizeDao.findById(recordToFind);
     assertEquals(Long.valueOf(1), dbRecord.getCount());
 
     dbRecord.setCount(2L);
     fileCountBySizeDao.update(dbRecord);
 
-    dbRecord = fileCountBySizeDao.findById(1024L);
+    dbRecord = fileCountBySizeDao.findById(recordToFind);
     assertEquals(Long.valueOf(2), dbRecord.getCount());
 
     Table<FileCountBySizeRecord> fileCountBySizeRecordTable =

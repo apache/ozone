@@ -22,6 +22,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
@@ -31,10 +32,14 @@ import java.io.IOException;
 import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+
 /**
  * Response for RecoverTrash request.
  */
+@CleanupTableInfo(cleanupTables = {KEY_TABLE})
 public class OMTrashRecoverResponse extends OMClientResponse {
+
   private OmKeyInfo omKeyInfo;
 
   public OMTrashRecoverResponse(@Nullable OmKeyInfo omKeyInfo,

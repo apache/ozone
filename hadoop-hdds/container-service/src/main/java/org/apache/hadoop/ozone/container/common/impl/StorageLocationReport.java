@@ -88,11 +88,14 @@ public final class StorageLocationReport implements
     return storageType;
   }
 
+  private StorageTypeProto getStorageTypeProto() throws IOException {
+    return getStorageTypeProto(getStorageType());
+  }
 
-  private StorageTypeProto getStorageTypeProto() throws
-      IOException {
+  public static StorageTypeProto getStorageTypeProto(StorageType type)
+      throws IOException {
     StorageTypeProto storageTypeProto;
-    switch (getStorageType()) {
+    switch (type) {
     case SSD:
       storageTypeProto = StorageTypeProto.SSD;
       break;
@@ -145,7 +148,7 @@ public final class StorageLocationReport implements
    * @return SCMStorageReport
    * @throws IOException In case, the storage type specified is invalid.
    */
-  public StorageReportProto getProtoBufMessage() throws IOException{
+  public StorageReportProto getProtoBufMessage() throws IOException {
     StorageReportProto.Builder srb = StorageReportProto.newBuilder();
     return srb.setStorageUuid(getId())
         .setCapacity(getCapacity())

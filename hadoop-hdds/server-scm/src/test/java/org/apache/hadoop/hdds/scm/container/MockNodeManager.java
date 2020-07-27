@@ -422,7 +422,7 @@ public class MockNodeManager implements NodeManager {
    *
    * @param datanodeDetails DatanodeDetails
    * @param nodeReport NodeReportProto
-   * @return SCMHeartbeatResponseProto
+   * @return SCMRegisteredResponseProto
    */
   @Override
   public RegisteredCommand register(DatanodeDetails datanodeDetails,

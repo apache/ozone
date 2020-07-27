@@ -17,7 +17,6 @@
 set -e
 
 COMPOSE_ENV_NAME=$(basename "$COMPOSE_DIR")
-COMPOSE_FILE=$COMPOSE_DIR/docker-compose.yaml
 RESULT_DIR=${RESULT_DIR:-"$COMPOSE_DIR/result"}
 RESULT_DIR_INSIDE="/tmp/smoketest/$(basename "$COMPOSE_ENV_NAME")/result"
 SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
@@ -25,12 +24,14 @@ SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
 OM_HA_PARAM=""
 if [[ -n "${OM_SERVICE_ID}" ]]; then
   OM_HA_PARAM="--om-service-id=${OM_SERVICE_ID}"
+else
+  OM_SERVICE_ID=om
 fi
 
 ## @description create results directory, purging any prior data
 create_results_dir() {
   #delete previous results
-  rm -rf "$RESULT_DIR"
+  [[ "${OZONE_KEEP_RESULTS:-}" == "true" ]] || rm -rf "$RESULT_DIR"
   mkdir -p "$RESULT_DIR"
   #Should be writeable from the docker containers where user is different.
   chmod ogu+w "$RESULT_DIR"
@@ -38,9 +39,9 @@ create_results_dir() {
 
 
 ## @description wait until safemode exit (or 180 seconds)
-## @param the docker-compose file
 wait_for_safemode_exit(){
-  local compose_file=$1
+  # version-dependent
+  : ${OZONE_ADMIN_COMMAND:=admin}
 
   #Reset the timer
   SECONDS=0
@@ -49,11 +50,11 @@ wait_for_safemode_exit(){
   while [[ $SECONDS -lt 180 ]]; do
 
      #This line checks the safemode status in scm
-     local command="ozone admin safemode status"
+     local command="ozone ${OZONE_ADMIN_COMMAND} safemode status"
      if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-         status=$(docker-compose -f "${compose_file}" exec -T scm bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
+         status=$(docker-compose exec -T scm bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
      else
-         status=$(docker-compose -f "${compose_file}" exec -T scm bash -c "$command")
+         status=$(docker-compose exec -T scm bash -c "$command")
      fi
 
      echo $status
@@ -78,9 +79,9 @@ start_docker_env(){
 
   create_results_dir
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
-  docker-compose -f "$COMPOSE_FILE" --no-ansi down
-  if ! { docker-compose -f "$COMPOSE_FILE" --no-ansi up -d --scale datanode="${datanode_count}" \
-      && wait_for_safemode_exit "$COMPOSE_FILE"; }; then
+  docker-compose --no-ansi down
+  if ! { docker-compose --no-ansi up -d --scale datanode="${datanode_count}" \
+      && wait_for_safemode_exit ; }; then
     OUTPUT_NAME="$COMPOSE_ENV_NAME"
     stop_docker_env
     return 1
@@ -101,13 +102,22 @@ execute_robot_test(){
   TEST_NAME="$(basename "$COMPOSE_DIR")-${TEST_NAME%.*}"
   set +e
   OUTPUT_NAME="$COMPOSE_ENV_NAME-$TEST_NAME-$CONTAINER"
-  OUTPUT_PATH="$RESULT_DIR_INSIDE/robot-$OUTPUT_NAME.xml"
+
+  # find unique filename
+  declare -i i=0
+  OUTPUT_FILE="robot-${OUTPUT_NAME}.xml"
+  while [[ -f $RESULT_DIR/$OUTPUT_FILE ]]; do
+    let i++
+    OUTPUT_FILE="robot-${OUTPUT_NAME}-${i}.xml"
+  done
+
+  OUTPUT_PATH="$RESULT_DIR_INSIDE/${OUTPUT_FILE}"
   # shellcheck disable=SC2068
-  docker-compose -f "$COMPOSE_FILE" exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
-    && docker-compose -f "$COMPOSE_FILE" exec -T -e SECURITY_ENABLED="${SECURITY_ENABLED}" -e OM_HA_PARAM="${OM_HA_PARAM}" -e OM_SERVICE_ID="${OM_SERVICE_ID}" "$CONTAINER" robot ${ARGUMENTS[@]} --log NONE -N "$TEST_NAME" --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" "$SMOKETEST_DIR_INSIDE/$TEST"
+  docker-compose exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
+    && docker-compose exec -T "$CONTAINER" robot -v OM_SERVICE_ID:"${OM_SERVICE_ID}" -v SECURITY_ENABLED:"${SECURITY_ENABLED}" -v OM_HA_PARAM:"${OM_HA_PARAM}" -v KEY_NAME:"${OZONE_BUCKET_KEY_NAME}" ${ARGUMENTS[@]} --log NONE -N "$TEST_NAME" --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" "$SMOKETEST_DIR_INSIDE/$TEST"
   local -i rc=$?
 
-  FULL_CONTAINER_NAME=$(docker-compose -f "$COMPOSE_FILE" ps | grep "_${CONTAINER}_" | head -n 1 | awk '{print $1}')
+  FULL_CONTAINER_NAME=$(docker-compose ps | grep "_${CONTAINER}_" | head -n 1 | awk '{print $1}')
   docker cp "$FULL_CONTAINER_NAME:$OUTPUT_PATH" "$RESULT_DIR/"
 
   copy_daemon_logs
@@ -124,7 +134,7 @@ execute_robot_test(){
 ## @description Copy any 'out' files for daemon processes to the result dir
 copy_daemon_logs() {
   local c f
-  for c in $(docker-compose -f "$COMPOSE_FILE" ps | grep "^${COMPOSE_ENV_NAME}_" | awk '{print $1}'); do
+  for c in $(docker-compose ps | grep "^${COMPOSE_ENV_NAME}_" | awk '{print $1}'); do
     for f in $(docker exec "${c}" ls -1 /var/log/hadoop | grep -F '.out'); do
       docker cp "${c}:/var/log/hadoop/${f}" "$RESULT_DIR/"
     done
@@ -138,7 +148,7 @@ copy_daemon_logs() {
 execute_command_in_container(){
   set -e
   # shellcheck disable=SC2068
-  docker-compose -f "$COMPOSE_FILE" exec -T "$@"
+  docker-compose exec -T "$@"
   set +e
 }
 
@@ -146,7 +156,7 @@ execute_command_in_container(){
 ## @param       List of container names, eg datanode_1 datanode_2
 stop_containers() {
   set -e
-  docker-compose -f "$COMPOSE_FILE" --no-ansi stop $@
+  docker-compose --no-ansi stop $@
   set +e
 }
 
@@ -155,7 +165,7 @@ stop_containers() {
 ## @param       List of container names, eg datanode_1 datanode_2
 start_containers() {
   set -e
-  docker-compose -f "$COMPOSE_FILE" --no-ansi start $@
+  docker-compose --no-ansi start $@
   set +e
 }
 
@@ -174,7 +184,7 @@ wait_for_port(){
 
   while [[ $SECONDS -lt $timeout ]]; do
      set +e
-     docker-compose -f "${COMPOSE_FILE}" exec -T scm /bin/bash -c "nc -z $host $port"
+     docker-compose exec -T scm /bin/bash -c "nc -z $host $port"
      status=$?
      set -e
      if [ $status -eq 0 ] ; then
@@ -191,9 +201,9 @@ wait_for_port(){
 
 ## @description  Stops a docker-compose based test environment (with saving the logs)
 stop_docker_env(){
-  docker-compose -f "$COMPOSE_FILE" --no-ansi logs > "$RESULT_DIR/docker-$OUTPUT_NAME.log"
+  docker-compose --no-ansi logs > "$RESULT_DIR/docker-$OUTPUT_NAME.log"
   if [ "${KEEP_RUNNING:-false}" = false ]; then
-     docker-compose -f "$COMPOSE_FILE" --no-ansi down
+     docker-compose --no-ansi down
   fi
 }
 

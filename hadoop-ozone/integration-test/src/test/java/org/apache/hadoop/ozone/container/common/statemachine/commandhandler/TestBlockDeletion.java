@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import com.google.common.primitives.Longs;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -31,7 +32,6 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
@@ -341,9 +341,9 @@ public class TestBlockDeletion {
           .getContainer(blockID.getContainerID()).getContainerData(), conf)) {
         Assert.assertNull(db.getStore().get(
             Longs.toByteArray(blockID.getLocalID())));
-        Assert.assertNull(db.getStore().get(DFSUtil.string2Bytes(
+        Assert.assertNull(db.getStore().get(StringUtils.string2Bytes(
             OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID())));
-        Assert.assertNotNull(DFSUtil.string2Bytes(
+        Assert.assertNotNull(StringUtils.string2Bytes(
             OzoneConsts.DELETED_KEY_PREFIX + blockID.getLocalID()));
       }
       containerIdsWithDeletedBlocks.add(blockID.getContainerID());

@@ -92,6 +92,13 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
         .getVolumeTable().get(volumeKey).getQuotaInBytes();
     Assert.assertEquals(quotaSet, quotaAfterSet);
     Assert.assertNotEquals(quotaBeforeSet, quotaAfterSet);
+
+    // modificationTime should be greater than creationTime.
+    long creationTime = omMetadataManager
+        .getVolumeTable().get(volumeKey).getCreationTime();
+    long modificationTime = omMetadataManager
+        .getVolumeTable().get(volumeKey).getModificationTime();
+    Assert.assertTrue(modificationTime > creationTime);
   }
 
   @Test
@@ -142,35 +149,5 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
     Assert.assertNotNull(omResponse.getCreateVolumeResponse());
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST,
         omResponse.getStatus());
-  }
-
-  @Test
-  public void testReplayRequest() throws Exception {
-    // create volume
-    String volumeName = UUID.randomUUID().toString();
-    String ownerName = "user1";
-    TestOMRequestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
-    TestOMRequestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
-
-    // create request with quota set.
-    long quota = 100L;
-    OMRequest originalRequest =
-        TestOMRequestUtils.createSetVolumePropertyRequest(volumeName, quota);
-    OMVolumeSetQuotaRequest omVolumeSetQuotaRequest =
-        new OMVolumeSetQuotaRequest(originalRequest);
-
-    // Execute the original request
-    omVolumeSetQuotaRequest.preExecute(ozoneManager);
-    omVolumeSetQuotaRequest.validateAndUpdateCache(ozoneManager, 1,
-        ozoneManagerDoubleBufferHelper);
-
-    // Replay the transaction - Execute the same request again
-    OMClientResponse omClientResponse =
-        omVolumeSetQuotaRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
-
-    // Replay should result in Replay response
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
-        omClientResponse.getOMResponse().getStatus());
   }
 }

@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -39,10 +40,12 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -132,6 +135,11 @@ public class ReplicationManager
   private volatile boolean running;
 
   /**
+   * Used for check datanode state.
+   */
+  private final NodeManager nodeManager;
+
+  /**
    * Constructs ReplicationManager instance with the given configuration.
    *
    * @param conf OzoneConfiguration
@@ -143,7 +151,8 @@ public class ReplicationManager
                             final ContainerManager containerManager,
                             final PlacementPolicy containerPlacement,
                             final EventPublisher eventPublisher,
-                            final LockManager<ContainerID> lockManager) {
+                            final LockManager<ContainerID> lockManager,
+                            final NodeManager nodeManager) {
     this.containerManager = containerManager;
     this.containerPlacement = containerPlacement;
     this.eventPublisher = eventPublisher;
@@ -152,6 +161,7 @@ public class ReplicationManager
     this.running = false;
     this.inflightReplication = new ConcurrentHashMap<>();
     this.inflightDeletion = new ConcurrentHashMap<>();
+    this.nodeManager = nodeManager;
   }
 
   /**
@@ -362,6 +372,9 @@ public class ReplicationManager
     final long deadline = Time.monotonicNow() - conf.getEventTimeout();
     if (inflightActions.containsKey(id)) {
       final List<InflightAction> actions = inflightActions.get(id);
+
+      actions.removeIf(action ->
+          nodeManager.getNodeState(action.datanode) != NodeState.HEALTHY);
       actions.removeIf(action -> action.time < deadline);
       actions.removeIf(filter);
       if (actions.isEmpty()) {
@@ -499,7 +512,7 @@ public class ReplicationManager
    */
   private void handleUnderReplicatedContainer(final ContainerInfo container,
       final Set<ContainerReplica> replicas) {
-    LOG.debug("Handling underreplicated container: {}",
+    LOG.debug("Handling under-replicated container: {}",
         container.getContainerID());
     try {
       final ContainerID id = container.containerID();
@@ -530,14 +543,18 @@ public class ReplicationManager
         List<DatanodeDetails> targetReplicas = new ArrayList<>(source);
         // Then add any pending additions
         targetReplicas.addAll(replicationInFlight);
-
-        int delta = replicationFactor - getReplicaCount(id, replicas);
         final ContainerPlacementStatus placementStatus =
             containerPlacement.validateContainerPlacement(
                 targetReplicas, replicationFactor);
+        int delta = replicationFactor - getReplicaCount(id, replicas);
         final int misRepDelta = placementStatus.misReplicationCount();
         final int replicasNeeded
             = delta < misRepDelta ? misRepDelta : delta;
+        if (replicasNeeded <= 0) {
+          LOG.debug("Container {} meets replication requirement with " +
+              "inflight replicas", id);
+          return;
+        }
 
         final List<DatanodeDetails> excludeList = replicas.stream()
             .map(ContainerReplica::getDatanodeDetails)
@@ -598,7 +615,7 @@ public class ReplicationManager
 
     final ContainerID id = container.containerID();
     final int replicationFactor = container.getReplicationFactor().getNumber();
-    // Dont consider inflight replication while calculating excess here.
+    // Don't consider inflight replication while calculating excess here.
     int excess = replicas.size() - replicationFactor -
         inflightDeletion.getOrDefault(id, Collections.emptyList()).size();
 
@@ -917,7 +934,7 @@ public class ReplicationManager
             "cluster. This property is used to configure the interval in " +
             "which that thread runs."
     )
-    private long interval = 5 * 60 * 1000;
+    private long interval = Duration.ofSeconds(300).toMillis();
 
     /**
      * Timeout for container replication & deletion command issued by
@@ -925,21 +942,19 @@ public class ReplicationManager
      */
     @Config(key = "event.timeout",
         type = ConfigType.TIME,
-        defaultValue = "10m",
+        defaultValue = "30m",
         tags = {SCM, OZONE},
         description = "Timeout for the container replication/deletion commands "
             + "sent  to datanodes. After this timeout the command will be "
             + "retried.")
-    private long eventTimeout = 10 * 60 * 1000;
+    private long eventTimeout = Duration.ofMinutes(30).toMillis();
 
-
-    public void setInterval(long interval) {
-      this.interval = interval;
+    public void setInterval(Duration interval) {
+      this.interval = interval.toMillis();
     }
 
-
-    public void setEventTimeout(long eventTimeout) {
-      this.eventTimeout = eventTimeout;
+    public void setEventTimeout(Duration timeout) {
+      this.eventTimeout = timeout.toMillis();
     }
 
     public long getInterval() {

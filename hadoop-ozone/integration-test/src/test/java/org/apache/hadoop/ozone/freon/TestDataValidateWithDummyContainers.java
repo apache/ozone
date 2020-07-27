@@ -21,10 +21,11 @@ package org.apache.hadoop.ozone.freon;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScrubberConfiguration;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,15 +36,18 @@ import org.slf4j.LoggerFactory;
  */
 public class TestDataValidateWithDummyContainers
     extends TestDataValidate {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   private static final Logger LOG =
       LoggerFactory.getLogger(TestDataValidateWithDummyContainers.class);
 
   @BeforeClass
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    ContainerScrubberConfiguration sc =
-        conf.getObject(ContainerScrubberConfiguration.class);
-    sc.setEnabled(false);
     conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA, false);
     conf.setBoolean(OzoneConfigKeys.OZONE_UNSAFEBYTEOPERATIONS_ENABLED,
         false);

@@ -18,6 +18,7 @@ package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -416,50 +417,49 @@ public class SCMContainerManager implements ContainerManager {
    */
   public ContainerInfo getMatchingContainer(final long sizeRequired,
       String owner, Pipeline pipeline) {
-    return getMatchingContainer(sizeRequired, owner, pipeline, Collections
-        .emptyList());
+    return getMatchingContainer(sizeRequired, owner, pipeline,
+        Collections.emptySet());
   }
 
   @SuppressWarnings("squid:S2445")
   public ContainerInfo getMatchingContainer(final long sizeRequired,
-      String owner, Pipeline pipeline, List<ContainerID> excludedContainers) {
+                                            String owner, Pipeline pipeline,
+                                            Collection<ContainerID>
+                                                      excludedContainers) {
     NavigableSet<ContainerID> containerIDs;
+    ContainerInfo containerInfo;
     try {
       synchronized (pipeline) {
         containerIDs = getContainersForOwner(pipeline, owner);
 
         if (containerIDs.size() < numContainerPerOwnerInPipeline) {
-          ContainerInfo containerInfo =
-              containerStateManager.allocateContainer(pipelineManager, owner,
-                  pipeline);
-          // Add to DB
-          addContainerToDB(containerInfo);
-          containerStateManager.updateLastUsedMap(pipeline.getId(),
-              containerInfo.containerID(), owner);
-          return containerInfo;
-        }
-      }
-
-      containerIDs.removeAll(excludedContainers);
-      ContainerInfo containerInfo =
-          containerStateManager.getMatchingContainer(sizeRequired, owner,
-              pipeline.getId(), containerIDs);
-      if (containerInfo == null) {
-        synchronized (pipeline) {
           containerInfo =
-              containerStateManager.allocateContainer(pipelineManager, owner,
-                  pipeline);
+                  containerStateManager.allocateContainer(
+                          pipelineManager, owner, pipeline);
           // Add to DB
           addContainerToDB(containerInfo);
+        } else {
+          containerIDs.removeAll(excludedContainers);
+          containerInfo =
+                  containerStateManager.getMatchingContainer(
+                          sizeRequired, owner, pipeline.getId(), containerIDs);
+          if (containerInfo == null) {
+            containerInfo =
+                    containerStateManager.
+                            allocateContainer(pipelineManager, owner,
+                                    pipeline);
+            // Add to DB
+            addContainerToDB(containerInfo);
+          }
         }
+        containerStateManager.updateLastUsedMap(pipeline.getId(),
+                containerInfo.containerID(), owner);
+        // TODO: #CLUTIL cleanup entries in lastUsedMap
+        return containerInfo;
       }
-      containerStateManager.updateLastUsedMap(pipeline.getId(),
-          containerInfo.containerID(), owner);
-      // TODO: #CLUTIL cleanup entries in lastUsedMap
-      return containerInfo;
     } catch (Exception e) {
       LOG.warn("Container allocation failed for pipeline={} requiredSize={} {}",
-          pipeline, sizeRequired, e);
+              pipeline, sizeRequired, e);
       return null;
     }
   }

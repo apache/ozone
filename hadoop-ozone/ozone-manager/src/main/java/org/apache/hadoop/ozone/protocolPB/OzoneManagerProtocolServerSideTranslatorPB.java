@@ -74,17 +74,27 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       boolean enableRatis) {
     this.ozoneManager = impl;
     this.isRatisEnabled = enableRatis;
-    this.ozoneManagerDoubleBuffer = new OzoneManagerDoubleBuffer.Builder()
-        .setOmMetadataManager(ozoneManager.getMetadataManager())
-        // Do nothing.
-        // For OM NON-HA code, there is no need to save transaction index.
-        // As we wait until the double buffer flushes DB to disk.
-        .setOzoneManagerRatisSnapShot((i) -> {})
-        .enableRatis(isRatisEnabled)
-        .enableTracing(TracingUtil.isTracingEnabled(
-            ozoneManager.getConfiguration()))
-        .build();
-    handler = new OzoneManagerRequestHandler(impl, ozoneManagerDoubleBuffer);
+
+    if (isRatisEnabled) {
+      // In case of ratis is enabled, handler in ServerSideTransaltorPB is used
+      // only for read requests and read requests does not require
+      // double-buffer to be initialized.
+      this.ozoneManagerDoubleBuffer = null;
+      handler = new OzoneManagerRequestHandler(impl, null);
+    } else {
+      this.ozoneManagerDoubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+          .setOmMetadataManager(ozoneManager.getMetadataManager())
+          // Do nothing.
+          // For OM NON-HA code, there is no need to save transaction index.
+          // As we wait until the double buffer flushes DB to disk.
+          .setOzoneManagerRatisSnapShot((i) -> {
+          })
+          .enableRatis(isRatisEnabled)
+          .enableTracing(TracingUtil.isTracingEnabled(
+              ozoneManager.getConfiguration()))
+          .build();
+      handler = new OzoneManagerRequestHandler(impl, ozoneManagerDoubleBuffer);
+    }
     this.omRatisServer = ratisServer;
     dispatcher = new OzoneProtocolMessageDispatcher<>("OzoneProtocol",
         metrics, LOG);

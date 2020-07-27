@@ -152,7 +152,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
       ReplicationFactor factor, String owner, ExcludeList excludeList)
       throws IOException {
     if (LOG.isTraceEnabled()) {
-      LOG.trace("Size;{} , type : {}, factor : {} ", size, type, factor);
+      LOG.trace("Size : {} , type : {}, factor : {} ", size, type, factor);
     }
     ScmUtils.preCheck(ScmOps.allocateBlock, safeModePrecheck);
     if (size < 0 || size > containerSize) {

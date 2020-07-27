@@ -4,7 +4,7 @@ summary: A simplified version of mapping between S3 buckets and Ozone volume/buc
 date: 2020-04-02
 jira: HDDS-3331
 status: accepted
-author: Marton Elek, Arpit Agarwall, Sunjay Radia
+author: Marton Elek, Arpit Agarwal, Sanjay Radia
 ---
 
 <!--
@@ -28,7 +28,7 @@ This document explores how we can improve the Ozone volume semantics especially 
 
 ## The Problems
 
- 1. Unpriviliged users cannot enumerate volumes.
+ 1. Unprivileged users cannot enumerate volumes.
  2. The mapping of S3 buckets to Ozone volumes is confusing. Based on external feedback it's hard to understand the exact Ozone URL to be used.
  3. The volume name is not friendly and cannot be remembered by humans.
  4. Ozone buckets created via the native object store interface are not visible via the S3 gateway.
@@ -89,7 +89,7 @@ Problem #5 can be easily supported with improving the `ozone s3` CLI. Ozone has 
 
 ### Solving the mapping problem (#2-4 from the problem listing)
 
- 1. Let's always use `s3` volume for all the s3 buckets **if the bucket is created from the s3 interface**.
+ 1. Let's always use `s3v` volume for all the s3 buckets **if the bucket is created from the s3 interface**.
 
 This is an easy an fast method, but with this approach not all the volumes are avilable via the S3 interface. We need to provide a method to publish any of the ozone volumes / buckets.
 
@@ -102,23 +102,34 @@ This is an easy an fast method, but with this approach not all the volumes are a
  To implement the second (expose ozone buckets as s3 buckets) we have multiple options:
 
    1. Store some metadata (** s3 bucket name **) on each of the buckets
-   2. Implement a **bind mount** mechanic which makes it possible to *mount* any volume/buckets to the specific "s3" volume.
+   2. Implement a **symbolic link** mechanism which makes it possible to *link* to any volume/buckets from the "s3" volume.
 
 The first approach required a secondary cache table and it violates the naming hierarchy. The s3 bucket name is a global unique name, therefore it's more than just a single attribute on a specific object. It's more like an element in the hierachy. For this reason the second option is proposed:
 
-For example if the default s3 volume is `s3`
+For example if the default s3 volume is `s3v`
 
- 1. Every new buckets created via s3 interface will be placed under the `/s3` volume
- 2. Any existing **Ozone** buckets can be exposed with mounting it to s3: `ozone sh mount /vol1/bucket1 /s3/s3bucketname`
+ 1. Every new buckets created via s3 interface will be placed under the `/s3v` volume
+ 2. Any existing **Ozone** buckets can be exposed by linking to it from s3: `ozone sh bucket link /vol1/bucket1 /s3v/s3bucketname`
 
 **Lock contention problem**
 
-One possible problem with using just one volume is using the locks of the same volume for all the D3 buckets (thanks Xiaoyu). But this shouldn't be a big problem.
+One possible problem with using just one volume is using the locks of the same volume for all the S3 buckets (thanks Xiaoyu). But this shouldn't be a big problem.
 
  1. We hold only a READ lock. Most of the time it can acquired without any contention (writing lock is required only to change owner / set quota)
- 2. For symbolic link / bind mounts the read lock is only required for the first read. After that the lock of the referenced volume will be used. In case of any performance problem multiple volumes + bind mounts can be used.
+ 2. For symbolic link the read lock is only required for the first read. After that the lock of the referenced volume will be used. In case of any performance problem multiple volumes and links can be used.
 
-Note: Sunjay is added to the authors as the original proposal of this approach.
+Note: Sanjay is added to the authors as the original proposal of this approach.
+
+#### Implementation details
+
+ * `bucket link` operation creates a link bucket.  Links are like regular buckets, stored in DB the same way, but with two new, optional pieces of information: source volume and bucket.  (The bucket being referenced by the link is called "source", not "target", to follow symlink terminology.)
+ * Link buckets share the namespace with regular buckets.  If a bucket or link with the same name already exists, a `BUCKET_ALREADY_EXISTS` result is returned.
+ * Link buckets are not inherently specific to a user, access is restricted only by ACL.
+ * Links are persistent, ie. they can be used until they are deleted.
+ * Existing bucket operations (info, delete, ACL) work on the link object in the same way as they do on regular buckets.  No new link-specific RPC is required.
+ * Links are followed for key operations (list, get, put, etc.).  Read permission on the link is required for this.
+ * Checks for existence of the source bucket, as well as ACL, are performed only when following the link (similar to symlinks).  Source bucket is not checked when operating on the link bucket itself (eg. deleting it).  This avoids the need for reverse checks for each bucket delete or ACL change.
+ * Bucket links are generic, not restricted to the `s3v` volume.
 
 ## Alternative approaches and reasons to reject
 

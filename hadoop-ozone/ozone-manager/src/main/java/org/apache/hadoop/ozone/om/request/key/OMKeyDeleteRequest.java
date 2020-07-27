@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyDeleteResponse;
@@ -76,7 +75,9 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     OzoneManagerProtocolProtos.KeyArgs keyArgs = deleteKeyRequest.getKeyArgs();
 
     OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs =
-        keyArgs.toBuilder().setModificationTime(Time.now());
+        keyArgs.toBuilder().setModificationTime(Time.now())
+            .setKeyName(validateAndNormalizeKey(
+                ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
 
     return getOmRequest().toBuilder()
         .setDeleteKeyRequest(deleteKeyRequest.toBuilder()
@@ -89,20 +90,19 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
     DeleteKeyRequest deleteKeyRequest = getOmRequest().getDeleteKeyRequest();
 
-    OzoneManagerProtocolProtos.KeyArgs deleteKeyArgs =
+    OzoneManagerProtocolProtos.KeyArgs keyArgs =
         deleteKeyRequest.getKeyArgs();
+    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
 
-    String volumeName = deleteKeyArgs.getVolumeName();
-    String bucketName = deleteKeyArgs.getBucketName();
-    String keyName = deleteKeyArgs.getKeyName();
+    String volumeName = keyArgs.getVolumeName();
+    String bucketName = keyArgs.getBucketName();
+    String keyName = keyArgs.getKeyName();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumKeyDeletes();
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
-
-    Map<String, String> auditMap = buildKeyArgsAuditMap(deleteKeyArgs);
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -112,6 +112,10 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
     Result result = null;
     try {
+      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+
       // check Acl
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
@@ -128,14 +132,6 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(objectKey);
       if (omKeyInfo == null) {
         throw new OMException("Key not found", KEY_NOT_FOUND);
-      }
-
-      // Check if this transaction is a replay of ratis logs.
-      if (isReplay(ozoneManager, omKeyInfo, trxnLogIndex)) {
-        // Replay implies the response has already been returned to
-        // the client. So take no further action and return a dummy
-        // OMClientResponse.
-        throw new OMReplayException();
       }
 
       // Set the UpdateID to current transactionLogIndex
@@ -158,16 +154,10 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
-      if (ex instanceof OMReplayException) {
-        result = Result.REPLAY;
-        omClientResponse = new OMKeyDeleteResponse(createReplayOMResponse(
-            omResponse));
-      } else {
-        result = Result.FAILURE;
-        exception = ex;
-        omClientResponse = new OMKeyDeleteResponse(createErrorOMResponse(
-            omResponse, exception));
-      }
+      result = Result.FAILURE;
+      exception = ex;
+      omClientResponse = new OMKeyDeleteResponse(
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
             omDoubleBufferHelper);
@@ -178,10 +168,9 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     }
 
     // Performing audit logging outside of the lock.
-    if (result != Result.REPLAY) {
-      auditLog(auditLogger, buildAuditMessage(OMAction.DELETE_KEY, auditMap,
-          exception, userInfo));
-    }
+    auditLog(auditLogger, buildAuditMessage(OMAction.DELETE_KEY, auditMap,
+        exception, userInfo));
+
 
     switch (result) {
     case SUCCESS:
@@ -189,13 +178,9 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       LOG.debug("Key deleted. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);
       break;
-    case REPLAY:
-      LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-          deleteKeyRequest);
-      break;
     case FAILURE:
       omMetrics.incNumKeyDeleteFails();
-      LOG.error("Key delete failed. Volume:{}, Bucket:{}, Key{}. Exception:{}",
+      LOG.error("Key delete failed. Volume:{}, Bucket:{}, Key:{}.",
           volumeName, bucketName, keyName, exception);
       break;
     default:

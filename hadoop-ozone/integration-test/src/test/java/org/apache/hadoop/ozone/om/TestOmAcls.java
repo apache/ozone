@@ -43,11 +43,18 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.junit.rules.Timeout;
 
 /**
  * Test for Ozone Manager ACLs.
  */
 public class TestOmAcls {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static boolean aclAllow = true;
   private static MiniOzoneCluster cluster = null;

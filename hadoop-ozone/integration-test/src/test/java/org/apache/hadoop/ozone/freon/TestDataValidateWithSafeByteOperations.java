@@ -22,11 +22,19 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 
 /**
  * Tests Freon, with MiniOzoneCluster and validate data.
  */
 public class TestDataValidateWithSafeByteOperations extends TestDataValidate {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   /**
    * Create a MiniDFSCluster for testing.

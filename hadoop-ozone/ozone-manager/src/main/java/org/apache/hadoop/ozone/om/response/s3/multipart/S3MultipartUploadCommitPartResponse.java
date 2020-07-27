@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -30,16 +31,23 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
+
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.MULTIPARTINFO_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .Status.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .Status.OK;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Response for S3MultipartUploadCommitPart request.
  */
+@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, DELETED_TABLE,
+    MULTIPARTINFO_TABLE})
 public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
 
   private String multipartKey;
@@ -62,43 +70,17 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
    */
   public S3MultipartUploadCommitPartResponse(@Nonnull OMResponse omResponse,
       String multipartKey, String openKey,
-      @Nonnull OmMultipartKeyInfo omMultipartKeyInfo,
-      @Nonnull OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo,
+      @Nullable OmMultipartKeyInfo omMultipartKeyInfo,
+      @Nullable OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo,
+      @Nullable OmKeyInfo openPartKeyInfoToBeDeleted,
       boolean isRatisEnabled) {
     super(omResponse);
     this.multipartKey = multipartKey;
     this.openKey = openKey;
     this.omMultipartKeyInfo = omMultipartKeyInfo;
     this.oldPartKeyInfo = oldPartKeyInfo;
-    this.isRatisEnabled = isRatisEnabled;
-  }
-
-  /**
-   * For the case when Multipart Upload does not exist (could have been
-   * aborted).
-   * 1. Put the partKeyInfo from openKeyTable into DeletedTable
-   * 2. Deleted openKey from OpenKeyTable
-   * @param omResponse
-   * @param openKey
-   * @param openPartKeyInfoToBeDeleted
-   */
-  public S3MultipartUploadCommitPartResponse(@Nonnull OMResponse omResponse,
-      String openKey, @Nonnull OmKeyInfo openPartKeyInfoToBeDeleted,
-      boolean isRatisEnabled) {
-    super(omResponse);
-    checkStatusNotOK();
-    this.openKey = openKey;
     this.openPartKeyInfoToBeDeleted = openPartKeyInfoToBeDeleted;
     this.isRatisEnabled = isRatisEnabled;
-  }
-
-  /**
-   * For when the request is not successful or it is a replay transaction.
-   * For a successful request, the other constructor should be used.
-   */
-  public S3MultipartUploadCommitPartResponse(@Nonnull OMResponse omResponse) {
-    super(omResponse);
-    checkStatusNotOK();
   }
 
   @Override
@@ -108,12 +90,14 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
     if (getOMResponse().getStatus() == NO_SUCH_MULTIPART_UPLOAD_ERROR) {
       // Means by the time we try to commit part, some one has aborted this
       // multipart upload. So, delete this part information.
+
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           omMetadataManager.getDeletedTable().get(openKey);
 
-      repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-          openPartKeyInfoToBeDeleted, repeatedOmKeyInfo,
-          openPartKeyInfoToBeDeleted.getUpdateID(), isRatisEnabled);
+      repeatedOmKeyInfo =
+          OmUtils.prepareKeyForDelete(openPartKeyInfoToBeDeleted,
+          repeatedOmKeyInfo, openPartKeyInfoToBeDeleted.getUpdateID(),
+              isRatisEnabled);
 
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
           openKey, repeatedOmKeyInfo);

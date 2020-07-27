@@ -40,8 +40,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -65,11 +65,19 @@ import org.junit.Test;
 
 import com.google.gson.Gson;
 import com.google.gson.internal.LinkedTreeMap;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 
 /**
  * Test Ozone Recon.
  */
 public class TestReconWithOzoneManager {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
   private static OMMetadataManager metadataManager;
@@ -327,7 +335,7 @@ public class TestReconWithOzoneManager {
    */
   private void addKeys(int start, int end) throws Exception {
     for(int i = start; i < end; i++) {
-      Pipeline pipeline = getRandomPipeline();
+      Pipeline pipeline = TestUtils.getRandomPipeline();
       List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
       BlockID blockID = new BlockID(i, 1);
       OmKeyLocationInfo omKeyLocationInfo1 = getOmKeyLocationInfo(blockID,
@@ -348,16 +356,6 @@ public class TestReconWithOzoneManager {
       iterator.next();
     }
     return keyCount;
-  }
-
-  private static Pipeline getRandomPipeline() {
-    return Pipeline.newBuilder()
-        .setFactor(HddsProtos.ReplicationFactor.ONE)
-        .setId(PipelineID.randomId())
-        .setNodes(Collections.EMPTY_LIST)
-        .setState(Pipeline.PipelineState.OPEN)
-        .setType(HddsProtos.ReplicationType.STAND_ALONE)
-        .build();
   }
 
   private static OmKeyLocationInfo getOmKeyLocationInfo(BlockID blockID,

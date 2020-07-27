@@ -18,6 +18,7 @@
     "datanodes": [
       {
         "hostname": "localhost1.storage.enterprise.com",
+        "uuid": "b590734e-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
         "lastHeartbeat": 1574728876059,
         "storageReport": {
@@ -40,10 +41,15 @@
           }
         ],
         "containers": 80,
-        "leaderCount": 2
+        "leaderCount": 2,
+        "version": "0.6.0-SNAPSHOT",
+        "setupTime": 1574728775759,
+        "revision": "caf471111cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-20T15:45Z"
       },
       {
         "hostname": "localhost2.storage.enterprise.com",
+        "uuid": "b5907812-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
         "lastHeartbeat": 1574724876059,
         "storageReport": {
@@ -66,10 +72,15 @@
           }
         ],
         "containers": 8192,
-        "leaderCount": 1
+        "leaderCount": 1,
+        "version": "0.6.0-SNAPSHOT",
+        "setupTime": 1574724805059,
+        "revision": "caf471111cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-20T15:45Z"
       },
       {
         "hostname": "localhost3.storage.enterprise.com",
+        "uuid": "b5907934-a5f2-11ea-bb37-0242ac130002",
         "state": "STALE",
         "lastHeartbeat": 1343544879843,
         "storageReport": {
@@ -98,10 +109,15 @@
           }
         ],
         "containers": 43,
-        "leaderCount": 2
+        "leaderCount": 2,
+        "version": "0.6.0-SNAPSHOT",
+        "setupTime": 1343544679543,
+        "revision": "aaf470000cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-19T13:45Z"
       },
       {
         "hostname": "localhost4.storage.enterprise.com",
+        "uuid": "b5907a06-a5f2-11ea-bb37-0242ac130002",
         "state": "DEAD",
         "lastHeartbeat": 1074724876059,
         "storageReport": {
@@ -111,10 +127,15 @@
         },
         "pipelines": [],
         "containers": 0,
-        "leaderCount": 0
+        "leaderCount": 0,
+        "version": "0.6.0-SNAPSHOT",
+        "setupTime": 1074724802059,
+        "revision": "aaf470000cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-19T13:45Z"
       },
       {
         "hostname": "localhost5.storage.enterprise.com",
+        "uuid": "b5907ac4-a5f2-11ea-bb37-0242ac130002",
         "state": "DECOMMISSIONING",
         "lastHeartbeat": 1574724876059,
         "storageReport": {
@@ -137,10 +158,15 @@
           }
         ],
         "containers": 643,
-        "leaderCount": 2
+        "leaderCount": 2,
+        "version": "0.6.0-SNAPSHOT",
+        "setupTime": 1574724816029,
+        "revision": "aaf470000cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-19T13:45Z"
       },
       {
         "hostname": "localhost6.storage.enterprise.com",
+        "uuid": "b5907b82-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
         "lastHeartbeat": 1574724876059,
         "storageReport": {
@@ -163,10 +189,15 @@
           }
         ],
         "containers": 5,
-        "leaderCount": 1
+        "leaderCount": 1,
+        "version": "0.6.0-SNAPSHOT",
+        "setupTime": 1574724802059,
+        "revision": "aaf470000cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-19T13:45Z"
       },
       {
         "hostname": "localhost7.storage.enterprise.com",
+        "uuid": "b5907c40-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
         "lastHeartbeat": 1574724876059,
         "storageReport": {
@@ -195,10 +226,15 @@
           }
         ],
         "containers": 64,
-        "leaderCount": 2
+        "leaderCount": 2,
+        "version": "0.6.0-SNAPSHOT",
+        "setupTime": 1574724676009,
+        "revision": "aaf470000cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-19T13:45Z"
       },
       {
         "hostname": "localhost8.storage.enterprise.com",
+        "uuid": "b5907cf4-a5f2-11ea-bb37-0242ac130002",
         "state": "DECOMMISSIONED",
         "lastHeartbeat": 1574724876059,
         "storageReport": {
@@ -221,10 +257,15 @@
           }
         ],
         "containers": 21,
-        "leaderCount": 1
+        "leaderCount": 1,
+        "version": "0.6.0-SNAPSHOT",
+        "setupTime": 1574724276050,
+        "revision": "caf471111cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-20T15:45Z"
       },
       {
         "hostname": "localhost9.storage.enterprise.com",
+        "uuid": "b5907f4c-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
         "lastHeartbeat": 1574724874011,
         "storageReport": {
@@ -247,10 +288,15 @@
           }
         ],
         "containers": 897,
-        "leaderCount": 1
+        "leaderCount": 1,
+        "version": "0.6.0-SNAPSHOT",
+        "setupTime": 1574724573011,
+        "revision": "caf471111cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-20T15:45Z"
       },
       {
         "hostname": "localhost10.storage.enterprise.com",
+        "uuid": "b590801e-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
         "lastHeartbeat": 1574723876959,
         "storageReport": {
@@ -279,10 +325,15 @@
           }
         ],
         "containers": 6754,
-        "leaderCount": 2
+        "leaderCount": 2,
+        "version": "0.6.0-SNAPSHOT",
+        "setupTime": 1574723756059,
+        "revision": "caf471111cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-20T15:45Z"
       },
       {
         "hostname": "localhost11.storage.enterprise.com",
+        "uuid": "b59080e6-a5f2-11ea-bb37-0242ac130002",
         "state": "STALE",
         "lastHeartbeat": 1474724876783,
         "storageReport": {
@@ -305,10 +356,15 @@
           }
         ],
         "containers": 78,
-        "leaderCount": 2
+        "leaderCount": 2,
+        "version": "0.6.0-SNAPSHOT",
+        "setupTime": 1474724705783,
+        "revision": "ace991111cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-20T10:45Z"
       },
       {
         "hostname": "localhost12.storage.enterprise.com",
+        "uuid": "b59081a4-a5f2-11ea-bb37-0242ac130002",
         "state": "HEALTHY",
         "lastHeartbeat": 1574724796532,
         "storageReport": {
@@ -331,7 +387,11 @@
           }
         ],
         "containers": 543,
-        "leaderCount": 1
+        "leaderCount": 1,
+        "version": "0.6.0-SNAPSHOT",
+        "setupTime": 1574724706232,
+        "revision": "ace991111cdb9168ec013f4526bb997aa513e079",
+        "buildDate": "2020-07-20T10:45Z"
       }
     ]
   },
@@ -506,5 +566,55 @@
         "ModificationTime": "2019-11-26T21:19:22.251Z"
       }
     ]
-  }
+  },
+  "fileSizeCounts": [
+    {
+      "volume": "vol1",
+      "bucket": "bucket1",
+      "fileSize": 1024,
+      "count": 56
+    },
+    {
+      "volume": "vol1",
+      "bucket": "bucket1",
+      "fileSize": 4096,
+      "count": 25
+    },
+    {
+      "volume": "vol1",
+      "bucket": "bucket1",
+      "fileSize": 32768,
+      "count": 312
+    },
+    {
+      "volume": "vol1",
+      "bucket": "bucket1",
+      "fileSize": 131072,
+      "count": 78
+    },
+    {
+      "volume": "vol1",
+      "bucket": "bucket2",
+      "fileSize": 1024,
+      "count": 123
+    },
+    {
+      "volume": "vol1",
+      "bucket": "bucket2",
+      "fileSize": 131072,
+      "count": 187
+    },
+    {
+      "volume": "vol2",
+      "bucket": "bucket1",
+      "fileSize": 1024,
+      "count": 54
+    },
+    {
+      "volume": "vol2",
+      "bucket": "bucket2",
+      "fileSize": 131072,
+      "count": 217
+    }
+  ]
 }

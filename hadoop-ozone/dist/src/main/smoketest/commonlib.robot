@@ -18,44 +18,14 @@ Library             OperatingSystem
 Library             String
 Library             BuiltIn
 
+Resource            lib/os.robot
+
 *** Variables ***
-${SECURITY_ENABLED}                 %{SECURITY_ENABLED}
-${OM_HA_PARAM}                      %{OM_HA_PARAM}
-${OM_SERVICE_ID}                    %{OM_SERVICE_ID}
+${SECURITY_ENABLED}  false
+${OM_HA_PARAM}       ${EMPTY}
+${OM_SERVICE_ID}     om
 
 *** Keywords ***
-Execute
-    [arguments]                     ${command}
-    ${rc}                           ${output} =                 Run And Return Rc And Output           ${command}
-    Log                             ${output}
-    Should Be Equal As Integers     ${rc}                       0
-    [return]                        ${output}
-
-Execute And Ignore Error
-    [arguments]                     ${command}
-    ${rc}                           ${output} =                 Run And Return Rc And Output           ${command}
-    Log                             ${output}
-    [return]                        ${output}
-
-Execute and checkrc
-    [arguments]                     ${command}                  ${expected_error_code}
-    ${rc}                           ${output} =                 Run And Return Rc And Output           ${command}
-    Log                             ${output}
-    Should Be Equal As Integers     ${rc}                       ${expected_error_code}
-    [return]                        ${output}
-
-Compare files
-    [arguments]                 ${file1}                   ${file2}
-    ${checksumbefore} =         Execute                    md5sum ${file1} | awk '{print $1}'
-    ${checksumafter} =          Execute                    md5sum ${file2} | awk '{print $1}'
-                                Should Be Equal            ${checksumbefore}            ${checksumafter}
-
-Install aws cli
-    ${rc}              ${output} =                 Run And Return Rc And Output           which apt-get
-    Run Keyword if     '${rc}' == '0'              Install aws cli s3 debian
-    ${rc}              ${output} =                 Run And Return Rc And Output           yum --help
-    Run Keyword if     '${rc}' == '0'              Install aws cli s3 centos
-
 Kinit HTTP user
     ${hostname} =       Execute                    hostname
     Wait Until Keyword Succeeds      2min       10sec      Execute            kinit -k HTTP/${hostname}@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab

@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.conf;
 
-import javax.annotation.PostConstruct;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -46,12 +45,12 @@ public class SimpleConfiguration extends SimpleConfigurationParent {
   @Config(key = "wait", type = ConfigType.TIME, timeUnit =
       TimeUnit.SECONDS, defaultValue = "30m", description = "Wait time (To "
       + "test TIME config type)", tags = ConfigTag.MANAGEMENT)
-  private long waitTime = 1;
+  private long waitTime;
 
   @PostConstruct
   public void validate() {
     if (port < 0) {
-      throw new NumberFormatException("Please use a postitive port number");
+      throw new NumberFormatException("Please use a positive port number");
     }
   }
 

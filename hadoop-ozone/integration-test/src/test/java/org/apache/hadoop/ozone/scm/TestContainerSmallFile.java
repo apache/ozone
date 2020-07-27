@@ -42,11 +42,18 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.junit.rules.Timeout;
 
 /**
  * Test Container calls.
  */
 public class TestContainerSmallFile {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   @Rule
   public ExpectedException thrown = ExpectedException.none();
 

@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.s3.exception;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
 import static java.net.HttpURLConnection.HTTP_CONFLICT;
@@ -28,6 +30,9 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_NOT_SATISFIABLE;
  * This class needs to be updated to add new errors when required.
  */
 public final class S3ErrorTable {
+
+  private final static Logger LOG = LoggerFactory.getLogger(
+      S3ErrorTable.class);
 
   private S3ErrorTable() {
     //No one should construct this object.
@@ -106,6 +111,7 @@ public final class S3ErrorTable {
     OS3Exception err =  new OS3Exception(e.getCode(), e.getErrorMessage(),
         e.getHttpCode());
     err.setResource(resource);
+    LOG.error(err.toXml());
     return err;
   }
 }

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -26,6 +26,7 @@ import javax.sql.DataSource;
 
 import com.google.inject.Singleton;
 
+import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
 import org.slf4j.Logger;
@@ -44,6 +45,7 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
       LoggerFactory.getLogger(UtilizationSchemaDefinition.class);
 
   private final DataSource dataSource;
+  private DSLContext dslContext;
 
   public static final String CLUSTER_GROWTH_DAILY_TABLE_NAME =
       "CLUSTER_GROWTH_DAILY";
@@ -59,6 +61,7 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
   @Transactional
   public void initializeSchema() throws SQLException {
     Connection conn = dataSource.getConnection();
+    dslContext = DSL.using(conn);
     if (!TABLE_EXISTS_CHECK.test(conn, FILE_COUNT_BY_SIZE_TABLE_NAME)) {
       createFileSizeCountTable(conn);
     }
@@ -68,7 +71,7 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
   }
 
   private void createClusterGrowthTable(Connection conn) {
-    DSL.using(conn).createTableIfNotExists(CLUSTER_GROWTH_DAILY_TABLE_NAME)
+    dslContext.createTableIfNotExists(CLUSTER_GROWTH_DAILY_TABLE_NAME)
         .column("timestamp", SQLDataType.TIMESTAMP)
         .column("datanode_id", SQLDataType.INTEGER)
         .column("datanode_host", SQLDataType.VARCHAR(1024))
@@ -83,11 +86,17 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
   }
 
   private void createFileSizeCountTable(Connection conn) {
-    DSL.using(conn).createTableIfNotExists(FILE_COUNT_BY_SIZE_TABLE_NAME)
+    dslContext.createTableIfNotExists(FILE_COUNT_BY_SIZE_TABLE_NAME)
+        .column("volume", SQLDataType.VARCHAR(64))
+        .column("bucket", SQLDataType.VARCHAR(64))
         .column("file_size", SQLDataType.BIGINT)
         .column("count", SQLDataType.BIGINT)
-        .constraint(DSL.constraint("pk_file_size")
-            .primaryKey("file_size"))
+        .constraint(DSL.constraint("pk_volume_bucket_file_size")
+            .primaryKey("volume", "bucket", "file_size"))
         .execute();
+  }
+
+  public DSLContext getDSLContext() {
+    return dslContext;
   }
 }
