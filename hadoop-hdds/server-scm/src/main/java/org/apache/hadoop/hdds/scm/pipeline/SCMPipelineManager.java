@@ -209,6 +209,7 @@ public class SCMPipelineManager implements PipelineManager {
   ) {
     if (!pipelineID.equals(pipeline.getId())) {
       try {
+        LOG.info("Found pipeline in old format key : {}", pipeline.getId());
         it.removeFromDB();
         pipelineStore.put(pipeline.getId(), pipeline);
       } catch (IOException e) {
@@ -700,5 +701,10 @@ public class SCMPipelineManager implements PipelineManager {
     if (!getSafeModeStatus() && currentlyInSafeMode) {
       startPipelineCreator();
     }
+  }
+
+  @VisibleForTesting
+  protected static Logger getLog() {
+    return LOG;
   }
 }

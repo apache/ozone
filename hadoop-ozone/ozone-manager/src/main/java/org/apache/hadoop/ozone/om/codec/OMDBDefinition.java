@@ -48,7 +48,7 @@ public class OMDBDefinition implements DBDefinition {
                     String.class,
                     new StringCodec(),
                     RepeatedOmKeyInfo.class,
-                    new RepeatedOmKeyInfoCodec());
+                    new RepeatedOmKeyInfoCodec(true));
 
   public static final DBColumnFamilyDefinition<String,
             OzoneManagerProtocolProtos.UserVolumeInfo>
@@ -85,7 +85,7 @@ public class OMDBDefinition implements DBDefinition {
                     String.class,
                     new StringCodec(),
                     OmKeyInfo.class,
-                    new OmKeyInfoCodec());
+                    new OmKeyInfoCodec(true));
 
   public static final DBColumnFamilyDefinition<String, OmKeyInfo>
             KEY_TABLE =
@@ -94,7 +94,7 @@ public class OMDBDefinition implements DBDefinition {
                     String.class,
                     new StringCodec(),
                     OmKeyInfo.class,
-                    new OmKeyInfoCodec());
+                    new OmKeyInfoCodec(true));
 
   public static final DBColumnFamilyDefinition<String, OmBucketInfo>
             BUCKET_TABLE =

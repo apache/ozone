@@ -63,7 +63,7 @@ public class TestNodeFailure {
     DatanodeRatisServerConfig ratisServerConfig =
         conf.getObject(DatanodeRatisServerConfig.class);
     ratisServerConfig.setFollowerSlownessTimeout(Duration.ofSeconds(10));
-    ratisServerConfig.setNoLeaderTimeout(Duration.ofSeconds(10));
+    ratisServerConfig.setNoLeaderTimeout(Duration.ofMinutes(5));
     conf.setFromObject(ratisServerConfig);
     conf.set(HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL, "2s");
 

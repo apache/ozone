@@ -166,6 +166,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
     CreateFileRequest createFileRequest = getOmRequest().getCreateFileRequest();
     KeyArgs keyArgs = createFileRequest.getKeyArgs();
+    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -199,6 +200,10 @@ public class OMFileCreateRequest extends OMKeyRequest {
     IOException exception = null;
     Result result = null;
     try {
+      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+
       // check Acl
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
@@ -219,6 +224,10 @@ public class OMFileCreateRequest extends OMKeyRequest {
           keyName);
       OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable()
           .getIfExist(ozoneKey);
+
+      if (dbKeyInfo != null) {
+        ozoneManager.getKeyManager().refresh(dbKeyInfo);
+      }
 
       OMFileRequest.OMPathInfo pathInfo =
           OMFileRequest.verifyFilesInPath(omMetadataManager, volumeName,
@@ -310,7 +319,6 @@ public class OMFileCreateRequest extends OMKeyRequest {
     }
 
     // Audit Log outside the lock
-    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
     auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.CREATE_FILE, auditMap, exception,
         getOmRequest().getUserInfo()));
