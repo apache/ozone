@@ -41,7 +41,6 @@
     <module>datanode</module>
     <module>s3gateway</module>
     <module>dist</module>
-    <module>upgrade</module>
     <module>csi</module>
     <module>fault-injection-test</module>
     <module>insight</module>
@@ -213,11 +212,6 @@
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-ozone-upgrade</artifactId>
-        <version>${ozone.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-hdds-container-service</artifactId>
         <version>${hdds.version}</version>
         <type>test-jar</type>
@@ -303,7 +297,7 @@
             <exclude>**/pnpm-lock.yaml</exclude>
             <exclude>**/ozone-recon-web/build/**</exclude>
             <exclude>src/main/license/**</exclude>
-            <exclude>src/main/proto/proto.lock</exclude>
+            <exclude>src/main/resources/proto.lock</exclude>
           </excludes>
         </configuration>
       </plugin>

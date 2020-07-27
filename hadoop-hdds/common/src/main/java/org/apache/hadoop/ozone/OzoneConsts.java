@@ -366,4 +366,7 @@ public final class OzoneConsts {
 
   public static final String CONTAINER_DB_TYPE_ROCKSDB = "RocksDB";
   public static final String CONTAINER_DB_TYPE_LEVELDB = "LevelDB";
+
+  // An on-disk transient marker file used when replacing DB with checkpoint
+  public static final String DB_TRANSIENT_MARKER = "dbInconsistentMarker";
 }

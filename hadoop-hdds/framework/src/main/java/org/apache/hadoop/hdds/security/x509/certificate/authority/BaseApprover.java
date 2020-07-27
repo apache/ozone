@@ -60,6 +60,15 @@ public abstract class BaseApprover implements CertificateApprover {
   }
 
   /**
+   * Returns the PKI policy profile.
+   *
+   * @return PKIProfile
+   */
+  public PKIProfile getProfile() {
+    return profile;
+  }
+
+  /**
    * Returns the Security config.
    *
    * @return SecurityConfig

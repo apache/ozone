@@ -23,7 +23,11 @@ source "$COMPOSE_DIR/../testlib.sh"
 
 export SECURITY_ENABLED=true
 
+: ${OZONE_BUCKET_KEY_NAME:=key1}
+
 start_docker_env
+
+execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
 
 execute_robot_test scm kinit.robot
 

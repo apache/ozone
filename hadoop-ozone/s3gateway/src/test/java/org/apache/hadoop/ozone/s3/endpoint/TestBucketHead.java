@@ -26,7 +26,10 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.Assert;
+
+import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static org.junit.Assert.assertEquals;
 import org.junit.Before;
 import org.junit.Test;
@@ -60,7 +63,11 @@ public class TestBucketHead {
 
   @Test
   public void testHeadFail() throws Exception {
-    Response response = bucketEndpoint.head("unknownbucket");
-    Assert.assertEquals(400, response.getStatus());
+    try {
+      bucketEndpoint.head("unknownbucket");
+    } catch (OS3Exception ex) {
+      Assert.assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
+      Assert.assertEquals("NoSuchBucket", ex.getCode());
+    }
   }
 }
