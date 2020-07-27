@@ -92,7 +92,6 @@ public class TestHadoopNestedDirGenerator {
     @Test
     public void testNestedDirTreeGeneration() throws Exception {
         try {
-            System.out.println("cloudera\n");
             startCluster();
             FileOutputStream out = FileUtils.openOutputStream(new File(path,
                     "conf"));
