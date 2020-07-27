@@ -22,6 +22,8 @@ import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .RepeatedKeyInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
@@ -29,12 +31,21 @@ import java.io.IOException;
  * Codec to encode RepeatedOmKeyInfo as byte array.
  */
 public class RepeatedOmKeyInfoCodec implements Codec<RepeatedOmKeyInfo> {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(RepeatedOmKeyInfoCodec.class);
+
+  private final boolean ignorePipeline;
+  public RepeatedOmKeyInfoCodec(boolean ignorePipeline) {
+    this.ignorePipeline = ignorePipeline;
+    LOG.info("RepeatedOmKeyInfoCodec ignorePipeline = " + ignorePipeline);
+  }
+
   @Override
   public byte[] toPersistedFormat(RepeatedOmKeyInfo object)
       throws IOException {
     Preconditions.checkNotNull(object,
         "Null object can't be converted to byte array.");
-    return object.getProto().toByteArray();
+    return object.getProto(ignorePipeline).toByteArray();
   }
 
   @Override

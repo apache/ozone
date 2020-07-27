@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.Path;
@@ -39,6 +40,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
@@ -748,9 +750,15 @@ public class BasicOzoneFileSystem extends FileSystem {
       path = new Path(workingDir, path);
     }
     // removing leading '/' char
-    String key = path.toUri().getPath().substring(1);
+    String key = path.toUri().getPath();
+
+    if (OzoneFSUtils.isValidName(key)) {
+      key = path.toUri().getPath();
+    } else {
+      throw new InvalidPathException("Invalid path Name" + key);
+    }
     LOG.trace("path for key:{} is:{}", key, path);
-    return key;
+    return key.substring(1);
   }
 
   /**

@@ -547,4 +547,17 @@ public final class TestUtils {
         .build();
   }
 
+  public static Pipeline getRandomPipeline() {
+    List<DatanodeDetails> nodes = new ArrayList<>();
+    nodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    nodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    nodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    return Pipeline.newBuilder()
+        .setFactor(HddsProtos.ReplicationFactor.THREE)
+        .setId(PipelineID.randomId())
+        .setNodes(nodes)
+        .setState(Pipeline.PipelineState.OPEN)
+        .setType(HddsProtos.ReplicationType.RATIS)
+        .build();
+  }
 }

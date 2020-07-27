@@ -170,9 +170,9 @@ public final class RatisHelper {
   }
 
   public static RaftClient newRaftClient(RaftPeer leader,
-      ConfigurationSource conf) {
+      ConfigurationSource conf, GrpcTlsConfig tlsConfig) {
     return newRaftClient(getRpcType(conf), leader,
-        RatisHelper.createRetryPolicy(conf), conf);
+        RatisHelper.createRetryPolicy(conf), tlsConfig, conf);
   }
 
   public static RaftClient newRaftClient(RpcType rpcType, RaftPeer leader,

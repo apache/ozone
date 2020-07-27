@@ -48,6 +48,7 @@ public class DNCertificateClient extends DefaultCertificateClient {
   /**
    * Returns a CSR builder that can be used to creates a Certificate signing
    * request.
+   * The default flag is added to allow basic SSL handshake.
    *
    * @return CertificateSignRequest.Builder
    */
@@ -55,8 +56,8 @@ public class DNCertificateClient extends DefaultCertificateClient {
   public CertificateSignRequest.Builder getCSRBuilder()
       throws CertificateException {
     return super.getCSRBuilder()
-        .setDigitalEncryption(false)
-        .setDigitalSignature(false);
+        .setDigitalEncryption(true)
+        .setDigitalSignature(true);
   }
 
   public Logger getLogger() {

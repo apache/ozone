@@ -93,7 +93,7 @@ public class ContainerMapper {
             Table.KeyValue<String, OmKeyInfo> keyValue =
                 keyValueTableIterator.next();
             OmKeyInfo omKeyInfo = keyValue.getValue();
-            byte[] value = omKeyInfo.getProtobuf().toByteArray();
+            byte[] value = omKeyInfo.getProtobuf(true).toByteArray();
             OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(
                 OzoneManagerProtocolProtos.KeyInfo.parseFrom(value));
             for (OmKeyLocationInfoGroup keyLocationInfoGroup : keyInfo
