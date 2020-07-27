@@ -123,6 +123,13 @@ jobs:
   acceptance:
     name: acceptance
     runs-on: ubuntu-18.04
+    strategy:
+      matrix:
+        suite:
+          - secure
+          - unsecure
+          - misc
+      fail-fast: false
     steps:
       - uses: actions/cache@v2
         with:
@@ -154,12 +161,13 @@ jobs:
           cd /mnt/ozone && hadoop-ozone/dev-support/checks/acceptance.sh
         env:
           KEEP_IMAGE: false
+          OZONE_ACCEPTANCE_SUITE: ${{ matrix.suite }}
           OZONE_WITH_COVERAGE: true
           OZONE_VOLUME_OWNER: 1000
       - uses: actions/upload-artifact@master
         if: always()
         with:
-          name: acceptance
+          name: acceptance-${{ matrix.suite }}
           path: /mnt/ozone/target/acceptance
         continue-on-error: true
       - run: |
@@ -170,16 +178,11 @@ jobs:
   integration:
     name: integration
     runs-on: ubuntu-18.04
-    needs:
-        - build
     strategy:
       matrix:
         profile:
           - client
-          - filesystem
-          - filesystem-contract
-          - freon
-          - hdds-om
+          - filesystem-hdds
           - ozone
       fail-fast: false
     steps:
