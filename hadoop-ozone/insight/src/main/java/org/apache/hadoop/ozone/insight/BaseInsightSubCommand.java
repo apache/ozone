@@ -99,7 +99,8 @@ public class BaseInsightSubCommand {
     insights.put("om.key-manager", new KeyManagerInsight());
     insights.put("om.protocol.client", new OmProtocolInsight());
     insights.put("datanode.pipeline", new RatisInsight(configuration));
-    insights.put("datanode.dispatcher", new DatanodeDispatcherInsight(configuration));
+    insights.put("datanode.dispatcher",
+        new DatanodeDispatcherInsight(configuration));
 
     return insights;
   }
