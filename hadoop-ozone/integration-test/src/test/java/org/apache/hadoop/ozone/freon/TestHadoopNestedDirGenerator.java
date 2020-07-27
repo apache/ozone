@@ -162,7 +162,7 @@ public class TestHadoopNestedDirGenerator {
             FileStatus[] temp = fs.listStatus(f.getPath());
             if(temp.length > 0){
                 ++depth;
-                for(int i=0;i<temp.length;i++){
+                for(int i = 0; i < temp.length; i++){
                     queue.add(temp[i]);
                 }
             }
