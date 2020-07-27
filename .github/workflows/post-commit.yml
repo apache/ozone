@@ -248,7 +248,7 @@ jobs:
           git fetch origin "${GITHUB_REF}"
           git checkout FETCH_HEAD
           git reset --hard
-      - name: insstall robotframework
+      - name: install robotframework
         run: sudo pip install robotframework
       - name: install k3s
         run: curl -sfL https://get.k3s.io | sh -
