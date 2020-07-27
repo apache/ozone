@@ -160,7 +160,7 @@ public class TestGetCommittedBlockLengthAndPutKey {
   public void tesPutKeyResposne() throws Exception {
     ContainerProtos.PutBlockResponseProto response;
     ContainerWithPipeline container = storageContainerLocationClient
-        .allocateContainer("REDUCED", OzoneConsts.OZONE);
+        .allocateContainer(OzoneConsts.OZONE, "REDUCED");
     long containerID = container.getContainerInfo().getContainerID();
     Pipeline pipeline = container.getPipeline();
     XceiverClientSpi client = xceiverClientManager.acquireClient(pipeline);

@@ -1019,8 +1019,8 @@ message MultipartKeyInfo {
     required uint64 creationTime = 2;
     // TODO(baoloongmao): Remove these two future
     // deprecated, please use storageClass instead
-    required hadoop.hdds.ReplicationType type = 3;
-    required hadoop.hdds.ReplicationFactor factor = 4;
+    optional hadoop.hdds.ReplicationType type = 3;
+    optional hadoop.hdds.ReplicationFactor factor = 4;
     repeated PartKeyInfo partKeyInfoList = 5;
     optional uint64 objectID = 6;
     optional uint64 updateID = 7;

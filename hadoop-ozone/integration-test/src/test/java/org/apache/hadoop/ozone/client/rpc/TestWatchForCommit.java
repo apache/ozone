@@ -242,7 +242,8 @@ public class TestWatchForCommit {
     XceiverClientManager clientManager = new XceiverClientManager(conf);
     ContainerWithPipeline container1 = storageContainerLocationClient
         .allocateContainer(
-            StaticStorageClassRegistry.STANDARD.getName(), OzoneConsts.OZONE);
+            OzoneConsts.OZONE,
+            StaticStorageClassRegistry.STANDARD.getName());
     XceiverClientSpi xceiverClient = clientManager
         .acquireClient(container1.getPipeline());
     Assert.assertEquals(1, xceiverClient.getRefcount());
@@ -285,7 +286,8 @@ public class TestWatchForCommit {
 
     ContainerWithPipeline container1 = storageContainerLocationClient
         .allocateContainer(
-            StaticStorageClassRegistry.STANDARD.getName(), OzoneConsts.OZONE);
+            OzoneConsts.OZONE,
+            StaticStorageClassRegistry.STANDARD.getName());
     XceiverClientSpi xceiverClient = clientManager
         .acquireClient(container1.getPipeline());
     Assert.assertEquals(1, xceiverClient.getRefcount());
@@ -328,7 +330,8 @@ public class TestWatchForCommit {
     XceiverClientManager clientManager = new XceiverClientManager(conf);
     ContainerWithPipeline container1 = storageContainerLocationClient
         .allocateContainer(
-            StaticStorageClassRegistry.STANDARD.getName(), OzoneConsts.OZONE);
+            OzoneConsts.OZONE,
+            StaticStorageClassRegistry.STANDARD.getName());
     XceiverClientSpi xceiverClient = clientManager
         .acquireClient(container1.getPipeline());
     Assert.assertEquals(1, xceiverClient.getRefcount());

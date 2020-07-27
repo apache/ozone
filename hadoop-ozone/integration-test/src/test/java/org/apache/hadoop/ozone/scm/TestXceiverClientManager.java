@@ -93,10 +93,10 @@ public class TestXceiverClientManager {
 
     ContainerWithPipeline container1 = storageContainerLocationClient
         .allocateContainer(
+            OzoneConsts.OZONE,
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)),
-            OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)));
     XceiverClientSpi client1 = clientManager
         .acquireClient(container1.getPipeline());
     Assert.assertEquals(1, client1.getRefcount());
@@ -136,10 +136,10 @@ public class TestXceiverClientManager {
 
     ContainerWithPipeline container1 =
         storageContainerLocationClient.allocateContainer(
+            OzoneConsts.OZONE,
             StorageClassConverter.convert(null,
                 HddsProtos.ReplicationFactor.ONE,
-                SCMTestUtils.getReplicationType(conf)),
-            OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)));
     XceiverClientSpi client1 = clientManager
         .acquireClient(container1.getPipeline());
     Assert.assertEquals(1, client1.getRefcount());
@@ -198,10 +198,10 @@ public class TestXceiverClientManager {
 
     ContainerWithPipeline container1 =
         storageContainerLocationClient.allocateContainer(
+            OzoneConsts.OZONE,
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)),
-            OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)));
     XceiverClientSpi client1 = clientManager
         .acquireClient(container1.getPipeline());
     Assert.assertEquals(1, client1.getRefcount());
@@ -253,10 +253,10 @@ public class TestXceiverClientManager {
     // client is added in cache
     ContainerWithPipeline container1 =
         storageContainerLocationClient.allocateContainer(
+            OzoneConsts.OZONE,
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)),
-            OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)));
     XceiverClientSpi client1 =
         clientManager.acquireClient(container1.getPipeline());
     clientManager.acquireClient(container1.getPipeline());

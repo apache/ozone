@@ -144,7 +144,8 @@ public class Test2WayCommitInRatis {
 
     ContainerWithPipeline container1 = storageContainerLocationClient
         .allocateContainer(
-            StaticStorageClassRegistry.STANDARD.getName(), OzoneConsts.OZONE);
+            OzoneConsts.OZONE,
+            StaticStorageClassRegistry.STANDARD.getName());
     XceiverClientSpi xceiverClient = clientManager
         .acquireClient(container1.getPipeline());
     Assert.assertEquals(1, xceiverClient.getRefcount());

@@ -231,8 +231,8 @@ public class ContainerOperationClient implements ScmClient {
     try {
       // allocate container on SCM.
       ContainerWithPipeline containerWithPipeline =
-          storageContainerLocationClient.allocateContainer(storageClass,
-              owner);
+          storageContainerLocationClient.allocateContainer(owner,
+              storageClass);
       Pipeline pipeline = containerWithPipeline.getPipeline();
       // connect to pipeline leader and allocate container on leader datanode.
       client = xceiverClientManager.acquireClient(pipeline);

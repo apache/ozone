@@ -87,8 +87,8 @@ public class TestContainerStateMachineIdempotency {
   public void testContainerStateMachineIdempotency() throws Exception {
     ContainerWithPipeline container = storageContainerLocationClient
         .allocateContainer(
-            StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
-            OzoneConsts.OZONE);
+            OzoneConsts.OZONE,
+            StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName());
     long containerID = container.getContainerInfo().getContainerID();
     Pipeline pipeline = container.getPipeline();
     XceiverClientSpi client = xceiverClientManager.acquireClient(pipeline);

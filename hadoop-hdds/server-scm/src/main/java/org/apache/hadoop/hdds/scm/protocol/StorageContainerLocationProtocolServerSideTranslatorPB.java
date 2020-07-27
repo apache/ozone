@@ -284,8 +284,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       throws IOException {
     ContainerWithPipeline containerWithPipeline = impl
         .allocateContainer(
-            request.getStorageClass(),
-            request.getOwner());
+            request.getOwner(),
+            request.getStorageClass());
     return ContainerResponseProto.newBuilder()
         .setContainerWithPipeline(containerWithPipeline.getProtobuf())
         .setErrorCode(ContainerResponseProto.Error.success)

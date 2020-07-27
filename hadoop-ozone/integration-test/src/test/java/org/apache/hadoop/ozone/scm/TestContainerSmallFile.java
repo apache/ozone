@@ -89,10 +89,10 @@ public class TestContainerSmallFile {
   public void testAllocateWrite() throws Exception {
     ContainerWithPipeline container =
         storageContainerLocationClient.allocateContainer(
+            OzoneConsts.OZONE,
             StorageClassConverter.convert(
                 null, HddsProtos.ReplicationFactor.ONE,
-                SCMTestUtils.getReplicationType(ozoneConfig)),
-            OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(ozoneConfig)));
     XceiverClientSpi client = xceiverClientManager
         .acquireClient(container.getPipeline());
     ContainerProtocolCalls.createContainer(client,
@@ -113,10 +113,10 @@ public class TestContainerSmallFile {
   public void testInvalidBlockRead() throws Exception {
     ContainerWithPipeline container =
         storageContainerLocationClient.allocateContainer(
+            OzoneConsts.OZONE,
             StorageClassConverter.convert(
                 null, HddsProtos.ReplicationFactor.ONE,
-                SCMTestUtils.getReplicationType(ozoneConfig)),
-            OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(ozoneConfig)));
     XceiverClientSpi client = xceiverClientManager
         .acquireClient(container.getPipeline());
     ContainerProtocolCalls.createContainer(client,
@@ -138,10 +138,10 @@ public class TestContainerSmallFile {
     long nonExistContainerID = 8888L;
     ContainerWithPipeline container =
         storageContainerLocationClient.allocateContainer(
+            OzoneConsts.OZONE,
             StorageClassConverter.convert(
                 null, HddsProtos.ReplicationFactor.ONE,
-                SCMTestUtils.getReplicationType(ozoneConfig)),
-            OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(ozoneConfig)));
     XceiverClientSpi client = xceiverClientManager
         .acquireClient(container.getPipeline());
     ContainerProtocolCalls.createContainer(client,
@@ -166,10 +166,11 @@ public class TestContainerSmallFile {
   public void testReadWriteWithBCSId() throws Exception {
     ContainerWithPipeline container =
         storageContainerLocationClient.allocateContainer(
+            OzoneConsts.OZONE,
             StorageClassConverter.convert(
                 null, HddsProtos.ReplicationFactor.ONE,
-                SCMTestUtils.getReplicationType(ozoneConfig)),
-            OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(ozoneConfig))
+        );
     XceiverClientSpi client = xceiverClientManager
         .acquireClient(container.getPipeline());
     ContainerProtocolCalls.createContainer(client,
