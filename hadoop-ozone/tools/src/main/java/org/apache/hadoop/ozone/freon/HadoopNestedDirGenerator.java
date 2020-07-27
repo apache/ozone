@@ -95,6 +95,14 @@ public class HadoopNestedDirGenerator extends BaseFreonGenerator
 
    */
   private void createDir(long counter) throws Exception {
+    if (depth <= 0) {
+      LOG.info("Invalid depth value, at least one depth should be passed!");
+      return;
+    }
+    if (span < 0) {
+      LOG.info("Invalid span value, at least one span should be passed!");
+      return;
+    }
     String dirString = RandomStringUtils.randomAlphanumeric(length);
     for (int i = 1; i <= depth; i++) {
       dirString = dirString.concat("/").concat(RandomStringUtils.
@@ -109,5 +117,7 @@ public class HadoopNestedDirGenerator extends BaseFreonGenerator
       Path dir = new Path(rootPath.concat("/").concat(childDir));
       fileSystem.mkdirs(dir.getParent());
     }
+    System.out.println("\nSuccessfully created directories. Total " +
+            "Directories with level = " + depth + " and span = " + span);
   }
 }
