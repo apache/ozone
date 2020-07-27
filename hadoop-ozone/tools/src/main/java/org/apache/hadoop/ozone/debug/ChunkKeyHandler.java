@@ -61,7 +61,7 @@ import picocli.CommandLine.Parameters;
         description = "returns chunk location"
                 + " information about an existing key")
 @MetaInfServices(SubcommandWithParent.class)
-public class ChunkKeyHandler  extends KeyHandler implements
+public class ChunkKeyHandler extends KeyHandler implements
     SubcommandWithParent {
 
   @Parameters(arity = "1..1", description = "key to be located")
