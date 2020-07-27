@@ -35,6 +35,13 @@ public abstract class Shell extends GenericCli {
       + "If they are not specified it will be identified from "
       + "the config files.";
 
+  public Shell() {
+  }
+
+  public Shell(Class<?> type) {
+    super(type);
+  }
+
   @Override
   protected void printError(Throwable errorArg) {
     if (errorArg instanceof OMException) {

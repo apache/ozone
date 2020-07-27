@@ -21,8 +21,6 @@ import java.util.function.Supplier;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.ozone.shell.bucket.BucketCommands;
-import org.apache.hadoop.ozone.shell.volume.VolumeCommands;
 
 import picocli.CommandLine.Command;
 
@@ -36,8 +34,7 @@ import picocli.CommandLine.Command;
 public class OzoneShell extends Shell {
 
   public OzoneShell() {
-    getCmd().addSubcommand("volume", new VolumeCommands());
-    getCmd().addSubcommand("bucket", new BucketCommands());
+    super(OzoneShell.class);
   }
 
   /**
