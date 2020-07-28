@@ -30,11 +30,15 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 import com.google.common.base.Preconditions;
 import org.apache.ratis.util.TimeDuration;
+
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_DEFAULT;
 
 /**
  * Set of Utility functions used in ozone.
@@ -164,6 +168,24 @@ public final class OzoneUtils {
       TimeDuration defaultValue) {
     return getTimeDuration(conf, key, defaultValue)
         .toLong(TimeUnit.MILLISECONDS);
+  }
+
+  /**
+   * Return true, when Authorizer class is configured with non-default value.
+   * @param configuration
+   * @return boolean
+   */
+  public static boolean checkExternalAuthorizer(
+      OzoneConfiguration configuration) {
+    String authorizerClass = configuration.get(OZONE_ACL_AUTHORIZER_CLASS);
+    if (authorizerClass != null &&
+        !authorizerClass.equals(OZONE_ACL_AUTHORIZER_CLASS_DEFAULT)) {
+      System.out.print(String.format("When External Authorizer %s is " +
+          "configured, Acl commands are not supported via ozone shell.",
+          authorizerClass));
+      return true;
+    }
+    return false;
   }
 
 }

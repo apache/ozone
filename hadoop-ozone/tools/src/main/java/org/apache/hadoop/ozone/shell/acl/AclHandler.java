@@ -17,12 +17,14 @@
  */
 package org.apache.hadoop.ozone.shell.acl;
 
+
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.StoreTypeOption;
 import org.apache.hadoop.ozone.shell.Handler;
 
+import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -55,7 +57,10 @@ public abstract class AclHandler extends Handler {
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
-
+    boolean externalAuthorizer = OzoneUtils.checkExternalAuthorizer(getConf());
+    if (externalAuthorizer) {
+      return;
+    }
     execute(client, address.toOzoneObj(storeType.getValue()));
   }
 
