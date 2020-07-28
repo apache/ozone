@@ -627,7 +627,6 @@ public class TestStorageContainerManager {
       modifiersField.setAccessible(true);
       modifiersField.setInt(f, f.getModifiers() & ~Modifier.FINAL);
       f.set(replicationManager, publisher);
-      Thread.sleep(20000);
 
       UUID dnUuid = cluster.getHddsDatanodes().iterator().next()
           .getDatanodeDetails().getUuid();
@@ -638,6 +637,13 @@ public class TestStorageContainerManager {
 
       CommandForDatanode commandForDatanode = new CommandForDatanode(
           dnUuid, closeContainerCommand);
+
+      GenericTestUtils.waitFor(() -> {
+        return replicationManager.isRunning();
+      }, 1000, 25000);
+
+      // Give ReplicationManager some time to process the containers.
+      Thread.sleep(5000);
 
       verify(publisher).fireEvent(eq(SCMEvents.DATANODE_COMMAND), argThat(new
           CloseContainerCommandMatcher(dnUuid, commandForDatanode)));
