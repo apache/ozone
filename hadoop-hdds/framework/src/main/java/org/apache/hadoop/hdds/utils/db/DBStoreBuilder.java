@@ -312,11 +312,12 @@ public final class DBStoreBuilder {
         // The default column family is always added.
         // If it is present in the DB Definition, ignore it so we don't get an
         // error about adding it twice.
-        addTable(columnFamily.getName())
-                .addCodec(columnFamily.getKeyType(), columnFamily.getKeyCodec())
-                .addCodec(columnFamily.getValueType(),
-                        columnFamily.getValueCodec());
+        addTable(columnFamily.getName());
       }
+      // Add new codecs specified for the table, which may be an alias for a
+      // table that was already added with different codecs.
+      addCodec(columnFamily.getKeyType(), columnFamily.getKeyCodec());
+      addCodec(columnFamily.getValueType(), columnFamily.getValueCodec());
     }
 
     return this;
