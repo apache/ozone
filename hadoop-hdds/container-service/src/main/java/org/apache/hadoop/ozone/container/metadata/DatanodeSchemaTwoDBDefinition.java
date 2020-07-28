@@ -48,12 +48,12 @@ public class DatanodeSchemaTwoDBDefinition extends
           Long.class,
           new LongCodec());
 
-  public static final DBColumnFamilyDefinition<Long, NoData>
+  public static final DBColumnFamilyDefinition<String, NoData>
           DELETED_BLOCKS =
           new DBColumnFamilyDefinition<>(
                   "deleted_blocks",
-                  Long.class,
-                  new LongCodec(),
+                  String.class,
+                  new StringCodec(),
                   NoData.class,
                   new NoDataCodec());
 
@@ -73,7 +73,8 @@ public class DatanodeSchemaTwoDBDefinition extends
   }
 
   @Override
-  public DBColumnFamilyDefinition<Long, NoData> getDeletedBlocksColumnFamily() {
+  public DBColumnFamilyDefinition<String, NoData>
+  getDeletedBlocksColumnFamily() {
     return DELETED_BLOCKS;
   }
 }
