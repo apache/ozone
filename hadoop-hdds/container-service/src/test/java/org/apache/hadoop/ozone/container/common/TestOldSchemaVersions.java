@@ -41,6 +41,7 @@ import org.yaml.snakeyaml.Yaml;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.util.UUID;
 
 import static org.junit.Assert.*;
@@ -57,27 +58,34 @@ public class TestOldSchemaVersions {
   private File metadataDir;
   private File dbFile;
 
-  // TODO : Rename this and access fields statically.
-  private TestDB db;
-
   @Rule
   public TemporaryFolder tempFolder = new TemporaryFolder();
 
   @Before
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
-    db = new TestDB();
+    TestDB testDB = new TestDB();
 
     // Copy data to the temporary folder so it can be safely modified.
     File tempMetadataDir =
-            tempFolder.newFolder(Long.toString(db.CONTAINER_ID),
+            tempFolder.newFolder(Long.toString(TestDB.CONTAINER_ID),
                     OzoneConsts.CONTAINER_META_PATH);
 
-    FileUtils.copyDirectoryToDirectory(db.getDBDirectory(), tempMetadataDir);
-    FileUtils.copyFileToDirectory(db.getContainerFile(), tempMetadataDir);
+    FileUtils.copyDirectoryToDirectory(testDB.getDBDirectory(),
+            tempMetadataDir);
+    FileUtils.copyFileToDirectory(testDB.getContainerFile(), tempMetadataDir);
 
     metadataDir = tempMetadataDir;
-    dbFile = metadataDir.listFiles((dir, name) -> name.equals(db.DB_NAME))[0];
+    File[] potentialDBFiles = metadataDir.listFiles((dir, name) ->
+            name.equals(TestDB.DB_NAME));
+
+    if (potentialDBFiles == null || potentialDBFiles.length != 1) {
+      throw new IOException("Failed load file named " + TestDB.DB_NAME + " " +
+              "from the " + "metadata directory " +
+              metadataDir.getAbsolutePath());
+    }
+
+    dbFile = potentialDBFiles[0];
   }
 
   /**
@@ -91,12 +99,12 @@ public class TestOldSchemaVersions {
     KeyValueContainerUtil.parseKVContainerData(kvData, conf);
 
     try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(kvData, conf)) {
-      assertEquals(db.NUM_DELETED_BLOCKS, countDeletedBlocks(refCountedDB));
+      assertEquals(TestDB.NUM_DELETED_BLOCKS, countDeletedBlocks(refCountedDB));
 
-      assertEquals(db.NUM_PENDING_DELETION_BLOCKS,
+      assertEquals(TestDB.NUM_PENDING_DELETION_BLOCKS,
               countDeletingBlocks(refCountedDB));
 
-      assertEquals(db.KEY_COUNT,
+      assertEquals(TestDB.KEY_COUNT,
               countUnprefixedBlocks(refCountedDB));
     }
   }
@@ -177,20 +185,20 @@ public class TestOldSchemaVersions {
 //
 //    try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
 //      // Blocks marked with #deleting# prefix should be deleted.
-//      assertEquals(db.NUM_PENDING_DELETION_BLOCKS - numBlocksToDelete,
+//      assertEquals(TestDB.NUM_PENDING_DELETION_BLOCKS - numBlocksToDelete,
 //              countDeletingBlocks(refCountedDB));
 //
 //      // All other blocks should remain unchanged.
-//      assertEquals(db.NUM_DELETED_BLOCKS, countDeletedBlocks(refCountedDB));
-//      assertEquals(db.KEY_COUNT, countUnprefixedBlocks(refCountedDB));
+//      assertEquals(TestDB.NUM_DELETED_BLOCKS, countDeletedBlocks(refCountedDB));
+//      assertEquals(TestDB.KEY_COUNT, countUnprefixedBlocks(refCountedDB));
 //
 //      // Since metadata is being stored in the same table, make sure it is not
 //      // altered as well.
 //      Table<String, Long> metadataTable =
 //              refCountedDB.getStore().getMetadataTable();
-//      assertEquals(db.KEY_COUNT,
+//      assertEquals(TestDB.KEY_COUNT,
 //              (long)metadataTable.get(OzoneConsts.BLOCK_COUNT));
-//      assertEquals(db.BYTES_USED,
+//      assertEquals(TestDB.BYTES_USED,
 //              (long)metadataTable.get(OzoneConsts.CONTAINER_BYTES_USED));
 //    }
   }
@@ -206,9 +214,9 @@ public class TestOldSchemaVersions {
     String pipelineID = UUID.randomUUID().toString();
     String nodeID = UUID.randomUUID().toString();
 
-    KeyValueContainerData kvData = new KeyValueContainerData(db.CONTAINER_ID,
-            clVersion, ContainerTestHelper.CONTAINER_MAX_SIZE,
-            pipelineID, nodeID);
+    KeyValueContainerData kvData = new KeyValueContainerData(
+            TestDB.CONTAINER_ID, clVersion,
+            ContainerTestHelper.CONTAINER_MAX_SIZE, pipelineID, nodeID);
     kvData.setMetadataPath(metadataDir.getAbsolutePath());
     kvData.setDbFile(dbFile);
 
@@ -224,10 +232,10 @@ public class TestOldSchemaVersions {
    * metadata values matching those in the database under test.
    */
   private void checkContainerData(KeyValueContainerData kvData) {
-    assertEquals(OzoneConsts.SCHEMA_V1, kvData.getSchemaVersion());
-    assertEquals(db.KEY_COUNT, kvData.getKeyCount());
-    assertEquals(db.BYTES_USED, kvData.getBytesUsed());
-    assertEquals(db.NUM_PENDING_DELETION_BLOCKS,
+    assertEquals(TestDB.SCHEMA_VERSION, kvData.getSchemaVersion());
+    assertEquals(TestDB.KEY_COUNT, kvData.getKeyCount());
+    assertEquals(TestDB.BYTES_USED, kvData.getBytesUsed());
+    assertEquals(TestDB.NUM_PENDING_DELETION_BLOCKS,
             kvData.getNumPendingDeletionBlocks());
   }
 
@@ -254,17 +262,33 @@ public class TestOldSchemaVersions {
 
   /**
    * Holds information about the database used for testing by this class.
+   * This database was generated by an old version of the code that wrote
+   * data in schema version 1. The values are arbitrary. We only care that
+   * it has keys representing metadata, deleted blocks, deleting blocks, and
+   * regular blocks.
+   *
+   * The contents of the database are:
+   *
+   * #BLOCKCOUNT : 4
+   * #BYTESUSED : 600
+   * #PENDINGDELETEBLOCKCOUNT : 2
+   * #deleted#1595596644098 : 1595596644098
+   * #deleted#1595596644101 : 1595596644101
+   * #deleting#1595596644028 : 1595596644028
+   * #deleting#1595596644096 : 1595596644096
+   * 1595596644103 : <blockdata>
+   * 1595596644105 : <blockdata>
    */
-  private class TestDB {
+  private static class TestDB {
     // Non configurable properties of the files.
     public static final long CONTAINER_ID = 123;
     public static final String CONTAINER_FILE_NAME =
             CONTAINER_ID + ".container";
     public static final String DB_NAME = CONTAINER_ID + "-dn-container.db";
 
+    public static final String SCHEMA_VERSION = OzoneConsts.SCHEMA_V1;
     public static final long KEY_COUNT = 2;
     public static final long BYTES_USED = 600;
-
     public static final long NUM_PENDING_DELETION_BLOCKS = 2;
     public static final long NUM_DELETED_BLOCKS = 2;
 
@@ -275,12 +299,22 @@ public class TestOldSchemaVersions {
     }
 
     private File getContainerFile() {
-      return new File(loader.getResource(CONTAINER_FILE_NAME)
-              .getFile());
+      return load(CONTAINER_FILE_NAME);
     }
 
     private File getDBDirectory() {
-      return new File(loader.getResource(DB_NAME).getFile());
+      return load(DB_NAME);
+    }
+
+    private File load(String name) {
+      File file = null;
+      URL url = loader.getResource(name);
+
+      if (url != null) {
+        file = new File(url.getFile());
+      }
+
+      return file;
     }
   }
 }
