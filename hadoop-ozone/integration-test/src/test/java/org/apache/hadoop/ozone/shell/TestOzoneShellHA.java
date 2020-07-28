@@ -38,6 +38,7 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -468,6 +469,7 @@ public class TestOzoneShellHA {
   }
 
   @Test
+  @Ignore("HDDS-3982. Disable moveToTrash in o3fs and ofs temporarily")
   public void testDeleteToTrashOrSkipTrash() throws Exception {
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
     OzoneConfiguration clientConf = getClientConfForOFS(hostPrefix, conf);

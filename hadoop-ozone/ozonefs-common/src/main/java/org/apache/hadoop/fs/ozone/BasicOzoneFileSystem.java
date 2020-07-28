@@ -28,7 +28,9 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -38,6 +40,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
@@ -397,6 +400,34 @@ public class BasicOzoneFileSystem extends FileSystem {
     return result;
   }
 
+  /**
+   * Intercept rename to trash calls from TrashPolicyDefault,
+   * convert them to delete calls instead.
+   */
+  @Deprecated
+  protected void rename(final Path src, final Path dst,
+      final Rename... options) throws IOException {
+    boolean hasMoveToTrash = false;
+    if (options != null) {
+      for (Rename option : options) {
+        if (option == Rename.TO_TRASH) {
+          hasMoveToTrash = true;
+          break;
+        }
+      }
+    }
+    if (!hasMoveToTrash) {
+      // if doesn't have TO_TRASH option, just pass the call to super
+      super.rename(src, dst, options);
+    } else {
+      // intercept when TO_TRASH is found
+      LOG.info("Move to trash is disabled for o3fs, deleting instead: {}. "
+          + "Files or directories will NOT be retained in trash. "
+          + "Ignore the following TrashPolicyDefault message, if any.", src);
+      delete(src, true);
+    }
+  }
+
   private class DeleteIterator extends OzoneListingIterator {
     private boolean recursive;
 
@@ -477,9 +508,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       result = innerDelete(f, recursive);
     } else {
       LOG.debug("delete: Path is a file: {}", f);
-      List<String> keyList = new ArrayList<>();
-      keyList.add(key);
-      result = adapter.deleteObjects(keyList);
+      result = adapter.deleteObject(key);
     }
 
     if (result) {
@@ -721,9 +750,15 @@ public class BasicOzoneFileSystem extends FileSystem {
       path = new Path(workingDir, path);
     }
     // removing leading '/' char
-    String key = path.toUri().getPath().substring(1);
+    String key = path.toUri().getPath();
+
+    if (OzoneFSUtils.isValidName(key)) {
+      key = path.toUri().getPath();
+    } else {
+      throw new InvalidPathException("Invalid path Name" + key);
+    }
     LOG.trace("path for key:{} is:{}", key, path);
-    return key;
+    return key.substring(1);
   }
 
   /**

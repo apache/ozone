@@ -21,6 +21,14 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import java.util.UUID;
 
+import com.google.common.base.Optional;
+import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -28,6 +36,12 @@ import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.mockito.Mockito;
+
+import static org.apache.hadoop.crypto.CipherSuite.AES_CTR_NOPADDING;
+import static org.apache.hadoop.crypto.CryptoProtocolVersion.ENCRYPTION_ZONES;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_SUPPORTED_OPERATION;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests S3 Initiate Multipart Upload request.
@@ -36,7 +50,7 @@ public class TestS3InitiateMultipartUploadRequest
     extends TestS3MultipartRequest {
 
   @Test
-  public void testPreExecute() {
+  public void testPreExecute() throws Exception {
     doPreExecuteInitiateMPU(UUID.randomUUID().toString(),
         UUID.randomUUID().toString(), UUID.randomUUID().toString());
   }
@@ -148,6 +162,49 @@ public class TestS3InitiateMultipartUploadRequest
     Assert.assertNull(omMetadataManager.getOpenKeyTable().get(multipartKey));
     Assert.assertNull(omMetadataManager.getMultipartInfoTable()
         .get(multipartKey));
+
+  }
+
+  @Test
+  public void testMPUNotSupported() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    when(ozoneManager.getKmsProvider())
+        .thenReturn(Mockito.mock(KeyProviderCryptoExtension.class));
+
+    TestOMRequestUtils.addVolumeToDB(volumeName, omMetadataManager);
+
+    // Set encryption info and create bucket
+    OmBucketInfo omBucketInfo =
+        OmBucketInfo.newBuilder().setVolumeName(volumeName)
+            .setBucketName(bucketName).setCreationTime(Time.now())
+            .setBucketEncryptionKey(new BucketEncryptionKeyInfo.Builder()
+                .setKeyName("dummy").setSuite(AES_CTR_NOPADDING)
+                .setVersion(ENCRYPTION_ZONES).build())
+            .build();
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+
+    omMetadataManager.getBucketTable().put(bucketKey, omBucketInfo);
+
+    omMetadataManager.getBucketTable().addCacheEntry(new CacheKey<>(bucketKey),
+        new CacheValue<>(Optional.of(omBucketInfo), 100L));
+
+    OMRequest modifiedRequest = doPreExecuteInitiateMPU(volumeName, bucketName,
+        keyName);
+
+    OMClientRequest omClientRequest =
+        new S3InitiateMultipartUploadRequest(modifiedRequest);
+
+    OMClientResponse omClientResponse =
+        omClientRequest.validateAndUpdateCache(ozoneManager, 1L,
+        ozoneManagerDoubleBufferHelper);
+
+    Assert.assertNotNull(omClientResponse.getOMResponse());
+    Assert.assertEquals(NOT_SUPPORTED_OPERATION,
+        omClientResponse.getOMResponse().getStatus());
 
   }
 }

@@ -19,7 +19,7 @@ Library             OperatingSystem
 Resource            ../commonlib.robot
 Resource            setup.robot
 Test Timeout        5 minutes
-Suite Setup         Setup ${BUCKET_TYPE}s for FS test
+Suite Setup         Setup for FS test
 
 *** Test Cases ***
 List root
