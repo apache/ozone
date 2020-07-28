@@ -591,7 +591,10 @@ public class TestStorageContainerManager {
           new TestStorageContainerManagerHelper(cluster, conf);
 
       helper.createKeys(10, 4096);
-      Thread.sleep(10000);
+      GenericTestUtils.waitFor(() -> {
+        return cluster.getStorageContainerManager().getContainerManager().
+            getContainers() != null;
+      }, 1000, 10000);
 
       StorageContainerManager scm = cluster.getStorageContainerManager();
       List<ContainerInfo> containers = cluster.getStorageContainerManager()
@@ -602,11 +605,16 @@ public class TestStorageContainerManager {
       // Stop processing HB
       scm.getDatanodeProtocolServer().stop();
 
-      LoggerFactory.getLogger(TestStorageContainerManager.class).info(
-          "Current Container State is" + selectedContainer.getState());
-      if (selectedContainer.getState() == HddsProtos.LifeCycleState.OPEN) {
+      LOG.info(
+          "Current Container State is {}", selectedContainer.getState());
+      try {
         scm.getContainerManager().updateContainerState(selectedContainer
             .containerID(), HddsProtos.LifeCycleEvent.FINALIZE);
+      } catch (SCMException ex) {
+        if (selectedContainer.getState() != HddsProtos.LifeCycleState.CLOSING) {
+          ex.printStackTrace();
+          throw(ex);
+        }
       }
 
       cluster.restartStorageContainerManager(false);
