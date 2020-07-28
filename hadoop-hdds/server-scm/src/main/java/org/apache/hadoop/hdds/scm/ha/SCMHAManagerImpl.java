@@ -80,16 +80,16 @@ public class SCMHAManagerImpl implements SCMHAManager {
       // SCM only has one raft group.
       serverImpl = ((RaftServerProxy) server)
           .getImpl(ratisServer.getRaftGroupId());
-    } catch (IOException ioe) {
-      LOG.error("Fail to get RaftServer impl and therefore it's not clear " +
-          "whether it's leader. ", ioe);
-    } finally {
       if (serverImpl != null) {
         // Only when it's sure the current SCM is the leader, otherwise
         // it should all return false.
         return serverImpl.isLeader();
       }
+    } catch (IOException ioe) {
+      LOG.error("Fail to get RaftServer impl and therefore it's not clear " +
+          "whether it's leader. ", ioe);
     }
+
     return false;
   }
 
@@ -106,9 +106,9 @@ public class SCMHAManagerImpl implements SCMHAManager {
       return RaftPeerId.getRaftPeerId(
           serverImpl.getRoleInfoProto().getLeaderInfo().toString());
     } else if (serverImpl.isFollower()) {
-      return RaftPeerId.getRaftPeerId(
+      return RaftPeerId.valueOf(
           serverImpl.getRoleInfoProto().getFollowerInfo()
-              .getLeaderInfo().getId().getAddress());
+              .getLeaderInfo().getId().getId());
     } else {
       return null;
     }

@@ -1,6 +1,106 @@
 {
   "definitions": [
     {
+      "protopath": "SCMRatisProtocol.proto",
+      "def": {
+        "enums": [
+          {
+            "name": "RequestType",
+            "enum_fields": [
+              {
+                "name": "PIPELINE",
+                "integer": 1
+              },
+              {
+                "name": "CONTAINER",
+                "integer": 2
+              }
+            ]
+          }
+        ],
+        "messages": [
+          {
+            "name": "Method",
+            "fields": [
+              {
+                "id": 1,
+                "name": "name",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "args",
+                "type": "MethodArgument",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "MethodArgument",
+            "fields": [
+              {
+                "id": 1,
+                "name": "type",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "value",
+                "type": "bytes"
+              }
+            ]
+          },
+          {
+            "name": "SCMRatisRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "type",
+                "type": "RequestType"
+              },
+              {
+                "id": 2,
+                "name": "method",
+                "type": "Method"
+              }
+            ]
+          },
+          {
+            "name": "SCMRatisResponseProto",
+            "fields": [
+              {
+                "id": 2,
+                "name": "type",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "value",
+                "type": "bytes"
+              }
+            ]
+          }
+        ],
+        "package": {
+          "name": "hadoop.hdds.security"
+        },
+        "options": [
+          {
+            "name": "java_package",
+            "value": "org.apache.hadoop.hdds.protocol.proto"
+          },
+          {
+            "name": "java_outer_classname",
+            "value": "SCMRatisProtocol"
+          },
+          {
+            "name": "java_generate_equals_and_hash",
+            "value": "true"
+          }
+        ]
+      }
+    },
+    {
       "protopath": "ScmServerDatanodeHeartbeatProtocol.proto",
       "def": {
         "enums": [
