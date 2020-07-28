@@ -253,12 +253,15 @@ public class BlockDeletingService extends BackgroundService {
       long startTime = Time.monotonicNow();
       // Scan container's db and get list of under deletion blocks
       try (ReferenceCountedDB meta = BlockUtils.getDB(containerData, conf)) {
+        Table<String, BlockData> blockDataTable =
+                meta.getStore().getBlockDataTable();
+
         // # of blocks to delete is throttled
         KeyPrefixFilter filter =
             new KeyPrefixFilter().addFilter(OzoneConsts.DELETING_KEY_PREFIX);
         List<? extends Table.KeyValue<String, BlockData>> toDeleteBlocks =
-            meta.getStore().getBlockDataTable()
-            .getSequentialRangeKVs(null, blockLimitPerTask, filter);
+            blockDataTable.getSequentialRangeKVs(null, blockLimitPerTask,
+                    filter);
         if (toDeleteBlocks.isEmpty()) {
           LOG.debug("No under deletion block found in container : {}",
               containerData.getContainerID());
@@ -294,14 +297,16 @@ public class BlockDeletingService extends BackgroundService {
         // entries
         BatchOperation batch = meta.getStore().getBatchHandler()
                 .initBatchOperation();
+        Table<String, NoData> deletedBlocksTable =
+                meta.getStore().getDeletedBlocksTable();
         for (String entry: succeedBlocks) {
-          long blockId =
-              Long.parseLong(entry.substring(
-                      OzoneConsts.DELETING_KEY_PREFIX.length()));
+          String blockId = entry.substring(
+                      OzoneConsts.DELETING_KEY_PREFIX.length());
 
-          meta.getStore().getDeletedBlocksTable().putWithBatch(batch, blockId,
+          deletedBlocksTable.putWithBatch(
+                  batch, OzoneConsts.DELETED_KEY_PREFIX + blockId,
                   NoData.get());
-          meta.getStore().getBlockDataTable().deleteWithBatch(batch, entry);
+          blockDataTable.deleteWithBatch(batch, entry);
         }
 
         int deleteBlockCount = succeedBlocks.size();

@@ -211,7 +211,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
             BlockUtils.getDB(containerData, conf)) {
       Table<String, BlockData> blockDataTable =
               containerDB.getStore().getBlockDataTable();
-      Table<Long, NoData> deletedBlocksTable =
+      Table<String, NoData> deletedBlocksTable =
               containerDB.getStore().getDeletedBlocksTable();
 
       for (Long blkLong : delTX.getLocalIDList()) {
@@ -223,7 +223,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           String deletingKey = OzoneConsts.DELETING_KEY_PREFIX + blk;
 
           if (blockDataTable.get(deletingKey) != null
-              || deletedBlocksTable.get(blkLong) != null) {
+              || deletedBlocksTable.get(blk) != null) {
             if (LOG.isDebugEnabled()) {
               LOG.debug(String.format(
                   "Ignoring delete for block %s in container %d."
