@@ -19,6 +19,13 @@
  */
 package org.apache.hadoop.ozone.dn.scrubber;
 
+import java.io.File;
+import java.io.IOException;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Set;
+import java.util.UUID;
+
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -26,22 +33,22 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -53,22 +60,15 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+
+import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Test;
-
-import java.io.IOException;
-import java.time.Instant;
-import java.util.HashMap;
-import java.util.Set;
-import java.util.UUID;
-import java.io.File;
-
 import org.junit.Rule;
+import org.junit.Test;
 import org.junit.rules.Timeout;
-import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
 
 /**
  * This class tests the data scrubber functionality.
@@ -136,7 +136,7 @@ public class TestDataScrubber {
 
       OzoneOutputStream out = bucket.createKey(keyName,
           value.getBytes().length,
-          StaticStorageClassRegistry.LEGACY.getName(),
+          StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
           new HashMap<>());
       out.write(value.getBytes());
       out.close();
@@ -146,7 +146,7 @@ public class TestDataScrubber {
       byte[] fileContent = new byte[value.getBytes().length];
       is.read(fileContent);
       Assert.assertTrue(verifyRatisReplication(volumeName, bucketName,
-          keyName, STAND_ALONE,
+          keyName, RATIS,
           ONE));
       Assert.assertEquals(value, new String(fileContent));
       Assert.assertFalse(key.getCreationTime().isBefore(testStartTime));
