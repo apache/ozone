@@ -200,16 +200,13 @@ public class TestBlockDeletingService {
       throws IOException {
     return meta.getStore().getBlockDataTable()
         .getRangeKVs(null, 100,
-        new MetadataKeyFilters.KeyPrefixFilter()
-        .addFilter(OzoneConsts.DELETING_KEY_PREFIX)).size();
+        MetadataKeyFilters.getDeletingKeyFilter()).size();
   }
 
   private int getDeletedBlocksCount(ReferenceCountedDB db) throws IOException {
-    // Empty key prefix filter used, since we want to count all keys in the
-    // deleted blocks table.
     return db.getStore().getDeletedBlocksTable()
           .getRangeKVs(null, 100,
-          new MetadataKeyFilters.KeyPrefixFilter()).size();
+          MetadataKeyFilters.getDeletedKeyFilter()).size();
   }
 
   @Test

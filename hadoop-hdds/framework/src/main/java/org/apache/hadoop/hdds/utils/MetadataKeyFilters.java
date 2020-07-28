@@ -30,45 +30,32 @@ import com.google.common.base.Strings;
  * An utility class to filter levelDB keys.
  */
 public final class MetadataKeyFilters {
-
-  private static KeyPrefixFilter deletingKeyFilter =
-      new MetadataKeyFilters.KeyPrefixFilter()
-          .addFilter(OzoneConsts.DELETING_KEY_PREFIX);
-
-  private static KeyPrefixFilter deletedKeyFilter =
-          new MetadataKeyFilters.KeyPrefixFilter()
-                  .addFilter(OzoneConsts.DELETED_KEY_PREFIX);
-
-  private static KeyPrefixFilter bcsIDFilter =
-          new MetadataKeyFilters.KeyPrefixFilter()
-                  .addFilter(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
-
-  private static KeyPrefixFilter normalKeyFilter =
-      new MetadataKeyFilters.KeyPrefixFilter()
-          .addFilter(OzoneConsts.DELETING_KEY_PREFIX, true)
-          .addFilter(OzoneConsts.DELETED_KEY_PREFIX, true)
-          .addFilter(OzoneConsts.DELETE_TRANSACTION_KEY_PREFIX, true)
-          .addFilter(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX, true)
-          .addFilter(OzoneConsts.BLOCK_COUNT, true)
-          .addFilter(OzoneConsts.CONTAINER_BYTES_USED, true)
-          .addFilter(OzoneConsts.PENDING_DELETE_BLOCK_COUNT, true);
-
   private MetadataKeyFilters() { }
 
   public static KeyPrefixFilter getDeletingKeyFilter() {
-    return deletingKeyFilter;
+    return new MetadataKeyFilters.KeyPrefixFilter()
+            .addFilter(OzoneConsts.DELETING_KEY_PREFIX);
   }
 
   public static KeyPrefixFilter getDeletedKeyFilter() {
-    return deletedKeyFilter;
+    return new MetadataKeyFilters.KeyPrefixFilter()
+            .addFilter(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
   }
 
   public static KeyPrefixFilter getBCSIDFilter() {
-    return bcsIDFilter;
+    return new MetadataKeyFilters.KeyPrefixFilter()
+            .addFilter(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
   }
 
   public static KeyPrefixFilter getNormalKeyFilter() {
-    return normalKeyFilter;
+    return new MetadataKeyFilters.KeyPrefixFilter()
+            .addFilter(OzoneConsts.DELETING_KEY_PREFIX, true)
+            .addFilter(OzoneConsts.DELETED_KEY_PREFIX, true)
+            .addFilter(OzoneConsts.DELETE_TRANSACTION_KEY_PREFIX, true)
+            .addFilter(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX, true)
+            .addFilter(OzoneConsts.BLOCK_COUNT, true)
+            .addFilter(OzoneConsts.CONTAINER_BYTES_USED, true)
+            .addFilter(OzoneConsts.PENDING_DELETE_BLOCK_COUNT, true);
   }
   /**
    * Interface for levelDB key filters.

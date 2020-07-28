@@ -189,8 +189,7 @@ public final class KeyValueContainerUtil {
       } else {
         // Set pending deleted block count.
         MetadataKeyFilters.KeyPrefixFilter filter =
-            new MetadataKeyFilters.KeyPrefixFilter()
-                .addFilter(OzoneConsts.DELETING_KEY_PREFIX);
+                MetadataKeyFilters.getDeletingKeyFilter();
         int numPendingDeletionBlocks =
             containerDB.getStore().getBlockDataTable()
             .getSequentialRangeKVs(null, Integer.MAX_VALUE, filter)
