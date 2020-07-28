@@ -1,10 +1,10 @@
 ---
-title: Ozone FS namespace
-summary: Use additional prefix table for indexed data retrieval
-date: 2020-01-20
-jira: HDDS-2939
-status: implementing
-author: Supratim Deka, Anu Engineer
+title: Topology-awareness
+summary: Placement policy to use rack information for read and write
+date: 2018-11-16
+jira: HDDS-698
+status: implemented
+author: junping, xiaoyu, junjie, jitendra, anu, nicholas
 ---
 <!--
   Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,8 +22,8 @@ author: Supratim Deka, Anu Engineer
 
 # Abstract
 
- Flat namespace (like key -> key info) is not efficient for retrieveing directories. (Large segments should be scanned, the whole sub-hierarchy)
-
+ Adjust read/write path to consider rack information for proper data placement.
+ 
 # Link
 
- * https://issues.apache.org/jira/secure/attachment/12991926/Ozone%20FS%20Namespace%20Proposal%20v1.0.docx
+  * https://docs.google.com/document/d/1HsZqlBcEmlezU6HriUaIOFE9SFdcBoaiz15Qt_ng0P8/edit

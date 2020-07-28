@@ -2,6 +2,9 @@
 title: Overview
 date: "2017-10-10"
 weight: 1
+menu: 
+  main:
+     parent: Architecture
 summary: Ozone's overview and components that make up Ozone.
 ---
 
@@ -29,7 +32,7 @@ scale to billions of objects.
 Ozone separates namespace management and block space management; this helps
 ozone to scale much better. The namespace is managed by a daemon called
 [Ozone Manager ]({{< ref "OzoneManager.md" >}}) (OM),  and block space is
-managed by [Storage Container Manager]({{< ref "Hdds.md" >}}) (SCM).
+managed by [Storage Container Manager]({{< ref "StorageContainerManager.md" >}}) (SCM).
 
 
 Ozone consists of volumes, buckets, and keys.
