@@ -47,12 +47,12 @@ import java.util.UUID;
 import static org.junit.Assert.*;
 
 /**
- * Tests reading of containers written with DB schema version 1, which will
- * have different column family layout than newer schema versions.
- * These tests only need to read data from these containers, since any new
- * containers will be created using the latest schema version.
+ * Tests reading of containers written with DB schema version 1,
+ * which stores all its data in the default RocksDB column family.
+ * Newer schema version will use a different column family layout, but they
+ * should still be able to read from schema version 1.
  */
-public class TestOldSchemaVersions {
+public class TestSchemaOneBackwardsCompatibility {
   private OzoneConfiguration conf;
 
   private File metadataDir;
