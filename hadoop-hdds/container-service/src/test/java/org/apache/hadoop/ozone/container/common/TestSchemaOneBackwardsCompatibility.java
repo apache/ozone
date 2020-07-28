@@ -22,17 +22,24 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
-//import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-//import org.apache.hadoop.ozone.container.testutils.BlockDeletingServiceTestImpl;
-//import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.testutils.BlockDeletingServiceTestImpl;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -45,6 +52,9 @@ import java.net.URL;
 import java.util.UUID;
 
 import static org.junit.Assert.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests reading of containers written with DB schema version 1,
@@ -169,38 +179,69 @@ public class TestSchemaOneBackwardsCompatibility {
    */
   @Test
   public void testDelete() throws Exception {
-//    final int numBlocksToDelete = 2;
-//
-//    // TODO : Figure out how to construct this.
-//    OzoneContainer container = new OzoneContainer();
-//    BlockDeletingServiceTestImpl service =
-//            new BlockDeletingServiceTestImpl(container,
-//            1000, conf);
-//    service.start();
-//    GenericTestUtils.waitFor(service::isStarted, 100, 3000);
-//    service.runDeletingTasks();
-//    GenericTestUtils.waitFor(()
-//        -> service.getTimesOfProcessed() == 1,
-//        00, 3000);
-//
-//    try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
-//      // Blocks marked with #deleting# prefix should be deleted.
-//      assertEquals(TestDB.NUM_PENDING_DELETION_BLOCKS - numBlocksToDelete,
-//              countDeletingBlocks(refCountedDB));
-//
-//      // All other blocks should remain unchanged.
-//      assertEquals(TestDB.NUM_DELETED_BLOCKS, countDeletedBlocks(refCountedDB));
-//      assertEquals(TestDB.KEY_COUNT, countUnprefixedBlocks(refCountedDB));
-//
-//      // Since metadata is being stored in the same table, make sure it is not
-//      // altered as well.
-//      Table<String, Long> metadataTable =
-//              refCountedDB.getStore().getMetadataTable();
-//      assertEquals(TestDB.KEY_COUNT,
-//              (long)metadataTable.get(OzoneConsts.BLOCK_COUNT));
-//      assertEquals(TestDB.BYTES_USED,
-//              (long)metadataTable.get(OzoneConsts.CONTAINER_BYTES_USED));
-//    }
+    final int numBlocksToDelete = 2;
+
+    runBlockDeletingService();
+
+    try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
+      // Blocks marked with #deleting# prefix should be deleted.
+      assertEquals(TestDB.NUM_PENDING_DELETION_BLOCKS - numBlocksToDelete,
+              countDeletingBlocks(refCountedDB));
+
+      // All other blocks should remain unchanged.
+      assertEquals(TestDB.NUM_DELETED_BLOCKS, countDeletedBlocks(refCountedDB));
+      assertEquals(TestDB.KEY_COUNT, countUnprefixedBlocks(refCountedDB));
+
+      // Since metadata is being stored in the same table, make sure it is not
+      // altered as well.
+      Table<String, Long> metadataTable =
+              refCountedDB.getStore().getMetadataTable();
+      assertEquals(TestDB.KEY_COUNT,
+              (long)metadataTable.get(OzoneConsts.BLOCK_COUNT));
+      assertEquals(TestDB.BYTES_USED,
+              (long)metadataTable.get(OzoneConsts.CONTAINER_BYTES_USED));
+    }
+  }
+
+  private void runBlockDeletingService() throws Exception {
+    conf.setInt(OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER, 2);
+    ContainerSet containerSet = makeContainerSet();
+
+    OzoneContainer container = makeMockOzoneContainer(containerSet);
+    BlockDeletingServiceTestImpl service =
+            new BlockDeletingServiceTestImpl(container, 1000, conf);
+    service.start();
+    GenericTestUtils.waitFor(service::isStarted, 100, 3000);
+    service.runDeletingTasks();
+    GenericTestUtils.waitFor(() -> service.getTimesOfProcessed() == 1,
+            100, 3000);
+  }
+
+  private ContainerSet makeContainerSet() throws Exception {
+    KeyValueContainerData kvData = newKvData();
+    KeyValueContainerUtil.parseKVContainerData(kvData, conf);
+
+    ContainerSet containerSet = new ContainerSet();
+    KeyValueContainer container = new KeyValueContainer(kvData, conf);
+
+    String scmID = UUID.randomUUID().toString();
+    String clusterID = UUID.randomUUID().toString();
+    container.create(new MutableVolumeSet(scmID, clusterID, conf),
+            new RoundRobinVolumeChoosingPolicy(), scmID);
+    containerSet.addContainer(container);
+
+    return containerSet;
+  }
+
+  private OzoneContainer makeMockOzoneContainer(ContainerSet containerSet) {
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+    when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
+    when(ozoneContainer.getWriteChannel()).thenReturn(null);
+    ContainerDispatcher dispatcher = mock(ContainerDispatcher.class);
+    when(ozoneContainer.getDispatcher()).thenReturn(dispatcher);
+    KeyValueHandler handler = mock(KeyValueHandler.class);
+    when(dispatcher.getHandler(any())).thenReturn(handler);
+    return ozoneContainer;
   }
 
   /**
