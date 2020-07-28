@@ -71,7 +71,7 @@ public interface DatanodeStore {
    *
    * @return Table
    */
-  Table<Long, NoData> getDeletedBlocksTable();
+  Table<String, NoData> getDeletedBlocksTable();
 
   /**
    * Helper to create and write batch transactions.

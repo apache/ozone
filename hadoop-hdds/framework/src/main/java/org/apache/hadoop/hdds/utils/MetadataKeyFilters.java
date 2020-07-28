@@ -35,6 +35,10 @@ public final class MetadataKeyFilters {
       new MetadataKeyFilters.KeyPrefixFilter()
           .addFilter(OzoneConsts.DELETING_KEY_PREFIX);
 
+  private static KeyPrefixFilter deletedKeyFilter =
+          new MetadataKeyFilters.KeyPrefixFilter()
+                  .addFilter(OzoneConsts.DELETED_KEY_PREFIX);
+
   private static KeyPrefixFilter bcsIDFilter =
           new MetadataKeyFilters.KeyPrefixFilter()
                   .addFilter(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
@@ -42,21 +46,25 @@ public final class MetadataKeyFilters {
   private static KeyPrefixFilter normalKeyFilter =
       new MetadataKeyFilters.KeyPrefixFilter()
           .addFilter(OzoneConsts.DELETING_KEY_PREFIX, true)
+          .addFilter(OzoneConsts.DELETED_KEY_PREFIX, true)
           .addFilter(OzoneConsts.DELETE_TRANSACTION_KEY_PREFIX, true)
           .addFilter(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX, true)
           .addFilter(OzoneConsts.BLOCK_COUNT, true)
           .addFilter(OzoneConsts.CONTAINER_BYTES_USED, true)
           .addFilter(OzoneConsts.PENDING_DELETE_BLOCK_COUNT, true);
 
-  private MetadataKeyFilters() {
+  private MetadataKeyFilters() { }
+
+  public static KeyPrefixFilter getDeletingKeyFilter() {
+    return deletingKeyFilter;
+  }
+
+  public static KeyPrefixFilter getDeletedKeyFilter() {
+    return deletedKeyFilter;
   }
 
   public static KeyPrefixFilter getBCSIDFilter() {
     return bcsIDFilter;
-  }
-
-  public static KeyPrefixFilter getDeletingKeyFilter() {
-    return deletingKeyFilter;
   }
 
   public static KeyPrefixFilter getNormalKeyFilter() {

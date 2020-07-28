@@ -31,7 +31,8 @@ import org.rocksdb.RocksDB;
  * block data, metadata and deleted block IDs), even
  * though all tables map back to the default table in this implementation.
  */
-public class DatanodeSchemaOneDBDefinition extends AbstractDatanodeDBDefinition {
+public class DatanodeSchemaOneDBDefinition
+        extends AbstractDatanodeDBDefinition {
   // In the underlying database, tables are retrieved by name, and then the
   // codecs/classes are applied on top. By defining different DBDefinitions
   // with different codecs that all map to the default table, clients are
@@ -54,12 +55,12 @@ public class DatanodeSchemaOneDBDefinition extends AbstractDatanodeDBDefinition 
                   Long.class,
                   new LongCodec());
 
-  public static final DBColumnFamilyDefinition<Long, NoData>
+  public static final DBColumnFamilyDefinition<String, NoData>
           DELETED_BLOCKS =
           new DBColumnFamilyDefinition<>(
                   StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
-                  Long.class,
-                  new LongCodec(),
+                  String.class,
+                  new StringCodec(),
                   NoData.class,
                   new NoDataCodec());
 
@@ -79,7 +80,7 @@ public class DatanodeSchemaOneDBDefinition extends AbstractDatanodeDBDefinition 
   }
 
   @Override
-  public DBColumnFamilyDefinition<Long, NoData> getDeletedBlocksColumnFamily() {
+  public DBColumnFamilyDefinition<String, NoData> getDeletedBlocksColumnFamily() {
     return DELETED_BLOCKS;
   }
 }

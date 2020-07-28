@@ -40,7 +40,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   private Table<String, BlockData> blockDataTable;
 
-  private Table<Long, NoData> deletedBlocksTable;
+  private Table<String, NoData> deletedBlocksTable;
 
   private static final Logger LOG =
           LoggerFactory.getLogger(AbstractDatanodeStore.class);
@@ -125,7 +125,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
-  public Table<Long, NoData> getDeletedBlocksTable() {
+  public Table<String, NoData> getDeletedBlocksTable() {
     return deletedBlocksTable;
   }
 
