@@ -28,7 +28,6 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.ratis.server.impl.RaftServerImpl;
 import org.apache.ratis.server.raftlog.RaftLog;
-import org.jooq.meta.derby.sys.Sys;
 import java.util.LinkedList;
 import org.junit.Assert;
 import org.junit.Before;
@@ -44,101 +43,104 @@ import java.net.URI;
 /**
  * Test for HadoopNestedDirGenerator.
  */
+
 public class TestHadoopNestedDirGenerator {
 
-    private String path;
-    private OzoneConfiguration conf = null;
-    private MiniOzoneCluster cluster = null;
-    private ObjectStore store = null;
-    private static final Logger LOG =
-            LoggerFactory.getLogger(TestHadoopNestedDirGenerator.class);
-    @Before
+  private String path;
+  private OzoneConfiguration conf = null;
+  private MiniOzoneCluster cluster = null;
+  private ObjectStore store = null;
+  private static final Logger LOG =
+          LoggerFactory.getLogger(TestHadoopNestedDirGenerator.class);
+  @Before
     public void setup() {
-        path = GenericTestUtils
+    path = GenericTestUtils
                 .getTempPath(TestOzoneClientKeyGenerator.class.getSimpleName());
-        GenericTestUtils.setLogLevel(RaftLog.LOG, Level.DEBUG);
-        GenericTestUtils.setLogLevel(RaftServerImpl.LOG, Level.DEBUG);
-        File baseDir = new File(path);
-        baseDir.mkdirs();
-    }
+    GenericTestUtils.setLogLevel(RaftLog.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(RaftServerImpl.LOG, Level.DEBUG);
+    File baseDir = new File(path);
+    baseDir.mkdirs();
+  }
 
     /**
      * Shutdown MiniDFSCluster.
      */
-    private void shutdown() throws IOException {
-        if (cluster != null) {
-            cluster.shutdown();
-            FileUtils.deleteDirectory(new File(path));
-        }
+
+  private void shutdown() throws IOException {
+    if (cluster != null) {
+      cluster.shutdown();
+      FileUtils.deleteDirectory(new File(path));
     }
+  }
 
     /**
      * Create a MiniDFSCluster for testing.
      *
      * @throws IOException
      */
+
     /**
      * Below we have 5 datanodes because only 5 tests are activated
      * As you need more tests increase the datanodes accordingly.
      */
-    private void startCluster() throws Exception {
-        conf = new OzoneConfiguration();
-        cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
-        cluster.waitForClusterToBeReady();
-        cluster.waitTobeOutOfSafeMode();
-        store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
-    }
 
-    @Test
+  private void startCluster() throws Exception {
+    conf = new OzoneConfiguration();
+    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
+    cluster.waitForClusterToBeReady();
+    cluster.waitTobeOutOfSafeMode();
+    store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
+  }
+
+  @Test
     public void testNestedDirTreeGeneration() throws Exception {
-        try {
-            startCluster();
-            FileOutputStream out = FileUtils.openOutputStream(new File(path,
-                    "conf"));
-            cluster.getConf().writeXml(out);
-            out.getFD().sync();
-            out.close();
-            verifyDirTree("vol1",
-                    "bucket1", 1, 1);
-            verifyDirTree("vol2",
-                    "bucket1", 1, 5);
-            verifyDirTree("vol3",
-                    "bucket1", 2, 0);
-            verifyDirTree("vol4",
-                    "bucket1", 3, 2);
-            verifyDirTree("vol5",
-                    "bucket1", 5, 4);
-        } finally {
-            shutdown();
-        }
+    try {
+      startCluster();
+      FileOutputStream out = FileUtils.openOutputStream(new File(path,
+              "conf"));
+      cluster.getConf().writeXml(out);
+      out.getFD().sync();
+      out.close();
+      verifyDirTree("vol1",
+              "bucket1", 1, 1);
+      verifyDirTree("vol2",
+              "bucket1", 1, 5);
+      verifyDirTree("vol3",
+              "bucket1", 2, 0);
+      verifyDirTree("vol4",
+              "bucket1", 3, 2);
+      verifyDirTree("vol5",
+              "bucket1", 5, 4);
+    } finally {
+      shutdown();
     }
+  }
 
-    private void verifyDirTree(String volumeName, String bucketName,
-                               int actualDepth, int span)
+  private void verifyDirTree(String volumeName, String bucketName,
+                             int actualDepth, int span)
             throws IOException {
-        store.createVolume(volumeName);
-        OzoneVolume volume = store.getVolume(volumeName);
-        volume.createBucket(bucketName);
-        String rootPath = "o3fs://" + bucketName + "." + volumeName;
-        String confPath = new File(path, "conf").getAbsolutePath();
-        new Freon().execute(
-                new String[]{"-conf", confPath, "ddsg", "-d", actualDepth + "" ,
-                        "-s", span + "", "-n", "1", "-r", rootPath });
-        // verify the directory structure
-        FileSystem fileSystem = FileSystem.get(URI.create(rootPath),
-                conf);
-        Path rootDir = new Path(rootPath.concat("/"));
-        // verify root path details
-        FileStatus[] fileStatuses = fileSystem.listStatus(rootDir);
-        Path p = null;
-        for (FileStatus fileStatus : fileStatuses) {
-            // verify the num of peer directories and span directories
-            p = depthBFS(fileSystem, fileStatuses, span, actualDepth);
-            int actualSpan = spanCheck(fileSystem, span, p);
-            Assert.assertEquals("Mismatch span in a path",
-                    span, actualSpan);
-        }
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    String rootPath = "o3fs://" + bucketName + "." + volumeName;
+    String confPath = new File(path, "conf").getAbsolutePath();
+    new Freon().execute(new String[]{"-conf", confPath, "ddsg", "-d",
+        actualDepth + "", "-s", span + "", "-n", "1", "-r", rootPath});
+    // verify the directory structure
+    FileSystem fileSystem = FileSystem.get(URI.create(rootPath),
+            conf);
+    Path rootDir = new Path(rootPath.concat("/"));
+    // verify root path details
+    FileStatus[] fileStatuses = fileSystem.listStatus(rootDir);
+    Path p = null;
+    for (FileStatus fileStatus : fileStatuses) {
+      // verify the num of peer directories and span directories
+      p = depthBFS(fileSystem, fileStatuses, span, actualDepth);
+      int actualSpan = spanCheck(fileSystem, span, p);
+      Assert.assertEquals("Mismatch span in a path",
+              span, actualSpan);
     }
+  }
 
     /**
      * Using BFS(Breadth First Search) to find the depth of nested
@@ -147,32 +149,39 @@ public class TestHadoopNestedDirGenerator {
      * we put them in an array and increment the depth variable by 1.
      */
 
-    private Path depthBFS(FileSystem fs, FileStatus[] fileStatuses,
-                          int span, int actualDepth) throws IOException {
-        int depth = 0;
-        Path p = null;
-        if(span > 0) depth = 0;
-        else if(span == 0) depth = 1;
-        else LOG.info("Span value can never be negative");
-        LinkedList<FileStatus> queue = new LinkedList<FileStatus>();
-        FileStatus f1 = fileStatuses[0];
-        queue.add(f1);
-        while(queue.size() != 0){
-            FileStatus f = queue.poll();
-            FileStatus[] temp = fs.listStatus(f.getPath());
-            if(temp.length > 0){
-                ++depth;
-                for(int i = 0; i < temp.length; i++){
-                    queue.add(temp[i]);
-                }
-            }
-            if(span == 0) p = f.getPath();
-            else p = f.getPath().getParent();
-        }
-        Assert.assertEquals("Mismatch depth in a path",
-                depth, actualDepth);
-        return p;
+  private Path depthBFS(FileSystem fs, FileStatus[] fileStatuses,
+                        int span, int actualDepth) throws IOException {
+    int depth = 0;
+    Path p = null;
+    if(span > 0){
+      depth = 0;
+    } else if(span == 0){
+      depth = 1;
+    } else{
+      LOG.info("Span value can never be negative");
     }
+    LinkedList<FileStatus> queue = new LinkedList<FileStatus>();
+    FileStatus f1 = fileStatuses[0];
+    queue.add(f1);
+    while(queue.size() != 0){
+      FileStatus f = queue.poll();
+      FileStatus[] temp = fs.listStatus(f.getPath());
+      if(temp.length > 0){
+        ++depth;
+        for(int i = 0; i < temp.length; i++){
+          queue.add(temp[i]);
+        }
+      }
+      if(span == 0){
+        p = f.getPath();
+      } else{
+        p = f.getPath().getParent();
+      }
+    }
+    Assert.assertEquals("Mismatch depth in a path",
+            depth, actualDepth);
+    return p;
+  }
 
     /**
      * We get the path of last parent directory or leaf parent directory
@@ -180,17 +189,20 @@ public class TestHadoopNestedDirGenerator {
      * and count the span directories.
      */
 
-    private int spanCheck(FileSystem fs, int span, Path p) throws IOException{
-        int sp = 0;
-        int depth = 0;
-        if(span >= 0) depth = 0;
-        else LOG.info("Span value can never be negative");
-        FileStatus[] fileStatuses = fs.listStatus(p);
-        for (FileStatus fileStatus : fileStatuses){
-            if(fileStatus.isDirectory()){
-                ++sp;
-            }
-        }
-        return sp;
+  private int spanCheck(FileSystem fs, int span, Path p) throws IOException{
+    int sp = 0;
+    int depth = 0;
+    if(span >= 0){
+      depth = 0;
+    } else{
+      LOG.info("Span value can never be negative");
     }
+    FileStatus[] fileStatuses = fs.listStatus(p);
+    for (FileStatus fileStatus : fileStatuses){
+      if(fileStatus.isDirectory()){
+        ++sp;
+      }
+    }
+    return sp;
+  }
 }
