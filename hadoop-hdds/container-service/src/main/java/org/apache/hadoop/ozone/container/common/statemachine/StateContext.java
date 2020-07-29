@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
@@ -35,6 +36,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
@@ -51,6 +53,8 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.GeneratedMessage;
 import static java.lang.Math.min;
 import org.apache.commons.collections.CollectionUtils;
+
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getLogWarnInterval;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,6 +78,7 @@ public class StateContext {
   private DatanodeStateMachine.DatanodeStates state;
   private boolean shutdownOnError = false;
   private boolean shutdownGracefully = false;
+  private final AtomicLong threadPoolNotAvailableCount;
 
   /**
    * Starting with a 2 sec heartbeat frequency which will be updated to the
@@ -103,6 +108,7 @@ public class StateContext {
     pipelineActions = new HashMap<>();
     lock = new ReentrantLock();
     stateExecutionCount = new AtomicLong(0);
+    threadPoolNotAvailableCount = new AtomicLong(0);
   }
 
   /**
@@ -393,6 +399,20 @@ public class StateContext {
     }
   }
 
+  @VisibleForTesting
+  public boolean isThreadPoolAvailable(ExecutorService executor) {
+    if (!(executor instanceof ThreadPoolExecutor)) {
+      return true;
+    }
+
+    ThreadPoolExecutor ex = (ThreadPoolExecutor) executor;
+    if (ex.getQueue().size() == 0) {
+      return true;
+    }
+
+    return false;
+  }
+
   /**
    * Executes the required state function.
    *
@@ -415,6 +435,17 @@ public class StateContext {
       if (this.isEntering()) {
         task.onEnter();
       }
+
+      if (!isThreadPoolAvailable(service)) {
+        long count = threadPoolNotAvailableCount.getAndIncrement();
+        if (count % getLogWarnInterval(conf) == 0) {
+          LOG.warn("No available thread in pool for past {} seconds.",
+              unit.toSeconds(time) * (count + 1));
+        }
+        return;
+      }
+
+      threadPoolNotAvailableCount.set(0);
       task.execute(service);
       DatanodeStateMachine.DatanodeStates newState = task.await(time, unit);
       if (this.state != newState) {

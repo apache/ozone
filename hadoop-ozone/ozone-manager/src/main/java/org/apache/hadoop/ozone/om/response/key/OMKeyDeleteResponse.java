@@ -105,7 +105,7 @@ public class OMKeyDeleteResponse extends OMClientResponse {
     }
     for (OmKeyLocationInfoGroup keyLocationList : keyInfo
         .getKeyLocationVersions()) {
-      if (keyLocationList.getLocationList().size() != 0) {
+      if (keyLocationList.getLocationListCount() != 0) {
         return false;
       }
     }

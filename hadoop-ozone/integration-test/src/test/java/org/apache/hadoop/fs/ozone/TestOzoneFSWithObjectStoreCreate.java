@@ -35,10 +35,15 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
+import static org.junit.Assert.fail;
 
 /**
  * Class tests create with object store and getFileStatus.
@@ -118,6 +123,100 @@ public class TestOzoneFSWithObjectStoreCreate {
     Assert.assertTrue(o3fs.getFileStatus(p).isFile());
     checkAncestors(p);
 
+  }
+
+
+  @Test
+  public void testObjectStoreCreateWithO3fs() throws Exception {
+    OzoneVolume ozoneVolume =
+        cluster.getRpcClient().getObjectStore().getVolume(volumeName);
+
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+
+
+    // Use ObjectStore API to create keys. This similates how s3 create keys.
+    String parentDir = "/dir1/dir2/dir3/dir4/";
+
+
+    List<String> keys = new ArrayList<>();
+    keys.add("/dir1");
+    keys.add("/dir1/dir2");
+    keys.add("/dir1/dir2/dir3");
+    keys.add("/dir1/dir2/dir3/dir4/");
+    for (int i=1; i <= 3; i++) {
+      int length = 10;
+      String fileName = parentDir.concat("/file" + i + "/");
+      keys.add(fileName);
+      OzoneOutputStream ozoneOutputStream =
+          ozoneBucket.createKey(fileName, length);
+      byte[] b = new byte[10];
+      Arrays.fill(b, (byte)96);
+      ozoneOutputStream.write(b);
+      ozoneOutputStream.close();
+    }
+
+    // check
+    for (int i=1; i <= 3; i++) {
+      String fileName = parentDir.concat("/file" + i + "/");
+      Path p = new Path(fileName);
+      Assert.assertTrue(o3fs.getFileStatus(p).isFile());
+      checkAncestors(p);
+    }
+
+    // Delete keys with object store api delete
+    for (int i = 1; i <= 3; i++) {
+      String fileName = parentDir.concat("/file" + i + "/");
+      ozoneBucket.deleteKey(fileName);
+    }
+
+
+    // Delete parent dir via o3fs.
+    boolean result = o3fs.delete(new Path("/dir1"), true);
+    Assert.assertTrue(result);
+
+    // No Key should exist.
+    for(String key : keys) {
+      checkPath(new Path(key));
+    }
+
+
+    for (int i=1; i <= 3; i++) {
+      int length = 10;
+      String fileName = parentDir.concat("/file" + i + "/");
+      OzoneOutputStream ozoneOutputStream =
+          ozoneBucket.createKey(fileName, length);
+      byte[] b = new byte[10];
+      Arrays.fill(b, (byte)96);
+      ozoneOutputStream.write(b);
+      ozoneOutputStream.close();
+    }
+
+    o3fs.mkdirs(new Path("/dest"));
+    o3fs.rename(new Path("/dir1"), new Path("/dest"));
+
+    // No source Key should exist.
+    for(String key : keys) {
+      checkPath(new Path(key));
+    }
+
+    // check dest path.
+    for (int i=1; i <= 3; i++) {
+      String fileName = "/dest/".concat(parentDir.concat("/file" + i + "/"));
+      Path p = new Path(fileName);
+      Assert.assertTrue(o3fs.getFileStatus(p).isFile());
+      checkAncestors(p);
+    }
+
+  }
+
+  private void checkPath(Path path) {
+    try {
+      o3fs.getFileStatus(path);
+      fail("testObjectStoreCreateWithO3fs failed for Path" + path);
+    } catch (IOException ex) {
+      Assert.assertTrue(ex instanceof FileNotFoundException);
+      Assert.assertTrue(ex.getMessage().contains("No such file or directory"));
+    }
   }
 
   private void checkAncestors(Path p) throws Exception {

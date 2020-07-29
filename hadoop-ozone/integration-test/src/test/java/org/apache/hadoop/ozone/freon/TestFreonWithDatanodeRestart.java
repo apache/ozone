@@ -77,8 +77,8 @@ public class TestFreonWithDatanodeRestart {
 
     RatisClientConfig.RaftConfig raftClientConfig =
         conf.getObject(RatisClientConfig.RaftConfig.class);
-    raftClientConfig.setRpcRequestTimeout(TimeUnit.SECONDS.toMillis(3));
-    raftClientConfig.setRpcWatchRequestTimeout(TimeUnit.SECONDS.toMillis(3));
+    raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
+    raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(3));
     conf.setFromObject(raftClientConfig);
 
     cluster = MiniOzoneCluster.newBuilder(conf)

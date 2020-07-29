@@ -226,5 +226,7 @@ public class OMException extends IOException {
     PARTIAL_DELETE,
 
     DETECTED_LOOP_IN_BUCKET_LINKS,
+
+    NOT_SUPPORTED_OPERATION
   }
 }
