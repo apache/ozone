@@ -49,7 +49,7 @@ wait_for_port datanode_3 9858 60
 
 stop_containers datanode_4 datanode_5 datanode_6
 
-execute_robot_test scm topology/readdata.robot -N readdata-second-half
+execute_robot_test scm -N readdata-second-half topology/readdata.robot
 
 stop_docker_env
 
