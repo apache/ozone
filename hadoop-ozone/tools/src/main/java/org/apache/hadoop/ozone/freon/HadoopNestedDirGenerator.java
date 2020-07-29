@@ -72,13 +72,21 @@ public class HadoopNestedDirGenerator extends BaseFreonGenerator
 
   @Override
   public Void call() throws Exception {
-
-    init();
-    OzoneConfiguration configuration = createOzoneConfiguration();
-    fileSystem = FileSystem.get(URI.create(rootPath), configuration);
-    runTests(this::createDir);
+    String s;
+    if (depth <= 0) {
+      s = "Invalid depth value, depth value should be greater than zero!";
+      print(s);
+    } else if (span < 0) {
+      s = "Invalid span value, span value should be greater or equal to zero!";
+      print(s);
+    } else {
+      init();
+      OzoneConfiguration configuration = createOzoneConfiguration();
+      fileSystem = FileSystem.get(URI.create(rootPath), configuration);
+      runTests(this::createDir);
+      return null;
+    }
     return null;
-
   }
 
   /*
@@ -95,14 +103,6 @@ public class HadoopNestedDirGenerator extends BaseFreonGenerator
 
    */
   private void createDir(long counter) throws Exception {
-    if (depth <= 0) {
-      LOG.info("Invalid depth value, at least one depth should be passed!");
-      return;
-    }
-    if (span < 0) {
-      LOG.info("Invalid span value, at least one span should be passed!");
-      return;
-    }
     String dirString = RandomStringUtils.randomAlphanumeric(length);
     for (int i = 1; i <= depth; i++) {
       dirString = dirString.concat("/").concat(RandomStringUtils.
@@ -117,7 +117,8 @@ public class HadoopNestedDirGenerator extends BaseFreonGenerator
       Path dir = new Path(rootPath.concat("/").concat(childDir));
       fileSystem.mkdirs(dir.getParent());
     }
-    System.out.println("\nSuccessfully created directories. Total " +
-            "Directories with level = " + depth + " and span = " + span);
+    String message = "\nSuccessfully created directories. " +
+            "Total Directories with level = " + depth + " and span = " + span;
+    print(message);
   }
 }

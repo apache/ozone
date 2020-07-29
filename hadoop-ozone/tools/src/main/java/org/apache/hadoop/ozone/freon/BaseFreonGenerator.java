@@ -301,6 +301,15 @@ public class BaseFreonGenerator {
     messages.forEach(print);
   }
 
+  public void print(String s){
+    List<String> messages = new LinkedList<>();
+    messages.add(s);
+    Consumer<String> print = freonCommand.isInteractive()
+            ? System.out::println
+            : LOG::info;
+    messages.forEach(print);
+  }
+
   /**
    * Create the OM RPC client to use it for testing.
    */
