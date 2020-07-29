@@ -15,16 +15,16 @@
 # limitations under the License.
 
 
-source ../../main/compose/testlib.sh
+load ../../main/compose/testlib.sh
 @test "Find test recursive, only on one level" {
   run find_tests
-  echo "x${output}x}"
   [[ "$output" == "./test1/test.sh ./test2/test.sh ./test4/test.sh" ]]
 }
 
 source ../../main/compose/testlib.sh
 @test "Find test by suite" {
   OZONE_ACCEPTANCE_SUITE=one
+  cd $BATS_TEST_DIRNAME
   run find_tests
   [[ "$output" == "./test4/test.sh" ]]
 }
