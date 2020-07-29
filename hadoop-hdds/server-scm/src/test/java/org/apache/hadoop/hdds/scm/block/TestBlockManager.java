@@ -298,6 +298,72 @@ public class TestBlockManager {
     }
   }
 
+
+  @Test
+  public void testBlockDistributionWithMultipleDisks() throws Exception {
+    int threadCount = numContainerPerOwnerInPipeline *
+            numContainerPerOwnerInPipeline;
+    nodeManager.setNumHealthyVolumes(numContainerPerOwnerInPipeline);
+    List<ExecutorService> executors = new ArrayList<>(threadCount);
+    for (int i = 0; i < threadCount; i++) {
+      executors.add(Executors.newSingleThreadExecutor());
+    }
+    pipelineManager.createPipeline(type, factor);
+    TestUtils.openAllRatisPipelines(pipelineManager);
+    Map<Long, List<AllocatedBlock>> allocatedBlockMap =
+            new ConcurrentHashMap<>();
+    List<CompletableFuture<AllocatedBlock>> futureList =
+            new ArrayList<>(threadCount);
+    for (int i = 0; i < threadCount; i++) {
+      final CompletableFuture<AllocatedBlock> future =
+              new CompletableFuture<>();
+      CompletableFuture.supplyAsync(() -> {
+        try {
+          List<AllocatedBlock> blockList;
+          AllocatedBlock block = blockManager
+                  .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor,
+                          OzoneConsts.OZONE,
+                          new ExcludeList());
+          long containerId = block.getBlockID().getContainerID();
+          if (!allocatedBlockMap.containsKey(containerId)) {
+            blockList = new ArrayList<>();
+          } else {
+            blockList = allocatedBlockMap.get(containerId);
+          }
+          blockList.add(block);
+          allocatedBlockMap.put(containerId, blockList);
+          future.complete(block);
+        } catch (IOException e) {
+          future.completeExceptionally(e);
+        }
+        return future;
+      }, executors.get(i));
+      futureList.add(future);
+    }
+    try {
+      CompletableFuture
+              .allOf(futureList.toArray(
+                      new CompletableFuture[futureList.size()])).get();
+      Assert.assertTrue(
+              pipelineManager.getPipelines(type).size() == 1);
+      Pipeline pipeline = pipelineManager.getPipelines(type).get(0);
+      // total no of containers to be created will be number of healthy
+      // volumes * number of numContainerPerOwnerInPipeline which is equal to
+      // the thread count
+      Assert.assertTrue(threadCount == pipelineManager.
+              getNumberOfContainers(pipeline.getId()));
+      Assert.assertTrue(
+              allocatedBlockMap.size() == threadCount);
+      Assert.assertTrue(allocatedBlockMap.
+              values().size() == threadCount);
+      allocatedBlockMap.values().stream().forEach(v -> {
+        Assert.assertTrue(v.size() == 1);
+      });
+    } catch (Exception e) {
+      Assert.fail("testAllocateBlockInParallel failed");
+    }
+  }
+
   @Test
   public void testAllocateOversizedBlock() throws Exception {
     long size = 6 * GB;
