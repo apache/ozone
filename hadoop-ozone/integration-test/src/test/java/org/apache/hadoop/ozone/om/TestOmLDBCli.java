@@ -16,25 +16,28 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
+
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.TestDataUtil;
-import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.debug.DBScanner;
 import org.apache.hadoop.ozone.debug.RDBParser;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.Assert;
+import org.junit.rules.TemporaryFolder;
 
-import java.util.ArrayList;
+import java.io.File;
 import java.util.List;
+import java.util.ArrayList;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 
 /**
  * This class tests the Debug LDB CLI that reads from an om.db file.
@@ -45,81 +48,72 @@ public class TestOmLDBCli {
 
   private RDBParser rdbParser;
   private DBScanner dbScanner;
+  private DBStore dbStore = null;
+
+  @Rule
+  public TemporaryFolder folder = new TemporaryFolder();
 
   @Before
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
-    cluster = MiniOzoneCluster.newBuilder(conf).build();
-    cluster.waitForClusterToBeReady();
-    String volumeName0 = "volume10";
-    String bucketName0 = "bucket10";
-    OzoneBucket bucket0 = TestDataUtil.createVolumeAndBucket(cluster,
-            volumeName0, bucketName0);
-    String volumeName1 = "volume11";
-    String bucketName1 = "bucket11";
-    OzoneBucket bucket1 = TestDataUtil.createVolumeAndBucket(cluster,
-            volumeName1, bucketName1);
-    String keyName0 = "key0";
-    TestDataUtil.createKey(bucket0, keyName0, "");
-    String keyName1 = "key1";
-    TestDataUtil.createKey(bucket1, keyName1, "");
-    cluster.getOzoneManager().stop();
-    cluster.getStorageContainerManager().stop();
     rdbParser = new RDBParser();
     dbScanner = new DBScanner();
   }
 
   @After
-  public void shutdown() {
-    if (cluster != null) {
-      cluster.shutdown();
+  public void shutdown() throws Exception {
+    if (dbStore!=null){
+      dbStore.close();
     }
   }
 
   @Test(expected = IllegalArgumentException.class)
   public void testOMDB() throws Exception {
-    String dbRootPath = conf.get(HddsConfigKeys.OZONE_METADATA_DIRS);
-    String dbPath = dbRootPath + "/" + OM_DB_NAME;
-    rdbParser.setDbPath(dbPath);
+    File newFolder = folder.newFolder();
+    if(!newFolder.exists()) {
+      Assert.assertTrue(newFolder.mkdirs());
+    }
+    // Dummy om.db with only keyTable
+    dbStore = DBStoreBuilder.newBuilder(conf)
+            .setName("om.db")
+            .setPath(newFolder.toPath())
+            .addTable("keyTable")
+            .build();
+    // insert 5 keys
+    for (int i = 0; i<5; i++) {
+      OmKeyInfo value = TestOMRequestUtils.createOmKeyInfo("sampleVol",
+          "sampleBuck", "key" + (i+1), HddsProtos.ReplicationType.STAND_ALONE,
+              HddsProtos.ReplicationFactor.ONE);
+      String key = "key"+ (i);
+      Table<byte[], byte[]> keyTable = dbStore.getTable("keyTable");
+      keyTable.put(key.getBytes(), value.getProtobuf().toByteArray());
+    }
+    rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());
     dbScanner.setParent(rdbParser);
     // list will store volumeNames/bucketNames/keyNames
-    List<String> entityNames = new ArrayList<>();
-    getEntityNames(dbScanner, "volumeTable", entityNames);
-    Assert.assertTrue(entityNames.contains("volume10"));
-    Assert.assertTrue(entityNames.contains("volume11"));
-    getEntityNames(dbScanner, "bucketTable", entityNames);
-    Assert.assertTrue(entityNames.contains("bucket10"));
-    Assert.assertTrue(entityNames.contains("bucket11"));
-    getEntityNames(dbScanner, "keyTable", entityNames);
-    Assert.assertTrue(entityNames.contains("key0"));
-    Assert.assertTrue(entityNames.contains("key1"));
-    //test maxLimit
-    Assert.assertEquals(2, entityNames.size());
+    List<String> keyNames = new ArrayList<>();
+    getKeyNames(dbScanner, "keyTable", keyNames);
+    Assert.assertEquals(5, keyNames.size());
+    Assert.assertTrue(keyNames.contains("key1"));
+    Assert.assertTrue(keyNames.contains("key5"));
+    Assert.assertFalse(keyNames.contains("key6"));
     dbScanner.setLimit(1);
-    getEntityNames(dbScanner, "keyTable", entityNames);
-    Assert.assertEquals(1, entityNames.size());
+    getKeyNames(dbScanner, "keyTable", keyNames);
+    Assert.assertEquals(1, keyNames.size());
     dbScanner.setLimit(-1);
-    getEntityNames(dbScanner, "keyTable", entityNames);
-    Assert.assertEquals(0, entityNames.size());
+    getKeyNames(dbScanner, "keyTable", keyNames);
+    Assert.assertEquals(0, keyNames.size());
   }
 
-  private static void getEntityNames(DBScanner dbScanner,
+  private static void getKeyNames(DBScanner dbScanner,
       String tableName, List<String> entityNames) throws Exception {
     dbScanner.setTableName(tableName);
     dbScanner.call();
     entityNames.clear();
     Assert.assertFalse(dbScanner.getScannedObjects().isEmpty());
     for (Object o : dbScanner.getScannedObjects()){
-      if(o instanceof OmVolumeArgs) {
-        OmVolumeArgs volumeArgs = (OmVolumeArgs) o;
-        entityNames.add(volumeArgs.getVolume());
-      } else if (o instanceof OmBucketInfo){
-        OmBucketInfo bucketInfo = (OmBucketInfo)o;
-        entityNames.add(bucketInfo.getBucketName());
-      } else {
-        OmKeyInfo keyInfo = (OmKeyInfo)o;
-        entityNames.add(keyInfo.getKeyName());
-      }
+      OmKeyInfo keyInfo = (OmKeyInfo)o;
+      entityNames.add(keyInfo.getKeyName());
     }
   }
 }
