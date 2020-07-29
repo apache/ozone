@@ -25,6 +25,7 @@ source ../../main/compose/testlib.sh
 source ../../main/compose/testlib.sh
 @test "Find test by suite" {
   OZONE_ACCEPTANCE_SUITE=one
+  cd $BATS_TEST_DIRNAME
   run find_tests
   [[ "$output" == "./test4/test.sh" ]]
 }
