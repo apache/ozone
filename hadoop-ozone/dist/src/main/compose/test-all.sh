@@ -59,7 +59,6 @@ done
 
 rebot -N acceptance -d "$ALL_RESULT_DIR" "$ALL_RESULT_DIR"/*.xml
 
-rebot -N "smoketests" -d "$SCRIPT_DIR/result" "$SCRIPT_DIR/result/robot-*.xml"
 if [ "$OZONE_WITH_COVERAGE" ]; then
   pkill -f JacocoServer
   cp /tmp/jacoco-combined.exec "$SCRIPT_DIR"/result
