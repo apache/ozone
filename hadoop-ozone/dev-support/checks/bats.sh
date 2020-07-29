@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -12,20 +13,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-name: comment-commands
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+cd "${DIR}/../../.." || exit 1
 
-on:
-  issue_comment:
-    types:
-      - created
-      - edited
+REPORT_DIR=${OUTPUT_DIR:-"${DIR}/../../../target/bats"}
+mkdir -p "${REPORT_DIR}"
+REPORT_FILE="${REPORT_DIR}/summary.txt"
 
-jobs:
-  process-comment:
-    name: check-comment
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - run: ./.github/process-comment.sh
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+rm -f "${REPORT_DIR}/output.log"
+
+find * -path '*/src/test/shell/*' -name '*.bats' -print0 \
+  | xargs -0 -n1 bats --formatter tap \
+  | tee -a "${REPORT_DIR}/output.log"
+
+grep '^\(not ok\|#\)' "${REPORT_DIR}/output.log" > "${REPORT_FILE}"
+
+grep -c '^not ok' "${REPORT_FILE}" > "${REPORT_DIR}/failures"
+
+if [[ -s "${REPORT_FILE}" ]]; then
+   exit 1
+fi
