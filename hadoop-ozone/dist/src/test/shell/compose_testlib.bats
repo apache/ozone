@@ -18,7 +18,6 @@
 source ../../main/compose/testlib.sh
 @test "Find test recursive, only on one level" {
   run find_tests
-  echo "x${output}x}"
   [[ "$output" == "./test1/test.sh ./test2/test.sh ./test4/test.sh" ]]
 }
 
