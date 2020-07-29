@@ -818,7 +818,7 @@
     <name>ozone.scm.pipeline.owner.container.count</name>
     <value>3</value>
     <tag>OZONE, SCM, PIPELINE</tag>
-    <description>Number of containers per owner in a pipeline.
+    <description>Number of containers per owner per disk in a pipeline.
     </description>
   </property>
   <property>
