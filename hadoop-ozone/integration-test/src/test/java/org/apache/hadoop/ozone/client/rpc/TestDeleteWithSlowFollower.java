@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -120,20 +120,22 @@ public class TestDeleteWithSlowFollower {
     ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
     ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(3));
     conf.setFromObject(ratisServerConfig);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
-                    "rpc.request.timeout",
-            3, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
-                    "watch.request.timeout",
-            10, TimeUnit.SECONDS);
+
+    RatisClientConfig.RaftConfig raftClientConfig =
+        conf.getObject(RatisClientConfig.RaftConfig.class);
+    raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
+    raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(10));
+    conf.setFromObject(raftClientConfig);
+
     conf.setTimeDuration(OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
         1, TimeUnit.SECONDS);
-    conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
-        + ".client.request.write.timeout", 30, TimeUnit.SECONDS);
-    conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
-        + ".client.request.watch.timeout", 30, TimeUnit.SECONDS);
+
+    RatisClientConfig ratisClientConfig =
+        conf.getObject(RatisClientConfig.class);
+    ratisClientConfig.setWriteRequestTimeout(Duration.ofSeconds(30));
+    ratisClientConfig.setWatchRequestTimeout(Duration.ofSeconds(30));
+    conf.setFromObject(ratisClientConfig);
+
     conf.setQuietMode(false);
     int numOfDatanodes = 3;
     cluster = MiniOzoneCluster.newBuilder(conf)

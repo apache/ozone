@@ -29,6 +29,7 @@ import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -49,6 +50,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -371,6 +373,34 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     return result;
   }
 
+  /**
+   * Intercept rename to trash calls from TrashPolicyDefault,
+   * convert them to delete calls instead.
+   */
+  @Deprecated
+  protected void rename(final Path src, final Path dst,
+      final Options.Rename... options) throws IOException {
+    boolean hasMoveToTrash = false;
+    if (options != null) {
+      for (Options.Rename option : options) {
+        if (option == Options.Rename.TO_TRASH) {
+          hasMoveToTrash = true;
+          break;
+        }
+      }
+    }
+    if (!hasMoveToTrash) {
+      // if doesn't have TO_TRASH option, just pass the call to super
+      super.rename(src, dst, options);
+    } else {
+      // intercept when TO_TRASH is found
+      LOG.info("Move to trash is disabled for ofs, deleting instead: {}. "
+          + "Files or directories will NOT be retained in trash. "
+          + "Ignore the following TrashPolicyDefault message, if any.", src);
+      delete(src, true);
+    }
+  }
+
   private class DeleteIterator extends OzoneListingIterator {
     final private boolean recursive;
     private final OzoneBucket bucket;
@@ -648,6 +678,17 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   public Path getTrashRoot(Path path) {
     OFSPath ofsPath = new OFSPath(path);
     return ofsPath.getTrashRoot();
+  }
+
+  /**
+   * Get all the trash roots of OFS for current user or for all the users.
+   * @param allUsers return trashRoots of all users if true, used by emptier
+   * @return trash roots
+   */
+  public Collection<FileStatus> getTrashRoots(boolean allUsers) {
+    // Since get all trash roots for one or more users requires listing all
+    // volumes and buckets, we will let adapter impl handle it.
+    return adapterImpl.getTrashRoots(allUsers, this);
   }
 
   /**

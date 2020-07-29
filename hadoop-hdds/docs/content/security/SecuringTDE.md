@@ -1,7 +1,7 @@
 ---
 title: "Transparent Data Encryption"
 date: "2019-April-03"
-summary: TDE allows data on the disks to be encrypted-at-rest and automatically decrypted during access. You can enable this per key or per bucket.
+summary: TDE allows data on the disks to be encrypted-at-rest and automatically decrypted during access. 
 weight: 3
 icon: lock
 ---
@@ -28,7 +28,7 @@ when a bucket is created.
 
 ### Setting up the Key Management Server
 
-To use TDE, clients must setup a Key Management Server and provide that URI to
+To use TDE, admin must setup a Key Management Server and provide that URI to
 Ozone/HDFS. Since Ozone and HDFS can use the same Key Management Server, this
  configuration can be provided via *hdfs-site.xml*.
 

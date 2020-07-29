@@ -24,9 +24,12 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.PKIProfile;
 import org.apache.hadoop.hdds.security.x509.keys.SecurityUtil;
 import org.apache.hadoop.util.Time;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
+import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.Extensions;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
@@ -135,6 +138,14 @@ public class DefaultApprover extends BaseApprover {
             validFrom,
             validTill,
             x500Name, keyInfo);
+
+    Extensions exts = SecurityUtil.getPkcs9Extensions(certificationRequest);
+    for (ASN1ObjectIdentifier extId : getProfile().getSupportedExtensions()) {
+      Extension ext = exts.getExtension(extId);
+      if (ext != null) {
+        certificateGenerator.addExtension(ext);
+      }
+    }
 
     ContentSigner sigGen = new BcRSAContentSignerBuilder(sigAlgId, digAlgId)
         .build(asymmetricKP);

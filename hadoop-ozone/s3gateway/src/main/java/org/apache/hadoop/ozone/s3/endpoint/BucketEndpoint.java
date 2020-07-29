@@ -31,7 +31,6 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import javax.ws.rs.core.Response.Status;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
@@ -253,12 +252,7 @@ public class BucketEndpoint extends EndpointBase {
       getBucket(bucketName);
     } catch (OS3Exception ex) {
       LOG.error("Exception occurred in headBucket", ex);
-      //TODO: use a subclass fo OS3Exception and catch it here.
-      if (ex.getCode().contains("NoSuchBucket")) {
-        return Response.status(Status.BAD_REQUEST).build();
-      } else {
-        throw ex;
-      }
+      throw ex;
     }
     return Response.ok().build();
   }

@@ -642,8 +642,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         }
         scmStorageConfig.initialize();
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
-                + ";cid={}", scmStorageConfig.getStorageDir(),
-                scmStorageConfig.getClusterID());
+            + ";cid={};layoutVersion={}", scmStorageConfig.getStorageDir(),
+            scmStorageConfig.getClusterID(),
+            scmStorageConfig.getLayoutVersion());
         return true;
       } catch (IOException ioe) {
         LOG.error("Could not initialize SCM version file", ioe);
@@ -651,8 +652,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       }
     } else {
       LOG.info("SCM already initialized. Reusing existing cluster id for sd={}"
-              + ";cid={}", scmStorageConfig.getStorageDir(),
-              scmStorageConfig.getClusterID());
+          + ";cid={};layoutVersion={}", scmStorageConfig.getStorageDir(),
+          scmStorageConfig.getClusterID(),
+          scmStorageConfig.getLayoutVersion());
       return true;
     }
   }
@@ -1119,5 +1121,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   public Map<String, Pair<Boolean, String>> getRuleStatus() {
     return scmSafeModeManager.getRuleStatus();
+  }
+
+  @Override
+  public Map<String, String> getRuleStatusMetrics() {
+    Map<String, String> map = new HashMap<>();
+    for (Map.Entry<String, Pair<Boolean, String>> entry :
+        scmSafeModeManager.getRuleStatus().entrySet()) {
+      map.put(entry.getKey(), entry.getValue().getRight());
+    }
+    return map;
   }
 }

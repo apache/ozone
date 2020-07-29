@@ -38,6 +38,16 @@
     </description>
   </property>
   <property>
+    <name>ozone.container.cache.lock.stripes</name>
+    <value>1024</value>
+    <tag>PERFORMANCE, CONTAINER, STORAGE</tag>
+    <description>Container DB open is an exclusive operation. We use a stripe
+      lock to guarantee that different threads can open different container DBs
+      concurrently, while for one container DB, only one thread can open it at
+      the same time. This setting controls the lock stripes.
+    </description>
+  </property>
+  <property>
     <name>dfs.container.ipc</name>
     <value>9859</value>
     <tag>OZONE, CONTAINER, MANAGEMENT</tag>
@@ -196,7 +206,7 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.num.write.chunk.threads</name>
+    <name>dfs.container.ratis.num.write.chunk.threads.per.volume</name>
     <value>10</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
     <description>Maximum number of threads in the thread pool that Datanode
@@ -632,17 +642,6 @@
       For production clusters or any time you care about performance, it is
       recommended that ozone.om.db.dirs, ozone.scm.db.dirs and
       dfs.container.ratis.datanode.storage.dir be configured separately.
-    </description>
-  </property>
-  <property>
-    <name>ozone.metastore.impl</name>
-    <value>RocksDB</value>
-    <tag>OZONE, OM, SCM, CONTAINER, STORAGE</tag>
-    <description>
-      Ozone metadata store implementation. Ozone metadata are well
-      distributed to multiple services such as ozoneManager, scm. They are stored in
-      some local key-value databases. This property determines which database
-      library to use. Supported value is either LevelDB or RocksDB.
     </description>
   </property>
 
@@ -1340,16 +1339,6 @@
     <description>
       Percentage of pipelines, where at least one datanode is reported in the
       pipeline.
-    </description>
-  </property>
-
-  <property>
-    <name>hdds.container.scrub.enabled</name>
-    <value>false</value>
-    <tag>DATANODE</tag>
-    <description>
-      Boolean value to enable data and metadata scrubbing in the containers
-      running on each datanode.
     </description>
   </property>
 
@@ -2302,15 +2291,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.recon.container.db.impl</name>
-    <value>RocksDB</value>
-    <tag>OZONE, RECON, STORAGE</tag>
-    <description>
-      Ozone Recon container DB store implementation.Supported value is either
-      LevelDB or RocksDB.
-    </description>
-  </property>
-  <property>
     <name>ozone.recon.om.db.dir</name>
   <value/>
   <tag>OZONE, RECON, STORAGE</tag>
@@ -2506,6 +2486,21 @@
       contains illegal characters when creating/renaming key.
       For the definition of illegal characters, follow the
       rules in Amazon S3's object key naming guide.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.enable.filesystem.paths</name>
+    <tag>OZONE, OM</tag>
+    <value>false</value>
+    <description>If true, key names will be interpreted as file system paths.
+      "/" will be treated as a special character and paths will be normalized
+      and must follow Unix filesystem path naming conventions. This flag will
+      be helpful when objects created by S3G need to be accessed using OFS/O3Fs.
+      If false, it will fallback to default behavior of Key/MPU create
+      requests where key paths are not normalized and any intermediate
+      directories will not be created or any file checks happens to check
+      filesystem semantics.
     </description>
   </property>
 </configuration>

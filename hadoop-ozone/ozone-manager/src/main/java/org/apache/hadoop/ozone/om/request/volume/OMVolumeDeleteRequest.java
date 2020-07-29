@@ -99,16 +99,6 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
 
       OmVolumeArgs omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
 
-      // Check if this transaction is a replay of ratis logs.
-      // If this is a replay, then the response has already been returned to
-      // the client. So take no further action and return a dummy
-      // OMClientResponse.
-      if (isReplay(ozoneManager, omVolumeArgs, transactionLogIndex)) {
-        LOG.debug("Replayed Transaction {} ignored. Request: {}",
-            transactionLogIndex, deleteVolumeRequest);
-        return new OMVolumeDeleteResponse(createReplayOMResponse(omResponse));
-      }
-
       owner = omVolumeArgs.getOwnerName();
       acquiredUserLock = omMetadataManager.getLock().acquireWriteLock(USER_LOCK,
           owner);

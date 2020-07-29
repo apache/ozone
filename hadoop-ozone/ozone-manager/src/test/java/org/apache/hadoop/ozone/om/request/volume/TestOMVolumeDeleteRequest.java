@@ -157,42 +157,4 @@ public class TestOMVolumeDeleteRequest extends TestOMVolumeRequest {
         .setCmdType(OzoneManagerProtocolProtos.Type.DeleteVolume)
         .setDeleteVolumeRequest(deleteVolumeRequest).build();
   }
-
-  @Test
-  public void testReplayRequest() throws Exception {
-
-    // create volume request
-    String volumeName = UUID.randomUUID().toString();
-    String user = "user1";
-    OMVolumeCreateRequest omVolumeCreateRequest = new OMVolumeCreateRequest(
-        createVolumeRequest(volumeName, user, user));
-
-    // Execute createVolume request
-    omVolumeCreateRequest.preExecute(ozoneManager);
-    omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-        ozoneManagerDoubleBufferHelper);
-
-    OMRequest originalDeleteRequest = deleteVolumeRequest(volumeName);
-    OMVolumeDeleteRequest omVolumeDeleteRequest =
-        new OMVolumeDeleteRequest(originalDeleteRequest);
-
-    // Execute the original request
-    omVolumeDeleteRequest.preExecute(ozoneManager);
-    omVolumeDeleteRequest.validateAndUpdateCache(ozoneManager, 2,
-        ozoneManagerDoubleBufferHelper);
-
-    // Create the volume again
-    omVolumeCreateRequest.preExecute(ozoneManager);
-    omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, 3,
-        ozoneManagerDoubleBufferHelper);
-
-    // Replay the delete transaction - Execute the same request again
-    OMClientResponse omClientResponse =
-        omVolumeDeleteRequest.validateAndUpdateCache(ozoneManager, 2,
-            ozoneManagerDoubleBufferHelper);
-
-    // Replay should result in Replay response
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
-        omClientResponse.getOMResponse().getStatus());
-  }
 }

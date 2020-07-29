@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.ratis;
 
 import java.io.IOException;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -75,13 +76,6 @@ public final class RatisHelper {
 
   // Prefix for Ratis Server GRPC and Ratis client conf.
   public static final String HDDS_DATANODE_RATIS_PREFIX_KEY = "hdds.ratis";
-  private static final String RAFT_SERVER_PREFIX_KEY = "raft.server";
-  public static final String HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY =
-      HDDS_DATANODE_RATIS_PREFIX_KEY + "." + RAFT_SERVER_PREFIX_KEY;
-  public static final String HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY =
-      HDDS_DATANODE_RATIS_PREFIX_KEY + "." + RaftClientConfigKeys.PREFIX;
-  public static final String HDDS_DATANODE_RATIS_GRPC_PREFIX_KEY =
-      HDDS_DATANODE_RATIS_PREFIX_KEY + "." + GrpcConfigKeys.PREFIX;
 
   private static final Class[] NO_RETRY_EXCEPTIONS =
       new Class[] {NotReplicatedException.class, GroupMismatchException.class,
@@ -177,9 +171,9 @@ public final class RatisHelper {
   }
 
   public static RaftClient newRaftClient(RaftPeer leader,
-      ConfigurationSource conf) {
+      ConfigurationSource conf, GrpcTlsConfig tlsConfig) {
     return newRaftClient(getRpcType(conf), leader,
-        RatisHelper.createRetryPolicy(conf), conf);
+        RatisHelper.createRetryPolicy(conf), tlsConfig, conf);
   }
 
   public static RaftClient newRaftClient(RpcType rpcType, RaftPeer leader,
@@ -227,7 +221,7 @@ public final class RatisHelper {
   }
 
   /**
-   * Set all the properties matching with regex
+   * Set all client properties matching with regex
    * {@link RatisHelper#HDDS_DATANODE_RATIS_PREFIX_KEY} in
    * ozone configuration object and configure it to RaftProperties.
    * @param ozoneConf
@@ -237,14 +231,17 @@ public final class RatisHelper {
       RaftProperties raftProperties) {
 
     // As for client we do not require server and grpc server/tls. exclude them.
-    Map<String, String> ratisClientConf = ozoneConf.getPropsWithPrefix(
-        StringUtils.appendIfNotPresent(HDDS_DATANODE_RATIS_PREFIX_KEY, '.'));
+    Map<String, String> ratisClientConf =
+        getDatanodeRatisPrefixProps(ozoneConf);
     ratisClientConf.forEach((key, val) -> {
-      if (key.startsWith(RaftClientConfigKeys.PREFIX) || isGrpcClientConfig(
-          key)) {
+      if (isClientConfig(key) || isGrpcClientConfig(key)) {
         raftProperties.set(key, val);
       }
     });
+  }
+
+  private static boolean isClientConfig(String key) {
+    return key.startsWith(RaftClientConfigKeys.PREFIX);
   }
 
   private static boolean isGrpcClientConfig(String key) {
@@ -253,7 +250,7 @@ public final class RatisHelper {
         .startsWith(GrpcConfigKeys.Server.PREFIX);
   }
   /**
-   * Set all the properties matching with prefix
+   * Set all server properties matching with prefix
    * {@link RatisHelper#HDDS_DATANODE_RATIS_PREFIX_KEY} in
    * ozone configuration object and configure it to RaftProperties.
    * @param ozoneConf
@@ -266,7 +263,7 @@ public final class RatisHelper {
         getDatanodeRatisPrefixProps(ozoneConf);
     ratisServerConf.forEach((key, val) -> {
       // Exclude ratis client configuration.
-      if (!key.startsWith(RaftClientConfigKeys.PREFIX)) {
+      if (!isClientConfig(key)) {
         raftProperties.set(key, val);
       }
     });
@@ -321,9 +318,6 @@ public final class RatisHelper {
         MultipleLinearRandomRetry
             .parseCommaSeparated(ratisClientConfig.getMultilinearPolicy());
 
-    long writeTimeout = ratisClientConfig.getWriteRequestTimeoutInMs();
-    long watchTimeout = ratisClientConfig.getWatchRequestTimeoutInMs();
-
     return RequestTypeDependentRetryPolicy.newBuilder()
         .setRetryPolicy(RaftProtos.RaftClientRequestProto.TypeCase.WRITE,
             createExceptionDependentPolicy(exponentialBackoffRetry,
@@ -332,23 +326,19 @@ public final class RatisHelper {
             createExceptionDependentPolicy(exponentialBackoffRetry,
                 multipleLinearRandomRetry, RetryPolicies.noRetry()))
         .setTimeout(RaftProtos.RaftClientRequestProto.TypeCase.WRITE,
-            TimeDuration.valueOf(writeTimeout, TimeUnit.MILLISECONDS))
+            toTimeDuration(ratisClientConfig.getWriteRequestTimeout()))
         .setTimeout(RaftProtos.RaftClientRequestProto.TypeCase.WATCH,
-            TimeDuration.valueOf(watchTimeout, TimeUnit.MILLISECONDS))
+            toTimeDuration(ratisClientConfig.getWatchRequestTimeout()))
         .build();
   }
 
   private static ExponentialBackoffRetry createExponentialBackoffPolicy(
       RatisClientConfig ratisClientConfig) {
-    long exponentialBaseSleep =
-        ratisClientConfig.getExponentialPolicyBaseSleepInMs();
-    long exponentialMaxSleep =
-        ratisClientConfig.getExponentialPolicyMaxSleepInMs();
     return ExponentialBackoffRetry.newBuilder()
         .setBaseSleepTime(
-            TimeDuration.valueOf(exponentialBaseSleep, TimeUnit.MILLISECONDS))
+            toTimeDuration(ratisClientConfig.getExponentialPolicyBaseSleep()))
         .setMaxSleepTime(
-            TimeDuration.valueOf(exponentialMaxSleep, TimeUnit.MILLISECONDS))
+            toTimeDuration(ratisClientConfig.getExponentialPolicyMaxSleep()))
         .build();
   }
 
@@ -373,4 +363,13 @@ public final class RatisHelper {
     return commitInfos.stream().map(RaftProtos.CommitInfoProto::getCommitIndex)
         .min(Long::compareTo).orElse(null);
   }
+
+  private static TimeDuration toTimeDuration(Duration duration) {
+    return toTimeDuration(duration.toMillis());
+  }
+
+  private static TimeDuration toTimeDuration(long milliseconds) {
+    return TimeDuration.valueOf(milliseconds, TimeUnit.MILLISECONDS);
+  }
+
 }

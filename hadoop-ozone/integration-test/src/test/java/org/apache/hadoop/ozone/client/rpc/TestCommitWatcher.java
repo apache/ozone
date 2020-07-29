@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.ratis.protocol.AlreadyClosedException;
 import org.apache.ratis.protocol.NotReplicatedException;
 import org.apache.ratis.protocol.RaftRetryFailureException;
+import org.apache.ratis.protocol.TimeoutIOException;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -112,18 +113,19 @@ public class TestCommitWatcher {
     ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
     ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(3));
     conf.setFromObject(ratisServerConfig);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
-                    "rpc.request.timeout",
-            3, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
-                    "watch.request.timeout",
-            3, TimeUnit.SECONDS);
-    conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
-        + ".client.request.write.timeout", 30, TimeUnit.SECONDS);
-    conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
-        + ".client.request.watch.timeout", 30, TimeUnit.SECONDS);
+
+    RatisClientConfig.RaftConfig raftClientConfig =
+        conf.getObject(RatisClientConfig.RaftConfig.class);
+    raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
+    raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(3));
+    conf.setFromObject(raftClientConfig);
+
+    RatisClientConfig ratisClientConfig =
+        conf.getObject(RatisClientConfig.class);
+    ratisClientConfig.setWriteRequestTimeout(Duration.ofSeconds(10));
+    ratisClientConfig.setWatchRequestTimeout(Duration.ofSeconds(10));
+    conf.setFromObject(ratisClientConfig);
+
     conf.set(OzoneConfigKeys.OZONE_CLIENT_CHECKSUM_TYPE, "NONE");
     conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
@@ -311,14 +313,17 @@ public class TestCommitWatcher {
       watcher.watchForCommit(replies.get(1).getLogIndex() + 100);
       Assert.fail("Expected exception not thrown");
     } catch(IOException ioe) {
-      // with retry count set to lower limit and a lower watch request
+      // with retry count set to noRetry and a lower watch request
       // timeout, watch request will eventually
-      // fail with RaftRetryFailure exception from ratis client or the client
+      // fail with TimeoutIOException from ratis client or the client
       // can itself get AlreadyClosedException from the Ratis Server
+      // and the write may fail with RaftRetryFailureException
       Throwable t = HddsClientUtils.checkForException(ioe);
-      Assert.assertTrue(t instanceof RaftRetryFailureException ||
-              t instanceof AlreadyClosedException ||
-              t instanceof NotReplicatedException);
+      Assert.assertTrue("Unexpected exception: " + t.getClass(),
+          t instanceof RaftRetryFailureException ||
+          t instanceof TimeoutIOException ||
+          t instanceof AlreadyClosedException ||
+          t instanceof NotReplicatedException);
     }
     if (ratisClient.getReplicatedMinCommitIndex() < replies.get(1)
         .getLogIndex()) {

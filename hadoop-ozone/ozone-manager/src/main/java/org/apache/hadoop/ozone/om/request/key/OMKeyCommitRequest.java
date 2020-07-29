@@ -41,7 +41,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -71,13 +70,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyCommitRequest.class);
 
-  private enum Result {
-    SUCCESS,
-    REPLAY,
-    DELETE_OPEN_KEY_ONLY,
-    FAILURE
-  }
-
   public OMKeyCommitRequest(OMRequest omRequest) {
     super(omRequest);
   }
@@ -99,7 +91,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     }
 
     KeyArgs.Builder newKeyArgs =
-        keyArgs.toBuilder().setModificationTime(Time.now());
+        keyArgs.toBuilder().setModificationTime(Time.now())
+            .setKeyName(validateAndNormalizeKey(
+                ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
 
     return getOmRequest().toBuilder()
         .setCommitKeyRequest(commitKeyRequest.toBuilder()
@@ -133,57 +127,36 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     OmKeyInfo omKeyInfo = null;
     OMClientResponse omClientResponse = null;
     boolean bucketLockAcquired = false;
-    Result result = null;
+    Result result;
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    String dbOzoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-        keyName);
-    String dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName,
-        keyName, commitKeyRequest.getClientID());
 
     try {
+      commitKeyArgs = resolveBucketLink(ozoneManager, commitKeyArgs, auditMap);
+      volumeName = commitKeyArgs.getVolumeName();
+      bucketName = commitKeyArgs.getBucketName();
+
       // check Acl
       checkKeyAclsInOpenKeyTable(ozoneManager, volumeName, bucketName,
           keyName, IAccessAuthorizer.ACLType.WRITE,
           commitKeyRequest.getClientID());
+
+      String dbOzoneKey =
+          omMetadataManager.getOzoneKey(volumeName, bucketName,
+              keyName);
+      String dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName,
+          keyName, commitKeyRequest.getClientID());
 
       List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
       for (KeyLocation keyLocation : commitKeyArgs.getKeyLocationsList()) {
         locationInfoList.add(OmKeyLocationInfo.getFromProtobuf(keyLocation));
       }
 
-      bucketLockAcquired = omMetadataManager.getLock().acquireLock(BUCKET_LOCK,
-          volumeName, bucketName);
+      bucketLockAcquired =
+          omMetadataManager.getLock().acquireLock(BUCKET_LOCK,
+              volumeName, bucketName);
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-
-      // Revisit this logic to see how we can skip this check when ratis is
-      // enabled.
-      if (ozoneManager.isRatisEnabled()) {
-        // Check if OzoneKey already exists in DB
-        OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable()
-            .getIfExist(dbOzoneKey);
-        if (dbKeyInfo != null) {
-          // Check if this transaction is a replay of ratis logs
-          if (isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
-            // During KeyCreate, we do not check the OpenKey Table for replay.
-            // This is so as to avoid an extra DB read during KeyCreate.
-            // If KeyCommit is a replay, the KeyCreate request could also have
-            // been replayed. And since we do not check for replay in KeyCreate,
-            // we should scrub the key from OpenKey table now, is it exists.
-
-            omKeyInfo = omMetadataManager.getOpenKeyTable().get(dbOpenKey);
-            if (omKeyInfo != null) {
-              omMetadataManager.getOpenKeyTable().addCacheEntry(
-                  new CacheKey<>(dbOpenKey),
-                  new CacheValue<>(Optional.absent(), trxnLogIndex));
-
-              throw new OMReplayException(true);
-            }
-            throw new OMReplayException();
-          }
-        }
-      }
 
       omKeyInfo = omMetadataManager.getOpenKeyTable().get(dbOpenKey);
       if (omKeyInfo == null) {
@@ -214,22 +187,10 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
-      if (ex instanceof OMReplayException) {
-        if (((OMReplayException) ex).isDBOperationNeeded()) {
-          result = Result.DELETE_OPEN_KEY_ONLY;
-          omClientResponse = new OMKeyCommitResponse(omResponse.build(),
-              dbOpenKey);
-        } else {
-          result = Result.REPLAY;
-          omClientResponse = new OMKeyCommitResponse(createReplayOMResponse(
-              omResponse));
-        }
-      } else {
-        result = Result.FAILURE;
-        exception = ex;
-        omClientResponse = new OMKeyCommitResponse(createErrorOMResponse(
-            omResponse, exception));
-      }
+      result = Result.FAILURE;
+      exception = ex;
+      omClientResponse = new OMKeyCommitResponse(createErrorOMResponse(
+          omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
@@ -240,11 +201,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       }
     }
 
-    // Performing audit logging outside of the lock.
-    if (result != Result.REPLAY && result != Result.DELETE_OPEN_KEY_ONLY) {
-      auditLog(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
+    auditLog(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
           exception, getOmRequest().getUserInfo()));
-    }
 
     switch (result) {
     case SUCCESS:
@@ -253,20 +211,11 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // As key also can have multiple versions, we need to increment keys
       // only if version is 0. Currently we have not complete support of
       // versioning of keys. So, this can be revisited later.
-
       if (omKeyInfo.getKeyLocationVersions().size() == 1) {
         omMetrics.incNumKeys();
       }
-      LOG.debug("Key commited. Volume:{}, Bucket:{}, Key:{}", volumeName,
+      LOG.debug("Key committed. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);
-      break;
-    case REPLAY:
-      LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-          commitKeyRequest);
-      break;
-    case DELETE_OPEN_KEY_ONLY:
-      LOG.debug("Replayed Transaction {}. Deleting old key {} from OpenKey " +
-          "table. Request: {}", trxnLogIndex, dbOpenKey, commitKeyRequest);
       break;
     case FAILURE:
       LOG.error("Key commit failed. Volume:{}, Bucket:{}, Key:{}. Exception:{}",

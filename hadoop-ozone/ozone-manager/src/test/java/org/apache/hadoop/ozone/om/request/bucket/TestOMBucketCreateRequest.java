@@ -219,32 +219,4 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
             .setOwnerName(UUID.randomUUID().toString()).build();
     TestOMRequestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
   }
-
-  @Test
-  public void testReplayRequest() throws Exception {
-
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    OMRequest originalRequest = TestOMRequestUtils.createBucketRequest(
-        bucketName, volumeName, false, StorageTypeProto.SSD);
-    OMBucketCreateRequest omBucketCreateRequest = new OMBucketCreateRequest(
-        originalRequest);
-
-    // Manually add volume to DB table
-    addCreateVolumeToTable(volumeName, omMetadataManager);
-
-    // Execute the original request
-    omBucketCreateRequest.preExecute(ozoneManager);
-    omBucketCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-        ozoneManagerDoubleBufferHelper);
-
-    // Replay the transaction - Execute the same request again
-    OMClientResponse omClientResponse =
-        omBucketCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
-
-    // Replay should result in Replay response
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
-        omClientResponse.getOMResponse().getStatus());
-  }
 }

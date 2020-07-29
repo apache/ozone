@@ -26,6 +26,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
+import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -43,6 +44,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -53,14 +55,18 @@ import org.junit.rules.Timeout;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
+import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -83,29 +89,33 @@ public class TestRootedOzoneFileSystem {
   private RootedOzoneFileSystem ofs;
   private ObjectStore objectStore;
   private static BasicRootedOzoneClientAdapterImpl adapter;
+  private Trash trash;
 
   private String volumeName;
+  private Path volumePath;
   private String bucketName;
   // Store path commonly used by tests that test functionality within a bucket
-  private Path testBucketPath;
+  private Path bucketPath;
   private String rootPath;
 
   @Before
   public void init() throws Exception {
     conf = new OzoneConfiguration();
+    conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
     objectStore = cluster.getClient().getObjectStore();
 
+    String username = UserGroupInformation.getCurrentUser().getUserName();
+
     // create a volume and a bucket to be used by RootedOzoneFileSystem (OFS)
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
     volumeName = bucket.getVolumeName();
+    volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
     bucketName = bucket.getName();
-    String testBucketStr =
-        OZONE_URI_DELIMITER + volumeName + OZONE_URI_DELIMITER + bucketName;
-    testBucketPath = new Path(testBucketStr);
+    bucketPath = new Path(volumePath, bucketName);
 
     rootPath = String.format("%s://%s/",
         OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
@@ -116,6 +126,7 @@ public class TestRootedOzoneFileSystem {
     //  hence this workaround.
     conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
     fs = FileSystem.get(conf);
+    trash = new Trash(conf);
     ofs = (RootedOzoneFileSystem) fs;
     adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
   }
@@ -142,7 +153,7 @@ public class TestRootedOzoneFileSystem {
 
   @Test
   public void testCreateDoesNotAddParentDirKeys() throws Exception {
-    Path grandparent = new Path(testBucketPath,
+    Path grandparent = new Path(bucketPath,
         "testCreateDoesNotAddParentDirKeys");
     Path parent = new Path(grandparent, "parent");
     Path child = new Path(parent, "child");
@@ -170,7 +181,7 @@ public class TestRootedOzoneFileSystem {
 
   @Test
   public void testDeleteCreatesFakeParentDir() throws Exception {
-    Path grandparent = new Path(testBucketPath,
+    Path grandparent = new Path(bucketPath,
         "testDeleteCreatesFakeParentDir");
     Path parent = new Path(grandparent, "parent");
     Path child = new Path(parent, "child");
@@ -200,17 +211,17 @@ public class TestRootedOzoneFileSystem {
 
   @Test
   public void testListStatus() throws Exception {
-    Path parent = new Path(testBucketPath, "testListStatus");
+    Path parent = new Path(bucketPath, "testListStatus");
     Path file1 = new Path(parent, "key1");
     Path file2 = new Path(parent, "key2");
 
-    FileStatus[] fileStatuses = ofs.listStatus(testBucketPath);
+    FileStatus[] fileStatuses = ofs.listStatus(bucketPath);
     Assert.assertEquals("Should be empty", 0, fileStatuses.length);
 
     ContractTestUtils.touch(fs, file1);
     ContractTestUtils.touch(fs, file2);
 
-    fileStatuses = ofs.listStatus(testBucketPath);
+    fileStatuses = ofs.listStatus(bucketPath);
     Assert.assertEquals("Should have created parent",
         1, fileStatuses.length);
     Assert.assertEquals("Parent path doesn't match",
@@ -423,12 +434,12 @@ public class TestRootedOzoneFileSystem {
     // which are /dir1/dir11 and /dir1/dir12. Super child files/dirs
     // (/dir1/dir12/file121 and /dir1/dir11/dir111) should not be returned by
     // listStatus.
-    Path dir1 = new Path(testBucketPath, "dir1");
+    Path dir1 = new Path(bucketPath, "dir1");
     Path dir11 = new Path(dir1, "dir11");
     Path dir111 = new Path(dir11, "dir111");
     Path dir12 = new Path(dir1, "dir12");
     Path file121 = new Path(dir12, "file121");
-    Path dir2 = new Path(testBucketPath, "dir2");
+    Path dir2 = new Path(bucketPath, "dir2");
     fs.mkdirs(dir111);
     fs.mkdirs(dir12);
     ContractTestUtils.touch(fs, file121);
@@ -452,10 +463,10 @@ public class TestRootedOzoneFileSystem {
   @Test
   public void testNonExplicitlyCreatedPathExistsAfterItsLeafsWereRemoved()
       throws Exception {
-    Path source = new Path(testBucketPath, "source");
+    Path source = new Path(bucketPath, "source");
     Path interimPath = new Path(source, "interimPath");
     Path leafInsideInterimPath = new Path(interimPath, "leaf");
-    Path target = new Path(testBucketPath, "target");
+    Path target = new Path(bucketPath, "target");
     Path leafInTarget = new Path(target, "leaf");
 
     fs.mkdirs(source);
@@ -479,10 +490,10 @@ public class TestRootedOzoneFileSystem {
    */
   @Test
   public void testRenameToDifferentBucket() throws IOException {
-    Path source = new Path(testBucketPath, "source");
+    Path source = new Path(bucketPath, "source");
     Path interimPath = new Path(source, "interimPath");
     Path leafInsideInterimPath = new Path(interimPath, "leaf");
-    Path target = new Path(testBucketPath, "target");
+    Path target = new Path(bucketPath, "target");
 
     fs.mkdirs(source);
     fs.mkdirs(target);
@@ -562,7 +573,8 @@ public class TestRootedOzoneFileSystem {
     // listStatus("/")
     Path root = new Path(OZONE_URI_DELIMITER);
     FileStatus[] fileStatusRoot = ofs.listStatus(root);
-    Assert.assertEquals(2, fileStatusRoot.length);
+    // Default volume "s3v" is created by OM during start up.
+    Assert.assertEquals(2 + 1, fileStatusRoot.length);
   }
 
   /**
@@ -676,7 +688,8 @@ public class TestRootedOzoneFileSystem {
     FileStatus[] fileStatusesOver = customListStatus(new Path("/"),
         false, "", 8);
     // There are only 5 volumes
-    Assert.assertEquals(5, fileStatusesOver.length);
+    // Default volume "s3v" is created during startup.
+    Assert.assertEquals(5 + 1, fileStatusesOver.length);
 
     // numEntries = 5
     FileStatus[] fileStatusesExact = customListStatus(new Path("/"),
@@ -869,6 +882,160 @@ public class TestRootedOzoneFileSystem {
     // rm root should always fail for OFS
     Assert.assertFalse(fs.delete(new Path("/"), false));
     Assert.assertFalse(fs.delete(new Path("/"), true));
+  }
+
+  /**
+   * Helper function for testGetTrashRoots() for checking the first element
+   * in the FileStatus Collection.
+   * @param expected Expected path String
+   * @param res Collection of FileStatus from getTrashRoots()
+   */
+  private void checkFirstFileStatusPath(String expected,
+      Collection<FileStatus> res) {
+    Optional<FileStatus> optional = res.stream().findFirst();
+    Assert.assertTrue(optional.isPresent());
+    Assert.assertEquals(expected, optional.get().getPath().toUri().getPath());
+  }
+
+  /**
+   * Helper function for testGetTrashRoots() for checking all owner field in
+   * FileStatuses in the Collection.
+   * @param expectedSize Expected size of the FileStatus Collection
+   * @param expectedOwner Expected owner String
+   * @param res Collection of FileStatus from getTrashRoots()
+   */
+  private void checkFileStatusOwner(int expectedSize, String expectedOwner,
+      Collection<FileStatus> res) {
+    Assert.assertEquals(expectedSize, res.size());
+    res.forEach(e -> Assert.assertEquals(expectedOwner, e.getOwner()));
+  }
+
+  /**
+   * Test getTrashRoots() in OFS. Different from the existing test for o3fs.
+   */
+  @Test
+  public void testGetTrashRoots() throws IOException {
+    String username = UserGroupInformation.getCurrentUser().getShortUserName();
+    OzoneVolume volume1 = objectStore.getVolume(volumeName);
+    String prevOwner = volume1.getOwner();
+    // Set owner of the volume to current user, so it will show up in vol list
+    Assert.assertTrue(volume1.setOwner(username));
+
+    Path trashRoot1 = new Path(bucketPath, TRASH_PREFIX);
+    Path user1Trash1 = new Path(trashRoot1, username);
+    // When user trash dir isn't been created
+    Assert.assertEquals(0, fs.getTrashRoots(false).size());
+    Assert.assertEquals(0, fs.getTrashRoots(true).size());
+    // Let's create our first user1 (current user) trash dir.
+    fs.mkdirs(user1Trash1);
+    // Results should be getTrashRoots(false)=1, gTR(true)=1
+    Collection<FileStatus> res = fs.getTrashRoots(false);
+    Assert.assertEquals(1, res.size());
+    checkFirstFileStatusPath(user1Trash1.toString(), res);
+    res = fs.getTrashRoots(true);
+    Assert.assertEquals(1, res.size());
+    checkFirstFileStatusPath(user1Trash1.toString(), res);
+
+    // Create one more trash for user2 in the same bucket
+    Path user2Trash1 = new Path(trashRoot1, "testuser2");
+    fs.mkdirs(user2Trash1);
+    // Results should be getTrashRoots(false)=1, gTR(true)=2
+    checkFileStatusOwner(1, username, fs.getTrashRoots(false));
+    Assert.assertEquals(2, fs.getTrashRoots(true).size());
+
+    // Create a new bucket in the same volume
+    final String bucketName2 = "trashroottest2";
+    volume1.createBucket(bucketName2);
+    Path bucketPath2 = new Path(volumePath, bucketName2);
+    Path trashRoot2 = new Path(bucketPath2, TRASH_PREFIX);
+    Path user1Trash2 = new Path(trashRoot2, username);
+    // Create a file at the trash location, it shouldn't be recognized as trash
+    try (FSDataOutputStream out1 = fs.create(user1Trash2)) {
+      out1.write(123);
+    }
+    // Results should still be getTrashRoots(false)=1, gTR(true)=2
+    checkFileStatusOwner(1, username, fs.getTrashRoots(false));
+    checkFirstFileStatusPath(user1Trash1.toString(), res);
+    Assert.assertEquals(2, fs.getTrashRoots(true).size());
+    // Remove the file and create a dir instead. It should be recognized now
+    fs.delete(user1Trash2, false);
+    fs.mkdirs(user1Trash2);
+    // Results should now be getTrashRoots(false)=2, gTR(true)=3
+    checkFileStatusOwner(2, username, fs.getTrashRoots(false));
+    Assert.assertEquals(3, fs.getTrashRoots(true).size());
+
+    // Create a new volume and a new bucket
+    OzoneBucket bucket3 = TestDataUtil.createVolumeAndBucket(cluster);
+    OzoneVolume volume3 = objectStore.getVolume(bucket3.getVolumeName());
+    // Need to setOwner to current test user so it has permission to list vols
+    volume3.setOwner(username);
+    Path volumePath3 = new Path(OZONE_URI_DELIMITER, bucket3.getVolumeName());
+    Path bucketPath3 = new Path(volumePath3, bucket3.getName());
+    Path trashRoot3 = new Path(bucketPath3, TRASH_PREFIX);
+    Path user1Trash3 = new Path(trashRoot3, username);
+    // Results should be getTrashRoots(false)=3, gTR(true)=4
+    fs.mkdirs(user1Trash3);
+    checkFileStatusOwner(3, username, fs.getTrashRoots(false));
+    Assert.assertEquals(4, fs.getTrashRoots(true).size());
+    // One more user
+    Path user3Trash1 = new Path(trashRoot3, "testuser3");
+    fs.mkdirs(user3Trash1);
+    // Results should be getTrashRoots(false)=3, gTR(true)=5
+    checkFileStatusOwner(3, username, fs.getTrashRoots(false));
+    Assert.assertEquals(5, fs.getTrashRoots(true).size());
+
+    // Clean up, and check while doing so
+    fs.delete(trashRoot3, true);
+    checkFileStatusOwner(2, username, fs.getTrashRoots(false));
+    Assert.assertEquals(3, fs.getTrashRoots(true).size());
+    fs.delete(trashRoot2, true);
+    checkFileStatusOwner(1, username, fs.getTrashRoots(false));
+    Assert.assertEquals(2, fs.getTrashRoots(true).size());
+    fs.delete(user2Trash1, true);
+    checkFileStatusOwner(1, username, fs.getTrashRoots(false));
+    Assert.assertEquals(1, fs.getTrashRoots(true).size());
+
+    volume3.deleteBucket(bucket3.getName());
+    objectStore.deleteVolume(volume3.getName());
+    volume1.deleteBucket(bucketName2);
+
+    fs.delete(user1Trash1, true);
+    Assert.assertEquals(0, fs.getTrashRoots(false).size());
+    Assert.assertEquals(0, fs.getTrashRoots(true).size());
+    // Restore owner
+    Assert.assertTrue(volume1.setOwner(prevOwner));
+  }
+
+  /**
+   * Check that no files are actually moved to trash since it is disabled by
+   * fs.rename(src, dst, options).
+   */
+  @Test
+  public void testRenameToTrashDisabled() throws IOException {
+    // Create a file
+    String testKeyName = "testKey1";
+    Path path = new Path(bucketPath, testKeyName);
+    try (FSDataOutputStream stream = fs.create(path)) {
+      stream.write(1);
+    }
+
+    // Call moveToTrash. We can't call protected fs.rename() directly
+    trash.moveToTrash(path);
+
+    // Construct paths
+    String username = UserGroupInformation.getCurrentUser().getShortUserName();
+    Path trashRoot = new Path(bucketPath, TRASH_PREFIX);
+    Path userTrash = new Path(trashRoot, username);
+    Path userTrashCurrent = new Path(userTrash, "Current");
+    Path trashPath = new Path(userTrashCurrent, testKeyName);
+
+    // Trash Current directory should still have been created.
+    Assert.assertTrue(ofs.exists(userTrashCurrent));
+    // Check under trash, the key should be deleted instead
+    Assert.assertFalse(ofs.exists(trashPath));
+
+    // Cleanup
+    ofs.delete(trashRoot, true);
   }
 
 }

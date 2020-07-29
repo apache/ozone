@@ -36,8 +36,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
@@ -487,7 +485,7 @@ public class MutableVolumeSet implements VolumeSet {
     return ImmutableMap.copyOf(volumeStateMap);
   }
 
-  public StorageContainerDatanodeProtocolProtos.NodeReportProto getNodeReport()
+  public StorageLocationReport[] getStorageReport()
       throws IOException {
     boolean failed;
     this.readLock();
@@ -540,11 +538,7 @@ public class MutableVolumeSet implements VolumeSet {
         StorageLocationReport r = builder.build();
         reports[counter++] = r;
       }
-      NodeReportProto.Builder nrb = NodeReportProto.newBuilder();
-      for (int i = 0; i < reports.length; i++) {
-        nrb.addStorageReport(reports[i].getProtoBufMessage());
-      }
-      return nrb.build();
+      return reports;
     } finally {
       this.readUnlock();
     }
