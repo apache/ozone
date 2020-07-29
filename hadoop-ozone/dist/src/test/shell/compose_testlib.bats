@@ -15,7 +15,7 @@
 # limitations under the License.
 
 
-source ../../main/compose/testlib.sh
+load ../../main/compose/testlib.sh
 @test "Find test recursive, only on one level" {
   run find_tests
   [[ "$output" == "./test1/test.sh ./test2/test.sh ./test4/test.sh" ]]
