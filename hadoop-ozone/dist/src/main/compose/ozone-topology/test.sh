@@ -39,7 +39,7 @@ execute_robot_test scm topology/loaddata.robot
 
 stop_containers datanode_1 datanode_2 datanode_3
 
-execute_robot_test scm topology/readdata.robot -N readdata-first-half
+execute_robot_test scm -N readdata-first-half topology/readdata.robot
 
 start_containers datanode_1 datanode_2 datanode_3
 
