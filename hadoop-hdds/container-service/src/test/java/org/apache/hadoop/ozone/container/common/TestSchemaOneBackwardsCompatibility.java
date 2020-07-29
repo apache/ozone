@@ -310,15 +310,15 @@ public class TestSchemaOneBackwardsCompatibility {
    *
    * The contents of the database are:
    *
-   * #BLOCKCOUNT : 4
-   * #BYTESUSED : 600
+   * #BLOCKCOUNT : 2
+   * #BYTESUSED : 200
    * #PENDINGDELETEBLOCKCOUNT : 2
-   * #deleted#1595596644098 : 1595596644098
-   * #deleted#1595596644101 : 1595596644101
-   * #deleting#1595596644028 : 1595596644028
-   * #deleting#1595596644096 : 1595596644096
-   * 1595596644103 : <blockdata>
-   * 1595596644105 : <blockdata>
+   * #deleted#1596029079371 : 1596029079371
+   * #deleted#1596029079374 : 1596029079374
+   * #deleting#1596029079378 : <block_data>
+   * #deleting#1596029079380 : <block_data>
+   * 1596029079382 : <block_data>
+   * 1596029079385 : <block_data>
    */
   private static class TestDB {
     // Non configurable properties of the files.
@@ -329,7 +329,7 @@ public class TestSchemaOneBackwardsCompatibility {
 
     public static final String SCHEMA_VERSION = OzoneConsts.SCHEMA_V1;
     public static final long KEY_COUNT = 2;
-    public static final long BYTES_USED = 600;
+    public static final long BYTES_USED = 200;
     public static final long NUM_PENDING_DELETION_BLOCKS = 2;
     public static final long NUM_DELETED_BLOCKS = 2;
 
