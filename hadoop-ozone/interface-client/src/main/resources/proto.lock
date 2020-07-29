@@ -426,7 +426,7 @@
               },
               {
                 "name": "PARTIAL_RENAME",
-                "integer": 64
+                "integer": 65
               }
             ]
           },
