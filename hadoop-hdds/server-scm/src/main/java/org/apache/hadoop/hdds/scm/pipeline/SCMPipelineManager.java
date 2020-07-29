@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -55,6 +56,8 @@ import org.apache.hadoop.util.Time;
 import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE;
 
 /**
  * Implements api needed for management of pipelines. All the write operations
@@ -272,8 +275,15 @@ public class SCMPipelineManager implements PipelineManager {
       recordMetricsForPipeline(pipeline);
       return pipeline;
     } catch (IOException ex) {
-      LOG.error("Failed to create pipeline of type {} and factor {}. " +
-          "Exception: {}", type, factor, ex.getMessage());
+      if (ex instanceof SCMException &&
+          ((SCMException) ex).getResult() == FAILED_TO_FIND_SUITABLE_NODE) {
+        // Avoid spam SCM log with errors when SCM has enough open pipelines
+        LOG.debug("Can't create more pipelines of type {} and factor {}. " +
+            "Reason: {}", type, factor, ex.getMessage());
+      } else {
+        LOG.error("Failed to create pipeline of type {} and factor {}. " +
+            "Exception: {}", type, factor, ex.getMessage());
+      }
       metrics.incNumPipelineCreationFailed();
       throw ex;
     } finally {
