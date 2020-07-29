@@ -31,7 +31,7 @@ import org.apache.hadoop.ozone.insight.Component.Type;
 /**
  * Utilities to handle pipelines.
  */
-public class PipelineComponentUtil {
+public final class PipelineComponentUtil {
 
   public static final String PIPELINE_FILTER = "pipeline";
 

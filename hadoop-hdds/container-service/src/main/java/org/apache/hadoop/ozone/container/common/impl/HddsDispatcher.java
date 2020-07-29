@@ -164,7 +164,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   @Override
   public ContainerCommandResponseProto dispatch(
       ContainerCommandRequestProto msg, DispatcherContext dispatcherContext) {
-    String spanName = "HddsDispatcher." + msg.getCmdType().name();
     try {
       return dispatcher.processRequest(msg,
           req -> dispatchRequest(msg, dispatcherContext),
