@@ -93,10 +93,10 @@ public class TestContainerReplicationEndToEnd {
 
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL,
         containerReportInterval, TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, containerReportInterval,
-        TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL,
+        5 * containerReportInterval, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL,
-        2 * containerReportInterval, TimeUnit.MILLISECONDS);
+        10 * containerReportInterval, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 1000,
         TimeUnit.SECONDS);
     DatanodeRatisServerConfig ratisServerConfig =
@@ -170,7 +170,7 @@ public class TestContainerReplicationEndToEnd {
         cluster.getStorageContainerManager().getContainerManager()
             .getContainer(new ContainerID(containerID)).getState();
     LoggerFactory.getLogger(TestContainerReplicationEndToEnd.class).info(
-        "Current Container State is " + containerState);
+        "Current Container State is {}",  containerState);
     if ((containerState != HddsProtos.LifeCycleState.CLOSING) &&
         (containerState != HddsProtos.LifeCycleState.CLOSED)) {
       cluster.getStorageContainerManager().getContainerManager()
