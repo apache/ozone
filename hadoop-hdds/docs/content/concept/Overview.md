@@ -4,6 +4,8 @@ date: "2017-10-10"
 weight: 1
 menu: 
   main:
+     name: "ArchitectureOverview"
+     title: "Overview"
      parent: Architecture
 summary: Ozone's overview and components that make up Ozone.
 ---
