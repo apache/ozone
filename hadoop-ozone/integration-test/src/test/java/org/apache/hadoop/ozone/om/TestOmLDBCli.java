@@ -43,7 +43,6 @@ import java.util.ArrayList;
  * This class tests the Debug LDB CLI that reads from an om.db file.
  */
 public class TestOmLDBCli {
-  private MiniOzoneCluster cluster = null;
   private OzoneConfiguration conf;
 
   private RDBParser rdbParser;
