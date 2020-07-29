@@ -37,6 +37,28 @@ create_results_dir() {
   chmod ogu+w "$RESULT_DIR"
 }
 
+## @description find all the test.sh scripts in the immediate child dirs
+find_tests(){
+  if [[ -n "${OZONE_ACCEPTANCE_SUITE}" ]]; then
+     tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$" | sort)
+
+     # 'misc' is default suite, add untagged tests, too
+    if [[ "misc" == "${OZONE_ACCEPTANCE_SUITE}" ]]; then
+       untagged="$(find . -mindepth 2 -maxdepth 2 -name test.sh | xargs grep -L "^#suite:")"
+       if [[ -n "${untagged}" ]]; then
+         tests=$(echo ${tests} ${untagged} | xargs -n1 | sort)
+       fi
+     fi
+
+    if [[ -z "${tests}" ]]; then
+       echo "No tests found for suite ${OZONE_ACCEPTANCE_SUITE}"
+       exit 1
+  fi
+  else
+    tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | grep "${OZONE_TEST_SELECTOR:-""}" | sort)
+  fi
+  echo $tests
+}
 
 ## @description wait until safemode exit (or 180 seconds)
 wait_for_safemode_exit(){

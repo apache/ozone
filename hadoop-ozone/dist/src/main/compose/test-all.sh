@@ -25,30 +25,15 @@ PROJECT_DIR="$SCRIPT_DIR/.."
 mkdir -p "$ALL_RESULT_DIR"
 rm "$ALL_RESULT_DIR/*" || true
 
+source "$SCRIPT_DIR"/testlib.sh
+
 if [ "$OZONE_WITH_COVERAGE" ]; then
    java -cp "$PROJECT_DIR"/share/coverage/$(ls "$PROJECT_DIR"/share/coverage | grep test-util):"$PROJECT_DIR"/share/coverage/jacoco-core.jar org.apache.hadoop.test.JacocoServer &
    DOCKER_BRIDGE_IP=$(docker network inspect bridge --format='{{(index .IPAM.Config 0).Gateway}}')
    export HADOOP_OPTS="-javaagent:share/coverage/jacoco-agent.jar=output=tcpclient,address=$DOCKER_BRIDGE_IP,includes=org.apache.hadoop.ozone.*:org.apache.hadoop.hdds.*:org.apache.hadoop.fs.ozone.*"
 fi
 
-if [[ -n "${OZONE_ACCEPTANCE_SUITE}" ]]; then
-  tests=$(find "$SCRIPT_DIR" -name test.sh | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$" | sort)
-
-  # 'misc' is default suite, add untagged tests, too
-  if [[ "misc" == "${OZONE_ACCEPTANCE_SUITE}" ]]; then
-    untagged="$(find "$SCRIPT_DIR" -name test.sh | xargs grep -L "^#suite:")"
-    if [[ -n "${untagged}" ]]; then
-      tests=$(echo ${tests} ${untagged} | xargs -n1 | sort)
-    fi
-  fi
-
-  if [[ -z "${tests}" ]]; then
-    echo "No tests found for suite ${OZONE_ACCEPTANCE_SUITE}"
-    exit 1
-  fi
-else
-  tests=$(find "$SCRIPT_DIR" -name test.sh | grep "${OZONE_TEST_SELECTOR:-""}" | sort)
-fi
+tests=$(find_tests)
 
 RESULT=0
 # shellcheck disable=SC2044
@@ -64,10 +49,12 @@ for t in ${tests}; do
       RESULT=1
       echo "ERROR: Test execution of ${d} is FAILED!!!!"
   fi
+  cd "$SCRIPT_DIR"
   RESULT_DIR="${d}/result"
-  TEST_DIR_NAME=$(basename ${d}
-  rebot -N $TEST_DIR_NAME -o "$ALL_RESULT_DIR"/$TEST_DIR_NAME.xml "$RESULT_DIR"/*.xml
-  cp "$RESULT_DIR"/docker-*.log "$RESULT_DIR"/*.out* "$ALL_RESULT_DIR"/
+  TEST_DIR_NAME=$(basename ${d})
+  rebot -N $TEST_DIR_NAME -o "$ALL_RESULT_DIR"/$TEST_DIR_NAME.xml "$RESULT_DIR"/"*.xml"
+  cp "$RESULT_DIR"/docker-*.log "$ALL_RESULT_DIR"/
+  cp "$RESULT_DIR"/*.out* "$ALL_RESULT_DIR"/ || true
 done
 
 rebot -N acceptance -d "$ALL_RESULT_DIR" "$ALL_RESULT_DIR"/*.xml
