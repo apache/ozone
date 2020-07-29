@@ -35,13 +35,6 @@ through goofys.
 
 If you don't have an Ozone cluster on kubernetes, you can reference [Kubernetes]({{< ref "start/Kubernetes.md" >}}) to create one. Use the resources from `kubernetes/examples/ozone` where you can find all the required Kubernetes resources to run cluster together with the dedicated Ozone CSI daemon (check `kubernetes/examples/ozone/csi`)   
 
-You should check if you already have a name of `/s3v` volume, if not create it by execute follow command:
-
-```bash
-kubectl exec -it  scm-0  bash
-[hadoop@scm-0 ~]$ ozone sh vol create s3v
-```
-
 Now, create the CSI related resources by execute the follow command.
 
 ```bash
