@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -97,7 +98,8 @@ public class TestOzoneFileInterfaces {
    */
   @Parameters
   public static Collection<Object[]> data() {
-    return Arrays.asList(new Object[][] {{false, true}, {true, false}});
+    return Arrays.asList(new Object[][] {{false, true, true},
+        {true, false, false}});
   }
 
   private boolean setDefaultFs;
@@ -118,10 +120,13 @@ public class TestOzoneFileInterfaces {
 
   private OMMetrics omMetrics;
 
+  private boolean enableFileSystemPaths;
+
   public TestOzoneFileInterfaces(boolean setDefaultFs,
-      boolean useAbsolutePath) {
+      boolean useAbsolutePath, boolean enabledFileSystemPaths) {
     this.setDefaultFs = setDefaultFs;
     this.useAbsolutePath = useAbsolutePath;
+    this.enableFileSystemPaths = enabledFileSystemPaths;
     GlobalStorageStatistics.INSTANCE.reset();
   }
 
@@ -131,6 +136,8 @@ public class TestOzoneFileInterfaces {
     bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
 
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+        enableFileSystemPaths);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
