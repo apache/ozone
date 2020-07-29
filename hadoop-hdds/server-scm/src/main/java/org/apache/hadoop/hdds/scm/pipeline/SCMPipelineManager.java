@@ -661,6 +661,16 @@ public class SCMPipelineManager implements PipelineManager {
     pipelineFactory.shutdown();
   }
 
+  /**
+   * returns max count of healthy volumes from the set of
+   * datanodes constituting the pipeline.
+   * @param  pipeline
+   * @return healthy volume count
+   */
+  public int getNumHealthyVolumes(Pipeline pipeline) {
+    return nodeManager.getNumHealthyVolumes(pipeline.getNodes());
+  }
+
   protected ReadWriteLock getLock() {
     return lock;
   }
