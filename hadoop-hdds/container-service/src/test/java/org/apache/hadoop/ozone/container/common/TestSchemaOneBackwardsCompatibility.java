@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.common;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -51,6 +52,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL;
 import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -187,9 +189,10 @@ public class TestSchemaOneBackwardsCompatibility {
       // Blocks marked with #deleting# prefix should be deleted.
       assertEquals(TestDB.NUM_PENDING_DELETION_BLOCKS - numBlocksToDelete,
               countDeletingBlocks(refCountedDB));
+      assertEquals(TestDB.NUM_DELETED_BLOCKS + numBlocksToDelete,
+              countDeletedBlocks(refCountedDB));
 
-      // All other blocks should remain unchanged.
-      assertEquals(TestDB.NUM_DELETED_BLOCKS, countDeletedBlocks(refCountedDB));
+      // Regular blocks should remain unchanged.
       assertEquals(TestDB.KEY_COUNT, countUnprefixedBlocks(refCountedDB));
 
       // Since metadata is being stored in the same table, make sure it is not
@@ -204,10 +207,13 @@ public class TestSchemaOneBackwardsCompatibility {
   }
 
   private void runBlockDeletingService() throws Exception {
+    conf.setInt(OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL, 10);
     conf.setInt(OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER, 2);
-    ContainerSet containerSet = makeContainerSet();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
+            metadataDir.getAbsolutePath());
 
-    OzoneContainer container = makeMockOzoneContainer(containerSet);
+    OzoneContainer container = makeMockOzoneContainer();
+
     BlockDeletingServiceTestImpl service =
             new BlockDeletingServiceTestImpl(container, 1000, conf);
     service.start();
@@ -224,16 +230,20 @@ public class TestSchemaOneBackwardsCompatibility {
     ContainerSet containerSet = new ContainerSet();
     KeyValueContainer container = new KeyValueContainer(kvData, conf);
 
-    String scmID = UUID.randomUUID().toString();
-    String clusterID = UUID.randomUUID().toString();
-    container.create(new MutableVolumeSet(scmID, clusterID, conf),
-            new RoundRobinVolumeChoosingPolicy(), scmID);
+//    String scmID = UUID.randomUUID().toString();
+//    String clusterID = UUID.randomUUID().toString();
+//    container.create(new MutableVolumeSet(scmID, clusterID, conf),
+//            new RoundRobinVolumeChoosingPolicy(), scmID);
     containerSet.addContainer(container);
+
+
 
     return containerSet;
   }
 
-  private OzoneContainer makeMockOzoneContainer(ContainerSet containerSet) {
+  private OzoneContainer makeMockOzoneContainer() throws Exception {
+    ContainerSet containerSet = makeContainerSet();
+
     OzoneContainer ozoneContainer = mock(OzoneContainer.class);
     when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
     when(ozoneContainer.getWriteChannel()).thenReturn(null);
@@ -241,6 +251,7 @@ public class TestSchemaOneBackwardsCompatibility {
     when(ozoneContainer.getDispatcher()).thenReturn(dispatcher);
     KeyValueHandler handler = mock(KeyValueHandler.class);
     when(dispatcher.getHandler(any())).thenReturn(handler);
+
     return ozoneContainer;
   }
 
@@ -260,6 +271,11 @@ public class TestSchemaOneBackwardsCompatibility {
             ContainerTestHelper.CONTAINER_MAX_SIZE, pipelineID, nodeID);
     kvData.setMetadataPath(metadataDir.getAbsolutePath());
     kvData.setDbFile(dbFile);
+
+    kvData.closeContainer();
+
+    // This must be set to some directory for the block deleting service to run.
+    kvData.setChunksPath(metadataDir.getAbsolutePath());
 
     Yaml yaml = ContainerDataYaml.getYamlForContainerType(
             kvData.getContainerType());
