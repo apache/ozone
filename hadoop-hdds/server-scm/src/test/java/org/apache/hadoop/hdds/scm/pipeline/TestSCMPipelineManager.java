@@ -76,6 +76,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.slf4j.event.Level.INFO;
 
 /**
  * Test cases to verify PipelineManager.
@@ -304,6 +305,8 @@ public class TestSCMPipelineManager {
         "NumPipelineCreationFailed", metrics);
     Assert.assertEquals(0, numPipelineCreateFailed);
 
+    LogCapturer logs = LogCapturer.captureLogs(SCMPipelineManager.getLog());
+    GenericTestUtils.setLogLevel(SCMPipelineManager.getLog(), INFO);
     //This should fail...
     try {
       pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
@@ -313,6 +316,10 @@ public class TestSCMPipelineManager {
       // pipeline creation failed this time.
       Assert.assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
           ioe.getResult());
+      Assert.assertFalse(logs.getOutput().contains(
+          "Failed to create pipeline of type"));
+    } finally {
+      logs.stopCapturing();
     }
 
     metrics = getMetrics(
