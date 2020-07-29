@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.volume;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
@@ -29,9 +30,12 @@ import java.io.IOException;
 
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
+
 /**
  * Response for set quota request.
  */
+@CleanupTableInfo(cleanupTables = {VOLUME_TABLE})
 public class OMVolumeSetQuotaResponse extends OMClientResponse {
   private OmVolumeArgs omVolumeArgs;
 
@@ -42,7 +46,7 @@ public class OMVolumeSetQuotaResponse extends OMClientResponse {
   }
 
   /**
-   * For when the request is not successful or it is a replay transaction.
+   * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
   public OMVolumeSetQuotaResponse(@Nonnull OMResponse omResponse) {
@@ -58,4 +62,5 @@ public class OMVolumeSetQuotaResponse extends OMClientResponse {
         omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
         omVolumeArgs);
   }
+
 }

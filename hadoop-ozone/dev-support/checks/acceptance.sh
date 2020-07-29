@@ -17,15 +17,18 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/acceptance"}
-mkdir -p "$REPORT_DIR"
 
 OZONE_VERSION=$(grep "<ozone.version>" "pom.xml" | sed 's/<[^>]*>//g'|  sed 's/^[ \t]*//')
 DIST_DIR="$DIR/../../dist/target/ozone-$OZONE_VERSION"
 
 if [ ! -d "$DIST_DIR" ]; then
     echo "Distribution dir is missing. Doing a full build"
-    "$DIR/build.sh"
+    "$DIR/build.sh" -Pcoverage
 fi
+
+mkdir -p "$REPORT_DIR"
+
+export OZONE_ACCEPTANCE_SUITE
 
 cd "$DIST_DIR/compose" || exit 1
 ./test-all.sh

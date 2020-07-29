@@ -34,11 +34,13 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
+import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_CHUNK;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,9 +64,11 @@ public class FilePerChunkStrategy implements ChunkManager {
       LoggerFactory.getLogger(FilePerChunkStrategy.class);
 
   private final boolean doSyncWrite;
+  private final BlockManager blockManager;
 
-  public FilePerChunkStrategy(boolean sync) {
+  public FilePerChunkStrategy(boolean sync, BlockManager manager) {
     doSyncWrite = sync;
+    blockManager = manager;
   }
 
   private static void checkLayoutVersion(Container container) {
@@ -218,17 +222,40 @@ public class FilePerChunkStrategy implements ChunkManager {
     long len = info.getLen();
     ByteBuffer data = ByteBuffer.allocate((int) len);
 
+    long chunkFileOffset = 0;
+    if (info.getOffset() != 0) {
+      try {
+        BlockData blockData = blockManager.getBlock(kvContainer, blockID);
+        List<ContainerProtos.ChunkInfo> chunks = blockData.getChunks();
+        String chunkName = info.getChunkName();
+        boolean found = false;
+        for (ContainerProtos.ChunkInfo chunk : chunks) {
+          if (chunk.getChunkName().equals(chunkName)) {
+            chunkFileOffset = chunk.getOffset();
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          throw new StorageContainerException(
+              "Cannot find chunk " + chunkName + " in block " +
+                  blockID.toString(), UNABLE_TO_FIND_CHUNK);
+        }
+      } catch (IOException e) {
+        throw new StorageContainerException(
+            "Cannot find block " + blockID.toString() + " for chunk " +
+                info.getChunkName(), UNABLE_TO_FIND_CHUNK);
+      }
+    }
+
     for (File file : possibleFiles) {
       try {
-        // use offset only if file written by old datanode
-        long offset;
-        if (file.exists() && file.length() == info.getOffset() + len) {
-          offset = info.getOffset();
-        } else {
-          offset = 0;
+        if (file.exists()) {
+          long offset = info.getOffset() - chunkFileOffset;
+          Preconditions.checkState(offset >= 0);
+          ChunkUtils.readData(file, data, offset, len, volumeIOStats);
+          return ChunkBuffer.wrap(data);
         }
-        ChunkUtils.readData(file, data, offset, len, volumeIOStats);
-        return ChunkBuffer.wrap(data);
       } catch (StorageContainerException ex) {
         //UNABLE TO FIND chunk is not a problem as we will try with the
         //next possible location

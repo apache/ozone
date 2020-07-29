@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -223,6 +224,16 @@ public interface OzoneManagerProtocol
    * @throws IOException
    */
   void deleteKey(OmKeyArgs args) throws IOException;
+
+  /**
+   * Deletes existing key/keys. This interface supports delete
+   * multiple keys and a single key. Used by deleting files
+   * through OzoneFileSystem.
+   *
+   * @param deleteKeys
+   * @throws IOException
+   */
+  void deleteKeys(OmDeleteKeys deleteKeys) throws IOException;
 
   /**
    * Deletes an existing empty bucket from volume.

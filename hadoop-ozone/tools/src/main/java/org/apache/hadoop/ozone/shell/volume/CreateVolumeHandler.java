@@ -37,7 +37,7 @@ import java.io.IOException;
 public class CreateVolumeHandler extends VolumeHandler {
 
   @Option(names = {"--user", "-u"},
-      description = "Owner of of the volume")
+      description = "Owner of the volume")
   private String ownerName;
 
   @Option(names = {"--quota", "-q"},

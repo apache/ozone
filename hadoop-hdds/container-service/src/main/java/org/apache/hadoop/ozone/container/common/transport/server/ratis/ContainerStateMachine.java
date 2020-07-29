@@ -38,7 +38,6 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Container2BCSIDMapProto;
@@ -104,7 +103,7 @@ import org.slf4j.LoggerFactory;
  * processed in 2 phases. The 2 phases are divided in
  * {@link #startTransaction(RaftClientRequest)}, in the first phase the user
  * data is written directly into the state machine via
- * {@link #writeStateMachineData} and in the second phase the
+ * {@link #write} and in the second phase the
  * transaction is committed via {@link #applyTransaction(TransactionContext)}
  *
  * For the requests with no stateMachine data, the transaction is directly
@@ -116,7 +115,7 @@ import org.slf4j.LoggerFactory;
  * the write chunk operation will fail otherwise as the container still hasn't
  * been created. Hence the create container operation has been split in the
  * {@link #startTransaction(RaftClientRequest)}, this will help in synchronizing
- * the calls in {@link #writeStateMachineData}
+ * the calls in {@link #write}
  *
  * 2) Write chunk commit operation is executed after write chunk state machine
  * operation. This will ensure that commit operation is sync'd with the state
@@ -162,7 +161,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     metrics = CSMMetrics.create(gid);
     this.writeChunkFutureMap = new ConcurrentHashMap<>();
     applyTransactionCompletionMap = new ConcurrentHashMap<>();
-    int numPendingRequests = OzoneConfiguration.of(conf)
+    int numPendingRequests = conf
         .getObject(DatanodeRatisServerConfig.class)
         .getLeaderNumPendingRequests();
     int pendingRequestsByteLimit = (int) conf.getStorageSize(
@@ -237,19 +236,25 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     // initialize the dispatcher with snapshot so that it build the missing
     // container list
+    buildMissingContainerSet(snapshotFile);
+    return last.getIndex();
+  }
+
+  @VisibleForTesting
+  public void buildMissingContainerSet(File snapshotFile) throws IOException {
+    // initialize the dispatcher with snapshot so that it build the missing
+    // container list
     try (FileInputStream fin = new FileInputStream(snapshotFile)) {
       ContainerProtos.Container2BCSIDMapProto proto =
-          ContainerProtos.Container2BCSIDMapProto
-              .parseFrom(fin);
+              ContainerProtos.Container2BCSIDMapProto
+                      .parseFrom(fin);
       // read the created containers list from the snapshot file and add it to
       // the container2BCSIDMap here.
       // container2BCSIDMap will further grow as and when containers get created
       container2BCSIDMap.putAll(proto.getContainer2BCSIDMap());
       dispatcher.buildMissingContainerSetAndValidate(container2BCSIDMap);
     }
-    return last.getIndex();
   }
-
   /**
    * As a part of taking snapshot with Ratis StateMachine, it will persist
    * the existing container set in the snapshotFile.
@@ -512,7 +517,7 @@ public class ContainerStateMachine extends BaseStateMachine {
    * and also with applyTransaction.
    */
   @Override
-  public CompletableFuture<Message> writeStateMachineData(LogEntryProto entry) {
+  public CompletableFuture<Message> write(LogEntryProto entry) {
     try {
       metrics.incNumWriteStateMachineOps();
       long writeStateMachineStartTime = Time.monotonicNowNanos();
@@ -613,7 +618,7 @@ public class ContainerStateMachine extends BaseStateMachine {
    * @return Combined future of all writeChunks till the log index given.
    */
   @Override
-  public CompletableFuture<Void> flushStateMachineData(long index) {
+  public CompletableFuture<Void> flush(long index) {
     List<CompletableFuture<ContainerCommandResponseProto>> futureList =
         writeChunkFutureMap.entrySet().stream().filter(x -> x.getKey() <= index)
             .map(Map.Entry::getValue).collect(Collectors.toList());
@@ -627,7 +632,7 @@ public class ContainerStateMachine extends BaseStateMachine {
    * evicted.
    */
   @Override
-  public CompletableFuture<ByteString> readStateMachineData(
+  public CompletableFuture<ByteString> read(
       LogEntryProto entry) {
     StateMachineLogEntryProto smLogEntryProto = entry.getStateMachineLogEntry();
     metrics.incNumReadStateMachineOps();
@@ -828,7 +833,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public CompletableFuture<Void> truncateStateMachineData(long index) {
+  public CompletableFuture<Void> truncate(long index) {
     stateMachineDataCache.removeIf(k -> k >= index);
     return CompletableFuture.completedFuture(null);
   }

@@ -88,12 +88,6 @@ public class OMKeyRemoveAclRequest extends OMKeyAclRequest {
         }
       }
       break;
-    case REPLAY:
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-            getOmRequest());
-      }
-      break;
     case FAILURE:
       LOG.error("Remove acl {} to path {} failed!", ozoneAcls, path, exception);
       break;

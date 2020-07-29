@@ -22,11 +22,13 @@ import java.util.Collection;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 
 /**
  * Configuration source to wrap Hadoop Configuration object.
  */
-public class LegacyHadoopConfigurationSource implements ConfigurationSource {
+public class LegacyHadoopConfigurationSource
+    implements MutableConfigurationSource {
 
   private Configuration configuration;
 

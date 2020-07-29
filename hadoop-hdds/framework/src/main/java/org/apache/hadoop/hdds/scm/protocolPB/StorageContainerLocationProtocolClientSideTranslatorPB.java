@@ -19,13 +19,19 @@ package org.apache.hadoop.hdds.scm.protocolPB;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.GetScmInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ActivatePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ClosePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerRequestProto;
@@ -457,6 +463,24 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         builder -> builder.setInSafeModeRequest(request))
         .getInSafeModeResponse().getInSafeMode();
 
+  }
+
+  @Override
+  public Map<String, Pair<Boolean, String>> getSafeModeRuleStatuses()
+      throws IOException {
+    GetSafeModeRuleStatusesRequestProto request =
+        GetSafeModeRuleStatusesRequestProto.getDefaultInstance();
+    GetSafeModeRuleStatusesResponseProto response =
+        submitRequest(Type.GetSafeModeRuleStatuses,
+            builder -> builder.setGetSafeModeRuleStatusesRequest(request))
+            .getGetSafeModeRuleStatusesResponse();
+    Map<String, Pair<Boolean, String>> map = new HashMap();
+    for (SafeModeRuleStatusProto statusProto :
+        response.getSafeModeRuleStatusesProtoList()) {
+      map.put(statusProto.getRuleName(),
+          Pair.of(statusProto.getValidate(), statusProto.getStatusText()));
+    }
+    return map;
   }
 
   /**

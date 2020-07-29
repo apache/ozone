@@ -295,6 +295,17 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
+   * Deletes keys through the list.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyNameList List of the Key
+   * @throws IOException
+   */
+  void deleteKeys(String volumeName, String bucketName,
+                  List<String> keyNameList)
+      throws IOException;
+
+  /**
    * Renames an existing key within a bucket.
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket

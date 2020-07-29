@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
@@ -114,30 +113,6 @@ public class TestOzoneManagerRestInterface {
     Assert.assertEquals(scmAddress.getHostName(), scmInfo.getHostname());
     Assert.assertEquals(scmAddress.getPort(),
         scmInfo.getPort(ServicePort.Type.RPC));
-
-    ServiceInfo datanodeInfo = serviceMap.get(HddsProtos.NodeType.DATANODE);
-    DatanodeDetails datanodeDetails = cluster.getHddsDatanodes().get(0)
-        .getDatanodeDetails();
-    Assert.assertEquals(datanodeDetails.getHostName(),
-        datanodeInfo.getHostname());
-
-    Map<ServicePort.Type, Integer> ports = datanodeInfo.getPorts();
-    for(ServicePort.Type type : ports.keySet()) {
-      switch (type) {
-      case HTTP:
-      case HTTPS:
-        Assert.assertEquals(
-            datanodeDetails.getPort(DatanodeDetails.Port.Name.REST).getValue(),
-            ports.get(type));
-        break;
-      default:
-        // OM only sends Datanode's info port details
-        // i.e. HTTP or HTTPS
-        // Other ports are not expected as of now.
-        Assert.fail();
-        break;
-      }
-    }
   }
 
 }

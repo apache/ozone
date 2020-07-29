@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.net;
 
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,7 +50,12 @@ public final class NetUtils {
    * If <i>path</i>is empty or null, then {@link NetConstants#ROOT} is returned
    */
   public static String normalize(String path) {
-    if (path == null || path.length() == 0) {
+    if (path == null) {
+      return NetConstants.ROOT;
+    }
+
+    int len = path.length();
+    if (len == 0) {
       return NetConstants.ROOT;
     }
 
@@ -60,8 +66,8 @@ public final class NetUtils {
     }
 
     // Remove any trailing NetConstants.PATH_SEPARATOR
-    return path.length() == 1 ? path :
-        TRAILING_PATH_SEPARATOR.matcher(path).replaceAll("");
+    return len == 1 ? path : StringUtils.removeEnd(path,
+        NetConstants.PATH_SEPARATOR_STR);
   }
 
   /**

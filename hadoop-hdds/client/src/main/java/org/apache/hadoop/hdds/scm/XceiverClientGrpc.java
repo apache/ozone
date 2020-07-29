@@ -298,7 +298,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     List<DatanodeDetails> datanodeList = null;
 
     DatanodeBlockID blockID = null;
-    if (request.getCmdType() == ContainerProtos.Type.ReadChunk) {
+    if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
+      blockID = request.getGetBlock().getBlockID();
+    } else if  (request.getCmdType() == ContainerProtos.Type.ReadChunk) {
       blockID = request.getReadChunk().getBlockID();
     } else if (request.getCmdType() == ContainerProtos.Type.GetSmallFile) {
       blockID = request.getGetSmallFile().getBlock().getBlockID();
@@ -314,15 +316,17 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           // Pull the Cached DN to the top of the DN list
           Collections.swap(datanodeList, 0, getBlockDNCacheIndex);
         }
-      } else if (topologyAwareRead) {
-        datanodeList = pipeline.getNodesInOrder();
       }
     }
     if (datanodeList == null) {
-      datanodeList = pipeline.getNodes();
-      // Shuffle datanode list so that clients do not read in the same order
-      // every time.
-      Collections.shuffle(datanodeList);
+      if (topologyAwareRead) {
+        datanodeList = pipeline.getNodesInOrder();
+      } else {
+        datanodeList = pipeline.getNodes();
+        // Shuffle datanode list so that clients do not read in the same order
+        // every time.
+        Collections.shuffle(datanodeList);
+      }
     }
 
     for (DatanodeDetails dn : datanodeList) {
@@ -421,7 +425,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     }
   }
 
-  private XceiverClientReply sendCommandAsync(
+  @VisibleForTesting
+  public XceiverClientReply sendCommandAsync(
       ContainerCommandRequestProto request, DatanodeDetails dn)
       throws IOException, InterruptedException {
     checkOpen(dn, request.getEncodedToken());

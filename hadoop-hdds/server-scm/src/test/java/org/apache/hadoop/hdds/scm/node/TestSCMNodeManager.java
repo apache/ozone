@@ -1182,6 +1182,8 @@ public class TestSCMNodeManager {
       List<DatanodeDetails> nodeList = nodeManager.getAllNodes();
       nodeList.stream().forEach(node ->
           Assert.assertTrue(node.getNetworkLocation().startsWith("/rack1/ng")));
+      nodeList.stream().forEach(node ->
+          Assert.assertTrue(node.getParent() != null));
     }
   }
 

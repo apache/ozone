@@ -119,7 +119,7 @@ public class KeyValueHandler extends Handler {
     super(config, datanodeId, contSet, volSet, metrics, icrSender);
     containerType = ContainerType.KeyValueContainer;
     blockManager = new BlockManagerImpl(config);
-    chunkManager = ChunkManagerFactory.createChunkManager(config);
+    chunkManager = ChunkManagerFactory.createChunkManager(config, blockManager);
     try {
       volumeChoosingPolicy = conf.getClass(
           HDDS_DATANODE_VOLUME_CHOOSING_POLICY, RoundRobinVolumeChoosingPolicy

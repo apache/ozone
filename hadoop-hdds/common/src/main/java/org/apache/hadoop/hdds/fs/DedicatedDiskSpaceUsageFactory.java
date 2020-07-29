@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 /**
  * Uses DedicatedDiskSpaceUsage for all volumes.  Does not save results since
@@ -40,7 +39,7 @@ public class DedicatedDiskSpaceUsageFactory implements SpaceUsageCheckFactory {
   @Override
   public SpaceUsageCheckFactory setConfiguration(
       ConfigurationSource configuration) {
-    conf = OzoneConfiguration.of(configuration).getObject(Conf.class);
+    conf = configuration.getObject(Conf.class);
     return this;
   }
 

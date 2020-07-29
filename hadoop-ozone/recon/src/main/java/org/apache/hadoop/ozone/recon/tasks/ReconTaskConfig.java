@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import java.util.concurrent.TimeUnit;
+import java.time.Duration;
 
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
@@ -32,38 +32,38 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 public class ReconTaskConfig {
 
   @Config(key = "pipelinesync.interval",
-      type = ConfigType.TIME, timeUnit = TimeUnit.SECONDS,
+      type = ConfigType.TIME,
       defaultValue = "600s",
       tags = { ConfigTag.RECON, ConfigTag.OZONE },
       description = "The time interval of periodic sync of pipeline state " +
           "from SCM to Recon."
   )
-  private long pipelineSyncTaskInterval;
+  private long pipelineSyncTaskInterval = Duration.ofMinutes(10).toMillis();
 
-  public long getPipelineSyncTaskInterval() {
-    return pipelineSyncTaskInterval;
+  public Duration getPipelineSyncTaskInterval() {
+    return Duration.ofMillis(pipelineSyncTaskInterval);
   }
 
-  public void setPipelineSyncTaskInterval(long pipelineSyncTaskInterval) {
-    this.pipelineSyncTaskInterval = pipelineSyncTaskInterval;
+  public void setPipelineSyncTaskInterval(Duration interval) {
+    this.pipelineSyncTaskInterval = interval.toMillis();
   }
 
   @Config(key = "missingcontainer.interval",
-      type = ConfigType.TIME, timeUnit = TimeUnit.SECONDS,
+      type = ConfigType.TIME,
       defaultValue = "300s",
       tags = { ConfigTag.RECON, ConfigTag.OZONE },
       description = "The time interval of the periodic check for " +
           "containers with zero replicas in the cluster as reported by " +
           "Datanodes."
   )
-  private long missingContainerTaskInterval;
+  private long missingContainerTaskInterval = Duration.ofMinutes(5).toMillis();
 
-  public long getMissingContainerTaskInterval() {
-    return missingContainerTaskInterval;
+  public Duration getMissingContainerTaskInterval() {
+    return Duration.ofMillis(missingContainerTaskInterval);
   }
 
-  public void setMissingContainerTaskInterval(long interval) {
-    this.missingContainerTaskInterval = interval;
+  public void setMissingContainerTaskInterval(Duration interval) {
+    this.missingContainerTaskInterval = interval.toMillis();
   }
 
 }

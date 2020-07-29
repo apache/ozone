@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
@@ -96,6 +97,9 @@ public abstract class CommonChunkManagerTestCases
 
     checkWriteIOStats(chunkInfo.getLen(), 1);
     checkReadIOStats(0, 0);
+    BlockData blockData = new BlockData(blockID);
+    blockData.addChunk(chunkInfo.getProtoBufMessage());
+    getBlockManager().putBlock(container, blockData);
 
     ByteBuffer expectedData = chunkManager
         .readChunk(container, blockID, chunkInfo, dispatcherContext)
@@ -175,13 +179,16 @@ public abstract class CommonChunkManagerTestCases
     ByteBuffer data = getData();
     DispatcherContext context = getDispatcherContext();
 
+    BlockData blockData = new BlockData(blockID);
     // WHEN
     for (int i = 0; i< count; i++) {
       ChunkInfo info = new ChunkInfo(String.format("%d.data.%d", localID, i),
           i * len, len);
       chunkManager.writeChunk(container, blockID, info, data, context);
       rewindBufferToDataStart();
+      blockData.addChunk(info.getProtoBufMessage());
     }
+    getBlockManager().putBlock(container, blockData);
 
     // THEN
     checkWriteIOStats(len * count, count);

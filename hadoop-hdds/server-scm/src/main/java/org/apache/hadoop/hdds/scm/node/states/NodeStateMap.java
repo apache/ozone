@@ -67,7 +67,7 @@ public class NodeStateMap {
    */
   private void initStateMap() {
     for (NodeState state : NodeState.values()) {
-      stateMap.put(state, new HashSet<>());
+      stateMap.put(state, ConcurrentHashMap.newKeySet());
     }
   }
 
@@ -88,7 +88,7 @@ public class NodeStateMap {
         throw new NodeAlreadyExistsException("Node UUID: " + id);
       }
       nodeMap.put(id, new DatanodeInfo(datanodeDetails));
-      nodeToContainer.put(id, new HashSet<>());
+      nodeToContainer.put(id, ConcurrentHashMap.newKeySet());
       stateMap.get(nodeState).add(id);
     } finally {
       lock.writeLock().unlock();

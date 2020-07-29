@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -45,6 +45,7 @@ import org.junit.rules.Timeout;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -96,27 +97,25 @@ public class TestBlockOutputStreamWithFailuresFlushDelay {
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
         StorageUnit.MB);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 3);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
-                    DatanodeRatisServerConfig.RATIS_SERVER_REQUEST_TIMEOUT_KEY,
-            3, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_SERVER_PREFIX_KEY + "." +
-                    DatanodeRatisServerConfig.
-                            RATIS_SERVER_WATCH_REQUEST_TIMEOUT_KEY,
-            3, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
-                    "rpc.request.timeout",
-            3, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
-                    "watch.request.timeout",
-            3, TimeUnit.SECONDS);
-    conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
-        + ".client.request.write.timeout", 30, TimeUnit.SECONDS);
-    conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
-        + ".client.request.watch.timeout", 30, TimeUnit.SECONDS);
+    DatanodeRatisServerConfig ratisServerConfig =
+        conf.getObject(DatanodeRatisServerConfig.class);
+    ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
+    ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(3));
+    conf.setFromObject(ratisServerConfig);
+
+    RatisClientConfig.RaftConfig raftClientConfig =
+        conf.getObject(RatisClientConfig.RaftConfig.class);
+    raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
+    raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(3));
+    conf.setFromObject(raftClientConfig);
+
+
+    RatisClientConfig ratisClientConfig =
+        conf.getObject(RatisClientConfig.class);
+    ratisClientConfig.setWriteRequestTimeout(Duration.ofSeconds(30));
+    ratisClientConfig.setWatchRequestTimeout(Duration.ofSeconds(30));
+    conf.setFromObject(ratisClientConfig);
+
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(7)
         .setTotalPipelineNumLimit(10).setBlockSize(blockSize)
         .setChunkSize(chunkSize).setStreamBufferFlushSize(flushSize)

@@ -79,15 +79,6 @@ public final class OzoneConfigKeys {
       "ozone.trace.enabled";
   public static final boolean OZONE_TRACE_ENABLED_DEFAULT = false;
 
-  public static final String OZONE_METADATA_STORE_IMPL =
-      "ozone.metastore.impl";
-  public static final String OZONE_METADATA_STORE_IMPL_LEVELDB =
-      "LevelDB";
-  public static final String OZONE_METADATA_STORE_IMPL_ROCKSDB =
-      "RocksDB";
-  public static final String OZONE_METADATA_STORE_IMPL_DEFAULT =
-      OZONE_METADATA_STORE_IMPL_ROCKSDB;
-
   public static final String OZONE_METADATA_STORE_ROCKSDB_STATISTICS =
       "ozone.metastore.rocksdb.statistics";
 
@@ -104,6 +95,9 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CONTAINER_CACHE_SIZE =
       "ozone.container.cache.size";
   public static final int OZONE_CONTAINER_CACHE_DEFAULT = 1024;
+  public static final String OZONE_CONTAINER_CACHE_LOCK_STRIPES =
+      "ozone.container.cache.lock.stripes";
+  public static final int OZONE_CONTAINER_CACHE_LOCK_STRIPES_DEFAULT = 1024;
 
   public static final String OZONE_SCM_BLOCK_SIZE =
       "ozone.scm.block.size";
@@ -248,10 +242,13 @@ public final class OzoneConfigKeys {
       = ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY;
   public static final String DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT
       = ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY;
-  public static final int DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT;
+  public static final String
+      DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_KEY
+      = ScmConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME;
+  public static final int
+      DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT
+      = ScmConfigKeys.
+      DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT;
   public static final String DFS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY
       = ScmConfigKeys.DFS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY;
   public static final ReplicationLevel
@@ -392,6 +389,10 @@ public final class OzoneConfigKeys {
   public static final String OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY =
       "ozone.s3.token.max.lifetime";
   public static final String OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY_DEFAULT = "3m";
+
+  public static final String OZONE_FS_ITERATE_BATCH_SIZE =
+      "ozone.fs.iterate.batch-size";
+  public static final int OZONE_FS_ITERATE_BATCH_SIZE_DEFAULT = 100;
 
   // Ozone Client Retry and Failover configurations
   public static final String OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY =

@@ -24,7 +24,6 @@ import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -93,14 +92,6 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
         throw new OMException(OMException.ResultCodes.KEY_NOT_FOUND);
       }
 
-      // Check if this transaction is a replay of ratis logs.
-      // If this is a replay, then the response has already been returned to
-      // the client. So take no further action and return a dummy
-      // OMClientResponse.
-      if (isReplay(ozoneManager, omKeyInfo, trxnLogIndex)) {
-        throw new OMReplayException();
-      }
-
       operationResult = apply(omKeyInfo, trxnLogIndex);
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
@@ -112,14 +103,9 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
       omClientResponse = onSuccess(omResponse, omKeyInfo, operationResult);
       result = Result.SUCCESS;
     } catch (IOException ex) {
-      if (ex instanceof OMReplayException) {
-        result = Result.REPLAY;
-        omClientResponse = onReplay(omResponse);
-      } else {
-        result = Result.FAILURE;
-        exception = ex;
-        omClientResponse = onFailure(omResponse, ex);
-      }
+      result = Result.FAILURE;
+      exception = ex;
+      omClientResponse = onFailure(omResponse, ex);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
@@ -168,10 +154,6 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
   OMClientResponse onFailure(OMResponse.Builder omResponse,
       IOException exception) {
     return new OMKeyAclResponse(createErrorOMResponse(omResponse, exception));
-  }
-
-  OMClientResponse onReplay(OMResponse.Builder omResponse) {
-    return new OMKeyAclResponse(createReplayOMResponse(omResponse));
   }
 
   /**
