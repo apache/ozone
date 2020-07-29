@@ -22,7 +22,6 @@ load ../../main/compose/testlib.sh
   [[ "$output" == "./test1/test.sh ./test2/test.sh ./test4/test.sh" ]]
 }
 
-load ../../main/compose/testlib.sh
 @test "Find test by suite" {
   OZONE_ACCEPTANCE_SUITE=one
   cd $BATS_TEST_DIRNAME
@@ -30,7 +29,6 @@ load ../../main/compose/testlib.sh
   [[ "$output" == "./test4/test.sh" ]]
 }
 
-load ../../main/compose/testlib.sh
 @test "Find test default suite" {
   OZONE_ACCEPTANCE_SUITE=misc
   cd $BATS_TEST_DIRNAME
