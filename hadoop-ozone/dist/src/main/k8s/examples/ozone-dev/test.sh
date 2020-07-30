@@ -34,5 +34,4 @@ combine_reports
 
 stop_k8s_env
 
-flekszible generate
-
+revert_resources

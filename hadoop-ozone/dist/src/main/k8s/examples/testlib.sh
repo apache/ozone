@@ -63,14 +63,14 @@ all_pods_are_running() {
 start_k8s_env() {
    print_phase "Deleting existing k8s resources"
    #reset environment
-   kubectl delete pvc --all
-   kubectl delete pv --all
    kubectl delete statefulset --all
    kubectl delete daemonset --all
    kubectl delete deployment --all
    kubectl delete service --all
    kubectl delete configmap --all
    kubectl delete pod --all
+   kubectl delete pvc --all
+   kubectl delete pv --all
 
    print_phase "Applying k8s resources from $1"
    kubectl apply -f .
@@ -84,6 +84,13 @@ stop_k8s_env() {
 }
 
 regenerate_resources() {
+  print_phase "Modifying Kubernetes resources file for test"
+  echo "   (mounting current Ozone directory to the containers, scheduling containers to one node, ...)"
+  echo ""
+  echo "WARNING: this test can be executed only with local Kubernetes cluster"
+  echo "   (source dir should be available from K8s nodes)"
+  echo ""
+
   PARENT_OF_PARENT=$(realpath ../..)
 
   if [ $(basename $PARENT_OF_PARENT) == "k8s" ]; then
@@ -95,6 +102,11 @@ regenerate_resources() {
   fi
 
   flekszible generate -t mount:hostPath="$OZONE_ROOT",path=/opt/hadoop -t image:image=apache/ozone-runner:20200420-1 -t ozone/onenode
+}
+
+revert_resources() {
+   print_phase "Regenerating original Kubernetes resource files"
+   flekszible generate
 }
 
 execute_robot_test() {
