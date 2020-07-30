@@ -79,11 +79,6 @@ public class TestHadoopNestedDirGenerator {
      * @throws IOException
      */
 
-    /**
-     * Below we have 5 datanodes because only 5 tests are activated
-     * As you need more tests increase the datanodes accordingly.
-     */
-
   private void startCluster() throws Exception {
     conf = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
