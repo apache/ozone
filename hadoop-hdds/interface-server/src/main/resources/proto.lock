@@ -1209,10 +1209,6 @@
               {
                 "name": "INTERNAL_ERROR",
                 "integer": 29
-              },
-              {
-                "name": "FAILED_TO_INIT_PIPELINE_CHOOSE_POLICY",
-                "integer": 30
               }
             ]
           },
