@@ -246,7 +246,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
       break;
     case FAILURE:
       ozoneManager.getMetrics().incNumKeyRenameFails();
-      LOG.error("Rename keys failed for auditMap:{}.", auditMap.toString());
+      LOG.error("Rename keys failed for auditMap:{}.", auditMap);
       break;
     default:
       LOG.error("Unrecognized Result for OMKeysRenameRequest: {}",
