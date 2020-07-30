@@ -14,13 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-
-#
-# Can be executed with bats (https://github.com/bats-core/bats-core)
-# bats k8s_testlib.bats (FROM THE CURRENT DIRECTORY)
-#
-
 export COUNTER=1
 
 pass_after_three_failures() {
@@ -39,7 +32,7 @@ pass_never() {
    return 255
 }
 
-source ../../main/k8s/examples/testlib.sh
+load ../../main/k8s/examples/testlib.sh
 
 @test "Test retry with passing function" {
    retry pass_first
