@@ -59,10 +59,15 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
+import org.apache.hadoop.ozone.recon.tasks.TableCountTask;
 import org.apache.hadoop.test.LambdaTestUtils;
+import org.hadoop.ozone.recon.schema.StatsSchemaDefinition;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
+import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
+import org.jooq.Configuration;
+import org.jooq.DSLContext;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -74,6 +79,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandom
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
+import static org.hadoop.ozone.recon.schema.tables.GlobalStatsTable.GLOBAL_STATS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.BDDMockito.given;
@@ -97,7 +103,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private UtilizationEndpoint utilizationEndpoint;
   private ReconOMMetadataManager reconOMMetadataManager;
   private FileSizeCountTask fileSizeCountTask;
+  private TableCountTask tableCountTask;
   private ReconStorageContainerManagerFacade reconScm;
+  private StatsSchemaDefinition statsSchemaDefinition;
   private boolean isSetupDone = false;
   private String pipelineId;
   private DatanodeDetails datanodeDetails;
@@ -166,17 +174,23 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     nodeEndpoint = reconTestInjector.getInstance(NodeEndpoint.class);
     pipelineEndpoint = reconTestInjector.getInstance(PipelineEndpoint.class);
-    clusterStateEndpoint =
-        reconTestInjector.getInstance(ClusterStateEndpoint.class);
     fileCountBySizeDao = getDao(FileCountBySizeDao.class);
+    GlobalStatsDao globalStatsDao = getDao(GlobalStatsDao.class);
     UtilizationSchemaDefinition utilizationSchemaDefinition =
         getSchemaDefinition(UtilizationSchemaDefinition.class);
+    statsSchemaDefinition = getSchemaDefinition(StatsSchemaDefinition.class);
+    Configuration sqlConfiguration =
+        reconTestInjector.getInstance(Configuration.class);
     utilizationEndpoint = new UtilizationEndpoint(
         fileCountBySizeDao, utilizationSchemaDefinition);
     fileSizeCountTask =
         new FileSizeCountTask(fileCountBySizeDao, utilizationSchemaDefinition);
+    tableCountTask = new TableCountTask(
+        globalStatsDao, sqlConfiguration, reconOMMetadataManager);
     reconScm = (ReconStorageContainerManagerFacade)
         reconTestInjector.getInstance(OzoneStorageContainerManager.class);
+    clusterStateEndpoint =
+        new ClusterStateEndpoint(reconScm, globalStatsDao);
   }
 
   @Before
@@ -305,6 +319,10 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     // key = key_three
     writeDataToOm(reconOMMetadataManager, "key_three");
+
+    DSLContext dslContext = statsSchemaDefinition.getDSLContext();
+    // Truncate global stats table before running each test
+    dslContext.truncate(GLOBAL_STATS);
   }
 
   private void testDatanodeResponse(DatanodeMetadata datanodeMetadata)
@@ -415,9 +433,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         (ClusterStateResponse) response.getEntity();
 
     Assert.assertEquals(1, clusterStateResponse.getPipelines());
-    Assert.assertEquals(2, clusterStateResponse.getVolumes());
-    Assert.assertEquals(2, clusterStateResponse.getBuckets());
-    Assert.assertEquals(3, clusterStateResponse.getKeys());
+    Assert.assertEquals(0, clusterStateResponse.getVolumes());
+    Assert.assertEquals(0, clusterStateResponse.getBuckets());
+    Assert.assertEquals(0, clusterStateResponse.getKeys());
     Assert.assertEquals(2, clusterStateResponse.getTotalDatanodes());
     Assert.assertEquals(2, clusterStateResponse.getHealthyDatanodes());
 
@@ -427,6 +445,16 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
           (ClusterStateResponse) response1.getEntity();
       return (clusterStateResponse1.getContainers() == 1);
     });
+
+    // check volume, bucket and key count after running table count task
+    Pair<String, Boolean> result =
+        tableCountTask.reprocess(reconOMMetadataManager);
+    assertTrue(result.getRight());
+    response = clusterStateEndpoint.getClusterState();
+    clusterStateResponse = (ClusterStateResponse) response.getEntity();
+    Assert.assertEquals(2, clusterStateResponse.getVolumes());
+    Assert.assertEquals(2, clusterStateResponse.getBuckets());
+    Assert.assertEquals(3, clusterStateResponse.getKeys());
   }
 
   @Test

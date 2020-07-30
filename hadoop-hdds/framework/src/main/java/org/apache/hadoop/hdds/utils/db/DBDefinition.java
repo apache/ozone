@@ -21,6 +21,10 @@ package org.apache.hadoop.hdds.utils.db;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Arrays;
+import java.util.Optional;
+import java.util.function.Function;
+
 /**
  * Simple interface to provide information to create a DBStore..
  */
@@ -43,4 +47,15 @@ public interface DBDefinition {
    */
   DBColumnFamilyDefinition[] getColumnFamilies();
 
+  default Optional<Class> getKeyType(String table) {
+    return Arrays.stream(getColumnFamilies()).filter(cf -> cf.getName().equals(
+        table)).map((Function<DBColumnFamilyDefinition, Class>)
+        DBColumnFamilyDefinition::getKeyType).findAny();
+  }
+
+  default Optional<Class> getValueType(String table) {
+    return Arrays.stream(getColumnFamilies()).filter(cf -> cf.getName().equals(
+        table)).map((Function<DBColumnFamilyDefinition, Class>)
+        DBColumnFamilyDefinition::getValueType).findAny();
+  }
 }
