@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -56,7 +57,7 @@ public class SchemaOneDeletedBlocksTable implements Table<String, NoData> {
 
   private Table<String, NoData> table;
 
-  public SchemaOneDeletedBlocksTable(TypedTable<String, NoData> table) {
+  public SchemaOneDeletedBlocksTable(Table<String, NoData> table) {
     this.table = table;
   }
 
@@ -156,7 +157,12 @@ public class SchemaOneDeletedBlocksTable implements Table<String, NoData> {
   }
 
   private static String prefix(String key) {
-    return key + DELETED_KEY_PREFIX;
+    String result = null;
+    if (key != null) {
+      result = DELETED_KEY_PREFIX + key;
+    }
+
+    return result;
   }
 
   private static MetadataKeyFilters.MetadataKeyFilter[] addDeletedFilter(
@@ -167,7 +173,7 @@ public class SchemaOneDeletedBlocksTable implements Table<String, NoData> {
     deletedFilter.addFilter(DELETED_KEY_PREFIX);
 
     List<MetadataKeyFilters.MetadataKeyFilter> newFilters =
-            Arrays.asList(currentFilters);
+            new ArrayList<>(Arrays.asList(currentFilters));
     newFilters.add(deletedFilter);
 
     return newFilters.toArray(new MetadataKeyFilters.MetadataKeyFilter[0]);

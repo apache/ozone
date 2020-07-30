@@ -144,7 +144,8 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
     store.compactDB();
   }
 
-  static void checkTableStatus(Table table, String name) throws IOException {
+  private static void checkTableStatus(Table<?, ?> table, String name)
+          throws IOException {
     String logMessage = "Unable to get a reference to %s table. Cannot " +
             "continue.";
     String errMsg = "Inconsistent DB state, Table - %s. Please check the" +

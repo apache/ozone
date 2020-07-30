@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.hdds.utils.db.Table;
 
 import java.io.IOException;
 
@@ -26,6 +28,7 @@ import java.io.IOException;
  * family.
  */
 public class DatanodeStoreSchemaOneImpl extends AbstractDatanodeStore {
+  private Table<String, NoData> deletedBlocksTable;
 
   /**
    * Constructs the metadata store and starts the DB Services.
@@ -36,5 +39,12 @@ public class DatanodeStoreSchemaOneImpl extends AbstractDatanodeStore {
   public DatanodeStoreSchemaOneImpl(ConfigurationSource config, String dbPath)
           throws IOException {
     super(config, new DatanodeSchemaOneDBDefinition(dbPath));
+  }
+
+  @Override
+  public Table<String, NoData> getDeletedBlocksTable() {
+    // Return a wrapper around the deleted blocks table to handle prefixes
+    // when all data is stored in a single table.
+    return new SchemaOneDeletedBlocksTable(super.getDeletedBlocksTable());
   }
 }
