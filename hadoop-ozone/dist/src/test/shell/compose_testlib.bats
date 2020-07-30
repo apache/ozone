@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -12,20 +13,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-name: comment-commands
 
-on:
-  issue_comment:
-    types:
-      - created
-      - edited
 
-jobs:
-  process-comment:
-    name: check-comment
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - run: ./.github/process-comment.sh
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+load ../../main/compose/testlib.sh
+@test "Find test recursive, only on one level" {
+  cd $BATS_TEST_DIRNAME
+  run find_tests
+  [[ "$output" == "./test1/test.sh ./test2/test.sh ./test4/test.sh" ]]
+}
+
+@test "Find test by suite" {
+  OZONE_ACCEPTANCE_SUITE=one
+  cd $BATS_TEST_DIRNAME
+  run find_tests
+  [[ "$output" == "./test4/test.sh" ]]
+}
+
+@test "Find test default suite" {
+  OZONE_ACCEPTANCE_SUITE=misc
+  cd $BATS_TEST_DIRNAME
+  run find_tests
+  [[ "$output" == "./test1/test.sh ./test2/test.sh" ]]
+}

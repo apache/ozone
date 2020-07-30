@@ -226,18 +226,25 @@ public class DatanodeStateMachine implements Closeable {
         nextHB.set(Time.monotonicNow() + heartbeatFrequency);
         context.execute(executorService, heartbeatFrequency,
             TimeUnit.MILLISECONDS);
-        now = Time.monotonicNow();
-        if (now < nextHB.get()) {
-          if(!Thread.interrupted()) {
-            Thread.sleep(nextHB.get() - now);
-          }
-        }
       } catch (InterruptedException e) {
         // Some one has sent interrupt signal, this could be because
         // 1. Trigger heartbeat immediately
         // 2. Shutdown has be initiated.
+        LOG.warn("Interrupt the execution.", e);
+        Thread.currentThread().interrupt();
       } catch (Exception e) {
         LOG.error("Unable to finish the execution.", e);
+      }
+
+      now = Time.monotonicNow();
+      if (now < nextHB.get()) {
+        if(!Thread.interrupted()) {
+          try {
+            Thread.sleep(nextHB.get() - now);
+          } catch (InterruptedException e) {
+            LOG.warn("Interrupt the execution.", e);
+          }
+        }
       }
     }
 
