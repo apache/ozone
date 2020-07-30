@@ -252,7 +252,15 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <configuration>
           <excludes>
             <exclude>**/hs_err*.log</exclude>
+            <exclude>**/.attach_*</exclude>
+            <exclude>**/**.rej</exclude>
+            <exclude>**/.factorypath</exclude>
+            <exclude>public</exclude>
+            <exclude>**/*.iml</exclude>
             <exclude>**/target/**</exclude>
+            <exclude>**/output.xml</exclude>
+            <exclude>**/log.html</exclude>
+            <exclude>**/report.html</exclude>
             <exclude>.gitattributes</exclude>
             <exclude>.idea/**</exclude>
             <exclude>src/main/resources/webapps/static/angular-1.7.9.min.js</exclude>
