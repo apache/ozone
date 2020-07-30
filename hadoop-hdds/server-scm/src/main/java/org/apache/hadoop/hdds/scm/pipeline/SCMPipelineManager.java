@@ -681,6 +681,16 @@ public class SCMPipelineManager implements PipelineManager {
     return nodeManager.getNumHealthyVolumes(pipeline.getNodes());
   }
 
+  /**
+   * returns max count of raft log volumes from the set of
+   * datanodes constituting the pipeline.
+   * @param  pipeline
+   * @return healthy volume count
+   */
+  public int getNumRaftLogVolumes(Pipeline pipeline) {
+    return nodeManager.getNumRaftLogVolumes(pipeline.getNodes());
+  }
+
   protected ReadWriteLock getLock() {
     return lock;
   }

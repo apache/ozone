@@ -363,6 +363,8 @@ public class SCMNodeManager implements NodeManager {
       DatanodeInfo datanodeInfo = nodeStateManager.getNode(datanodeDetails);
       if (nodeReport != null) {
         datanodeInfo.updateStorageReports(nodeReport.getStorageReportList());
+        datanodeInfo.updateMetaDataStorageReports(nodeReport.
+            getMetadataStorageReportList());
         metrics.incNumNodeReportProcessed();
       }
     } catch (NodeNotFoundException e) {
@@ -524,6 +526,26 @@ public class SCMNodeManager implements NodeManager {
       } catch (NodeNotFoundException e) {
         LOG.warn("Cannot generate NodeStat, datanode {} not found.",
                 dn.getUuid());
+      }
+    }
+    Preconditions.checkArgument(!volumeCountList.isEmpty());
+    return Collections.max(volumeCountList);
+  }
+
+  /**
+   * Returns the max of no raft log volumes reported out of the set
+   * of datanodes constituting the pipeline.
+   */
+  @Override
+  public int getNumRaftLogVolumes(List<DatanodeDetails> dnList) {
+    List<Integer> volumeCountList = new ArrayList<>(dnList.size());
+    for (DatanodeDetails dn : dnList) {
+      try {
+        volumeCountList.add(nodeStateManager.getNode(dn).
+            getRaftLogVolumeCount());
+      } catch (NodeNotFoundException e) {
+        LOG.warn("Cannot generate NodeStat, datanode {} not found.",
+            dn.getUuid());
       }
     }
     Preconditions.checkArgument(!volumeCountList.isEmpty());

@@ -365,6 +365,71 @@ public class TestBlockManager {
   }
 
   @Test
+  public void testBlockDistributionWithMultipleRaftLogDisks() throws Exception {
+    int threadCount = numContainerPerOwnerInPipeline *
+        numContainerPerOwnerInPipeline;
+    int numRaftLogVolumes = 2;
+    nodeManager.setNumHealthyVolumes(numContainerPerOwnerInPipeline);
+    nodeManager.setNumRaftLogVolumes(numRaftLogVolumes);
+    List<ExecutorService> executors = new ArrayList<>(threadCount);
+    for (int i = 0; i < threadCount; i++) {
+      executors.add(Executors.newSingleThreadExecutor());
+    }
+    pipelineManager.createPipeline(type, factor);
+    TestUtils.openAllRatisPipelines(pipelineManager);
+    Map<Long, List<AllocatedBlock>> allocatedBlockMap =
+        new ConcurrentHashMap<>();
+    List<CompletableFuture<AllocatedBlock>> futureList =
+        new ArrayList<>(threadCount);
+    for (int i = 0; i < threadCount; i++) {
+      final CompletableFuture<AllocatedBlock> future =
+          new CompletableFuture<>();
+      CompletableFuture.supplyAsync(() -> {
+        try {
+          List<AllocatedBlock> blockList;
+          AllocatedBlock block = blockManager
+              .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor,
+                  OzoneConsts.OZONE,
+                  new ExcludeList());
+          long containerId = block.getBlockID().getContainerID();
+          if (!allocatedBlockMap.containsKey(containerId)) {
+            blockList = new ArrayList<>();
+          } else {
+            blockList = allocatedBlockMap.get(containerId);
+          }
+          blockList.add(block);
+          allocatedBlockMap.put(containerId, blockList);
+          future.complete(block);
+        } catch (IOException e) {
+          future.completeExceptionally(e);
+        }
+        return future;
+      }, executors.get(i));
+      futureList.add(future);
+    }
+    try {
+      CompletableFuture
+          .allOf(futureList.toArray(
+              new CompletableFuture[futureList.size()])).get();
+      Assert.assertTrue(
+          pipelineManager.getPipelines(type).size() == 1);
+      Pipeline pipeline = pipelineManager.getPipelines(type).get(0);
+      // the pipeline per raft log disk config is set to 1 by default
+      int numContainers = (int)Math.ceil((double)
+              (numContainerPerOwnerInPipeline *
+                  numContainerPerOwnerInPipeline)/numRaftLogVolumes);
+      Assert.assertTrue(numContainers == pipelineManager.
+          getNumberOfContainers(pipeline.getId()));
+      Assert.assertTrue(
+          allocatedBlockMap.size() == numContainers);
+      Assert.assertTrue(allocatedBlockMap.
+          values().size() == numContainers);
+    } catch (Exception e) {
+      Assert.fail("testAllocateBlockInParallel failed");
+    }
+  }
+
+  @Test
   public void testAllocateOversizedBlock() throws Exception {
     long size = 6 * GB;
     thrown.expectMessage("Unsupported block size");

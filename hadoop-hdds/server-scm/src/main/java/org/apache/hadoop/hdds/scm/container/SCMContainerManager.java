@@ -68,6 +68,8 @@ public class SCMContainerManager implements ContainerManager {
 
   private final int numContainerPerVolume;
 
+  private final int numPipelinesPerRaftLogDisk;
+
   private final SCMContainerManagerMetrics scmContainerManagerMetrics;
 
   private Table<ContainerID, ContainerInfo> containerStore;
@@ -101,10 +103,22 @@ public class SCMContainerManager implements ContainerManager {
     this.numContainerPerVolume = conf
         .getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
             ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
+    this.numPipelinesPerRaftLogDisk = conf
+        .getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_PER_RAFT_LOG_DISK,
+            ScmConfigKeys.OZONE_SCM_PIPELINE_PER_RAFT_LOG_DISK_DEFAULT);
 
     loadExistingContainers();
 
     scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
+  }
+
+  private int getOpenContainerCountPerPipeline(Pipeline pipeline) {
+    int totalContainerCountPerDn = numContainerPerVolume *
+        pipelineManager.getNumHealthyVolumes(pipeline);
+    int totalPipelineCountPerDn = numPipelinesPerRaftLogDisk *
+        pipelineManager.getNumRaftLogVolumes(pipeline);
+    return (int) Math.ceil(
+        ((double) totalContainerCountPerDn / totalPipelineCountPerDn));
   }
 
   private void loadExistingContainers() throws IOException {
@@ -436,8 +450,7 @@ public class SCMContainerManager implements ContainerManager {
       synchronized (pipeline) {
         containerIDs = getContainersForOwner(pipeline, owner);
 
-        if (containerIDs.size() < numContainerPerVolume * pipelineManager.
-                getNumHealthyVolumes(pipeline)) {
+        if (containerIDs.size() < getOpenContainerCountPerPipeline(pipeline)) {
           containerInfo =
                   containerStateManager.allocateContainer(
                           pipelineManager, owner, pipeline);

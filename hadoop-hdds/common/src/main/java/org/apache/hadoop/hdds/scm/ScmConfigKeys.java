@@ -308,6 +308,10 @@ public final class ScmConfigKeys {
       OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY =
       "ozone.scm.keyvalue.container.deletion-choosing.policy";
 
+  public static final String OZONE_SCM_PIPELINE_PER_RAFT_LOG_DISK =
+      "ozone.scm.pipeline.per.raft.log.disk";
+
+  public static final int OZONE_SCM_PIPELINE_PER_RAFT_LOG_DISK_DEFAULT = 1;
   // Max timeout for pipeline to stay at ALLOCATED state before scrubbed.
   public static final String OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT =
       "ozone.scm.pipeline.allocated.timeout";

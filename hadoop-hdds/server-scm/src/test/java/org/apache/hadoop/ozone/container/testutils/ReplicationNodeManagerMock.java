@@ -348,4 +348,9 @@ public class ReplicationNodeManagerMock implements NodeManager {
   public int getNumHealthyVolumes(List<DatanodeDetails> dnList) {
     return 0;
   }
+
+  @Override
+  public int getNumRaftLogVolumes(List<DatanodeDetails> dnList) {
+    return 0;
+  }
 }

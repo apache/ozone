@@ -93,6 +93,7 @@ public class MockNodeManager implements NodeManager {
   private NetworkTopology clusterMap;
   private ConcurrentMap<String, Set<String>> dnsToUuidMap;
   private int numHealthyDisksPerDatanode;
+  private int numRaftLogDisksPerDatanode;
 
   public MockNodeManager(NetworkTopologyImpl clusterMap,
                          List<DatanodeDetails> nodes,
@@ -123,6 +124,7 @@ public class MockNodeManager implements NodeManager {
     safemode = false;
     this.commandMap = new HashMap<>();
     numHealthyDisksPerDatanode = 1;
+    numRaftLogDisksPerDatanode = 1;
   }
 
   public MockNodeManager(boolean initializeFakeNodes, int nodeCount) {
@@ -589,8 +591,17 @@ public class MockNodeManager implements NodeManager {
     return numHealthyDisksPerDatanode;
   }
 
+  @Override
+  public int getNumRaftLogVolumes(List<DatanodeDetails> dnList) {
+    return numRaftLogDisksPerDatanode;
+  }
+
   public void setNumHealthyVolumes(int value) {
     numHealthyDisksPerDatanode = value;
+  }
+
+  public void setNumRaftLogVolumes(int value) {
+    numRaftLogDisksPerDatanode = value;
   }
 
   /**
