@@ -47,6 +47,7 @@ public class TestOmLDBCli {
   private RDBParser rdbParser;
   private DBScanner dbScanner;
   private DBStore dbStore = null;
+  private static List<String> keyNames;
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -56,6 +57,7 @@ public class TestOmLDBCli {
     conf = new OzoneConfiguration();
     rdbParser = new RDBParser();
     dbScanner = new DBScanner();
+    keyNames = new ArrayList<>();
   }
 
   @After
@@ -65,7 +67,7 @@ public class TestOmLDBCli {
     }
   }
 
-  @Test(expected = IllegalArgumentException.class)
+  @Test
   public void testOMDB() throws Exception {
     File newFolder = folder.newFolder();
     if(!newFolder.exists()) {
@@ -88,30 +90,31 @@ public class TestOmLDBCli {
     }
     rdbParser.setDbPath(dbStore.getDbLocation().getAbsolutePath());
     dbScanner.setParent(rdbParser);
-    // list will store volumeNames/bucketNames/keyNames
-    List<String> keyNames = new ArrayList<>();
-    getKeyNames(dbScanner, "keyTable", keyNames);
-    Assert.assertEquals(5, keyNames.size());
-    Assert.assertTrue(keyNames.contains("key1"));
-    Assert.assertTrue(keyNames.contains("key5"));
-    Assert.assertFalse(keyNames.contains("key6"));
+    Assert.assertEquals(5, getKeyNames(dbScanner).size());
+    Assert.assertTrue(getKeyNames(dbScanner).contains("key1"));
+    Assert.assertTrue(getKeyNames(dbScanner).contains("key5"));
+    Assert.assertFalse(getKeyNames(dbScanner).contains("key6"));
     dbScanner.setLimit(1);
-    getKeyNames(dbScanner, "keyTable", keyNames);
-    Assert.assertEquals(1, keyNames.size());
+    Assert.assertEquals(1, getKeyNames(dbScanner).size());
     dbScanner.setLimit(-1);
-    getKeyNames(dbScanner, "keyTable", keyNames);
-    Assert.assertEquals(0, keyNames.size());
+    try {
+      getKeyNames(dbScanner);
+      Assert.fail("IllegalArgumentException is expected");
+    }catch (IllegalArgumentException e){
+      //ignore
+    }
   }
 
-  private static void getKeyNames(DBScanner dbScanner,
-      String tableName, List<String> entityNames) throws Exception {
-    dbScanner.setTableName(tableName);
+  private static List<String> getKeyNames(DBScanner dbScanner)
+      throws Exception {
+    keyNames.clear();
+    dbScanner.setTableName("keyTable");
     dbScanner.call();
-    entityNames.clear();
     Assert.assertFalse(dbScanner.getScannedObjects().isEmpty());
     for (Object o : dbScanner.getScannedObjects()){
       OmKeyInfo keyInfo = (OmKeyInfo)o;
-      entityNames.add(keyInfo.getKeyName());
+      keyNames.add(keyInfo.getKeyName());
     }
+    return keyNames;
   }
 }
