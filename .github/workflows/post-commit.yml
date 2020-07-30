@@ -242,11 +242,13 @@ jobs:
     name: kubernetes
     runs-on: ubuntu-18.04
     steps:
-      - uses: actions/cache@v2
+      - name: Cache for maven dependencies
+        uses: actions/cache@v2
         with:
           path: ~/.m2/repository
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
-      - uses: actions/cache@v2
+      - name: Cache for npm dependencies
+        uses: actions/cache@v2
         with:
           path: |
             ~/.pnpm-store
@@ -254,7 +256,7 @@ jobs:
           key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-
-      - name: checkout to /mnt/ozone
+      - name: Checkout to /mnt/ozone
         run: |
           sudo chmod 777 /mnt
           git clone 'https://github.com/${{ github.repository }}.git' /mnt/ozone
@@ -266,36 +268,38 @@ jobs:
           fi
           git checkout FETCH_HEAD
           git reset --hard
-      - name: install robotframework
+      - name: Install robotframework
         run: sudo pip install robotframework
-      - name: install k3s
+      - name: Install k3s
         run: curl -sfL https://get.k3s.io | sh -
-      - name: copy kubeconfig
+      - name: Copy Kubernetes config file
         run: |
           sudo mkdir ~/.kube
           sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
           sudo chown $(id -u) ~/.kube/config
-      - name: install flekszible
+      - name: Install flekszible
         run: |
           cd /tmp
           wget https://github.com/elek/flekszible/releases/download/v1.8.1/flekszible_1.8.1_Linux_x86_64.tar.gz -O - | tar -zx
           chmod +x flekszible
           sudo mv flekszible /usr/bin/flekszible
-      - name: run a full build
+      - name: Run a full build
         run: |
           cd /mnt/ozone
           hadoop-ozone/dev-support/checks/build.sh -Pcoverage
-      - name: execute test
+      - name: Execute tests
         run: |
           cd /mnt/ozone/hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
           cd /mnt/ozone && hadoop-ozone/dev-support/checks/kubernetes.sh
-      - uses: actions/upload-artifact@master
+      - name: Archive build results
+        uses: actions/upload-artifact@master
         if: always()
         with:
           name: kubernetes
           path: /mnt/ozone/target/kubernetes
         continue-on-error: true
-      - run: |
+      - name: Delete temporary build artifacts before caching
+        run: |
           #Never cache local artifacts
           rm -rf ~/.m2/repository/org/apache/hadoop/hdds
           rm -rf ~/.m2/repository/org/apache/hadoop/ozone
