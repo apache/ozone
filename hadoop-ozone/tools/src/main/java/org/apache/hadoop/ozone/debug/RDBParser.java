@@ -38,7 +38,7 @@ import picocli.CommandLine.Spec;
 public class RDBParser implements Callable<Void>, SubcommandWithParent {
 
   @Spec
-  CommandSpec spec;
+  private CommandSpec spec;
 
   @CommandLine.Option(names = {"--db"},
             description = "Database File Path")
