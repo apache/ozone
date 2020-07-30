@@ -466,11 +466,6 @@ public final class OzoneConfigKeys {
       "ozone.https.client.need-auth";
   public static final boolean OZONE_CLIENT_HTTPS_NEED_AUTH_DEFAULT = false;
 
-  public static final String OZONE_CLIENT_BUFFER_SIZE_KEY =
-      "ozone.client.buffer.size";
-  public static final String OZONE_CLIENT_BUFFER_SIZE_DEFAULT =
-      "4KB";
-
   /**
    * There is no need to instantiate this class.
    */

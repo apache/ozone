@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import javax.annotation.PostConstruct;
+import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -50,6 +51,7 @@ import java.util.Map;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
@@ -80,8 +82,8 @@ import org.apache.commons.io.IOUtils;
 
 import org.apache.commons.lang3.tuple.Pair;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_BUFFER_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_BUFFER_SIZE_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ENTITY_TOO_SMALL;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
@@ -120,11 +122,14 @@ public class ObjectEndpoint extends EndpointBase {
     customizableGetHeaders.add("Content-Encoding");
   }
 
+  @Inject
+  private OzoneConfiguration ozoneConfiguration;
+
   @PostConstruct
   public void init() {
-    bufferSize = (int) this.getClient().getConfiguration().getStorageSize(
-        OZONE_CLIENT_BUFFER_SIZE_KEY,
-        OZONE_CLIENT_BUFFER_SIZE_DEFAULT, StorageUnit.BYTES);
+    bufferSize = (int) ozoneConfiguration.getStorageSize(
+        OZONE_S3G_CLIENT_BUFFER_SIZE_KEY,
+        OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT, StorageUnit.BYTES);
   }
 
   /**

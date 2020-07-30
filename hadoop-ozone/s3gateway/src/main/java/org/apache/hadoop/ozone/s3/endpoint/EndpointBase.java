@@ -170,8 +170,4 @@ public class EndpointBase {
   public void setClient(OzoneClient ozoneClient) {
     this.client = ozoneClient;
   }
-
-  public OzoneClient getClient() {
-    return client;
-  }
 }
