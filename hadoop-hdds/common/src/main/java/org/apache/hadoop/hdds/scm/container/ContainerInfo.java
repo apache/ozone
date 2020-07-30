@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Comparator;
 
+import org.apache.hadoop.hdds.StorageClass;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
@@ -54,7 +55,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   private ReplicationFactor replicationFactor;
   @Deprecated
   private ReplicationType replicationType;
-  private String storageClass;
+  private StorageClass storageClass;
   private long usedBytes;
   private long numberOfKeys;
   private Instant lastUsed;
@@ -115,7 +116,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
       long sequenceId,
       ReplicationFactor replicationFactor,
       ReplicationType repType,
-      String storageClass) {
+      StorageClass storageClass) {
     this.containerID = containerID;
     this.pipelineID = pipelineID;
     this.usedBytes = usedBytes;
@@ -229,7 +230,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     return replicationType;
   }
 
-  public String getStorageClass() {
+  public StorageClass getStorageClass() {
     return storageClass;
   }
 
@@ -248,7 +249,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
         .setContainerID(getContainerID())
         .setDeleteTransactionId(getDeleteTransactionId())
         .setPipelineID(getPipelineID().getProtobuf())
-        .setStorageClass(getStorageClass())
+        .setStorageClass(getStorageClass().getName())
         .setOwner(getOwner())
         .build();
   }
@@ -400,7 +401,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     throw new IOException(SERIALIZATION_ERROR_MSG);
   }
 
-  public void setStorageClass(String sc) {
+  public void setStorageClass(StorageClass sc) {
     this.storageClass = sc;
   }
 
@@ -419,7 +420,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     private PipelineID pipelineID;
     private ReplicationFactor replicationFactor;
     private ReplicationType replicationType;
-    private String storageClass;
+    private StorageClass storageClass;
 
     public Builder setReplicationType(
         ReplicationType repType) {
@@ -478,7 +479,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
       return this;
     }
 
-    public Builder setStorageClass(String sc) {
+    public Builder setStorageClass(StorageClass sc) {
       this.storageClass = sc;
       return this;
     }

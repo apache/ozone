@@ -128,7 +128,7 @@ public class TestReconAsPassiveScm {
     ContainerManager reconContainerManager = reconScm.getContainerManager();
     ContainerInfo containerInfo =
         scmContainerManager.allocateContainer(
-            StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
+            StaticStorageClassRegistry.REDUCED_REDUNDANCY,
             "test");
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline =
@@ -169,7 +169,7 @@ public class TestReconAsPassiveScm {
     // Create container in SCM.
     ContainerInfo containerInfo =
         scmContainerManager.allocateContainer(
-            StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(), "test");
+            StaticStorageClassRegistry.REDUCED_REDUNDANCY, "test");
     long containerID = containerInfo.getContainerID();
     PipelineManager scmPipelineManager = scm.getPipelineManager();
     Pipeline pipeline =

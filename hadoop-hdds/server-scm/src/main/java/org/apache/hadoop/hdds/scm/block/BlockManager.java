@@ -21,6 +21,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 
+import org.apache.hadoop.hdds.StorageClass;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -46,7 +47,7 @@ public interface BlockManager extends Closeable,
    */
   AllocatedBlock allocateBlock(
       long size,
-      String storageClass,
+      StorageClass storageClass,
       String owner,
       ExcludeList excludeList) throws IOException;
 

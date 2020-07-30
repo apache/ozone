@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -411,7 +412,7 @@ public final class TestUtils {
       allocateContainer(ContainerManager containerManager)
       throws IOException {
     return containerManager
-        .allocateContainer("STANDARD", "root");
+        .allocateContainer(StaticStorageClassRegistry.STANDARD, "root");
 
   }
 
@@ -491,7 +492,7 @@ public final class TestUtils {
         .setReplicationType(HddsProtos.ReplicationType.RATIS)
         .setReplicationFactor(HddsProtos.ReplicationFactor.THREE)
         .setState(state)
-        .setStorageClass("STANDARD")
+        .setStorageClass(StaticStorageClassRegistry.STANDARD)
         .setSequenceId(10000L)
         .setOwner("TEST")
         .build();

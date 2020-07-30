@@ -152,7 +152,7 @@ public class OmMultipartKeyInfo extends WithObjectID {
     } else {
       storageClass = StorageClassConverter.convert(null,
           multipartKeyInfo.getFactor(),
-          multipartKeyInfo.getType());
+          multipartKeyInfo.getType()).getName();
     }
     return new OmMultipartKeyInfo(multipartKeyInfo.getUploadID(),
         multipartKeyInfo.getCreationTime(), storageClass, list,

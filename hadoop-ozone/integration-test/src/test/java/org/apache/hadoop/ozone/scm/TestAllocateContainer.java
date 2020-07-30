@@ -78,7 +78,7 @@ public class TestAllocateContainer {
             OzoneConsts.OZONE,
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)));
+                SCMTestUtils.getReplicationType(conf)).getName());
     Assert.assertNotNull(container);
     Assert.assertNotNull(container.getPipeline().getFirstNode());
 
@@ -91,6 +91,6 @@ public class TestAllocateContainer {
         null,
         StorageClassConverter.convert(null,
             SCMTestUtils.getReplicationFactor(conf),
-            SCMTestUtils.getReplicationType(conf)));
+            SCMTestUtils.getReplicationType(conf)).getName());
   }
 }

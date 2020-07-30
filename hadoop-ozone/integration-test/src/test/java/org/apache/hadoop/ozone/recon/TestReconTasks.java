@@ -106,7 +106,7 @@ public class TestReconTasks {
         (ReconContainerManager) reconScm.getContainerManager();
     ContainerInfo containerInfo =
         scmContainerManager.allocateContainer(
-            StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(), "test");
+            StaticStorageClassRegistry.REDUCED_REDUNDANCY, "test");
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline =
         scmPipelineManager.getPipeline(containerInfo.getPipelineID());

@@ -29,6 +29,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.StorageClass;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -254,7 +255,7 @@ public class SCMContainerManager implements ContainerManager {
    */
   @Override
   public ContainerInfo allocateContainer(
-      String storageClass,
+      StorageClass storageClass,
       final String owner
   )
       throws IOException {
@@ -415,25 +416,27 @@ public class SCMContainerManager implements ContainerManager {
    * @param pipeline     - Pipeline to which the container should belong.
    * @return ContainerInfo, null if there is no match found.
    */
+  @Override
   public ContainerInfo getMatchingContainer(
       final long sizeRequired,
       String owner,
-      String storageClassName,
+      StorageClass storageClass,
       Pipeline pipeline
   ) {
     return getMatchingContainer(
         sizeRequired,
         owner,
-        storageClassName,
+        storageClass,
         pipeline,
         Collections.emptySet());
   }
 
   @SuppressWarnings("squid:S2445")
+  @Override
   public ContainerInfo getMatchingContainer(
       final long sizeRequired,
       String owner,
-      String storageClassName,
+      StorageClass storageClass,
       Pipeline pipeline,
       Set<ContainerID> excludedContainers
   ) {
@@ -441,30 +444,30 @@ public class SCMContainerManager implements ContainerManager {
     ContainerInfo containerInfo;
     try {
       synchronized (pipeline) {
-        containerIDs = getContainersForOwner(storageClassName, pipeline, owner);
+        containerIDs = getContainersForOwner(storageClass, pipeline, owner);
 
         if (containerIDs.size() < numContainerPerOwnerInPipeline) {
           containerInfo =
               containerStateManager.allocateContainer(
-                  storageClassName, pipelineManager, owner, pipeline);
+                  storageClass, pipelineManager, owner, pipeline);
           // Add to DB
           addContainerToDB(containerInfo);
         } else {
           containerIDs.removeAll(excludedContainers);
           containerInfo =
-              containerStateManager.getMatchingContainer(storageClassName,
-                  sizeRequired, pipeline.getId(), containerIDs);
+              containerStateManager.getMatchingContainer(storageClass,
+                  sizeRequired, owner, pipeline.getId(), containerIDs);
           if (containerInfo == null) {
             containerInfo =
                 containerStateManager.
-                    allocateContainer(storageClassName, pipelineManager, owner,
-                        pipeline);
+                    allocateContainer(storageClass,
+                        pipelineManager, owner, pipeline);
             // Add to DB
             addContainerToDB(containerInfo);
           }
         }
         containerStateManager.updateLastUsedMap(pipeline.getId(),
-                containerInfo.containerID(), owner);
+                containerInfo.containerID(), owner, storageClass);
         // TODO: #CLUTIL cleanup entries in lastUsedMap
         return containerInfo;
       }
@@ -515,7 +518,7 @@ public class SCMContainerManager implements ContainerManager {
    * @return NavigableSet<ContainerID>
    */
   private NavigableSet<ContainerID> getContainersForOwner(
-      String storageClassName, Pipeline pipeline, String owner
+      StorageClass storageClass, Pipeline pipeline, String owner
   )
       throws IOException {
     NavigableSet<ContainerID> containerIDs =
@@ -525,7 +528,8 @@ public class SCMContainerManager implements ContainerManager {
       ContainerID cid = containerIDIterator.next();
       try {
         if (!getContainer(cid).getOwner().equals(owner) ||
-            !getContainer(cid).getStorageClass().equals(storageClassName)) {
+            !getContainer(cid).getStorageClass().getName().equals(
+                storageClass.getName())) {
           containerIDIterator.remove();
         }
       } catch (ContainerNotFoundException e) {

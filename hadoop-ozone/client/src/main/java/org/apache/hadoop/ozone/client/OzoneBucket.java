@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
+import org.apache.hadoop.hdds.StorageClass;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -368,16 +369,16 @@ public class OzoneBucket extends WithMetadata {
    * Creates a new key in the bucket.
    * @param key Name of the key to be created.
    * @param size Size of the data the key will point to.
-   * @param storageClass storage class name
+   * @param storageClassName storage class name
    * @return OzoneOutputStream to which the data has to be written.
    * @throws IOException
    */
   public OzoneOutputStream createKey(String key, long size,
-                                     String sc,
+                                     String storageClassName,
                                      Map<String, String> keyMetadata)
       throws IOException {
     return proxy
-        .createKey(volumeName, name, key, size, sc, keyMetadata);
+        .createKey(volumeName, name, key, size, storageClassName, keyMetadata);
   }
 
   /**
@@ -459,8 +460,7 @@ public class OzoneBucket extends WithMetadata {
   /**
    * Initiate multipart upload for a specified key.
    * @param keyName
-   * @param type
-   * @param factor
+   * @param sc
    * @return OmMultipartInfo
    * @throws IOException
    */
@@ -597,10 +597,10 @@ public class OzoneBucket extends WithMetadata {
    *                     invalid arguments
    */
   public OzoneOutputStream createFile(String keyName, long size,
-      String sc, boolean overWrite,
+      StorageClass sc, boolean overWrite,
       boolean recursive) throws IOException {
     return proxy
-        .createFile(volumeName, name, keyName, size, sc, overWrite,
+        .createFile(volumeName, name, keyName, size, sc.getName(), overWrite,
             recursive);
   }
 

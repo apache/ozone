@@ -108,7 +108,7 @@ public class TestSCMPipelineMetrics {
     AllocatedBlock block =
         cluster.getStorageContainerManager().getScmBlockManager()
             .allocateBlock(5,
-                StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
+                StaticStorageClassRegistry.REDUCED_REDUNDANCY,
                 "Test", new ExcludeList());
     MetricsRecordBuilder metrics =
         getMetrics(SCMPipelineMetrics.class.getSimpleName());

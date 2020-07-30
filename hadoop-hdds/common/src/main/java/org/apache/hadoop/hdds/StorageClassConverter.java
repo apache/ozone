@@ -33,7 +33,7 @@ public final class StorageClassConverter {
   private StorageClassConverter() {
   }
 
-  public static String convert(
+  public static StorageClass convert(
       ConfigurationSource conf,
       ReplicationFactor factor,
       ReplicationType type
@@ -50,22 +50,22 @@ public final class StorageClassConverter {
     }
 
     if (factor == ReplicationFactor.THREE && type == ReplicationType.RATIS) {
-      return StaticStorageClassRegistry.STANDARD.getName();
+      return StaticStorageClassRegistry.STANDARD;
     }
 
     if (factor == ReplicationFactor.ONE && type == ReplicationType.RATIS) {
-      return StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName();
+      return StaticStorageClassRegistry.REDUCED_REDUNDANCY;
     }
 
     if (factor == ReplicationFactor.ONE
         && type == ReplicationType.STAND_ALONE) {
-      return StaticStorageClassRegistry.LEGACY.getName();
+      return StaticStorageClassRegistry.LEGACY;
     }
 
-    return StaticStorageClassRegistry.STANDARD.getName();
+    return StaticStorageClassRegistry.STANDARD;
   }
 
-  public static String convert(OzoneConfiguration conf,
+  public static StorageClass convert(OzoneConfiguration conf,
       org.apache.hadoop.hdds.client.ReplicationFactor factor,
       org.apache.hadoop.hdds.client.ReplicationType type) {
     ReplicationFactor replicationFactor =
@@ -74,7 +74,7 @@ public final class StorageClassConverter {
     return convert(conf, replicationFactor, replicationType);
   }
 
-  public static String convert(OzoneConfiguration conf,
+  public static StorageClass convert(OzoneConfiguration conf,
       org.apache.hadoop.hdds.client.ReplicationFactor factor,
       ReplicationType type) {
     ReplicationFactor replicationFactor =
@@ -82,7 +82,7 @@ public final class StorageClassConverter {
     return convert(conf, replicationFactor, type);
   }
 
-  public static String convert(Pipeline pipeline) {
+  public static StorageClass convert(Pipeline pipeline) {
     return convert(null, pipeline.getFactor(), pipeline.getType());
   }
 }

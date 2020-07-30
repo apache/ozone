@@ -195,7 +195,7 @@ public final class TestOMRequestUtils {
         .setModificationTime(Time.now())
         .setDataSize(1000L)
         .setStorageClass(StorageClassConverter.convert(
-        null, replicationFactor, replicationType))
+        null, replicationFactor, replicationType).getName())
         .build();
   }
 
@@ -225,7 +225,7 @@ public final class TestOMRequestUtils {
         .setModificationTime(Time.now())
         .setDataSize(1000L)
         .setStorageClass(StorageClassConverter.convert(
-            null, replicationFactor, replicationType))
+            null, replicationFactor, replicationType).getName())
         .setObjectID(objectID)
         .setUpdateID(objectID)
         .build();

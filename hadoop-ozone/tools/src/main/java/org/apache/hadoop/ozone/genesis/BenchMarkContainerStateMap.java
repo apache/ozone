@@ -195,6 +195,6 @@ public class BenchMarkContainerStateMap {
     }
     bh.consume(state.stateMap
         .getMatchingContainerIDs(OPEN, OzoneConsts.OZONE,
-            StaticStorageClassRegistry.LEGACY.getName()));
+            StaticStorageClassRegistry.LEGACY));
   }
 }

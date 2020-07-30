@@ -84,7 +84,7 @@ public class TestSCMContainerManagerMetrics {
         "NumSuccessfulCreateContainers", metrics);
 
     ContainerInfo containerInfo = containerManager.allocateContainer(
-        StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(), OzoneConsts.OZONE);
+        StaticStorageClassRegistry.REDUCED_REDUNDANCY, OzoneConsts.OZONE);
 
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
     Assert.assertEquals(getLongCounter("NumSuccessfulCreateContainers",
@@ -92,7 +92,7 @@ public class TestSCMContainerManagerMetrics {
 
     try {
       containerManager.allocateContainer(
-          StaticStorageClassRegistry.STANDARD.getName(), OzoneConsts.OZONE);
+          StaticStorageClassRegistry.STANDARD, OzoneConsts.OZONE);
       fail("testContainerOpsMetrics failed");
     } catch (IOException ex) {
       // Here it should fail, so it should have the old metric value.

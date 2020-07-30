@@ -192,7 +192,7 @@ public class TestStorageContainerManager {
             .allocateContainer(
                 StorageClassConverter.convert(null,
                     HddsProtos.ReplicationFactor.ONE,
-                    SCMTestUtils.getReplicationType(ozoneConf)),
+                    SCMTestUtils.getReplicationType(ozoneConf)).getName(),
                 OzoneConsts.OZONE);
         if (expectPermissionDenied) {
           fail("Operation should fail, expecting an IOException here.");
@@ -208,7 +208,7 @@ public class TestStorageContainerManager {
             .allocateContainer(
                 StorageClassConverter.convert(null,
                     HddsProtos.ReplicationFactor.ONE,
-                    SCMTestUtils.getReplicationType(ozoneConf)),
+                    SCMTestUtils.getReplicationType(ozoneConf)).getName(),
                 OzoneConsts.OZONE);
         if (expectPermissionDenied) {
           fail("Operation should fail, expecting an IOException here.");

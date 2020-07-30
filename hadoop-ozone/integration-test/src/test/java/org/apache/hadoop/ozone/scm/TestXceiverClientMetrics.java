@@ -101,7 +101,7 @@ public class TestXceiverClientMetrics {
             StorageClassConverter.convert(
                 null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)));
+                SCMTestUtils.getReplicationType(conf)).getName());
     XceiverClientSpi client = clientManager
         .acquireClient(container.getPipeline());
 

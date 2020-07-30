@@ -114,7 +114,7 @@ public class OzoneClientKeyGenerator extends BaseFreonGenerator
     timer.time(() -> {
       try (OutputStream stream = bucket.createKey(key, keySize,
           StorageClassConverter.convert(
-              null, factor, ReplicationType.RATIS), metadata)) {
+              null, factor, ReplicationType.RATIS).getName(), metadata)) {
         contentGenerator.write(stream);
         stream.flush();
       }

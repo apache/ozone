@@ -120,7 +120,7 @@ public class BenchMarkSCM {
   public void allocateBlockBenchMark(BenchMarkSCM state,
       Blackhole bh) throws IOException {
     state.blockManager
-        .allocateBlock(50, StaticStorageClassRegistry.STANDARD.getName(),
+        .allocateBlock(50, StaticStorageClassRegistry.STANDARD,
             "Genesis", new ExcludeList());
   }
 }

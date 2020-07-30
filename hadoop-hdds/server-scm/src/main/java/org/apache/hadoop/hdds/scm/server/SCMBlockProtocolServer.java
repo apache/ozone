@@ -28,6 +28,9 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
+import org.apache.hadoop.hdds.StorageClass;
+import org.apache.hadoop.hdds.StorageClassRegistry;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -89,6 +92,8 @@ public class SCMBlockProtocolServer implements
   private final ProtocolMessageMetrics<ProtocolMessageEnum>
       protocolMessageMetrics;
 
+  private StorageClassRegistry storageClassRegistry;
+
   /**
    * The RPC server that listens to requests from block service clients.
    */
@@ -133,6 +138,9 @@ public class SCMBlockProtocolServer implements
         false)) {
       blockRpcServer.refreshServiceAcl(conf, SCMPolicyProvider.getInstance());
     }
+
+    // TODO(maobaolong): get the storageClassRegistry instance from config
+    storageClassRegistry = new StaticStorageClassRegistry();
   }
 
   public RPC.Server getBlockRpcServer() {
@@ -175,6 +183,7 @@ public class SCMBlockProtocolServer implements
       String owner,
       ExcludeList excludeList
   ) throws IOException {
+    StorageClass sc = storageClassRegistry.getStorageClass(storageClass);
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("size", String.valueOf(size));
     auditMap.put("storageClass", storageClass);
@@ -189,7 +198,7 @@ public class SCMBlockProtocolServer implements
     try {
       for (int i = 0; i < num; i++) {
         AllocatedBlock block = scm.getScmBlockManager()
-            .allocateBlock(size, storageClass, owner, excludeList);
+            .allocateBlock(size, sc, owner, excludeList);
         if (block != null) {
           blocks.add(block);
         }

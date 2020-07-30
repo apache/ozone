@@ -421,7 +421,8 @@ public final class OmKeyInfo extends WithObjectID {
       if (keyInfo.hasType()) {
         type = keyInfo.getType();
       }
-      storageClass = StorageClassConverter.convert(null, factor, type);
+      storageClass =
+          StorageClassConverter.convert(null, factor, type).getName();
     }
 
     Builder builder = new Builder()

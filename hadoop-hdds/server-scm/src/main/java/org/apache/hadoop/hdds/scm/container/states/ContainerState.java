@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container.states;
 
+import org.apache.hadoop.hdds.StorageClass;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
@@ -27,22 +28,25 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
  * Class that acts as the container state.
  */
 public class ContainerState {
-  private final String storageClass;
+  private final StorageClass storageClass;
   private final PipelineID pipelineID;
+  private final String owner;
 
   /**
    * Constructs a Container Key.
    *
-   * @param owner      - Container Owners
+   * @param storageClass - storageClass
    * @param pipelineID - ID of the pipeline
    */
-  public ContainerState(String storageClass, PipelineID pipelineID) {
+  public ContainerState(
+      StorageClass storageClass, String owner, PipelineID pipelineID) {
+    this.owner = owner;
     this.pipelineID = pipelineID;
     this.storageClass = storageClass;
   }
 
   public String getOwner() {
-    return storageClass;
+    return this.owner;
   }
 
   @Override

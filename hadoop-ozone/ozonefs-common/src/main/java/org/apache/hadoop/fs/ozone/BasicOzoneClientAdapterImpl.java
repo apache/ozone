@@ -203,13 +203,13 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
           || replication == ReplicationFactor.THREE.getValue()) {
         ReplicationFactor clientReplication = ReplicationFactor
             .valueOf(replication);
-        String sc = StorageClassConverter.convert(null, clientReplication,
+        StorageClass sc = StorageClassConverter.convert(null, clientReplication,
             storageClass.getOpenStateConfiguration().getReplicationType());
         ozoneOutputStream = bucket.createFile(key, 0, sc, overWrite,
             recursive);
       } else {
         ozoneOutputStream = bucket.createFile(key, 0,
-            storageClass.getName(), overWrite, recursive);
+            storageClass, overWrite, recursive);
       }
       return new OzoneFSOutputStream(ozoneOutputStream.getOutputStream());
     } catch (OMException ex) {

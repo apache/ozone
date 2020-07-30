@@ -97,7 +97,7 @@ public class TestGetCommittedBlockLengthAndPutKey {
             StorageClassConverter.convert(
                             null,
                 HddsProtos.ReplicationFactor.ONE,
-                SCMTestUtils.getReplicationType(ozoneConfig))
+                SCMTestUtils.getReplicationType(ozoneConfig)).getName()
             );
     long containerID = container.getContainerInfo().getContainerID();
     Pipeline pipeline = container.getPipeline();
@@ -135,7 +135,7 @@ public class TestGetCommittedBlockLengthAndPutKey {
             StorageClassConverter.convert(
                 null,
                 HddsProtos.ReplicationFactor.ONE,
-                SCMTestUtils.getReplicationType(ozoneConfig))
+                SCMTestUtils.getReplicationType(ozoneConfig)).getName()
         );
     long containerID = container.getContainerInfo().getContainerID();
     XceiverClientSpi client = xceiverClientManager

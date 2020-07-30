@@ -37,6 +37,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
+import org.apache.hadoop.hdds.StorageClassRegistry;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -194,6 +196,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private SCMContainerMetrics scmContainerMetrics;
   private SCMContainerPlacementMetrics placementMetrics;
   private MetricsSystem ms;
+  // TODO(baoloongmao): assign this froms configuration
+  private StorageClassRegistry storageClassRegistry =
+      new StaticStorageClassRegistry();
 
   /**
    *  Network topology Map.
@@ -1131,5 +1136,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       map.put(entry.getKey(), entry.getValue().getRight());
     }
     return map;
+  }
+
+  public StorageClassRegistry getStorageClassRegistry() {
+    return storageClassRegistry;
   }
 }

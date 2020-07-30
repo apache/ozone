@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container.states;
 
+import org.apache.hadoop.hdds.StorageClass;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
@@ -29,7 +30,7 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 public class ContainerQueryKey {
   private final HddsProtos.LifeCycleState state;
   private final String owner;
-  private final String storageClass;
+  private final StorageClass storageClass;
 
   @Override
   public boolean equals(Object o) {
@@ -46,7 +47,7 @@ public class ContainerQueryKey {
     return new EqualsBuilder()
         .append(getState(), that.getState())
         .append(getOwner(), that.getOwner())
-        .append(getStorageClass(), that.getStorageClass())
+        .append(getStorageClass().getName(), that.getStorageClass().getName())
         .isEquals();
   }
 
@@ -67,7 +68,7 @@ public class ContainerQueryKey {
    * @param storageClass - StorageClass
    */
   public ContainerQueryKey(HddsProtos.LifeCycleState state, String owner,
-      String storageClass) {
+      StorageClass storageClass) {
     this.state = state;
     this.owner = owner;
     this.storageClass = storageClass;
@@ -92,7 +93,7 @@ public class ContainerQueryKey {
   /**
    * Returns the storageClass of this specific container.
    */
-  public String getStorageClass() {
+  public StorageClass getStorageClass() {
     return storageClass;
   }
 }

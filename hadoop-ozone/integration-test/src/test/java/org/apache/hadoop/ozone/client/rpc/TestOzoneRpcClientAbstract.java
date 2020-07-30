@@ -2566,7 +2566,7 @@ public abstract class TestOzoneRpcClientAbstract {
       ReplicationType replicationType, ReplicationFactor replicationFactor)
       throws Exception {
     String storageClass = StorageClassConverter.convert(
-        null, replicationFactor, replicationType);
+        null, replicationFactor, replicationType).getName();
     OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName,
         storageClass);
 

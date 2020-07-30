@@ -25,9 +25,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.StorageClass;
-import org.apache.hadoop.hdds.StorageClassRegistry;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -61,7 +59,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /** Block Manager manages the block access for SCM. */
 public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   private static final Logger LOG =
@@ -80,10 +77,6 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
 
   private ObjectName mxBean;
   private SafeModePrecheck safeModePrecheck;
-
-  // TODO(baoloongmao): assign this froms configuration
-  private StorageClassRegistry storageClassRegistry =
-      new StaticStorageClassRegistry();
 
   /**
    * Constructor.
@@ -147,7 +140,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
    * Allocates a block in a container and returns that info.
    *
    * @param size             - Block Size
-   * @param storageClassName StorageClass
+   * @param storageClass     StorageClass
    * @param excludeList      List of datanodes/containers to exclude during
    *                         block
    *                         allocation.
@@ -157,12 +150,13 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   @Override
   public AllocatedBlock allocateBlock(
       final long size,
-      String storageClassName,
+      StorageClass storageClass,
       String owner,
       ExcludeList excludeList)
       throws IOException {
     if (LOG.isTraceEnabled()) {
-      LOG.trace("Size : {} , storageClassName : {} ", size, storageClassName);
+      LOG.trace("Size : {} , storageClassName : {} ", size,
+          storageClass.getName());
     }
     ScmUtils.preCheck(ScmOps.allocateBlock, safeModePrecheck);
     if (size < 0 || size > containerSize) {
@@ -186,9 +180,6 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     */
 
     ContainerInfo containerInfo;
-
-    final StorageClass storageClass =
-        storageClassRegistry.getStorageClass(storageClassName);
 
     final ReplicationFactor factor =
         storageClass.getOpenStateConfiguration().getReplicationFactor();
@@ -248,7 +239,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
 
       // look for OPEN containers that match the criteria.
       containerInfo = containerManager.getMatchingContainer(size, owner,
-          storageClassName, pipeline, excludeList.getContainerIds());
+          storageClass, pipeline, excludeList.getContainerIds());
 
       if (containerInfo != null) {
         return newBlock(containerInfo);

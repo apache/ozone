@@ -105,7 +105,7 @@ public final class TestHelper {
             org.apache.hadoop.hdds.client.ReplicationFactor.ONE :
             org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
     String storageClass =
-        StorageClassConverter.convert(null, factor, type);
+        StorageClassConverter.convert(null, factor, type).getName();
     return objectStore.getVolume(volumeName).getBucket(bucketName)
         .createKey(keyName, size, storageClass, new HashMap<>());
   }
@@ -116,7 +116,7 @@ public final class TestHelper {
       ObjectStore objectStore, String volumeName, String bucketName)
       throws Exception {
     String storageClass =
-        StorageClassConverter.convert(null, factor, type);
+        StorageClassConverter.convert(null, factor, type).getName();
     return objectStore.getVolume(volumeName).getBucket(bucketName)
         .createKey(keyName, size, storageClass, new HashMap<>());
   }

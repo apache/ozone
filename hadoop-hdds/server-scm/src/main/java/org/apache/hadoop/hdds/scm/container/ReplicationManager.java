@@ -35,9 +35,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.StorageClass;
-import org.apache.hadoop.hdds.StorageClassRegistry;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
@@ -141,9 +139,6 @@ public class ReplicationManager
    * Used for check datanode state.
    */
   private final NodeManager nodeManager;
-
-  private StorageClassRegistry storageClassRegistry =
-      new StaticStorageClassRegistry();
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -271,8 +266,7 @@ public class ReplicationManager
           .getContainerReplicas(container.containerID());
       final LifeCycleState state = container.getState();
 
-      StorageClass storageClass =
-          storageClassRegistry.getStorageClass(container.getStorageClass());
+      StorageClass storageClass = container.getStorageClass();
 
       /*
        * We don't take any action if the container is in OPEN state and

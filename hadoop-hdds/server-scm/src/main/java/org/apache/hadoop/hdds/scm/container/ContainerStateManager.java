@@ -26,10 +26,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.StorageClass;
 import org.apache.hadoop.hdds.StorageClass.OpenStateConfiguration;
-import org.apache.hadoop.hdds.StorageClassRegistry;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -125,10 +123,6 @@ public class ContainerStateManager {
   private final AtomicLong containerCount;
   private final AtomicLongMap<LifeCycleState> containerStateCount =
       AtomicLongMap.create();
-
-  // TODO(baoloongmao): assign this froms configuration
-  private StorageClassRegistry storageClassRegistry =
-      new StaticStorageClassRegistry();
 
   /**
    * Constructs a Container State Manager that tracks all containers owned by
@@ -247,18 +241,15 @@ public class ContainerStateManager {
    * Allocates a new container based on the type, replication etc.
    *
    * @param pipelineManager -- Pipeline Manager class.
-   * @param storageClassName    -- storageClass for the container.
+   * @param storageClass    -- storageClass for the container.
    * @return ContainerWithPipeline
    * @throws IOException on Failure.
    */
   ContainerInfo allocateContainer(
       final PipelineManager pipelineManager,
-      String storageClassName,
+      StorageClass storageClass,
       final String owner)
       throws IOException {
-
-    final StorageClass storageClass =
-        storageClassRegistry.getStorageClass(storageClassName);
 
     final OpenStateConfiguration openState =
         storageClass.getOpenStateConfiguration();
@@ -274,8 +265,9 @@ public class ContainerStateManager {
 
     boolean bgCreateOne = (type == ReplicationType.RATIS) && replicationFactor
         == ReplicationFactor.ONE && autoCreateRatisOne;
-    boolean bgCreateThree = (type == ReplicationType.RATIS) && replicationFactor
-        == ReplicationFactor.THREE;
+    boolean bgCreateThree =
+        (type == ReplicationType.RATIS) && replicationFactor
+            == ReplicationFactor.THREE;
 
     if (!pipelines.isEmpty() && (bgCreateOne || bgCreateThree)) {
       // let background create Ratis pipelines.
@@ -287,16 +279,17 @@ public class ContainerStateManager {
       } catch (IOException e) {
 
         if (pipelines.isEmpty()) {
-          throw new IOException("Could not allocate container. Cannot get any" +
-              " matching pipeline for Type:" + type +
-              ", Factor:" + replicationFactor + ", State:PipelineState.OPEN", e);
+          throw new IOException("Could not allocate container. Cannot get any"
+              + " matching pipeline for Type:" + type + ", Factor:"
+              + replicationFactor + ", State:PipelineState.OPEN", e);
         }
-        pipeline = pipelines.get((int) containerCount.get() % pipelines.size());
+        pipeline =
+            pipelines.get((int) containerCount.get() % pipelines.size());
       }
     }
 
     synchronized (pipeline) {
-      return allocateContainer(storageClassName, pipelineManager,
+      return allocateContainer(storageClass, pipelineManager,
           owner, pipeline);
     }
   }
@@ -314,7 +307,7 @@ public class ContainerStateManager {
    * @throws IOException on Failure.
    */
   ContainerInfo allocateContainer(
-      String storageClassName,
+      StorageClass storageClass,
       final PipelineManager pipelineManager,
       final String owner,
       Pipeline pipeline) throws IOException {
@@ -332,7 +325,7 @@ public class ContainerStateManager {
         .setOwner(owner)
         .setContainerID(containerID)
         .setDeleteTransactionId(0)
-        .setStorageClass(storageClassName)
+        .setStorageClass(storageClass)
         .build();
     addContainerInfo(containerID, containerInfo, pipelineManager, pipeline);
     if (LOG.isTraceEnabled()) {
@@ -408,8 +401,7 @@ public class ContainerStateManager {
    * @return ContainerInfo, null if there is no match found.
    */
   ContainerInfo getMatchingContainer(
-      String storageClass,
-      long size,
+      StorageClass storageClass, long size, String owner,
       PipelineID pipelineID, NavigableSet<ContainerID> containerIDs) {
     if (containerIDs.isEmpty()) {
       return null;
@@ -417,7 +409,8 @@ public class ContainerStateManager {
 
     // Get the last used container and find container above the last used
     // container ID.
-    final ContainerState key = new ContainerState(storageClass, pipelineID);
+    final ContainerState key = new ContainerState(storageClass, owner,
+        pipelineID);
     final ContainerID lastID =
         lastUsedMap.getOrDefault(key, containerIDs.first());
 
@@ -429,7 +422,8 @@ public class ContainerStateManager {
     }
 
     ContainerInfo selectedContainer =
-        findContainerWithSpace(storageClass, size, resultSet, pipelineID);
+        findContainerWithSpace(
+            storageClass, size, resultSet, pipelineID);
     if (selectedContainer == null) {
 
       // If we did not find any space in the tailSet, we need to look for
@@ -442,14 +436,15 @@ public class ContainerStateManager {
 
       resultSet = containerIDs.headSet(lastID, true);
       selectedContainer =
-          findContainerWithSpace(storageClass, size, resultSet, pipelineID);
+          findContainerWithSpace(storageClass,
+              size, resultSet, pipelineID);
     }
 
     return selectedContainer;
   }
 
   private ContainerInfo findContainerWithSpace(
-      String storageClassName,
+      StorageClass storageClass,
       final long size,
       final NavigableSet<ContainerID> searchSet,
       final PipelineID pipelineID) {
@@ -458,7 +453,8 @@ public class ContainerStateManager {
       for (ContainerID id : searchSet) {
         final ContainerInfo containerInfo = containers.getContainerInfo(id);
         if (containerInfo.getUsedBytes() + size <= this.containerSize
-            && storageClassName.equals(containerInfo.getStorageClass())) {
+            && storageClass.getName().equals(
+                containerInfo.getStorageClass().getName())) {
           containerInfo.updateLastUsedTime();
           return containerInfo;
         }
@@ -498,15 +494,15 @@ public class ContainerStateManager {
    * Returns a set of ContainerIDs that match the Container.
    *
    * @param owner  Owner of the Containers.
-   * @param storageClassName - Name of the storage class
+   * @param storageClass - The storage class
    * @param state - Current State, like Open, Close etc.
    * @return Set of containers that match the specific query parameters.
    */
   NavigableSet<ContainerID> getMatchingContainerIDs(final String owner,
-      final String storageClassName,
+      final StorageClass storageClass,
       final LifeCycleState state) {
     return containers.getMatchingContainerIDs(state, owner,
-        storageClassName);
+        storageClass);
   }
 
   /**
@@ -569,10 +565,11 @@ public class ContainerStateManager {
    * @param pipelineID
    * @param containerID
    * @param owner
+   * @param storageClass
    */
   public synchronized void updateLastUsedMap(PipelineID pipelineID,
-      ContainerID containerID, String owner) {
-    lastUsedMap.put(new ContainerState(owner, pipelineID),
+      ContainerID containerID, String owner, StorageClass storageClass) {
+    lastUsedMap.put(new ContainerState(storageClass, owner, pipelineID),
         containerID);
   }
 

@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.hadoop.hdds.StorageClass;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
@@ -102,7 +103,7 @@ public interface ContainerManager extends Closeable {
    * @throws IOException
    */
   ContainerInfo allocateContainer(
-      String storageClass,
+      StorageClass storageClass,
       String owner)
       throws IOException;
 
@@ -171,7 +172,7 @@ public interface ContainerManager extends Closeable {
    * @return ContainerInfo for the matching container.
    */
   ContainerInfo getMatchingContainer(long size, String owner,
-      String storageClass,
+      StorageClass storageClass,
       Pipeline pipeline);
 
   /**
@@ -187,7 +188,7 @@ public interface ContainerManager extends Closeable {
    */
   ContainerInfo getMatchingContainer(long size,
       String owner,
-      String storageClass,
+      StorageClass storageClass,
       Pipeline pipeline,
       Set<ContainerID> excludedContainerIDS);
 

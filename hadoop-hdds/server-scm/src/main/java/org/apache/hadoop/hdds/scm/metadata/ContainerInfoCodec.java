@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.metadata;
 
 import java.io.IOException;
 
+import org.apache.hadoop.hdds.StorageClass;
 import org.apache.hadoop.hdds.StorageClassConverter;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -40,7 +41,7 @@ public class ContainerInfoCodec implements Codec<ContainerInfo> {
     ContainerInfo info = ContainerInfo.fromProtobuf(
         ContainerInfoProto.PARSER.parseFrom(rawData));
     if (info.getStorageClass() == null) {
-      final String calculatedStorageClass =
+      StorageClass calculatedStorageClass =
           StorageClassConverter.convert(null, info.getReplicationFactor(),
               info.getReplicationType());
       info.setStorageClass(calculatedStorageClass);

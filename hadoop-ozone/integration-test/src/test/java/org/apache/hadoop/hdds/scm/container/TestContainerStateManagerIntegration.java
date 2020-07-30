@@ -25,6 +25,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.UUID;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.StorageClass;
 import org.apache.hadoop.hdds.StorageClassConverter;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -100,9 +101,9 @@ public class TestContainerStateManagerIntegration {
         .allocateContainer(
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)),
+                SCMTestUtils.getReplicationType(conf)).getName(),
             OzoneConsts.OZONE);
-    String storageClass =
+    StorageClass storageClass =
         StorageClassConverter.convert(null,
             container1.getPipeline().getFactor(),
             container1.getPipeline().getType());
@@ -123,7 +124,8 @@ public class TestContainerStateManagerIntegration {
         .allocateContainer(
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)), OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)).getName(),
+            OzoneConsts.OZONE);
     int numContainers = containerStateManager
         .getMatchingContainerIDs(OzoneConsts.OZONE,
             StorageClassConverter.convert(null,
@@ -143,8 +145,9 @@ public class TestContainerStateManagerIntegration {
         .allocateContainer(
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)), OzoneConsts.OZONE);
-    String storageClass =
+                SCMTestUtils.getReplicationType(conf)).getName(),
+            OzoneConsts.OZONE);
+    StorageClass storageClass =
         StorageClassConverter.convert(null,
             container1.getPipeline().getFactor(),
             container1.getPipeline().getType());
@@ -158,7 +161,8 @@ public class TestContainerStateManagerIntegration {
         .allocateContainer(
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)), newContainerOwner);
+                SCMTestUtils.getReplicationType(conf)).getName(),
+            newContainerOwner);
     ContainerInfo info2 = containerManager
         .getMatchingContainer(OzoneConsts.GB * 3, newContainerOwner,
             storageClass, container1.getPipeline());
@@ -178,7 +182,8 @@ public class TestContainerStateManagerIntegration {
           .allocateContainer(
               StorageClassConverter.convert(null,
                   SCMTestUtils.getReplicationFactor(conf),
-                  SCMTestUtils.getReplicationType(conf)), OzoneConsts.OZONE);
+                  SCMTestUtils.getReplicationType(conf)).getName(),
+              OzoneConsts.OZONE);
       if (i >= 5) {
         scm.getContainerManager().updateContainerState(container
                 .getContainerInfo().containerID(),
@@ -226,13 +231,14 @@ public class TestContainerStateManagerIntegration {
         allocateContainer(
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)), OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)).getName(),
+            OzoneConsts.OZONE);
     cid = container1.getContainerInfo().getContainerID();
 
     // each getMatchingContainer call allocates a container in the
     // pipeline till the pipeline has numContainerPerOwnerInPipeline number of
     // containers.
-    String storageClass =
+    StorageClass storageClass =
         StorageClassConverter.convert(null,
             container1.getPipeline().getFactor(),
             container1.getPipeline().getType());
@@ -260,10 +266,11 @@ public class TestContainerStateManagerIntegration {
         allocateContainer(
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)), OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)).getName(),
+            OzoneConsts.OZONE);
     cid = container1.getContainerInfo().getContainerID();
 
-    String storageClass =
+    StorageClass storageClass =
         StorageClassConverter.convert(null,
             container1.getPipeline().getFactor(),
             container1.getPipeline().getType());
@@ -297,10 +304,11 @@ public class TestContainerStateManagerIntegration {
         allocateContainer(
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)), OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)).getName(),
+            OzoneConsts.OZONE);
     cid = container1.getContainerInfo().getContainerID();
 
-    String storageClass =
+    StorageClass storageClass =
         StorageClassConverter.convert(null,
             container1.getPipeline().getFactor(),
             container1.getPipeline().getType());
@@ -329,11 +337,12 @@ public class TestContainerStateManagerIntegration {
         allocateContainer(
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)), OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)).getName(),
+            OzoneConsts.OZONE);
     Map<Long, Long> container2MatchedCount = new ConcurrentHashMap<>();
 
     // allocate blocks using multiple threads
-    String storageClass =
+    StorageClass storageClass =
         StorageClassConverter.convert(null,
             container1.getPipeline().getFactor(),
             container1.getPipeline().getType());
@@ -386,7 +395,8 @@ public class TestContainerStateManagerIntegration {
         .allocateContainer(
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)), OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)).getName(),
+            OzoneConsts.OZONE);
     containers = containerStateManager.getMatchingContainerIDs(
         OzoneConsts.OZONE,
         StorageClassConverter.convert(null,
@@ -445,7 +455,8 @@ public class TestContainerStateManagerIntegration {
         .allocateContainer(
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)), OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)).getName(),
+            OzoneConsts.OZONE);
     containerManager
         .updateContainerState(container3.getContainerInfo().containerID(),
             HddsProtos.LifeCycleEvent.FINALIZE);
@@ -485,7 +496,8 @@ public class TestContainerStateManagerIntegration {
         .allocateContainer(
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)), OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)).getName(),
+            OzoneConsts.OZONE);
 
     ContainerID id = container.getContainerInfo().containerID();
 

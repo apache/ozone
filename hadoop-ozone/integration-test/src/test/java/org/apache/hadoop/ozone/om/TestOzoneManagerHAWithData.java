@@ -266,7 +266,7 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createFile(keyName,
         data.length(),
-        StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
+        StaticStorageClassRegistry.REDUCED_REDUNDANCY,
         overwrite, recursive);
 
     ozoneOutputStream.write(data.getBytes(), 0, data.length());

@@ -86,7 +86,7 @@ public class OzoneBucketStub extends OzoneBucket {
 
   @Override
   public OzoneOutputStream createKey(String key, long size,
-                                    String storageClass,
+                                    String storageClassName,
                                     Map<String, String> metadata)
       throws IOException {
     ByteArrayOutputStream byteArrayOutputStream =
@@ -102,7 +102,7 @@ public class OzoneBucketStub extends OzoneBucket {
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
                 new ArrayList<>(), metadata, null,
-                storageClass
+                storageClassName
             ));
             super.close();
           }

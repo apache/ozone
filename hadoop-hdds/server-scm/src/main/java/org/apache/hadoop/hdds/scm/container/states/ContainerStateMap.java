@@ -27,6 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.apache.hadoop.hdds.StorageClass;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -81,7 +82,7 @@ public class ContainerStateMap {
 
   private final ContainerAttribute<LifeCycleState> lifeCycleStateMap;
   private final ContainerAttribute<String> ownerMap;
-  private final ContainerAttribute<String> storageClassMap;
+  private final ContainerAttribute<StorageClass> storageClassMap;
   private final Map<ContainerID, ContainerInfo> containerMap;
   private final Map<ContainerID, Set<ContainerReplica>> replicaMap;
   private final Map<ContainerQueryKey, NavigableSet<ContainerID>> resultCache;
@@ -351,11 +352,11 @@ public class ContainerStateMap {
   /**
    * Returns Containers by replication factor.
    *
-   * @param factor - Replication Factor.
+   * @param storageClass - StorageClass.
    * @return NavigableSet.
    */
   NavigableSet<ContainerID> getContainerIDsByStorageClass(
-      final String storageClass) {
+      final StorageClass storageClass) {
     Preconditions.checkNotNull(storageClass);
     lock.readLock().lock();
     try {
@@ -391,7 +392,8 @@ public class ContainerStateMap {
    * @return ContainerInfo or Null if not container satisfies the criteria.
    */
   public NavigableSet<ContainerID> getMatchingContainerIDs(
-      final LifeCycleState state, final String owner, String storageClass) {
+      final LifeCycleState state, final String owner,
+      StorageClass storageClass) {
 
     Preconditions.checkNotNull(state, "State cannot be null");
     Preconditions.checkNotNull(owner, "Owner cannot be null");

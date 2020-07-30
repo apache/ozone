@@ -72,7 +72,7 @@ public class TestNode2PipelineMap {
     containerManager = scm.getContainerManager();
     pipelineManager = scm.getPipelineManager();
     ContainerInfo containerInfo = containerManager.allocateContainer(
-        StaticStorageClassRegistry.STANDARD.getName(), "testOwner");
+        StaticStorageClassRegistry.STANDARD, "testOwner");
     ratisContainer = new ContainerWithPipeline(containerInfo,
         pipelineManager.getPipeline(containerInfo.getPipelineID()));
     pipelineManager = scm.getPipelineManager();

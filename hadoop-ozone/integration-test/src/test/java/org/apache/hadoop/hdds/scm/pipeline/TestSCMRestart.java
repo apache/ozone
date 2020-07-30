@@ -75,11 +75,11 @@ public class TestSCMRestart {
     pipelineManager = scm.getPipelineManager();
     ratisPipeline1 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
-            StaticStorageClassRegistry.STANDARD.getName(), "Owner1")
+            StaticStorageClassRegistry.STANDARD, "Owner1")
             .getPipelineID());
     ratisPipeline2 = pipelineManager.getPipeline(
         containerManager.allocateContainer(
-            StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(), "Owner2")
+            StaticStorageClassRegistry.REDUCED_REDUNDANCY, "Owner2")
             .getPipelineID());
     // At this stage, there should be 2 pipeline one with 1 open container
     // each. Try restarting the SCM and then discover that pipeline are in
@@ -116,7 +116,7 @@ public class TestSCMRestart {
     // as was before restart
     ContainerInfo containerInfo = newContainerManager
         .allocateContainer(
-            StaticStorageClassRegistry.STANDARD.getName(), "Owner1");
+            StaticStorageClassRegistry.STANDARD, "Owner1");
     Assert.assertEquals(containerInfo.getPipelineID(), ratisPipeline1.getId());
   }
 }

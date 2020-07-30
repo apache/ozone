@@ -1353,7 +1353,7 @@ public class KeyManagerImpl implements KeyManager {
             } else {
               storageClass = StorageClassConverter.convert(null,
                   partKeyInfo.getPartKeyInfo().getFactor(),
-                  partKeyInfo.getPartKeyInfo().getType());
+                  partKeyInfo.getPartKeyInfo().getType()).getName();
             }
             count++;
           }

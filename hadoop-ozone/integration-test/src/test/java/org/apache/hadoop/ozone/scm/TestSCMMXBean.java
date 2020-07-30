@@ -32,6 +32,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -151,7 +152,7 @@ public class TestSCMMXBean {
     List<ContainerInfo> containerInfoList = new ArrayList<>();
     for (int i=0; i < 10; i++) {
       containerInfoList.add(scmContainerManager.allocateContainer(
-          "LEGACY",
+          StaticStorageClassRegistry.LEGACY,
           UUID.randomUUID().toString()));
     }
     long containerID;
