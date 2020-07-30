@@ -37,23 +37,23 @@ public class TestDBDefinitionFactory {
   @Test
   public void testGetDefinition() {
     DBDefinition definition =
-        DBDefinitionFactory.getDefinition(new OMDBDefinition().getName(), null);
+        DBDefinitionFactory.getDefinition(new OMDBDefinition().getName());
     assertTrue(definition instanceof OMDBDefinition);
 
     definition = DBDefinitionFactory.getDefinition(
-        new SCMDBDefinition().getName(), null);
+        new SCMDBDefinition().getName());
     assertTrue(definition instanceof SCMDBDefinition);
 
     definition = DBDefinitionFactory.getDefinition(
-        new ReconSCMDBDefinition().getName(), "recon");
+        new ReconSCMDBDefinition().getName());
     assertTrue(definition instanceof ReconSCMDBDefinition);
 
     definition = DBDefinitionFactory.getDefinition(
-        RECON_OM_SNAPSHOT_DB + "_1", "recon");
+        RECON_OM_SNAPSHOT_DB + "_1");
     assertTrue(definition instanceof OMDBDefinition);
 
     definition = DBDefinitionFactory.getDefinition(
-        RECON_CONTAINER_KEY_DB + "_1", "recon");
+        RECON_CONTAINER_KEY_DB + "_1");
     assertTrue(definition instanceof ReconDBDefinition);
   }
 }

@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.debug;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_CONTAINER_KEY_DB;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
-import static org.apache.hadoop.ozone.recon.scm.ReconSCMDBDefinition.RECON_SCM_DB_NAME;
 
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
@@ -28,6 +27,7 @@ import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.recon.scm.ReconSCMDBDefinition;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition;
 
+import java.util.Arrays;
 import java.util.HashMap;
 
 /**
@@ -42,24 +42,22 @@ public final class DBDefinitionFactory {
 
   static {
     dbMap = new HashMap<>();
-    dbMap.put(new SCMDBDefinition().getName(), new SCMDBDefinition());
-    dbMap.put(new OMDBDefinition().getName(), new OMDBDefinition());
+    Arrays.asList(
+      new SCMDBDefinition(),
+      new OMDBDefinition(),
+      new ReconSCMDBDefinition()
+    ).forEach(dbDefinition -> dbMap.put(dbDefinition.getName(), dbDefinition));
   }
 
-  public static DBDefinition getDefinition(String dbName, String type){
+  public static DBDefinition getDefinition(String dbName){
     if (dbMap.containsKey(dbName)){
       return dbMap.get(dbName);
     }
-    if (type != null && type.equals("recon")) {
-      return getReconDBDefinition(dbName);
-    }
-    return null;
+    return getReconDBDefinition(dbName);
   }
 
   private static DBDefinition getReconDBDefinition(String dbName){
-    if (dbName.equals(RECON_SCM_DB_NAME)) {
-      return new ReconSCMDBDefinition();
-    } else if (dbName.startsWith(RECON_CONTAINER_KEY_DB)) {
+    if (dbName.startsWith(RECON_CONTAINER_KEY_DB)) {
       return new ReconDBDefinition(dbName);
     } else if (dbName.startsWith(RECON_OM_SNAPSHOT_DB)) {
       return new OMDBDefinition();

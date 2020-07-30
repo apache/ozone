@@ -44,15 +44,11 @@ public class DBScanner implements Callable<Void> {
             description = "Table name")
   private String tableName;
 
-  @CommandLine.Option(names = {"--withKey"},
+  @CommandLine.Option(names = {"--with-keys"},
       description = "List Key -> Value instead of just Value.",
       defaultValue = "false",
       showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
   private boolean withKey;
-
-  @CommandLine.Option(names = {"--type"},
-      description = "Type name. (Pass in 'recon' for a Recon managed DB)")
-  private String dbType;
 
   @CommandLine.ParentCommand
   private RDBParser parent;
@@ -143,7 +139,7 @@ public class DBScanner implements Callable<Void> {
           RocksDB rocksDB, String dbPath) throws IOException {
     dbPath = removeTrailingSlashIfNeeded(dbPath);
     this.constructColumnFamilyMap(DBDefinitionFactory.
-            getDefinition(new File(dbPath).getName(), dbType));
+            getDefinition(new File(dbPath).getName()));
     if (this.columnFamilyMap !=null) {
       if (!this.columnFamilyMap.containsKey(tableName)) {
         System.out.print("Table with specified name does not exist");
