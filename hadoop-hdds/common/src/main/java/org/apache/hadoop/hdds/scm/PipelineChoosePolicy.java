@@ -20,15 +20,11 @@ package org.apache.hadoop.hdds.scm;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * A {@link PipelineChoosePolicy} support choosing pipeline from exist list.
  */
 public interface PipelineChoosePolicy {
-
-  String PIPELINE_CHOOSE_POLICY_PARAM_SIZE =
-      "pipeline_choose_policy_param_size";
 
   /**
    * Given an initial list of pipelines, return one of the pipelines.
@@ -37,5 +33,5 @@ public interface PipelineChoosePolicy {
    * @return one of the pipelines.
    */
   Pipeline choosePipeline(List<Pipeline> pipelineList,
-      Map<String, Object> params);
+      PipelineRequestInformation pri);
 }

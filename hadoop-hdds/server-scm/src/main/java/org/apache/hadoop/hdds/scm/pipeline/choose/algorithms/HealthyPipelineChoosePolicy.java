@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.pipeline.choose.algorithms;
 
+import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * The healthy pipeline choose policy that chooses pipeline
@@ -30,10 +30,10 @@ public class HealthyPipelineChoosePolicy extends RandomPipelineChoosePolicy {
 
   @Override
   public Pipeline choosePipeline(List<Pipeline> pipelineList,
-      Map<String, Object> params) {
+      PipelineRequestInformation pri) {
     Pipeline fallback = null;
     while (pipelineList.size() > 0) {
-      Pipeline pipeline = super.choosePipeline(pipelineList, params);
+      Pipeline pipeline = super.choosePipeline(pipelineList, pri);
       if (pipeline.isHealthy()) {
         return pipeline;
       } else {

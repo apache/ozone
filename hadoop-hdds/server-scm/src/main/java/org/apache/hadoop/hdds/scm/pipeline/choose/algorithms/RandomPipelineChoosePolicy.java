@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.pipeline.choose.algorithms;
 
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
+import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
 import java.util.List;
@@ -32,7 +33,7 @@ public class RandomPipelineChoosePolicy implements PipelineChoosePolicy {
 
   @Override
   public Pipeline choosePipeline(List<Pipeline> pipelineList,
-      Map<String, Object> params) {
+      PipelineRequestInformation pri) {
     return pipelineList.get((int) (Math.random() * pipelineList.size()));
   }
 }

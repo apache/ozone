@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmOps;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
+import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -224,11 +225,12 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
       }
 
       if (null == pipeline) {
-        Map<String, Object> params = new HashMap<>();
-        params.put(
-            PipelineChoosePolicy.PIPELINE_CHOOSE_POLICY_PARAM_SIZE, size);
+        PipelineRequestInformation pri =
+            PipelineRequestInformation.Builder.getBuilder()
+                .setSize(size)
+                .build();
         pipeline = pipelineChoosePolicy.choosePipeline(
-            availablePipelines, params);
+            availablePipelines, pri);
       }
 
       // look for OPEN containers that match the criteria.
