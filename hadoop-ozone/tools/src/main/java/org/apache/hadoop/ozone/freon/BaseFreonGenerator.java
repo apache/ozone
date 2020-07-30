@@ -302,8 +302,7 @@ public class BaseFreonGenerator {
   }
 
   /**
-   * Print out the messages for HadoopNestedDirGenerator
-   * and HadoopDirTreeGenerator tools.
+   * Print out reports with the given message.
    */
   public void print(String msg){
     List<String> messages = new LinkedList<>();
