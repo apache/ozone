@@ -39,12 +39,12 @@ execute_robot_test scm security
 
 for scheme in ofs o3fs; do
   for bucket in link bucket; do
-    execute_robot_test scm -v SCHEME:${scheme} -v BUCKET_TYPE:${bucket} ozonefs/ozonefs.robot
+    execute_robot_test scm -v SCHEME:${scheme} -v BUCKET_TYPE:${bucket} -N ozonefs-${scheme}-${bucket} ozonefs/ozonefs.robot
   done
 done
 
 for bucket in link generated; do
-  execute_robot_test s3g -v BUCKET:${bucket} s3
+  execute_robot_test s3g -v BUCKET:${bucket} -N s3-${bucket} s3
 done
 
 #expects 4 pipelines, should be run before 
