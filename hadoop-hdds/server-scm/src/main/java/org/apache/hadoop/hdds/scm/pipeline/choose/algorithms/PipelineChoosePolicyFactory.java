@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.pipeline.choose.algorithms;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.ScmConfig;
@@ -36,7 +37,8 @@ public final class PipelineChoosePolicyFactory {
   private static final Logger LOG =
       LoggerFactory.getLogger(PipelineChoosePolicyFactory.class);
 
-  private static final Class<? extends PipelineChoosePolicy>
+  @VisibleForTesting
+  public static final Class<? extends PipelineChoosePolicy>
       OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT =
       RandomPipelineChoosePolicy.class;
 
@@ -46,21 +48,8 @@ public final class PipelineChoosePolicyFactory {
   public static PipelineChoosePolicy getPolicy(
       ConfigurationSource conf) throws SCMException {
     ScmConfig scmConfig = conf.getObject(ScmConfig.class);
-    Class<? extends PipelineChoosePolicy> policyClass;
-    try {
-      String policyName = scmConfig.getPipelineChoosePolicyName();
-      Class<?> theClass = Class.forName(policyName);
-      Class<PipelineChoosePolicy> xface = PipelineChoosePolicy.class;
-      if (theClass != null && !xface.isAssignableFrom(theClass)) {
-        throw new RuntimeException(theClass + " not " + xface.getName());
-      } else if (theClass != null) {
-        policyClass = theClass.asSubclass(xface);
-      } else {
-        policyClass = null;
-      }
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+    Class<? extends PipelineChoosePolicy> policyClass = getClass(
+        scmConfig.getPipelineChoosePolicyName(), PipelineChoosePolicy.class);
 
     try {
       return createPipelineChoosePolicyFromClass(policyClass);
@@ -98,6 +87,20 @@ public final class PipelineChoosePolicyFactory {
     } catch (Exception e) {
       throw new RuntimeException("Failed to instantiate class " +
           policyClass.getCanonicalName() + " for " + e.getMessage());
+    }
+  }
+
+  private static <U> Class<? extends U> getClass(String name,
+      Class<U> xface) {
+    try {
+      Class<?> theClass = Class.forName(name);
+      if (!xface.isAssignableFrom(theClass)) {
+        throw new RuntimeException(theClass + " not " + xface.getName());
+      } else {
+        return theClass.asSubclass(xface);
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
   }
 }

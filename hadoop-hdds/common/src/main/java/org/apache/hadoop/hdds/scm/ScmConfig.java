@@ -87,6 +87,10 @@ public class ScmConfig {
     this.action = unknownContainerAction;
   }
 
+  public void setPipelineChoosePolicyName(String pipelineChoosePolicyName) {
+    this.pipelineChoosePolicyName = pipelineChoosePolicyName;
+  }
+
   public String getKerberosPrincipal() {
     return this.principal;
   }
