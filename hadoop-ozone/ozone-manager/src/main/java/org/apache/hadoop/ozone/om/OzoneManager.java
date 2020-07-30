@@ -124,6 +124,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
+import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -2223,7 +2224,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
 
   @Override
-  public void renameKeys(Map<OmKeyArgs, String> omKeyArgsMap)
+  public void renameKeys(OmRenameKeys omRenameKeys)
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented. As write requests use a new approach");

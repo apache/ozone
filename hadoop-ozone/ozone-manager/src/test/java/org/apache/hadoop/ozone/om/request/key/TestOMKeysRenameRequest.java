@@ -23,14 +23,15 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyArgs;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysMap;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysRequest;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -102,7 +103,7 @@ public class TestOMKeysRenameRequest extends TestOMKeyRequest {
     }
 
     // The key not rename should be in unRenamedKeys.
-    RenameKeyArgs unRenamedKeys = omKeysRenameResponse.getOMResponse()
+    RenameKeysMap unRenamedKeys = omKeysRenameResponse.getOMResponse()
         .getRenameKeysResponse().getUnRenamedKeys(0);
     Assert.assertEquals("testKey", unRenamedKeys.getFromKeyName());
   }
@@ -114,11 +115,11 @@ public class TestOMKeysRenameRequest extends TestOMKeyRequest {
    */
   private OMRequest createRenameKeyRequest(Boolean isIllegal) throws Exception {
 
-    RenameKeysRequest.Builder renameKeysReq = RenameKeysRequest.newBuilder();
-
     // Add volume, bucket and key entries to OM DB.
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
+
+    List<RenameKeysMap> renameKeyList  = new ArrayList<>();
 
     for (int i = 0; i < count; i++) {
       String key = parentDir.concat("/key" + i);
@@ -127,21 +128,28 @@ public class TestOMKeysRenameRequest extends TestOMKeyRequest {
           parentDir.concat("/key" + i), HddsProtos.ReplicationType.RATIS,
           HddsProtos.ReplicationFactor.THREE, omMetadataManager);
 
-      KeyArgs keyArgs = KeyArgs.newBuilder().setKeyName(key)
-          .setVolumeName(volumeName).setBucketName(bucketName).build();
-      RenameKeyRequest renameKeyRequest = RenameKeyRequest.newBuilder()
-          .setKeyArgs(keyArgs).setToKeyName(toKey).build();
-      renameKeysReq.addRenameKeyRequest(renameKeyRequest);
+      RenameKeysMap.Builder renameKey = RenameKeysMap.newBuilder()
+          .setFromKeyName(key)
+          .setToKeyName(toKey);
+      renameKeyList.add(renameKey.build());
     }
+
 
     // Generating illegal data causes Rename Keys to fail.
     if (isIllegal) {
-      KeyArgs keyArgs = KeyArgs.newBuilder().setKeyName("testKey")
-          .setVolumeName(volumeName).setBucketName(bucketName).build();
-      RenameKeyRequest renameKeyRequest = RenameKeyRequest.newBuilder()
-          .setKeyArgs(keyArgs).setToKeyName("testToKey").build();
-      renameKeysReq.addRenameKeyRequest(renameKeyRequest);
+      RenameKeysMap.Builder renameKey = RenameKeysMap.newBuilder()
+          .setFromKeyName("testKey")
+          .setToKeyName("toKey");
+      renameKeyList.add(renameKey.build());
     }
+
+    RenameKeysArgs.Builder renameKeyArgs = RenameKeysArgs.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .addAllRenameKeysMap(renameKeyList);
+
+    RenameKeysRequest.Builder renameKeysReq = RenameKeysRequest.newBuilder()
+        .setRenameKeysArgs(renameKeyArgs.build());
 
     return OMRequest.newBuilder()
         .setClientId(UUID.randomUUID().toString())

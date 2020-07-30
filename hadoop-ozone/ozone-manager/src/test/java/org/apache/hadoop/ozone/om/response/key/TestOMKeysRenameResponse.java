@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import org.apache.hadoop.ozone.om.OmRenameKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -29,8 +29,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
@@ -39,7 +39,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.R
  * Tests OMKeyRenameResponse.
  */
 public class TestOMKeysRenameResponse extends TestOMKeyResponse {
-  private List<OmRenameKeyInfo> renameKeyInfoList;
+  private OmRenameKeys omRenameKeys;
   private int count = 10;
   private String parentDir = "/test";
 
@@ -53,7 +53,7 @@ public class TestOMKeysRenameResponse extends TestOMKeyResponse {
         .setStatus(Status.OK).setCmdType(Type.RenameKeys).build();
 
     OMKeysRenameResponse omKeysRenameResponse = new OMKeysRenameResponse(
-        omResponse, renameKeyInfoList);
+        omResponse, omRenameKeys);
 
     omKeysRenameResponse.addToDBBatch(omMetadataManager, batchOperation);
 
@@ -86,7 +86,7 @@ public class TestOMKeysRenameResponse extends TestOMKeyResponse {
         .build();
 
     OMKeysRenameResponse omKeyRenameResponse = new OMKeysRenameResponse(
-        omResponse, renameKeyInfoList);
+        omResponse, omRenameKeys);
 
     omKeyRenameResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
@@ -107,10 +107,10 @@ public class TestOMKeysRenameResponse extends TestOMKeyResponse {
 
   private void createPreRequisities() throws Exception {
 
-    renameKeyInfoList = new ArrayList<>();
     // Add volume, bucket and key entries to OM DB.
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
+    Map<String, OmKeyInfo> formAndToKeyInfo = new HashMap<>();
 
     for (int i = 0; i < count; i++) {
       String key = parentDir.concat("/key" + i);
@@ -122,9 +122,10 @@ public class TestOMKeysRenameResponse extends TestOMKeyResponse {
       OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(
           omMetadataManager.getOzoneKey(volumeName, bucketName, key));
       omKeyInfo.setKeyName(toKey);
-      OmRenameKeyInfo omRenameKeyInfo = new OmRenameKeyInfo(key, omKeyInfo);
-      renameKeyInfoList.add(omRenameKeyInfo);
+      formAndToKeyInfo.put(key, omKeyInfo);
     }
+    omRenameKeys =
+        new OmRenameKeys(volumeName, bucketName, null, formAndToKeyInfo);
 
   }
 }

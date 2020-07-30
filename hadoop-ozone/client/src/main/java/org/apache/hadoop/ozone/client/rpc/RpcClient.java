@@ -27,7 +27,6 @@ import java.security.InvalidKeyException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -86,6 +85,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
@@ -767,16 +767,9 @@ public class RpcClient implements ClientProtocol {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     HddsClientUtils.checkNotNull(keyMap);
-    Map <OmKeyArgs, String> keyArgsMap = new HashMap<>();
-    for (Map.Entry< String, String > entry : keyMap.entrySet()) {
-      OmKeyArgs keyArgs = new OmKeyArgs.Builder()
-          .setVolumeName(volumeName)
-          .setBucketName(bucketName)
-          .setKeyName(entry.getKey())
-          .build();
-      keyArgsMap.put(keyArgs, entry.getValue());
-    }
-    ozoneManagerClient.renameKeys(keyArgsMap);
+    OmRenameKeys omRenameKeys =
+        new OmRenameKeys(volumeName, bucketName, keyMap, null);
+    ozoneManagerClient.renameKeys(omRenameKeys);
   }
 
 

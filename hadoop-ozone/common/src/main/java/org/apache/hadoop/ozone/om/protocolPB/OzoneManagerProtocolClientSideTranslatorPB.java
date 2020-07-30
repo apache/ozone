@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
+import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -122,6 +123,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Recover
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysMap;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenewDelegationTokenResponseProto;
@@ -678,24 +681,27 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void renameKeys(Map<OmKeyArgs, String> keyMap) throws IOException {
-    RenameKeysRequest.Builder reqKeys = RenameKeysRequest.newBuilder();
-    List<RenameKeyRequest> renameKeyRequestList  = new ArrayList<>();
-    for (Map.Entry< OmKeyArgs, String> entry : keyMap.entrySet()) {
-      RenameKeyRequest.Builder reqKey = RenameKeyRequest.newBuilder();
-      OmKeyArgs args = entry.getKey();
-      KeyArgs keyArgs = KeyArgs.newBuilder()
-          .setVolumeName(args.getVolumeName())
-          .setBucketName(args.getBucketName())
-          .setKeyName(args.getKeyName()).build();
-      reqKey.setKeyArgs(keyArgs);
-      reqKey.setToKeyName(entry.getValue());
-      renameKeyRequestList.add(reqKey.build());
+  public void renameKeys(OmRenameKeys omRenameKeys) throws IOException {
+
+    List<RenameKeysMap> renameKeyList  = new ArrayList<>();
+    for (Map.Entry< String, String> entry :
+        omRenameKeys.getFromAndToKey().entrySet()) {
+      RenameKeysMap.Builder renameKey = RenameKeysMap.newBuilder()
+          .setFromKeyName(entry.getKey())
+          .setToKeyName(entry.getValue());
+      renameKeyList.add(renameKey.build());
     }
-    reqKeys.addAllRenameKeyRequest(renameKeyRequestList);
+
+    RenameKeysArgs.Builder renameKeyArgs = RenameKeysArgs.newBuilder()
+        .setVolumeName(omRenameKeys.getVolume())
+        .setBucketName(omRenameKeys.getBucket())
+        .addAllRenameKeysMap(renameKeyList);
+
+    RenameKeysRequest.Builder reqKeys = RenameKeysRequest.newBuilder()
+        .setRenameKeysArgs(renameKeyArgs.build());
 
     OMRequest omRequest = createOMRequest(Type.RenameKeys)
-        .setRenameKeysRequest(reqKeys)
+        .setRenameKeysRequest(reqKeys.build())
         .build();
 
     handleError(submitRequest(omRequest));

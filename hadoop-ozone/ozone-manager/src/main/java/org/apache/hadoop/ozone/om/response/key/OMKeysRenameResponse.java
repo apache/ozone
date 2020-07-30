@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmRenameKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -28,7 +28,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
-import java.util.List;
+import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 
@@ -38,14 +38,12 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 @CleanupTableInfo(cleanupTables = {KEY_TABLE})
 public class OMKeysRenameResponse extends OMClientResponse {
 
-  private List<OmRenameKeyInfo> renameKeyInfoList;
-  private String fromKeyName = null;
-  private String toKeyName = null;
+  private OmRenameKeys omRenameKeys;
 
   public OMKeysRenameResponse(@Nonnull OMResponse omResponse,
-                              List<OmRenameKeyInfo> renameKeyInfoList) {
+                              OmRenameKeys omRenameKeys) {
     super(omResponse);
-    this.renameKeyInfoList = renameKeyInfoList;
+    this.omRenameKeys = omRenameKeys;
   }
 
 
@@ -61,12 +59,14 @@ public class OMKeysRenameResponse extends OMClientResponse {
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
                            BatchOperation batchOperation) throws IOException {
-    for (OmRenameKeyInfo omRenameKeyInfo : renameKeyInfoList) {
-      String volumeName = omRenameKeyInfo.getNewKeyInfo().getVolumeName();
-      String bucketName = omRenameKeyInfo.getNewKeyInfo().getBucketName();
-      fromKeyName = omRenameKeyInfo.getFromKeyName();
-      OmKeyInfo newKeyInfo = omRenameKeyInfo.getNewKeyInfo();
-      toKeyName = newKeyInfo.getKeyName();
+    String volumeName = omRenameKeys.getVolume();
+    String bucketName = omRenameKeys.getBucket();
+
+    for (Map.Entry< String, OmKeyInfo> entry :
+        omRenameKeys.getFromKeyAndToKeyInfo().entrySet()) {
+      String fromKeyName = entry.getKey();
+      OmKeyInfo newKeyInfo = entry.getValue();
+      String toKeyName = newKeyInfo.getKeyName();
 
       omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
           omMetadataManager
@@ -74,7 +74,6 @@ public class OMKeysRenameResponse extends OMClientResponse {
       omMetadataManager.getKeyTable().putWithBatch(batchOperation,
           omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName),
           newKeyInfo);
-
     }
   }
 

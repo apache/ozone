@@ -845,19 +845,23 @@ message LookupKeyResponse {
     optional uint64 openVersion = 4;
 }
 
-message RenameKeysRequest{
-    repeated RenameKeyRequest renameKeyRequest = 1;
+message RenameKeysRequest {
+    required RenameKeysArgs renameKeysArgs = 1;
 }
 
-message RenameKeyArgs{
+message RenameKeysArgs {
     required string volumeName = 1;
     required string bucketName = 2;
-    optional string fromKeyName = 3;
-    optional string toKeyName = 4;
+    repeated RenameKeysMap renameKeysMap = 3;
+}
+
+message RenameKeysMap {
+    required string fromKeyName = 1;
+    required string toKeyName = 2;
 }
 
 message RenameKeysResponse{
-    repeated RenameKeyArgs unRenamedKeys = 1;
+    repeated RenameKeysMap unRenamedKeys = 1;
     optional bool status = 2;
 }
 
