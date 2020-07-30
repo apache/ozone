@@ -436,18 +436,17 @@ public class StateContext {
         task.onEnter();
       }
 
-      if (isThreadPoolAvailable(service)) {
-        task.execute(service);
-        threadPoolNotAvailableCount.set(0);
-      } else {
-        if (threadPoolNotAvailableCount.get()
-            % getLogWarnInterval(conf) == 0) {
+      if (!isThreadPoolAvailable(service)) {
+        long count = threadPoolNotAvailableCount.getAndIncrement();
+        if (count % getLogWarnInterval(conf) == 0) {
           LOG.warn("No available thread in pool for past {} seconds.",
-              unit.toSeconds(time) * (threadPoolNotAvailableCount.get() + 1));
+              unit.toSeconds(time) * (count + 1));
         }
-        threadPoolNotAvailableCount.incrementAndGet();
+        return;
       }
 
+      threadPoolNotAvailableCount.set(0);
+      task.execute(service);
       DatanodeStateMachine.DatanodeStates newState = task.await(time, unit);
       if (this.state != newState) {
         if (LOG.isDebugEnabled()) {

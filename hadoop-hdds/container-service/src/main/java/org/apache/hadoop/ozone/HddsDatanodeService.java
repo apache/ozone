@@ -352,9 +352,15 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         dnCertClient.storeCertificate(pemEncodedCert, true);
         dnCertClient.storeCertificate(response.getX509CACertificate(), true,
             true);
-        datanodeDetails.setCertSerialId(getX509Certificate(pemEncodedCert).
-            getSerialNumber().toString());
+        String dnCertSerialId = getX509Certificate(pemEncodedCert).
+            getSerialNumber().toString();
+        datanodeDetails.setCertSerialId(dnCertSerialId);
         persistDatanodeDetails(datanodeDetails);
+        // Rebuild dnCertClient with the new CSR result so that the default
+        // certSerialId and the x509Certificate can be updated.
+        dnCertClient = new DNCertificateClient(
+            new SecurityConfig(config), dnCertSerialId);
+
       } else {
         throw new RuntimeException("Unable to retrieve datanode certificate " +
             "chain");

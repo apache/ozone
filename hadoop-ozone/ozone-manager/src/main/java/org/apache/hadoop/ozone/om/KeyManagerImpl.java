@@ -23,6 +23,7 @@ import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -54,6 +55,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -105,7 +107,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
@@ -171,6 +172,15 @@ public class KeyManagerImpl implements KeyManager {
       OzoneBlockTokenSecretManager secretManager) {
     this(null, new ScmClient(scmBlockClient, null), metadataManager,
         conf, omId, secretManager, null, null);
+  }
+
+  @VisibleForTesting
+  public KeyManagerImpl(ScmBlockLocationProtocol scmBlockClient,
+      StorageContainerLocationProtocol scmContainerClient,
+      OMMetadataManager metadataManager, OzoneConfiguration conf, String omId,
+      OzoneBlockTokenSecretManager secretManager) {
+    this(null, new ScmClient(scmBlockClient, scmContainerClient),
+        metadataManager, conf, omId, secretManager, null, null);
   }
 
   public KeyManagerImpl(OzoneManager om, ScmClient scmClient,
@@ -678,9 +688,8 @@ public class KeyManagerImpl implements KeyManager {
     // Refresh container pipeline info from SCM
     // based on OmKeyArgs.refreshPipeline flag
     // value won't be null as the check is done inside try/catch block.
-    if (args.getRefreshPipeline()) {
-      refreshPipeline(value);
-    }
+    refreshPipeline(value);
+
     if (args.getSortDatanodes()) {
       sortDatanodeInPipeline(value, clientAddress);
     }
@@ -693,21 +702,62 @@ public class KeyManagerImpl implements KeyManager {
    */
   @VisibleForTesting
   protected void refreshPipeline(OmKeyInfo value) throws IOException {
-    final List<OmKeyLocationInfoGroup> locationInfoGroups = value == null ?
-        null : value.getKeyLocationVersions();
+    Preconditions.checkNotNull(value, "OMKeyInfo cannot be null");
+    refreshPipeline(Arrays.asList(value));
+  }
 
-    // TODO: fix Some tests that may not initialize container client
-    // The production should always have containerClient initialized.
-    if (scmClient.getContainerClient() == null ||
-        CollectionUtils.isEmpty(locationInfoGroups)) {
+  /**
+   * Refresh pipeline info in OM by asking SCM.
+   * @param keyList a list of OmKeyInfo
+   */
+  @VisibleForTesting
+  protected void refreshPipeline(List<OmKeyInfo> keyList) throws IOException {
+    if (keyList == null || keyList.isEmpty()) {
       return;
     }
 
     Set<Long> containerIDs = new HashSet<>();
-    for (OmKeyLocationInfoGroup key : locationInfoGroups) {
-      for (OmKeyLocationInfo k : key.getLocationList()) {
-        containerIDs.add(k.getContainerID());
+    for (OmKeyInfo keyInfo : keyList) {
+      List<OmKeyLocationInfoGroup> locationInfoGroups =
+          keyInfo.getKeyLocationVersions();
+
+      for (OmKeyLocationInfoGroup key : locationInfoGroups) {
+        for (OmKeyLocationInfo k : key.getLocationList()) {
+          containerIDs.add(k.getContainerID());
+        }
       }
+    }
+
+    Map<Long, ContainerWithPipeline> containerWithPipelineMap =
+        refreshPipeline(containerIDs);
+
+    for (OmKeyInfo keyInfo : keyList) {
+      List<OmKeyLocationInfoGroup> locationInfoGroups =
+          keyInfo.getKeyLocationVersions();
+      for (OmKeyLocationInfoGroup key : locationInfoGroups) {
+        for (OmKeyLocationInfo k : key.getLocationList()) {
+          ContainerWithPipeline cp =
+              containerWithPipelineMap.get(k.getContainerID());
+          if (cp != null && !cp.getPipeline().equals(k.getPipeline())) {
+            k.setPipeline(cp.getPipeline());
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Refresh pipeline info in OM by asking SCM.
+   * @param containerIDs a set of containerIDs
+   */
+  @VisibleForTesting
+  protected Map<Long, ContainerWithPipeline> refreshPipeline(
+      Set<Long> containerIDs) throws IOException {
+    // TODO: fix Some tests that may not initialize container client
+    // The production should always have containerClient initialized.
+    if (scmClient.getContainerClient() == null ||
+        containerIDs == null || containerIDs.isEmpty()) {
+      return Collections.EMPTY_MAP;
     }
 
     Map<Long, ContainerWithPipeline> containerWithPipelineMap = new HashMap<>();
@@ -719,21 +769,11 @@ public class KeyManagerImpl implements KeyManager {
         containerWithPipelineMap.put(
             cp.getContainerInfo().getContainerID(), cp);
       }
+      return containerWithPipelineMap;
     } catch (IOException ioEx) {
-      LOG.debug("Get containerPipeline failed for volume:{} bucket:{} " +
-          "key:{}", value.getVolumeName(), value.getBucketName(),
-          value.getKeyName(), ioEx);
+      LOG.debug("Get containerPipeline failed for {}",
+          containerIDs.toString(), ioEx);
       throw new OMException(ioEx.getMessage(), SCM_GET_PIPELINE_EXCEPTION);
-    }
-
-    for (OmKeyLocationInfoGroup key : locationInfoGroups) {
-      for (OmKeyLocationInfo k : key.getLocationList()) {
-        ContainerWithPipeline cp =
-            containerWithPipelineMap.get(k.getContainerID());
-        if (!cp.getPipeline().equals(k.getPipeline())) {
-          k.setPipeline(cp.getPipeline());
-        }
-      }
     }
   }
 
@@ -872,8 +912,10 @@ public class KeyManagerImpl implements KeyManager {
     // underlying table using an iterator. That automatically creates a
     // snapshot of the data, so we don't need these locks at a higher level
     // when we iterate.
-    return metadataManager.listKeys(volumeName, bucketName,
+    List<OmKeyInfo> keyList = metadataManager.listKeys(volumeName, bucketName,
         startKey, keyPrefix, maxKeys);
+    refreshPipeline(keyList);
+    return keyList;
   }
 
   @Override
@@ -1742,9 +1784,7 @@ public class KeyManagerImpl implements KeyManager {
 
       // if the key is a file then do refresh pipeline info in OM by asking SCM
       if (fileKeyInfo != null) {
-        if (refreshPipeline) {
-          refreshPipeline(fileKeyInfo);
-        }
+        refreshPipeline(fileKeyInfo);
         if (sortDatanodes) {
           sortDatanodeInPipeline(fileKeyInfo, clientAddress);
         }
@@ -1914,6 +1954,15 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   /**
+   * Refresh the key block location information by get latest info from SCM.
+   * @param key
+   */
+  public void refresh(OmKeyInfo key) throws IOException {
+    Preconditions.checkNotNull(key, "Key info can not be null");
+    refreshPipeline(Arrays.asList(key));
+  }
+
+  /**
    * Helper function for listStatus to find key in TableCache.
    */
   private void listStatusFindKeyInTableCache(
@@ -2079,7 +2128,11 @@ public class KeyManagerImpl implements KeyManager {
       for (Map.Entry<String, OzoneFileStatus> entry : cacheKeyMap.entrySet()) {
         // No need to check if a key is deleted or not here, this is handled
         // when adding entries to cacheKeyMap from DB.
-        fileStatusList.add(entry.getValue());
+        OzoneFileStatus fileStatus = entry.getValue();
+        if (fileStatus.isFile()) {
+          refreshPipeline(fileStatus.getKeyInfo());
+        }
+        fileStatusList.add(fileStatus);
         countEntries++;
         if (countEntries >= numEntries) {
           break;

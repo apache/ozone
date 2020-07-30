@@ -37,6 +37,28 @@ create_results_dir() {
   chmod ogu+w "$RESULT_DIR"
 }
 
+## @description find all the test.sh scripts in the immediate child dirs
+find_tests(){
+  if [[ -n "${OZONE_ACCEPTANCE_SUITE}" ]]; then
+     tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$" | sort)
+
+     # 'misc' is default suite, add untagged tests, too
+    if [[ "misc" == "${OZONE_ACCEPTANCE_SUITE}" ]]; then
+       untagged="$(find . -mindepth 2 -maxdepth 2 -name test.sh | xargs grep -L "^#suite:")"
+       if [[ -n "${untagged}" ]]; then
+         tests=$(echo ${tests} ${untagged} | xargs -n1 | sort)
+       fi
+     fi
+
+    if [[ -z "${tests}" ]]; then
+       echo "No tests found for suite ${OZONE_ACCEPTANCE_SUITE}"
+       exit 1
+  fi
+  else
+    tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | grep "${OZONE_TEST_SELECTOR:-""}" | sort)
+  fi
+  echo $tests
+}
 
 ## @description wait until safemode exit (or 180 seconds)
 wait_for_safemode_exit(){
@@ -114,7 +136,7 @@ execute_robot_test(){
   OUTPUT_PATH="$RESULT_DIR_INSIDE/${OUTPUT_FILE}"
   # shellcheck disable=SC2068
   docker-compose exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
-    && docker-compose exec -T "$CONTAINER" robot -v OM_SERVICE_ID:"${OM_SERVICE_ID}" -v SECURITY_ENABLED:"${SECURITY_ENABLED}" -v OM_HA_PARAM:"${OM_HA_PARAM}" -v KEY_NAME:"${OZONE_BUCKET_KEY_NAME}" ${ARGUMENTS[@]} --log NONE -N "$TEST_NAME" --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" "$SMOKETEST_DIR_INSIDE/$TEST"
+    && docker-compose exec -T "$CONTAINER" robot -v OM_SERVICE_ID:"${OM_SERVICE_ID}" -v SECURITY_ENABLED:"${SECURITY_ENABLED}" -v OM_HA_PARAM:"${OM_HA_PARAM}" -v KEY_NAME:"${OZONE_BUCKET_KEY_NAME}" ${ARGUMENTS[@]} --log NONE --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" "$SMOKETEST_DIR_INSIDE/$TEST"
   local -i rc=$?
 
   FULL_CONTAINER_NAME=$(docker-compose ps | grep "_${CONTAINER}_" | head -n 1 | awk '{print $1}')

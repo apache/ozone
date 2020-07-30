@@ -377,13 +377,26 @@ public final class OmKeyInfo extends WithObjectID {
     }
   }
 
+  /**
+   * For network transmit.
+   * @return
+   */
   public KeyInfo getProtobuf() {
+    return getProtobuf(false);
+  }
+
+  /**
+   *
+   * @param ignorePipeline true for persist to DB, false for network transmit.
+   * @return
+   */
+  public KeyInfo getProtobuf(boolean ignorePipeline) {
     long latestVersion = keyLocationVersions.size() == 0 ? -1 :
         keyLocationVersions.get(keyLocationVersions.size() - 1).getVersion();
 
     List<KeyLocationList> keyLocations = new ArrayList<>();
     for (OmKeyLocationInfoGroup locationInfoGroup : keyLocationVersions) {
-      keyLocations.add(locationInfoGroup.getProtobuf());
+      keyLocations.add(locationInfoGroup.getProtobuf(ignorePipeline));
     }
 
     KeyInfo.Builder kb = KeyInfo.newBuilder()
@@ -393,8 +406,8 @@ public final class OmKeyInfo extends WithObjectID {
         .setDataSize(dataSize)
         .setFactor(factor)
         .setType(type)
-        .addAllKeyLocationList(keyLocations)
         .setLatestVersion(latestVersion)
+        .addAllKeyLocationList(keyLocations)
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
         .addAllMetadata(KeyValueUtil.toProtobuf(metadata))

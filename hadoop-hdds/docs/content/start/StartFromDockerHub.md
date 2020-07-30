@@ -72,11 +72,7 @@ connecting to the SCM's UI at [http://localhost:9876](http://localhost:9876).
 
 The S3 gateway endpoint will be exposed at port 9878. You can use Ozone's S3
 support as if you are working against the real S3.  S3 buckets are stored under
-the `/s3v` volume, which needs to be created by an administrator first:
-
-```
-docker-compose exec scm ozone sh volume create /s3v
-```
+the `/s3v` volume.
 
 Here is how you create buckets from command line:
 

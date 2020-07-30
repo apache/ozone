@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.ratis;
 
 import java.io.IOException;
 import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -170,9 +171,9 @@ public final class RatisHelper {
   }
 
   public static RaftClient newRaftClient(RaftPeer leader,
-      ConfigurationSource conf) {
+      ConfigurationSource conf, GrpcTlsConfig tlsConfig) {
     return newRaftClient(getRpcType(conf), leader,
-        RatisHelper.createRetryPolicy(conf), conf);
+        RatisHelper.createRetryPolicy(conf), tlsConfig, conf);
   }
 
   public static RaftClient newRaftClient(RpcType rpcType, RaftPeer leader,
@@ -317,9 +318,6 @@ public final class RatisHelper {
         MultipleLinearRandomRetry
             .parseCommaSeparated(ratisClientConfig.getMultilinearPolicy());
 
-    long writeTimeout = ratisClientConfig.getWriteRequestTimeoutInMs();
-    long watchTimeout = ratisClientConfig.getWatchRequestTimeoutInMs();
-
     return RequestTypeDependentRetryPolicy.newBuilder()
         .setRetryPolicy(RaftProtos.RaftClientRequestProto.TypeCase.WRITE,
             createExceptionDependentPolicy(exponentialBackoffRetry,
@@ -328,23 +326,19 @@ public final class RatisHelper {
             createExceptionDependentPolicy(exponentialBackoffRetry,
                 multipleLinearRandomRetry, RetryPolicies.noRetry()))
         .setTimeout(RaftProtos.RaftClientRequestProto.TypeCase.WRITE,
-            TimeDuration.valueOf(writeTimeout, TimeUnit.MILLISECONDS))
+            toTimeDuration(ratisClientConfig.getWriteRequestTimeout()))
         .setTimeout(RaftProtos.RaftClientRequestProto.TypeCase.WATCH,
-            TimeDuration.valueOf(watchTimeout, TimeUnit.MILLISECONDS))
+            toTimeDuration(ratisClientConfig.getWatchRequestTimeout()))
         .build();
   }
 
   private static ExponentialBackoffRetry createExponentialBackoffPolicy(
       RatisClientConfig ratisClientConfig) {
-    long exponentialBaseSleep =
-        ratisClientConfig.getExponentialPolicyBaseSleepInMs();
-    long exponentialMaxSleep =
-        ratisClientConfig.getExponentialPolicyMaxSleepInMs();
     return ExponentialBackoffRetry.newBuilder()
         .setBaseSleepTime(
-            TimeDuration.valueOf(exponentialBaseSleep, TimeUnit.MILLISECONDS))
+            toTimeDuration(ratisClientConfig.getExponentialPolicyBaseSleep()))
         .setMaxSleepTime(
-            TimeDuration.valueOf(exponentialMaxSleep, TimeUnit.MILLISECONDS))
+            toTimeDuration(ratisClientConfig.getExponentialPolicyMaxSleep()))
         .build();
   }
 
@@ -369,4 +363,13 @@ public final class RatisHelper {
     return commitInfos.stream().map(RaftProtos.CommitInfoProto::getCommitIndex)
         .min(Long::compareTo).orElse(null);
   }
+
+  private static TimeDuration toTimeDuration(Duration duration) {
+    return toTimeDuration(duration.toMillis());
+  }
+
+  private static TimeDuration toTimeDuration(long milliseconds) {
+    return TimeDuration.valueOf(milliseconds, TimeUnit.MILLISECONDS);
+  }
+
 }

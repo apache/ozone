@@ -14,14 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-
 #
 # Can be executed with bats (https://github.com/bats-core/bats-core)
-# bats gc_opts.bats (FROM THE CURRENT DIRECTORY)
+# bats gc_opts.bats
 #
 
-source ../../shell/hdds/hadoop-functions.sh
+load ../../shell/hdds/hadoop-functions.sh
 @test "Setting Hadoop GC parameters: add GC params for server" {
   export HADOOP_SUBCMD_SUPPORTDAEMONIZATION=true
   export HADOOP_OPTS="Test"
