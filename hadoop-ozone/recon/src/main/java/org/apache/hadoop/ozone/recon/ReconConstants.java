@@ -32,7 +32,17 @@ public final class ReconConstants {
 
   public static final String RECON_CONTAINER_KEY_DB = "recon-container-key.db";
 
-  public static final String CONTAINER_COUNT_KEY = "totalCount";
+  public static final String CONTAINER_COUNT_KEY = "containerCount";
+
+  public static final String VOLUME_COUNT_KEY = "volumeCount";
+
+  public static final String BUCKET_COUNT_KEY = "bucketCount";
+
+  public static final String KEY_COUNT_KEY = "keyCount";
+
+  public static final String OPEN_KEY_COUNT_KEY = "openKeyCount";
+
+  public static final String DELETED_KEY_COUNT_KEY = "deletedKeyCount";
 
   public static final String RECON_OM_SNAPSHOT_DB =
       "om.snapshot.db";

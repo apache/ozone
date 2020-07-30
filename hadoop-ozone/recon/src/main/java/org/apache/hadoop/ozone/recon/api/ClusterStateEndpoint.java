@@ -24,10 +24,11 @@ import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStateResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
-import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
+import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
+import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,6 +39,10 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.List;
+
+import static org.apache.hadoop.ozone.recon.ReconConstants.BUCKET_COUNT_KEY;
+import static org.apache.hadoop.ozone.recon.ReconConstants.KEY_COUNT_KEY;
+import static org.apache.hadoop.ozone.recon.ReconConstants.VOLUME_COUNT_KEY;
 
 /**
  * Endpoint to fetch current state of ozone cluster.
@@ -52,17 +57,17 @@ public class ClusterStateEndpoint {
   private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
   private ReconContainerManager containerManager;
-  private ReconOMMetadataManager omMetadataManager;
+  private GlobalStatsDao globalStatsDao;
 
   @Inject
   ClusterStateEndpoint(OzoneStorageContainerManager reconSCM,
-                       ReconOMMetadataManager omMetadataManager) {
+                       GlobalStatsDao globalStatsDao) {
     this.nodeManager =
         (ReconNodeManager) reconSCM.getScmNodeManager();
     this.pipelineManager = (ReconPipelineManager) reconSCM.getPipelineManager();
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
-    this.omMetadataManager = omMetadataManager;
+    this.globalStatsDao = globalStatsDao;
   }
 
   /**
@@ -80,25 +85,17 @@ public class ClusterStateEndpoint {
         new DatanodeStorageReport(stats.getCapacity().get(),
             stats.getScmUsed().get(), stats.getRemaining().get());
     ClusterStateResponse.Builder builder = ClusterStateResponse.newBuilder();
-    if (omMetadataManager.isOmTablesInitialized()) {
-      try {
-        builder.setVolumes(
-            omMetadataManager.getVolumeTable().getEstimatedKeyCount());
-      } catch (Exception ex) {
-        LOG.error("Unable to get Volumes count in ClusterStateResponse.", ex);
-      }
-      try {
-        builder.setBuckets(
-            omMetadataManager.getBucketTable().getEstimatedKeyCount());
-      } catch (Exception ex) {
-        LOG.error("Unable to get Buckets count in ClusterStateResponse.", ex);
-      }
-      try {
-        builder.setKeys(
-            omMetadataManager.getKeyTable().getEstimatedKeyCount());
-      } catch (Exception ex) {
-        LOG.error("Unable to get Keys count in ClusterStateResponse.", ex);
-      }
+    GlobalStats volumeRecord = globalStatsDao.findById(VOLUME_COUNT_KEY);
+    GlobalStats bucketRecord = globalStatsDao.findById(BUCKET_COUNT_KEY);
+    GlobalStats keyRecord = globalStatsDao.findById(KEY_COUNT_KEY);
+    if (volumeRecord != null) {
+      builder.setVolumes(volumeRecord.getValue());
+    }
+    if (bucketRecord != null) {
+      builder.setBuckets(bucketRecord.getValue());
+    }
+    if (keyRecord != null) {
+      builder.setKeys(keyRecord.getValue());
     }
     ClusterStateResponse response = builder
         .setStorageReport(storageReport)
