@@ -242,7 +242,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
     switch (result) {
     case SUCCESS:
       LOG.debug("Rename Keys is successfully completed for auditMap:{}.",
-          auditMap.toString());
+          auditMap);
       break;
     case FAILURE:
       ozoneManager.getMetrics().incNumKeyRenameFails();
