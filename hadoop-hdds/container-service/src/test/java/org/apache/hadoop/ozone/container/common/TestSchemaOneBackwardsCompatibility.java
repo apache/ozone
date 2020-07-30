@@ -304,8 +304,7 @@ public class TestSchemaOneBackwardsCompatibility {
   private int countDeletedBlocks(ReferenceCountedDB refCountedDB)
           throws IOException {
     return refCountedDB.getStore().getDeletedBlocksTable()
-            .getRangeKVs(null, 100,
-                    MetadataKeyFilters.getDeletedKeyFilter()).size();
+            .getRangeKVs(null, 100).size();
   }
 
   private int countDeletingBlocks(ReferenceCountedDB refCountedDB)

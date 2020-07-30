@@ -150,9 +150,13 @@ public class SchemaOneDeletedBlocksTable extends TypedTable<String, NoData> {
   private static MetadataKeyFilters.MetadataKeyFilter[] addDeletedFilter(
           MetadataKeyFilters.MetadataKeyFilter[] currentFilters) {
 
+    MetadataKeyFilters.KeyPrefixFilter deletedFilter =
+            new MetadataKeyFilters.KeyPrefixFilter();
+    deletedFilter.addFilter(DELETED_KEY_PREFIX);
+
     List<MetadataKeyFilters.MetadataKeyFilter> newFilters =
             Arrays.asList(currentFilters);
-    newFilters.add(MetadataKeyFilters.getDeletedKeyFilter());
+    newFilters.add(deletedFilter);
 
     return newFilters.toArray(new MetadataKeyFilters.MetadataKeyFilter[0]);
   }

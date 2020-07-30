@@ -205,8 +205,7 @@ public class TestBlockDeletingService {
 
   private int getDeletedBlocksCount(ReferenceCountedDB db) throws IOException {
     return db.getStore().getDeletedBlocksTable()
-          .getRangeKVs(null, 100,
-          MetadataKeyFilters.getDeletedKeyFilter()).size();
+          .getRangeKVs(null, 100).size();
   }
 
   @Test

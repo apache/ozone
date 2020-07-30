@@ -300,7 +300,7 @@ public class BlockDeletingService extends BackgroundService {
                       OzoneConsts.DELETING_KEY_PREFIX.length());
 
           deletedBlocksTable.putWithBatch(
-                  batch, OzoneConsts.DELETED_KEY_PREFIX + blockId,
+                  batch, blockId,
                   NoData.get());
           blockDataTable.deleteWithBatch(batch, entry);
         }

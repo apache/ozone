@@ -345,7 +345,7 @@ public class TestBlockDeletion {
                 blockID.getLocalID();
         Assert.assertNull(db.getStore().getBlockDataTable().get(deletingKey));
         Assert.assertNotNull(db.getStore().getDeletedBlocksTable()
-            .get(blockID.getLocalID()));
+            .get(Long.toString(blockID.getLocalID())));
       }
       containerIdsWithDeletedBlocks.add(blockID.getContainerID());
     }, omKeyLocationInfoGroups);
