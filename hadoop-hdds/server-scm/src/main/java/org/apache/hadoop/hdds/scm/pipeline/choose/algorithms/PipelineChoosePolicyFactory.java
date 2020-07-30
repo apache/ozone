@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.scm.pipeline.choose.algorithms;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -30,7 +30,7 @@ import java.lang.reflect.Constructor;
 
 /**
  * A factory to create pipeline choose policy instance based on configuration
- * property {@link ScmConfigKeys#OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_KEY}.
+ * property {@link ScmConfig}.
  */
 public final class PipelineChoosePolicyFactory {
   private static final Logger LOG =
@@ -45,10 +45,23 @@ public final class PipelineChoosePolicyFactory {
 
   public static PipelineChoosePolicy getPolicy(
       ConfigurationSource conf) throws SCMException {
-    final Class<? extends PipelineChoosePolicy> policyClass = conf
-        .getClass(ScmConfigKeys.OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_KEY,
-            OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
-            PipelineChoosePolicy.class);
+    ScmConfig scmConfig = conf.getObject(ScmConfig.class);
+    Class<? extends PipelineChoosePolicy> policyClass;
+    try {
+      String policyName = scmConfig.getPipelineChoosePolicyName();
+      Class<?> theClass = Class.forName(policyName);
+      Class<PipelineChoosePolicy> xface = PipelineChoosePolicy.class;
+      if (theClass != null && !xface.isAssignableFrom(theClass)) {
+        throw new RuntimeException(theClass + " not " + xface.getName());
+      } else if (theClass != null) {
+        policyClass = theClass.asSubclass(xface);
+      } else {
+        policyClass = null;
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+
     try {
       return createPipelineChoosePolicyFromClass(policyClass);
     } catch (Exception e) {

@@ -59,6 +59,21 @@ public class ScmConfig {
   )
   private String action;
 
+  @Config(key = "pipeline.choose.policy.impl",
+      type = ConfigType.STRING,
+      defaultValue = "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms" +
+          ".RandomPipelineChoosePolicy",
+      tags = { ConfigTag.SCM, ConfigTag.PIPELINE },
+      description =
+          "The full name of class which implements "
+          + "org.apache.hadoop.hdds.scm.PipelineChoosePolicy. "
+          + "The class decides which pipeline will be used to find or "
+          + "allocate container. If not set, "
+          + "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms. "
+          + "RandomPipelineChoosePolicy will be used as default value."
+  )
+  private String pipelineChoosePolicyName;
+
   public void setKerberosPrincipal(String kerberosPrincipal) {
     this.principal = kerberosPrincipal;
   }
@@ -82,6 +97,10 @@ public class ScmConfig {
 
   public String getUnknownContainerAction() {
     return this.action;
+  }
+
+  public String getPipelineChoosePolicyName() {
+    return pipelineChoosePolicyName;
   }
 
   /**
