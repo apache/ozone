@@ -19,13 +19,9 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.db.CodecRegistry;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TypedTable;
+import org.apache.hadoop.hdds.utils.db.*;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.hdds.utils.db.cache.TableCacheImpl;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -55,44 +51,55 @@ import java.util.List;
  * {@link SchemaOneDeletedBlocksTable#iterator} will return keys prefixed
  * with {@link SchemaOneDeletedBlocksTable#DELETED_KEY_PREFIX}.
  */
-public class SchemaOneDeletedBlocksTable extends TypedTable<String, NoData> {
+public class SchemaOneDeletedBlocksTable implements Table<String, NoData> {
   public static final String DELETED_KEY_PREFIX = "#deleted#";
 
-  public SchemaOneDeletedBlocksTable(
-          Table<byte[], byte[]> rawTable,
-          CodecRegistry codecRegistry, Class<String> keyType,
-          Class<NoData> valueType) throws IOException {
-    super(rawTable, codecRegistry, keyType, valueType);
-  }
+  private Table<String, NoData> table;
 
-  public SchemaOneDeletedBlocksTable(
-          Table<byte[], byte[]> rawTable,
-          CodecRegistry codecRegistry, Class<String> keyType,
-          Class<NoData> valueType,
-          TableCacheImpl.CacheCleanupPolicy cleanupPolicy) throws IOException {
-    super(rawTable, codecRegistry, keyType, valueType, cleanupPolicy);
+  public SchemaOneDeletedBlocksTable(TypedTable<String, NoData> table) {
+    this.table = table;
   }
 
   @Override
   public void put(String key, NoData value) throws IOException {
-    super.put(prefix(key), value);
+    table.put(prefix(key), value);
   }
 
   @Override
   public void putWithBatch(BatchOperation batch, String key, NoData value)
           throws IOException {
-    super.putWithBatch(batch, prefix(key), value);
+    table.putWithBatch(batch, prefix(key), value);
+  }
+
+  @Override
+  public boolean isEmpty() throws IOException {
+    return table.isEmpty();
   }
 
   @Override
   public void delete(String key) throws IOException {
-    super.delete(prefix(key));
+    table.delete(prefix(key));
   }
 
   @Override
   public void deleteWithBatch(BatchOperation batch, String key)
           throws IOException {
-    super.deleteWithBatch(batch, prefix(key));
+    table.deleteWithBatch(batch, prefix(key));
+  }
+
+  @Override
+  public TableIterator<String, ? extends KeyValue<String, NoData>> iterator() {
+    return table.iterator();
+  }
+
+  @Override
+  public String getName() throws IOException {
+    return table.getName();
+  }
+
+  @Override
+  public long getEstimatedKeyCount() throws IOException {
+    return table.getEstimatedKeyCount();
   }
 
   @Override
@@ -100,47 +107,52 @@ public class SchemaOneDeletedBlocksTable extends TypedTable<String, NoData> {
                             CacheValue<NoData> cacheValue) {
     CacheKey<String> prefixedCacheKey =
             new CacheKey<>(prefix(cacheKey.getCacheKey()));
-    super.addCacheEntry(prefixedCacheKey, cacheValue);
+    table.addCacheEntry(prefixedCacheKey, cacheValue);
   }
 
   @Override
   public boolean isExist(String key) throws IOException {
-    return super.isExist(prefix(key));
+    return table.isExist(prefix(key));
   }
 
   @Override
   public NoData get(String key) throws IOException {
-    return super.get(prefix(key));
+    return table.get(prefix(key));
   }
 
   @Override
   public NoData getIfExist(String key) throws IOException {
-    return super.getIfExist(prefix(key));
+    return table.getIfExist(prefix(key));
   }
 
   @Override
   public NoData getReadCopy(String key) throws IOException {
-    return super.getReadCopy(prefix(key));
+    return table.getReadCopy(prefix(key));
   }
 
   @Override
-  public List<TypedKeyValue> getRangeKVs(
+  public List<? extends KeyValue<String, NoData>> getRangeKVs(
           String startKey, int count,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
 
-    return super.getRangeKVs(prefix(startKey), count,
+    return table.getRangeKVs(prefix(startKey), count,
             addDeletedFilter(filters));
   }
 
   @Override
-  public List<TypedKeyValue> getSequentialRangeKVs(
+  public List<? extends KeyValue<String, NoData>> getSequentialRangeKVs(
           String startKey, int count,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
 
-    return super.getSequentialRangeKVs(prefix(startKey), count,
+    return table.getSequentialRangeKVs(prefix(startKey), count,
             addDeletedFilter(filters));
+  }
+
+  @Override
+  public void close() throws Exception {
+    table.close();
   }
 
   private static String prefix(String key) {
