@@ -36,11 +36,11 @@ public final class PipelineRequestInformation {
 
     /**
      * sets the size.
-     * @param size request size
+     * @param sz request size
      * @return Builder for PipelineRequestInformation
      */
-    public PipelineRequestInformation.Builder setSize(long size) {
-      this.size = size;
+    public Builder setSize(long sz) {
+      this.size = sz;
       return this;
     }
 

@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Random choose policy that randomly chooses pipeline.
