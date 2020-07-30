@@ -84,7 +84,6 @@ public class HadoopNestedDirGenerator extends BaseFreonGenerator
       OzoneConfiguration configuration = createOzoneConfiguration();
       fileSystem = FileSystem.get(URI.create(rootPath), configuration);
       runTests(this::createDir);
-      return null;
     }
     return null;
   }

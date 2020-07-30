@@ -113,7 +113,6 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
       timer = getMetrics().timer("file-create");
 
       runTests(this::createDir);
-      return null;
     }
     return null;
   }

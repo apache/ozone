@@ -301,9 +301,13 @@ public class BaseFreonGenerator {
     messages.forEach(print);
   }
 
-  public void print(String s){
+  /**
+   * Print out the messages for HadoopNestedDirGenerator
+   * and HadoopDirTreeGenerator tools.
+   */
+  public void print(String msg){
     List<String> messages = new LinkedList<>();
-    messages.add(s);
+    messages.add(msg);
     Consumer<String> print = freonCommand.isInteractive()
             ? System.out::println
             : LOG::info;
