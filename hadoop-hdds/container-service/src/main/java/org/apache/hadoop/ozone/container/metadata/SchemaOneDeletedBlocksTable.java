@@ -137,8 +137,10 @@ public class SchemaOneDeletedBlocksTable implements Table<String, NoData> {
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
 
-    return table.getRangeKVs(prefix(startKey), count,
-            addDeletedFilter(filters));
+    // Deleted blocks will always have the #deleted# key prefix and nothing
+    // else in this schema version. Ignore any user passed prefixes that could
+    // collide with this, returning results that are not deleted blocks.
+    return table.getRangeKVs(prefix(startKey), count, getDeletedFilter());
   }
 
   @Override
@@ -147,8 +149,11 @@ public class SchemaOneDeletedBlocksTable implements Table<String, NoData> {
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
 
+    // Deleted blocks will always have the #deleted# key prefix and nothing
+    // else in this schema version. Ignore any user passed prefixes that could
+    // collide with this, returning results that are not deleted blocks.
     return table.getSequentialRangeKVs(prefix(startKey), count,
-            addDeletedFilter(filters));
+            getDeletedFilter());
   }
 
   @Override
@@ -165,17 +170,8 @@ public class SchemaOneDeletedBlocksTable implements Table<String, NoData> {
     return result;
   }
 
-  private static MetadataKeyFilters.MetadataKeyFilter[] addDeletedFilter(
-          MetadataKeyFilters.MetadataKeyFilter[] currentFilters) {
-
-    MetadataKeyFilters.KeyPrefixFilter deletedFilter =
-            new MetadataKeyFilters.KeyPrefixFilter();
-    deletedFilter.addFilter(DELETED_KEY_PREFIX);
-
-    List<MetadataKeyFilters.MetadataKeyFilter> newFilters =
-            new ArrayList<>(Arrays.asList(currentFilters));
-    newFilters.add(deletedFilter);
-
-    return newFilters.toArray(new MetadataKeyFilters.MetadataKeyFilter[0]);
+  private static MetadataKeyFilters.KeyPrefixFilter getDeletedFilter() {
+    return (new MetadataKeyFilters.KeyPrefixFilter())
+            .addFilter(DELETED_KEY_PREFIX);
   }
 }
