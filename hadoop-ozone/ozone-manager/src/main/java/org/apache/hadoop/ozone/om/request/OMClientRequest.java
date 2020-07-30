@@ -295,7 +295,7 @@ public abstract class OMClientRequest implements RequestAuditor {
           .normalize().getPath();
     }
     if (!keyName.equals(normalizedKeyName)) {
-      LOG.debug("Normalized key {} to {} ", keyName,
+      LOG.info("Normalized key {} to {} ", keyName,
           normalizedKeyName.substring(1));
     }
     return isValidKeyPath(normalizedKeyName.substring(1));
