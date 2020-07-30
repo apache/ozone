@@ -90,12 +90,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
           .setModificationTime(Time.now());
       renameKey.toBuilder().setKeyArgs(newKeyArgs);
       renameKeyList.add(renameKey);
-      if (volumeName == null) {
-        volumeName = renameKey.getKeyArgs().getVolumeName();
-      }
-      if (bucketName == null) {
-        bucketName = renameKey.getKeyArgs().getBucketName();
-      }
+
     }
     RenameKeysRequest renameKeysRequest = RenameKeysRequest
         .newBuilder().addAllRenameKeyRequest(renameKeyList).build();
@@ -129,8 +124,6 @@ public class OMKeysRenameRequest extends OMKeyRequest {
 
     Result result = null;
     Map<String, String> auditMap = new LinkedHashMap<>();
-    auditMap.put(VOLUME, volumeName);
-    auditMap.put(BUCKET, bucketName);
     String fromKeyName = null;
     String toKeyName = null;
     boolean acquiredLock = false;
@@ -142,9 +135,15 @@ public class OMKeysRenameRequest extends OMKeyRequest {
         OzoneManagerProtocolProtos.KeyArgs keyArgs =
             renameKeyRequest.getKeyArgs();
 
-        keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
-        volumeName = keyArgs.getVolumeName();
-        bucketName = keyArgs.getBucketName();
+        // resolve Bucket Link at the first time.
+        if (bucketName == null) {
+          keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
+          volumeName = keyArgs.getVolumeName();
+          bucketName = keyArgs.getBucketName();
+          auditMap.put(VOLUME, volumeName);
+          auditMap.put(BUCKET, bucketName);
+        }
+
         fromKeyName = keyArgs.getKeyName();
         toKeyName = renameKeyRequest.getToKeyName();
 
