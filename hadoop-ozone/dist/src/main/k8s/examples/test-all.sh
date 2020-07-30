@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -13,15 +14,31 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-name: ozone/onenode
-description: remove scheduling rules to make it possible to run multiple datanode on the same k8s node.
----
-- type: Remove
-  trigger:
-    metadata:
-      name: datanode
-  path:
-    - spec
-    - template
-    - spec
-    - affinity
+
+
+#
+# Test executor to test all the compose/*/test.sh test scripts.
+#
+SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )
+
+set -ex
+
+ALL_RESULT_DIR="$SCRIPT_DIR/result"
+rm "$ALL_RESULT_DIR/*" || true
+mkdir -p "$ALL_RESULT_DIR"
+
+RESULT=0
+IFS=$'\n'
+# shellcheck disable=SC2044
+for test in $(find "$SCRIPT_DIR" -name test.sh | grep "${OZONE_TEST_SELECTOR:-""}" |sort); do
+  echo ""
+  echo "#### Executing tests of $(dirname "$test") #####"
+  echo ""
+  TEST_DIR="$(dirname $test)"
+  cd "$TEST_DIR" || continue
+  ./test.sh
+  cp "$TEST_DIR"/result/output.xml "$ALL_RESULT_DIR"/"$(basename "$TEST_DIR")".xml
+done
+
+rebot -N "smoketests" -d "$ALL_RESULT_DIR/" "$ALL_RESULT_DIR/*.xml"
+
