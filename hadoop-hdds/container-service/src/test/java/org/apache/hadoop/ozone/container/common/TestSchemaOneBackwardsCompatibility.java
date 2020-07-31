@@ -100,13 +100,6 @@ public class TestSchemaOneBackwardsCompatibility {
     }
 
     dbFile = potentialDBFiles[0];
-
-    // Fix incorrect values.
-//    RocksDB rocksDB = RocksDB.open(testDB.getDBDirectory().getAbsolutePath());
-//    rocksDB.put(StringUtils.string2Bytes(OzoneConsts.CONTAINER_BYTES_USED),
-//            Longs.toByteArray(400));
-//    rocksDB.close();
-//    System.out.println('f');
   }
 
   /**
