@@ -252,7 +252,15 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <configuration>
           <excludes>
             <exclude>**/hs_err*.log</exclude>
+            <exclude>**/.attach_*</exclude>
+            <exclude>**/**.rej</exclude>
+            <exclude>**/.factorypath</exclude>
+            <exclude>public</exclude>
+            <exclude>**/*.iml</exclude>
             <exclude>**/target/**</exclude>
+            <exclude>**/output.xml</exclude>
+            <exclude>**/log.html</exclude>
+            <exclude>**/report.html</exclude>
             <exclude>.gitattributes</exclude>
             <exclude>.idea/**</exclude>
             <exclude>src/main/resources/webapps/static/angular-1.7.9.min.js</exclude>
@@ -269,7 +277,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             <exclude>src/test/resources/incorrect.checksum.container</exclude>
             <exclude>src/test/resources/incorrect.container</exclude>
             <exclude>src/test/resources/test.db.ini</exclude>
-            <exclude>src/main/proto/proto.lock</exclude>
+            <exclude>src/main/resources/proto.lock</exclude>
           </excludes>
         </configuration>
       </plugin>

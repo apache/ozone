@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
@@ -137,6 +138,7 @@ public class TestKeyManagerImpl {
   private static NodeManager nodeManager;
   private static StorageContainerManager scm;
   private static ScmBlockLocationProtocol mockScmBlockLocationProtocol;
+  private static StorageContainerLocationProtocol mockScmContainerClient;
   private static OzoneConfiguration conf;
   private static OMMetadataManager metadataManager;
   private static File dir;
@@ -178,9 +180,11 @@ public class TestKeyManagerImpl {
             StorageUnit.BYTES);
     conf.setLong(OZONE_KEY_PREALLOCATION_BLOCKS_MAX, 10);
 
+    mockScmContainerClient =
+        Mockito.mock(StorageContainerLocationProtocol.class);
     keyManager =
-        new KeyManagerImpl(scm.getBlockProtocolServer(), metadataManager, conf,
-            "om1", null);
+        new KeyManagerImpl(scm.getBlockProtocolServer(),
+            mockScmContainerClient, metadataManager, conf, "om1", null);
     prefixManager = new PrefixManagerImpl(metadataManager, false);
 
     Mockito.when(mockScmBlockLocationProtocol
@@ -763,6 +767,12 @@ public class TestKeyManagerImpl {
     keyArgs.setLocationInfoList(locationInfoList);
 
     keyManager.commitKey(keyArgs, keySession.getId());
+    ContainerInfo containerInfo = new ContainerInfo.Builder().setContainerID(1L)
+        .setPipelineID(pipeline.getId()).build();
+    List<ContainerWithPipeline> containerWithPipelines = Arrays.asList(
+        new ContainerWithPipeline(containerInfo, pipeline));
+    when(mockScmContainerClient.getContainerWithPipelineBatch(
+        Arrays.asList(1L))).thenReturn(containerWithPipelines);
 
     OmKeyInfo key = keyManager.lookupKey(keyArgs, null);
     Assert.assertEquals(key.getKeyName(), keyName);

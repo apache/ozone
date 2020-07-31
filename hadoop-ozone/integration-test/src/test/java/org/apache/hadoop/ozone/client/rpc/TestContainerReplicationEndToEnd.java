@@ -45,8 +45,8 @@ import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -65,7 +65,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_L
  * Tests delete key operation with a slow follower in the datanode
  * pipeline.
  */
-@Ignore
 public class TestContainerReplicationEndToEnd {
 
   private static MiniOzoneCluster cluster;
@@ -94,10 +93,10 @@ public class TestContainerReplicationEndToEnd {
 
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL,
         containerReportInterval, TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, containerReportInterval,
-        TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL,
+        5 * containerReportInterval, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL,
-        2 * containerReportInterval, TimeUnit.MILLISECONDS);
+        10 * containerReportInterval, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 1000,
         TimeUnit.SECONDS);
     DatanodeRatisServerConfig ratisServerConfig =
@@ -167,9 +166,13 @@ public class TestContainerReplicationEndToEnd {
             .getPipeline(pipelineID);
     key.close();
 
-    if (cluster.getStorageContainerManager().getContainerManager()
-        .getContainer(new ContainerID(containerID)).getState() !=
-        HddsProtos.LifeCycleState.CLOSING) {
+    HddsProtos.LifeCycleState containerState =
+        cluster.getStorageContainerManager().getContainerManager()
+            .getContainer(new ContainerID(containerID)).getState();
+    LoggerFactory.getLogger(TestContainerReplicationEndToEnd.class).info(
+        "Current Container State is {}",  containerState);
+    if ((containerState != HddsProtos.LifeCycleState.CLOSING) &&
+        (containerState != HddsProtos.LifeCycleState.CLOSED)) {
       cluster.getStorageContainerManager().getContainerManager()
           .updateContainerState(new ContainerID(containerID),
               HddsProtos.LifeCycleEvent.FINALIZE);

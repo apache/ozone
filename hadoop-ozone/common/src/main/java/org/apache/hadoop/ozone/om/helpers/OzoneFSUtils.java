@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.util.StringUtils;
 
 import java.nio.file.Paths;
 
@@ -95,5 +96,34 @@ public final class OzoneFSUtils {
   public static String getFileName(String keyName) {
     java.nio.file.Path keyPath = Paths.get(keyName);
     return keyPath.getFileName().toString();
+  }  
+
+  /**
+   * Whether the pathname is valid.  Currently prohibits relative paths,
+   * names which contain a ":" or "//", or other non-canonical paths.
+   */
+  public static boolean isValidName(String src) {
+    // Path must be absolute.
+    if (!src.startsWith(Path.SEPARATOR)) {
+      return false;
+    }
+
+    // Check for ".." "." ":" "/"
+    String[] components = StringUtils.split(src, '/');
+    for (int i = 0; i < components.length; i++) {
+      String element = components[i];
+      if (element.equals(".")  ||
+          (element.contains(":"))  ||
+          (element.contains("/") || element.equals(".."))) {
+        return false;
+      }
+      // The string may start or end with a /, but not have
+      // "//" in the middle.
+      if (element.isEmpty() && i != components.length - 1 &&
+          i != 0) {
+        return false;
+      }
+    }
+    return true;
   }
 }

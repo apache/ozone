@@ -45,6 +45,8 @@ message DatanodeDetailsProto {
     optional string networkLocation = 7; // Network topology location
     optional string version = 8;         // Datanode version
     optional int64 setupTime = 9;
+    optional string revision = 10;
+    optional string buildDate = 11;
     // TODO(runzhiwang): when uuid is gone, specify 1 as the index of uuid128 and mark as required
     optional UUID uuid128 = 100; // UUID with 128 bits assigned to the Datanode.
 }

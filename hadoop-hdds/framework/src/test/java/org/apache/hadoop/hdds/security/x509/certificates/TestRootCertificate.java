@@ -19,11 +19,14 @@
 
 package org.apache.hadoop.hdds.security.x509.certificates;
 
+import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.SelfSignedCertificate;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
@@ -33,6 +36,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.InvalidKeyException;
@@ -48,6 +52,9 @@ import java.util.Date;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.CSR_ERROR;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 /**
  * Test Class for Root Certificate generation.
@@ -131,7 +138,7 @@ public class TestRootCertificate {
   @Test
   public void testCACert()
       throws SCMSecurityException, NoSuchProviderException,
-      NoSuchAlgorithmException, IOException {
+      NoSuchAlgorithmException, IOException, CertificateException {
     LocalDate notBefore = LocalDate.now();
     LocalDate notAfter = notBefore.plus(365, ChronoUnit.DAYS);
     String clusterID = UUID.randomUUID().toString();
@@ -152,6 +159,23 @@ public class TestRootCertificate {
             .setConfiguration(conf)
             .makeCA();
 
+    try {
+      DomainValidator validator = DomainValidator.getInstance();
+      // Add all valid ips.
+      OzoneSecurityUtil.getValidInetsForCurrentHost().forEach(
+          ip -> {
+            builder.addIpAddress(ip.getHostAddress());
+            if(validator.isValid(ip.getCanonicalHostName())) {
+              builder.addDnsName(ip.getCanonicalHostName());
+            }
+          });
+    } catch (IOException e) {
+      throw new org.apache.hadoop.hdds.security.x509
+          .exceptions.CertificateException(
+          "Error while adding ip to CA self signed certificate", e,
+          CSR_ERROR);
+    }
+
     X509CertificateHolder certificateHolder = builder.build();
     // This time we asked for a CertificateServer Certificate, make sure that
     // extension is
@@ -165,6 +189,22 @@ public class TestRootCertificate {
     // Since this code assigns ONE for the root certificate, we check if the
     // serial number is the expected number.
     Assert.assertEquals(certificateHolder.getSerialNumber(), BigInteger.ONE);
+
+    CertificateCodec codec = new CertificateCodec(securityConfig, "scm");
+    String pemString = codec.getPEMEncodedString(certificateHolder);
+
+    File basePath = temporaryFolder.newFolder();
+    if (!basePath.exists()) {
+      Assert.assertTrue(basePath.mkdirs());
+    }
+    codec.writeCertificate(basePath.toPath(), "pemcertificate.crt",
+        pemString, false);
+
+    X509CertificateHolder loadedCert =
+        codec.readCertificate(basePath.toPath(), "pemcertificate.crt");
+    assertNotNull(loadedCert);
+    assertEquals(certificateHolder.getSerialNumber(),
+        loadedCert.getSerialNumber());
   }
 
   @Test
