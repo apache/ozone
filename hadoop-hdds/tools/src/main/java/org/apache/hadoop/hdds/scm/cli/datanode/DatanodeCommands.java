@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -21,7 +21,6 @@ import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.scm.cli.container.WithScmClient;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Model.CommandSpec;
@@ -42,13 +41,6 @@ public class DatanodeCommands implements Callable<Void> {
 
   @Spec
   private CommandSpec spec;
-
-  @CommandLine.ParentCommand
-  private WithScmClient parent;
-
-  public WithScmClient getParent() {
-    return parent;
-  }
 
   @Override
   public Void call() throws Exception {

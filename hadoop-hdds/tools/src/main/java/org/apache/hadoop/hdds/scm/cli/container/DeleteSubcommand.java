@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,16 +18,16 @@
 
 package org.apache.hadoop.hdds.scm.cli.container;
 
-import java.util.concurrent.Callable;
+import java.io.IOException;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 
 import static org.apache.hadoop.hdds.scm.cli.container.ContainerCommands.checkContainerExists;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
-import picocli.CommandLine.ParentCommand;
 
 /**
  * This is the handler that process delete container command.
@@ -37,7 +37,7 @@ import picocli.CommandLine.ParentCommand;
     description = "Delete container",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class DeleteSubcommand implements Callable<Void> {
+public class DeleteSubcommand extends ScmSubcommand {
 
   @Parameters(description = "Id of the container to close")
   private long containerId;
@@ -46,15 +46,9 @@ public class DeleteSubcommand implements Callable<Void> {
       "--force"}, description = "forcibly delete the container")
   private boolean force;
 
-  @ParentCommand
-  private ContainerCommands parent;
-
   @Override
-  public Void call() throws Exception {
-    try (ScmClient scmClient = parent.getParent().createScmClient()) {
-      checkContainerExists(scmClient, containerId);
-      scmClient.deleteContainer(containerId, force);
-      return null;
-    }
+  public void execute(ScmClient scmClient) throws IOException {
+    checkContainerExists(scmClient, containerId);
+    scmClient.deleteContainer(containerId, force);
   }
 }

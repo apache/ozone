@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.Spec;
 
 /**
@@ -49,13 +48,6 @@ public class ContainerCommands implements Callable<Void> {
 
   @Spec
   private CommandSpec spec;
-
-  @ParentCommand
-  private WithScmClient parent;
-
-  public WithScmClient getParent() {
-    return parent;
-  }
 
   @Override
   public Void call() throws Exception {

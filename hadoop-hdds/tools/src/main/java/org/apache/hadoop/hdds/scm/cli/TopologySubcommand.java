@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -29,7 +29,6 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.cli.container.WithScmClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
@@ -54,17 +53,17 @@ public class TopologySubcommand implements Callable<Void> {
   @Spec
   private CommandSpec spec;
 
-  @CommandLine.ParentCommand
-  private WithScmClient parent;
+  @CommandLine.Mixin
+  private ScmOption scmOption;
 
-  private static List<HddsProtos.NodeState> stateArray = new ArrayList<>();
+  private static final List<HddsProtos.NodeState> STATES = new ArrayList<>();
 
   static {
-    stateArray.add(HEALTHY);
-    stateArray.add(STALE);
-    stateArray.add(DEAD);
-    stateArray.add(DECOMMISSIONING);
-    stateArray.add(DECOMMISSIONED);
+    STATES.add(HEALTHY);
+    STATES.add(STALE);
+    STATES.add(DEAD);
+    STATES.add(DECOMMISSIONING);
+    STATES.add(DECOMMISSIONED);
   }
 
   @CommandLine.Option(names = {"-o", "--order"},
@@ -77,11 +76,11 @@ public class TopologySubcommand implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    try (ScmClient scmClient = parent.createScmClient()) {
-      for (HddsProtos.NodeState state : stateArray) {
+    try (ScmClient scmClient = scmOption.createScmClient()) {
+      for (HddsProtos.NodeState state : STATES) {
         List<HddsProtos.Node> nodes = scmClient.queryNode(state,
             HddsProtos.QueryScope.CLUSTER, "");
-        if (nodes != null && nodes.size() > 0) {
+        if (nodes != null && !nodes.isEmpty()) {
           // show node state
           System.out.println("State = " + state.toString());
           if (order) {
@@ -124,7 +123,7 @@ public class TopologySubcommand implements Callable<Void> {
     StringBuilder sb = new StringBuilder();
     for (int i = 0; i < ports.size(); i++) {
       HddsProtos.Port port = ports.get(i);
-      sb.append(port.getName() + "=" + port.getValue());
+      sb.append(port.getName()).append("=").append(port.getValue());
       if (i < ports.size() - 1) {
         sb.append(",");
       }

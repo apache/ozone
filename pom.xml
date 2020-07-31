@@ -260,7 +260,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>info.picocli</groupId>
         <artifactId>picocli</artifactId>
-        <version>3.9.6</version>
+        <version>4.4.0</version>
       </dependency>
       <dependency>
         <groupId>jdiff</groupId>
