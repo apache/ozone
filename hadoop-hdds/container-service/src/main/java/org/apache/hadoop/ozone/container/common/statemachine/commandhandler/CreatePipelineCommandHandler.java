@@ -98,7 +98,8 @@ public class CreatePipelineCommandHandler implements CommandHandler {
             d -> !d.getUuid().equals(dn.getUuid()))
             .forEach(d -> {
               final RaftPeer peer = RatisHelper.toRaftPeer(d);
-              try (RaftClient client = RatisHelper.newRaftClient(peer, conf)) {
+              try (RaftClient client = RatisHelper.newRaftClient(peer, conf,
+                  ozoneContainer.getTlsClientConfig())) {
                 client.groupAdd(group, peer.getId());
               } catch (AlreadyExistsException ae) {
                 // do not log

@@ -43,6 +43,8 @@ interface IDatanodeResponse {
   uuid: string;
   version: string;
   setupTime: number;
+  revision: string;
+  buildDate: string;
 }
 
 interface IDatanodesResponse {
@@ -63,6 +65,8 @@ interface IDatanode {
   uuid: string;
   version: string;
   setupTime: number;
+  revision: string;
+  buildDate: string;
 }
 
 interface IPipeline {
@@ -103,16 +107,8 @@ const COLUMNS = [
     filters: DatanodeStatusList.map(status => ({text: status, value: status})),
     onFilter: (value: DatanodeStatus, record: IDatanode) => record.state === value,
     render: (text: DatanodeStatus) => renderDatanodeStatus(text),
-    sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state)
-  },
-  {
-    title: 'Uuid',
-    dataIndex: 'uuid',
-    key: 'uuid',
-    isVisible: true,
-    isSearchable: true,
-    sorter: (a: IDatanode, b: IDatanode) => a.uuid.localeCompare(b.uuid),
-    defaultSortOrder: 'ascend' as const
+    sorter: (a: IDatanode, b: IDatanode) => a.state.localeCompare(b.state),
+    fixed: 'left'
   },
   {
     title: 'Hostname',
@@ -121,6 +117,16 @@ const COLUMNS = [
     isVisible: true,
     isSearchable: true,
     sorter: (a: IDatanode, b: IDatanode) => a.hostname.localeCompare(b.hostname),
+    defaultSortOrder: 'ascend' as const,
+    fixed: 'left'
+  },
+  {
+    title: 'Uuid',
+    dataIndex: 'uuid',
+    key: 'uuid',
+    isVisible: true,
+    isSearchable: true,
+    sorter: (a: IDatanode, b: IDatanode) => a.uuid.localeCompare(b.uuid),
     defaultSortOrder: 'ascend' as const
   },
   {
@@ -208,6 +214,24 @@ const COLUMNS = [
     render: (uptime: number) => {
       return uptime > 0 ? moment(uptime).format('ll LTS') : 'NA';
     }
+  },
+  {
+    title: 'Revision',
+    dataIndex: 'revision',
+    key: 'revision',
+    isVisible: false,
+    isSearchable: true,
+    sorter: (a: IDatanode, b: IDatanode) => a.revision.localeCompare(b.revision),
+    defaultSortOrder: 'ascend' as const
+  },
+  {
+    title: 'BuildDate',
+    dataIndex: 'buildDate',
+    key: 'buildDate',
+    isVisible: false,
+    isSearchable: true,
+    sorter: (a: IDatanode, b: IDatanode) => a.buildDate.localeCompare(b.buildDate),
+    defaultSortOrder: 'ascend' as const
   }
 ];
 
@@ -244,10 +268,19 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
     });
   };
 
+  _getSelectedColumns = (selected: IOption[]) => {
+    const selectedColumns = selected.length > 0 ? selected : COLUMNS.filter(column => column.isVisible).map(column => ({
+      label: column.key,
+      value: column.key
+    }));
+    return selectedColumns;
+  };
+
   _loadData = () => {
-    this.setState({
-      loading: true
-    });
+    this.setState(prevState => ({
+      loading: true,
+      selectedColumns: this._getSelectedColumns(prevState.selectedColumns)
+    }));
     axios.get('/api/v1/datanodes').then(response => {
       const datanodesResponse: IDatanodesResponse = response.data;
       const totalCount = datanodesResponse.totalCount;
@@ -265,21 +298,17 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
           containers: datanode.containers,
           leaderCount: datanode.leaderCount,
           version: datanode.version,
-          setupTime: datanode.setupTime
+          setupTime: datanode.setupTime,
+          revision: datanode.revision,
+          buildDate: datanode.buildDate
         };
       });
-      const selectedColumns: IOption[] = COLUMNS.filter(column => column.isVisible).map(column => ({
-        label: column.key,
-        value: column.key
-      }));
 
       this.setState({
         loading: false,
         dataSource,
         totalCount,
         lastUpdated: Number(moment())
-      }, () => {
-        this._handleColumnChange(selectedColumns, {action: 'select-option'});
       });
     }).catch(error => {
       this.setState({
@@ -357,6 +386,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
             loading={loading}
             pagination={paginationConfig}
             rowKey='hostname'
+            scroll={{x: true, y: false, scrollToFirstRowOnChange: true}}
           />
         </div>
       </div>

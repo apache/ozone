@@ -96,7 +96,8 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
 
       repeatedOmKeyInfo =
           OmUtils.prepareKeyForDelete(openPartKeyInfoToBeDeleted,
-          repeatedOmKeyInfo, omMultipartKeyInfo.getUpdateID(), isRatisEnabled);
+          repeatedOmKeyInfo, openPartKeyInfoToBeDeleted.getUpdateID(),
+              isRatisEnabled);
 
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
           openKey, repeatedOmKeyInfo);

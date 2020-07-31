@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,23 +15,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.upgrade;
 
-import java.util.concurrent.Callable;
+package org.apache.hadoop.ozone.om.helpers;
 
-import picocli.CommandLine.Command;
+import org.junit.Assert;
+import org.junit.Test;
 
 /**
- * Execute Ozone specific HDFS ballanced..
+ * Test OzoneFsUtils.
  */
-@Command(name = "execute",
-    description = "Start/restart upgrade from HDFS to Ozone cluster.")
-public class Execute implements Callable<Void> {
+public class TestOzoneFsUtils {
 
-  @Override
-  public Void call() throws Exception {
-    System.err.println("In-Place upgrade : execute] is not yet supported.");
-    return null;
+  @Test
+  public void testPaths() {
+    Assert.assertTrue(OzoneFSUtils.isValidName("/a/b"));
+    Assert.assertFalse(OzoneFSUtils.isValidName("../../../a/b"));
+    Assert.assertFalse(OzoneFSUtils.isValidName("/./."));
+    Assert.assertFalse(OzoneFSUtils.isValidName("/:/"));
+    Assert.assertFalse(OzoneFSUtils.isValidName("a/b"));
+    Assert.assertFalse(OzoneFSUtils.isValidName("/a:/b"));
+    Assert.assertFalse(OzoneFSUtils.isValidName("/a//b"));
   }
-
 }

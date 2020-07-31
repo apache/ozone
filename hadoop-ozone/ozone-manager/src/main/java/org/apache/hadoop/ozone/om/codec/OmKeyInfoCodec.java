@@ -18,23 +18,34 @@
 package org.apache.hadoop.ozone.om.codec;
 
 import java.io.IOException;
+
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.hdds.utils.db.Codec;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.InvalidProtocolBufferException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Codec to encode OmKeyInfo as byte array.
  */
 public class OmKeyInfoCodec implements Codec<OmKeyInfo> {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OmKeyInfoCodec.class);
+
+  private final boolean ignorePipeline;
+  public OmKeyInfoCodec(boolean ignorePipeline) {
+    this.ignorePipeline = ignorePipeline;
+    LOG.info("OmKeyInfoCodec ignorePipeline = " + ignorePipeline);
+  }
 
   @Override
   public byte[] toPersistedFormat(OmKeyInfo object) throws IOException {
     Preconditions
         .checkNotNull(object, "Null object can't be converted to byte array.");
-    return object.getProtobuf().toByteArray();
+    return object.getProtobuf(ignorePipeline).toByteArray();
   }
 
   @Override
