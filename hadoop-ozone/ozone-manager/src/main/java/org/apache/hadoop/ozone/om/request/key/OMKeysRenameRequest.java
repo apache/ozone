@@ -113,6 +113,9 @@ public class OMKeysRenameRequest extends OMKeyRequest {
       bucket.audit(auditMap);
       volumeName = bucket.realVolume();
       bucketName = bucket.realBucket();
+      acquiredLock =
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
+              volumeName, bucketName);
 
       for (RenameKeysMap renameKey : renameKeysArgs.getRenameKeysMapList()) {
 
@@ -183,9 +186,6 @@ public class OMKeysRenameRequest extends OMKeyRequest {
         //Set modification time
         fromKeyValue.setModificationTime(Time.now());
 
-        acquiredLock =
-            omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-                volumeName, bucketName);
         // Add to cache.
         // fromKey should be deleted, toKey should be added with newly updated
         // omKeyInfo.
@@ -196,16 +196,8 @@ public class OMKeysRenameRequest extends OMKeyRequest {
             new CacheValue<>(Optional.of(fromKeyValue), trxnLogIndex));
         renamedKeys.put(fromKeyName, toKeyName);
         fromKeyAndToKeyInfo.put(fromKeyName, fromKeyValue);
-        if (acquiredLock) {
-          omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-              bucketName);
-          acquiredLock = false;
-        }
       }
 
-      acquiredLock =
-          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-              volumeName, bucketName);
       OmRenameKeys newOmRenameKeys =
           new OmRenameKeys(volumeName, bucketName, null, fromKeyAndToKeyInfo);
       omClientResponse = new OMKeysRenameResponse(omResponse
