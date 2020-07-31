@@ -55,6 +55,7 @@ jobs:
         with:
           name: ${{ github.job }}
           path: target/${{ github.job }}
+        continue-on-error: true
   rat:
     name: rat
     runs-on: ubuntu-18.04
