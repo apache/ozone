@@ -305,12 +305,10 @@ public class BaseFreonGenerator {
    * Print out reports with the given message.
    */
   public void print(String msg){
-    List<String> messages = new LinkedList<>();
-    messages.add(msg);
     Consumer<String> print = freonCommand.isInteractive()
             ? System.out::println
             : LOG::info;
-    messages.forEach(print);
+    print.accept(msg);
   }
 
   /**
