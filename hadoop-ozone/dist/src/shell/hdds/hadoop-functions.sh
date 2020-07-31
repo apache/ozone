@@ -999,7 +999,7 @@ function hadoop_connect_to_hosts
   # shellcheck disable=SC2124
   local params="$@"
   local worker_file
-  local tmpslvnames
+  local tmp_worker_names
 
   #
   # ssh (or whatever) to a host
@@ -1030,10 +1030,10 @@ function hadoop_connect_to_hosts
     else
       # no spaces allowed in the pdsh arg host list
       # shellcheck disable=SC2086
-      tmpslvnames=$(echo ${HADOOP_WORKER_NAMES} | tr -s ' ' ,)
+      tmp_worker_names=$(echo ${HADOOP_WORKER_NAMES} | tr -s ' ' ,)
       PDSH_SSH_ARGS_APPEND="${HADOOP_SSH_OPTS}" pdsh \
         -f "${HADOOP_SSH_PARALLEL}" \
-        -w "${tmpslvnames}" $"${@// /\\ }" 2>&1
+        -w "${tmp_worker_names}" $"${@// /\\ }" 2>&1
     fi
   else
     if [[ -z "${HADOOP_WORKER_NAMES}" ]]; then
