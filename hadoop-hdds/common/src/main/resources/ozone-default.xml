@@ -2422,7 +2422,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.client.buffer.size</name>
+    <name>ozone.s3g.client.buffer.size</name>
     <tag>OZONE, S3GATEWAY</tag>
     <value>4KB</value>
     <description>
