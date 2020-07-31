@@ -815,20 +815,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.scm.pipeline.choose.policy.impl</name>
-    <value>
-      org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy
-    </value>
-    <tag>OZONE, MANAGEMENT</tag>
-    <description>
-      The full name of class which implements
-      org.apache.hadoop.hdds.scm.PipelineChoosePolicy.
-      The class decides which pipeline will be used to find or allocate container. If not set,
-      org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy will be used as default
-      value.
-    </description>
-  </property>
-  <property>
     <name>ozone.scm.pipeline.owner.container.count</name>
     <value>3</value>
     <tag>OZONE, SCM, PIPELINE</tag>
