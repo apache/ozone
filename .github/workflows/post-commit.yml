@@ -62,7 +62,6 @@ jobs:
           path: target/${{ github.job }}
         continue-on-error: true
   rat:
-    name: rat
     runs-on: ubuntu-18.04
     steps:
       - name: Checkout project
@@ -82,7 +81,6 @@ jobs:
           path: target/rat
         continue-on-error: true
   author:
-    name: author
     runs-on: ubuntu-18.04
     steps:
       - name: Checkout project
@@ -100,7 +98,6 @@ jobs:
           path: target/author
         continue-on-error: true
   unit:
-    name: unit
     runs-on: ubuntu-18.04
     steps:
       - name: Checkout project
@@ -120,7 +117,6 @@ jobs:
           path: target/unit
         continue-on-error: true
   checkstyle:
-    name: checkstyle
     runs-on: ubuntu-18.04
     steps:
       - name: Checkout project
@@ -140,7 +136,6 @@ jobs:
           path: target/checkstyle
         continue-on-error: true
   findbugs:
-    name: findbugs
     runs-on: ubuntu-18.04
     steps:
       - name: Checkout project
@@ -160,7 +155,6 @@ jobs:
           path: target/findbugs
         continue-on-error: true
   acceptance:
-    name: acceptance
     runs-on: ubuntu-18.04
     strategy:
       matrix:
@@ -225,7 +219,6 @@ jobs:
           rm -rf ~/.m2/repository/org/apache/hadoop/ozone
         if: always()
   integration:
-    name: integration
     runs-on: ubuntu-18.04
     strategy:
       matrix:
@@ -256,7 +249,6 @@ jobs:
           path: mnt/ozone/target/integration
         continue-on-error: true
   coverage:
-    name: coverage
     runs-on: ubuntu-18.04
     needs:
       - acceptance
@@ -296,7 +288,6 @@ jobs:
           path: target/coverage
         continue-on-error: true
   kubernetes:
-    name: kubernetes
     runs-on: ubuntu-18.04
     steps:
       - name: Cache for maven dependencies
