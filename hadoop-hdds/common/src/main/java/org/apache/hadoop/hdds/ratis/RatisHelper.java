@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.ratis.retrypolicy.RetryLimitedPolicyCreator;
+import org.apache.hadoop.hdds.ratis.retrypolicy.RequestTypeDependentRetryPolicyCreator;
 import org.apache.hadoop.hdds.ratis.retrypolicy.RetryPolicyCreator;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -277,7 +277,7 @@ public final class RatisHelper {
     try {
       RetryPolicyCreator creator = conf.getClass(
           OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_RETRY_POLICY,
-          RetryLimitedPolicyCreator.class,
+          RequestTypeDependentRetryPolicyCreator.class,
           RetryPolicyCreator.class).newInstance();
       return creator.create(conf);
     } catch (Exception e) {

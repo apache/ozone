@@ -2522,7 +2522,7 @@
     <tag>OZONE, RATIS, MANAGEMENT</tag>
     <description>
       The class name of the policy for retry. Defaults to
-      org.apache.hadoop.hdds.ratis.retrypolicy.RetryLimitedPolicyCreator.
+      org.apache.hadoop.hdds.ratis.retrypolicy.RequestTypeDependentRetryPolicyCreator.
     </description>
   </property>
 </configuration>

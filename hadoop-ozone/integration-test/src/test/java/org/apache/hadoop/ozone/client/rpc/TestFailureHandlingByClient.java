@@ -33,8 +33,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
-import org.apache.hadoop.hdds.ratis.retrypolicy.RequestTypeDependentRetryPolicyCreator;
-import org.apache.hadoop.hdds.ratis.retrypolicy.RetryPolicyCreator;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -99,10 +97,6 @@ public class TestFailureHandlingByClient {
     chunkSize = (int) OzoneConsts.MB;
     blockSize = 4 * chunkSize;
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 100, TimeUnit.SECONDS);
-
-    conf.setClass(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_RETRY_POLICY,
-        RequestTypeDependentRetryPolicyCreator.class,
-        RetryPolicyCreator.class);
 
     RatisClientConfig ratisClientConfig =
         conf.getObject(RatisClientConfig.class);
