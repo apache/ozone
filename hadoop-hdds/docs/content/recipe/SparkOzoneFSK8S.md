@@ -112,7 +112,6 @@ Download any text file and put it to the `/tmp/alice.txt` first.
 
 ```bash
 kubectl port-forward s3g-0 9878:9878
-ozone sh volume create /s3v
 aws s3api --endpoint http://localhost:9878 create-bucket --bucket=test
 aws s3api --endpoint http://localhost:9878 put-object --bucket test --key alice.txt --body /tmp/alice.txt
 ```

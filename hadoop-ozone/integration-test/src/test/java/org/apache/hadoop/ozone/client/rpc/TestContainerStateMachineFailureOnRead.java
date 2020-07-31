@@ -100,15 +100,15 @@ public class TestContainerStateMachineFailureOnRead {
 
     RatisClientConfig.RaftConfig raftClientConfig =
         conf.getObject(RatisClientConfig.RaftConfig.class);
-    raftClientConfig.setRpcRequestTimeout(TimeUnit.SECONDS.toMillis(3));
-    raftClientConfig.setRpcWatchRequestTimeout(TimeUnit.SECONDS.toMillis(3));
+    raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
+    raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(3));
     conf.setFromObject(raftClientConfig);
 
 
     RatisClientConfig ratisClientConfig =
         conf.getObject(RatisClientConfig.class);
-    ratisClientConfig.setWriteRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(30));
-    ratisClientConfig.setWatchRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(30));
+    ratisClientConfig.setWriteRequestTimeout(Duration.ofSeconds(30));
+    ratisClientConfig.setWatchRequestTimeout(Duration.ofSeconds(30));
     conf.setFromObject(ratisClientConfig);
 
     conf.setQuietMode(false);
