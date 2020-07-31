@@ -411,29 +411,4 @@ public class TestKeyValueContainer {
           .getResult());
     }
   }
-
-  @Test
-  public void testRocksDBCreateUsesCachedOptions() throws Exception {
-    int initialSize = MetadataStoreBuilder.CACHED_OPTS.size();
-
-    // Create Container 1
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
-    Assert.assertTrue("Rocks DB options should be cached.",
-        MetadataStoreBuilder.CACHED_OPTS.containsKey(conf));
-
-    Options opts = MetadataStoreBuilder.CACHED_OPTS.get(conf);
-
-    // Create Container 2
-    keyValueContainerData = new KeyValueContainerData(2L,
-        layout,
-        (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
-        datanodeId.toString());
-
-    keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
-
-    assertEquals(initialSize + 1, MetadataStoreBuilder.CACHED_OPTS.size());
-    Options cachedOpts = MetadataStoreBuilder.CACHED_OPTS.get(conf);
-    assertSame("Cache object should not be updated.", opts, cachedOpts);
-  }
 }
