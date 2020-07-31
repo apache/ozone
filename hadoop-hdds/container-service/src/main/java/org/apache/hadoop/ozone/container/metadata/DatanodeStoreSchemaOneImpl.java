@@ -28,8 +28,6 @@ import java.io.IOException;
  * family.
  */
 public class DatanodeStoreSchemaOneImpl extends AbstractDatanodeStore {
-  private Table<String, NoData> deletedBlocksTable;
-
   /**
    * Constructs the metadata store and starts the DB Services.
    *
