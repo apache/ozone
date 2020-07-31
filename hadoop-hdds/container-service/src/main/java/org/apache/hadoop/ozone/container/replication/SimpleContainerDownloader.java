@@ -18,8 +18,10 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -27,6 +29,7 @@ import java.util.function.Function;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import org.slf4j.Logger;
@@ -45,9 +48,11 @@ public class SimpleContainerDownloader implements ContainerDownloader {
       LoggerFactory.getLogger(SimpleContainerDownloader.class);
 
   private final Path workingDirectory;
+  private final SecurityConfig securityConfig;
+  private final X509Certificate caCert;
 
-  public SimpleContainerDownloader(ConfigurationSource conf) {
-
+  public SimpleContainerDownloader(ConfigurationSource conf,
+      X509Certificate caCert) {
     String workDirString =
         conf.get(OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR);
 
@@ -57,6 +62,8 @@ public class SimpleContainerDownloader implements ContainerDownloader {
     } else {
       workingDirectory = Paths.get(workDirString);
     }
+    securityConfig = new SecurityConfig(conf);
+    this.caCert = caCert;
   }
 
   @Override
@@ -66,22 +73,27 @@ public class SimpleContainerDownloader implements ContainerDownloader {
     CompletableFuture<Path> result = null;
     for (DatanodeDetails datanode : sourceDatanodes) {
       try {
-
         if (result == null) {
           GrpcReplicationClient grpcReplicationClient =
               new GrpcReplicationClient(datanode.getIpAddress(),
                   datanode.getPort(Name.STANDALONE).getValue(),
-                  workingDirectory);
+                  workingDirectory, securityConfig, caCert);
           result = grpcReplicationClient.download(containerId);
         } else {
           result = result.thenApply(CompletableFuture::completedFuture)
               .exceptionally(t -> {
                 LOG.error("Error on replicating container: " + containerId, t);
-                GrpcReplicationClient grpcReplicationClient =
-                    new GrpcReplicationClient(datanode.getIpAddress(),
-                        datanode.getPort(Name.STANDALONE).getValue(),
-                        workingDirectory);
-                return grpcReplicationClient.download(containerId);
+                try {
+                  GrpcReplicationClient grpcReplicationClient =
+                      new GrpcReplicationClient(datanode.getIpAddress(),
+                          datanode.getPort(Name.STANDALONE).getValue(),
+                          workingDirectory, securityConfig, caCert);
+                  return grpcReplicationClient.download(containerId);
+                } catch (IOException e) {
+                  LOG.error("Error on replicating container: " + containerId,
+                      t);
+                  return null;
+                }
               }).thenCompose(Function.identity());
         }
       } catch (Exception ex) {

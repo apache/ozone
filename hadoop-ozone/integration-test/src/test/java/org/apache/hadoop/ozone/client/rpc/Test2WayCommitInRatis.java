@@ -100,8 +100,8 @@ public class Test2WayCommitInRatis {
 
     RatisClientConfig.RaftConfig raftClientConfig =
         conf.getObject(RatisClientConfig.RaftConfig.class);
-    raftClientConfig.setRpcRequestTimeout(TimeUnit.SECONDS.toMillis(3));
-    raftClientConfig.setRpcWatchRequestTimeout(TimeUnit.SECONDS.toMillis(10));
+    raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
+    raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(10));
     conf.setFromObject(raftClientConfig);
 
     conf.setQuietMode(false);

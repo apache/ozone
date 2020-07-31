@@ -20,7 +20,7 @@ Library             String
 Resource            ../commonlib.robot
 Resource            ../lib/os.robot
 Resource            ../ozone-lib/shell.robot
-Test Setup          Setup Test
+Suite Setup         Setup Test
 Test Timeout        5 minutes
 
 *** Variables ***
@@ -38,3 +38,8 @@ Create Encrypted Bucket
     ${output} =      Execute    ozone sh bucket create -k ${KEY_NAME} o3://${OM_SERVICE_ID}/${VOLUME}/encrypted-bucket
                      Should Not Contain    ${output}    INVALID_REQUEST
     Bucket Exists    o3://${OM_SERVICE_ID}/${VOLUME}/encrypted-bucket
+
+Create Key in Encrypted Bucket
+    ${key} =         Set Variable    o3://${OM_SERVICE_ID}/${VOLUME}/encrypted-bucket/passwd
+    ${output} =      Execute    ozone sh key put ${key} /etc/passwd
+    Key Should Match Local File    ${key}    /etc/passwd

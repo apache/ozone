@@ -422,12 +422,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   // In summary:
   // authenticate from server to client is via TLS.
   // authenticate from client to server is via block token (or container token).
+  // DN Ratis server act as both SSL client and server and we must pass TLS
+  // configuration for both.
   static GrpcTlsConfig createTlsServerConfigForDN(SecurityConfig conf,
       CertificateClient caClient) {
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
       return new GrpcTlsConfig(
           caClient.getPrivateKey(), caClient.getCertificate(),
-          null, false);
+          caClient.getCACertificate(), false);
     }
     return null;
   }

@@ -131,3 +131,4 @@ run cp -p -r "${ROOT}/hadoop-ozone/dist/target/Dockerfile" .
 
 #workaround for https://issues.apache.org/jira/browse/MRESOURCES-236
 find ./compose -name "*.sh" -exec chmod 755 {} \;
+find ./kubernetes -name "*.sh" -exec chmod 755 {} \;

@@ -367,9 +367,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OZONE_OM_USER_MAX_VOLUME + " value should be greater than zero");
 
     if (omStorage.getState() != StorageState.INITIALIZED) {
-      throw new OMException("OM not initialized, current OM storage state: " +
-          omStorage.getState().name() + ". Please ensure 'ozone om --init' "
-          + "command is executed once before starting the OM service.",
+      throw new OMException("OM not initialized, current OM storage state: "
+          + omStorage.getState().name() + ". Please ensure 'ozone om --init' "
+          + "command is executed to generate all the required metadata to "
+          + omStorage.getStorageDir()
+          + " once before starting the OM service.",
           ResultCodes.OM_NOT_INITIALIZED);
     }
     omMetaDir = OMStorage.getOmDbDir(configuration);
@@ -1145,8 +1147,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metricsTimer.schedule(scheduleOMMetricsWriteTask, 0, period);
 
     keyManager.start(configuration);
-    omRpcServer.start();
-    isOmRpcServerRunning = true;
+
     try {
       httpServer = new OzoneManagerHttpServer(configuration, this);
       httpServer.start();
@@ -1154,6 +1155,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // Allow OM to start as Http Server failure is not fatal.
       LOG.error("OM HttpServer failed to start.", ex);
     }
+    omRpcServer.start();
+    isOmRpcServerRunning = true;
+
     registerMXBean();
 
     startJVMPauseMonitor();
@@ -1199,8 +1203,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     omRpcServer = getRpcServer(configuration);
-    omRpcServer.start();
-    isOmRpcServerRunning = true;
 
     try {
       httpServer = new OzoneManagerHttpServer(configuration, this);
@@ -1209,6 +1211,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // Allow OM to start as Http Server failure is not fatal.
       LOG.error("OM HttpServer failed to start.", ex);
     }
+
+    omRpcServer.start();
+    isOmRpcServerRunning = true;
+
     registerMXBean();
 
     startJVMPauseMonitor();
@@ -1363,8 +1369,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setConfiguration(config)
         .setScmID(omStore.getScmId())
         .setClusterID(omStore.getClusterID())
-        .setSubject(subject)
-        .addIpAddress(ip);
+        .setSubject(subject);
 
     OMHANodeDetails haOMHANodeDetails = OMHANodeDetails.loadOMHAConfig(config);
     String serviceName =
@@ -2502,13 +2507,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .setType(ServicePort.Type.RPC)
             .setValue(omRpcAddress.getPort())
             .build());
-    if (httpServer.getHttpAddress() != null) {
+    if (httpServer != null
+        && httpServer.getHttpAddress() != null) {
       omServiceInfoBuilder.addServicePort(ServicePort.newBuilder()
           .setType(ServicePort.Type.HTTP)
           .setValue(httpServer.getHttpAddress().getPort())
           .build());
     }
-    if (httpServer.getHttpsAddress() != null) {
+    if (httpServer != null
+        && httpServer.getHttpsAddress() != null) {
       omServiceInfoBuilder.addServicePort(ServicePort.newBuilder()
           .setType(ServicePort.Type.HTTPS)
           .setValue(httpServer.getHttpsAddress().getPort())
