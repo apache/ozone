@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone;
 
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.thirdparty.io.grpc.Context;
@@ -235,7 +234,7 @@ public final class OzoneConsts {
   public static final String ORIGIN_NODE_ID = "originNodeId";
   public static final String SCHEMA_VERSION = "schemaVersion";
 
-  // Supported .container database schema versions
+  // Supported .container database schema versions.
   // V1: All data in default column family.
   public static final String SCHEMA_V1 = "1";
   // V2: Metadata, block data, and deleted blocks in their own column families.

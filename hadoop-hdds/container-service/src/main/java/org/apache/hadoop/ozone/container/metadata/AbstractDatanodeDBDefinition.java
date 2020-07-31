@@ -26,8 +26,7 @@ import java.io.File;
 
 /**
  * This class serves as an intermediate format for all possible database
- * layouts for datanodes. It is used to support the old (one column family) and
- * the new (three column family) formats.
+ * layouts for datanodes.
  */
 public abstract class AbstractDatanodeDBDefinition implements DBDefinition {
 
@@ -58,7 +57,7 @@ public abstract class AbstractDatanodeDBDefinition implements DBDefinition {
   }
 
   @Override
-  public DBColumnFamilyDefinition[] getColumnFamilies() {
+  public DBColumnFamilyDefinition<?, ?>[] getColumnFamilies() {
     return new DBColumnFamilyDefinition[] {getBlockDataColumnFamily(),
             getMetadataColumnFamily(), getDeletedBlocksColumnFamily()};
   }

@@ -18,14 +18,13 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 import java.io.IOException;
 
 /**
- * Constructs a datanode store that places all data in the default column
- * family.
+ * Constructs a datanode store in accordance with schema version 1, which
+ * places all data in the default column family.
  */
 public class DatanodeStoreSchemaOneImpl extends AbstractDatanodeStore {
   /**

@@ -23,9 +23,9 @@ import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 
 /**
- * This class defines a RocksDB structure for datanodes, where the block
- * data, metadata, and deleted block ids are put in their own separate column
- * families.
+ * This class defines the RocksDB structure for datanodes following schema
+ * version 2, where the block data, metadata, and deleted block ids are put in
+ * their own separate column families.
  */
 public class DatanodeSchemaTwoDBDefinition extends
         AbstractDatanodeDBDefinition {
@@ -74,7 +74,7 @@ public class DatanodeSchemaTwoDBDefinition extends
 
   @Override
   public DBColumnFamilyDefinition<String, NoData>
-  getDeletedBlocksColumnFamily() {
+      getDeletedBlocksColumnFamily() {
     return DELETED_BLOCKS;
   }
 }

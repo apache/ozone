@@ -25,8 +25,9 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.rocksdb.RocksDB;
 
 /**
- * This class allows support of the old RocksDB layout for datanode, where
- * all data was kept in the same default table. Clients can use this class as
+ * This class allows support of the schema version one RocksDB layout for
+ * datanode, where
+ * all data is kept in the same default table. Clients can use this class as
  * if the database is in the new format (which has separate column families for
  * block data, metadata and deleted block IDs), even
  * though all tables map back to the default table in this implementation.
@@ -80,7 +81,8 @@ public class DatanodeSchemaOneDBDefinition
   }
 
   @Override
-  public DBColumnFamilyDefinition<String, NoData> getDeletedBlocksColumnFamily() {
+  public DBColumnFamilyDefinition<String, NoData>
+      getDeletedBlocksColumnFamily() {
     return DELETED_BLOCKS;
   }
 }

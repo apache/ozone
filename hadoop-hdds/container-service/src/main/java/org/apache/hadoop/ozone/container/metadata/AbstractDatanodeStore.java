@@ -45,8 +45,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   private static final Logger LOG =
           LoggerFactory.getLogger(AbstractDatanodeStore.class);
   private DBStore store;
-  private AbstractDatanodeDBDefinition dbDef;
-  private final ConfigurationSource configuration;
+  private final AbstractDatanodeDBDefinition dbDef;
 
   /**
    * Constructs the metadata store and starts the DB services.
@@ -57,7 +56,6 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   protected AbstractDatanodeStore(ConfigurationSource config,
                                   AbstractDatanodeDBDefinition dbDef)
           throws IOException {
-    this.configuration = config;
     this.dbDef = dbDef;
     start(config);
   }

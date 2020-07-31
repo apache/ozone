@@ -24,8 +24,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -39,13 +37,13 @@ import java.util.List;
  * column families.
  * <p>
  * Since clients must operate independently of the underlying schema version,
- * This class is returned returned to clients using a RocksDB schema
- * version 1 instance, allowing them to access keys as if no prefix is
+ * This class is returned to clients using {@link DatanodeStoreSchemaOneImpl}
+ * instances, allowing them to access keys as if no prefix is
  * required, while it adds the prefix when necessary.
- * This means the client can always omit the deleted prefix when putting and
+ * This means the client should omit the deleted prefix when putting and
  * getting keys, regardless of the schema version.
  * <p>
- * Note that this method will only apply prefixes to keys as parameters,
+ * Note that this class will only apply prefixes to keys as parameters,
  * never as return types. This means that keys returned through iterators
  * like {@link SchemaOneDeletedBlocksTable#getSequentialRangeKVs},
  * {@link SchemaOneDeletedBlocksTable#getRangeKVs}, and
@@ -55,7 +53,7 @@ import java.util.List;
 public class SchemaOneDeletedBlocksTable implements Table<String, NoData> {
   public static final String DELETED_KEY_PREFIX = "#deleted#";
 
-  private Table<String, NoData> table;
+  private final Table<String, NoData> table;
 
   public SchemaOneDeletedBlocksTable(Table<String, NoData> table) {
     this.table = table;
@@ -88,6 +86,11 @@ public class SchemaOneDeletedBlocksTable implements Table<String, NoData> {
     table.deleteWithBatch(batch, prefix(key));
   }
 
+  /**
+   * Because the actual underlying table in this schema version is the
+   * default table where all keys are stored, this method will iterate
+   * through all keys in the database.
+   */
   @Override
   public TableIterator<String, ? extends KeyValue<String, NoData>> iterator() {
     return table.iterator();
@@ -131,6 +134,10 @@ public class SchemaOneDeletedBlocksTable implements Table<String, NoData> {
     return table.getReadCopy(prefix(key));
   }
 
+  /**
+   * Keys returned in the list by this method will begin with the
+   * {@link SchemaOneDeletedBlocksTable#DELETED_KEY_PREFIX}.
+   */
   @Override
   public List<? extends KeyValue<String, NoData>> getRangeKVs(
           String startKey, int count,
@@ -143,6 +150,10 @@ public class SchemaOneDeletedBlocksTable implements Table<String, NoData> {
     return table.getRangeKVs(prefix(startKey), count, getDeletedFilter());
   }
 
+  /**
+   * Keys returned in the list by this method will begin with the
+   * {@link SchemaOneDeletedBlocksTable#DELETED_KEY_PREFIX}.
+   */
   @Override
   public List<? extends KeyValue<String, NoData>> getSequentialRangeKVs(
           String startKey, int count,

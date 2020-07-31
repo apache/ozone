@@ -22,7 +22,8 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import java.io.IOException;
 
 /**
- * Constructs a datanode store that uses three column families/tables:
+ * Constructs a datanode store in accordance with schema version 2, which uses
+ * three column families/tables:
  * 1. A block data table.
  * 2. A metadata table.
  * 3. A deleted blocks table.

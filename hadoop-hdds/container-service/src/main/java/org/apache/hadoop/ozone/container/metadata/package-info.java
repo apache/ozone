@@ -17,5 +17,6 @@
  */
 package org.apache.hadoop.ozone.container.metadata;
 /**
- This package contains classes that define the structure of the datanode's database, and allow reading and writing to it.
+ This package contains classes that define the structure of the datanode's
+ database, and allow reading and writing to it.
 **/
