@@ -91,8 +91,7 @@ public class TestSchemaOneBackwardsCompatibility {
 
     if (potentialDBFiles == null || potentialDBFiles.length != 1) {
       throw new IOException("Failed load file named " + TestDB.DB_NAME + " " +
-              "from the " + "metadata directory " +
-              metadataDir.getAbsolutePath());
+              "from the metadata directory " + metadataDir.getAbsolutePath());
     }
 
     dbFile = potentialDBFiles[0];
@@ -100,10 +99,7 @@ public class TestSchemaOneBackwardsCompatibility {
     // Fix incorrect values.
 //    RocksDB rocksDB = RocksDB.open(testDB.getDBDirectory().getAbsolutePath());
 //    rocksDB.put(StringUtils.string2Bytes(OzoneConsts.CONTAINER_BYTES_USED),
-//            Longs.toByteArray(200));
-//    rocksDB.put(StringUtils.string2Bytes(
-//            OzoneConsts.PENDING_DELETE_BLOCK_COUNT),
-//            Longs.toByteArray(2));
+//            Longs.toByteArray(400));
 //    rocksDB.close();
 //    System.out.println('f');
   }
@@ -124,7 +120,7 @@ public class TestSchemaOneBackwardsCompatibility {
       assertEquals(TestDB.NUM_PENDING_DELETION_BLOCKS,
               countDeletingBlocks(refCountedDB));
 
-      assertEquals(TestDB.KEY_COUNT,
+      assertEquals(TestDB.KEY_COUNT - TestDB.NUM_PENDING_DELETION_BLOCKS,
               countUnprefixedBlocks(refCountedDB));
     }
   }
@@ -189,32 +185,36 @@ public class TestSchemaOneBackwardsCompatibility {
    */
   @Test
   public void testDelete() throws Exception {
-    final int numBlocksToDelete = 2;
+    final long numBlocksToDelete = TestDB.NUM_PENDING_DELETION_BLOCKS;
 
     runBlockDeletingService();
 
+    // Expected values after blocks with #deleting# prefix in original DB are
+    // deleted.
+    final long expectedDeletingBlocks =
+            TestDB.NUM_PENDING_DELETION_BLOCKS - numBlocksToDelete;
+    final long expectedDeletedBlocks =
+            TestDB.NUM_DELETED_BLOCKS + numBlocksToDelete;
+    final long expectedRegularBlocks =
+            TestDB.KEY_COUNT - numBlocksToDelete;
+
     try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
-      // Blocks marked with #deleting# prefix should be deleted.
-      assertEquals(TestDB.NUM_PENDING_DELETION_BLOCKS - numBlocksToDelete,
+      // Test results via block iteration.
+      assertEquals(expectedDeletingBlocks,
               countDeletingBlocks(refCountedDB));
-      assertEquals(TestDB.NUM_DELETED_BLOCKS + numBlocksToDelete,
+      assertEquals(expectedDeletedBlocks,
               countDeletedBlocks(refCountedDB));
+      assertEquals(expectedRegularBlocks,
+              countUnprefixedBlocks(refCountedDB));
 
-      // Regular blocks should remain unchanged.
-      assertEquals(TestDB.KEY_COUNT, countUnprefixedBlocks(refCountedDB));
-
-      // Since metadata is being stored in the same table, make sure it is not
-      // altered as well.
+      // Test table metadata.
       Table<String, Long> metadataTable =
               refCountedDB.getStore().getMetadataTable();
+      assertEquals(expectedRegularBlocks + expectedDeletingBlocks,
+              (long)metadataTable.get(OzoneConsts.BLOCK_COUNT));
+      // TODO : Determine why bytes used does not change.
       assertEquals(TestDB.BYTES_USED,
               (long)metadataTable.get(OzoneConsts.CONTAINER_BYTES_USED));
-      // TODO : Fix key count in KeyValueContainerUtil
-      //  .initializeUsedBytesAndBlockCount() to include #deleting# blocks,
-      //  and update the value stored in the DB as well. This will make this
-      //  test pass.
-//      assertEquals(TestDB.KEY_COUNT,
-//              (long)metadataTable.get(OzoneConsts.BLOCK_COUNT));
     }
   }
 
@@ -329,10 +329,10 @@ public class TestSchemaOneBackwardsCompatibility {
    * it has keys representing metadata, deleted blocks, deleting blocks, and
    * regular blocks.
    *
-   * The contents of the database are:
+   * The contents of the database (present in the default column family) are:
    *
-   * #BLOCKCOUNT : 2
-   * #BYTESUSED : 200
+   * #BLOCKCOUNT : 4
+   * #BYTESUSED : 400
    * #PENDINGDELETEBLOCKCOUNT : 2
    * #deleted#1596029079371 : 1596029079371
    * #deleted#1596029079374 : 1596029079374
@@ -349,8 +349,8 @@ public class TestSchemaOneBackwardsCompatibility {
     public static final String DB_NAME = CONTAINER_ID + "-dn-container.db";
 
     public static final String SCHEMA_VERSION = OzoneConsts.SCHEMA_V1;
-    public static final long KEY_COUNT = 2;
-    public static final long BYTES_USED = 200;
+    public static final long KEY_COUNT = 4;
+    public static final long BYTES_USED = 400;
     public static final long NUM_PENDING_DELETION_BLOCKS = 2;
     public static final long NUM_DELETED_BLOCKS = 2;
 
@@ -360,11 +360,11 @@ public class TestSchemaOneBackwardsCompatibility {
       loader = getClass().getClassLoader();
     }
 
-    private File getContainerFile() {
+    public File getContainerFile() {
       return load(CONTAINER_FILE_NAME);
     }
 
-    private File getDBDirectory() {
+    public File getDBDirectory() {
       return load(DB_NAME);
     }
 
