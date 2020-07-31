@@ -90,7 +90,7 @@ public class ReconContainerManager extends SCMContainerManager {
           datanodeDetails.getHostName());
       ContainerWithPipeline containerWithPipeline =
           scmClient.getContainerWithPipeline(containerID.getId());
-      LOG.info("Verified new container from SCM {}, part of {} ",
+      LOG.debug("Verified new container from SCM {}, {} ",
           containerID, containerWithPipeline.getPipeline().getId());
       // If no other client added this, go ahead and add this container.
       if (!exists(containerID)) {
