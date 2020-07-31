@@ -468,6 +468,9 @@ public class KeyManagerImpl implements KeyManager {
     openVersion = keyInfo.getLatestVersionLocations().getVersion();
     LOG.debug("Key {} allocated in volume {} bucket {}",
         keyName, volumeName, bucketName);
+
+    // Previously we initialized the size of the size greater than 0. Here we
+    // call allocateBlock.
     allocateBlockInKey(keyInfo, size, currentTime);
     return new OpenKeySession(currentTime, keyInfo, openVersion);
   }
@@ -477,16 +480,10 @@ public class KeyManagerImpl implements KeyManager {
     String openKey = metadataManager
         .getOpenKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
             keyInfo.getKeyName(), sessionId);
-    // requested size is not required but more like a optimization:
-    // SCM looks at the requested, if it 0, no block will be allocated at
-    // the point, if client needs more blocks, client can always call
-    // allocateBlock. But if requested size is not 0, OM will preallocate
-    // some blocks and piggyback to client, to save RPC calls.
-    if (size > 0) {
-      List<OmKeyLocationInfo> locationInfos =
-          allocateBlock(keyInfo, new ExcludeList(), size);
-      keyInfo.appendNewBlocks(locationInfos, true);
-    }
+
+    List<OmKeyLocationInfo> locationInfos =
+        allocateBlock(keyInfo, new ExcludeList(), size);
+    keyInfo.appendNewBlocks(locationInfos, true);
 
     metadataManager.getOpenKeyTable().put(openKey, keyInfo);
 
