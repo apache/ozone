@@ -50,7 +50,7 @@ jobs:
       - name: Summary of failures
         run: cat target/${{ github.job }}/summary.txt
         if: always()
-      - uses: actions/upload-artifact@master
+      - uses: actions/upload-artifact@v2
         if: always()
         with:
           name: ${{ github.job }}
@@ -313,7 +313,7 @@ jobs:
           cd /mnt/ozone/hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
           cd /mnt/ozone && hadoop-ozone/dev-support/checks/kubernetes.sh
       - name: Archive build results
-        uses: actions/upload-artifact@master
+        uses: actions/upload-artifact@v2
         if: always()
         with:
           name: kubernetes
