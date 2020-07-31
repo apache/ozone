@@ -287,7 +287,7 @@ public class BlockManagerImpl implements BlockManager {
         List<? extends Table.KeyValue<String, BlockData>> range =
             db.getStore().getBlockDataTable()
             .getSequentialRangeKVs(Long.toString(startLocalID), count,
-                MetadataKeyFilters.getNormalKeyFilter());
+                MetadataKeyFilters.getUnprefixedKeyFilter());
         for (Table.KeyValue<String, BlockData> entry: range) {
           BlockData data = new BlockData(entry.getValue().getBlockID());
           result.add(data);

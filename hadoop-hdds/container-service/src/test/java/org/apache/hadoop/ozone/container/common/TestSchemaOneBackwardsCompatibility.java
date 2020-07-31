@@ -305,7 +305,7 @@ public class TestSchemaOneBackwardsCompatibility {
           throws IOException {
     return refCountedDB.getStore().getDeletedBlocksTable()
             .getRangeKVs(null, 100,
-                    MetadataKeyFilters.getNormalKeyFilter()).size();
+                    MetadataKeyFilters.getUnprefixedKeyFilter()).size();
   }
 
   private int countDeletingBlocks(ReferenceCountedDB refCountedDB)
@@ -319,7 +319,7 @@ public class TestSchemaOneBackwardsCompatibility {
           throws IOException {
     return refCountedDB.getStore().getBlockDataTable()
             .getRangeKVs(null, 100,
-                    MetadataKeyFilters.getNormalKeyFilter()).size();
+                    MetadataKeyFilters.getUnprefixedKeyFilter()).size();
   }
 
   /**

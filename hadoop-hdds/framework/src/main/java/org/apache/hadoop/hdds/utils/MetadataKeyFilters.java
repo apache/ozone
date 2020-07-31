@@ -42,14 +42,15 @@ public final class MetadataKeyFilters {
             .addFilter(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
   }
 
-  public static KeyPrefixFilter getNormalKeyFilter() {
+  /**
+   * @return A {@link KeyPrefixFilter} that ignores all keys beginning with
+   * {@code #}. This uses the convention that key prefixes are surrounded by
+   * {@code #} to ignore keys with any prefix currently used or that will be
+   * added in the future.
+   */
+  public static KeyPrefixFilter getUnprefixedKeyFilter() {
     return new MetadataKeyFilters.KeyPrefixFilter()
-            .addFilter(OzoneConsts.DELETING_KEY_PREFIX, true)
-            .addFilter(OzoneConsts.DELETE_TRANSACTION_KEY_PREFIX, true)
-            .addFilter(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX, true)
-            .addFilter(OzoneConsts.BLOCK_COUNT, true)
-            .addFilter(OzoneConsts.CONTAINER_BYTES_USED, true)
-            .addFilter(OzoneConsts.PENDING_DELETE_BLOCK_COUNT, true);
+            .addFilter("#", true);
   }
   /**
    * Interface for levelDB key filters.

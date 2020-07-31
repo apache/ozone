@@ -128,7 +128,7 @@ public class TestStorageContainerManagerHelper {
     List<? extends Table.KeyValue<String, BlockData>> kvs =
           meta.getStore().getBlockDataTable()
           .getRangeKVs(null, Integer.MAX_VALUE,
-          MetadataKeyFilters.getNormalKeyFilter());
+          MetadataKeyFilters.getUnprefixedKeyFilter());
 
     for (Table.KeyValue<String, BlockData> entry : kvs) {
       allBlocks.add(Long.valueOf(entry.getKey()));

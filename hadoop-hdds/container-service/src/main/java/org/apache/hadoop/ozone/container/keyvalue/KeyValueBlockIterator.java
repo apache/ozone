@@ -47,7 +47,7 @@ import java.util.NoSuchElementException;
  * Block Iterator for KeyValue Container. This block iterator returns blocks
  * which match with the {@link MetadataKeyFilters.KeyPrefixFilter}. If no
  * filter is specified, then default filter used is
- * {@link MetadataKeyFilters#getNormalKeyFilter()}
+ * {@link MetadataKeyFilters#getUnprefixedKeyFilter()}
  */
 @InterfaceAudience.Public
 public class KeyValueBlockIterator implements BlockIterator<BlockData>,
@@ -60,7 +60,7 @@ public class KeyValueBlockIterator implements BlockIterator<BlockData>,
           blockIterator;
   private final ReferenceCountedDB db;
   private static KeyPrefixFilter defaultBlockFilter = MetadataKeyFilters
-      .getNormalKeyFilter();
+      .getUnprefixedKeyFilter();
   private KeyPrefixFilter blockFilter;
   private BlockData nextBlock;
   private long containerId;
