@@ -73,7 +73,7 @@ public class TestReconPipelineManager {
         temporaryFolder.newFolder().getAbsolutePath());
     conf.set(OZONE_SCM_NAMES, "localhost");
     scmStorageConfig = new ReconStorageConfig(conf);
-    store = DBStoreBuilder.createDBStore(conf, new ReconDBDefinition());
+    store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
   }
 
   @After
@@ -114,7 +114,7 @@ public class TestReconPipelineManager {
 
     try (ReconPipelineManager reconPipelineManager =
         new ReconPipelineManager(conf, nodeManager,
-            ReconDBDefinition.PIPELINES.getTable(store), eventQueue)) {
+            ReconSCMDBDefinition.PIPELINES.getTable(store), eventQueue)) {
       reconPipelineManager.addPipeline(validPipeline);
       reconPipelineManager.addPipeline(invalidPipeline);
 
@@ -150,7 +150,7 @@ public class TestReconPipelineManager {
 
     ReconPipelineManager reconPipelineManager =
         new ReconPipelineManager(conf, nodeManager,
-            ReconDBDefinition.PIPELINES.getTable(store), eventQueue);
+            ReconSCMDBDefinition.PIPELINES.getTable(store), eventQueue);
     assertFalse(reconPipelineManager.containsPipeline(pipeline.getId()));
     reconPipelineManager.addPipeline(pipeline);
     assertTrue(reconPipelineManager.containsPipeline(pipeline.getId()));
@@ -162,7 +162,7 @@ public class TestReconPipelineManager {
     NodeManager nodeManagerMock = mock(NodeManager.class);
 
     ReconPipelineManager reconPipelineManager = new ReconPipelineManager(
-        conf, nodeManagerMock, ReconDBDefinition.PIPELINES.getTable(store),
+        conf, nodeManagerMock, ReconSCMDBDefinition.PIPELINES.getTable(store),
         new EventQueue());
     PipelineFactory pipelineFactory = reconPipelineManager.getPipelineFactory();
     assertTrue(pipelineFactory instanceof ReconPipelineFactory);
