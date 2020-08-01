@@ -44,6 +44,12 @@ public class DBScanner implements Callable<Void> {
             description = "Table name")
   private String tableName;
 
+  @CommandLine.Option(names = {"--with-keys"},
+      description = "List Key -> Value instead of just Value.",
+      defaultValue = "false",
+      showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
+  private boolean withKey;
+
   @CommandLine.ParentCommand
   private RDBParser parent;
 
@@ -51,21 +57,29 @@ public class DBScanner implements Callable<Void> {
 
   private static void displayTable(RocksDB rocksDB,
         DBColumnFamilyDefinition dbColumnFamilyDefinition,
-        List<ColumnFamilyHandle> list) throws IOException {
+        List<ColumnFamilyHandle> list, boolean withKey) throws IOException {
     ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
             dbColumnFamilyDefinition.getTableName()
                     .getBytes(StandardCharsets.UTF_8), list);
-    if (columnFamilyHandle==null){
+    if (columnFamilyHandle == null) {
       throw new IllegalArgumentException("columnFamilyHandle is null");
     }
     RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle);
     iterator.seekToFirst();
     while (iterator.isValid()){
+      StringBuilder result = new StringBuilder();
+      if (withKey) {
+        Object key = dbColumnFamilyDefinition.getKeyCodec()
+            .fromPersistedFormat(iterator.key());
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        result.append(gson.toJson(key));
+        result.append(" -> ");
+      }
       Object o = dbColumnFamilyDefinition.getValueCodec()
               .fromPersistedFormat(iterator.value());
       Gson gson = new GsonBuilder().setPrettyPrinting().create();
-      String result = gson.toJson(o);
-      System.out.println(result);
+      result.append(gson.toJson(o));
+      System.out.println(result.toString());
       iterator.next();
     }
   }
@@ -132,7 +146,8 @@ public class DBScanner implements Callable<Void> {
       } else {
         DBColumnFamilyDefinition columnFamilyDefinition =
                 this.columnFamilyMap.get(tableName);
-        displayTable(rocksDB, columnFamilyDefinition, columnFamilyHandleList);
+        displayTable(rocksDB, columnFamilyDefinition, columnFamilyHandleList,
+            withKey);
       }
     } else {
       System.out.println("Incorrect db Path");

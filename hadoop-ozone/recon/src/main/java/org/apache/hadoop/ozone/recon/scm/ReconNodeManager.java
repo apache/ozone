@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
@@ -26,29 +25,21 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import org.apache.hadoop.hdds.StringUtils;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.utils.MetadataStore;
-import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
-import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.collect.ImmutableSet;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reregisterCommand;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DB_CACHE_SIZE_MB;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_NODE_DB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,7 +51,7 @@ public class ReconNodeManager extends SCMNodeManager {
   public static final Logger LOG = LoggerFactory
       .getLogger(ReconNodeManager.class);
 
-  private final MetadataStore nodeStore;
+  private Table<UUID, DatanodeDetails> nodeDB;
   private final static Set<Type> ALLOWED_COMMANDS =
       ImmutableSet.of(reregisterCommand);
 
@@ -73,27 +64,20 @@ public class ReconNodeManager extends SCMNodeManager {
   public ReconNodeManager(OzoneConfiguration conf,
                           SCMStorageConfig scmStorageConfig,
                           EventPublisher eventPublisher,
-                          NetworkTopology networkTopology) throws IOException {
+                          NetworkTopology networkTopology,
+                          Table<UUID, DatanodeDetails> nodeDB) {
     super(conf, scmStorageConfig, eventPublisher, networkTopology);
-    final File nodeDBPath = getNodeDBPath(conf);
-    final int cacheSize = conf.getInt(OZONE_SCM_DB_CACHE_SIZE_MB,
-        OZONE_SCM_DB_CACHE_SIZE_DEFAULT);
-    this.nodeStore = MetadataStoreBuilder.newBuilder()
-        .setConf(conf)
-        .setDbFile(nodeDBPath)
-        .setCacheSize(cacheSize * OzoneConsts.MB)
-        .build();
+    this.nodeDB = nodeDB;
     loadExistingNodes();
   }
 
   private void loadExistingNodes() {
     try {
-      List<Map.Entry<byte[], byte[]>> range = nodeStore
-          .getSequentialRangeKVs(null, Integer.MAX_VALUE, null);
       int nodeCount = 0;
-      for (Map.Entry<byte[], byte[]> entry : range) {
-        DatanodeDetails datanodeDetails = DatanodeDetails.getFromProtoBuf(
-            HddsProtos.DatanodeDetailsProto.PARSER.parseFrom(entry.getValue()));
+      TableIterator<UUID, ? extends Table.KeyValue<UUID, DatanodeDetails>>
+          iterator = nodeDB.iterator();
+      while (iterator.hasNext()) {
+        DatanodeDetails datanodeDetails = iterator.next().getValue();
         register(datanodeDetails, null, null);
         nodeCount++;
       }
@@ -108,25 +92,8 @@ public class ReconNodeManager extends SCMNodeManager {
    * @param datanodeDetails Datanode details.
    */
   public void addNodeToDB(DatanodeDetails datanodeDetails) throws IOException {
-    byte[] nodeIdBytes =
-        StringUtils.string2Bytes(datanodeDetails.getUuidString());
-    byte[] nodeDetailsBytes =
-        datanodeDetails.getProtoBufMessage().toByteArray();
-    nodeStore.put(nodeIdBytes, nodeDetailsBytes);
+    nodeDB.put(datanodeDetails.getUuid(), datanodeDetails);
     LOG.info("Adding new node {} to Node DB.", datanodeDetails.getUuid());
-  }
-
-  protected File getNodeDBPath(ConfigurationSource conf) {
-    File metaDir = ReconUtils.getReconScmDbDir(conf);
-    return new File(metaDir, RECON_SCM_NODE_DB);
-  }
-
-  @Override
-  public void close() throws IOException {
-    if (nodeStore != null) {
-      nodeStore.close();
-    }
-    super.close();
   }
 
   /**
