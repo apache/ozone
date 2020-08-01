@@ -30,13 +30,12 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.ratis.retrypolicy.RequestTypeDependentRetryPolicyCreator;
+import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.ratis.retrypolicy.RetryPolicyCreator;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.client.RaftClientConfigKeys;
@@ -275,11 +274,12 @@ public final class RatisHelper {
 
   public static RetryPolicy createRetryPolicy(ConfigurationSource conf) {
     try {
-      RetryPolicyCreator creator = conf.getClass(
-          OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_RETRY_POLICY,
-          RequestTypeDependentRetryPolicyCreator.class,
-          RetryPolicyCreator.class).newInstance();
-      return creator.create(conf);
+      RatisClientConfig scmClientConfig =
+          conf.getObject(RatisClientConfig.class);
+      Class<? extends RetryPolicyCreator> policyClass = getClass(
+          scmClientConfig.getRetryPolicy(),
+          RetryPolicyCreator.class);
+      return policyClass.newInstance().create(conf);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -289,5 +289,19 @@ public final class RatisHelper {
       Collection<RaftProtos.CommitInfoProto> commitInfos) {
     return commitInfos.stream().map(RaftProtos.CommitInfoProto::getCommitIndex)
         .min(Long::compareTo).orElse(null);
+  }
+
+  private static <U> Class<? extends U> getClass(String name,
+      Class<U> xface) {
+    try {
+      Class<?> theClass = Class.forName(name);
+      if (!xface.isAssignableFrom(theClass)) {
+        throw new RuntimeException(theClass + " not " + xface.getName());
+      } else {
+        return theClass.asSubclass(xface);
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 }

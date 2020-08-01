@@ -19,7 +19,7 @@
 package org.apache.hadoop.hdds.ratis.retrypolicy;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.ratis.retry.RetryPolicies;
 import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.util.TimeDuration;
@@ -33,14 +33,11 @@ public class RetryLimitedPolicyCreator implements RetryPolicyCreator {
 
   @Override
   public RetryPolicy create(ConfigurationSource conf) {
+    RatisClientConfig scmClientConfig =
+        conf.getObject(RatisClientConfig.class);
     int maxRetryCount =
-        conf.getInt(OzoneConfigKeys.DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_KEY,
-            OzoneConfigKeys.
-                DFS_RATIS_CLIENT_REQUEST_MAX_RETRIES_DEFAULT);
-    long retryInterval = conf.getTimeDuration(OzoneConfigKeys.
-        DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_KEY, OzoneConfigKeys.
-        DFS_RATIS_CLIENT_REQUEST_RETRY_INTERVAL_DEFAULT
-        .toIntExact(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
+        scmClientConfig.getRetrylimitedMaxRetries();
+    long retryInterval = scmClientConfig.getRetrylimitedRetryInterval();
     TimeDuration sleepDuration =
         TimeDuration.valueOf(retryInterval, TimeUnit.MILLISECONDS);
     RetryPolicy retryPolicy = RetryPolicies
