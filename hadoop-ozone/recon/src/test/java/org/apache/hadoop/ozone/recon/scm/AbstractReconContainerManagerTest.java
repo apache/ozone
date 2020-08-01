@@ -69,17 +69,17 @@ public class AbstractReconContainerManagerTest {
     conf.set(OZONE_METADATA_DIRS,
         temporaryFolder.newFolder().getAbsolutePath());
     conf.set(OZONE_SCM_NAMES, "localhost");
-    store = DBStoreBuilder.createDBStore(conf, new ReconDBDefinition());
+    store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
     scmStorageConfig = new ReconStorageConfig(conf);
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
     NodeManager nodeManager =
         new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
     pipelineManager = new ReconPipelineManager(conf, nodeManager,
-        ReconDBDefinition.PIPELINES.getTable(store), eventQueue);
+        ReconSCMDBDefinition.PIPELINES.getTable(store), eventQueue);
     containerManager = new ReconContainerManager(
         conf,
-        ReconDBDefinition.CONTAINERS.getTable(store),
+        ReconSCMDBDefinition.CONTAINERS.getTable(store),
         store,
         pipelineManager,
         getScmServiceProvider(),
