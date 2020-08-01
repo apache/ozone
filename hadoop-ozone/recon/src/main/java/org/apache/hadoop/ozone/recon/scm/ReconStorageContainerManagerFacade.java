@@ -100,10 +100,11 @@ public class ReconStorageContainerManagerFacade
     this.scmStorageConfig = new ReconStorageConfig(conf);
     this.clusterMap = new NetworkTopologyImpl(conf);
     dbStore = DBStoreBuilder
-        .createDBStore(ozoneConfiguration, new ReconDBDefinition());
+        .createDBStore(ozoneConfiguration, new ReconSCMDBDefinition());
 
     this.nodeManager =
-        new ReconNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
+        new ReconNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
+            ReconSCMDBDefinition.NODES.getTable(dbStore));
     placementMetrics = SCMContainerPlacementMetrics.create();
     this.containerPlacementPolicy =
         ContainerPlacementPolicyFactory.getPolicy(conf, nodeManager,
@@ -114,10 +115,10 @@ public class ReconStorageContainerManagerFacade
 
         new ReconPipelineManager(conf,
             nodeManager,
-            ReconDBDefinition.PIPELINES.getTable(dbStore),
+            ReconSCMDBDefinition.PIPELINES.getTable(dbStore),
             eventQueue);
     this.containerManager = new ReconContainerManager(conf,
-        ReconDBDefinition.CONTAINERS.getTable(dbStore),
+        ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
         dbStore,
         pipelineManager,
         scmServiceProvider,
