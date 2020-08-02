@@ -23,7 +23,7 @@ menu:
 -->
 
 
- Ozone  shell is the primary interface to interact with Ozone. It provides a command shell interface to work against Ozone. It uses the [Java API]({{< ref "interface/JavaApi.md">}}).
+Ozone shell is the primary interface to interact with Ozone from the command line. Behind the scenes it uses the [Java API]({{< ref "interface/JavaApi.md">}}).
  
  There are some functionality which couldn't be accessed without using `ozone sh` commands. For example:
  
@@ -42,29 +42,29 @@ For example:
 ozone sh volume --help
 ```
 
-This will show all possible actions for volumes.
+will show all possible actions for volumes.
 
-or it can be invoked to explain a specific action like
+Or it can be invoked to explain a specific action like:
 
 ```bash
 ozone sh volume create --help
 ```
 
-This command will give you command line options of the create command.
+which will print the command line options of the `create` command for volumes.
 
 ## General Command Format
 
-The Ozone shell commands take the following format.
+Ozone shell commands take the following form:
 
 > _ozone sh object action url_
 
 **ozone** script is used to invoke all Ozone sub-commands. The ozone shell is
 invoked via ```sh``` command.
 
-The object can be a volume, bucket or a key. The action is various verbs like
+Object can be volume, bucket or key. Actions are various verbs like
 create, list, delete etc.
 
-Ozone URL can point to a volume, bucket or keys in the following format:
+Depending on the action, Ozone URL can point to a volume, bucket or key in the following format:
 
 _\[schema\]\[server:port\]/volume/bucket/key_
 
@@ -77,22 +77,21 @@ Where,
 2. **Server:Port** - This is the address of the Ozone Manager. If the port is
 omitted the default port from ozone-site.xml will be used.
 
-Depending on the call, the volume/bucket/key names will be part of the URL.
 Please see volume commands, bucket commands, and key commands section for more
 detail.
 
-## Volume operation
+## Volume operations
 
-Volume is the top level element of the hierarchy and supposed to managed only by the administrators. Quota and the owner user can be defined.
+Volume is the top level element of the hierarchy, managed only by administrators. Optionally, quota and the owner user can be specified.
 
 Example commands:
 
 ```shell
-> ozone sh volume create /vol1
+$ ozone sh volume create /vol1
 ```
 
 ```shell
-bash-4.2$ ozone sh volume info /vol1
+$ ozone sh volume info /vol1
 {
   "metadata" : { },
   "name" : "vol1",
@@ -116,7 +115,7 @@ bash-4.2$ ozone sh volume info /vol1
 ```
 
 ```shell
-ozone sh volume list /
+$ ozone sh volume list /
 {
   "metadata" : { },
   "name" : "s3v",
@@ -139,18 +138,18 @@ ozone sh volume list /
 }
 ....
 ```
-## Bucket operation
+## Bucket operations
 
-Bucket is the second level hierarchy, similar to the AWS S3 buckets. Users can create buckets in volumes with permissions.
+Bucket is the second level of the object hierarchy, and is similar to AWS S3 buckets. Users can create buckets in volumes, if they have the necessary permissions.
 
 Command examples:
 
 ```shell
-> ozone sh bucket create /vol1/bucket1
+$ ozone sh bucket create /vol1/bucket1
 ```shell
 
 ```shell
-> ozone sh bucket info /vol1/bucket1
+$ ozone sh bucket info /vol1/bucket1
 {
   "metadata" : { },
   "volumeName" : "vol1",
@@ -165,25 +164,25 @@ Command examples:
 }
 ```
 
-Bucket is the level of the [Transparent Data Encryption]({{< ref "security/SecuringTDE.md" >}})
+[Transparent Data Encryption]({{< ref "security/SecuringTDE.md" >}}) can be enabled at the bucket level.
 
-## Key
+## Key operations
 
 Key is the object which can store the data.
 
 ```shell
->ozone sh key put /vol1/bucket1/README.md README.md
+$ ozone sh key put /vol1/bucket1/README.md README.md
 ```
 
 <div class="alert alert-warning" role="alert">
 
-The standard `ozone sh _object_type _action_ _url_` scheme can cause some confusion here as the parameter order is `ozone sh key put <DESTINATION> <SOURCE>` instead of the opposite. 
+In this case the standard `ozone sh <object_type> <action> <url>` scheme may be a bit confusing at first, as it results in the syntax `ozone sh key put <destination> <source>` instead of the arguably more natural order of `<source> <destination>`.
 </div>
 
 
 
 ```shell
->ozone sh key info /vol1/bucket1/README.md
+$ ozone sh key info /vol1/bucket1/README.md
 {
   "volumeName" : "vol1",
   "bucketName" : "bucket1",
@@ -205,5 +204,5 @@ The standard `ozone sh _object_type _action_ _url_` scheme can cause some confus
 ```
 
 ```shell
->ozone sh key get /vol1/bucket1/README.md /tmp/
+$ ozone sh key get /vol1/bucket1/README.md /tmp/
 ```

@@ -4,7 +4,7 @@ weight: 5
 menu: 
   main:
      parent: Architecture
-summary: Description of the Containers, the replication unif ot Ozone.
+summary: Description of the Containers, the replication unit of Ozone.
 ---
 
 <!---
