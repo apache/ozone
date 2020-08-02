@@ -28,10 +28,13 @@ import static org.mockito.Mockito.mock;
 
 import java.net.InetSocketAddress;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -39,6 +42,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
+import org.apache.hadoop.test.LambdaTestUtils;
+import org.junit.Assert;
 import org.junit.Test;
 
 import com.google.protobuf.GeneratedMessage;
@@ -182,4 +187,84 @@ public class TestStateContext {
     assertEquals(DatanodeStates.SHUTDOWN, subject.getState());
   }
 
+  @Test
+  public void testIsThreadPoolAvailable() throws Exception {
+    StateContext stateContext = new StateContext(null, null, null);
+
+    int threadPoolSize = 2;
+    ExecutorService executorService = Executors.newFixedThreadPool(
+        threadPoolSize);
+
+    CompletableFuture<String> futureOne = new CompletableFuture<>();
+    CompletableFuture<String> futureTwo = new CompletableFuture<>();
+
+    // task num greater than pool size
+    for (int i = 0; i < threadPoolSize; i++) {
+      executorService.submit(() -> futureOne.get());
+    }
+    executorService.submit(() -> futureTwo.get());
+
+    Assert.assertFalse(stateContext.isThreadPoolAvailable(executorService));
+
+    futureOne.complete("futureOne");
+    LambdaTestUtils.await(1000, 100, () ->
+        stateContext.isThreadPoolAvailable(executorService));
+
+    futureTwo.complete("futureTwo");
+    executorService.shutdown();
+  }
+
+  @Test
+  public void doesNotAwaitWithoutExecute() throws Exception {
+    final AtomicInteger executed = new AtomicInteger();
+    final AtomicInteger awaited = new AtomicInteger();
+
+    ExecutorService executorService = Executors.newFixedThreadPool(1);
+    CompletableFuture<String> future = new CompletableFuture<>();
+    executorService.submit(() -> future.get());
+    executorService.submit(() -> future.get());
+
+    StateContext subject = new StateContext(new OzoneConfiguration(),
+        DatanodeStates.INIT, mock(DatanodeStateMachine.class)) {
+      @Override
+      public DatanodeState<DatanodeStates> getTask() {
+        // this task counts the number of execute() and await() calls
+        return new DatanodeState<DatanodeStates>() {
+          @Override
+          public void onEnter() {
+            // no-op
+          }
+
+          @Override
+          public void onExit() {
+            // no-op
+          }
+
+          @Override
+          public void execute(ExecutorService executor) {
+            executed.incrementAndGet();
+          }
+
+          @Override
+          public DatanodeStates await(long time, TimeUnit timeUnit) {
+            awaited.incrementAndGet();
+            return DatanodeStates.INIT;
+          }
+        };
+      }
+    };
+
+    subject.execute(executorService, 2, TimeUnit.SECONDS);
+
+    assertEquals(0, awaited.get());
+    assertEquals(0, executed.get());
+
+    future.complete("any");
+    LambdaTestUtils.await(1000, 100, () ->
+        subject.isThreadPoolAvailable(executorService));
+
+    subject.execute(executorService, 2, TimeUnit.SECONDS);
+    assertEquals(1, awaited.get());
+    assertEquals(1, executed.get());
+  }
 }

@@ -57,6 +57,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 import org.apache.ratis.protocol.AlreadyClosedException;
 import org.apache.ratis.protocol.NotReplicatedException;
 import org.apache.ratis.protocol.RaftRetryFailureException;
+import org.apache.ratis.protocol.TimeoutIOException;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -114,14 +115,14 @@ public class TestCommitWatcher {
 
     RatisClientConfig.RaftConfig raftClientConfig =
         conf.getObject(RatisClientConfig.RaftConfig.class);
-    raftClientConfig.setRpcRequestTimeout(TimeUnit.SECONDS.toMillis(3));
-    raftClientConfig.setRpcWatchRequestTimeout(TimeUnit.SECONDS.toMillis(3));
+    raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
+    raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(3));
     conf.setFromObject(raftClientConfig);
 
     RatisClientConfig ratisClientConfig =
         conf.getObject(RatisClientConfig.class);
-    ratisClientConfig.setWriteRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(30));
-    ratisClientConfig.setWatchRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(30));
+    ratisClientConfig.setWriteRequestTimeout(Duration.ofSeconds(10));
+    ratisClientConfig.setWatchRequestTimeout(Duration.ofSeconds(10));
     conf.setFromObject(ratisClientConfig);
 
     conf.set(OzoneConfigKeys.OZONE_CLIENT_CHECKSUM_TYPE, "NONE");
@@ -313,14 +314,17 @@ public class TestCommitWatcher {
       watcher.watchForCommit(replies.get(1).getLogIndex() + 100);
       Assert.fail("Expected exception not thrown");
     } catch(IOException ioe) {
-      // with retry count set to lower limit and a lower watch request
+      // with retry count set to noRetry and a lower watch request
       // timeout, watch request will eventually
-      // fail with RaftRetryFailure exception from ratis client or the client
+      // fail with TimeoutIOException from ratis client or the client
       // can itself get AlreadyClosedException from the Ratis Server
+      // and the write may fail with RaftRetryFailureException
       Throwable t = HddsClientUtils.checkForException(ioe);
-      Assert.assertTrue(t instanceof RaftRetryFailureException ||
-              t instanceof AlreadyClosedException ||
-              t instanceof NotReplicatedException);
+      Assert.assertTrue("Unexpected exception: " + t.getClass(),
+          t instanceof RaftRetryFailureException ||
+          t instanceof TimeoutIOException ||
+          t instanceof AlreadyClosedException ||
+          t instanceof NotReplicatedException);
     }
     if (ratisClient.getReplicatedMinCommitIndex() < replies.get(1)
         .getLogIndex()) {

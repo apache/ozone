@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.stream.Collectors;
@@ -507,6 +508,26 @@ public class SCMNodeManager implements NodeManager {
     nodeInfo.put("SSDUsed", ssdUsed);
     nodeInfo.put("SSDRemaining", ssdRemaining);
     return nodeInfo;
+  }
+
+  /**
+   * Returns the max of no healthy volumes reported out of the set
+   * of datanodes constituting the pipeline.
+   */
+  @Override
+  public int getNumHealthyVolumes(List<DatanodeDetails> dnList) {
+    List<Integer> volumeCountList = new ArrayList<>(dnList.size());
+    for (DatanodeDetails dn : dnList) {
+      try {
+        volumeCountList.add(nodeStateManager.getNode(dn).
+                getHealthyVolumeCount());
+      } catch (NodeNotFoundException e) {
+        LOG.warn("Cannot generate NodeStat, datanode {} not found.",
+                dn.getUuid());
+      }
+    }
+    Preconditions.checkArgument(!volumeCountList.isEmpty());
+    return Collections.max(volumeCountList);
   }
 
   /**

@@ -306,6 +306,8 @@ enum Status {
     PARTIAL_DELETE = 62;
 
     DETECTED_LOOP_IN_BUCKET_LINKS = 63;
+
+    NOT_SUPPORTED_OPERATION = 64;
 }
 
 /**

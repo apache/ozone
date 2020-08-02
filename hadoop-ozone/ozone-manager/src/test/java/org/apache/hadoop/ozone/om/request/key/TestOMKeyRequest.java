@@ -24,6 +24,8 @@ import java.util.UUID;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
+import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.junit.After;
@@ -66,6 +68,7 @@ public class TestOMKeyRequest {
   public TemporaryFolder folder = new TemporaryFolder();
 
   protected OzoneManager ozoneManager;
+  protected KeyManager keyManager;
   protected OMMetrics omMetrics;
   protected OMMetadataManager omMetadataManager;
   protected AuditLogger auditLogger;
@@ -113,6 +116,8 @@ public class TestOMKeyRequest {
     ozoneBlockTokenSecretManager =
         Mockito.mock(OzoneBlockTokenSecretManager.class);
     scmBlockLocationProtocol = Mockito.mock(ScmBlockLocationProtocol.class);
+    keyManager = new KeyManagerImpl(ozoneManager, scmClient, ozoneConfiguration,
+        "");
     when(ozoneManager.getScmClient()).thenReturn(scmClient);
     when(ozoneManager.getBlockTokenSecretManager())
         .thenReturn(ozoneBlockTokenSecretManager);
@@ -121,6 +126,7 @@ public class TestOMKeyRequest {
     when(ozoneManager.isGrpcBlockTokenEnabled()).thenReturn(false);
     when(ozoneManager.getOMNodeId()).thenReturn(UUID.randomUUID().toString());
     when(scmClient.getBlockClient()).thenReturn(scmBlockLocationProtocol);
+    when(ozoneManager.getKeyManager()).thenReturn(keyManager);
 
     Pipeline pipeline = Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)

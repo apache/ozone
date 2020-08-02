@@ -34,6 +34,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
@@ -54,6 +55,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTPS_BIND_PORT_D
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_BIND_HOST_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_BIND_PORT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_PORT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
@@ -525,6 +527,51 @@ public final class OmUtils {
     } catch (IllegalArgumentException e) {
       throw new OMException(e.getMessage(),
               OMException.ResultCodes.INVALID_KEY_NAME);
+    }
+  }
+
+  /**
+   * Return configured OzoneManager service id based on the following logic.
+   * Look at 'ozone.om.internal.service.id' first. If configured, return that.
+   * If the above is not configured, look at 'ozone.om.service.ids'.
+   * If count(ozone.om.service.ids) == 1, return that id.
+   * If count(ozone.om.service.ids) > 1 throw exception
+   * If 'ozone.om.service.ids' is not configured, return null. (Non HA)
+   * @param conf configuration
+   * @return OM service ID.
+   * @throws IOException on error.
+   */
+  public static String getOzoneManagerServiceId(OzoneConfiguration conf)
+      throws IOException {
+    String localOMServiceId = conf.get(OZONE_OM_INTERNAL_SERVICE_ID);
+    Collection<String> omServiceIds = conf.getTrimmedStringCollection(
+        OZONE_OM_SERVICE_IDS_KEY);
+    if (localOMServiceId == null) {
+      LOG.info("{} is not defined, falling back to {} to find serviceID for "
+              + "OzoneManager if it is HA enabled cluster",
+          OZONE_OM_INTERNAL_SERVICE_ID, OZONE_OM_SERVICE_IDS_KEY);
+      if (omServiceIds.size() > 1) {
+        throw new IOException(String.format(
+            "More than 1 OzoneManager ServiceID (%s) " +
+                "configured : %s, but %s is not " +
+                "configured.", OZONE_OM_SERVICE_IDS_KEY,
+            omServiceIds.toString(), OZONE_OM_INTERNAL_SERVICE_ID));
+      }
+    } else if (!omServiceIds.contains(localOMServiceId)) {
+      throw new IOException(String.format(
+          "Cannot find the internal service id %s in %s",
+          localOMServiceId, omServiceIds.toString()));
+    } else {
+      omServiceIds = Collections.singletonList(localOMServiceId);
+    }
+
+    if (omServiceIds.isEmpty()) {
+      LOG.info("No OzoneManager ServiceID configured.");
+      return null;
+    } else {
+      String serviceId = omServiceIds.iterator().next();
+      LOG.info("Using OzoneManager ServiceID '{}'.", serviceId);
+      return serviceId;
     }
   }
 }

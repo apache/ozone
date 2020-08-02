@@ -22,7 +22,7 @@
     <version>0.6.0-SNAPSHOT</version>
   </parent>
   <artifactId>hadoop-ozone-filesystem-hadoop3</artifactId>
-  <name>Apache Hadoop Ozone FileSystem Hadoop 3.x compatibility</name>
+  <name>Apache Hadoop Ozone FS Hadoop 3.x compatibility</name>
   <packaging>jar</packaging>
   <version>0.6.0-SNAPSHOT</version>
   <properties>

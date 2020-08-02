@@ -64,7 +64,7 @@ public class SCMContainerManager implements ContainerManager {
 
   private final ContainerStateManager containerStateManager;
 
-  private final int numContainerPerOwnerInPipeline;
+  private final int numContainerPerVolume;
 
   private final SCMContainerManagerMetrics scmContainerManagerMetrics;
 
@@ -96,7 +96,7 @@ public class SCMContainerManager implements ContainerManager {
     this.lock = new ReentrantLock();
     this.pipelineManager = pipelineManager;
     this.containerStateManager = new ContainerStateManager(conf);
-    this.numContainerPerOwnerInPipeline = conf
+    this.numContainerPerVolume = conf
         .getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
             ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
 
@@ -446,7 +446,8 @@ public class SCMContainerManager implements ContainerManager {
       synchronized (pipeline) {
         containerIDs = getContainersForOwner(storageClass, pipeline, owner);
 
-        if (containerIDs.size() < numContainerPerOwnerInPipeline) {
+        if (containerIDs.size() < numContainerPerVolume * pipelineManager.
+                getNumHealthyVolumes(pipeline)) {
           containerInfo =
               containerStateManager.allocateContainer(
                   storageClass, pipelineManager, owner, pipeline);

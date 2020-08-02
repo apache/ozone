@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.freon;
 
 import java.time.Duration;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
@@ -59,8 +58,8 @@ public class TestRandomKeyGenerator {
 
     RatisClientConfig.RaftConfig raftClientConfig =
         conf.getObject(RatisClientConfig.RaftConfig.class);
-    raftClientConfig.setRpcRequestTimeout(TimeUnit.SECONDS.toMillis(3));
-    raftClientConfig.setRpcWatchRequestTimeout(TimeUnit.SECONDS.toMillis(3));
+    raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
+    raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(3));
     conf.setFromObject(raftClientConfig);
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
