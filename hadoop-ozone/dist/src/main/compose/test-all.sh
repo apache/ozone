@@ -43,8 +43,10 @@ for t in ${tests}; do
 
   #required to read the .env file from the right location
   cd "${d}" || continue
+  set +e
   ./test.sh
   ret=$?
+  set -e
   if [[ $ret -ne 0 ]]; then
       RESULT=1
       echo "ERROR: Test execution of ${d} is FAILED!!!!"
@@ -52,12 +54,12 @@ for t in ${tests}; do
   cd "$SCRIPT_DIR"
   RESULT_DIR="${d}/result"
   TEST_DIR_NAME=$(basename ${d})
-  rebot -N $TEST_DIR_NAME -o "$ALL_RESULT_DIR"/$TEST_DIR_NAME.xml "$RESULT_DIR"/"*.xml"
+  rebot --nostatusrc -N $TEST_DIR_NAME -o "$ALL_RESULT_DIR"/$TEST_DIR_NAME.xml "$RESULT_DIR"/"*.xml"
   cp "$RESULT_DIR"/docker-*.log "$ALL_RESULT_DIR"/
   cp "$RESULT_DIR"/*.out* "$ALL_RESULT_DIR"/ || true
 done
 
-rebot -N acceptance -d "$ALL_RESULT_DIR" "$ALL_RESULT_DIR"/*.xml
+rebot --nostatusrc -N acceptance -d "$ALL_RESULT_DIR" "$ALL_RESULT_DIR"/*.xml
 
 if [ "$OZONE_WITH_COVERAGE" ]; then
   pkill -f JacocoServer
