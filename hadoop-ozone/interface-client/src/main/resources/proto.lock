@@ -1234,11 +1234,6 @@
                 "id": 10,
                 "name": "modificationTime",
                 "type": "uint64"
-              },
-              {
-                "id": 11,
-                "name": "quotaInCounts",
-                "type": "uint64"
               }
             ]
           },
@@ -1347,11 +1342,6 @@
               {
                 "id": 4,
                 "name": "modificationTime",
-                "type": "uint64"
-              },
-              {
-                "id": 5,
-                "name": "quotaInCounts",
                 "type": "uint64"
               }
             ]
