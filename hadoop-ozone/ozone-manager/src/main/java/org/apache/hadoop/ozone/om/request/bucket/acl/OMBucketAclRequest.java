@@ -109,6 +109,21 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
       omBucketInfo.setUpdateID(transactionLogIndex,
           ozoneManager.isRatisEnabled());
 
+      // Update the modification time when updating ACLs of Bucket.
+      long modificationTime = 0;
+      if (getOmRequest().getAddAclRequest().hasObj()) {
+        modificationTime = getOmRequest().getAddAclRequest()
+            .getModificationTime();
+      } else if (getOmRequest().getSetAclRequest().hasObj()) {
+        modificationTime = getOmRequest().getSetAclRequest()
+            .getModificationTime();
+      } else if (getOmRequest().getRemoveAclRequest().hasObj()) {
+        modificationTime = getOmRequest().getRemoveAclRequest()
+            .getModificationTime();
+      }
+      omBucketInfo = omBucketInfo.toBuilder()
+          .setModificationTime(modificationTime).build();
+
       if (operationResult) {
         // update cache.
         omMetadataManager.getBucketTable().addCacheEntry(

@@ -23,8 +23,10 @@ import java.util.List;
 
 import com.google.common.collect.Lists;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.util.BooleanBiFunction;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,6 +58,19 @@ public class OMBucketAddAclRequest extends OMBucketAclRequest {
     bucketAddAclOp = (ozoneAcls, omBucketInfo) -> {
       return omBucketInfo.addAcl(ozoneAcls.get(0));
     };
+  }
+
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    long modificationTime = Time.now();
+    OzoneManagerProtocolProtos.AddAclRequest addAclRequest =
+        getOmRequest().getAddAclRequest().toBuilder()
+            .setModificationTime(modificationTime).build();
+
+    return getOmRequest().toBuilder()
+        .setAddAclRequest(addAclRequest.toBuilder())
+        .setUserInfo(getUserInfo())
+        .build();
   }
 
   public OMBucketAddAclRequest(OMRequest omRequest) {
