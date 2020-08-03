@@ -325,8 +325,12 @@ public class ContainerStateManager {
                                Pipeline pipeline) throws IOException {
     Preconditions.checkNotNull(containerInfo);
     containers.addContainer(containerInfo);
-    pipelineManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueof(containerID));
+    if (pipeline != null) {
+      // In Recon, while adding a 'new' CLOSED container, pipeline will be a
+      // random ID, and hence be passed down as null.
+      pipelineManager.addContainerToPipeline(pipeline.getId(),
+          ContainerID.valueof(containerID));
+    }
     containerStateCount.incrementAndGet(containerInfo.getState());
   }
 
