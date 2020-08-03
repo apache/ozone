@@ -27,6 +27,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.collections.CollectionUtils;
@@ -458,37 +459,78 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   /**
+   * Helper function to check if the list of key paths are in the same volume
+   * and same bucket.
+   */
+  private boolean areInSameBucket(List<String> keyNameList) {
+    if (keyNameList.size() == 0) {
+      return true;
+    }
+    String firstKeyPath = keyNameList.get(0);
+    final String volAndBucket = new OFSPath(firstKeyPath).getNonKeyPath();
+    // If any key path's volume and bucket from the second element and on
+    // in the list doesn't match the first element's, hasDifferentVolAndBucket
+    // would be true
+    boolean hasDifferentVolAndBucket = keyNameList.stream().skip(1)
+        .anyMatch(p -> !(new OFSPath(p).getNonKeyPath().equals(volAndBucket)));
+    return !hasDifferentVolAndBucket;
+  }
+
+  /**
    * Helper method to delete an object specified by key name in bucket.
    *
-   * @param pathList key name list to be deleted
+   * Only supports deleting keys in the same bucket in one call.
+   *
+   * Each item in the given list should be the String of an OFS path:
+   * e.g. ofs://om/vol1/buck1/k1
+   *
+   * @param keyNameList key name list to be deleted
    * @return true if the key is deleted, false otherwise
    */
   @Override
-  public boolean deleteObjects(List<String> pathList) {
-    // TODO: we will support deleteObjects in ofs.
-    LOG.error("ofs currently does not support deleteObjects");
-    return false;
+  public boolean deleteObjects(List<String> keyNameList) {
+    LOG.trace("issuing delete for keys: {}", keyNameList);
+    if (keyNameList.size() == 0) {
+      return false;
+    }
+    // Sanity check. Support only deleting a list of keys in the same bucket
+    if (!areInSameBucket(keyNameList)) {
+      LOG.error("Deleting keys from different buckets in a single batch "
+          + "is not supported.");
+      return false;
+    }
+    try {
+      OFSPath firstKeyPath = new OFSPath(keyNameList.get(0));
+      OzoneBucket bucket = getBucket(firstKeyPath, false);
+      return deleteObjects(bucket, keyNameList);
+    } catch (IOException ioe) {
+      LOG.error("delete key failed: {}", ioe.getMessage());
+      return false;
+    }
   }
 
   /**
    * Package-private helper function to reduce calls to getBucket().
+   *
+   * This will be faster than the public variant of the method since this
+   * doesn't verify the same-bucket condition.
+   *
    * @param bucket Bucket to operate in.
-   * @param path Path to delete.
-   * @return true if operation succeeded, false upon IOException.
+   * @param keyNameList key name list to be deleted.
+   * @return true if operation succeeded, false on IOException.
    */
-  boolean deleteObject(OzoneBucket bucket, String path) {
-    LOG.trace("issuing delete for path to key: {}", path);
-    incrementCounter(Statistic.OBJECTS_DELETED);
-    OFSPath ofsPath = new OFSPath(path);
-    String keyName = ofsPath.getKeyName();
-    if (keyName.length() == 0) {
-      return false;
-    }
+  boolean deleteObjects(OzoneBucket bucket, List<String> keyNameList) {
+    LOG.trace("issuing delete in volume: {}, bucket: {} for keys: {}",
+        bucket.getVolumeName(), bucket.getName(), keyNameList);
+    List<String> keyList = keyNameList.stream()
+        .map(p -> new OFSPath(p).getKeyName())
+        .collect(Collectors.toList());
     try {
-      bucket.deleteKey(keyName);
+      incrementCounter(Statistic.OBJECTS_DELETED);
+      bucket.deleteKeys(keyList);
       return true;
     } catch (IOException ioe) {
-      LOG.error("delete key failed " + ioe.getMessage());
+      LOG.error("delete key failed: {}", ioe.getMessage());
       return false;
     }
   }
