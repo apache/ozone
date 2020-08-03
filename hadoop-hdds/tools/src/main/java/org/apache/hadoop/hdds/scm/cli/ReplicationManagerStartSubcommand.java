@@ -26,7 +26,7 @@ import picocli.CommandLine.Command;
 import java.io.IOException;
 
 /**
- * This is the handler that process safe mode check command.
+ * Handler to start replication manager.
  */
 @Command(
     name = "start",
