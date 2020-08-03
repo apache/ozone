@@ -139,9 +139,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public Pipeline createPipeline(ReplicationType type,
                                  ReplicationFactor factor) throws IOException {
-    if (!scmhaManager.isLeader()) {
-      throw scmhaManager.triggerNotLeaderException();
-    }
+    checkLeader();
     if (!isPipelineCreationAllowed() && factor != ReplicationFactor.ONE) {
       LOG.debug("Pipeline creation is not allowed until safe mode prechecks " +
           "complete");
@@ -272,9 +270,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void addContainerToPipeline(
       PipelineID pipelineID, ContainerID containerID) throws IOException {
-    if (!scmhaManager.isLeader()) {
-      throw scmhaManager.triggerNotLeaderException();
-    }
+    checkLeader();
     lock.writeLock().lock();
     try {
       stateManager.addContainerToPipeline(pipelineID, containerID);
@@ -286,9 +282,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void removeContainerFromPipeline(
       PipelineID pipelineID, ContainerID containerID) throws IOException {
-    if (!scmhaManager.isLeader()) {
-      throw scmhaManager.triggerNotLeaderException();
-    }
+    checkLeader();
     lock.writeLock().lock();
     try {
       stateManager.removeContainerFromPipeline(pipelineID, containerID);
@@ -300,9 +294,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public NavigableSet<ContainerID> getContainersInPipeline(
       PipelineID pipelineID) throws IOException {
-    if (!scmhaManager.isLeader()) {
-      throw scmhaManager.triggerNotLeaderException();
-    }
+    checkLeader();
     lock.readLock().lock();
     try {
       return stateManager.getContainers(pipelineID);
@@ -313,17 +305,13 @@ public final class PipelineManagerV2Impl implements PipelineManager {
 
   @Override
   public int getNumberOfContainers(PipelineID pipelineID) throws IOException {
-    if (!scmhaManager.isLeader()) {
-      throw scmhaManager.triggerNotLeaderException();
-    }
+    checkLeader();
     return stateManager.getNumberOfContainers(pipelineID);
   }
 
   @Override
   public void openPipeline(PipelineID pipelineId) throws IOException {
-    if (!scmhaManager.isLeader()) {
-      throw scmhaManager.triggerNotLeaderException();
-    }
+    checkLeader();
     lock.writeLock().lock();
     try {
       Pipeline pipeline = stateManager.getPipeline(pipelineId);
@@ -349,9 +337,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
    * @throws IOException
    */
   protected void removePipeline(Pipeline pipeline) throws IOException {
-    if (!scmhaManager.isLeader()) {
-      throw scmhaManager.triggerNotLeaderException();
-    }
+    checkLeader();
     pipelineFactory.close(pipeline.getType(), pipeline);
     PipelineID pipelineID = pipeline.getId();
     lock.writeLock().lock();
@@ -373,9 +359,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
    */
   protected void closeContainersForPipeline(final PipelineID pipelineId)
       throws IOException {
-    if (!scmhaManager.isLeader()) {
-      throw scmhaManager.triggerNotLeaderException();
-    }
+    checkLeader();
     Set<ContainerID> containerIDs = stateManager.getContainers(pipelineId);
     for (ContainerID containerID : containerIDs) {
       eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
@@ -391,9 +375,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void closePipeline(Pipeline pipeline, boolean onTimeout)
       throws IOException {
-    if (!scmhaManager.isLeader()) {
-      throw scmhaManager.triggerNotLeaderException();
-    }
+    checkLeader();
     PipelineID pipelineID = pipeline.getId();
     lock.writeLock().lock();
     try {
@@ -423,9 +405,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void scrubPipeline(ReplicationType type, ReplicationFactor factor)
       throws IOException {
-    if (!scmhaManager.isLeader()) {
-      throw scmhaManager.triggerNotLeaderException();
-    }
+    checkLeader();
     if (type != ReplicationType.RATIS || factor != ReplicationFactor.THREE) {
       // Only srub pipeline for RATIS THREE pipeline
       return;
@@ -464,10 +444,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
    * Schedules a fixed interval job to create pipelines.
    */
   @Override
-  public void startPipelineCreator() throws NotLeaderException {
-    if (!scmhaManager.isLeader()) {
-      throw scmhaManager.triggerNotLeaderException();
-    }
+  public void startPipelineCreator() {
     backgroundPipelineCreator.startFixedIntervalPipelineCreator();
   }
 
@@ -476,9 +453,8 @@ public final class PipelineManagerV2Impl implements PipelineManager {
    */
   @Override
   public void triggerPipelineCreation() throws NotLeaderException {
-    if (!scmhaManager.isLeader()) {
-      throw scmhaManager.triggerNotLeaderException();
-    }
+    // TODO add checkLeader once follower validates safemode
+    // before it becomes leader.
     backgroundPipelineCreator.triggerPipelineCreation();
   }
 
@@ -496,9 +472,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void activatePipeline(PipelineID pipelineID)
       throws IOException {
-    if (!scmhaManager.isLeader()) {
-      throw scmhaManager.triggerNotLeaderException();
-    }
+    checkLeader();
     stateManager.updatePipelineState(pipelineID.getProtobuf(),
         HddsProtos.PipelineState.PIPELINE_OPEN);
   }
@@ -512,9 +486,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void deactivatePipeline(PipelineID pipelineID)
       throws IOException {
-    if (!scmhaManager.isLeader()) {
-      throw scmhaManager.triggerNotLeaderException();
-    }
+    checkLeader();
     stateManager.updatePipelineState(pipelineID.getProtobuf(),
         HddsProtos.PipelineState.PIPELINE_DORMANT);
   }
@@ -529,9 +501,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void waitPipelineReady(PipelineID pipelineID, long timeout)
       throws IOException {
-    if (!scmhaManager.isLeader()) {
-      throw scmhaManager.triggerNotLeaderException();
-    }
+    checkLeader();
     long st = Time.monotonicNow();
     if (timeout == 0) {
       timeout = pipelineWaitDefaultTimeout;
@@ -564,9 +534,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
 
   @Override
   public Map<String, Integer> getPipelineInfo() throws NotLeaderException {
-    if (!scmhaManager.isLeader()) {
-      throw scmhaManager.triggerNotLeaderException();
-    }
+    checkLeader();
     final Map<String, Integer> pipelineInfo = new HashMap<>();
     for (Pipeline.PipelineState state : Pipeline.PipelineState.values()) {
       pipelineInfo.put(state.toString(), 0);
@@ -655,6 +623,16 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   
   public void setScmhaManager(SCMHAManager scmhaManager) {
     this.scmhaManager = scmhaManager;
+  }
+
+  /**
+   * Check if scm is current leader.
+   * @throws NotLeaderException when it's not the current leader.
+   */
+  private void checkLeader() throws NotLeaderException {
+    if (!scmhaManager.isLeader()) {
+      throw scmhaManager.triggerNotLeaderException();
+    }
   }
 
   private void setBackgroundPipelineCreator(

@@ -50,7 +50,7 @@ public class NonHealthyToHealthyNodeHandler
     try {
       pipelineManager.triggerPipelineCreation();
     } catch (NotLeaderException ex) {
-      LOG.warn("Not the current leader SCM and cannot start pipeline" +
+      LOG.debug("Not the current leader SCM and cannot start pipeline" +
           " creation.");
     }
   }

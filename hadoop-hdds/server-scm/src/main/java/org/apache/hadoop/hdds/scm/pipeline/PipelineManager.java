@@ -83,7 +83,7 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean,
   void scrubPipeline(ReplicationType type, ReplicationFactor factor)
       throws IOException;
 
-  void startPipelineCreator() throws NotLeaderException;
+  void startPipelineCreator();
 
   void triggerPipelineCreation() throws NotLeaderException;
 
