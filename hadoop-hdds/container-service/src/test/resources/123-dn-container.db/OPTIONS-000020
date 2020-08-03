@@ -55,7 +55,7 @@
   new_table_reader_for_compaction_inputs=false
   skip_checking_sst_file_sizes_on_db_open=false
   skip_stats_update_on_db_open=false
-  wal_dir=/home/work/Files/hadoop-ozone/hadoop-hdds/container-service/target/test-dir/TestBlockDeletingService/hdds/73eb89cf-ab05-42fc-af5c-995e1783263a/current/containerDir135/1596029079265/metadata/1596029079265-dn-container.db
+  wal_dir=/home/work/Files/hadoop-ozone/hadoop-hdds/container-service/target/test-classes/123-dn-container.db
   random_access_max_buffer_size=1048576
   skip_log_error_on_recovery=false
   paranoid_checks=true
