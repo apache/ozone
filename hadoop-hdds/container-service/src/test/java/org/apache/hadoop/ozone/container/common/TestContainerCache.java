@@ -151,7 +151,7 @@ public class TestContainerCache {
     Runnable task = () -> {
       try {
         ReferenceCountedDB db1 = cache.getDB(1, "RocksDB",
-            containerDir.getPath(), conf);
+            containerDir.getPath(), OzoneConsts.SCHEMA_LATEST, conf);
         Assert.assertNotNull(db1);
       } catch (IOException e) {
         Assert.fail("Should get the DB instance");
@@ -169,7 +169,7 @@ public class TestContainerCache {
     }
 
     ReferenceCountedDB db = cache.getDB(1, "RocksDB",
-        containerDir.getPath(), conf);
+        containerDir.getPath(), OzoneConsts.SCHEMA_LATEST, conf);
     db.close();
     db.close();
     db.close();
