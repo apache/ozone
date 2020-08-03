@@ -53,7 +53,8 @@ public interface DBDefinition {
 
   /**
    * Create a new DB store instance based on the configuration.
+   * @return
    */
-  DBColumnFamilyDefinition<?, ?>[] getColumnFamilies();
+  DBColumnFamilyDefinition[] getColumnFamilies();
 
 }
