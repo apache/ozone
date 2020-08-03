@@ -42,6 +42,11 @@ public interface BlockIterator<T> {
   void seekToFirst();
 
   /**
+   * Seek to last entry.
+   */
+  void seekToLast();
+
+  /**
    * Get next block in the container.
    * @return next block or null if there are no blocks
    * @throws IOException

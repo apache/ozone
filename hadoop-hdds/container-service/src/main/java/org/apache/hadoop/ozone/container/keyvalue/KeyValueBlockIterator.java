@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocat
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.hdds.utils.MetadataStore.KeyValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,9 +65,6 @@ public class KeyValueBlockIterator implements BlockIterator<BlockData>,
   private KeyPrefixFilter blockFilter;
   private BlockData nextBlock;
   private long containerId;
-  // If true, indicates that the internal iterator position was moved using
-  // seek, and our queued up default block is no longer valid.
-  private boolean wasReset;
 
   /**
    * KeyValueBlockIterator to iterate blocks in a container.
@@ -103,7 +101,6 @@ public class KeyValueBlockIterator implements BlockIterator<BlockData>,
         OzoneConfiguration());
     blockIterator = db.getStore().getBlockDataTable().iterator();
     blockFilter = filter;
-    wasReset = true;
   }
 
   /**
@@ -113,63 +110,51 @@ public class KeyValueBlockIterator implements BlockIterator<BlockData>,
    */
   @Override
   public BlockData nextBlock() throws IOException, NoSuchElementException {
-    if (wasReset) {
-      nextBlock = findNextBlock();
-      wasReset = false;
+    if (nextBlock != null) {
+      BlockData currentBlock = nextBlock;
+      nextBlock = null;
+      return currentBlock;
     }
-
-    if (nextBlock == null) {
-      throw new NoSuchElementException("Block Iterator reached end for " +
-              "ContainerID " + containerId);
+    if(hasNext()) {
+      return nextBlock();
     }
-
-    BlockData result = nextBlock;
-    nextBlock = findNextBlock();
-
-    return result;
+    throw new NoSuchElementException("Block Iterator reached end for " +
+        "ContainerID " + containerId);
   }
 
   @Override
   public boolean hasNext() throws IOException {
-    if (wasReset) {
-      nextBlock = findNextBlock();
-      wasReset = false;
+    if (nextBlock != null) {
+      return true;
     }
-
-    return (nextBlock != null);
+    while (blockIterator.hasNext()) {
+      Table.KeyValue<String, BlockData> keyValue = blockIterator.next();
+      byte[] keyBytes = StringUtils.string2Bytes(keyValue.getKey());
+      if (blockFilter.filterKey(null, keyBytes, null)) {
+        nextBlock = keyValue.getValue();
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("Block matching with filter found: blockID is : {} for " +
+              "containerID {}", nextBlock.getLocalID(), containerId);
+        }
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override
   public void seekToFirst() {
-    // Cannot call findNextBlock() here, as the IOException would break the
-    // interface.
+    nextBlock = null;
     blockIterator.seekToFirst();
-    wasReset = true;
+  }
+
+  @Override
+  public void seekToLast() {
+    nextBlock = null;
+    blockIterator.seekToLast();
   }
 
   public void close() {
     db.close();
-  }
-
-  /**
-   * @return The next block in the iterator that passes the filter.
-   * @throws IOException
-   */
-  private BlockData findNextBlock() throws IOException {
-    BlockData foundBlock = null;
-
-    while (blockIterator.hasNext() && foundBlock == null) {
-      Table.KeyValue<String, BlockData> blockKV = blockIterator.next();
-      if (blockFilter.filterKey(null,
-              StringUtils.string2Bytes(blockKV.getKey()), null)) {
-        foundBlock = blockKV.getValue();
-        if (LOG.isTraceEnabled()) {
-          LOG.trace("Block matching with filter found: blockID is : {} for " +
-                  "containerID {}", foundBlock.getLocalID(), containerId);
-        }
-      }
-    }
-
-    return foundBlock;
   }
 }
