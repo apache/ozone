@@ -19,22 +19,18 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
-import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -180,7 +176,6 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
     OmKeyInfo omKeyInfo = null;
     final List<OmKeyLocationInfo> locations = new ArrayList<>();
-    List<OmKeyInfo> missingParentInfos;
     List<OmDirectoryInfo> missingParentDirInfos;
 
     OMClientResponse omClientResponse = null;
@@ -189,6 +184,11 @@ public class OMFileCreateRequest extends OMKeyRequest {
     IOException exception = null;
     Result result = null;
     try {
+      if (keyName.length() == 0) {
+        // Check if this is the root of the filesystem.
+        throw new OMException("Can not write to directory: " + keyName,
+                OMException.ResultCodes.NOT_A_FILE);
+      }
       // check Acl
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
@@ -199,13 +199,9 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
       validateBucketAndVolume(omMetadataMgr, volumeName, bucketName);
 
-      if (keyName.length() == 0) {
-        // Check if this is the root of the filesystem.
-        throw new OMException("Can not write to directory: " + keyName,
-            OMException.ResultCodes.NOT_A_FILE);
-      }
-      OmKeyInfo dbKeyInfo = getOmKeyInfo(ozoneManager, trxnLogIndex,
-              volumeName, bucketName, keyName, omMetadataMgr);
+      OmKeyInfo dbKeyInfo = OMFileRequest.getOmKeyInfoFromDB(ozoneManager,
+              trxnLogIndex, volumeName, bucketName, keyName, omMetadataMgr,
+              this);
 
       //1. Verify the path against directory table
       //2. Verify the leaf node against key table
@@ -343,32 +339,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
     }
   }
 
-  @Nullable
-  private OmKeyInfo getOmKeyInfo(OzoneManager ozoneManager, long trxnLogIndex,
-                                 String volumeName, String bucketName,
-                                 String keyName, OMMetadataManager omMetaMgr)
-          throws IOException {
-    // Check if Key already exists in KeyTable and this transaction is a
-    // replay.
-    OmKeyInfo dbKeyInfo = OMFileRequest.getKeyIfExists(volumeName, bucketName
-            , keyName, omMetaMgr);
-    if (dbKeyInfo != null) {
-      // Check if this transaction is a replay of ratis logs.
-      // We check only the KeyTable here and not the OpenKeyTable. In case
-      // this transaction is a replay but the transaction was not committed
-      // to the KeyTable, then we recreate the key in OpenKey table. This is
-      // okay as all the subsequent transactions would also be replayed and
-      // the openKey table would eventually reach the same state.
-      // The reason we do not check the OpenKey table is to avoid a DB read
-      // in regular non-replay scenario.
-      if (isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
-        // Replay implies the response has already been returned to
-        // the client. So take no further action and return a dummy response.
-        throw new OMReplayException();
-      }
-    }
-    return dbKeyInfo;
-  }
+
 
   private void checkAllParentsExist(OzoneManager ozoneManager,
       KeyArgs keyArgs,

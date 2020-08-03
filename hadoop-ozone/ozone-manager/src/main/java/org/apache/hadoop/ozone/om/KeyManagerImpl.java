@@ -1726,6 +1726,7 @@ public class KeyManagerImpl implements KeyManager {
             OMFileRequest.getLastKnownPrefixIfExists(volumeName, bucketName,
             keyName, metadataManager);
     int totalDirsCount = OzoneFSUtils.getFileCount(keyName);
+    // check if the key is a directory
     if(dirInfo.getIndex() == totalDirsCount - 1){
       OmKeyInfo fileKeyInfo = OMFileRequest.getKeyInfo(dirInfo, keyName);
       return new OzFileInfo(true, fileKeyInfo, scmBlockSize);
@@ -1751,7 +1752,7 @@ public class KeyManagerImpl implements KeyManager {
 
   private class OzFileInfo {
     boolean isUri = false;
-    boolean isDir = false;
+    boolean isDir = true;
     long parentId;
     @Nullable
     OmKeyInfo omKeyInfo;
@@ -1760,7 +1761,6 @@ public class KeyManagerImpl implements KeyManager {
     OzFileInfo(boolean isUri, long parentId){
       this.isUri = isUri;
       this.parentId = parentId;
-      this.isDir = true;
     }
 
     OzFileInfo(boolean isDir, OmKeyInfo omKeyInfo,

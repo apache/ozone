@@ -309,6 +309,7 @@ public final class OzoneManagerDoubleBuffer {
     omMetadataManager.getDelegationTokenTable().cleanupCache(
         lastRatisTransactionIndex);
     omMetadataManager.getPrefixTable().cleanupCache(lastRatisTransactionIndex);
+    omMetadataManager.getDirectoryTable().cleanupCache(lastRatisTransactionIndex);
 
   }
 

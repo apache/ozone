@@ -376,8 +376,9 @@ public class TestOzoneFileSystem {
     testNonExplicitlyCreatedPathExistsAfterItsLeafsWereRemoved();
 
     // TODO: [HDDS-2939] rename should be supported
-    // testRenameDir();
+    testRenameDir();
     testSeekOnFileLength();
+    testDeleteDir();
     testDeleteRoot();
   }
 
@@ -455,13 +456,16 @@ public class TestOzoneFileSystem {
       assertKeyNotFoundException(ex);
     }
 
+    // Child key creation should create all the missing parents.
+    String parentKey = o3fs.pathToKey(parent) + "/";
+    OzoneKeyDetails parentKeyInfo = getKey(parent, true);
+    assertEquals(parentKey, parentKeyInfo.getName());
+
     // Delete the child key
     fs.delete(child, false);
 
-    // Deleting the only child should create the parent dir key if it does
-    // not exist
-    String parentKey = o3fs.pathToKey(parent) + "/";
-    OzoneKeyDetails parentKeyInfo = getKey(parent, true);
+    // Deleting the only child should not delete the parent key.
+    parentKeyInfo = getKey(parent, true);
     assertEquals(parentKey, parentKeyInfo.getName());
   }
 
@@ -609,6 +613,32 @@ public class TestOzoneFileSystem {
     }
   }
 
+  public void testDeleteDir() throws IOException {
+    Path dir1 = new Path("/dir/sub-dir1");
+    fs.mkdirs(dir1);
+    Path dir2 = new Path("/dir/sub-dir2");
+    fs.mkdirs(dir2);
+    assertTrue("Failed to delete dir!", fs.delete(new Path("/dir"), true));
+    try{
+      fs.getFileStatus(new Path("/dir"));
+      fail("Should throw IOE as /dir doesn't exists!");
+    } catch(IOException ioe) {
+      // expected
+    }
+    try{
+      fs.getFileStatus(new Path("/dir/sub-dir1"));
+      fail("Should throw IOE as /dir/sub-dir1 doesn't exists!");
+    } catch(IOException ioe) {
+      // expected
+    }
+    try{
+      fs.getFileStatus(new Path("/dir/sub-dir2"));
+      fail("Should throw IOE as /dir/sub-dir2 doesn't exists!");
+    } catch(IOException ioe) {
+      // expected
+    }
+  }
+
   public void testDeleteRoot() throws IOException {
     Path dir = new Path("/dir");
     fs.mkdirs(dir);
@@ -643,6 +673,8 @@ public class TestOzoneFileSystem {
 
   private void testRenameDir() throws Exception {
     final String dir = "/root_dir/dir1";
+
+    // Test-1: RENAME when destination path doesn't exists
     final Path source = new Path(fs.getUri().toString() + dir);
     final Path dest = new Path(source.toString() + ".renamed");
     // Add a sub-dir to the directory to be moved.
@@ -650,12 +682,27 @@ public class TestOzoneFileSystem {
     fs.mkdirs(subdir);
     LOG.info("Created dir {}", subdir);
     LOG.info("Will move {} to {}", source, dest);
-    fs.rename(source, dest);
+    assertTrue("Directory rename failed", fs.rename(source, dest));
+    // destin should exists
     assertTrue("Directory rename failed", fs.exists(dest));
+    // source should be deleted
+    assertFalse("Directory rename failed", fs.exists(source));
     // Verify that the subdir is also renamed i.e. keys corresponding to the
     // sub-directories of the renamed directory have also been renamed.
     assertTrue("Keys under the renamed directory not renamed",
         fs.exists(new Path(dest, "sub_dir1")));
+
+    // Test-2: RENAME when destination path exists
+    final Path newdest = new Path("/root_dir/newdir");
+    fs.mkdirs(newdest);
+    assertTrue("Destin directory doesn't exists", fs.exists(newdest));
+    final Path newsrc = dest;
+    assertTrue("Source directory doesn't exists", fs.exists(newsrc));
+    assertTrue("Directory rename failed", fs.rename(newsrc, newdest));
+    Path expectedDest = new Path(newdest, newsrc.getName());
+    assertTrue("Directory rename failed", fs.exists(expectedDest));
+    // source should be deleted
+    assertFalse("Directory rename failed", fs.exists(newsrc));
 
     // Test if one path belongs to other FileSystem.
     LambdaTestUtils.intercept(IllegalArgumentException.class, "Wrong FS",

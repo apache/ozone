@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -39,7 +38,6 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -63,8 +61,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .Status;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
@@ -191,6 +187,8 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
                 keyArgs, omPathInfo.getLeafNodeObjectId(),
                 omPathInfo.getLastKnownParentId(), trxnLogIndex,
                 OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()));
+
+        // Add cache entries for the prefix directories.
         OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
                 volumeName,
                 bucketName, Optional.of(dirInfo),
@@ -289,13 +287,6 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       objectCount++;
 
       missingParentInfos.add(dirInfo);
-
-      // add entry to directory table
-      omMetadataManager.getDirectoryTable().addCacheEntry(
-              new CacheKey<>(omMetadataManager.getOzoneKey(volumeName,
-                      bucketName, dirInfo.getName())),
-              new CacheValue<>(Optional.of(dirInfo),
-                      trxnLogIndex));
 
       // updating id for the next sub-dir
       lastKnownParentId = nextObjId;

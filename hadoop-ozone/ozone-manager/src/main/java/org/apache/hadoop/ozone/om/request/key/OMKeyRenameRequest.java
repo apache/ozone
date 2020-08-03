@@ -24,10 +24,14 @@ import java.util.Map;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -145,14 +149,27 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
+      // fromKeyName should exist
+      OMFileRequest.OzKeyInfo fromOzKeyInfo =
+              OMFileRequest.getOmKeyInfoFromDB(volumeName,
+                      bucketName,
+                      fromKeyName,
+                      omMetadataManager);
+      fromKeyValue = fromOzKeyInfo.getOmKeyInfo();
+      if (fromKeyValue == null) {
+        // TODO: Add support for renaming open key
+        throw new OMException("Key not found " + fromKeyName, KEY_NOT_FOUND);
+      }
+      // identify fromKey is a directory or a file
+      boolean isDir = fromOzKeyInfo.isDir();
+
       // Check if toKey exists
-      fromKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-          fromKeyName);
-      toKey = omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName);
-      OmKeyInfo toKeyValue = omMetadataManager.getKeyTable().get(toKey);
-
+      OMFileRequest.OzKeyInfo toOzKeyInfo =
+              OMFileRequest.getOmKeyInfoFromDB(volumeName,
+                      bucketName,
+                      toKeyName, omMetadataManager);
+      OmKeyInfo toKeyValue = toOzKeyInfo.getOmKeyInfo();
       if (toKeyValue != null) {
-
         // Check if this transaction is a replay of ratis logs.
         if (isReplay(ozoneManager, toKeyValue, trxnLogIndex)) {
 
@@ -167,7 +184,6 @@ public class OMKeyRenameRequest extends OMKeyRequest {
           //     Replay Trxn 2 : Key2 is not created as it exists in DB and the
           //                     request would be deemed a replay. But Key1
           //                     is still in the DB and needs to be deleted.
-          fromKeyValue = omMetadataManager.getKeyTable().get(fromKey);
           if (fromKeyValue != null) {
             // Check if this replay transaction was after the fromKey was
             // created. If so, we have to delete the fromKey.
@@ -176,14 +192,25 @@ public class OMKeyRenameRequest extends OMKeyRequest {
               // Add to cache. Only fromKey should be deleted. ToKey already
               // exists in DB as this transaction is a replay.
               result = Result.DELETE_FROM_KEY_ONLY;
-              Table<String, OmKeyInfo> keyTable = omMetadataManager
-                  .getKeyTable();
-              keyTable.addCacheEntry(new CacheKey<>(fromKey),
-                  new CacheValue<>(Optional.absent(), trxnLogIndex));
+              String dbFromKeyname =
+                      omMetadataManager.getOzoneLeafNodeKey(
+                              fromKeyValue.getParentObjectID(),
+                              fromKeyValue.getLeafNodeName());
+              if(isDir){
+                Table<String, OmDirectoryInfo> dirTable = omMetadataManager
+                        .getDirectoryTable();
+                dirTable.addCacheEntry(new CacheKey<>(dbFromKeyname),
+                        new CacheValue<>(Optional.absent(), trxnLogIndex));
+              } else {
+                Table<String, OmKeyInfo> keyTable = omMetadataManager
+                        .getKeyTable();
+                keyTable.addCacheEntry(new CacheKey<>(dbFromKeyname),
+                        new CacheValue<>(Optional.absent(), trxnLogIndex));
+              }
 
               omClientResponse = new OMKeyRenameResponse(omResponse
                   .setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),
-                  fromKeyName, fromKeyValue);
+                  fromKeyName, fromKeyValue, isDir);
             }
           }
 
@@ -195,42 +222,70 @@ public class OMKeyRenameRequest extends OMKeyRequest {
                 omResponse));
           }
         } else {
-          // This transaction is not a replay. toKeyName should not exist
-          throw new OMException("Key already exists " + toKeyName,
-              OMException.ResultCodes.KEY_ALREADY_EXISTS);
+
+          if (fromKeyValue != null) {
+            if (fromKeyValue.getKeyName().equals(toKeyValue.getKeyName())) {
+              // if dst exists and source and destination are same,
+              // check both the src and dst are of same type
+              if (toOzKeyInfo.isDir() && fromOzKeyInfo.isDir()) {
+                result = Result.SUCCESS;
+              } else {
+                // toKeyName should not exist
+                throw new OMException("Key already exists " + toKeyName,
+                        OMException.ResultCodes.KEY_ALREADY_EXISTS);
+              }
+            } else if (toOzKeyInfo.isDir()) {
+              // If dst is a directory, rename source as subpath of it.
+              // for example rename /source to /dst will lead to /dst/source
+              String fromFileName = OzoneFSUtils.getFileName(fromKeyName);
+              String newToKeyName = OzoneFSUtils.appendKeyName(toKeyName,
+                      fromFileName);
+              OMFileRequest.OzKeyInfo newToOzKeyInfo=
+                      OMFileRequest.getOmKeyInfoFromDB(volumeName,
+                              bucketName,
+                              newToKeyName, omMetadataManager);
+              OmKeyInfo newToKeyValue = newToOzKeyInfo.getOmKeyInfo();
+              if(newToKeyValue != null) {
+                // If dst exists and not a directory not empty
+                throw new OMException(String.format(
+                        "Failed to rename %s to %s," +
+                                " file already exists or not empty!",
+                        fromKeyName, newToKeyName),
+                        OMException.ResultCodes.KEY_ALREADY_EXISTS);
+              }
+              omClientResponse = renameKey(trxnLogIndex,
+                      fromKeyValue, isDir,
+                      newToKeyName, toOzKeyInfo.getOmKeyInfo().getObjectID(),
+                      renameKeyArgs.getModificationTime(),
+                      omResponse, ozoneManager,
+                      omMetadataManager);
+                result = Result.SUCCESS;
+            } else {
+              // toKeyName should not exist
+              throw new OMException("Key already exists " + toKeyName,
+                      OMException.ResultCodes.KEY_ALREADY_EXISTS);
+            }
+          }
         }
       } else {
 
-        // This transaction is not a replay.
+        // This transaction is not a replay and destination doesn't exits.
 
-        // fromKeyName should exist
-        fromKeyValue = omMetadataManager.getKeyTable().get(fromKey);
-        if (fromKeyValue == null) {
-          // TODO: Add support for renaming open key
-          throw new OMException("Key not found " + fromKey, KEY_NOT_FOUND);
-        }
+        // Cannot rename a directory to its own subdirectory
+        OMFileRequest.verifyToDirIsASubDirOfFromDirectory(fromKeyName,
+                toKeyName, isDir);
 
-        fromKeyValue.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+        // Destination doesn't exist, check whether dst parent dir exists or not
+        // if the parent exists, the source can still be renamed to dst path
+        OMFileRequest.verifyToKeynameParentDirExists(volumeName, bucketName,
+                toKeyName, fromKeyName, omMetadataManager);
 
-        fromKeyValue.setKeyName(toKeyName);
-        //Set modification time
-        fromKeyValue.setModificationTime(renameKeyArgs.getModificationTime());
-
-        // Add to cache.
-        // fromKey should be deleted, toKey should be added with newly updated
-        // omKeyInfo.
-        Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable();
-
-        keyTable.addCacheEntry(new CacheKey<>(fromKey),
-            new CacheValue<>(Optional.absent(), trxnLogIndex));
-
-        keyTable.addCacheEntry(new CacheKey<>(toKey),
-            new CacheValue<>(Optional.of(fromKeyValue), trxnLogIndex));
-
-        omClientResponse = new OMKeyRenameResponse(omResponse
-            .setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),
-            fromKeyName, toKeyName, fromKeyValue);
-
+        omClientResponse = renameKey(trxnLogIndex,
+                fromKeyValue, isDir,
+                toKeyName, toOzKeyInfo.getLastKnownParentId(),
+                renameKeyArgs.getModificationTime(),
+                omResponse, ozoneManager,
+                omMetadataManager);
         result = Result.SUCCESS;
       }
     } catch (IOException ex) {
@@ -277,6 +332,62 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       LOG.error("Unrecognized Result for OMKeyRenameRequest: {}",
           renameKeyRequest);
     }
+    return omClientResponse;
+  }
+
+  @NotNull
+  private OMClientResponse renameKey(long trxnLogIndex,
+                                     OmKeyInfo fromKeyValue,
+                                     boolean isDir,
+                                     String toKeyName,
+                                     long toLastKnownParentId,
+                                     long modificationTime,
+                                     OMResponse.Builder omResponse,
+                                     OzoneManager ozoneManager,
+                                     OMMetadataManager omMetadataManager) {
+
+    // fromKey should be deleted, toKey should be added with newly updated
+    // omKeyInfo.
+    String dbFromKeyname =
+            omMetadataManager.getOzoneLeafNodeKey(
+                    fromKeyValue.getParentObjectID(),
+                    fromKeyValue.getLeafNodeName());
+    String dbToKeyname =
+            omMetadataManager.getOzoneLeafNodeKey(
+                    toLastKnownParentId,
+                    OzoneFSUtils.getFileName(toKeyName));
+
+    // Do rename by updating fromKeyValue object to toKeyName details.
+    fromKeyValue.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+    fromKeyValue.setKeyName(toKeyName);
+    fromKeyValue.setLeafNodeName(OzoneFSUtils.getFileName(toKeyName));
+    fromKeyValue.setParentObjectID(toLastKnownParentId);
+    //Set modification time
+    fromKeyValue.setModificationTime(modificationTime);
+
+    // Add from_key and to_key details into cache.
+    if (isDir) {
+      Table<String, OmDirectoryInfo> dirTable =
+              omMetadataManager.getDirectoryTable();
+      dirTable.addCacheEntry(new CacheKey<>(dbFromKeyname),
+              new CacheValue<>(Optional.absent(), trxnLogIndex));
+
+      dirTable.addCacheEntry(new CacheKey<>(dbToKeyname),
+              new CacheValue<>(
+                      Optional.of(OMFileRequest.
+                              getDirectoryInfo(fromKeyValue)),
+                      trxnLogIndex));
+    } else {
+      Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable();
+      keyTable.addCacheEntry(new CacheKey<>(dbFromKeyname),
+              new CacheValue<>(Optional.absent(), trxnLogIndex));
+
+      keyTable.addCacheEntry(new CacheKey<>(dbToKeyname),
+              new CacheValue<>(Optional.of(fromKeyValue), trxnLogIndex));
+    }
+    OMClientResponse omClientResponse = new OMKeyRenameResponse(omResponse
+        .setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),
+            dbFromKeyname, dbToKeyname, fromKeyValue, isDir);
     return omClientResponse;
   }
 

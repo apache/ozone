@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,9 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -175,6 +179,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         getOmRequest());
     IOException exception = null;
     Result result = null;
+    List<OmDirectoryInfo> missingParentDirInfos;
     try {
       // check Acl
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
@@ -188,34 +193,27 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       // true, we can avoid get from bucket table.
 
       // Check if Key already exists
-      String dbKeyName = omMetadataManager.getOzoneKey(volumeName, bucketName,
-          keyName);
-      OmKeyInfo dbKeyInfo =
-          omMetadataManager.getKeyTable().getIfExist(dbKeyName);
-      if (dbKeyInfo != null) {
-        // Check if this transaction is a replay of ratis logs.
-        // We check only the KeyTable here and not the OpenKeyTable. In case
-        // this transaction is a replay but the transaction was not committed
-        // to the KeyTable, then we recreate the key in OpenKey table. This is
-        // okay as all the subsequent transactions would also be replayed and
-        // the openKey table would eventually reach the same state.
-        // The reason we do not check the OpenKey table is to avoid a DB read
-        // in regular non-replay scenario.
-        if (isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
-          // Replay implies the response has already been returned to
-          // the client. So take no further action and return a dummy
-          // OMClientResponse.
-          throw new OMReplayException();
-        }
-      }
+      OmKeyInfo dbKeyInfo = OMFileRequest.getOmKeyInfoFromDB(ozoneManager,
+              trxnLogIndex, volumeName, bucketName, keyName, omMetadataManager,
+              this);
 
       OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
           omMetadataManager.getBucketKey(volumeName, bucketName));
 
-      omKeyInfo = prepareKeyInfo(omMetadataManager, keyArgs, dbKeyInfo,
-          keyArgs.getDataSize(), locations,  getFileEncryptionInfo(keyArgs),
-          ozoneManager.getPrefixManager(), bucketInfo, trxnLogIndex,
-          ozoneManager.isRatisEnabled());
+      //1. Verify the path against directory table
+      //2. Verify the leaf node against key table
+      OMFileRequest.OMPathInfo omPathInfo =
+              OMFileRequest.verifyDirectoryKeysInPath(omMetadataManager,
+                      volumeName, bucketName, keyName, Paths.get(keyName));
+
+      // add all missing parents to dir table
+      missingParentDirInfos = OMDirectoryCreateRequest.getAllParentDirInfo(
+              ozoneManager, keyArgs, omPathInfo, trxnLogIndex);
+
+      omKeyInfo = prepareLeafNodeInfo(omMetadataManager, keyArgs, dbKeyInfo,
+              keyArgs.getDataSize(), locations, getFileEncryptionInfo(keyArgs),
+              ozoneManager.getPrefixManager(), bucketInfo, omPathInfo,
+              trxnLogIndex, ozoneManager.isRatisEnabled());
 
       long openVersion = omKeyInfo.getLatestVersionLocations().getVersion();
       long clientID = createKeyRequest.getClientID();
@@ -230,9 +228,23 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
+      // Add to cache entry can be done outside of lock for this openKey.
+      // Even if bucket gets deleted, when commitKey we shall identify if
+      // bucket gets deleted.
+      String dbOpenLeafNodeName = omMetadataManager.getOpenLeafNodeKey(
+              omPathInfo.getLastKnownParentId(),
+              omPathInfo.getLeafNodeName(), clientID);
       omMetadataManager.getOpenKeyTable().addCacheEntry(
-          new CacheKey<>(dbOpenKeyName),
-          new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+              new CacheKey<>(dbOpenLeafNodeName),
+              new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+
+      // Add cache entries for the prefix directories.
+      // Skip adding for the file key itself, until Key Commit.
+      // Add Directory Table entry
+      OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
+              volumeName,
+              bucketName, Optional.absent(),
+              Optional.of(missingParentDirInfos), trxnLogIndex);
 
       // Prepare response
       omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()

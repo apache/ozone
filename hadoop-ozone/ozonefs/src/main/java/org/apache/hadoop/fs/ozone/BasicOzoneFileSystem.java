@@ -278,26 +278,6 @@ public class BasicOzoneFileSystem extends FileSystem {
         + getClass().getSimpleName() + " FileSystem implementation");
   }
 
-  private class RenameIterator extends OzoneListingIterator {
-    private final String srcKey;
-    private final String dstKey;
-
-    RenameIterator(Path srcPath, Path dstPath)
-        throws IOException {
-      super(srcPath);
-      srcKey = pathToKey(srcPath);
-      dstKey = pathToKey(dstPath);
-      LOG.trace("rename from:{} to:{}", srcKey, dstKey);
-    }
-
-    @Override
-    boolean processKey(String key) throws IOException {
-      String newKeyName = dstKey.concat(key.substring(srcKey.length()));
-      adapter.renameKey(key, newKeyName);
-      return true;
-    }
-  }
-
   /**
    * Check whether the source and destination path are valid and then perform
    * rename from source path to destination path.
@@ -331,140 +311,13 @@ public class BasicOzoneFileSystem extends FileSystem {
       return false;
     }
 
-    // Check if the source exists
-    FileStatus srcStatus;
-    try {
-      srcStatus = getFileStatus(src);
-    } catch (FileNotFoundException fnfe) {
-      // source doesn't exist, return
-      return false;
+    if (dst.isRoot()) {
+      // Cannot rename root of file system
+      throw new IOException("rename destination cannot be the root");
     }
 
-    // Cannot rename a directory to its own subdirectory
-    if (srcStatus.isDirectory()) {
-      Path dstParent = dst.getParent();
-      while (dstParent != null && !src.equals(dstParent)) {
-        dstParent = dstParent.getParent();
-      }
-      Preconditions.checkArgument(dstParent == null,
-          "Cannot rename a directory to its own subdirectory");
-    }
-    // Check if the destination exists
-    FileStatus dstStatus;
-    try {
-      dstStatus = getFileStatus(dst);
-    } catch (FileNotFoundException fnde) {
-      dstStatus = null;
-    }
-
-    if (dstStatus == null) {
-      // If dst doesn't exist, check whether dst parent dir exists or not
-      // if the parent exists, the source can still be renamed to dst path
-      dstStatus = getFileStatus(dst.getParent());
-      if (!dstStatus.isDirectory()) {
-        throw new IOException(String.format(
-            "Failed to rename %s to %s, %s is a file", src, dst,
-            dst.getParent()));
-      }
-    } else {
-      // if dst exists and source and destination are same,
-      // check both the src and dst are of same type
-      if (srcStatus.getPath().equals(dstStatus.getPath())) {
-        return !srcStatus.isDirectory();
-      } else if (dstStatus.isDirectory()) {
-        // If dst is a directory, rename source as subpath of it.
-        // for example rename /source to /dst will lead to /dst/source
-        dst = new Path(dst, src.getName());
-        dstPath = dst.toUri().getPath();
-        FileStatus[] statuses;
-        try {
-          statuses = listStatus(dst);
-        } catch (FileNotFoundException fnde) {
-          statuses = null;
-        }
-
-        if (statuses != null && statuses.length > 0) {
-          // If dst exists and not a directory not empty
-          throw new FileAlreadyExistsException(String.format(
-              "Failed to rename %s to %s, file already exists or not empty!",
-              src, dst));
-        }
-      } else {
-        // If dst is not a directory
-        throw new FileAlreadyExistsException(String.format(
-            "Failed to rename %s to %s, file already exists!", src, dst));
-      }
-    }
-
-    if (srcStatus.isDirectory()) {
-      if (dstPath.toString()
-          .startsWith(srcPath.toString() + OZONE_URI_DELIMITER)) {
-        LOG.trace("Cannot rename a directory to a subdirectory of self");
-        return false;
-      }
-    }
-    RenameIterator iterator = new RenameIterator(src, dst);
-    boolean result = iterator.iterate();
-    if (result) {
-      createFakeParentDirectory(src);
-    }
-    return result;
-  }
-
-  private class DeleteIterator extends OzoneListingIterator {
-    private boolean recursive;
-
-    DeleteIterator(Path f, boolean recursive)
-        throws IOException {
-      super(f);
-      this.recursive = recursive;
-      if (getStatus().isDirectory()
-          && !this.recursive
-          && listStatus(f).length != 0) {
-        throw new PathIsNotEmptyDirectoryException(f.toString());
-      }
-    }
-
-    @Override
-    boolean processKey(String key) throws IOException {
-      if (key.equals("")) {
-        LOG.trace("Skipping deleting root directory");
-        return true;
-      } else {
-        LOG.trace("deleting key:{}", key);
-        boolean succeed = adapter.deleteObject(key);
-        // if recursive delete is requested ignore the return value of
-        // deleteObject and issue deletes for other keys.
-        return recursive || succeed;
-      }
-    }
-  }
-
-  /**
-   * Deletes the children of the input dir path by iterating though the
-   * DeleteIterator.
-   *
-   * @param f directory path to be deleted
-   * @return true if successfully deletes all required keys, false otherwise
-   * @throws IOException
-   */
-  private boolean innerDelete(Path f, boolean recursive) throws IOException {
-    LOG.trace("delete() path:{} recursive:{}", f, recursive);
-    try {
-      DeleteIterator iterator = new DeleteIterator(f, recursive);
-
-      if (f.isRoot()) {
-        LOG.warn("Cannot delete root directory.");
-        return false;
-      }
-
-      return iterator.iterate();
-    } catch (FileNotFoundException e) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Couldn't delete {} - does not exist", f);
-      }
-      return false;
-    }
+    adapter.renameKey(srcPath, dstPath);
+    return true;
   }
 
   @Override
@@ -472,25 +325,14 @@ public class BasicOzoneFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_DELETE);
     statistics.incrementWriteOps(1);
     LOG.debug("Delete path {} - recursive {}", f, recursive);
-    FileStatus status;
-    try {
-      status = getFileStatus(f);
-    } catch (FileNotFoundException ex) {
-      LOG.warn("delete: Path does not exist: {}", f);
-      return false;
-    }
 
     String key = pathToKey(f);
-    boolean result;
-
-    if (status.isDirectory()) {
-      LOG.debug("delete: Path is a directory: {}", f);
-
-      result = innerDelete(f, recursive);
-    } else {
-      LOG.debug("delete: Path is a file: {}", f);
-      result = adapter.deleteObject(key);
+    if (key.equals("")) {
+      LOG.trace("Skipping deleting root directory");
+      return false;
     }
+    LOG.debug("delete path : {}", f);
+    boolean result = adapter.deleteObject(key);
 
     if (result) {
       // If this delete operation removes all files/directories from the
@@ -711,80 +553,6 @@ public class BasicOzoneFileSystem extends FileSystem {
         + "userName=" + userName + ", "
         + "statistics=" + statistics
         + "}";
-  }
-
-  /**
-   * This class provides an interface to iterate through all the keys in the
-   * bucket prefixed with the input path key and process them.
-   * <p>
-   * Each implementing class should define how the keys should be processed
-   * through the processKey() function.
-   */
-  private abstract class OzoneListingIterator {
-    private final Path path;
-    private final FileStatus status;
-    private String pathKey;
-    private Iterator<BasicKeyInfo> keyIterator;
-
-    OzoneListingIterator(Path path)
-        throws IOException {
-      this.path = path;
-      this.status = getFileStatus(path);
-      this.pathKey = pathToKey(path);
-      if (status.isDirectory()) {
-        this.pathKey = addTrailingSlashIfNeeded(pathKey);
-      }
-      keyIterator = adapter.listKeys(pathKey);
-    }
-
-    /**
-     * The output of processKey determines if further iteration through the
-     * keys should be done or not.
-     *
-     * @return true if we should continue iteration of keys, false otherwise.
-     * @throws IOException
-     */
-    abstract boolean processKey(String key) throws IOException;
-
-    /**
-     * Iterates thorugh all the keys prefixed with the input path's key and
-     * processes the key though processKey().
-     * If for any key, the processKey() returns false, then the iteration is
-     * stopped and returned with false indicating that all the keys could not
-     * be processed successfully.
-     *
-     * @return true if all keys are processed successfully, false otherwise.
-     * @throws IOException
-     */
-    boolean iterate() throws IOException {
-      LOG.trace("Iterating path {}", path);
-      if (status.isDirectory()) {
-        LOG.trace("Iterating directory:{}", pathKey);
-        while (keyIterator.hasNext()) {
-          BasicKeyInfo key = keyIterator.next();
-          LOG.trace("iterating key:{}", key.getName());
-          if (!processKey(key.getName())) {
-            return false;
-          }
-        }
-        return true;
-      } else {
-        LOG.trace("iterating file:{}", path);
-        return processKey(pathKey);
-      }
-    }
-
-    String getPathKey() {
-      return pathKey;
-    }
-
-    boolean pathIsDirectory() {
-      return status.isDirectory();
-    }
-
-    FileStatus getStatus() {
-      return status;
-    }
   }
 
   public OzoneClientAdapter getAdapter() {

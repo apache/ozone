@@ -51,7 +51,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
             .build();
 
     OMKeyDeleteResponse omKeyDeleteResponse = new OMKeyDeleteResponse(
-        omResponse, omKeyInfo, true);
+        omResponse, omKeyInfo, true, false);
 
     String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
         keyName);
@@ -113,7 +113,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
             .build();
 
     OMKeyDeleteResponse omKeyDeleteResponse = new OMKeyDeleteResponse(
-        omResponse, omKeyInfo, true);
+        omResponse, omKeyInfo, true, false);
 
     Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneKey));
     omKeyDeleteResponse.addToDBBatch(omMetadataManager, batchOperation);
@@ -142,7 +142,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
             .build();
 
     OMKeyDeleteResponse omKeyDeleteResponse = new OMKeyDeleteResponse(
-        omResponse, omKeyInfo, true);
+        omResponse, omKeyInfo, true, false);
 
     String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
         keyName);

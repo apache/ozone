@@ -23,6 +23,7 @@ import java.util.List;
 import javax.annotation.Nonnull;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -40,11 +41,11 @@ public class OMKeyCreateResponse extends OMClientResponse {
       LoggerFactory.getLogger(OMKeyCreateResponse.class);
   private OmKeyInfo omKeyInfo;
   private long openKeySessionID;
-  private List<OmKeyInfo> parentKeyInfos;
+  private List<OmDirectoryInfo> parentKeyInfos;
 
   public OMKeyCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo,
-      List<OmKeyInfo> parentKeyInfos, long openKeySessionID) {
+      List<OmDirectoryInfo> parentKeyInfos, long openKeySessionID) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
     this.openKeySessionID = openKeySessionID;
@@ -63,30 +64,28 @@ public class OMKeyCreateResponse extends OMClientResponse {
   @Override
   protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
-
     /**
      * Create parent directory entries during Key Create - do not wait
      * for Key Commit request.
      * XXX handle stale directory entries.
      */
     if (parentKeyInfos != null) {
-      for (OmKeyInfo parentKeyInfo : parentKeyInfos) {
+      for (OmDirectoryInfo parentKeyInfo : parentKeyInfos) {
         String parentKey = omMetadataManager
-            .getOzoneDirKey(parentKeyInfo.getVolumeName(),
-                parentKeyInfo.getBucketName(), parentKeyInfo.getKeyName());
+                .getOzonePrefixKey(parentKeyInfo.getParentObjectID(), parentKeyInfo.getName());
         if (LOG.isDebugEnabled()) {
           LOG.debug("putWithBatch adding parent : key {} info : {}", parentKey,
-              parentKeyInfo);
+                  parentKeyInfo);
         }
-        omMetadataManager.getKeyTable()
-            .putWithBatch(batchOperation, parentKey, parentKeyInfo);
+        omMetadataManager.getDirectoryTable()
+                .putWithBatch(batchOperation, parentKey, parentKeyInfo);
       }
     }
 
-    String openKey = omMetadataManager.getOpenKey(omKeyInfo.getVolumeName(),
-        omKeyInfo.getBucketName(), omKeyInfo.getKeyName(), openKeySessionID);
+    String openKey = omMetadataManager.getOpenLeafNodeKey(omKeyInfo.getParentObjectID(),
+            omKeyInfo.getLeafNodeName(), openKeySessionID);
     omMetadataManager.getOpenKeyTable().putWithBatch(batchOperation,
-        openKey, omKeyInfo);
+            openKey, omKeyInfo);
   }
 }
 

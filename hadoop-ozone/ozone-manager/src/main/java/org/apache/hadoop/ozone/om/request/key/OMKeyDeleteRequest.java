@@ -22,7 +22,10 @@ import java.io.IOException;
 import java.util.Map;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -116,36 +119,58 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
 
-      String objectKey = omMetadataManager.getOzoneKey(
-          volumeName, bucketName, keyName);
-
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
           volumeName, bucketName);
 
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-
-      OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(objectKey);
-      if (omKeyInfo == null) {
+      OmKeyInfo dbKeyInfo = null;
+      boolean isDir = false;
+      OmDirectoryInfo dirInfo =
+              OMFileRequest.getLastKnownPrefixIfExists(volumeName, bucketName,
+                      keyName, omMetadataManager);
+      int totalDirsCount = OzoneFSUtils.getFileCount(keyName);
+      if(dirInfo.getIndex() == totalDirsCount - 1){
+        dbKeyInfo = OMFileRequest.getKeyInfo(dirInfo, keyName);
+        isDir = true;
+      } else {
+        // check if the key is a file
+        // check if the immediate parent exists
+        if (dirInfo.getIndex() == totalDirsCount - 2) {
+          String fileName = OzoneFSUtils.getFileName(keyName);
+          String dbNodeName = omMetadataManager.getOzonePrefixKey(dirInfo.getObjectID(),
+                  fileName);
+          dbKeyInfo = omMetadataManager.getKeyTable().get(dbNodeName);
+        }
+      }
+      if (dbKeyInfo == null) {
         throw new OMException("Key not found", KEY_NOT_FOUND);
       }
-
       // Check if this transaction is a replay of ratis logs.
-      if (isReplay(ozoneManager, omKeyInfo, trxnLogIndex)) {
+      if (isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
         // Replay implies the response has already been returned to
         // the client. So take no further action and return a dummy
         // OMClientResponse.
         throw new OMReplayException();
       }
-
       // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+      dbKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
+      // TODO: Need to support recursive deletion of files and sub-dirs
+      //  via KeyDeletingService. This is not implemented yet and ops will
+      //  fail now.
       // Update table cache.
-      omMetadataManager.getKeyTable().addCacheEntry(
-          new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
-              keyName)),
-          new CacheValue<>(Optional.absent(), trxnLogIndex));
+      if(isDir){
+        omMetadataManager.getDirectoryTable().addCacheEntry(
+                new CacheKey<>(omMetadataManager.getOzonePrefixKey(
+                        dbKeyInfo.getParentObjectID(), dbKeyInfo.getKeyName())),
+                new CacheValue<>(Optional.absent(), trxnLogIndex));
+      } else {
+        omMetadataManager.getKeyTable().addCacheEntry(
+                new CacheKey<>(omMetadataManager.getOzonePrefixKey(
+                        dbKeyInfo.getParentObjectID(), dbKeyInfo.getKeyName())),
+                new CacheValue<>(Optional.absent(), trxnLogIndex));
+      }
 
       // No need to add cache entries to delete table. As delete table will
       // be used by DeleteKeyService only, not used for any client response
@@ -154,7 +179,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
       omClientResponse = new OMKeyDeleteResponse(omResponse
           .setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
-          omKeyInfo, ozoneManager.isRatisEnabled());
+              dbKeyInfo, ozoneManager.isRatisEnabled(), isDir);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

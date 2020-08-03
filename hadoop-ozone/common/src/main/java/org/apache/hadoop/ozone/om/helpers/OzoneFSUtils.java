@@ -90,6 +90,13 @@ public final class OzoneFSUtils {
     return keyPath.getNameCount();
   }
 
+  public static String appendKeyName(String toKeyName, String fromFileName) {
+    StringBuilder newToKeyName = new StringBuilder(toKeyName);
+    newToKeyName.append(OZONE_URI_DELIMITER);
+    newToKeyName.append(fromFileName);
+    return newToKeyName.toString();
+  }
+
   public static String addTrailingSlashIfNeeded(String key) {
     if (!key.endsWith(OZONE_URI_DELIMITER)) {
       return key + OZONE_URI_DELIMITER;

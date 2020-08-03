@@ -288,7 +288,7 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @return true if transactionID is less than or equal to updateID, false
    * otherwise.
    */
-  protected boolean isReplay(OzoneManager om, WithObjectID ozoneObj,
+  public boolean isReplay(OzoneManager om, WithObjectID ozoneObj,
       long transactionID) {
     return om.isRatisEnabled() && ozoneObj.isUpdateIDset() &&
         transactionID <= ozoneObj.getUpdateID();

@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.response.key;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
@@ -37,13 +38,16 @@ public class OMKeyRenameResponse extends OMClientResponse {
   private String fromKeyName;
   private String toKeyName;
   private OmKeyInfo newKeyInfo;
+  private boolean isDir;
 
   public OMKeyRenameResponse(@Nonnull OMResponse omResponse,
-      String fromKeyName, String toKeyName, @Nonnull OmKeyInfo renameKeyInfo) {
+      String fromKeyName, String toKeyName, @Nonnull OmKeyInfo renameKeyInfo,
+       boolean isDir) {
     super(omResponse);
     this.fromKeyName = fromKeyName;
     this.toKeyName = toKeyName;
     this.newKeyInfo = renameKeyInfo;
+    this.isDir = isDir;
   }
 
   /**
@@ -59,11 +63,12 @@ public class OMKeyRenameResponse extends OMClientResponse {
    *  deleted.
    */
   public OMKeyRenameResponse(@Nonnull OMResponse omResponse,
-      String fromKeyName, OmKeyInfo fromKeyInfo) {
+      String fromKeyName, OmKeyInfo fromKeyInfo, boolean isDir) {
     super(omResponse);
     this.fromKeyName = fromKeyName;
     this.newKeyInfo = fromKeyInfo;
     this.toKeyName = null;
+    this.isDir = isDir;
   }
 
   /**
@@ -84,15 +89,27 @@ public class OMKeyRenameResponse extends OMClientResponse {
     // KeyTable. This is the case of replay where toKey exists but fromKey
     // has not been deleted.
     if (deleteFromKeyOnly()) {
-      omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
-          omMetadataManager.getOzoneKey(volumeName, bucketName, fromKeyName));
+      if (isDir) {
+        omMetadataManager.getDirectoryTable().deleteWithBatch(batchOperation,
+                omMetadataManager.getOzoneKey(volumeName, bucketName, fromKeyName));
+      } else {
+        omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
+                omMetadataManager.getOzoneKey(volumeName, bucketName, fromKeyName));
+      }
+
     } else if (createToKeyAndDeleteFromKey()) {
       // If both from and toKeyName are equal do nothing
-      omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
-          omMetadataManager.getOzoneKey(volumeName, bucketName, fromKeyName));
-      omMetadataManager.getKeyTable().putWithBatch(batchOperation,
-          omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName),
-          newKeyInfo);
+      if (isDir) {
+        omMetadataManager.getDirectoryTable().deleteWithBatch(batchOperation,
+                fromKeyName);
+        omMetadataManager.getDirectoryTable().putWithBatch(batchOperation,
+                toKeyName, OMFileRequest.getDirectoryInfo(newKeyInfo));
+      } else {
+        omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
+                fromKeyName);
+        omMetadataManager.getKeyTable().putWithBatch(batchOperation, toKeyName,
+                newKeyInfo);
+      }
     }
   }
 

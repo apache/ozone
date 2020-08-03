@@ -39,12 +39,14 @@ import javax.annotation.Nonnull;
 public class OMKeyDeleteResponse extends OMClientResponse {
   private OmKeyInfo omKeyInfo;
   private boolean isRatisEnabled;
+  private boolean isDir;
 
   public OMKeyDeleteResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo, boolean isRatisEnabled) {
+      @Nonnull OmKeyInfo omKeyInfo, boolean isRatisEnabled, boolean isDir) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
     this.isRatisEnabled = isRatisEnabled;
+    this.isDir = isDir;
   }
 
   /**
@@ -63,29 +65,34 @@ public class OMKeyDeleteResponse extends OMClientResponse {
     // For OmResponse with failure, this should do nothing. This method is
     // not called in failure scenario in OM code.
     if (getOMResponse().getStatus() == OzoneManagerProtocolProtos.Status.OK) {
-      String ozoneKey = omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
-          omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
-      omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
-          ozoneKey);
-
-      // If Key is not empty add this to delete table.
-      if (!isKeyEmpty(omKeyInfo)) {
-        // If a deleted key is put in the table where a key with the same
-        // name already exists, then the old deleted key information would be
-        // lost. To avoid this, first check if a key with same name exists.
-        // deletedTable in OM Metadata stores <KeyName, RepeatedOMKeyInfo>.
-        // The RepeatedOmKeyInfo is the structure that allows us to store a
-        // list of OmKeyInfo that can be tied to same key name. For a keyName
-        // if RepeatedOMKeyInfo structure is null, we create a new instance,
-        // if it is not null, then we simply add to the list and store this
-        // instance in deletedTable.
-        RepeatedOmKeyInfo repeatedOmKeyInfo =
-            omMetadataManager.getDeletedTable().get(ozoneKey);
-        repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-            omKeyInfo, repeatedOmKeyInfo, omKeyInfo.getUpdateID(),
-            isRatisEnabled);
-        omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-            ozoneKey, repeatedOmKeyInfo);
+      String ozoneKey = omMetadataManager.getOzonePrefixKey(
+              omKeyInfo.getParentObjectID(), omKeyInfo.getKeyName());
+      if (isDir) {
+        omMetadataManager.getDirectoryTable().deleteWithBatch(batchOperation,
+                ozoneKey);
+      } else {
+        // If Key is not empty add this to delete table.
+        if (!isKeyEmpty(omKeyInfo)) {
+          // If a deleted key is put in the table where a key with the same
+          // name already exists, then the old deleted key information would be
+          // lost. To avoid this, first check if a key with same name exists.
+          // deletedTable in OM Metadata stores <KeyName, RepeatedOMKeyInfo>.
+          // The RepeatedOmKeyInfo is the structure that allows us to store a
+          // list of OmKeyInfo that can be tied to same key name. For a keyName
+          // if RepeatedOMKeyInfo structure is null, we create a new instance,
+          // if it is not null, then we simply add to the list and store this
+          // instance in deletedTable.
+          RepeatedOmKeyInfo repeatedOmKeyInfo =
+                  omMetadataManager.getDeletedTable().get(ozoneKey);
+          repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
+                  omKeyInfo, repeatedOmKeyInfo, omKeyInfo.getUpdateID(),
+                  isRatisEnabled);
+          omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
+                  ozoneKey, repeatedOmKeyInfo);
+        } else {
+          omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
+                  ozoneKey);
+        }
       }
     }
   }
