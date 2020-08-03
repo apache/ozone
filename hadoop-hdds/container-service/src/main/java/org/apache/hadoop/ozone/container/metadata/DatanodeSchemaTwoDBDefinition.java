@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 
 /**
  * This class defines the RocksDB structure for datanodes following schema
@@ -48,14 +49,14 @@ public class DatanodeSchemaTwoDBDefinition extends
           Long.class,
           new LongCodec());
 
-  public static final DBColumnFamilyDefinition<String, NoData>
+  public static final DBColumnFamilyDefinition<String, ChunkInfo>
           DELETED_BLOCKS =
           new DBColumnFamilyDefinition<>(
                   "deleted_blocks",
                   String.class,
                   new StringCodec(),
-                  NoData.class,
-                  new NoDataCodec());
+                  ChunkInfo.class,
+                  new ChunkInfoCodec());
 
   protected DatanodeSchemaTwoDBDefinition(String dbPath) {
     super(dbPath);
@@ -73,7 +74,7 @@ public class DatanodeSchemaTwoDBDefinition extends
   }
 
   @Override
-  public DBColumnFamilyDefinition<String, NoData>
+  public DBColumnFamilyDefinition<String, ChunkInfo>
       getDeletedBlocksColumnFamily() {
     return DELETED_BLOCKS;
   }

@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.rocksdb.RocksDB;
 
 /**
@@ -56,14 +57,14 @@ public class DatanodeSchemaOneDBDefinition
                   Long.class,
                   new LongCodec());
 
-  public static final DBColumnFamilyDefinition<String, NoData>
+  public static final DBColumnFamilyDefinition<String, ChunkInfo>
           DELETED_BLOCKS =
           new DBColumnFamilyDefinition<>(
                   StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
                   String.class,
                   new StringCodec(),
-                  NoData.class,
-                  new NoDataCodec());
+                  ChunkInfo.class,
+                  new ChunkInfoCodec());
 
   protected DatanodeSchemaOneDBDefinition(String dbPath) {
     super(dbPath);
@@ -81,7 +82,7 @@ public class DatanodeSchemaOneDBDefinition
   }
 
   @Override
-  public DBColumnFamilyDefinition<String, NoData>
+  public DBColumnFamilyDefinition<String, ChunkInfo>
       getDeletedBlocksColumnFamily() {
     return DELETED_BLOCKS;
   }

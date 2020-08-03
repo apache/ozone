@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.metadata;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 
 import java.io.IOException;
 
@@ -39,7 +40,7 @@ public class DatanodeStoreSchemaOneImpl extends AbstractDatanodeStore {
   }
 
   @Override
-  public Table<String, NoData> getDeletedBlocksTable() {
+  public Table<String, ChunkInfo> getDeletedBlocksTable() {
     // Return a wrapper around the deleted blocks table to handle prefixes
     // when all data is stored in a single table.
     return new SchemaOneDeletedBlocksTable(super.getDeletedBlocksTable());
