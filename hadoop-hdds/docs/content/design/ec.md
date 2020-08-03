@@ -26,7 +26,7 @@ author: Uma Maheswara Rao Gangumalla, Marton Elek, Stephen O'Donnell
   
 # Status
 
- The design doc describe two main method to implement EC:
+ The design doc describes two main methods to implement EC:
  
   * Container level, async Erasure Coding, to encode closed containers in the background
   * Block level, striped Erasure Coding
