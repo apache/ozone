@@ -28,7 +28,7 @@ Ozone has two leader nodes (*Ozone Manager* for key space management and *Storag
 To avoid any single point of failure the leader nodes also should have a HA setup.
 
  1. HA of Ozone Manager is implemented with the help of RAFT (Apache Ratis)
- 2. HA of Storage Container Manager is [under implementation]({{< ref "omha.md">}})
+ 2. HA of Storage Container Manager is [under implementation]({{< ref "scmha.md">}})
 
 ## Ozone Manager HA
 

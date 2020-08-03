@@ -87,8 +87,6 @@ The following data is persisted in Storage Container Manager side in a specific 
    * Block data is deleted in the background. Need a list to follow the progress.
  * Valid cert, Revoked certs
   * Used by the internal Certificate Authority to authorize other Ozone services
- * List of nodes
-   * It's reported by the Datanodes via HB. *Not persisted*
 
 ## Notable configuration
 

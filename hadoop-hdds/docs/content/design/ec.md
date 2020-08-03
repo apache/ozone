@@ -1,6 +1,6 @@
 ---
 title: Erasure Coding in Ozone 
-summary: Crypto key management to handle GDPR "right to be forgotten" feature
+summary: Use Erasure Coding algorithm for efficient storage
 date: 2020-06-30
 jira: HDDS-3816
 status: draft

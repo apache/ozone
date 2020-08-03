@@ -24,7 +24,7 @@ summary: Ozone Manager is the principal name space service of Ozone. OM manages 
   limitations under the License.
 -->
 
-![Write Path](OzoneManager.png)
+![Ozone Manager](OzoneManager.png)
 
 Ozone Manager (OM) is the namespace manager for Ozone.
 
