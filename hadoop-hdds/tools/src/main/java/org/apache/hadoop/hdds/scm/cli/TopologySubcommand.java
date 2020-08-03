@@ -18,13 +18,13 @@
 
 package org.apache.hadoop.hdds.scm.cli;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.TreeSet;
-import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -37,8 +37,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DECOMMI
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 import picocli.CommandLine;
-import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Spec;
 
 /**
  * Handler of printTopology command.
@@ -48,13 +46,7 @@ import picocli.CommandLine.Spec;
     description = "Print a tree of the network topology as reported by SCM",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class TopologySubcommand implements Callable<Void> {
-
-  @Spec
-  private CommandSpec spec;
-
-  @CommandLine.Mixin
-  private ScmOption scmOption;
+public class TopologySubcommand extends ScmSubcommand {
 
   private static final List<HddsProtos.NodeState> STATES = new ArrayList<>();
 
@@ -75,22 +67,19 @@ public class TopologySubcommand implements Callable<Void> {
   private boolean fullInfo;
 
   @Override
-  public Void call() throws Exception {
-    try (ScmClient scmClient = scmOption.createScmClient()) {
-      for (HddsProtos.NodeState state : STATES) {
-        List<HddsProtos.Node> nodes = scmClient.queryNode(state,
-            HddsProtos.QueryScope.CLUSTER, "");
-        if (nodes != null && !nodes.isEmpty()) {
-          // show node state
-          System.out.println("State = " + state.toString());
-          if (order) {
-            printOrderedByLocation(nodes);
-          } else {
-            printNodesWithLocation(nodes);
-          }
+  protected void execute(ScmClient scmClient) throws IOException {
+    for (HddsProtos.NodeState state : STATES) {
+      List<HddsProtos.Node> nodes = scmClient.queryNode(state,
+          HddsProtos.QueryScope.CLUSTER, "");
+      if (nodes != null && !nodes.isEmpty()) {
+        // show node state
+        System.out.println("State = " + state.toString());
+        if (order) {
+          printOrderedByLocation(nodes);
+        } else {
+          printNodesWithLocation(nodes);
         }
       }
-      return null;
     }
   }
 
