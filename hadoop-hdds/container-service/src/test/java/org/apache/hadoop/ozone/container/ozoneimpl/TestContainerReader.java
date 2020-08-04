@@ -139,17 +139,10 @@ public class TestContainerReader {
       }
 
       if (setMetaData) {
+        // Pending delete blocks are still counted towards the block count
+        // and bytes used metadata values, so those do not change.
         metadataStore.getStore().put(DB_PENDING_DELETE_BLOCK_COUNT_KEY,
             Longs.toByteArray(count));
-        long blkCount = Longs.fromByteArray(
-            metadataStore.getStore().get(DB_BLOCK_COUNT_KEY));
-        metadataStore.getStore().put(DB_BLOCK_COUNT_KEY,
-            Longs.toByteArray(blkCount - count));
-        long bytesUsed = Longs.fromByteArray(
-            metadataStore.getStore().get(DB_CONTAINER_BYTES_USED_KEY));
-        metadataStore.getStore().put(DB_CONTAINER_BYTES_USED_KEY,
-            Longs.toByteArray(bytesUsed - (count * blockLen)));
-
       }
     }
 
@@ -210,10 +203,10 @@ public class TestContainerReader {
           keyValueContainer.getContainerData();
 
       // Verify block related metadata.
-      Assert.assertEquals(blockCount - i,
+      Assert.assertEquals(blockCount,
           keyValueContainerData.getKeyCount());
 
-      Assert.assertEquals((blockCount - i) * blockLen,
+      Assert.assertEquals(blockCount * blockLen,
           keyValueContainerData.getBytesUsed());
 
       Assert.assertEquals(i,
