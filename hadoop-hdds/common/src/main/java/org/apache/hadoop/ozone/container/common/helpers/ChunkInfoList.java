@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.helpers;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -30,6 +31,10 @@ public class ChunkInfoList {
 
   public ChunkInfoList(List<ContainerProtos.ChunkInfo> chunks) {
     this.chunks = chunks;
+  }
+
+  public List<ContainerProtos.ChunkInfo> asList() {
+    return Collections.unmodifiableList(chunks);
   }
 
   /**

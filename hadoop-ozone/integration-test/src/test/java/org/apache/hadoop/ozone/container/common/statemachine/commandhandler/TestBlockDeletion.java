@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
@@ -38,6 +39,8 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -59,12 +62,7 @@ import org.slf4j.event.Level;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Set;
-import java.util.List;
-import java.util.HashSet;
-import java.util.ArrayList;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -338,16 +336,41 @@ public class TestBlockDeletion {
       try(ReferenceCountedDB db =
           BlockUtils.getDB((KeyValueContainerData) dnContainerSet
           .getContainer(blockID.getContainerID()).getContainerData(), conf)) {
-        Assert.assertNotNull(
-                db.getStore().getBlockDataTable()
-                .get(Long.toString(blockID.getLocalID())));
-        String deletingKey = OzoneConsts.DELETING_KEY_PREFIX +
-                blockID.getLocalID();
-        Assert.assertNull(db.getStore().getBlockDataTable().get(deletingKey));
-        Assert.assertNotNull(db.getStore().getDeletedBlocksTable()
-            .get(Long.toString(blockID.getLocalID())));
+
+        Table<String, BlockData> blockDataTable =
+                db.getStore().getBlockDataTable();
+        Table<String, ChunkInfoList> deletedBlocksTable =
+                db.getStore().getDeletedBlocksTable();
+
+        String blockIDString = Long.toString(blockID.getLocalID());
+
+        BlockData blockData = blockDataTable.get(blockIDString);
+        Assert.assertNotNull(blockData);
+
+        String deletingKey = OzoneConsts.DELETING_KEY_PREFIX + blockIDString;
+        Assert.assertNull(blockDataTable.get(deletingKey));
+
+        ChunkInfoList chunks = deletedBlocksTable.get(blockIDString);
+        Assert.assertNotNull(chunks);
+
+        verifyChunksEqual(blockData.getChunks(), chunks.asList());
       }
       containerIdsWithDeletedBlocks.add(blockID.getContainerID());
     }, omKeyLocationInfoGroups);
+  }
+
+  private void verifyChunksEqual(List<ContainerProtos.ChunkInfo> chunks1,
+                                    List<ContainerProtos.ChunkInfo> chunks2) {
+    Assert.assertEquals(chunks1.size(), chunks2.size());
+
+    Iterator<ContainerProtos.ChunkInfo> iter1 = chunks1.iterator();
+    Iterator<ContainerProtos.ChunkInfo> iter2 = chunks2.iterator();
+
+    while(iter1.hasNext() && iter2.hasNext())  {
+      ContainerProtos.ChunkInfo c1 = iter1.next();
+      ContainerProtos.ChunkInfo c2 = iter2.next();
+
+      Assert.assertEquals(c1, c2);
+    }
   }
 }
