@@ -149,6 +149,11 @@ public class PipelineStateManagerV2Impl implements StateManager {
   }
 
   @Override
+  public int getNumHealthyVolumes(Pipeline pipeline) {
+    return nodeManager.getNumHealthyVolumes(pipeline.getNodes());
+  }
+
+  @Override
   public void removePipeline(HddsProtos.PipelineID pipelineIDProto)
       throws IOException {
     PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineIDProto);

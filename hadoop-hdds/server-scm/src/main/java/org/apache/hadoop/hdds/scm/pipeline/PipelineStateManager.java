@@ -118,6 +118,11 @@ public class PipelineStateManager implements StateManager {
   }
 
   @Override
+  public int getNumHealthyVolumes(Pipeline pipeline) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public Pipeline removePipeline(PipelineID pipelineID) throws IOException {
     Pipeline pipeline = pipelineStateMap.removePipeline(pipelineID);
     LOG.info("Pipeline {} removed from db", pipeline);

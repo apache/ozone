@@ -159,6 +159,11 @@ public final class MockPipelineManager implements PipelineManager {
   }
 
   @Override
+  public int getNumHealthyVolumes(Pipeline pipeline) {
+    return stateManager.getNumHealthyVolumes(pipeline);
+  }
+
+  @Override
   public void openPipeline(final PipelineID pipelineId)
       throws IOException {
     stateManager.openPipeline(pipelineId);

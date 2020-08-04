@@ -309,6 +309,16 @@ public final class PipelineManagerV2Impl implements PipelineManager {
     return stateManager.getNumberOfContainers(pipelineID);
   }
 
+  /**
+   * returns max count of healthy volumes from the set of
+   * datanodes constituting the pipeline.
+   * @param  pipeline
+   * @return healthy volume count
+   */
+  public int getNumHealthyVolumes(Pipeline pipeline) {
+    return stateManager.getNumHealthyVolumes(pipeline);
+  }
+
   @Override
   public void openPipeline(PipelineID pipelineId) throws IOException {
     checkLeader();

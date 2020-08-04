@@ -92,6 +92,7 @@ public interface StateManager {
 
   int getNumberOfContainers(PipelineID pipelineID) throws IOException;
 
+  int getNumHealthyVolumes(Pipeline pipeline);
 
   void removeContainerFromPipeline(PipelineID pipelineID,
                                    ContainerID containerID) throws IOException;
