@@ -39,7 +39,7 @@ import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletionChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -49,7 +49,6 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverSe
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.metadata.NoData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.util.Time;
 
@@ -295,7 +294,7 @@ public class BlockDeletingService extends BackgroundService {
         // entries
         BatchOperation batch = meta.getStore().getBatchHandler()
                 .initBatchOperation();
-        Table<String, ChunkInfo> deletedBlocksTable =
+        Table<String, ChunkInfoList> deletedBlocksTable =
                 meta.getStore().getDeletedBlocksTable();
         for (String entry: succeedBlocks) {
           List<ContainerProtos.ChunkInfo> chunkList =
@@ -305,7 +304,7 @@ public class BlockDeletingService extends BackgroundService {
 
           deletedBlocksTable.putWithBatch(
                   batch, blockId,
-                  chunkList);
+                  new ChunkInfoList(chunkList));
           blockDataTable.deleteWithBatch(batch, entry);
         }
 

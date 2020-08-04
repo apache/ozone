@@ -32,7 +32,7 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.helpers
     .DeletedContainerBlocksSummary;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -211,7 +211,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
             BlockUtils.getDB(containerData, conf)) {
       Table<String, BlockData> blockDataTable =
               containerDB.getStore().getBlockDataTable();
-      Table<String, ChunkInfo> deletedBlocksTable =
+      Table<String, ChunkInfoList> deletedBlocksTable =
               containerDB.getStore().getDeletedBlocksTable();
 
       for (Long blkLong : delTX.getLocalIDList()) {
