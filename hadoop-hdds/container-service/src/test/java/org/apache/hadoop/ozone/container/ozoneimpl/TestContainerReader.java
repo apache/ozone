@@ -134,16 +134,11 @@ public class TestContainerReader {
       }
 
       if (setMetaData) {
+        // Pending delete blocks are still counted towards the block count
+        // and bytes used metadata values, so those do not change.
         Table<String, Long> metadataTable =
                 metadataStore.getStore().getMetadataTable();
-
         metadataTable.put(OzoneConsts.PENDING_DELETE_BLOCK_COUNT, (long)count);
-        long blkCount = metadataTable.get(OzoneConsts.BLOCK_COUNT);
-        metadataTable.put(OzoneConsts.BLOCK_COUNT, blkCount - count);
-        long bytesUsed = metadataTable.get(OzoneConsts.CONTAINER_BYTES_USED);
-        metadataTable.put(OzoneConsts.CONTAINER_BYTES_USED,
-                bytesUsed - (count * blockLen));
-
       }
     }
 
@@ -204,10 +199,10 @@ public class TestContainerReader {
           keyValueContainer.getContainerData();
 
       // Verify block related metadata.
-      Assert.assertEquals(blockCount - i,
+      Assert.assertEquals(blockCount,
           keyValueContainerData.getKeyCount());
 
-      Assert.assertEquals((blockCount - i) * blockLen,
+      Assert.assertEquals(blockCount * blockLen,
           keyValueContainerData.getBytesUsed());
 
       Assert.assertEquals(i,
