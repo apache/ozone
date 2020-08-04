@@ -230,10 +230,22 @@ public final class KeyValueContainerUtil {
   private static void initializeUsedBytesAndBlockCount(
       KeyValueContainerData kvContainerData) throws IOException {
 
+    MetadataKeyFilters.KeyPrefixFilter filter =
+            new MetadataKeyFilters.KeyPrefixFilter();
+
+    // Ignore all blocks except those with no prefix, or those with
+    // #deleting# prefix.
+    filter.addFilter(OzoneConsts.DELETED_KEY_PREFIX, true)
+          .addFilter(OzoneConsts.DELETE_TRANSACTION_KEY_PREFIX, true)
+          .addFilter(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX, true)
+          .addFilter(OzoneConsts.BLOCK_COUNT, true)
+          .addFilter(OzoneConsts.CONTAINER_BYTES_USED, true)
+          .addFilter(OzoneConsts.PENDING_DELETE_BLOCK_COUNT, true);
+
     long blockCount = 0;
     try (KeyValueBlockIterator blockIter = new KeyValueBlockIterator(
         kvContainerData.getContainerID(),
-        new File(kvContainerData.getContainerPath()))) {
+        new File(kvContainerData.getContainerPath()), filter)) {
       long usedBytes = 0;
 
 
