@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
@@ -52,9 +53,12 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -81,10 +85,22 @@ import static org.junit.Assert.assertTrue;
  * Ozone file system tests that are not covered by contract tests.
  * TODO: Refactor this and TestOzoneFileSystem later to reduce code duplication.
  */
+@RunWith(Parameterized.class)
 public class TestRootedOzoneFileSystem {
+
+  @Parameterized.Parameters
+  public static Collection<Object[]> data() {
+    return Arrays.asList(new Object[]{true}, new Object[]{false});
+  }
+
+  public TestRootedOzoneFileSystem(boolean setDefaultFs) {
+    this.enabledFileSystemPaths = setDefaultFs;
+  }
 
   @Rule
   public Timeout globalTimeout = new Timeout(300_000);
+
+  private boolean enabledFileSystemPaths;
 
   private OzoneConfiguration conf;
   private MiniOzoneCluster cluster = null;
@@ -105,6 +121,8 @@ public class TestRootedOzoneFileSystem {
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+        enabledFileSystemPaths);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
