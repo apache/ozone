@@ -41,11 +41,10 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
-import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import static org.junit.Assert.fail;
-import org.junit.Before;
-import org.junit.Ignore;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -54,16 +53,15 @@ import org.junit.rules.Timeout;
  * Test some client operations after cluster starts. And perform restart and
  * then performs client operations and check the behavior is expected or not.
  */
-@Ignore
 public class TestOzoneManagerRestart {
-  private MiniOzoneCluster cluster = null;
-  private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
-  private String omId;
+  private static MiniOzoneCluster cluster = null;
+  private static OzoneConfiguration conf;
+  private static String clusterId;
+  private static String scmId;
+  private static String omId;
 
   @Rule
-  public Timeout timeout = new Timeout(60000);
+  public Timeout timeout = new Timeout(240000);
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -72,8 +70,8 @@ public class TestOzoneManagerRestart {
    *
    * @throws IOException
    */
-  @Before
-  public void init() throws Exception {
+  @BeforeClass
+  public static void init() throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
@@ -94,8 +92,8 @@ public class TestOzoneManagerRestart {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
-  public void shutdown() {
+  @AfterClass
+  public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
