@@ -185,4 +185,39 @@ public class RatisClientConfig {
   public void setExponentialPolicyMaxSleep(Duration duration) {
     exponentialPolicyMaxSleepInMs = duration.toMillis();
   }
+
+  @Config(key = "client.retrylimited.retry.interval",
+      defaultValue = "1s",
+      type = ConfigType.TIME,
+      tags = { OZONE, CLIENT, PERFORMANCE },
+      description = "Interval between successive retries for "
+          + "a ratis client request.")
+  private long retrylimitedRetryInterval;
+
+  public long getRetrylimitedRetryInterval() {
+    return retrylimitedRetryInterval;
+  }
+
+  @Config(key = "client.retrylimited.max.retries",
+      defaultValue = "180",
+      type = ConfigType.INT,
+      tags = { OZONE, CLIENT, PERFORMANCE },
+      description = "Number of retries for ratis client request.")
+  private int retrylimitedMaxRetries;
+
+  public int getRetrylimitedMaxRetries() {
+    return retrylimitedMaxRetries;
+  }
+
+  @Config(key = "client.retry.policy",
+      defaultValue = "org.apache.hadoop.hdds.ratis.retrypolicy."
+          + "RequestTypeDependentRetryPolicyCreator",
+      type = ConfigType.STRING,
+      tags = { OZONE, CLIENT, PERFORMANCE },
+      description = "The class name of the policy for retry.")
+  private String retryPolicy;
+
+  public String getRetryPolicy() {
+    return retryPolicy;
+  }
 }
