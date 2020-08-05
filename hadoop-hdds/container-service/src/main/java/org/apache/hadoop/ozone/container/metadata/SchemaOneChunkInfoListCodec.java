@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.container.metadata;
 
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
@@ -25,6 +24,25 @@ import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferExce
 
 import java.io.IOException;
 
+/**
+ * Codec for parsing {@link ContainerProtos.ChunkInfoList} objects from data
+ * that may have been written using schema version one. Before upgrading
+ * schema versions, deleted block IDs were stored with a duplicate copy of
+ * their ID as the value in the database. After upgrading the code, any
+ * deletes that happen on the DB will save the chunk information with the
+ * deleted blocks instead, even if those deletes are performed on a database
+ * created with schema version one.
+ * <p>
+ * Since the resulting database may contain a mix of values that could either
+ * be block IDs or chunk information, this codec will attempt to parse bytes as
+ * chunk information, and on failure, throw an exception with a message about
+ * the old schema format.
+ * <p>
+ * Note that there is currently no where in the code (except for tests) where
+ * the values associated with deleted block IDs are used. If it is added in the
+ * future, callers should be aware that the associated chunk information may not
+ * always be present.
+ */
 public class SchemaOneChunkInfoListCodec implements Codec<ChunkInfoList> {
   @Override
   public byte[] toPersistedFormat(ChunkInfoList chunkList) {
@@ -37,7 +55,7 @@ public class SchemaOneChunkInfoListCodec implements Codec<ChunkInfoList> {
       return ChunkInfoList.getFromProtoBuf(
               ContainerProtos.ChunkInfoList.parseFrom(rawData));
     } catch (InvalidProtocolBufferException ex) {
-      throw new IllegalArgumentException("Invalid chunk information. " +
+      throw new IOException("Invalid chunk information. " +
               "This data may have been written using datanode " +
               "schema version one, which did not save chunk information.", ex);
     }

@@ -247,7 +247,7 @@ public class TestSchemaOneBackwardsCompatibility {
           chunkListKV.getValue();
           Assert.fail("No exception thrown when trying to retrieve old " +
                   "deleted blocks values as chunk lists.");
-        } catch(IllegalArgumentException ex) {
+        } catch(IOException ex) {
           // Exception thrown as expected.
         }
       }
