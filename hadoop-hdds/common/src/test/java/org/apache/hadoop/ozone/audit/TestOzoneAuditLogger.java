@@ -162,7 +162,11 @@ public class TestOzoneAuditLogger {
                         .withResult(FAILURE)
                         .withException(testException).build();
         AUDIT.logWriteFailure(exceptionAuditMessage);
-        verifyLog("TestException","org.apache.hadoop.ozone.audit.TestOzoneAuditLogger.messageIncludesMultilineException");
+        verifyLog("TestException",
+            "org.apache.hadoop.ozone.audit."
+                + "TestOzoneAuditLogger."
+                + "messageIncludesMultilineException",
+            "Dummy exception");
 
       }
   }
