@@ -163,7 +163,40 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
+
+    if (!checkAllNodesAreEqual(nodeManager.getClusterNetworkTopologyMap())) {
+      boolean multipleRacks = multipleRacksAvailable(healthyNodes);
+      boolean multipleRacksAfterFilter = multipleRacksAvailable(healthyList);
+      if (multipleRacks && !multipleRacksAfterFilter) {
+        msg = "The cluster has multiple racks, but all nodes with available " +
+            "pipeline capacity are on a single rack. There are insufficient " +
+            "cross rack nodes available to create a pipeline";
+        LOG.debug(msg);
+        throw new SCMException(msg,
+            SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+      }
+    }
     return healthyList;
+  }
+
+  /**
+   * Given a list of Datanodes, return false if the entire list is only on a
+   * single rack, or the list is empty. If there is more than 1 rack, return
+   * true.
+   * @param dns List of datanodes to check
+   * @return True if there are multiple racks, false otherwise
+   */
+  private boolean multipleRacksAvailable(List<DatanodeDetails> dns) {
+    if (dns.size() <= 1) {
+      return false;
+    }
+    String initialRack = dns.get(0).getNetworkLocation();
+    for (DatanodeDetails dn : dns) {
+      if (!dn.getNetworkLocation().equals(initialRack)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
