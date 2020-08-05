@@ -28,6 +28,9 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -151,21 +154,32 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         }
       }
 
+      long quotaReleased = 0;
+      OmVolumeArgs omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
+
       // Mark all keys which can be deleted, in cache as deleted.
       for (OmKeyInfo omKeyInfo : omKeyInfoList) {
         omMetadataManager.getKeyTable().addCacheEntry(
             new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
                 omKeyInfo.getKeyName())),
             new CacheValue<>(Optional.absent(), trxnLogIndex));
+
+        int keyFactor = omKeyInfo.getFactor().getNumber();
+        OmKeyLocationInfoGroup keyLocationGroup =
+            omKeyInfo.getLatestVersionLocations();
+        for(OmKeyLocationInfo locationInfo: keyLocationGroup.getLocationList()){
+          quotaReleased += locationInfo.getLength() * keyFactor;
+        }
       }
+      // update usedBytes atomically.
+      omVolumeArgs.getUsedBytes().add(-quotaReleased);
 
       omClientResponse = new OMKeysDeleteResponse(omResponse
           .setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
               .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys))
           .setStatus(deleteStatus ? OK : PARTIAL_DELETE)
-          .setSuccess(deleteStatus).build(),
-          omKeyInfoList, trxnLogIndex,
-          ozoneManager.isRatisEnabled());
+          .setSuccess(deleteStatus).build(), omKeyInfoList, trxnLogIndex,
+          ozoneManager.isRatisEnabled(), omVolumeArgs);
 
       result = Result.SUCCESS;
 

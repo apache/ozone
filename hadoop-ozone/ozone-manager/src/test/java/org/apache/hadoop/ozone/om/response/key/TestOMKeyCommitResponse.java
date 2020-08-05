@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -35,6 +37,9 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
         bucketName, keyName, replicationType, replicationFactor);
+    OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
+        .setOwnerName(keyName).setAdminName(keyName)
+        .setVolume(volumeName).setCreationTime(Time.now()).build();
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         OzoneManagerProtocolProtos.OMResponse.newBuilder().setCommitKeyResponse(
@@ -55,7 +60,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
     String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
         keyName);
     OMKeyCommitResponse omKeyCommitResponse = new OMKeyCommitResponse(
-        omResponse, omKeyInfo, ozoneKey, openKey);
+        omResponse, omKeyInfo, ozoneKey, openKey, omVolumeArgs);
 
     omKeyCommitResponse.addToDBBatch(omMetadataManager, batchOperation);
 
@@ -73,6 +78,9 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
         bucketName, keyName, replicationType, replicationFactor);
+    OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
+        .setOwnerName(keyName).setAdminName(keyName)
+        .setVolume(volumeName).setCreationTime(Time.now()).build();
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         OzoneManagerProtocolProtos.OMResponse.newBuilder().setCommitKeyResponse(
@@ -87,7 +95,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
         keyName);
 
     OMKeyCommitResponse omKeyCommitResponse = new OMKeyCommitResponse(
-        omResponse, omKeyInfo, ozoneKey, openKey);
+        omResponse, omKeyInfo, ozoneKey, openKey, omVolumeArgs);
 
     // As during commit Key, entry will be already there in openKeyTable.
     // Adding it here.
