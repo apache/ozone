@@ -143,7 +143,31 @@ public class TestOzoneAuditLogger {
     verifyNoLog();
   }
 
-  private void verifyLog(String expected) throws IOException {
+  /**
+   * Test to verify if multiline entries can be checked.
+   */
+
+  @Test
+  public void messageIncludesMultilineException() throws IOException {
+      try{
+        throw new TestException("Dummy exception");
+      } catch(TestException testException)
+      {
+        AuditMessage exceptionAuditMessage =
+                new AuditMessage.Builder()
+                        .setUser(USER)
+                        .atIp(IP_ADDRESS)
+                        .forOperation(DummyAction.CREATE_VOLUME)
+                        .withParams(PARAMS)
+                        .withResult(FAILURE)
+                        .withException(testException).build();
+        AUDIT.logWriteFailure(exceptionAuditMessage);
+        verifyLog("TestException","org.apache.hadoop.ozone.audit.TestOzoneAuditLogger.messageIncludesMultilineException");
+
+      }
+  }
+
+  private void verifyLog(String... expected_strings) throws IOException {
     File file = new File("audit.log");
     List<String> lines = FileUtils.readLines(file, (String)null);
     final int retry = 5;
@@ -158,14 +182,23 @@ public class TestOzoneAuditLogger {
       }
       i++;
     }
-
-    // When log entry is expected, the log file will contain one line and
-    // that must be equal to the expected string
-    assertTrue(lines.size() != 0);
-    assertTrue(expected.equalsIgnoreCase(lines.get(0)));
+    //check if every expected string can be found in the log entry
+    for(String expected : expected_strings)
+    {
+      assertTrue(contains(lines,expected));
+    }
     //empty the file
     lines.clear();
     FileUtils.writeLines(file, lines, false);
+  }
+
+  private boolean contains(List<String> lines, String searched){
+    for(String line : lines){
+      if(line.toLowerCase().contains(searched.toLowerCase())){
+        return true;
+      }
+    }
+    return false;
   }
 
   private void verifyNoLog() throws IOException {
@@ -173,5 +206,11 @@ public class TestOzoneAuditLogger {
     List<String> lines = FileUtils.readLines(file, (String)null);
     // When no log entry is expected, the log file must be empty
     assertEquals(0, lines.size());
+  }
+
+  private class TestException extends Exception{
+    public TestException(String message) {
+      super(message);
+    }
   }
 }
