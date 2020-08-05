@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 
 import java.io.File;
 
@@ -68,6 +69,6 @@ public abstract class AbstractDatanodeDBDefinition implements DBDefinition {
   public abstract DBColumnFamilyDefinition<String, Long>
       getMetadataColumnFamily();
 
-  public abstract DBColumnFamilyDefinition<String, NoData>
+  public abstract DBColumnFamilyDefinition<String, ChunkInfoList>
       getDeletedBlocksColumnFamily();
 }

@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.*;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 
 import java.io.IOException;
 import java.util.List;
@@ -50,22 +51,24 @@ import java.util.List;
  * {@link SchemaOneDeletedBlocksTable#iterator} will return keys prefixed
  * with {@link SchemaOneDeletedBlocksTable#DELETED_KEY_PREFIX}.
  */
-public class SchemaOneDeletedBlocksTable implements Table<String, NoData> {
+public class SchemaOneDeletedBlocksTable implements Table<String,
+        ChunkInfoList> {
   public static final String DELETED_KEY_PREFIX = "#deleted#";
 
-  private final Table<String, NoData> table;
+  private final Table<String, ChunkInfoList> table;
 
-  public SchemaOneDeletedBlocksTable(Table<String, NoData> table) {
+  public SchemaOneDeletedBlocksTable(Table<String, ChunkInfoList> table) {
     this.table = table;
   }
 
   @Override
-  public void put(String key, NoData value) throws IOException {
+  public void put(String key, ChunkInfoList value) throws IOException {
     table.put(prefix(key), value);
   }
 
   @Override
-  public void putWithBatch(BatchOperation batch, String key, NoData value)
+  public void putWithBatch(BatchOperation batch, String key,
+                           ChunkInfoList value)
           throws IOException {
     table.putWithBatch(batch, prefix(key), value);
   }
@@ -92,7 +95,8 @@ public class SchemaOneDeletedBlocksTable implements Table<String, NoData> {
    * through all keys in the database.
    */
   @Override
-  public TableIterator<String, ? extends KeyValue<String, NoData>> iterator() {
+  public TableIterator<String, ? extends KeyValue<String, ChunkInfoList>>
+      iterator() {
     return table.iterator();
   }
 
@@ -108,7 +112,7 @@ public class SchemaOneDeletedBlocksTable implements Table<String, NoData> {
 
   @Override
   public void addCacheEntry(CacheKey<String> cacheKey,
-                            CacheValue<NoData> cacheValue) {
+                            CacheValue<ChunkInfoList> cacheValue) {
     CacheKey<String> prefixedCacheKey =
             new CacheKey<>(prefix(cacheKey.getCacheKey()));
     table.addCacheEntry(prefixedCacheKey, cacheValue);
@@ -120,17 +124,17 @@ public class SchemaOneDeletedBlocksTable implements Table<String, NoData> {
   }
 
   @Override
-  public NoData get(String key) throws IOException {
+  public ChunkInfoList get(String key) throws IOException {
     return table.get(prefix(key));
   }
 
   @Override
-  public NoData getIfExist(String key) throws IOException {
+  public ChunkInfoList getIfExist(String key) throws IOException {
     return table.getIfExist(prefix(key));
   }
 
   @Override
-  public NoData getReadCopy(String key) throws IOException {
+  public ChunkInfoList getReadCopy(String key) throws IOException {
     return table.getReadCopy(prefix(key));
   }
 
@@ -139,7 +143,7 @@ public class SchemaOneDeletedBlocksTable implements Table<String, NoData> {
    * {@link SchemaOneDeletedBlocksTable#DELETED_KEY_PREFIX}.
    */
   @Override
-  public List<? extends KeyValue<String, NoData>> getRangeKVs(
+  public List<? extends KeyValue<String, ChunkInfoList>> getRangeKVs(
           String startKey, int count,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {
@@ -155,7 +159,7 @@ public class SchemaOneDeletedBlocksTable implements Table<String, NoData> {
    * {@link SchemaOneDeletedBlocksTable#DELETED_KEY_PREFIX}.
    */
   @Override
-  public List<? extends KeyValue<String, NoData>> getSequentialRangeKVs(
+  public List<? extends KeyValue<String, ChunkInfoList>> getSequentialRangeKVs(
           String startKey, int count,
           MetadataKeyFilters.MetadataKeyFilter... filters)
           throws IOException, IllegalArgumentException {

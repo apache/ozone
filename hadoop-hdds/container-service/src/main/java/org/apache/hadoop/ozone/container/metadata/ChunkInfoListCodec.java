@@ -17,32 +17,29 @@
  */
 package org.apache.hadoop.ozone.container.metadata;
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 
 import java.io.IOException;
 
 /**
- * Constructs a datanode store in accordance with schema version 1, which
- * places all data in the default column family.
+ * Supports encoding and decoding {@link ChunkInfoList} objects.
  */
-public class DatanodeStoreSchemaOneImpl extends AbstractDatanodeStore {
-  /**
-   * Constructs the metadata store and starts the DB Services.
-   *
-   * @param config - Ozone Configuration.
-   * @throws IOException - on Failure.
-   */
-  public DatanodeStoreSchemaOneImpl(ConfigurationSource config, String dbPath)
-          throws IOException {
-    super(config, new DatanodeSchemaOneDBDefinition(dbPath));
+public class ChunkInfoListCodec implements Codec<ChunkInfoList> {
+  @Override
+  public byte[] toPersistedFormat(ChunkInfoList chunkList) {
+    return chunkList.getProtoBufMessage().toByteArray();
   }
 
   @Override
-  public Table<String, ChunkInfoList> getDeletedBlocksTable() {
-    // Return a wrapper around the deleted blocks table to handle prefixes
-    // when all data is stored in a single table.
-    return new SchemaOneDeletedBlocksTable(super.getDeletedBlocksTable());
+  public ChunkInfoList fromPersistedFormat(byte[] rawData) throws IOException {
+    return ChunkInfoList.getFromProtoBuf(
+            ContainerProtos.ChunkInfoList.parseFrom(rawData));
+  }
+
+  @Override
+  public ChunkInfoList copyObject(ChunkInfoList object) {
+    throw new UnsupportedOperationException();
   }
 }

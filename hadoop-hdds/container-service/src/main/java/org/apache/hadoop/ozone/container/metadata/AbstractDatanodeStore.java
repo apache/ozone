@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.metadata;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.db.*;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.rocksdb.DBOptions;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
@@ -40,7 +41,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   private Table<String, BlockData> blockDataTable;
 
-  private Table<String, NoData> deletedBlocksTable;
+  private Table<String, ChunkInfoList> deletedBlocksTable;
 
   private static final Logger LOG =
           LoggerFactory.getLogger(AbstractDatanodeStore.class);
@@ -123,7 +124,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
-  public Table<String, NoData> getDeletedBlocksTable() {
+  public Table<String, ChunkInfoList> getDeletedBlocksTable() {
     return deletedBlocksTable;
   }
 
