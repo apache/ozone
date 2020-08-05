@@ -234,18 +234,22 @@ public class TestSchemaOneBackwardsCompatibility {
     KeyValueContainerUtil.parseKVContainerData(kvData, conf);
 
     try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
-      Table<String, ChunkInfoList> deletedBlocksTable =
-              refCountedDB.getStore().getDeletedBlocksTable();
-
       // Read blocks that were already deleted before the upgrade.
       List<? extends Table.KeyValue<String, ChunkInfoList>> deletedBlocks =
-              deletedBlocksTable.getRangeKVs(null, 100);
+              refCountedDB.getStore()
+                      .getDeletedBlocksTable().getRangeKVs(null, 100);
 
       Set<String> preUpgradeBlocks = new HashSet<>();
 
       for(Table.KeyValue<String, ChunkInfoList> chunkListKV: deletedBlocks) {
         preUpgradeBlocks.add(chunkListKV.getKey());
-        Assert.assertNull(chunkListKV.getValue());
+        try {
+          chunkListKV.getValue();
+          Assert.fail("No exception thrown when trying to retrieve old " +
+                  "deleted blocks values as chunk lists.");
+        } catch(IllegalArgumentException ex) {
+          // Exception thrown as expected.
+        }
       }
 
       runBlockDeletingService();
