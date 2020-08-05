@@ -302,6 +302,16 @@ public class BaseFreonGenerator {
   }
 
   /**
+   * Print out reports with the given message.
+   */
+  public void print(String msg){
+    Consumer<String> print = freonCommand.isInteractive()
+            ? System.out::println
+            : LOG::info;
+    print.accept(msg);
+  }
+
+  /**
    * Create the OM RPC client to use it for testing.
    */
   public OzoneManagerProtocolClientSideTranslatorPB createOmClient(
