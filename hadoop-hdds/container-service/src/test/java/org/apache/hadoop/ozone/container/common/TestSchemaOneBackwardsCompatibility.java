@@ -68,6 +68,10 @@ import static org.mockito.Mockito.when;
  * The functionality executed by these tests assumes that all containers will
  * have to be closed before an upgrade, meaning that containers written with
  * schema version 1 will only ever be encountered in their closed state.
+ * <p>
+ * For an example of a RocksDB instance written with schema version 1, see
+ * {@link TestDB}, which is used by these tests to load a pre created schema
+ * version 1 RocksDB instance from test resources.
  */
 public class TestSchemaOneBackwardsCompatibility {
   private OzoneConfiguration conf;
@@ -252,13 +256,27 @@ public class TestSchemaOneBackwardsCompatibility {
         }
       }
 
+      Assert.assertEquals(TestDB.NUM_DELETED_BLOCKS, preUpgradeBlocks.size());
+
       runBlockDeletingService();
 
+      // After the block deleting service runs, get the updated list of
+      // deleted blocks.
+      deletedBlocks = refCountedDB.getStore()
+                      .getDeletedBlocksTable().getRangeKVs(null, 100);
+
+      int numPostUpgradeDeletesFound = 0;
       for(Table.KeyValue<String, ChunkInfoList> chunkListKV: deletedBlocks) {
         if (!preUpgradeBlocks.contains(chunkListKV.getKey())) {
+          numPostUpgradeDeletesFound++;
           Assert.assertNotNull(chunkListKV.getValue());
         }
       }
+
+      // The blocks that were originally marked for deletion should now be
+      // deleted.
+      Assert.assertEquals(TestDB.NUM_PENDING_DELETION_BLOCKS,
+              numPostUpgradeDeletesFound);
     }
 
 
