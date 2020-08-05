@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails.ExtraDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -202,18 +203,19 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     try {
       String hostname = HddsUtils.getHostName(conf);
       String ip = InetAddress.getByName(hostname).getHostAddress();
+
       datanodeDetails = initializeDatanodeDetails();
       datanodeDetails.setHostName(hostname);
       datanodeDetails.setIpAddress(ip);
-      datanodeDetails.setVersion(
-          HddsVersionInfo.HDDS_VERSION_INFO.getVersion());
-      datanodeDetails.setSetupTime(Time.now());
-      datanodeDetails.setRevision(
-          HddsVersionInfo.HDDS_VERSION_INFO.getRevision());
-      datanodeDetails.setBuildDate(HddsVersionInfo.HDDS_VERSION_INFO.getDate());
+      ExtraDatanodeDetails extraDatanodeDetails = new ExtraDatanodeDetails(
+          HddsVersionInfo.HDDS_VERSION_INFO.getVersion(),
+          Time.now(),
+          HddsVersionInfo.HDDS_VERSION_INFO.getRevision(),
+          HddsVersionInfo.HDDS_VERSION_INFO.getDate());
       TracingUtil.initTracing(
           "HddsDatanodeService." + datanodeDetails.getUuidString()
               .substring(0, 8), conf);
+      datanodeDetails.setExtraDatanodeDetails(extraDatanodeDetails);
       LOG.info("HddsDatanodeService host:{} ip:{}", hostname, ip);
       // Authenticate Hdds Datanode service if security is enabled
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
@@ -245,8 +247,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
         initializeCertificateClient(conf);
       }
-      datanodeStateMachine = new DatanodeStateMachine(datanodeDetails, conf,
-          dnCertClient, this::terminateDatanode);
+      datanodeStateMachine = new DatanodeStateMachine(datanodeDetails,
+          conf, dnCertClient, this::terminateDatanode);
       try {
         httpServer = new HddsDatanodeHttpServer(conf);
         httpServer.start();

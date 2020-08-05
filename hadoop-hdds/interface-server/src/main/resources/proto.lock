@@ -315,16 +315,21 @@
               },
               {
                 "id": 2,
+                "name": "extraDatanodeDetails",
+                "type": "ExtraDatanodeDetailsProto"
+              },
+              {
+                "id": 3,
                 "name": "nodeReport",
                 "type": "NodeReportProto"
               },
               {
-                "id": 3,
+                "id": 4,
                 "name": "containerReport",
                 "type": "ContainerReportsProto"
               },
               {
-                "id": 4,
+                "id": 5,
                 "name": "pipelineReports",
                 "type": "PipelineReportsProto"
               }

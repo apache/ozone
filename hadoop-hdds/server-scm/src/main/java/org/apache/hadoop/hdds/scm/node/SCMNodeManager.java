@@ -520,10 +520,10 @@ public class SCMNodeManager implements NodeManager {
     for (DatanodeDetails dn : dnList) {
       try {
         volumeCountList.add(nodeStateManager.getNode(dn).
-                getHealthyVolumeCount());
+            getHealthyVolumeCount());
       } catch (NodeNotFoundException e) {
         LOG.warn("Cannot generate NodeStat, datanode {} not found.",
-                dn.getUuid());
+            dn.getUuid());
       }
     }
     Preconditions.checkArgument(!volumeCountList.isEmpty());

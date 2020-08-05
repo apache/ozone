@@ -481,7 +481,7 @@ public class NodeStateManager implements Runnable, Closeable {
    *                        use addDatanodeInContainerMap call.
    */
   public void addContainer(final UUID uuid,
-                           final ContainerID containerId)
+      final ContainerID containerId)
       throws NodeNotFoundException {
     nodeStateMap.addContainer(uuid, containerId);
   }
@@ -564,18 +564,18 @@ public class NodeStateManager implements Runnable, Closeable {
      *                      >>-->> time-line >>-->>
      *
      * Here is the logic of computing the health of a node.
-     *
-     * 1. We get the current time and look back that the time
-     *    when we got a heartbeat from a node.
-     * 
-     * 2. If the last heartbeat was within the window of healthy node we mark
-     *    it as healthy.
-     * 
-     * 3. If the last HB Time stamp is longer and falls within the window of
-     *    Stale Node time, we will mark it as Stale.
-     * 
-     * 4. If the last HB time is older than the Stale Window, then the node is
-     *    marked as dead.
+     *
+     * 1. We get the current time and look back that the time
+     *    when we got a heartbeat from a node.
+     *
+     * 2. If the last heartbeat was within the window of healthy node we mark
+     *    it as healthy.
+     *
+     * 3. If the last HB Time stamp is longer and falls within the window of
+     *    Stale Node time, we will mark it as Stale.
+     *
+     * 4. If the last HB time is older than the Stale Window, then the node is
+     *    marked as dead.
      *
      * The Processing starts from current time and looks backwards in time.
      */
@@ -598,33 +598,33 @@ public class NodeStateManager implements Runnable, Closeable {
         for (UUID id : nodes) {
           DatanodeInfo node = nodeStateMap.getNodeInfo(id);
           switch (state) {
-          case HEALTHY:
-            // Move the node to STALE if the last heartbeat time is less than
-            // configured stale-node interval.
-            updateNodeState(node, staleNodeCondition, state,
+            case HEALTHY:
+              // Move the node to STALE if the last heartbeat time is less than
+              // configured stale-node interval.
+              updateNodeState(node, staleNodeCondition, state,
                   NodeLifeCycleEvent.TIMEOUT);
-            break;
-          case STALE:
-            // Move the node to DEAD if the last heartbeat time is less than
-            // configured dead-node interval.
-            updateNodeState(node, deadNodeCondition, state,
-                NodeLifeCycleEvent.TIMEOUT);
-            // Restore the node if we have received heartbeat before configured
-            // stale-node interval.
-            updateNodeState(node, healthyNodeCondition, state,
-                NodeLifeCycleEvent.RESTORE);
-            break;
-          case DEAD:
-            // Resurrect the node if we have received heartbeat before
-            // configured stale-node interval.
-            updateNodeState(node, healthyNodeCondition, state,
-                NodeLifeCycleEvent.RESURRECT);
-            break;
+              break;
+            case STALE:
+              // Move the node to DEAD if the last heartbeat time is less than
+              // configured dead-node interval.
+              updateNodeState(node, deadNodeCondition, state,
+                  NodeLifeCycleEvent.TIMEOUT);
+              // Restore the node if we have received heartbeat before configured
+              // stale-node interval.
+              updateNodeState(node, healthyNodeCondition, state,
+                  NodeLifeCycleEvent.RESTORE);
+              break;
+            case DEAD:
+              // Resurrect the node if we have received heartbeat before
+              // configured stale-node interval.
+              updateNodeState(node, healthyNodeCondition, state,
+                  NodeLifeCycleEvent.RESURRECT);
+              break;
             // We don't do anything for DECOMMISSIONING and DECOMMISSIONED in
             // heartbeat processing.
-          case DECOMMISSIONING:
-          case DECOMMISSIONED:
-          default:
+            case DECOMMISSIONING:
+            case DECOMMISSIONED:
+            default:
           }
         }
       }

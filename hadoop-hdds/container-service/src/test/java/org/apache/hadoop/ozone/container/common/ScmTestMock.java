@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.container.common;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtraDatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -217,7 +218,9 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
   @Override
   public StorageContainerDatanodeProtocolProtos
       .SCMRegisteredResponseProto register(
-          DatanodeDetailsProto datanodeDetailsProto, NodeReportProto nodeReport,
+          DatanodeDetailsProto datanodeDetailsProto,
+          ExtraDatanodeDetailsProto extraDatanodeDetailsProto,
+          NodeReportProto nodeReport,
           ContainerReportsProto containerReportsRequestProto,
           PipelineReportsProto pipelineReportsProto)
       throws IOException {

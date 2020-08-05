@@ -18,8 +18,9 @@ package org.apache.hadoop.ozone.protocol;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtraDatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto
-        .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+    .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -53,7 +54,7 @@ public interface StorageContainerDatanodeProtocol {
   /**
    * Version 1: Initial version.
    */
-  long versionID = 1L;
+      long versionID = 1L;
 
   /**
    * Returns SCM version.
@@ -74,14 +75,16 @@ public interface StorageContainerDatanodeProtocol {
   /**
    * Register Datanode.
    * @param datanodeDetails - Datanode Details.
+   * @param extraDatanodeDetails - Datanode more details.
    * @param nodeReport - Node Report.
    * @param containerReportsRequestProto - Container Reports.
    * @return SCM Command.
    */
   SCMRegisteredResponseProto register(
-          DatanodeDetailsProto datanodeDetails,
-          NodeReportProto nodeReport,
-          ContainerReportsProto containerReportsRequestProto,
-          PipelineReportsProto pipelineReports) throws IOException;
+      DatanodeDetailsProto datanodeDetails,
+      ExtraDatanodeDetailsProto extraDatanodeDetails,
+      NodeReportProto nodeReport,
+      ContainerReportsProto containerReportsRequestProto,
+      PipelineReportsProto pipelineReports) throws IOException;
 
 }

@@ -178,7 +178,7 @@ public class RunningDatanodeState implements DatanodeState {
    * @return next container state.
    */
   private DatanodeStateMachine.DatanodeStates
-      computeNextContainerState(
+  computeNextContainerState(
       List<Future<EndPointStates>> results) {
     for (Future<EndPointStates> state : results) {
       try {

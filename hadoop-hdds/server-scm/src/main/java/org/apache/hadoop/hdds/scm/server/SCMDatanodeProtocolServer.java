@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails.ExtraDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
@@ -204,12 +205,16 @@ public class SCMDatanodeProtocolServer implements
   @Override
   public SCMRegisteredResponseProto register(
       HddsProtos.DatanodeDetailsProto datanodeDetailsProto,
+      HddsProtos.ExtraDatanodeDetailsProto extraDatanodeDetailsProto,
       NodeReportProto nodeReport,
       ContainerReportsProto containerReportsProto,
           PipelineReportsProto pipelineReportsProto)
       throws IOException {
     DatanodeDetails datanodeDetails = DatanodeDetails
         .getFromProtoBuf(datanodeDetailsProto);
+    ExtraDatanodeDetails extraDatanodeDetails =ExtraDatanodeDetails
+        .getFromProtoBuf(extraDatanodeDetailsProto);
+    datanodeDetails.setExtraDatanodeDetails(extraDatanodeDetails);
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("datanodeDetails", datanodeDetails.toString());

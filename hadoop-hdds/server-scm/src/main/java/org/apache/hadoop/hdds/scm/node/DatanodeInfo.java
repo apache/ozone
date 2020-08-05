@@ -127,7 +127,7 @@ public class DatanodeInfo extends DatanodeDetails {
    */
   private int getFailedVolumeCount() {
     return (int) storageReports.stream().
-            filter(e -> e.hasFailed() ? e.getFailed() : false).count();
+        filter(e -> e.hasFailed() ? e.getFailed() : false).count();
   }
 
   /**

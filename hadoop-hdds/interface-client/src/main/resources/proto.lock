@@ -1531,21 +1531,36 @@
                 "type": "string"
               },
               {
-                "id": 8,
-                "name": "version",
-                "type": "string"
-              },
-              {
-                "id": 9,
-                "name": "setupTime",
-                "type": "int64"
-              },
-              {
                 "id": 100,
                 "name": "uuid128",
                 "type": "UUID"
               }
             ]
+          },
+          {
+		"name": "ExtraDatanodeDetailsProto",
+            "fields": [
+			  {
+			    "id": 1,
+				"name": "version",
+				"type": "string"
+			  },
+			  {
+			    "id": 2,
+				"name": "setupTime",
+				"type": "int64"
+			  },
+			  {
+			    "id": 3,
+				"name": "revision",
+				"type": "string"
+			  },
+			  {
+			    "id": 4,
+				"name": "buildDate",
+				"type": "string"
+			  }
+			]
           },
           {
             "name": "OzoneManagerDetailsProto",

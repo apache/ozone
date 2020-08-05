@@ -68,7 +68,8 @@ public class StorageContainerDatanodeProtocolServerSideTranslatorPB
         .getContainerReport();
     NodeReportProto dnNodeReport = request.getNodeReport();
     PipelineReportsProto pipelineReport = request.getPipelineReports();
-    return impl.register(request.getDatanodeDetails(), dnNodeReport,
+    return impl.register(request.getDatanodeDetails(),
+        request.getExtraDatanodeDetails(), dnNodeReport,
         containerRequestProto, pipelineReport);
 
   }
