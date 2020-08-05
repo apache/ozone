@@ -24,8 +24,8 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
-import org.apache.hadoop.hdds.utils.MetadataStore;
-import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -52,14 +52,14 @@ public class TestContainerCache {
 
   private void createContainerDB(OzoneConfiguration conf, File dbFile)
       throws Exception {
-    MetadataStore store = MetadataStoreBuilder.newBuilder().setConf(conf)
-        .setCreateIfMissing(true).setDbFile(dbFile).build();
+    DatanodeStore store = new DatanodeStoreSchemaTwoImpl(
+            conf, dbFile.getAbsolutePath());
 
     // we close since the SCM pre-creates containers.
     // we will open and put Db handle into a cache when keys are being created
     // in a container.
 
-    store.close();
+    store.stop();
   }
 
   @Test
