@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.container.metadata;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 
 import java.io.IOException;
@@ -28,7 +27,6 @@ import java.io.IOException;
  * Supports encoding and decoding {@link ChunkInfoList} objects.
  */
 public class ChunkInfoListCodec implements Codec<ChunkInfoList> {
-
   @Override
   public byte[] toPersistedFormat(ChunkInfoList chunkList) {
     return chunkList.getProtoBufMessage().toByteArray();

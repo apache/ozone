@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -39,6 +40,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.testutils.BlockDeletingServiceTestImpl;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -48,7 +50,7 @@ import org.yaml.snakeyaml.Yaml;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
-import java.util.UUID;
+import java.util.*;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL;
 import static org.junit.Assert.*;
@@ -66,6 +68,10 @@ import static org.mockito.Mockito.when;
  * The functionality executed by these tests assumes that all containers will
  * have to be closed before an upgrade, meaning that containers written with
  * schema version 1 will only ever be encountered in their closed state.
+ * <p>
+ * For an example of a RocksDB instance written with schema version 1, see
+ * {@link TestDB}, which is used by these tests to load a pre created schema
+ * version 1 RocksDB instance from test resources.
  */
 public class TestSchemaOneBackwardsCompatibility {
   private OzoneConfiguration conf;
@@ -213,6 +219,72 @@ public class TestSchemaOneBackwardsCompatibility {
       // TODO : Determine why bytes used does not change.
       assertEquals(TestDB.BYTES_USED,
               (long)metadataTable.get(OzoneConsts.CONTAINER_BYTES_USED));
+    }
+  }
+
+  /**
+   * Tests reading the chunk info saved from a block that was deleted from a
+   * database in schema version one. Blocks deleted from schema version one
+   * before the upgrade will have the block ID saved as their value. Trying
+   * to retrieve this value as a {@link ChunkInfoList} should fail. Blocks
+   * deleted from schema version one after the upgrade should have their
+   * {@link ChunkInfoList} saved as the corresponding value in the deleted
+   * blocks table. Reading these values should succeed.
+   * @throws Exception
+   */
+  @Test
+  public void testReadDeletedBlockChunkInfo() throws Exception {
+    KeyValueContainerData kvData = newKvData();
+    KeyValueContainerUtil.parseKVContainerData(kvData, conf);
+
+    try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
+      // Read blocks that were already deleted before the upgrade.
+      List<? extends Table.KeyValue<String, ChunkInfoList>> deletedBlocks =
+              refCountedDB.getStore()
+                      .getDeletedBlocksTable().getRangeKVs(null, 100);
+
+      Set<String> preUpgradeBlocks = new HashSet<>();
+
+      for(Table.KeyValue<String, ChunkInfoList> chunkListKV: deletedBlocks) {
+        preUpgradeBlocks.add(chunkListKV.getKey());
+        try {
+          chunkListKV.getValue();
+          Assert.fail("No exception thrown when trying to retrieve old " +
+                  "deleted blocks values as chunk lists.");
+        } catch(IOException ex) {
+          // Exception thrown as expected.
+        }
+      }
+
+      Assert.assertEquals(TestDB.NUM_DELETED_BLOCKS, preUpgradeBlocks.size());
+
+      runBlockDeletingService();
+
+      // After the block deleting service runs, get the updated list of
+      // deleted blocks.
+      deletedBlocks = refCountedDB.getStore()
+                      .getDeletedBlocksTable().getRangeKVs(null, 100);
+
+      int numPostUpgradeDeletesFound = 0;
+      for(Table.KeyValue<String, ChunkInfoList> chunkListKV: deletedBlocks) {
+        if (!preUpgradeBlocks.contains(chunkListKV.getKey())) {
+          numPostUpgradeDeletesFound++;
+          Assert.assertNotNull(chunkListKV.getValue());
+        }
+      }
+
+      // The blocks that were originally marked for deletion should now be
+      // deleted.
+      Assert.assertEquals(TestDB.NUM_PENDING_DELETION_BLOCKS,
+              numPostUpgradeDeletesFound);
+    }
+
+
+    try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
+      List<? extends Table.KeyValue<String, ChunkInfoList>> deletedBlocks =
+              refCountedDB.getStore().getDeletedBlocksTable()
+                      .getRangeKVs(null, 100);
+
     }
   }
 
