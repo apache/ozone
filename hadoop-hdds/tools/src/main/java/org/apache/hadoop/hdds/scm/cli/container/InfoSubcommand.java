@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
@@ -52,6 +53,10 @@ public class InfoSubcommand implements Callable<Void> {
   @Parameters(description = "Decimal id of the container.")
   private long containerID;
 
+  @CommandLine.Option(names = {"--verbose"},
+      description = "Show detailed info of the container.")
+  private boolean verbose;
+
   @Override
   public Void call() throws Exception {
     try (ScmClient scmClient = parent.getParent().createScmClient()) {
@@ -61,7 +66,11 @@ public class InfoSubcommand implements Callable<Void> {
 
       // Print container report info.
       LOG.info("Container id: {}", containerID);
-      LOG.info("Pipeline id: {}", container.getPipeline().getId().getId());
+      if (verbose) {
+        LOG.info("Pipeline Info: {}", container.getPipeline());
+      } else {
+        LOG.info("Pipeline id: {}", container.getPipeline().getId().getId());
+      }
       LOG.info("Container State: {}", container.getContainerInfo().getState());
 
       // Print pipeline of an existing container.
