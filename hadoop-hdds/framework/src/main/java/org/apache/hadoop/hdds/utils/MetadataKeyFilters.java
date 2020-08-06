@@ -44,8 +44,8 @@ public final class MetadataKeyFilters {
 
   /**
    * @return A {@link KeyPrefixFilter} that ignores all keys beginning with
-   * {@code #}. This uses the convention that key prefixes are surrounded by
-   * {@code #} to ignore keys with any prefix currently used or that will be
+   * #. This uses the convention that key prefixes are surrounded by
+   * # to ignore keys with any prefix currently used or that will be
    * added in the future.
    */
   public static KeyPrefixFilter getUnprefixedKeyFilter() {
@@ -53,7 +53,7 @@ public final class MetadataKeyFilters {
             .addFilter("#", true);
   }
   /**
-   * Interface for levelDB key filters.
+   * Interface for RocksDB key filters.
    */
   public interface MetadataKeyFilter {
     /**

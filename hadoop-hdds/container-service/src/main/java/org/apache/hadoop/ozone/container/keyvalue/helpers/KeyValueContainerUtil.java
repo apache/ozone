@@ -39,8 +39,6 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.OzoneConsts.*;
-
 /**
  * Class which defines utility methods for KeyValueContainer.
  */
@@ -212,14 +210,14 @@ public final class KeyValueContainerUtil {
       // Set bytes used.
       // commitSpace for Open Containers relies on usedBytes
       Long bytesUsed =
-          metadataTable.get(CONTAINER_BYTES_USED);
+          metadataTable.get(OzoneConsts.CONTAINER_BYTES_USED);
       if (bytesUsed != null) {
         isBlockMetadataSet = true;
         kvContainerData.setBytesUsed(bytesUsed);
       }
 
       // Set block count.
-      Long blockCount = metadataTable.get(BLOCK_COUNT);
+      Long blockCount = metadataTable.get(OzoneConsts.BLOCK_COUNT);
       if (blockCount != null) {
         isBlockMetadataSet = true;
         kvContainerData.setKeyCount(blockCount);

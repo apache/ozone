@@ -62,7 +62,13 @@ import org.slf4j.event.Level;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Set;
+import java.util.List;
+import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.UUID;
+import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -350,10 +356,10 @@ public class TestBlockDeletion {
         String deletingKey = OzoneConsts.DELETING_KEY_PREFIX + blockIDString;
         Assert.assertNull(blockDataTable.get(deletingKey));
 
-        ChunkInfoList chunks = deletedBlocksTable.get(blockIDString);
-        Assert.assertNotNull(chunks);
+        ChunkInfoList deletedBlocksChunks = deletedBlocksTable.get(blockIDString);
+        Assert.assertNotNull(deletedBlocksChunks);
 
-        verifyChunksEqual(blockData.getChunks(), chunks.asList());
+        verifyChunksEqual(blockData.getChunks(), deletedBlocksChunks.asList());
       }
       containerIdsWithDeletedBlocks.add(blockID.getContainerID());
     }, omKeyLocationInfoGroups);

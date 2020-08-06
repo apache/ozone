@@ -59,7 +59,6 @@ import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .Result.CONTAINER_NOT_FOUND;
-import static org.apache.hadoop.ozone.OzoneConsts.*;
 
 /**
  * Handle block deletion commands.
@@ -269,13 +268,13 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       if (delTX.getTxID() > containerData.getDeleteTransactionId()) {
         // Update in DB pending delete key count and delete transaction ID.
         metadataTable.putWithBatch(batchOperation,
-                DELETE_TRANSACTION_KEY_PREFIX, delTX.getTxID());
+                OzoneConsts.DELETE_TRANSACTION_KEY_PREFIX, delTX.getTxID());
       }
 
       long pendingDeleteBlocks = containerData.getNumPendingDeletionBlocks() +
               newDeletionBlocks;
       metadataTable.putWithBatch(batchOperation,
-              PENDING_DELETE_BLOCK_COUNT, pendingDeleteBlocks);
+              OzoneConsts.PENDING_DELETE_BLOCK_COUNT, pendingDeleteBlocks);
 
       containerDB.getStore().getBatchHandler()
               .commitBatchOperation(batchOperation);
