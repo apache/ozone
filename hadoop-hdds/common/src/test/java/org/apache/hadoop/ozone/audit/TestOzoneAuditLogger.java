@@ -166,8 +166,7 @@ public class TestOzoneAuditLogger {
                 + "TestOzoneAuditLogger."
                 + "messageIncludesMultilineException",
             "Dummy exception");
-
-      }
+    }
   }
 
   private void verifyLog(String... expectedStrings) throws IOException {
