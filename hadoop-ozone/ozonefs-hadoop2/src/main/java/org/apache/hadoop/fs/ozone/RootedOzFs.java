@@ -41,4 +41,9 @@ public class RootedOzFs extends DelegateToFileSystem {
     super(theUri, new RootedOzoneFileSystem(), conf,
         OzoneConsts.OZONE_OFS_URI_SCHEME, false);
   }
+
+  @Override
+  public int getUriDefaultPort() {
+    return -1;
+  }
 }
