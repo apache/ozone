@@ -37,9 +37,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.SecretManager;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.RpcController;
@@ -128,18 +126,17 @@ public class Hadoop3OmTransport implements OmTransport {
       public RetryAction shouldRetry(Exception exception, int retries,
           int failovers, boolean isIdempotentOrAtMostOnce)
           throws Exception {
-        if (isAccessControlException(exception)) {
-          return RetryAction.FAIL; // do not retry
+
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("RetryProxy: {}", exception.getCause() != null ?
+              exception.getCause().getMessage() : exception.getMessage());
         }
+        retryExceptions.add(getExceptionMsg(exception, failovers));
+
         if (exception instanceof ServiceException) {
           OMNotLeaderException notLeaderException =
               getNotLeaderException(exception);
           if (notLeaderException != null) {
-            retryExceptions.add(getExceptionMsg(notLeaderException, failovers));
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("RetryProxy: {}", notLeaderException.getMessage());
-            }
-
             // TODO: NotLeaderException should include the host
             //  address of the suggested leader along with the nodeID.
             //  Failing over just based on nodeID is not very robust.
@@ -152,35 +149,22 @@ public class Hadoop3OmTransport implements OmTransport {
 
           OMLeaderNotReadyException leaderNotReadyException =
               getLeaderNotReadyException(exception);
-          // As in this case, current OM node is leader, but it is not ready.
-          // OMFailoverProxyProvider#performFailover() is a dummy call and
-          // does not perform any failover.
-          // So Just retry with same OM node.
           if (leaderNotReadyException != null) {
-            retryExceptions.add(getExceptionMsg(leaderNotReadyException,
-                failovers));
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("RetryProxy: {}", leaderNotReadyException.getMessage());
-            }
-            // HDDS-3465. OM index will not change, but LastOmID will be
-            // updated to currentOMId, so that waitTime calculation will
-            // know lastOmID and currentID are same and need to increment
-            // wait time in between.
+            // Retry on same OM again as leader OM is not ready.
+            // Failing over to same OM so that wait time between retries is
+            // incremented
             omFailoverProxyProvider.performFailoverIfRequired(
                 omFailoverProxyProvider.getCurrentProxyOMNodeId());
             return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
           }
         }
 
-        // For all other exceptions other than LeaderNotReadyException and
-        // NotLeaderException fail over manually to the next OM Node proxy.
-        // OMFailoverProxyProvider#performFailover() is a dummy call and
-        // does not perform any failover.
-        retryExceptions.add(getExceptionMsg(exception, failovers));
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("RetryProxy: {}", exception.getCause() != null ?
-              exception.getCause().getMessage() : exception.getMessage());
+        if (!omFailoverProxyProvider.shouldFailover(exception)) {
+          return RetryAction.FAIL; // do not retry
         }
+
+        // For all other exceptions, fail over manually to the next OM Node
+        // proxy.
         omFailoverProxyProvider.performFailoverToNextProxy();
         return getRetryAction(RetryDecision.FAILOVER_AND_RETRY, failovers);
       }
@@ -243,27 +227,6 @@ public class Hadoop3OmTransport implements OmTransport {
       }
     }
     return null;
-  }
-
-  /**
-   * Unwrap exception to check if it is some kind of access control problem
-   * ({@link AccessControlException} or {@link SecretManager.InvalidToken}).
-   */
-  private boolean isAccessControlException(Exception ex) {
-    if (ex instanceof ServiceException) {
-      Throwable t = ex.getCause();
-      if (t instanceof RemoteException) {
-        t = ((RemoteException) t).unwrapRemoteException();
-      }
-      while (t != null) {
-        if (t instanceof AccessControlException ||
-            t instanceof SecretManager.InvalidToken) {
-          return true;
-        }
-        t = t.getCause();
-      }
-    }
-    return false;
   }
 
   /**

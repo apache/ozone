@@ -80,7 +80,6 @@ public class OMFailoverProxyProvider implements
 
   private final String omServiceId;
 
-
   // OMFailoverProxyProvider, on encountering certain exception, tries each OM
   // once in a round robin fashion. After that it waits for configured time
   // before attempting to contact all the OMs again. For other exceptions
@@ -90,6 +89,7 @@ public class OMFailoverProxyProvider implements
   private String lastAttemptedOM;
   private int numAttemptsOnSameOM = 0;
   private final long waitBetweenRetries;
+  private Set<String> accessControlExceptionOMs = new HashSet<>();
 
   public OMFailoverProxyProvider(ConfigurationSource configuration,
       UserGroupInformation ugi, String omServiceId) throws IOException {
@@ -351,7 +351,7 @@ public class OMFailoverProxyProvider implements
 
   public synchronized long getWaitTime() {
     if (currentProxyOMNodeId.equals(lastAttemptedOM)) {
-      // Clear attemptedOMs list as round robin has been broken. Add only the
+      // Clear attemptedOMs list as round robin has been broken.
       attemptedOMs.clear();
 
       // The same OM will be contacted again. So wait and then retry.
@@ -373,6 +373,20 @@ public class OMFailoverProxyProvider implements
     // should not include these atttempts again.
     attemptedOMs.clear();
     return waitBetweenRetries;
+  }
+
+  public synchronized boolean shouldFailover(Exception ex) {
+    if (OmUtils.isAccessControlException(ex)) {
+      // Retry all available OMs once before failing with
+      // AccessControlException.
+      if (accessControlExceptionOMs.contains(omNodeIDList) ||
+          accessControlExceptionOMs.contains(currentProxyOMNodeId)) {
+        accessControlExceptionOMs.clear();
+        return false;
+      }
+      accessControlExceptionOMs.add(currentProxyOMNodeId);
+    }
+    return true;
   }
 
   /**
