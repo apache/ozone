@@ -149,20 +149,19 @@ public class TestOzoneAuditLogger {
 
   @Test
   public void messageIncludesMultilineException() throws IOException {
-      try{
-        throw new TestException("Dummy exception");
-      } catch(TestException testException)
-      {
-        AuditMessage exceptionAuditMessage =
-                new AuditMessage.Builder()
-                        .setUser(USER)
-                        .atIp(IP_ADDRESS)
-                        .forOperation(DummyAction.CREATE_VOLUME)
-                        .withParams(PARAMS)
-                        .withResult(FAILURE)
-                        .withException(testException).build();
-        AUDIT.logWriteFailure(exceptionAuditMessage);
-        verifyLog("TestException",
+    try{
+      throw new TestException("Dummy exception");
+    } catch(TestException testException) {
+      AuditMessage exceptionAuditMessage =
+          new AuditMessage.Builder()
+              .setUser(USER)
+              .atIp(IP_ADDRESS)
+              .forOperation(DummyAction.CREATE_VOLUME)
+              .withParams(PARAMS)
+              .withResult(FAILURE)
+              .withException(testException).build();
+      AUDIT.logWriteFailure(exceptionAuditMessage);
+      verifyLog("TestException",
             "org.apache.hadoop.ozone.audit."
                 + "TestOzoneAuditLogger."
                 + "messageIncludesMultilineException",
@@ -171,7 +170,7 @@ public class TestOzoneAuditLogger {
       }
   }
 
-  private void verifyLog(String... expected_strings) throws IOException {
+  private void verifyLog(String... expectedStrings) throws IOException {
     File file = new File("audit.log");
     List<String> lines = FileUtils.readLines(file, (String)null);
     final int retry = 5;
@@ -187,9 +186,8 @@ public class TestOzoneAuditLogger {
       i++;
     }
     //check if every expected string can be found in the log entry
-    for(String expected : expected_strings)
-    {
-      assertTrue(contains(lines,expected));
+    for(String expected : expectedStrings) {
+      assertTrue(contains(lines, expected));
     }
     //empty the file
     lines.clear();
@@ -213,7 +211,7 @@ public class TestOzoneAuditLogger {
   }
 
   private class TestException extends Exception{
-    public TestException(String message) {
+    TestException(String message) {
       super(message);
     }
   }
