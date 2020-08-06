@@ -86,7 +86,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final boolean isTracingEnabled;
 
   // Map which contains index and term for the ratis transactions which are
-  // stateMachine entries which are recived through applyTransaction.
+  // stateMachine entries which are received through applyTransaction.
   private ConcurrentMap<Long, Long> applyTransactionMap =
       new ConcurrentSkipListMap<>();
 

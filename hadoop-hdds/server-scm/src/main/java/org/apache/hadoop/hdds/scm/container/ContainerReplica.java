@@ -39,15 +39,19 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
   final private UUID placeOfBirth;
 
   private Long sequenceId;
+  final private long keyCount;
+  final private long bytesUsed;
 
 
   private ContainerReplica(final ContainerID containerID,
       final ContainerReplicaProto.State state, final DatanodeDetails datanode,
-      final UUID originNodeId) {
+      final UUID originNodeId, long keyNum, long dataSize) {
     this.containerID = containerID;
     this.state = state;
     this.datanodeDetails = datanode;
     this.placeOfBirth = originNodeId;
+    this.keyCount = keyNum;
+    this.bytesUsed = dataSize;
   }
 
   private void setSequenceId(Long seqId) {
@@ -88,6 +92,24 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
    */
   public Long getSequenceId() {
     return sequenceId;
+  }
+
+  /**
+   * Returns the key count of of this replica.
+   *
+   * @return Key count
+   */
+  public long getKeyCount() {
+    return keyCount;
+  }
+
+  /**
+   * Returns the data size of this replica.
+   *
+   * @return Data size
+   */
+  public long getBytesUsed() {
+    return bytesUsed;
   }
 
   @Override
@@ -141,6 +163,8 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
         ", datanodeDetails=" + datanodeDetails +
         ", placeOfBirth=" + placeOfBirth +
         ", sequenceId=" + sequenceId +
+        ", keyCount=" + keyCount +
+        ", bytesUsed=" + bytesUsed +
         '}';
   }
 
@@ -154,6 +178,8 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     private DatanodeDetails datanode;
     private UUID placeOfBirth;
     private Long sequenceId;
+    private long bytesUsed;
+    private long keyCount;
 
     /**
      * Set Container Id.
@@ -207,6 +233,16 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
       return this;
     }
 
+    public ContainerReplicaBuilder setKeyCount(long count) {
+      keyCount = count;
+      return this;
+    }
+
+    public ContainerReplicaBuilder setBytesUsed(long used) {
+      bytesUsed = used;
+      return this;
+    }
+
     /**
      * Constructs new ContainerReplicaBuilder.
      *
@@ -221,11 +257,10 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
           "DatanodeDetails can't be null");
       ContainerReplica replica = new ContainerReplica(
           containerID, state, datanode,
-          Optional.ofNullable(placeOfBirth).orElse(datanode.getUuid()));
+          Optional.ofNullable(placeOfBirth).orElse(datanode.getUuid()),
+          keyCount, bytesUsed);
       Optional.ofNullable(sequenceId).ifPresent(replica::setSequenceId);
       return replica;
     }
   }
-
-
 }

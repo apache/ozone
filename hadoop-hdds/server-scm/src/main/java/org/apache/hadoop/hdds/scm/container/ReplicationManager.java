@@ -312,6 +312,26 @@ public class ReplicationManager
           action -> replicas.stream()
               .noneMatch(r -> r.getDatanodeDetails().equals(action.datanode)));
 
+      if (state == LifeCycleState.CLOSED) {
+        // check container key count and bytes used
+        long maxUsedBytes = 0;
+        long maxKeyCount = 0;
+        ContainerReplica[] rps = replicas.toArray(new ContainerReplica[0]);
+        for (int i = 0; i < rps.length; i++) {
+          maxUsedBytes = Math.max(maxUsedBytes, rps[i].getBytesUsed());
+          maxKeyCount = Math.max(maxKeyCount, rps[i].getKeyCount());
+          LOG.info("Replica key count {}, bytes used {}",
+              rps[i].getKeyCount(), rps[i].getBytesUsed());
+        }
+        if (maxKeyCount < container.getNumberOfKeys()) {
+          container.setNumberOfKeys(maxKeyCount);
+        }
+        if (maxUsedBytes < container.getUsedBytes()) {
+          container.setUsedBytes(maxUsedBytes);
+        }
+        LOG.info("Container key count {}, bytes used {}",
+            container.getNumberOfKeys(), container.getUsedBytes());
+      }
 
       /*
        * We don't have to take any action if the container is healthy.
