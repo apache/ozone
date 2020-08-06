@@ -85,7 +85,7 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
       omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
 
       // Update the modification time when updating ACLs of Volume.
-      long modificationTime = 0;
+      long modificationTime = omVolumeArgs.getModificationTime();
       if (getOmRequest().getAddAclRequest().hasObj()) {
         modificationTime = getOmRequest().getAddAclRequest()
             .getModificationTime();
