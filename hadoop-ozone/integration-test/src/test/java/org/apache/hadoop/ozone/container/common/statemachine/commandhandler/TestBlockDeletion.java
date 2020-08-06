@@ -301,9 +301,8 @@ public class TestBlockDeletion {
     LogCapturer logCapturer =
         LogCapturer.captureLogs(RetriableDatanodeEventWatcher.LOG);
     logCapturer.clearOutput();
-    GenericTestUtils.waitFor(() ->
-      logCapturer.getOutput()
-          .contains("RetriableDatanodeCommand type=deleteBlocksCommand"),
+    GenericTestUtils.waitFor(() -> logCapturer.getOutput()
+            .contains("RetriableDatanodeCommand type=deleteBlocksCommand"),
         500, 5000);
     cluster.restartHddsDatanode(0, true);
   }
