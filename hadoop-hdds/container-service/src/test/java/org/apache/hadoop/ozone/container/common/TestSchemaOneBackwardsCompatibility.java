@@ -216,7 +216,6 @@ public class TestSchemaOneBackwardsCompatibility {
               refCountedDB.getStore().getMetadataTable();
       assertEquals(expectedRegularBlocks + expectedDeletingBlocks,
               (long)metadataTable.get(OzoneConsts.BLOCK_COUNT));
-      // TODO : Determine why bytes used does not change.
       assertEquals(TestDB.BYTES_USED,
               (long)metadataTable.get(OzoneConsts.CONTAINER_BYTES_USED));
     }
