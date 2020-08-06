@@ -98,7 +98,7 @@ public class TestRootedOzoneFileSystem {
   }
 
   @Rule
-  public Timeout globalTimeout = new Timeout(600_000);
+  public Timeout globalTimeout = new Timeout(300_000);
 
   private boolean enabledFileSystemPaths;
 
