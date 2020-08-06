@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -110,4 +111,18 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     server.close();
   }
 
+  @Override
+  public RaftServer getServer() {
+    return server;
+  }
+
+  @Override
+  public RaftGroupId getRaftGroupId() {
+    return raftGroupId;
+  }
+
+  @Override
+  public List<RaftPeer> getRaftPeers() {
+    return Collections.singletonList(new RaftPeer(raftPeerId));
+  }
 }

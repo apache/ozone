@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.server.events.EventHandler;
+import org.apache.ratis.protocol.NotLeaderException;
 
 /**
  * Interface which exposes the api for pipeline management.
@@ -55,7 +56,7 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean,
       ReplicationFactor factor);
 
   List<Pipeline> getPipelines(ReplicationType type,
-      Pipeline.PipelineState state);
+      Pipeline.PipelineState state) throws NotLeaderException;
 
   List<Pipeline> getPipelines(ReplicationType type,
       ReplicationFactor factor, Pipeline.PipelineState state);
@@ -84,7 +85,7 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean,
 
   void startPipelineCreator();
 
-  void triggerPipelineCreation();
+  void triggerPipelineCreation() throws NotLeaderException;
 
   void incNumBlocksAllocatedMetric(PipelineID id);
 
