@@ -2,6 +2,9 @@
 title: "Ozone ACLs"
 date: "2019-April-03"
 weight: 6
+menu:
+   main:
+      parent: Security
 summary: Native Ozone Authorizer provides Access Control List (ACL) support for Ozone without Ranger integration.
 icon: transfer
 ---

@@ -1,10 +1,10 @@
 ---
-title: Ozone FS namespace
-summary: Use additional prefix table for indexed data retrieval
-date: 2020-01-20
-jira: HDDS-2939
-status: implementing
-author: Supratim Deka, Anu Engineer
+title: Storage Class
+summary: New abstraction to configure replication methods.
+date: 2020-06-08
+jira: HDDS-3755
+status: draft
+author: Marton Ele
 ---
 <!--
   Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,11 +19,10 @@ author: Supratim Deka, Anu Engineer
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-
 # Abstract
 
- Flat namespace (like key -> key info) is not efficient for retrieveing directories. (Large segments should be scanned, the whole sub-hierarchy)
+Proposal suggest to introduce a new storage-class abstraction which can be used to define different replication strategies (factor, type, ...) for different bucket/keys.
 
 # Link
 
- * https://issues.apache.org/jira/secure/attachment/12991926/Ozone%20FS%20Namespace%20Proposal%20v1.0.docx
+https://hackmd.io/4kxufJBOQNaKn7PKFK_6OQ?view

@@ -1,7 +1,10 @@
 ---
 title: "Apache Ranger"
 date: "2019-April-03"
-weight: 5
+weight: 7
+menu:
+   main:
+      parent: Security
 summary: Apache Ranger is a framework to enable, monitor and manage comprehensive data security across the Hadoop platform.
 icon: user
 ---
