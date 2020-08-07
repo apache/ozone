@@ -22,8 +22,6 @@ import java.net.ServerSocket;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails.ExtraDatanodeDetails;
-import org.apache.hadoop.util.Time;
 
 /**
  * Provides {@link DatanodeDetails} factory methods for testing.
@@ -46,7 +44,7 @@ public final class MockDatanodeDetails {
    * @return DatanodeDetails
    */
   public static DatanodeDetails createDatanodeDetails(String hostname,
-       String loc) {
+      String loc) {
     Random random = ThreadLocalRandom.current();
     String ipAddress = random.nextInt(256)
         + "." + random.nextInt(256)
@@ -89,18 +87,6 @@ public final class MockDatanodeDetails {
 
   public static DatanodeDetails createDatanodeDetails(String uuid,
       String hostname, String ipAddress, String networkLocation, int port) {
-    ExtraDatanodeDetails extraDatanodeDetails =
-        DatanodeDetails.newExtraDatanodeDetails(
-            "0.6.0", Time.now(),
-            "1346f493fa1690358add7bb9f3e5b52545993f36",
-            "2020-08-01T16:19Z");
-    return createDatanodeDetails(uuid, hostname, ipAddress,
-        networkLocation, 0, extraDatanodeDetails);
-  }
-
-  public static DatanodeDetails createDatanodeDetails(String uuid,
-      String hostname, String ipAddress, String networkLocation, int port,
-      ExtraDatanodeDetails extraDatanodeDetails) {
     DatanodeDetails.Port containerPort = DatanodeDetails.newPort(
         DatanodeDetails.Port.Name.STANDALONE, port);
     DatanodeDetails.Port ratisPort = DatanodeDetails.newPort(
@@ -115,7 +101,6 @@ public final class MockDatanodeDetails {
         .addPort(ratisPort)
         .addPort(restPort)
         .setNetworkLocation(networkLocation)
-        .setExtraDatanodeDetails(extraDatanodeDetails)
         .build();
   }
 

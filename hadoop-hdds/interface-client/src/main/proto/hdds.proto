@@ -49,14 +49,15 @@ message DatanodeDetailsProto {
 
 /**
  The DatanodeDetailsProto is a basic type that will be shared by many Proto,
- and we just need some more detail information to register with SCM, so I use
- ExtraDatanodeDetailsProto to extend DatanodeDetailsProto for registration.
+ to reduce the number of fields transfered by ProtoBuf, only need to extend
+ DatanodeDetailsProto for registering DataNode with SCM and Recon.
 */
-message ExtraDatanodeDetailsProto {
-    optional string version = 1;         // Datanode version
-    optional int64 setupTime = 2;
-    optional string revision = 3;
-    optional string buildDate = 4;
+message ExtendedDatanodeDetailsProto {
+    required DatanodeDetailsProto datanodeDetails = 1;
+    optional string version = 2;
+    optional int64 setupTime = 3;
+    optional string revision = 4;
+    optional string buildDate = 5;
 }
 
 /**

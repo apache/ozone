@@ -310,26 +310,21 @@
             "fields": [
               {
                 "id": 1,
-                "name": "datanodeDetails",
-                "type": "DatanodeDetailsProto"
+                "name": "extendedDatanodeDetails",
+                "type": "ExtendedDatanodeDetailsProto"
               },
               {
                 "id": 2,
-                "name": "extraDatanodeDetails",
-                "type": "ExtraDatanodeDetailsProto"
-              },
-              {
-                "id": 3,
                 "name": "nodeReport",
                 "type": "NodeReportProto"
               },
               {
-                "id": 4,
+                "id": 3,
                 "name": "containerReport",
                 "type": "ContainerReportsProto"
               },
               {
-                "id": 5,
+                "id": 4,
                 "name": "pipelineReports",
                 "type": "PipelineReportsProto"
               }

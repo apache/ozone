@@ -121,10 +121,10 @@ public class NodeEndpoint {
           .withPipelines(pipelines)
           .withLeaderCount(leaderCount.get())
           .withUUid(datanode.getUuidString())
-          .withVersion(datanode.getExtraDatanodeDetails().getVersion())
-          .withSetupTime(datanode.getExtraDatanodeDetails().getSetupTime())
-          .withRevision(datanode.getExtraDatanodeDetails().getRevision())
-          .withBuildDate(datanode.getExtraDatanodeDetails().getBuildDate())
+          .withVersion(datanode.getVersion())
+          .withSetupTime(datanode.getSetupTime())
+          .withRevision(datanode.getRevision())
+          .withBuildDate(datanode.getBuildDate())
           .build());
     });
 

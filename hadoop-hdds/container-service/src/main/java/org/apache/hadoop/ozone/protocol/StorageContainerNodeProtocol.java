@@ -51,7 +51,7 @@ public interface StorageContainerNodeProtocol {
 
   /**
    * Register the node if the node finds that it is not registered with any SCM.
-   * @param datanodeDetails ExtendedDatanodeDetails
+   * @param datanodeDetails DatanodeDetails
    * @param nodeReport NodeReportProto
    * @param pipelineReport PipelineReportsProto
    * @return  SCMRegisteredResponseProto

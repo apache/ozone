@@ -21,8 +21,9 @@ package org.apache.hadoop.ozone.recon.api;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos
+    .ExtendedDatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
@@ -128,8 +129,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private DatanodeDetails datanodeDetails2;
   private long containerId = 1L;
   private ContainerReportsProto containerReportsProto;
-  private DatanodeDetailsProto datanodeDetailsProto;
-  private HddsProtos.ExtraDatanodeDetailsProto extraDatanodeDetailsProto;
+  private ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto;
   private Pipeline pipeline;
   private FileCountBySizeDao fileCountBySizeDao;
   private DSLContext dslContext;
@@ -265,14 +265,15 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     PipelineReportsProto pipelineReportsProto =
         PipelineReportsProto.newBuilder()
             .addPipelineReport(pipelineReport).build();
-    datanodeDetailsProto =
+    DatanodeDetailsProto datanodeDetailsProto =
         DatanodeDetailsProto.newBuilder()
             .setHostName(host1)
             .setUuid(datanodeId)
             .setIpAddress(ip1)
             .build();
-    extraDatanodeDetailsProto =
-        HddsProtos.ExtraDatanodeDetailsProto.newBuilder()
+    extendedDatanodeDetailsProto =
+        HddsProtos.ExtendedDatanodeDetailsProto.newBuilder()
+            .setDatanodeDetails(datanodeDetailsProto)
             .setVersion("0.6.0")
             .setSetupTime(1596347628802l)
             .setBuildDate("2020-08-01T08:50Z")
@@ -296,11 +297,18 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .addStorageReport(storageReportProto2).build();
 
     DatanodeDetailsProto datanodeDetailsProto2 =
-
         DatanodeDetailsProto.newBuilder()
             .setHostName(host2)
-            .setUuid(datanodeId2)
-            .setIpAddress(ip2)
+            .setUuid(datanodeId)
+            .setIpAddress(ip1)
+            .build();
+    ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto2 =
+        ExtendedDatanodeDetailsProto.newBuilder()
+            .setDatanodeDetails(datanodeDetailsProto)
+            .setVersion("0.6.0")
+            .setSetupTime(1596347636802l)
+            .setBuildDate("2020-08-01T08:50Z")
+            .setRevision("3346f493fa1690358add7bb9f3e5b52545993f36")
             .build();
     StorageReportProto storageReportProto3 =
         StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
@@ -321,11 +329,10 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
     try {
       reconScm.getDatanodeProtocolServer()
-          .register(datanodeDetailsProto, extraDatanodeDetailsProto,
-              nodeReportProto, containerReportsProto, pipelineReportsProto);
+          .register(extendedDatanodeDetailsProto, nodeReportProto,
+              containerReportsProto, pipelineReportsProto);
       reconScm.getDatanodeProtocolServer()
-          .register(datanodeDetailsProto2, extraDatanodeDetailsProto,
-              nodeReportProto2,
+          .register(extendedDatanodeDetailsProto2, nodeReportProto2,
               ContainerReportsProto.newBuilder().build(),
               PipelineReportsProto.newBuilder().build());
       // Process all events in the event queue
@@ -375,39 +382,39 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       throws IOException {
     String hostname = datanodeMetadata.getHostname();
     switch (hostname) {
-      case host1:
-        Assert.assertEquals(75000,
-            datanodeMetadata.getDatanodeStorageReport().getCapacity());
-        Assert.assertEquals(15400,
-            datanodeMetadata.getDatanodeStorageReport().getRemaining());
-        Assert.assertEquals(35000,
-            datanodeMetadata.getDatanodeStorageReport().getUsed());
+    case host1:
+      Assert.assertEquals(75000,
+          datanodeMetadata.getDatanodeStorageReport().getCapacity());
+      Assert.assertEquals(15400,
+          datanodeMetadata.getDatanodeStorageReport().getRemaining());
+      Assert.assertEquals(35000,
+          datanodeMetadata.getDatanodeStorageReport().getUsed());
 
-        Assert.assertEquals(1, datanodeMetadata.getPipelines().size());
-        Assert.assertEquals(pipelineId,
-            datanodeMetadata.getPipelines().get(0).getPipelineID().toString());
-        Assert.assertEquals(pipeline.getFactor().getNumber(),
-            datanodeMetadata.getPipelines().get(0).getReplicationFactor());
-        Assert.assertEquals(pipeline.getType().toString(),
-            datanodeMetadata.getPipelines().get(0).getReplicationType());
-        Assert.assertEquals(pipeline.getLeaderNode().getHostName(),
-            datanodeMetadata.getPipelines().get(0).getLeaderNode());
-        Assert.assertEquals(1, datanodeMetadata.getLeaderCount());
-        break;
-      case host2:
-        Assert.assertEquals(130000,
-            datanodeMetadata.getDatanodeStorageReport().getCapacity());
-        Assert.assertEquals(17800,
-            datanodeMetadata.getDatanodeStorageReport().getRemaining());
-        Assert.assertEquals(80000,
-            datanodeMetadata.getDatanodeStorageReport().getUsed());
+      Assert.assertEquals(1, datanodeMetadata.getPipelines().size());
+      Assert.assertEquals(pipelineId,
+          datanodeMetadata.getPipelines().get(0).getPipelineID().toString());
+      Assert.assertEquals(pipeline.getFactor().getNumber(),
+          datanodeMetadata.getPipelines().get(0).getReplicationFactor());
+      Assert.assertEquals(pipeline.getType().toString(),
+          datanodeMetadata.getPipelines().get(0).getReplicationType());
+      Assert.assertEquals(pipeline.getLeaderNode().getHostName(),
+          datanodeMetadata.getPipelines().get(0).getLeaderNode());
+      Assert.assertEquals(1, datanodeMetadata.getLeaderCount());
+      break;
+    case host2:
+      Assert.assertEquals(130000,
+          datanodeMetadata.getDatanodeStorageReport().getCapacity());
+      Assert.assertEquals(17800,
+          datanodeMetadata.getDatanodeStorageReport().getRemaining());
+      Assert.assertEquals(80000,
+          datanodeMetadata.getDatanodeStorageReport().getUsed());
 
-        Assert.assertEquals(0, datanodeMetadata.getPipelines().size());
-        Assert.assertEquals(0, datanodeMetadata.getLeaderCount());
-        break;
-      default:
-        Assert.fail(String.format("Datanode %s not registered",
-            hostname));
+      Assert.assertEquals(0, datanodeMetadata.getPipelines().size());
+      Assert.assertEquals(0, datanodeMetadata.getLeaderCount());
+      break;
+    default:
+      Assert.fail(String.format("Datanode %s not registered",
+          hostname));
     }
   }
 
@@ -639,7 +646,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     SCMHeartbeatRequestProto heartbeatRequestProto =
         SCMHeartbeatRequestProto.newBuilder()
             .setContainerReport(containerReportsProto)
-            .setDatanodeDetails(datanodeDetailsProto)
+            .setDatanodeDetails(extendedDatanodeDetailsProto
+                .getDatanodeDetails())
             .build();
     reconScm.getDatanodeProtocolServer().sendHeartbeat(heartbeatRequestProto);
     LambdaTestUtils.await(30000, 1000, check);

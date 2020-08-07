@@ -43,7 +43,7 @@ import java.util.UUID;
 @InterfaceStability.Evolving
 public class DatanodeDetails extends NodeImpl implements
     Comparable<DatanodeDetails> {
-/**
+  /**
    * DataNode's unique identifier in the cluster.
    */
   private final UUID uuid;
@@ -52,7 +52,10 @@ public class DatanodeDetails extends NodeImpl implements
   private String hostName;
   private List<Port> ports;
   private String certSerialId;
-  private ExtraDatanodeDetails extraDatanodeDetails;
+  private String version;
+  private long setupTime;
+  private String revision;
+  private String buildDate;
 
   /**
    * Constructs DatanodeDetails instance. DatanodeDetails.Builder is used
@@ -63,15 +66,25 @@ public class DatanodeDetails extends NodeImpl implements
    * @param networkLocation DataNode's network location path
    * @param ports Ports used by the DataNode
    * @param certSerialId serial id from SCM issued certificate.
+   * @param version DataNode's version
+   * @param setupTime the setup time of DataNode
+   * @param revision DataNodes's revision
+   * @param buildDate DataNodes's build timestamp
    */
-  protected DatanodeDetails(UUID uuid, String ipAddress, String hostName,
-      String networkLocation, List<Port> ports, String certSerialId) {
+  @SuppressWarnings("parameternumber")
+  private DatanodeDetails(UUID uuid, String ipAddress, String hostName,
+      String networkLocation, List<Port> ports, String certSerialId,
+      String version, long setupTime, String revision, String buildDate) {
     super(hostName, networkLocation, NetConstants.NODE_COST_DEFAULT);
     this.uuid = uuid;
     this.ipAddress = ipAddress;
     this.hostName = hostName;
     this.ports = ports;
     this.certSerialId = certSerialId;
+    this.version = version;
+    this.setupTime = setupTime;
+    this.revision = revision;
+    this.buildDate = buildDate;
   }
 
   public DatanodeDetails(DatanodeDetails datanodeDetails) {
@@ -83,9 +96,10 @@ public class DatanodeDetails extends NodeImpl implements
     this.ports = datanodeDetails.ports;
     this.setNetworkName(datanodeDetails.getNetworkName());
     this.setParent(datanodeDetails.getParent());
-    if (datanodeDetails.getExtraDatanodeDetails() != null) {
-      this.extraDatanodeDetails = datanodeDetails.getExtraDatanodeDetails();
-    }
+    this.version = datanodeDetails.version;
+    this.setupTime = datanodeDetails.setupTime;
+    this.revision = datanodeDetails.revision;
+    this.buildDate = datanodeDetails.buildDate;
   }
 
   /**
@@ -180,25 +194,6 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   /**
-   * Returns DataNode extended fields.
-   *
-   * @return ExtraDatanodeDetails
-   */
-  public ExtraDatanodeDetails getExtraDatanodeDetails() {
-    return extraDatanodeDetails;
-  }
-
-  /**
-   * Sets a DataNode extended fields.
-   *
-   * @param extraDatanodeDetails DataNode extended fields
-   */
-  public void setExtraDatanodeDetails(
-      ExtraDatanodeDetails extraDatanodeDetails) {
-    this.extraDatanodeDetails = extraDatanodeDetails;
-  }
-
-  /**
    * Returns a DatanodeDetails from the protocol buffers.
    *
    * @param datanodeDetailsProto - protoBuf Message
@@ -232,6 +227,36 @@ public class DatanodeDetails extends NodeImpl implements
     }
     if (datanodeDetailsProto.hasNetworkLocation()) {
       builder.setNetworkLocation(datanodeDetailsProto.getNetworkLocation());
+    }
+    return builder.build();
+  }
+
+
+  /**
+   * Returns a ExtendedDatanodeDetails from the protocol buffers.
+   *
+   * @param extendedDetailsProto - protoBuf Message
+   * @return DatanodeDetails
+   */
+  public static DatanodeDetails getFromProtoBuf(
+      HddsProtos.ExtendedDatanodeDetailsProto extendedDetailsProto) {
+    DatanodeDetails.Builder builder = newBuilder();
+    if (extendedDetailsProto.hasDatanodeDetails()) {
+      DatanodeDetails datanodeDetails = getFromProtoBuf(
+          extendedDetailsProto.getDatanodeDetails());
+      builder.setDatanodeDetails(datanodeDetails);
+    }
+    if (extendedDetailsProto.hasVersion()) {
+      builder.setVersion(extendedDetailsProto.getVersion());
+    }
+    if (extendedDetailsProto.hasSetupTime()) {
+      builder.setSetupTime(extendedDetailsProto.getSetupTime());
+    }
+    if (extendedDetailsProto.hasRevision()) {
+      builder.setRevision(extendedDetailsProto.getRevision());
+    }
+    if (extendedDetailsProto.hasBuildDate()) {
+      builder.setBuildDate(extendedDetailsProto.getBuildDate());
     }
     return builder.build();
   }
@@ -276,6 +301,33 @@ public class DatanodeDetails extends NodeImpl implements
     }
 
     return builder.build();
+  }
+
+  /**
+   * Returns a ExtendedDatanodeDetails protobuf message from a datanode ID.
+   * @return HddsProtos.ExtendedDatanodeDetailsProto
+   */
+  public HddsProtos.ExtendedDatanodeDetailsProto getExtendedProtoBufMessage() {
+    HddsProtos.DatanodeDetailsProto datanodeDetailsProto = getProtoBufMessage();
+
+    HddsProtos.ExtendedDatanodeDetailsProto.Builder extendedBuilder =
+        HddsProtos.ExtendedDatanodeDetailsProto.newBuilder()
+            .setDatanodeDetails(datanodeDetailsProto);
+
+    if (!Strings.isNullOrEmpty(getVersion())) {
+      extendedBuilder.setVersion(getVersion());
+    }
+
+    extendedBuilder.setSetupTime(getSetupTime());
+
+    if (!Strings.isNullOrEmpty(getRevision())) {
+      extendedBuilder.setRevision(getRevision());
+    }
+    if (!Strings.isNullOrEmpty(getBuildDate())) {
+      extendedBuilder.setBuildDate(getBuildDate());
+    }
+
+    return extendedBuilder.build();
   }
 
   @Override
@@ -327,14 +379,38 @@ public class DatanodeDetails extends NodeImpl implements
     private String networkLocation;
     private List<Port> ports;
     private String certSerialId;
-    private ExtraDatanodeDetails extraDatanodeDetails;
+    private String version;
+    private long setupTime;
+    private String revision;
+    private String buildDate;
 
     /**
      * Default private constructor. To create Builder instance use
      * DatanodeDetails#newBuilder.
      */
-    protected Builder() {
+    private Builder() {
       ports = new ArrayList<>();
+    }
+
+    /**
+     * Initialize with DatanodeDetails.
+     *
+     * @param details DatanodeDetails
+     * @return DatanodeDetails.Builder
+     */
+    public Builder setDatanodeDetails(DatanodeDetails details) {
+      this.id = details.getUuid();
+      this.ipAddress = details.getIpAddress();
+      this.hostName = details.getHostName();
+      this.networkName = details.getNetworkName();
+      this.networkLocation = details.getNetworkLocation();
+      this.ports = details.getPorts();
+      this.certSerialId = details.getCertSerialId();
+      this.version = details.getVersion();
+      this.setupTime = details.getSetupTime();
+      this.revision = details.getRevision();
+      this.buildDate = details.getBuildDate();
+      return this;
     }
 
     /**
@@ -417,15 +493,50 @@ public class DatanodeDetails extends NodeImpl implements
     }
 
     /**
-     * Adds extra DataNode info.
+     * Sets the DataNode version.
      *
-     * @param extraDatanodeDetails extra DataNode info.
+     * @param ver the version of DataNode.
      *
      * @return DatanodeDetails.Builder
      */
-    public Builder setExtraDatanodeDetails(
-        ExtraDatanodeDetails extraDatanodeDetails) {
-      this.extraDatanodeDetails = extraDatanodeDetails;
+    public Builder setVersion(String ver) {
+      this.version = ver;
+      return this;
+    }
+
+    /**
+     * Sets the DataNode revision.
+     *
+     * @param rev the revision of DataNode.
+     *
+     * @return DatanodeDetails.Builder
+     */
+    public Builder setRevision(String rev) {
+      this.revision = rev;
+      return this;
+    }
+
+    /**
+     * Sets the DataNode build date.
+     *
+     * @param date the build date of DataNode.
+     *
+     * @return DatanodeDetails.Builder
+     */
+    public Builder setBuildDate(String date) {
+      this.buildDate = date;
+      return this;
+    }
+
+    /**
+     * Sets the DataNode setup time.
+     *
+     * @param time the setup time of DataNode.
+     *
+     * @return DatanodeDetails.Builder
+     */
+    public Builder setSetupTime(long time) {
+      this.setupTime = time;
       return this;
     }
 
@@ -440,12 +551,10 @@ public class DatanodeDetails extends NodeImpl implements
         networkLocation = NetConstants.DEFAULT_RACK;
       }
       DatanodeDetails dn = new DatanodeDetails(id, ipAddress, hostName,
-          networkLocation, ports, certSerialId);
+          networkLocation, ports, certSerialId,
+          version, setupTime, revision, buildDate);
       if (networkName != null) {
         dn.setNetworkName(networkName);
-      }
-      if (extraDatanodeDetails != null) {
-        dn.setExtraDatanodeDetails(extraDatanodeDetails);
       }
       return dn;
     }
@@ -519,7 +628,7 @@ public class DatanodeDetails extends NodeImpl implements
      * @param anObject
      *          The object to compare this {@code Port} against
      * @return {@code true} if the given object represents a {@code Port}
-               and has the same name, {@code false} otherwise
+    and has the same name, {@code false} otherwise
      */
     @Override
     public boolean equals(Object anObject) {
@@ -551,251 +660,74 @@ public class DatanodeDetails extends NodeImpl implements
   }
 
   /**
-   * Constructs ExtraDatanodeDetails instance.
+   * Returns the DataNode version.
    *
-   * @param version DataNode's version
-   * @param setupTime the setup time of DataNode
-   * @param revision DataNodes's revision
-   * @param buildDate DataNodes's build timestamp
-   *
-   * @return ExtraDatanodeDetails instance
+   * @return DataNode version
    */
-  public static ExtraDatanodeDetails newExtraDatanodeDetails(
-      String version, long setupTime, String revision, String buildDate) {
-    return new ExtraDatanodeDetails(version, setupTime, revision, buildDate);
+  public String getVersion() {
+    return version;
   }
 
-  public static final class ExtraDatanodeDetails {
-    private String version;
-    private long setupTime;
-    private String revision;
-    private String buildDate;
-
-    /**
-     * Constructs ExtraDatanodeDetails instance.
-     * @param version DataNode's version
-     * @param setupTime the setup time of DataNode
-     * @param revision DataNodes's revision
-     * @param buildDate DataNodes's build timestamp
-     */
-    public ExtraDatanodeDetails(String version, long setupTime,
-        String revision, String buildDate) {
-      this.version = version;
-      this.setupTime = setupTime;
-      this.revision = revision;
-      this.buildDate = buildDate;
-    }
-
-    public ExtraDatanodeDetails(ExtraDatanodeDetails
-        ExtraDatanodeDetails) {
-      this.version = ExtraDatanodeDetails.version;
-      this.setupTime = ExtraDatanodeDetails.setupTime;
-      this.revision = ExtraDatanodeDetails.revision;
-      this.buildDate = ExtraDatanodeDetails.buildDate;
-    }
-
-    /**
-     * Returns the DataNode version.
-     *
-     * @return DataNode version
-     */
-    public String getVersion() {
-      return version;
-    }
-
-    /**
-     * Set DataNode version.
-     *
-     * @param version DataNode version
-     */
-    public void setVersion(String version) {
-      this.version = version;
-    }
-
-    /**
-     * Returns the DataNode setup time.
-     *
-     * @return DataNode setup time
-     */
-    public long getSetupTime() {
-      return setupTime;
-    }
-
-    /**
-     * Set DataNode setup time.
-     *
-     * @param setupTime DataNode setup time
-     */
-    public void setSetupTime(long setupTime) {
-      this.setupTime = setupTime;
-    }
-
-    /**
-     * Returns the DataNode revision.
-     *
-     * @return DataNode revision
-     */
-    public String getRevision() {
-      return revision;
-    }
-
-    /**
-     * Set DataNode revision.
-     *
-     * @param rev DataNode revision
-     */
-    public void setRevision(String rev) {
-      this.revision = rev;
-    }
-
-    /**
-     * Returns the DataNode build date.
-     *
-     * @return DataNode build date
-     */
-    public String getBuildDate() {
-      return buildDate;
-    }
-
-    /**
-     * Set DataNode build date.
-     *
-     * @param date DataNode build date
-     */
-    public void setBuildDate(String date) {
-      this.buildDate = date;
-    }
-
-    /**
-     * Returns a ExtraDatanodeDetails from the protocol buffers.
-     *
-     * @param extraDatanodeDetailsProto - protoBuf Message
-     * @return ExtraDatanodeDetails
-     */
-    public static ExtraDatanodeDetails getFromProtoBuf(
-        HddsProtos.ExtraDatanodeDetailsProto extraDatanodeDetailsProto) {
-      Builder builder = newBuilder();
-      if (extraDatanodeDetailsProto.hasVersion()) {
-        builder.setVersion(extraDatanodeDetailsProto.getVersion());
-      }
-      if (extraDatanodeDetailsProto.hasSetupTime()) {
-        builder.setSetupTime(extraDatanodeDetailsProto.getSetupTime());
-      }
-      if (extraDatanodeDetailsProto.hasRevision()) {
-        builder.setRevision(extraDatanodeDetailsProto.getRevision());
-      }
-      if (extraDatanodeDetailsProto.hasBuildDate()) {
-        builder.setBuildDate(extraDatanodeDetailsProto.getBuildDate());
-      }
-      return builder.build();
-    }
-
-    /**
-     * Returns a ExtraDatanodeDetailsProto protobuf message from a datanode ID.
-     * @return HddsProtos.ExtraDatanodeDetailsProto
-     */
-    public HddsProtos.ExtraDatanodeDetailsProto getProtoBufMessage() {
-      HddsProtos.ExtraDatanodeDetailsProto.Builder builder =
-          HddsProtos.ExtraDatanodeDetailsProto.newBuilder();
-      if (!Strings.isNullOrEmpty(getVersion())) {
-        builder.setVersion(getVersion());
-      }
-
-      builder.setSetupTime(getSetupTime());
-
-      if (!Strings.isNullOrEmpty(getRevision())) {
-        builder.setRevision(getRevision());
-      }
-      if (!Strings.isNullOrEmpty(getBuildDate())) {
-        builder.setBuildDate(getBuildDate());
-      }
-
-      return builder.build();
-    }
-
-    /**
-     * Returns ExtraDatanodeDetails.Builder instance.
-     *
-     * @return ExtraDatanodeDetails.Builder
-     */
-    public static Builder newBuilder() {
-      return new Builder();
-    }
-
-    /**
-     * Builder class for building DatanodeDetails.
-     */
-    public static final class Builder {
-      private String version;
-      private long setupTime;
-      private String revision;
-      private String buildDate;
-
-      /**
-       * Default private constructor. To create Builder instance use
-       * ExtraDatanodeDetails#newBuilder.
-       */
-      private Builder() { }
-
-      /**
-       * Sets the DataNode version.
-       *
-       * @param ver the version of DataNode.
-       *
-       * @return ExtraDatanodeDetails.Builder
-       */
-      public Builder setVersion(String ver) {
-        this.version = ver;
-        return this;
-      }
-
-      /**
-       * Sets the DataNode revision.
-       *
-       * @param rev the revision of DataNode.
-       *
-       * @return ExtraDatanodeDetails.Builder
-       */
-      public Builder setRevision(String rev) {
-        this.revision = rev;
-        return this;
-      }
-
-      /**
-       * Sets the DataNode build date.
-       *
-       * @param date the build date of DataNode.
-       *
-       * @return ExtraDatanodeDetails.Builder
-       */
-      public Builder setBuildDate(String date) {
-        this.buildDate = date;
-        return this;
-      }
-
-      /**
-       * Sets the DataNode setup time.
-       *
-       * @param time the setup time of DataNode.
-       *
-       * @return ExtraDatanodeDetails.Builder
-       */
-      public Builder setSetupTime(long time) {
-        this.setupTime = time;
-        return this;
-      }
-
-      /**
-       * Builds and returns DatanodeDetails instance.
-       *
-       * @return ExtraDatanodeDetails
-       */
-      public ExtraDatanodeDetails build() {
-        ExtraDatanodeDetails dn = new ExtraDatanodeDetails(
-            version, setupTime, revision, buildDate);
-        return dn;
-      }
-    }
+  /**
+   * Set DataNode version.
+   *
+   * @param version DataNode version
+   */
+  public void setVersion(String version) {
+    this.version = version;
   }
 
+  /**
+   * Returns the DataNode setup time.
+   *
+   * @return DataNode setup time
+   */
+  public long getSetupTime() {
+    return setupTime;
+  }
+
+  /**
+   * Set DataNode setup time.
+   *
+   * @param setupTime DataNode setup time
+   */
+  public void setSetupTime(long setupTime) {
+    this.setupTime = setupTime;
+  }
+
+  /**
+   * Returns the DataNode revision.
+   *
+   * @return DataNode revision
+   */
+  public String getRevision() {
+    return revision;
+  }
+
+  /**
+   * Set DataNode revision.
+   *
+   * @param rev DataNode revision
+   */
+  public void setRevision(String rev) {
+    this.revision = rev;
+  }
+
+  /**
+   * Returns the DataNode build date.
+   *
+   * @return DataNode build date
+   */
+  public String getBuildDate() {
+    return buildDate;
+  }
+
+  /**
+   * Set DataNode build date.
+   *
+   * @param date DataNode build date
+   */
+  public void setBuildDate(String date) {
+    this.buildDate = date;
+  }
 }

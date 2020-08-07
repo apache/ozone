@@ -1538,25 +1538,30 @@
             ]
           },
           {
-		"name": "ExtraDatanodeDetailsProto",
+		"name": "ExtendedDatanodeDetailsProto",
             "fields": [
 			  {
 			    "id": 1,
+				"name": "datanodeDetails",
+				"type": "DatanodeDetailsProto"
+			  },
+			  {
+			    "id": 2,
 				"name": "version",
 				"type": "string"
 			  },
 			  {
-			    "id": 2,
+			    "id": 3,
 				"name": "setupTime",
 				"type": "int64"
 			  },
 			  {
-			    "id": 3,
+			    "id": 4,
 				"name": "revision",
 				"type": "string"
 			  },
 			  {
-			    "id": 4,
+			    "id": 5,
 				"name": "buildDate",
 				"type": "string"
 			  }

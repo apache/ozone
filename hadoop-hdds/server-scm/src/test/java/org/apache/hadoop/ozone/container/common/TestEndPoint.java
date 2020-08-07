@@ -269,9 +269,8 @@ public class TestEndPoint {
     try (EndpointStateMachine rpcEndPoint = createEndpoint(
         SCMTestUtils.getConf(), serverAddress, 1000)) {
       SCMRegisteredResponseProto responseProto = rpcEndPoint.getEndPoint()
-          .register(nodeToRegister.getProtoBufMessage(),
-              nodeToRegister.getExtraDatanodeDetails().getProtoBufMessage(),
-              TestUtils.createNodeReport(
+          .register(nodeToRegister.getExtendedProtoBufMessage(), TestUtils
+                  .createNodeReport(
                       getStorageReports(nodeToRegister.getUuid())),
               TestUtils.getRandomContainerReports(10),
                   TestUtils.getRandomPipelineReports());
