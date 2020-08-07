@@ -146,7 +146,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    *                        use addDatanodeInContainerMap call.
    */
   void addContainer(DatanodeDetails datanodeDetails,
-      ContainerID containerId) throws NodeNotFoundException;
+                    ContainerID containerId) throws NodeNotFoundException;
 
   /**
    * Remaps datanode to containers mapping to the new set of containers.
@@ -181,7 +181,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @param nodeReport
    */
   void processNodeReport(DatanodeDetails datanodeDetails,
-      NodeReportProto nodeReport);
+                         NodeReportProto nodeReport);
 
   /**
    * Get list of SCMCommands in the Command Queue for a particular Datanode.

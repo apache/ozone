@@ -481,7 +481,7 @@ public class NodeStateManager implements Runnable, Closeable {
    *                        use addDatanodeInContainerMap call.
    */
   public void addContainer(final UUID uuid,
-      final ContainerID containerId)
+                           final ContainerID containerId)
       throws NodeNotFoundException {
     nodeStateMap.addContainer(uuid, containerId);
   }
@@ -598,33 +598,33 @@ public class NodeStateManager implements Runnable, Closeable {
         for (UUID id : nodes) {
           DatanodeInfo node = nodeStateMap.getNodeInfo(id);
           switch (state) {
-            case HEALTHY:
-              // Move the node to STALE if the last heartbeat time is less than
-              // configured stale-node interval.
-              updateNodeState(node, staleNodeCondition, state,
-                  NodeLifeCycleEvent.TIMEOUT);
-              break;
-            case STALE:
-              // Move the node to DEAD if the last heartbeat time is less than
-              // configured dead-node interval.
-              updateNodeState(node, deadNodeCondition, state,
-                  NodeLifeCycleEvent.TIMEOUT);
-              // Restore the node if we have received heartbeat before configured
-              // stale-node interval.
-              updateNodeState(node, healthyNodeCondition, state,
-                  NodeLifeCycleEvent.RESTORE);
-              break;
-            case DEAD:
-              // Resurrect the node if we have received heartbeat before
-              // configured stale-node interval.
-              updateNodeState(node, healthyNodeCondition, state,
-                  NodeLifeCycleEvent.RESURRECT);
-              break;
-            // We don't do anything for DECOMMISSIONING and DECOMMISSIONED in
-            // heartbeat processing.
-            case DECOMMISSIONING:
-            case DECOMMISSIONED:
-            default:
+          case HEALTHY:
+            // Move the node to STALE if the last heartbeat time is less than
+            // configured stale-node interval.
+            updateNodeState(node, staleNodeCondition, state,
+                NodeLifeCycleEvent.TIMEOUT);
+            break;
+          case STALE:
+            // Move the node to DEAD if the last heartbeat time is less than
+            // configured dead-node interval.
+            updateNodeState(node, deadNodeCondition, state,
+                NodeLifeCycleEvent.TIMEOUT);
+            // Restore the node if we have received heartbeat before configured
+            // stale-node interval.
+            updateNodeState(node, healthyNodeCondition, state,
+                NodeLifeCycleEvent.RESTORE);
+            break;
+          case DEAD:
+            // Resurrect the node if we have received heartbeat before
+            // configured stale-node interval.
+            updateNodeState(node, healthyNodeCondition, state,
+                NodeLifeCycleEvent.RESURRECT);
+            break;
+          // We don't do anything for DECOMMISSIONING and DECOMMISSIONED in
+          // heartbeat processing.
+          case DECOMMISSIONING:
+          case DECOMMISSIONED:
+          default:
           }
         }
       }

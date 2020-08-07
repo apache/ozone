@@ -231,7 +231,6 @@ public class DatanodeDetails extends NodeImpl implements
     return builder.build();
   }
 
-
   /**
    * Returns a ExtendedDatanodeDetails from the protocol buffers.
    *
@@ -628,7 +627,7 @@ public class DatanodeDetails extends NodeImpl implements
      * @param anObject
      *          The object to compare this {@code Port} against
      * @return {@code true} if the given object represents a {@code Port}
-    and has the same name, {@code false} otherwise
+               and has the same name, {@code false} otherwise
      */
     @Override
     public boolean equals(Object anObject) {

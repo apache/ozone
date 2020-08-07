@@ -105,7 +105,7 @@ public class NodeStateMap {
    * @throws NodeNotFoundException if the node is not present
    */
   public void updateNodeState(UUID nodeId, NodeState currentState,
-      NodeState newState)throws NodeNotFoundException {
+                              NodeState newState)throws NodeNotFoundException {
     lock.writeLock().lock();
     try {
       checkIfNodeExist(nodeId);
@@ -234,7 +234,7 @@ public class NodeStateMap {
    *                        use addDatanodeInContainerMap call.
    */
   public void addContainer(final UUID uuid,
-      final ContainerID containerId)
+                           final ContainerID containerId)
       throws NodeNotFoundException {
     lock.writeLock().lock();
     try {

@@ -53,7 +53,7 @@ public interface StorageContainerDatanodeProtocol {
   /**
    * Version 1: Initial version.
    */
-      long versionID = 1L;
+  long versionID = 1L;
 
   /**
    * Returns SCM version.

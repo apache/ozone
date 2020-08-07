@@ -202,7 +202,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     try {
       String hostname = HddsUtils.getHostName(conf);
       String ip = InetAddress.getByName(hostname).getHostAddress();
-
       datanodeDetails = initializeDatanodeDetails();
       datanodeDetails.setHostName(hostname);
       datanodeDetails.setIpAddress(ip);
@@ -246,8 +245,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
         initializeCertificateClient(conf);
       }
-      datanodeStateMachine = new DatanodeStateMachine(datanodeDetails,
-          conf, dnCertClient, this::terminateDatanode);
+      datanodeStateMachine = new DatanodeStateMachine(datanodeDetails, conf,
+          dnCertClient, this::terminateDatanode);
       try {
         httpServer = new HddsDatanodeHttpServer(conf);
         httpServer.start();
