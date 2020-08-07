@@ -275,7 +275,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         HddsProtos.ExtendedDatanodeDetailsProto.newBuilder()
             .setDatanodeDetails(datanodeDetailsProto)
             .setVersion("0.6.0")
-            .setSetupTime(1596347628802l)
+            .setSetupTime(1596347628802L)
             .setBuildDate("2020-08-01T08:50Z")
             .setRevision("3346f493fa1690358add7bb9f3e5b52545993f36")
             .build();
@@ -306,7 +306,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         ExtendedDatanodeDetailsProto.newBuilder()
             .setDatanodeDetails(datanodeDetailsProto)
             .setVersion("0.6.0")
-            .setSetupTime(1596347636802l)
+            .setSetupTime(1596347636802L)
             .setBuildDate("2020-08-01T08:50Z")
             .setRevision("3346f493fa1690358add7bb9f3e5b52545993f36")
             .build();
