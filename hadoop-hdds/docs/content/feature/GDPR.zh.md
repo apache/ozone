@@ -22,6 +22,11 @@ icon: user
   limitations under the License.
 -->
 
+<div class="alert alert-warning">
+
+注意：本页面翻译的信息可能滞后，最新的信息请参看英文版的相关页面。
+
+</div>
 
 在 Ozone 中遵守 GDPR 规范非常简单，只需要在创建桶时指定 `--enforcegdpr=true` 或  `-g=true` 参数，这样创建出的桶都是符合 GDPR 规范的，当然，在桶中创建的键也都自动符合。
 
