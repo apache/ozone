@@ -25,13 +25,20 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.audit.AuditEventStatus.FAILURE;
 import static org.apache.hadoop.ozone.audit.AuditEventStatus.SUCCESS;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.core.StringContains.containsString;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import org.hamcrest.Matcher;
+import org.hamcrest.collection.IsIterableContainingInOrder;
+
 
 /**
  * Test Ozone Audit Logger.
@@ -149,7 +156,7 @@ public class TestOzoneAuditLogger {
 
   @Test
   public void messageIncludesMultilineException() throws IOException {
-    String exceptionMessage = "Dummuy exception message";
+    String exceptionMessage = "Dummy exception message";
     TestException testException = new TestException(exceptionMessage);
     AuditMessage exceptionAuditMessage =
         new AuditMessage.Builder()
@@ -160,10 +167,11 @@ public class TestOzoneAuditLogger {
             .withResult(FAILURE)
             .withException(testException).build();
     AUDIT.logWriteFailure(exceptionAuditMessage);
-    verifyLog(exceptionMessage,
-          "org.apache.hadoop.ozone.audit."
-              + "TestOzoneAuditLogger."
-              + "messageIncludesMultilineException");
+    verifyLog(
+        "ERROR | OMAudit | user=john | ip=192.168.0.1 | op=CREATE_VOLUME {key1=value1, key2=value2} | ret=FAILURE",
+        "org.apache.hadoop.ozone.audit.TestOzoneAuditLogger$TestException: Dummy exception message",
+        "at org.apache.hadoop.ozone.audit.TestOzoneAuditLogger.messageIncludesMultilineException(TestOzoneAuditLogger.java:160) [test-classes/:?]");
+
 
   }
 
@@ -183,9 +191,10 @@ public class TestOzoneAuditLogger {
       i++;
     }
     //check if every expected string can be found in the log entry
-    for(String expected : expectedStrings) {
-      assertTrue(contains(lines, expected));
-    }
+    assertThat(
+        lines.subList(0,expectedStrings.length),
+        containsInOrder(expectedStrings)
+    );
     //empty the file
     lines.clear();
     FileUtils.writeLines(file, lines, false);
@@ -211,5 +220,14 @@ public class TestOzoneAuditLogger {
     TestException(String message) {
       super(message);
     }
+  }
+
+  private Matcher<Iterable<? extends String>> containsInOrder(
+      String[] expectedStrings) {
+    return IsIterableContainingInOrder.contains(
+        Arrays.stream(expectedStrings)
+            .map(str -> containsString(str))
+            .collect(Collectors.toList())
+    );
   }
 }
