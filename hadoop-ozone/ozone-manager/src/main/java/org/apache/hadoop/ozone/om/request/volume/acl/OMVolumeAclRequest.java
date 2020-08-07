@@ -84,19 +84,6 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
           VOLUME_LOCK, volume);
       omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
 
-      // Update the modification time when updating ACLs of Volume.
-      long modificationTime = omVolumeArgs.getModificationTime();
-      if (getOmRequest().getAddAclRequest().hasObj()) {
-        modificationTime = getOmRequest().getAddAclRequest()
-            .getModificationTime();
-      } else if (getOmRequest().getSetAclRequest().hasObj()){
-        modificationTime = getOmRequest().getSetAclRequest()
-            .getModificationTime();
-      } else if (getOmRequest().getRemoveAclRequest().hasObj()) {
-        modificationTime = getOmRequest().getRemoveAclRequest()
-            .getModificationTime();
-      }
-      omVolumeArgs.setModificationTime(modificationTime);
 
       // result is false upon add existing acl or remove non-existing acl
       boolean applyAcl = true;
@@ -108,6 +95,20 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
 
       // Update only when
       if (applyAcl) {
+        // Update the modification time when updating ACLs of Volume.
+        long modificationTime = omVolumeArgs.getModificationTime();
+        if (getOmRequest().getAddAclRequest().hasObj()) {
+          modificationTime = getOmRequest().getAddAclRequest()
+              .getModificationTime();
+        } else if (getOmRequest().getSetAclRequest().hasObj()){
+          modificationTime = getOmRequest().getSetAclRequest()
+              .getModificationTime();
+        } else if (getOmRequest().getRemoveAclRequest().hasObj()) {
+          modificationTime = getOmRequest().getRemoveAclRequest()
+              .getModificationTime();
+        }
+        omVolumeArgs.setModificationTime(modificationTime);
+
         omVolumeArgs.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
         // update cache.
