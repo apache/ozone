@@ -50,7 +50,7 @@ kubectl create -f /ozone/kubernetes/examples/ozone/csi
 kubectl create -f /ozone/kubernetes/examples/ozone/pv-test
 ```
 
-连接 pod scm-0 并且 创建一个键到篮子/s3v/pvc* 。
+连接 pod scm-0 并且 创建一个键到桶/s3v/pvc* 。
 
 ```bash
 kubectl exec -it  scm-0  bash
