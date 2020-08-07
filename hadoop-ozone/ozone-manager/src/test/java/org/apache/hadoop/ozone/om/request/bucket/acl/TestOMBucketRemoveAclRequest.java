@@ -66,8 +66,8 @@ public class TestOMBucketRemoveAclRequest extends TestBucketRequest {
     String ownerName = "testUser";
 
     TestOMRequestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
-    TestOMRequestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
-    TestOMRequestUtils.addBucketToDB(volumeName, bucketName, omMetadataManager);
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager);
 
     OzoneAcl acl = OzoneAcl.parseAcl("user:newUser:rw");
 

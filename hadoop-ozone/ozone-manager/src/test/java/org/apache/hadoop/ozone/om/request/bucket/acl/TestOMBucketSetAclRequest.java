@@ -68,8 +68,8 @@ public class TestOMBucketSetAclRequest extends TestBucketRequest {
     String ownerName = "owner";
 
     TestOMRequestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
-    TestOMRequestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
-    TestOMRequestUtils.addBucketToDB(volumeName, bucketName, omMetadataManager);
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager);
 
     OzoneAcl userAcl = OzoneAcl.parseAcl("user:newUser:rw");
     OzoneAcl groupAcl = OzoneAcl.parseAcl("group:newGroup:rw");
