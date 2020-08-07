@@ -25,7 +25,7 @@ summary: Ozone 支持 容器存储接口(CSI) 协议。你可以通过Ozone CSI 
 
 获取更多CSI的信息，可以参考[SCI spec](https://github.com/container-storage-interface/spec/blob/master/spec.md)
 
-Ozone CSI是 CSI 的一种实现，它使得在容器里使用Ozone成为了可能。 
+Ozone CSI是 CSI 的一种实现，它可以将Ozone用作容器的存储卷。 
 
 ## 入门
 
