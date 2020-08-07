@@ -25,7 +25,7 @@ import java.util.Map;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 
 /**
- * In memory, mutable configuration source for testing..
+ * In memory, mutable configuration source for testing.
  */
 public class InMemoryConfiguration implements MutableConfigurationSource {
 
