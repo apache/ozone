@@ -281,7 +281,6 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
    */
   @Override
   public boolean deleteObjects(List<String> keyNameList) {
-    LOG.trace("issuing delete for key {}", keyNameList);
     try {
       incrementCounter(Statistic.OBJECTS_DELETED);
       bucket.deleteKeys(keyNameList);
