@@ -299,12 +299,12 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     DatanodeDetailsProto datanodeDetailsProto2 =
         DatanodeDetailsProto.newBuilder()
             .setHostName(host2)
-            .setUuid(datanodeId)
-            .setIpAddress(ip1)
+            .setUuid(datanodeId2)
+            .setIpAddress(ip2)
             .build();
     ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto2 =
         ExtendedDatanodeDetailsProto.newBuilder()
-            .setDatanodeDetails(datanodeDetailsProto)
+            .setDatanodeDetails(datanodeDetailsProto2)
             .setVersion("0.6.0")
             .setSetupTime(1596347636802L)
             .setBuildDate("2020-08-01T08:50Z")
