@@ -1,8 +1,10 @@
 ---
-title: 命令行接口
+title: "Recon"
+weight: 7
 menu:
    main:
-      weight: 3
+      parent: Features
+summary: Recon is the Web UI and analysis service for Ozone
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
@@ -21,7 +23,9 @@ menu:
   limitations under the License.
 -->
 
+Recon is the Web UI and analytics service for Ozone. It's an optional component, but strongly recommended as it can add additional visibility.
 
-{{<jumbotron title="OzoneShell">}}
-    Ozone shell 是用户与 Ozone 进行交互的主要接口，它提供了操作 Ozone 的命令行接口。
-{{</jumbotron>}}
+Recon collects all the data from an Ozone cluster and **store** them in a SQL database for further analyses.
+
+ 1. Ozone Manager data is downloaded in the background by an async process. A RocksDB snapshots are created on OM side periodically, and the incremental data is copied to Recon and processed.
+ 2. Datanodes can send Heartbeats not just to SCM but Recon. Recon can be a read-only listener of the Heartbeats and updates the local database based on the received information.   

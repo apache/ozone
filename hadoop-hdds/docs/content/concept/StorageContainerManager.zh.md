@@ -21,6 +21,12 @@ summary:  Storage Container Manager（SCM）是 Ozone 的核心元数据服务�
   limitations under the License.
 -->
 
+<div class="alert alert-warning">
+
+注意：本页面翻译的信息可能滞后，最新的信息请参看英文版的相关页面。
+
+</div>
+
 SCM 为 Ozone 集群提供了多种重要功能，包括：集群管理、证书管理、块管理和副本管理等。
 
 {{<card title="集群管理" icon="tasks">}}
