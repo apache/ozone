@@ -485,13 +485,13 @@ public class BasicRootedOzoneClientAdapterImpl
    * e.g. ofs://om/vol1/buck1/k1
    *
    * @param keyNameList key name list to be deleted
-   * @return true if the key is deleted, false otherwise
+   * @return true if the key deletion is successful, false otherwise
    */
   @Override
   public boolean deleteObjects(List<String> keyNameList) {
     LOG.trace("issuing delete for keys: {}", keyNameList);
     if (keyNameList.size() == 0) {
-      return false;
+      return true;
     }
     // Sanity check. Support only deleting a list of keys in the same bucket
     if (!areInSameBucket(keyNameList)) {
