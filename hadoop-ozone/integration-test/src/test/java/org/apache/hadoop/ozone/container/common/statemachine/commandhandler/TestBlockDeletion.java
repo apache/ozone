@@ -356,7 +356,8 @@ public class TestBlockDeletion {
         String deletingKey = OzoneConsts.DELETING_KEY_PREFIX + blockIDString;
         Assert.assertNull(blockDataTable.get(deletingKey));
 
-        ChunkInfoList deletedBlocksChunks = deletedBlocksTable.get(blockIDString);
+        ChunkInfoList deletedBlocksChunks =
+                deletedBlocksTable.get(blockIDString);
         Assert.assertNotNull(deletedBlocksChunks);
 
         verifyChunksEqual(blockData.getChunks(), deletedBlocksChunks.asList());
