@@ -267,48 +267,6 @@ public class VolumeManagerImpl implements VolumeManager {
     }
   }
 
-
-  /**
-   * Changes the Quota on a volume.
-   *
-   * @param volume - Name of the volume.
-   * @param quotaInCounts - Volume quota in counts.
-   * @param quotaInBytes - Volume quota in bytes.
-   *
-   * @throws IOException
-   */
-  @Override
-  public void setQuota(String volume, long quotaInCounts,
-                       long quotaInBytes) throws IOException {
-    Preconditions.checkNotNull(volume);
-    metadataManager.getLock().acquireLock(VOLUME_LOCK, volume);
-    try {
-      String dbVolumeKey = metadataManager.getVolumeKey(volume);
-      OmVolumeArgs volumeArgs =
-          metadataManager.getVolumeTable().get(dbVolumeKey);
-      if (volumeArgs == null) {
-        LOG.debug("volume:{} does not exist", volume);
-        throw new OMException(ResultCodes.VOLUME_NOT_FOUND);
-      }
-
-      Preconditions.checkState(volume.equals(volumeArgs.getVolume()));
-
-      volumeArgs.setQuotaInBytes(quotaInBytes);
-      volumeArgs.setQuotaInCounts(quotaInCounts);
-
-      metadataManager.getVolumeTable().put(dbVolumeKey, volumeArgs);
-    } catch (IOException ex) {
-      if (!(ex instanceof OMException)) {
-        LOG.error("Changing volume quota failed for volume:{} " +
-                "space quota:{}, counts quota:{}", volume,
-            quotaInBytes, quotaInCounts, ex);
-      }
-      throw ex;
-    } finally {
-      metadataManager.getLock().releaseLock(VOLUME_LOCK, volume);
-    }
-  }
-
   /**
    * Gets the volume information.
    * @param volume - Volume name.

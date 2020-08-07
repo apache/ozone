@@ -1748,25 +1748,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public void setQuota(String volume, long quotaInCounts,
                        long quotaInBytes) throws IOException {
-    if(isAclEnabled) {
-      checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.WRITE, volume,
-          null, null);
-    }
-
-    Map<String, String> auditMap = buildAuditMap(volume);
-    auditMap.put(OzoneConsts.QUOTA_IN_BYTES, String.valueOf(quotaInBytes));
-    auditMap.put(OzoneConsts.QUOTA_IN_COUNTS, String.valueOf(quotaInCounts));
-    try {
-      metrics.incNumVolumeUpdates();
-      volumeManager.setQuota(volume, quotaInCounts, quotaInBytes);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.SET_QUOTA,
-          auditMap));
-    } catch (Exception ex) {
-      metrics.incNumVolumeUpdateFails();
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.SET_QUOTA,
-          auditMap, ex));
-      throw ex;
-    }
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As this requests use a new approach");
   }
 
   /**
