@@ -32,7 +32,7 @@ Ozone CSI是 CSI 的一种实现，它使得在容器里使用Ozone成为了可�
 首先，我们需要一个带有S3Gateway的Ozone集群，并且它的OM和S3Gateway的端口都可以对CSI pod可见，
 因为CSIServer 将会访问 OM 来创建或者删除篮子，并且，CSIServer将会通过goofys创建到s3g的挂载点的方式来发布桶。 
 
-如果你没有一个运行在kubernetes上的Ozone集群，你可以参考[Kubernetes]({{< ref "start/Kubernetes.md" >}}) 来创建一个。
+如果你没有一个运行在kubernetes上的Ozone集群，你可以参考[Kubernetes]({{< ref "start/Kubernetes.zh.md" >}}) 来创建一个。
 使用来自 `kubernetes/examples/ozone`的资源，你可以找到所有需要的kubernetes资源来和指定的CSI运行在一起
 (参考 `kubernetes/examples/ozone/csi`)   
 
