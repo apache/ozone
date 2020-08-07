@@ -489,7 +489,6 @@ public class BasicRootedOzoneClientAdapterImpl
    */
   @Override
   public boolean deleteObjects(List<String> keyNameList) {
-    LOG.trace("issuing delete for keys: {}", keyNameList);
     if (keyNameList.size() == 0) {
       return true;
     }
@@ -520,8 +519,6 @@ public class BasicRootedOzoneClientAdapterImpl
    * @return true if operation succeeded, false on IOException.
    */
   boolean deleteObjects(OzoneBucket bucket, List<String> keyNameList) {
-    LOG.trace("issuing delete in volume: {}, bucket: {} for keys: {}",
-        bucket.getVolumeName(), bucket.getName(), keyNameList);
     List<String> keyList = keyNameList.stream()
         .map(p -> new OFSPath(p).getKeyName())
         .collect(Collectors.toList());
