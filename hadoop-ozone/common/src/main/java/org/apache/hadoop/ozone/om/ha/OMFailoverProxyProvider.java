@@ -379,12 +379,15 @@ public class OMFailoverProxyProvider implements
     if (OmUtils.isAccessControlException(ex)) {
       // Retry all available OMs once before failing with
       // AccessControlException.
-      if (accessControlExceptionOMs.contains(omNodeIDList) ||
-          accessControlExceptionOMs.contains(currentProxyOMNodeId)) {
+      if (accessControlExceptionOMs.contains(currentProxyOMNodeId)) {
         accessControlExceptionOMs.clear();
         return false;
+      } else {
+        accessControlExceptionOMs.add(currentProxyOMNodeId);
+        if (accessControlExceptionOMs.containsAll(omNodeIDList)) {
+          return false;
+        }
       }
-      accessControlExceptionOMs.add(currentProxyOMNodeId);
     }
     return true;
   }
