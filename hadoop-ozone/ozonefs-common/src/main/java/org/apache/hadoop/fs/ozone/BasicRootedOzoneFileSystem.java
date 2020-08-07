@@ -24,12 +24,15 @@ import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Options;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -715,6 +718,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
   @Override
   public boolean mkdirs(Path f, FsPermission permission) throws IOException {
+    incrementCounter(Statistic.INVOCATION_MKDIRS);
     LOG.trace("mkdir() path:{} ", f);
     String key = pathToKey(f);
     if (isEmpty(key)) {
@@ -762,6 +766,73 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   @Override
   public short getDefaultReplication() {
     return adapter.getDefaultReplication();
+  }
+
+  @Override
+  public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path[] srcs,
+      Path dst) throws IOException {
+    incrementCounter(Statistic.INVOCATION_COPY_FROM_LOCAL_FILE);
+    super.copyFromLocalFile(delSrc, overwrite, srcs, dst);
+  }
+
+  @Override
+  public void copyFromLocalFile(boolean delSrc, boolean overwrite, Path src,
+      Path dst) throws IOException {
+    incrementCounter(Statistic.INVOCATION_COPY_FROM_LOCAL_FILE);
+    super.copyFromLocalFile(delSrc, overwrite, src, dst);
+  }
+
+  @Override
+  public boolean exists(Path f) throws IOException {
+    incrementCounter(Statistic.INVOCATION_EXISTS);
+    return super.exists(f);
+  }
+
+  @Override
+  public FileChecksum getFileChecksum(Path f, long length) throws IOException {
+    incrementCounter(Statistic.INVOCATION_GET_FILE_CHECKSUM);
+    return super.getFileChecksum(f, length);
+  }
+
+  @Override
+  public FileStatus[] globStatus(Path pathPattern) throws IOException {
+    incrementCounter(Statistic.INVOCATION_GLOB_STATUS);
+    return super.globStatus(pathPattern);
+  }
+
+  @Override
+  public FileStatus[] globStatus(Path pathPattern, PathFilter filter)
+      throws IOException {
+    incrementCounter(Statistic.INVOCATION_GLOB_STATUS);
+    return super.globStatus(pathPattern, filter);
+  }
+
+  @Override
+  @SuppressWarnings("deprecation")
+  public boolean isDirectory(Path f) throws IOException {
+    incrementCounter(Statistic.INVOCATION_IS_DIRECTORY);
+    return super.isDirectory(f);
+  }
+
+  @Override
+  @SuppressWarnings("deprecation")
+  public boolean isFile(Path f) throws IOException {
+    incrementCounter(Statistic.INVOCATION_IS_FILE);
+    return super.isFile(f);
+  }
+
+  @Override
+  public RemoteIterator<LocatedFileStatus> listFiles(Path f, boolean recursive)
+      throws IOException {
+    incrementCounter(Statistic.INVOCATION_LIST_FILES);
+    return super.listFiles(f, recursive);
+  }
+
+  @Override
+  public RemoteIterator<LocatedFileStatus> listLocatedStatus(Path f)
+      throws IOException {
+    incrementCounter(Statistic.INVOCATION_LIST_LOCATED_STATUS);
+    return super.listLocatedStatus(f);
   }
 
   /**
