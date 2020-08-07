@@ -90,9 +90,7 @@ public class OzoneAddress {
   }
 
   @VisibleForTesting
-  protected OzoneClient createRpcClient(
-      ConfigurationSource conf
-  )
+  protected OzoneClient createRpcClient(ConfigurationSource conf)
       throws IOException {
     return OzoneClientFactory.getRpcClient(conf);
   }
