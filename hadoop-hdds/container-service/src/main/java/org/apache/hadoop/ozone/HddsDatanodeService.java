@@ -99,7 +99,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private HddsDatanodeHttpServer httpServer;
   private boolean printBanner;
   private String[] args;
-  private volatile AtomicBoolean isStopped = new AtomicBoolean(false);
+  private final AtomicBoolean isStopped = new AtomicBoolean(false);
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
   private DNMXBeanImpl serviceRuntimeInfo =
@@ -531,8 +531,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   @Override
   public void stop() {
-    if (!isStopped.get()) {
-      isStopped.set(true);
+    if (!isStopped.getAndSet(true)) {
       if (plugins != null) {
         for (ServicePlugin plugin : plugins) {
           try {

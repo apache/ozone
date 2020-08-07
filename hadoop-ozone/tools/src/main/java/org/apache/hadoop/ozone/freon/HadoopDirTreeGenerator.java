@@ -97,17 +97,24 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
 
   @Override
   public Void call() throws Exception {
+    String s;
+    if (depth <= 0) {
+      s = "Invalid depth value, depth value should be greater than zero!";
+      print(s);
+    } else if (span <= 0) {
+      s = "Invalid span value, span value should be greater than zero!";
+      print(s);
+    } else {
+      init();
+      OzoneConfiguration configuration = createOzoneConfiguration();
+      fileSystem = FileSystem.get(URI.create(rootPath), configuration);
 
-    init();
-    OzoneConfiguration configuration = createOzoneConfiguration();
-    fileSystem = FileSystem.get(URI.create(rootPath), configuration);
+      contentGenerator = new ContentGenerator(fileSizeInBytes, bufferSize);
+      timer = getMetrics().timer("file-create");
 
-    contentGenerator = new ContentGenerator(fileSizeInBytes, bufferSize);
-    timer = getMetrics().timer("file-create");
-
-    runTests(this::createDir);
+      runTests(this::createDir);
+    }
     return null;
-
   }
 
   /*
@@ -139,21 +146,14 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
      created.
    */
   private void createDir(long counter) throws Exception {
-    if (depth <= 0) {
-      LOG.info("Invalid depth value, at least one depth should be passed!");
-      return;
-    }
-    if (span <= 0) {
-      LOG.info("Invalid span value, at least one span should be passed!");
-      return;
-    }
     String dir = makeDirWithGivenNumberOfFiles(rootPath);
     if (depth > 1) {
       createSubDirRecursively(dir, 1, 1);
     }
-    System.out.println("Successfully created directories & files. Total Dirs " +
+    String message = "Successfully created directories & files. Total Dirs " +
             "Count=" + totalDirsCnt.get() + ", Total Files Count=" +
-            timer.getCount());
+            timer.getCount();
+    print(message);
   }
 
   private void createSubDirRecursively(String parent, int depthIndex,
