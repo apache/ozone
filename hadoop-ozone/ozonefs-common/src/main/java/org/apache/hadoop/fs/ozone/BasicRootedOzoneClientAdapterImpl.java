@@ -285,7 +285,7 @@ public class BasicRootedOzoneClientAdapterImpl
 
   @Override
   public InputStream readFile(String pathStr) throws IOException {
-    incrementCounter(Statistic.OBJECTS_READ);
+    incrementCounter(Statistic.OBJECTS_READ, 1);
     OFSPath ofsPath = new OFSPath(pathStr);
     String key = ofsPath.getKeyName();
     try {
@@ -302,14 +302,14 @@ public class BasicRootedOzoneClientAdapterImpl
     }
   }
 
-  protected void incrementCounter(Statistic objectsRead) {
+  protected void incrementCounter(Statistic objectsRead, long count) {
     //noop: Use OzoneClientAdapterImpl which supports statistics.
   }
 
   @Override
   public OzoneFSOutputStream createFile(String pathStr, short replication,
       boolean overWrite, boolean recursive) throws IOException {
-    incrementCounter(Statistic.OBJECTS_CREATED);
+    incrementCounter(Statistic.OBJECTS_CREATED, 1);
     OFSPath ofsPath = new OFSPath(pathStr);
     if (ofsPath.isRoot() || ofsPath.isVolume() || ofsPath.isBucket()) {
       throw new IOException("Cannot create file under root or volume.");
@@ -359,7 +359,7 @@ public class BasicRootedOzoneClientAdapterImpl
    */
   @Override
   public void rename(String path, String newPath) throws IOException {
-    incrementCounter(Statistic.OBJECTS_RENAMED);
+    incrementCounter(Statistic.OBJECTS_RENAMED, 1);
     OFSPath ofsPath = new OFSPath(path);
     OFSPath ofsNewPath = new OFSPath(newPath);
 
@@ -385,7 +385,7 @@ public class BasicRootedOzoneClientAdapterImpl
    */
   void rename(OzoneBucket bucket, String path, String newPath)
       throws IOException {
-    incrementCounter(Statistic.OBJECTS_RENAMED);
+    incrementCounter(Statistic.OBJECTS_RENAMED, 1);
     OFSPath ofsPath = new OFSPath(path);
     OFSPath ofsNewPath = new OFSPath(newPath);
     // No same-bucket policy check here since this call path is controlled
@@ -403,7 +403,7 @@ public class BasicRootedOzoneClientAdapterImpl
   @Override
   public boolean createDirectory(String pathStr) throws IOException {
     LOG.trace("creating dir for path: {}", pathStr);
-    incrementCounter(Statistic.OBJECTS_CREATED);
+    incrementCounter(Statistic.OBJECTS_CREATED, 1);
     OFSPath ofsPath = new OFSPath(pathStr);
     if (ofsPath.getVolumeName().isEmpty()) {
       // Volume name unspecified, invalid param, return failure
@@ -442,7 +442,7 @@ public class BasicRootedOzoneClientAdapterImpl
   @Override
   public boolean deleteObject(String path) {
     LOG.trace("issuing delete for path to key: {}", path);
-    incrementCounter(Statistic.OBJECTS_DELETED);
+    incrementCounter(Statistic.OBJECTS_DELETED, 1);
     OFSPath ofsPath = new OFSPath(path);
     String keyName = ofsPath.getKeyName();
     if (keyName.length() == 0) {
@@ -523,7 +523,7 @@ public class BasicRootedOzoneClientAdapterImpl
         .map(p -> new OFSPath(p).getKeyName())
         .collect(Collectors.toList());
     try {
-      incrementCounter(Statistic.OBJECTS_DELETED);
+      incrementCounter(Statistic.OBJECTS_DELETED, keyNameList.size());
       bucket.deleteKeys(keyList);
       return true;
     } catch (IOException ioe) {
@@ -534,7 +534,7 @@ public class BasicRootedOzoneClientAdapterImpl
 
   public FileStatusAdapter getFileStatus(String path, URI uri,
       Path qualifiedPath, String userName) throws IOException {
-    incrementCounter(Statistic.OBJECTS_QUERY);
+    incrementCounter(Statistic.OBJECTS_QUERY, 1);
     OFSPath ofsPath = new OFSPath(path);
     String key = ofsPath.getKeyName();
     if (ofsPath.isRoot()) {
@@ -618,7 +618,7 @@ public class BasicRootedOzoneClientAdapterImpl
 
   @Override
   public Iterator<BasicKeyInfo> listKeys(String pathStr) {
-    incrementCounter(Statistic.OBJECTS_LIST);
+    incrementCounter(Statistic.OBJECTS_LIST, 1);
     OFSPath ofsPath = new OFSPath(pathStr);
     String key = ofsPath.getKeyName();
     OzoneBucket bucket;
@@ -707,7 +707,7 @@ public class BasicRootedOzoneClientAdapterImpl
       String startPath, long numEntries, URI uri,
       Path workingDir, String username) throws IOException {
 
-    incrementCounter(Statistic.OBJECTS_LIST);
+    incrementCounter(Statistic.OBJECTS_LIST, 1);
     // Remove authority from startPath if it exists
     if (startPath.startsWith(uri.toString())) {
       try {

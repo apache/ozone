@@ -87,6 +87,13 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
   }
 
   @Override
+  protected void incrementCounter(Statistic statistic, long count) {
+    if (storageStatistics != null) {
+      storageStatistics.incrementCounter(statistic, count);
+    }
+  }
+
+  @Override
   protected OzoneClientAdapter createAdapter(ConfigurationSource conf,
       String omHost, int omPort) throws IOException {
     return new RootedOzoneClientAdapterImpl(omHost, omPort, conf,

@@ -88,6 +88,13 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
   }
 
   @Override
+  protected void incrementCounter(Statistic statistic, long count) {
+    if (storageStatistics != null) {
+      storageStatistics.incrementCounter(statistic, count);
+    }
+  }
+
+  @Override
   protected OzoneClientAdapter createAdapter(ConfigurationSource conf,
       String bucketStr, String volumeStr, String omHost, int omPort)
       throws IOException {
