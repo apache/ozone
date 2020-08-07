@@ -302,6 +302,11 @@ public class BasicRootedOzoneClientAdapterImpl
     }
   }
 
+  @Deprecated
+  protected void incrementCounter(Statistic objectsRead) {
+    //noop: Use OzoneClientAdapterImpl which supports statistics.
+  }
+
   protected void incrementCounter(Statistic objectsRead, long count) {
     //noop: Use OzoneClientAdapterImpl which supports statistics.
   }
