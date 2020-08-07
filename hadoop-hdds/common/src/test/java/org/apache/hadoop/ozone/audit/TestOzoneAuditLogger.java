@@ -149,24 +149,22 @@ public class TestOzoneAuditLogger {
 
   @Test
   public void messageIncludesMultilineException() throws IOException {
-    try{
-      throw new TestException("Dummy exception");
-    } catch(TestException testException) {
-      AuditMessage exceptionAuditMessage =
-          new AuditMessage.Builder()
-              .setUser(USER)
-              .atIp(IP_ADDRESS)
-              .forOperation(DummyAction.CREATE_VOLUME)
-              .withParams(PARAMS)
-              .withResult(FAILURE)
-              .withException(testException).build();
-      AUDIT.logWriteFailure(exceptionAuditMessage);
-      verifyLog("TestException",
-            "org.apache.hadoop.ozone.audit."
-                + "TestOzoneAuditLogger."
-                + "messageIncludesMultilineException",
-            "Dummy exception");
-    }
+    String exceptionMessage = "Dummuy exception message";
+    TestException testException = new TestException(exceptionMessage);
+    AuditMessage exceptionAuditMessage =
+        new AuditMessage.Builder()
+            .setUser(USER)
+            .atIp(IP_ADDRESS)
+            .forOperation(DummyAction.CREATE_VOLUME)
+            .withParams(PARAMS)
+            .withResult(FAILURE)
+            .withException(testException).build();
+    AUDIT.logWriteFailure(exceptionAuditMessage);
+    verifyLog(exceptionMessage,
+          "org.apache.hadoop.ozone.audit."
+              + "TestOzoneAuditLogger."
+              + "messageIncludesMultilineException");
+
   }
 
   private void verifyLog(String... expectedStrings) throws IOException {
