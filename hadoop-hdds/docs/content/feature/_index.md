@@ -1,9 +1,8 @@
 ---
-title: GDPR
-name: GDPR
-identifier: gdpr
+title: Features
+name: Features
 menu: main
-weight: 5
+weight: 4
 ---
 <!---
     Licensed to the Apache Software Foundation (ASF) under one or more
@@ -27,10 +26,7 @@ weight: 5
           Ozone supports GDPR's Right to Erasure(Right to be Forgotten).
 {{</jumbotron>}}
 
-<div class="alert alert-warning" role="alert">
-If you would like to understand Ozone's GDPR framework at a greater
-depth, please take a look at <a href="https://issues.apache.org/jira/secure/attachment/12978992/Ozone%20GDPR%20Framework.pdf">Ozone GDPR Framework.</a>
-</div>
+
 
 Once you create a GDPR compliant bucket, any key created in that bucket will 
 automatically be GDPR compliant.
