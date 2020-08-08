@@ -61,7 +61,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.Iterator;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
 
@@ -380,11 +379,13 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateDirectory)
         .setClientId(UUID.randomUUID().toString()).build();
 
-    OmMetadataManagerImpl omMetadataManager = new OmMetadataManagerImpl(getConf());
+    OmMetadataManagerImpl omMetadataManager =
+        new OmMetadataManagerImpl(getConf());
     OzoneManagerRatisSnapshot ozoneManagerRatisSnapshot = index -> {
       index.get(index.size() - 1);
     };
-    OzoneManagerDoubleBuffer doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+    OzoneManagerDoubleBuffer doubleBuffer =
+        new OzoneManagerDoubleBuffer.Builder()
         .setOmMetadataManager(omMetadataManager)
         .enableRatis(false)
         .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
@@ -408,7 +409,8 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     request = omClientRequest.preExecute(ozoneManager);
 
     OMClientResponse response = handler.handleWriteRequest(request, 0);
-    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
   }
 
   private void validateVolumesList(String userName,
