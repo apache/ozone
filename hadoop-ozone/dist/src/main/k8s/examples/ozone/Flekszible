@@ -31,7 +31,7 @@ import:
     destination: pv-test
   - path: ozone-csi
     destination: csi
-  - path: pv-test
+  - path: test-webserver
     destination: pv-test
 transformations:
   - type: Namespace

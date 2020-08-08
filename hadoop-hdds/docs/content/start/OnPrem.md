@@ -165,7 +165,7 @@ ozone om --init
 start-ozone.sh
 {{< /highlight >}}
 
-This assumes that you have set up the slaves file correctly and ssh
+This assumes that you have set up the `workers` file correctly and ssh
 configuration that allows ssh-ing to all data nodes. This is the same as the
 HDFS configuration, so please refer to HDFS documentation on how to set this
 up.
