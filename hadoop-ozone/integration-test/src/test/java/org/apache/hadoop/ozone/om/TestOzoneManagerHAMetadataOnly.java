@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import java.util.UUID;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdfs.LogVerificationAppender;
@@ -30,7 +31,18 @@ import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisSnapshot;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateDirectoryRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
+import org.apache.hadoop.ozone.protocolPB.RequestHandler;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.log4j.Logger;
 import org.junit.Assert;
@@ -49,10 +61,13 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.Iterator;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
 
 import static org.apache.ratis.server.metrics.RaftLogMetrics.RATIS_APPLICATION_NAME_METRICS;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /**
@@ -116,10 +131,10 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
 
     OzoneBucket ozoneBucket = retVolume.getBucket(bucketName);
 
-    Assert.assertEquals(volumeName, ozoneBucket.getVolumeName());
-    Assert.assertEquals(bucketName, ozoneBucket.getName());
+    assertEquals(volumeName, ozoneBucket.getVolumeName());
+    assertEquals(bucketName, ozoneBucket.getName());
     Assert.assertTrue(ozoneBucket.getVersioning());
-    Assert.assertEquals(StorageType.DISK, ozoneBucket.getStorageType());
+    assertEquals(StorageType.DISK, ozoneBucket.getStorageType());
     Assert.assertFalse(ozoneBucket.getCreationTime().isAfter(Instant.now()));
 
 
@@ -150,7 +165,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     List<OMProxyInfo> omProxies =
         omFailoverProxyProvider.getOMProxyInfos();
 
-    Assert.assertEquals(getNumOfOMs(), omProxies.size());
+    assertEquals(getNumOfOMs(), omProxies.size());
 
     for (int i = 0; i < getNumOfOMs(); i++) {
       InetSocketAddress omRpcServerAddr =
@@ -236,7 +251,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
 
     // The old and new Leader OM NodeId must match since there was no new
     // election in the Ratis ring.
-    Assert.assertEquals(leaderOMNodeId, newLeaderOMNodeId);
+    assertEquals(leaderOMNodeId, newLeaderOMNodeId);
   }
 
   @Test
@@ -257,11 +272,11 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
       // the RpcClient should give up.
       fail("TestOMRetryProxy should fail when there are no OMs running");
     } catch (ConnectException e) {
-      Assert.assertEquals(1,
+      assertEquals(1,
           appender.countLinesWithMessage("Failed to connect to OMs:"));
-      Assert.assertEquals(maxFailoverAttempts,
+      assertEquals(maxFailoverAttempts,
           appender.countLinesWithMessage("Trying to failover"));
-      Assert.assertEquals(1,
+      assertEquals(1,
           appender.countLinesWithMessage("Attempted " +
               maxFailoverAttempts + " failovers."));
     }
@@ -297,9 +312,9 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
       // A read request should result in the proxyProvider failing over to
       // leader node.
       OzoneVolume volume = store.getVolume(volumeName);
-      Assert.assertEquals(volumeName, volume.getName());
+      assertEquals(volumeName, volume.getName());
 
-      Assert.assertEquals(currentLeaderNodeId,
+      assertEquals(currentLeaderNodeId,
           proxyProvider.getCurrentProxyOMNodeId());
     }
   }
@@ -348,6 +363,54 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     Assert.assertTrue((long) flushCount >= 0);
   }
 
+  @Test
+  public void testOMCreateDirectory() throws Exception {
+    ObjectStore objectStore = getCluster().getRpcClient().getObjectStore();
+    String volumeName = "vol";
+    String bucketName = "buk";
+    String keyName = "test_dir";
+
+    objectStore.createVolume(volumeName);
+    objectStore.getVolume(volumeName).createBucket(bucketName);
+
+    OMRequest request = OMRequest.newBuilder().setCreateDirectoryRequest(
+        CreateDirectoryRequest.newBuilder().setKeyArgs(
+            KeyArgs.newBuilder().setVolumeName(volumeName)
+                .setBucketName(bucketName).setKeyName(keyName)))
+        .setCmdType(OzoneManagerProtocolProtos.Type.CreateDirectory)
+        .setClientId(UUID.randomUUID().toString()).build();
+
+    OmMetadataManagerImpl omMetadataManager = new OmMetadataManagerImpl(getConf());
+    OzoneManagerRatisSnapshot ozoneManagerRatisSnapshot = index -> {
+      index.get(index.size() - 1);
+    };
+    OzoneManagerDoubleBuffer doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+        .setOmMetadataManager(omMetadataManager)
+        .enableRatis(false)
+        .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
+        .build();
+
+    OzoneManager ozoneManager = null;
+    for (int i = 0; i < getNumOfOMs(); i++) {
+      ozoneManager = getCluster().getOzoneManager(i);
+      if (ozoneManager.isLeader()) {
+        break;
+      }
+    }
+
+    assertTrue(ozoneManager != null);
+    assertTrue(ozoneManager.isLeader());
+
+    RequestHandler handler =
+        new OzoneManagerRequestHandler(ozoneManager, doubleBuffer);
+    OMClientRequest omClientRequest =
+        OzoneManagerRatisUtils.createClientRequest(request);
+    request = omClientRequest.preExecute(ozoneManager);
+
+    OMClientResponse response = handler.handleWriteRequest(request, 0);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+  }
+
   private void validateVolumesList(String userName,
       Set<String> expectedVolumes) throws Exception {
     ObjectStore objectStore = getObjectStore();
@@ -362,6 +425,6 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
       expectedCount++;
     }
 
-    Assert.assertEquals(expectedVolumes.size(),  expectedCount);
+    assertEquals(expectedVolumes.size(),  expectedCount);
   }
 }
