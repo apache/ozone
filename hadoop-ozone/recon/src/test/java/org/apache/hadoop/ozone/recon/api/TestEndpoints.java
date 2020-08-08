@@ -59,7 +59,7 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
-import org.apache.hadoop.ozone.recon.tasks.ObjectCountTask;
+import org.apache.hadoop.ozone.recon.tasks.TableCountTask;
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.StatsSchemaDefinition;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
@@ -103,7 +103,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private UtilizationEndpoint utilizationEndpoint;
   private ReconOMMetadataManager reconOMMetadataManager;
   private FileSizeCountTask fileSizeCountTask;
-  private ObjectCountTask objectCountTask;
+  private TableCountTask tableCountTask;
   private ReconStorageContainerManagerFacade reconScm;
   private StatsSchemaDefinition statsSchemaDefinition;
   private boolean isSetupDone = false;
@@ -185,7 +185,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         fileCountBySizeDao, utilizationSchemaDefinition);
     fileSizeCountTask =
         new FileSizeCountTask(fileCountBySizeDao, utilizationSchemaDefinition);
-    objectCountTask = new ObjectCountTask(globalStatsDao, sqlConfiguration);
+    tableCountTask = new TableCountTask(
+        globalStatsDao, sqlConfiguration, reconOMMetadataManager);
     reconScm = (ReconStorageContainerManagerFacade)
         reconTestInjector.getInstance(OzoneStorageContainerManager.class);
     clusterStateEndpoint =
@@ -445,9 +446,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       return (clusterStateResponse1.getContainers() == 1);
     });
 
-    // check volume, bucket and key count after running objectcount task
+    // check volume, bucket and key count after running table count task
     Pair<String, Boolean> result =
-        objectCountTask.reprocess(reconOMMetadataManager);
+        tableCountTask.reprocess(reconOMMetadataManager);
     assertTrue(result.getRight());
     response = clusterStateEndpoint.getClusterState();
     clusterStateResponse = (ClusterStateResponse) response.getEntity();

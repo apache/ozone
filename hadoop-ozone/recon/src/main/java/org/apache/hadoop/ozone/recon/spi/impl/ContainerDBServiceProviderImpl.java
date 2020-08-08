@@ -38,6 +38,7 @@ import javax.inject.Singleton;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
@@ -385,20 +386,8 @@ public class ContainerDBServiceProviderImpl
    */
   @Override
   public void storeContainerCount(Long count) {
-    // Get the current timestamp
-    Timestamp now =
-        using(sqlConfiguration).fetchValue(select(currentTimestamp()));
-    GlobalStats containerCountRecord =
-        globalStatsDao.fetchOneByKey(CONTAINER_COUNT_KEY);
-    GlobalStats globalStatsRecord =
-        new GlobalStats(CONTAINER_COUNT_KEY, count, now);
-
-    // Insert a new record for CONTAINER_COUNT_KEY if it does not exist
-    if (containerCountRecord == null) {
-      globalStatsDao.insert(globalStatsRecord);
-    } else {
-      globalStatsDao.update(globalStatsRecord);
-    }
+    ReconUtils.upsertGlobalStatsTable(sqlConfiguration, globalStatsDao,
+        CONTAINER_COUNT_KEY, count);
   }
 
   /**
