@@ -38,15 +38,23 @@ public class ContentGenerator {
    */
   private int bufferSize;
 
+  /**
+   * Number of bytes to write in one call. Should be less than the bufferSize.
+   */
+  private final int copyBufferSize;
+
   private final byte[] buffer;
 
   ContentGenerator(long keySize, int bufferSize) {
+    this(keySize, bufferSize, bufferSize);
+  }
+
+  ContentGenerator(long keySize, int bufferSize, int copyBufferSize) {
     this.keySize = keySize;
     this.bufferSize = bufferSize;
-
+    this.copyBufferSize = copyBufferSize;
     buffer = RandomStringUtils.randomAscii(bufferSize)
         .getBytes(StandardCharsets.UTF_8);
-
   }
 
   /**
@@ -56,7 +64,20 @@ public class ContentGenerator {
     for (long nrRemaining = keySize;
          nrRemaining > 0; nrRemaining -= bufferSize) {
       int curSize = (int) Math.min(bufferSize, nrRemaining);
-      outputStream.write(buffer, 0, curSize);
+      if (copyBufferSize == 1) {
+        for (int i = 0; i < curSize; i++) {
+          outputStream.write(buffer[i]);
+        }
+      } else {
+        for (int i = 0; i < nrRemaining; i += copyBufferSize) {
+          outputStream.write(buffer, i,
+              Math.min(copyBufferSize, (int) (nrRemaining - i)));
+        }
+      }
     }
+  }
+
+  public byte[] getBuffer() {
+    return buffer;
   }
 }
