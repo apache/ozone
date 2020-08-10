@@ -80,30 +80,31 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
     OzoneConfiguration ozoneConf = createOzoneConfiguration();
     if (OzoneSecurityUtil.isSecurityEnabled(ozoneConf)) {
       throw new IllegalArgumentException(
-              "Datanode chunk generator is not supported in secure environment");
+              "Datanode chunk validator is not supported in secure environment"
+      );
     }
 
     try (StorageContainerLocationProtocol scmLocationClient =
                  createStorageContainerLocationClient(ozoneConf)) {
-    List<Pipeline> pipelines = scmLocationClient.listPipelines();
-    Pipeline pipeline;
-    if (pipelineId != null && pipelineId.length() > 0) {
-      pipeline = pipelines.stream()
+      List<Pipeline> pipelines = scmLocationClient.listPipelines();
+      Pipeline pipeline;
+      if (pipelineId != null && pipelineId.length() > 0) {
+        pipeline = pipelines.stream()
               .filter(p -> p.getId().toString().equals(pipelineId))
               .findFirst()
               .orElseThrow(() -> new IllegalArgumentException(
                       "Pipeline ID is defined, but there is no such pipeline: "
                               + pipelineId));
 
-    } else {
-      pipeline = pipelines.stream()
+      } else {
+        pipeline = pipelines.stream()
               .filter(p -> p.getFactor() == HddsProtos.ReplicationFactor.THREE)
               .findFirst()
               .orElseThrow(() -> new IllegalArgumentException(
                       "Pipeline ID is NOT defined, and no pipeline " +
                               "has been found with factor=THREE"));
-      LOG.info("Using pipeline {}", pipeline.getId());
-    }
+        LOG.info("Using pipeline {}", pipeline.getId());
+      }
 
       try (XceiverClientManager xceiverClientManager =
                    new XceiverClientManager(ozoneConf)) {
@@ -125,11 +126,13 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
   }
 
   /**
-   * Read a reference chunk using same name than one from the @code{org.apache.hadoop.ozone.freon.DatanodeChunkGenerator}
+   * Read a reference chunk using same name than one from the
+   * {@link org.apache.hadoop.ozone.freon.DatanodeChunkGenerator}.
    * @throws IOException
    */
   private void readReference() throws IOException {
-    ContainerProtos.DatanodeBlockID blockId = ContainerProtos.DatanodeBlockID.newBuilder()
+    ContainerProtos.DatanodeBlockID blockId =
+        ContainerProtos.DatanodeBlockID.newBuilder()
             .setContainerID(1L)
             .setLocalID(0 % 20)
             .setBlockCommitSequenceId(0)
@@ -147,7 +150,8 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
                             .build())
             .build();
 
-    ContainerProtos.ReadChunkRequestProto.Builder readChunkRequest = ContainerProtos.ReadChunkRequestProto
+    ContainerProtos.ReadChunkRequestProto.Builder readChunkRequest =
+        ContainerProtos.ReadChunkRequestProto
             .newBuilder()
             .setBlockID(blockId)
             .setChunkData(chunkInfo);
@@ -163,16 +167,20 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
                     .setReadChunk(readChunkRequest);
 
     ContainerProtos.ContainerCommandRequestProto request = builder.build();
-    ContainerProtos.ContainerCommandResponseProto response = xceiverClientSpi.sendCommand(request);
+    ContainerProtos.ContainerCommandResponseProto response =
+        xceiverClientSpi.sendCommand(request);
 
     checksum = new Checksum(ContainerProtos.ChecksumType.CRC32, chunkSize);
-    checksumReference = checksum.computeChecksum(response.getReadChunk().getData().toByteArray());
+    checksumReference = checksum.computeChecksum(
+        response.getReadChunk().getData().toByteArray()
+    );
 
   }
 
 
   private void validateChunk(long stepNo) throws Exception {
-    ContainerProtos.DatanodeBlockID blockId = ContainerProtos.DatanodeBlockID.newBuilder()
+    ContainerProtos.DatanodeBlockID blockId =
+        ContainerProtos.DatanodeBlockID.newBuilder()
             .setContainerID(1L)
             .setLocalID(stepNo % 20)
             .setBlockCommitSequenceId(stepNo)
@@ -189,7 +197,8 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
             .setLen(chunkSize)
             .build();
 
-    ContainerProtos.ReadChunkRequestProto.Builder readChunkRequest = ContainerProtos.ReadChunkRequestProto
+    ContainerProtos.ReadChunkRequestProto.Builder readChunkRequest =
+        ContainerProtos.ReadChunkRequestProto
             .newBuilder()
             .setBlockID(blockId)
             .setChunkData(chunkInfo);
@@ -206,20 +215,27 @@ public class DatanodeChunkValidator extends BaseFreonGenerator
 
     ContainerProtos.ContainerCommandRequestProto request = builder.build();
 
-    timer.time(() -> { try {
-      ContainerProtos.ContainerCommandResponseProto response = xceiverClientSpi.sendCommand(request);
+    timer.time(() -> {
+      try {
+        ContainerProtos.ContainerCommandResponseProto response =
+            xceiverClientSpi.sendCommand(request);
 
-      ChecksumData checksumOfChunk = checksum.computeChecksum(response.getReadChunk().getData().toByteArray());
+        ChecksumData checksumOfChunk =
+            checksum.computeChecksum(
+                response.getReadChunk().getData().toByteArray()
+            );
 
-      if (!checksumReference.equals(checksumOfChunk)) {
-        throw new IllegalStateException(
-                "Reference (=first) message checksum doesn't match with checksum of chunk "
-                        + response.getReadChunk().getChunkData().getChunkName());
+        if (!checksumReference.equals(checksumOfChunk)) {
+          throw new IllegalStateException(
+              "Reference (=first) message checksum doesn't match " +
+                  "with checksum of chunk "
+                        + response.getReadChunk()
+                  .getChunkData().getChunkName());
+        }
+      } catch (IOException e) {
+        LOG.warn("Could not read chunk due to IOException: ", e);
       }
-    } catch (IOException e) {
-      LOG.warn("Could not read chunk due to IOException: ", e);
-    }
-      });
+    });
 
   }
 
