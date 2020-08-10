@@ -468,17 +468,15 @@ public class BasicRootedOzoneClientAdapterImpl
    * and same bucket.
    */
   private boolean areInSameBucket(List<String> keyNameList) {
-    if (keyNameList.size() == 0) {
+    if (keyNameList.isEmpty()) {
       return true;
     }
     String firstKeyPath = keyNameList.get(0);
     final String volAndBucket = new OFSPath(firstKeyPath).getNonKeyPath();
-    // If any key path's volume and bucket from the second element and on
-    // in the list doesn't match the first element's, hasDifferentVolAndBucket
-    // would be true
-    boolean hasDifferentVolAndBucket = keyNameList.stream().skip(1)
-        .anyMatch(p -> !(new OFSPath(p).getNonKeyPath().equals(volAndBucket)));
-    return !hasDifferentVolAndBucket;
+    // return true only if all key paths' volume and bucket in the list match
+    // the first element's
+    return keyNameList.stream().skip(1).allMatch(p ->
+        new OFSPath(p).getNonKeyPath().equals(volAndBucket));
   }
 
   /**
