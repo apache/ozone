@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
-import org.apache.hadoop.test.InMemoryConfiguration;
+import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import org.junit.Assert;

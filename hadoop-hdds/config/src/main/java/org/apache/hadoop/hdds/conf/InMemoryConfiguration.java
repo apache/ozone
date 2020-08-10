@@ -15,14 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.test;
+package org.apache.hadoop.hdds.conf;
 
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-
-import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 
 /**
  * In memory, mutable configuration source for testing.
