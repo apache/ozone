@@ -151,4 +151,4 @@ ozone om --init
 start-ozone.sh
 {{< /highlight >}}
 
-这么做的前提是，slaves 文件已经正确编写，并且配置好了到各个 Datanode 的 ssh，这和 HDFS 的配置方式相同，具体方法请查看 HDFS 文档。
+这么做的前提是，`workers` 文件已经正确编写，并且配置好了到各个 Datanode 的 ssh，这和 HDFS 的配置方式相同，具体方法请查看 HDFS 文档。

@@ -213,4 +213,6 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @return cluster map
    */
   NetworkTopology getClusterNetworkTopologyMap();
+
+  int getNumHealthyVolumes(List <DatanodeDetails> dnList);
 }

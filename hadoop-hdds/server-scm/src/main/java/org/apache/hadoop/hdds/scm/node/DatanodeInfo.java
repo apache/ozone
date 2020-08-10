@@ -109,6 +109,28 @@ public class DatanodeInfo extends DatanodeDetails {
   }
 
   /**
+   * Returns count of healthy volumes reported from datanode.
+   * @return count of healthy volumes
+   */
+  public int getHealthyVolumeCount() {
+    try {
+      lock.readLock().lock();
+      return storageReports.size() - getFailedVolumeCount();
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+  /**
+   * Returns count of failed volumes reported from datanode.
+   * @return count of failed volumes
+   */
+  private int getFailedVolumeCount() {
+    return (int) storageReports.stream().
+            filter(e -> e.hasFailed() ? e.getFailed() : false).count();
+  }
+
+  /**
    * Returns the last updated time of datanode info.
    * @return the last updated time of datanode info.
    */

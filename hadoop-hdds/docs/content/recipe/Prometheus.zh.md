@@ -85,9 +85,10 @@ http://localhost:9090/graph?g0.range_input=1h&g0.expr=om_metrics_num_key_allocat
 
 ## 注意事项
 
-Ozone 发行包中包含了一个即开即用的容器化环境来试用 Ozone 和 Prometheus，在 `compose/ozoneperf` 目录下。
+Ozone 发行包中包含了一个即开即用的容器化环境来试用 Ozone 和 Prometheus，在 `compose/ozone` 目录下。
 
 ```bash
-cd compose/ozoneperf
+cd compose/ozone
+export COMPOSE_FILE=docker-compose.yaml:monitoring.yaml
 docker-compose up -d
 ```

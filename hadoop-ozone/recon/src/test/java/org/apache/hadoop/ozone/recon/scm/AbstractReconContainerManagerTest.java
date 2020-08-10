@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.recon.scm;
 import java.io.IOException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -33,6 +34,7 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 
@@ -40,6 +42,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OP
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
+import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CONTAINERS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import org.junit.After;
@@ -69,17 +72,17 @@ public class AbstractReconContainerManagerTest {
     conf.set(OZONE_METADATA_DIRS,
         temporaryFolder.newFolder().getAbsolutePath());
     conf.set(OZONE_SCM_NAMES, "localhost");
-    store = DBStoreBuilder.createDBStore(conf, new ReconDBDefinition());
+    store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
     scmStorageConfig = new ReconStorageConfig(conf);
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
     NodeManager nodeManager =
         new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
     pipelineManager = new ReconPipelineManager(conf, nodeManager,
-        ReconDBDefinition.PIPELINES.getTable(store), eventQueue);
+        ReconSCMDBDefinition.PIPELINES.getTable(store), eventQueue);
     containerManager = new ReconContainerManager(
         conf,
-        ReconDBDefinition.CONTAINERS.getTable(store),
+        ReconSCMDBDefinition.CONTAINERS.getTable(store),
         store,
         pipelineManager,
         getScmServiceProvider(),
@@ -128,5 +131,47 @@ public class AbstractReconContainerManagerTest {
     when(scmServiceProviderMock.getContainerWithPipeline(100L))
         .thenReturn(containerWithPipeline);
     return scmServiceProviderMock;
+  }
+
+  protected Table<ContainerID, ContainerInfo> getContainerTable()
+      throws IOException {
+    return CONTAINERS.getTable(store);
+  }
+
+  protected ContainerWithPipeline getTestContainer(LifeCycleState state)
+      throws IOException {
+    ContainerID containerID = new ContainerID(100L);
+    Pipeline pipeline = getRandomPipeline();
+    pipelineManager.addPipeline(pipeline);
+    ContainerInfo containerInfo =
+        new ContainerInfo.Builder()
+            .setContainerID(containerID.getId())
+            .setNumberOfKeys(10)
+            .setPipelineID(pipeline.getId())
+            .setReplicationFactor(ONE)
+            .setOwner("test")
+            .setState(state)
+            .setReplicationType(STAND_ALONE)
+            .build();
+    return new ContainerWithPipeline(containerInfo, pipeline);
+  }
+
+  protected ContainerWithPipeline getTestContainer(long id,
+                                                   LifeCycleState state)
+      throws IOException {
+    ContainerID containerID = new ContainerID(id);
+    Pipeline pipeline = getRandomPipeline();
+    pipelineManager.addPipeline(pipeline);
+    ContainerInfo containerInfo =
+        new ContainerInfo.Builder()
+            .setContainerID(containerID.getId())
+            .setNumberOfKeys(10)
+            .setPipelineID(pipeline.getId())
+            .setReplicationFactor(ONE)
+            .setOwner("test")
+            .setState(state)
+            .setReplicationType(STAND_ALONE)
+            .build();
+    return new ContainerWithPipeline(containerInfo, pipeline);
   }
 }

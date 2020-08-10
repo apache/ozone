@@ -23,7 +23,7 @@ jobs:
     name: compile
     runs-on: ubuntu-18.04
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@v2
       - uses: actions/cache@v2
         with:
           path: |
@@ -35,18 +35,38 @@ jobs:
       - uses: ./.github/buildenv
         with:
           args: ./hadoop-ozone/dev-support/checks/build.sh
+  bats:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: install bats
+        run: |
+          cd /tmp
+          curl -LSs https://github.com/bats-core/bats-core/archive/v1.2.1.tar.gz | tar xzf -
+          cd bats-core-1.2.1
+          sudo ./install.sh /usr/local
+      - name: run tests
+        run: ./hadoop-ozone/dev-support/checks/${{ github.job }}.sh
+      - name: Summary of failures
+        run: cat target/${{ github.job }}/summary.txt
+        if: always()
+      - uses: actions/upload-artifact@master
+        if: always()
+        with:
+          name: ${{ github.job }}
+          path: target/${{ github.job }}
   rat:
     name: rat
     runs-on: ubuntu-18.04
     steps:
-        - uses: actions/checkout@master
+        - uses: actions/checkout@v2
         - uses: ./.github/buildenv
           with:
              args: ./hadoop-ozone/dev-support/checks/rat.sh
         - name: Summary of failures
           run: cat target/${{ github.job }}/summary.txt
           if: always()
-        - uses: actions/upload-artifact@master
+        - uses: actions/upload-artifact@v2
           if: always()
           with:
             name: rat
@@ -56,14 +76,12 @@ jobs:
     name: author
     runs-on: ubuntu-18.04
     steps:
-        - uses: actions/checkout@master
-        - uses: ./.github/buildenv
-          with:
-             args: ./hadoop-ozone/dev-support/checks/author.sh
+        - uses: actions/checkout@v2
+        - run: hadoop-ozone/dev-support/checks/author.sh
         - name: Summary of failures
           run: cat target/${{ github.job }}/summary.txt
           if: always()
-        - uses: actions/upload-artifact@master
+        - uses: actions/upload-artifact@v2
           if: always()
           with:
             name: author
@@ -73,14 +91,14 @@ jobs:
     name: unit
     runs-on: ubuntu-18.04
     steps:
-        - uses: actions/checkout@master
+        - uses: actions/checkout@v2
         - uses: ./.github/buildenv
           with:
              args: ./hadoop-ozone/dev-support/checks/unit.sh
         - name: Summary of failures
           run: cat target/${{ github.job }}/summary.txt
           if: always()
-        - uses: actions/upload-artifact@master
+        - uses: actions/upload-artifact@v2
           if: always()
           with:
             name: unit
@@ -90,14 +108,14 @@ jobs:
     name: checkstyle
     runs-on: ubuntu-18.04
     steps:
-        - uses: actions/checkout@master
+        - uses: actions/checkout@v2
         - uses: ./.github/buildenv
           with:
              args: ./hadoop-ozone/dev-support/checks/checkstyle.sh
         - name: Summary of failures
           run: cat target/${{ github.job }}/summary.txt
           if: always()
-        - uses: actions/upload-artifact@master
+        - uses: actions/upload-artifact@v2
           if: always()
           with:
             name: checkstyle
@@ -107,14 +125,14 @@ jobs:
     name: findbugs
     runs-on: ubuntu-18.04
     steps:
-        - uses: actions/checkout@master
+        - uses: actions/checkout@v2
         - uses: ./.github/buildenv
           with:
              args: ./hadoop-ozone/dev-support/checks/findbugs.sh
         - name: Summary of failures
           run: cat target/${{ github.job }}/summary.txt
           if: always()
-        - uses: actions/upload-artifact@master
+        - uses: actions/upload-artifact@v2
           if: always()
           with:
             name: findbugs
@@ -146,9 +164,13 @@ jobs:
       - name: checkout to /mnt/ozone
         run: |
           sudo chmod 777 /mnt
-          git clone https://github.com/${GITHUB_REPOSITORY}.git /mnt/ozone
+          git clone 'https://github.com/${{ github.repository }}.git' /mnt/ozone
           cd /mnt/ozone
-          git fetch origin "${GITHUB_REF}"
+          if [[ '${{ github.event_name }}' == 'pull_request' ]]; then
+            git fetch --verbose origin '${{ github.ref }}'
+          else
+            git fetch --verbose origin '${{ github.sha }}'
+          fi
           git checkout FETCH_HEAD
           git reset --hard
       - name: run a full build
@@ -164,7 +186,7 @@ jobs:
           OZONE_ACCEPTANCE_SUITE: ${{ matrix.suite }}
           OZONE_WITH_COVERAGE: true
           OZONE_VOLUME_OWNER: 1000
-      - uses: actions/upload-artifact@master
+      - uses: actions/upload-artifact@v2
         if: always()
         with:
           name: acceptance-${{ matrix.suite }}
@@ -187,7 +209,7 @@ jobs:
       fail-fast: false
     steps:
         - run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
-        - uses: actions/checkout@master
+        - uses: actions/checkout@v2
           with:
             path: mnt/ozone
         - uses: ./mnt/ozone/.github/buildenv
@@ -196,7 +218,7 @@ jobs:
         - name: Summary of failures
           run: cat mnt/ozone/target/${{ github.job }}/summary.txt
           if: always()
-        - uses: actions/upload-artifact@master
+        - uses: actions/upload-artifact@v2
           if: always()
           with:
             name: it-${{ matrix.profile }}
@@ -231,8 +253,74 @@ jobs:
            file: ./target/coverage/all.xml
            name: codecov-umbrella
            fail_ci_if_error: true
-       - uses: actions/upload-artifact@master
+       - uses: actions/upload-artifact@v2
          with:
            name: coverage
            path: target/coverage
          continue-on-error: true
+  kubernetes:
+    name: kubernetes
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Cache for maven dependencies
+        uses: actions/cache@v2
+        with:
+          path: ~/.m2/repository
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
+      - name: Cache for npm dependencies
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.pnpm-store
+            **/node_modules
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+      - name: Checkout to /mnt/ozone
+        run: |
+          sudo chmod 777 /mnt
+          git clone 'https://github.com/${{ github.repository }}.git' /mnt/ozone
+          cd /mnt/ozone
+          if [[ '${{ github.event_name }}' == 'pull_request' ]]; then
+            git fetch --verbose origin '${{ github.ref }}'
+          else
+            git fetch --verbose origin '${{ github.sha }}'
+          fi
+          git checkout FETCH_HEAD
+          git reset --hard
+      - name: Install robotframework
+        run: sudo pip install robotframework
+      - name: Install k3s
+        run: curl -sfL https://get.k3s.io | sh -
+      - name: Copy Kubernetes config file
+        run: |
+          sudo mkdir ~/.kube
+          sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+          sudo chown $(id -u) ~/.kube/config
+      - name: Install flekszible
+        run: |
+          cd /tmp
+          wget https://github.com/elek/flekszible/releases/download/v1.8.1/flekszible_1.8.1_Linux_x86_64.tar.gz -O - | tar -zx
+          chmod +x flekszible
+          sudo mv flekszible /usr/bin/flekszible
+      - name: Run a full build
+        run: |
+          cd /mnt/ozone
+          hadoop-ozone/dev-support/checks/build.sh -Pcoverage
+      - name: Execute tests
+        run: |
+          cd /mnt/ozone/hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
+          cd /mnt/ozone && hadoop-ozone/dev-support/checks/kubernetes.sh
+      - name: Archive build results
+        uses: actions/upload-artifact@master
+        if: always()
+        with:
+          name: kubernetes
+          path: /mnt/ozone/target/kubernetes
+        continue-on-error: true
+      - name: Delete temporary build artifacts before caching
+        run: |
+          #Never cache local artifacts
+          rm -rf ~/.m2/repository/org/apache/hadoop/hdds
+          rm -rf ~/.m2/repository/org/apache/hadoop/ozone
+        if: always()

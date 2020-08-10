@@ -21,6 +21,12 @@ summary: Ozone Manager 是 Ozone 主要的命名空间服务，它管理了卷�
   limitations under the License.
 -->
 
+<div class="alert alert-warning">
+
+注意：本页面翻译的信息可能滞后，最新的信息请参看英文版的相关页面。
+
+</div>
+
 Ozone Manager（OM）管理 Ozone 的命名空间。
 
 当向 Ozone 写入数据时，你需要向 OM 请求一个块，OM 会返回一个块并记录下相关信息。当你想要读取那个文件时，你也需要先通过 OM 获取那个块的地址。
