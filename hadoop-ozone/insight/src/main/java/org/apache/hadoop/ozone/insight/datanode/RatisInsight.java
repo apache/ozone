@@ -33,7 +33,7 @@ import static org.apache.hadoop.ozone.insight.datanode.PipelineComponentUtil.get
 import static org.apache.hadoop.ozone.insight.datanode.PipelineComponentUtil.withDatanodesFromPipeline;
 
 /**
- * Insight definition for datanode/pipline metrics.
+ * Insight definition for datanode/pipeline metrics.
  */
 public class RatisInsight extends BaseInsightPoint implements InsightPoint {
 

@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.server.http.PrometheusMetricsSink;
 import org.apache.hadoop.ozone.insight.LoggerSource.Level;
 
-import com.google.protobuf.ProtocolMessageEnum;
+import org.apache.ratis.thirdparty.com.google.protobuf.ProtocolMessageEnum;
 
 /**
  * Default implementation of Insight point logic.

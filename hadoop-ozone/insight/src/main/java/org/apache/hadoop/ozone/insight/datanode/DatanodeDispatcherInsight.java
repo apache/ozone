@@ -24,11 +24,9 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.insight.BaseInsightPoint;
-import org.apache.hadoop.ozone.insight.Component.Type;
 import org.apache.hadoop.ozone.insight.InsightPoint;
 import org.apache.hadoop.ozone.insight.LoggerSource;
 import org.apache.hadoop.ozone.insight.MetricGroupDisplay;
@@ -37,7 +35,7 @@ import static org.apache.hadoop.ozone.insight.datanode.PipelineComponentUtil.get
 import static org.apache.hadoop.ozone.insight.datanode.PipelineComponentUtil.withDatanodesFromPipeline;
 
 /**
- * Insight definition for datanode/pipline metrics.
+ * Insight definition for HddsDispatcher.
  */
 public class DatanodeDispatcherInsight extends BaseInsightPoint
     implements InsightPoint {
@@ -73,17 +71,12 @@ public class DatanodeDispatcherInsight extends BaseInsightPoint
 
   @Override
   public List<MetricGroupDisplay> getMetrics() {
-    List<MetricGroupDisplay> metrics = new ArrayList<>();
-
-    addProtocolMessageMetrics(metrics, "hdds_dispatcher",
-        Type.SCM, ScmBlockLocationProtocolProtos.Type.values());
-
-    return metrics;
+    return new ArrayList<>();
   }
 
   @Override
   public String getDescription() {
-    return "Datanode client protocol";
+    return "Datanode request dispatcher (after Ratis replication)";
   }
 
   @Override
