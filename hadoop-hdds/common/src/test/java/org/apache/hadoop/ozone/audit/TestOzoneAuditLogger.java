@@ -175,7 +175,7 @@ public class TestOzoneAuditLogger {
             + "TestOzoneAuditLogger$TestException: Dummy exception message",
         "at org.apache.hadoop.ozone.audit.TestOzoneAuditLogger"
             + ".messageIncludesMultilineException"
-            + "(TestOzoneAuditLogger.java:160) [test-classes/:?]");
+            + "(TestOzoneAuditLogger.java");
   }
 
   private void verifyLog(String... expectedStrings) throws IOException {
