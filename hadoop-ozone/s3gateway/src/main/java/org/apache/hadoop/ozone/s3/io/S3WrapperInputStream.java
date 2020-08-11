@@ -23,14 +23,12 @@ import org.apache.hadoop.ozone.client.io.KeyInputStream;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 
 /**
  * S3Wrapper Input Stream which encapsulates KeyInputStream from ozone.
  */
 public class S3WrapperInputStream extends FSInputStream {
   private final KeyInputStream inputStream;
-  private static final int DEFAULT_BUFFER_SIZE = 32 * 1024;
 
   /**
    * Constructs S3WrapperInputStream with KeyInputStream.
@@ -75,36 +73,12 @@ public class S3WrapperInputStream extends FSInputStream {
   }
 
   @Override
-  public boolean seekToNewSource(long targetPos) throws IOException {
-    return false;
+  public long skip(long n) throws IOException {
+    return inputStream.skip(n);
   }
 
-  /**
-   * Copies some or all bytes from a large (over 2GB) <code>InputStream</code>
-   * to an <code>OutputStream</code>, optionally skipping input bytes.
-   * <p>
-   * Copy the method from IOUtils of commons-io to reimplement skip by seek
-   * rather than read. The reason why IOUtils of commons-io implement skip
-   * by read can be found at
-   * <a href="https://issues.apache.org/jira/browse/IO-203">IO-203</a>.
-   * </p>
-   * <p>
-   * This method buffers the input internally, so there is no need to use a
-   * <code>BufferedInputStream</code>.
-   * </p>
-   * The buffer size is given by {@link #DEFAULT_BUFFER_SIZE}.
-   *
-   * @param output the <code>OutputStream</code> to write to
-   * @param inputOffset : number of bytes to skip from input before copying
-   * -ve values are ignored
-   * @param length : number of bytes to copy. -ve means all
-   * @return the number of bytes copied
-   * @throws NullPointerException if the input or output is null
-   * @throws IOException          if an I/O error occurs
-   */
-  public long copyLarge(final OutputStream output, final long inputOffset,
-      final long length) throws IOException {
-    return inputStream.copyLarge(output, inputOffset, length,
-        new byte[DEFAULT_BUFFER_SIZE]);
+  @Override
+  public boolean seekToNewSource(long targetPos) throws IOException {
+    return false;
   }
 }
