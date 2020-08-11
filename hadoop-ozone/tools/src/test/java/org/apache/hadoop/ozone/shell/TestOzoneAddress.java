@@ -39,9 +39,9 @@ public class TestOzoneAddress {
   @Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(new Object[][] {
-        {"o3fs://localhost:9878/"},
-        {"o3fs://localhost/"},
-        {"o3fs:///"},
+        {"o3://localhost:9878/"},
+        {"o3://localhost/"},
+        {"o3:///"},
         {"/"},
         {""}
     });
