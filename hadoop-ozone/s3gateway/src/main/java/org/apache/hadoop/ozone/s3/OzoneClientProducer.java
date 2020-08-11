@@ -51,7 +51,7 @@ public class OzoneClientProducer {
   private OzoneClient client;
 
   @Inject
-  private SignatureProcessor v4RequestParser;
+  private SignatureProcessor signatureParser;
 
   @Inject
   private OzoneConfiguration ozoneConfiguration;
@@ -76,7 +76,7 @@ public class OzoneClientProducer {
 
   private OzoneClient getClient(OzoneConfiguration config) throws IOException {
     try {
-      String awsAccessId = v4RequestParser.getAwsAccessId();
+      String awsAccessId = signatureParser.getAwsAccessId();
       UserGroupInformation remoteUser =
           UserGroupInformation.createRemoteUser(awsAccessId);
       if (OzoneSecurityUtil.isSecurityEnabled(config)) {
@@ -85,8 +85,8 @@ public class OzoneClientProducer {
 
           OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
           identifier.setTokenType(S3AUTHINFO);
-          identifier.setStrToSign(v4RequestParser.getStringToSign());
-          identifier.setSignature(v4RequestParser.getSignature());
+          identifier.setStrToSign(signatureParser.getStringToSign());
+          identifier.setSignature(signatureParser.getSignature());
           identifier.setAwsAccessId(awsAccessId);
           identifier.setOwner(new Text(awsAccessId));
           if (LOG.isTraceEnabled()) {

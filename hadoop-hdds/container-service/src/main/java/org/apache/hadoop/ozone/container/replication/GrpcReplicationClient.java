@@ -24,6 +24,7 @@ import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.cert.X509Certificate;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -37,10 +38,13 @@ import org.apache.hadoop.hdds.protocol.datanode.proto
     .IntraDatanodeProtocolServiceGrpc.IntraDatanodeProtocolServiceStub;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
+import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
+import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,13 +62,26 @@ public class GrpcReplicationClient {
 
   private final Path workingDirectory;
 
-  public GrpcReplicationClient(String host,
-      int port, Path workingDir) {
+  public GrpcReplicationClient(String host, int port, Path workingDir,
+      SecurityConfig secConfig, X509Certificate caCert) throws IOException {
+    NettyChannelBuilder channelBuilder =
+        NettyChannelBuilder.forAddress(host, port)
+            .usePlaintext()
+            .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
 
-    channel = NettyChannelBuilder.forAddress(host, port)
-        .usePlaintext()
-        .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
-        .build();
+    if (secConfig.isGrpcTlsEnabled()) {
+      channelBuilder.useTransportSecurity();
+
+      SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
+      if (caCert != null) {
+        sslContextBuilder.trustManager(caCert);
+      }
+      if (secConfig.useTestCert()) {
+        channelBuilder.overrideAuthority("localhost");
+      }
+      channelBuilder.sslContext(sslContextBuilder.build());
+    }
+    channel = channelBuilder.build();
     client = IntraDatanodeProtocolServiceGrpc.newStub(channel);
     workingDirectory = workingDir;
   }

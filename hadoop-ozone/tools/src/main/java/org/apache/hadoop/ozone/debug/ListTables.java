@@ -18,13 +18,16 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import org.rocksdb.Options;
-import org.rocksdb.RocksDB;
-import picocli.CommandLine;
-
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.Callable;
+
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+
+import org.kohsuke.MetaInfServices;
+import org.rocksdb.Options;
+import org.rocksdb.RocksDB;
+import picocli.CommandLine;
 
 /**
  * List all column Families/Tables in db.
@@ -34,7 +37,8 @@ import java.util.concurrent.Callable;
         aliases = "ls",
         description = "list all column families in db."
 )
-public class ListTables implements Callable<Void> {
+@MetaInfServices(SubcommandWithParent.class)
+public class ListTables implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.ParentCommand
   private RDBParser parent;
@@ -47,5 +51,10 @@ public class ListTables implements Callable<Void> {
       System.out.println(new String(b, StandardCharsets.UTF_8));
     }
     return null;
+  }
+
+  @Override
+  public Class<?> getParentType() {
+    return RDBParser.class;
   }
 }

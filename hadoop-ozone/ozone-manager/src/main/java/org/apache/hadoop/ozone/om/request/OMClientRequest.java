@@ -18,15 +18,9 @@
 
 package org.apache.hadoop.ozone.om.request;
 
-import java.io.IOException;
-import java.net.InetAddress;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -36,23 +30,27 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .DeleteKeysResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.nio.file.Paths;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 
 /**
  * OMClientRequest provides methods which every write OM request should
@@ -60,6 +58,8 @@ import javax.annotation.Nonnull;
  */
 public abstract class OMClientRequest implements RequestAuditor {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMClientRequest.class);
   private OMRequest omRequest;
 
   /**
@@ -221,36 +221,6 @@ public abstract class OMClientRequest implements RequestAuditor {
   }
 
   /**
-   * Set parameters needed for return error response to client.
-   *
-   * @param omResponse
-   * @param ex         - IOException
-   * @param unDeletedKeys    - Set<OmKeyInfo>
-   * @return error response need to be returned to client - OMResponse.
-   */
-  protected OMResponse createOperationKeysErrorOMResponse(
-      @Nonnull OMResponse.Builder omResponse,
-      @Nonnull IOException ex, @Nonnull Set<OmKeyInfo> unDeletedKeys) {
-    omResponse.setSuccess(false);
-    StringBuffer errorMsg = new StringBuffer();
-    DeleteKeysResponse.Builder resp = DeleteKeysResponse.newBuilder();
-    for (OmKeyInfo key : unDeletedKeys) {
-      if(key != null) {
-        resp.addUnDeletedKeys(key.getProtobuf());
-      }
-    }
-    if (errorMsg != null) {
-      omResponse.setMessage(errorMsg.toString());
-    }
-    // TODO: Currently all delete operations in OzoneBucket.java are void. Here
-    //  we put the List of unDeletedKeys into Response. These KeyInfo can be
-    //  used to continue deletion if client support delete retry.
-    omResponse.setDeleteKeysResponse(resp.build());
-    omResponse.setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(ex));
-    return omResponse.build();
-  }
-
-  /**
    * Add the client response to double buffer and set the flush future.
    * @param trxIndex
    * @param omClientResponse
@@ -302,5 +272,73 @@ public abstract class OMClientRequest implements RequestAuditor {
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.VOLUME, volume);
     return auditMap;
+  }
+
+
+  public static String validateAndNormalizeKey(boolean enableFileSystemPaths,
+      String keyName) throws OMException {
+    if (enableFileSystemPaths) {
+      return validateAndNormalizeKey(keyName);
+    } else {
+      return keyName;
+    }
+  }
+
+  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
+  public static String validateAndNormalizeKey(String keyName)
+      throws OMException {
+    String normalizedKeyName;
+    if (keyName.startsWith(OM_KEY_PREFIX)) {
+      normalizedKeyName = Paths.get(keyName).toUri().normalize().getPath();
+    } else {
+      normalizedKeyName = Paths.get(OM_KEY_PREFIX, keyName).toUri()
+          .normalize().getPath();
+    }
+    if (!keyName.equals(normalizedKeyName)) {
+      LOG.debug("Normalized key {} to {} ", keyName,
+          normalizedKeyName.substring(1));
+    }
+    return isValidKeyPath(normalizedKeyName.substring(1));
+  }
+
+  /**
+   * Whether the pathname is valid.  Check key names which contain a
+   * ":", ".", "..", "//", "". If it has any of these characters throws
+   * OMException, else return the path.
+   */
+  private static String isValidKeyPath(String path) throws OMException {
+    boolean isValid = true;
+
+    // If keyName is empty string throw error.
+    if (path.length() == 0) {
+      throw new OMException("Invalid KeyPath, empty keyName" + path,
+          INVALID_KEY_NAME);
+    } else if(path.startsWith("/")) {
+      isValid = false;
+    } else {
+      // Check for ".." "." ":" "/"
+      String[] components = StringUtils.split(path, '/');
+      for (int i = 0; i < components.length; i++) {
+        String element = components[i];
+        if (element.equals(".") ||
+            (element.contains(":")) ||
+            (element.contains("/") || element.equals(".."))) {
+          isValid = false;
+          break;
+        }
+
+        // The string may end with a /, but not have
+        // "//" in the middle.
+        if (element.isEmpty() && i != components.length - 1) {
+          isValid = false;
+        }
+      }
+    }
+
+    if (isValid) {
+      return path;
+    } else {
+      throw new OMException("Invalid KeyPath " + path, INVALID_KEY_NAME);
+    }
   }
 }

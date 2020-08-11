@@ -3,7 +3,7 @@ title: Ozone Enhancement Proposals
 summary: Definition of the process to share new technical proposals with the Ozone community.
 date: 2019-06-07
 jira: HDDS-1659
-status: accepted
+status: implemented
 author: Anu Enginner, Marton Elek
 ---
 <!---

@@ -94,7 +94,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
    * For every registered task, we try process step twice and then reprocess
    * once (if process failed twice) to absorb the events. If a task has failed
    * reprocess call more than 2 times across events, it is unregistered
-   * (blacklisted).
+   * (ignored).
    * @param events set of events
    * @throws InterruptedException
    */
@@ -140,7 +140,7 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           results = executorService.invokeAll(tasks);
           List<String> reprocessFailedTasks =
               processTaskResults(results, events);
-          blacklistFailedTasks(reprocessFailedTasks);
+          ignoreFailedTasks(reprocessFailedTasks);
         }
       }
     } catch (ExecutionException e) {
@@ -149,15 +149,15 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   }
 
   /**
-   * Blacklist tasks that failed reprocess step more than threshold times.
+   * Ignore tasks that failed reprocess step more than threshold times.
    * @param failedTasks list of failed tasks.
    */
-  private void blacklistFailedTasks(List<String> failedTasks) {
+  private void ignoreFailedTasks(List<String> failedTasks) {
     for (String taskName : failedTasks) {
       LOG.info("Reprocess step failed for task {}.", taskName);
       if (taskFailureCounter.get(taskName).incrementAndGet() >
           TASK_FAILURE_THRESHOLD) {
-        LOG.info("Blacklisting Task since it failed retry and " +
+        LOG.info("Ignoring task since it failed retry and " +
             "reprocess more than {} times.", TASK_FAILURE_THRESHOLD);
         reconOmTasks.remove(taskName);
       }

@@ -363,23 +363,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   public CompletableFuture<TermIndex> notifyInstallSnapshotFromLeader(
       RaftProtos.RoleInfoProto roleInfoProto, TermIndex firstTermIndexInLog) {
 
-    String leaderNodeId = RaftPeerId.valueOf(roleInfoProto.getSelf().getId())
-        .toString();
-
-    LOG.info("Received install snapshot notificaiton form OM leader: {} with " +
+    String leaderNodeId = RaftPeerId.valueOf(roleInfoProto.getFollowerInfo()
+        .getLeaderInfo().getId().getId()).toString();
+    LOG.info("Received install snapshot notification from OM leader: {} with " +
             "term index: {}", leaderNodeId, firstTermIndexInLog);
 
-    if (!roleInfoProto.getRole().equals(RaftProtos.RaftPeerRole.LEADER)) {
-      // A non-leader Ratis server should not send this notification.
-      LOG.error("Received Install Snapshot notification from non-leader OM " +
-          "node: {}. Ignoring the notification.", leaderNodeId);
-      return completeExceptionally(new OMException("Received notification to " +
-          "install snaphost from non-leader OM node",
-          OMException.ResultCodes.RATIS_ERROR));
-    }
-
     CompletableFuture<TermIndex> future = CompletableFuture.supplyAsync(
-        () -> ozoneManager.installSnapshot(leaderNodeId),
+        () -> ozoneManager.installSnapshotFromLeader(leaderNodeId),
         installSnapshotExecutor);
     return future;
   }
@@ -521,9 +511,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
             ozoneManager.getMetadataManager());
     if (omTransactionInfo != null) {
       setLastAppliedTermIndex(TermIndex.newTermIndex(
-          omTransactionInfo.getCurrentTerm(),
+          omTransactionInfo.getTerm(),
           omTransactionInfo.getTransactionIndex()));
-      snapshotInfo.updateTermIndex(omTransactionInfo.getCurrentTerm(),
+      snapshotInfo.updateTermIndex(omTransactionInfo.getTerm(),
           omTransactionInfo.getTransactionIndex());
     }
     LOG.info("LastAppliedIndex is set from TransactionInfo from OM DB as {}",

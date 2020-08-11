@@ -222,5 +222,11 @@ public class OMException extends IOException {
     DIRECTORY_ALREADY_EXISTS,
 
     INVALID_VOLUME_NAME,
+
+    PARTIAL_DELETE,
+
+    DETECTED_LOOP_IN_BUCKET_LINKS,
+
+    NOT_SUPPORTED_OPERATION
   }
 }

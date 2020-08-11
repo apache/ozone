@@ -31,5 +31,6 @@ ${BUCKET}             generated
 Head Bucket not existent
     ${result} =         Execute AWSS3APICli     head-bucket --bucket ${BUCKET}
     ${result} =         Execute AWSS3APICli and checkrc      head-bucket --bucket ozonenosuchbucketqqweqwe  255
-                        Should contain          ${result}    Bad Request
-                        Should contain          ${result}    400
+                        Should contain          ${result}    404
+                        Should contain          ${result}    Not Found
+

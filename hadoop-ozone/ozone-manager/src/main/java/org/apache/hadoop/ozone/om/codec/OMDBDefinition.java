@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -31,6 +32,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 
+import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 
@@ -46,7 +48,7 @@ public class OMDBDefinition implements DBDefinition {
                     String.class,
                     new StringCodec(),
                     RepeatedOmKeyInfo.class,
-                    new RepeatedOmKeyInfoCodec());
+                    new RepeatedOmKeyInfoCodec(true));
 
   public static final DBColumnFamilyDefinition<String,
             OzoneManagerProtocolProtos.UserVolumeInfo>
@@ -83,7 +85,7 @@ public class OMDBDefinition implements DBDefinition {
                     String.class,
                     new StringCodec(),
                     OmKeyInfo.class,
-                    new OmKeyInfoCodec());
+                    new OmKeyInfoCodec(true));
 
   public static final DBColumnFamilyDefinition<String, OmKeyInfo>
             KEY_TABLE =
@@ -92,7 +94,7 @@ public class OMDBDefinition implements DBDefinition {
                     String.class,
                     new StringCodec(),
                     OmKeyInfo.class,
-                    new OmKeyInfoCodec());
+                    new OmKeyInfoCodec(true));
 
   public static final DBColumnFamilyDefinition<String, OmBucketInfo>
             BUCKET_TABLE =
@@ -139,6 +141,15 @@ public class OMDBDefinition implements DBDefinition {
                     S3SecretValue.class,
                     new S3SecretValueCodec());
 
+  public static final DBColumnFamilyDefinition<String, OMTransactionInfo>
+      TRANSACTION_INFO_TABLE =
+      new DBColumnFamilyDefinition<>(
+          OmMetadataManagerImpl.TRANSACTION_INFO_TABLE,
+          String.class,
+          new StringCodec(),
+          OMTransactionInfo.class,
+          new OMTransactionInfoCodec());
+
 
   @Override
   public String getName() {
@@ -155,7 +166,7 @@ public class OMDBDefinition implements DBDefinition {
     return new DBColumnFamilyDefinition[] {DELETED_TABLE, USER_TABLE,
         VOLUME_TABLE, S3_TABLE, OPEN_KEY_TABLE, KEY_TABLE,
         BUCKET_TABLE, MULTIPART_INFO_TABLE, PREFIX_TABLE, DTOKEN_TABLE,
-        S3_SECRET_TABLE};
+        S3_SECRET_TABLE, TRANSACTION_INFO_TABLE};
   }
 }
 

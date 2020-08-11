@@ -131,7 +131,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testBadBehavedTaskBlacklisting() throws Exception {
+  public void testBadBehavedTaskIsIgnored() throws Exception {
     String taskName = "Dummy_" + System.currentTimeMillis();
     DummyReconDBTask dummyReconDBTask =
         new DummyReconDBTask(taskName, DummyReconDBTask.TaskType.ALWAYS_FAIL);
@@ -151,7 +151,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
           .get(dummyReconDBTask.getTaskName()));
     }
 
-    //Should be blacklisted now.
+    //Should be ignored now.
     reconTaskController.consumeOMEvents(omUpdateEventBatchMock,
         omMetadataManagerMock);
     assertTrue(reconTaskController.getRegisteredTasks().isEmpty());

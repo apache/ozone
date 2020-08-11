@@ -76,6 +76,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
@@ -447,6 +448,8 @@ public class RpcClient implements ClientProtocol {
         .setIsVersionEnabled(isVersionEnabled)
         .addAllMetadata(bucketArgs.getMetadata())
         .setStorageType(storageType)
+        .setSourceVolume(bucketArgs.getSourceVolume())
+        .setSourceBucket(bucketArgs.getSourceBucket())
         .setAcls(listOfAcls.stream().distinct().collect(Collectors.toList()));
 
     if (bek != null) {
@@ -613,7 +616,10 @@ public class RpcClient implements ClientProtocol {
         bucketInfo.getModificationTime(),
         bucketInfo.getMetadata(),
         bucketInfo.getEncryptionKeyInfo() != null ? bucketInfo
-            .getEncryptionKeyInfo().getKeyName() : null);
+            .getEncryptionKeyInfo().getKeyName() : null,
+        bucketInfo.getSourceVolume(),
+        bucketInfo.getSourceBucket()
+    );
   }
 
   @Override
@@ -634,7 +640,9 @@ public class RpcClient implements ClientProtocol {
         bucket.getModificationTime(),
         bucket.getMetadata(),
         bucket.getEncryptionKeyInfo() != null ? bucket
-            .getEncryptionKeyInfo().getKeyName() : null))
+            .getEncryptionKeyInfo().getKeyName() : null,
+        bucket.getSourceVolume(),
+        bucket.getSourceBucket()))
         .collect(Collectors.toList());
   }
 
@@ -730,16 +738,9 @@ public class RpcClient implements ClientProtocol {
           throws IOException {
     HddsClientUtils.verifyResourceName(volumeName, bucketName);
     Preconditions.checkNotNull(keyNameList);
-    List<OmKeyArgs> keyArgsList = new ArrayList<>();
-    for (String keyName: keyNameList) {
-      OmKeyArgs keyArgs = new OmKeyArgs.Builder()
-          .setVolumeName(volumeName)
-          .setBucketName(bucketName)
-          .setKeyName(keyName)
-          .build();
-      keyArgsList.add(keyArgs);
-    }
-    ozoneManagerClient.deleteKeys(keyArgsList);
+    OmDeleteKeys omDeleteKeys = new OmDeleteKeys(volumeName, bucketName,
+        keyNameList);
+    ozoneManagerClient.deleteKeys(omDeleteKeys);
   }
 
   @Override

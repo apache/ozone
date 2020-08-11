@@ -18,18 +18,29 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
-import org.apache.hadoop.hdds.utils.db.DBDefinition;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.rocksdb.*;
-import picocli.CommandLine;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.Callable;
+
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
+import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.ozone.OzoneConsts;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import org.kohsuke.MetaInfServices;
+import org.rocksdb.ColumnFamilyDescriptor;
+import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.Options;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksIterator;
+import picocli.CommandLine;
 
 /**
  * Parser for scm.db file.
@@ -38,43 +49,49 @@ import java.util.concurrent.Callable;
         name = "scan",
         description = "Parse specified metadataTable"
 )
-public class DBScanner implements Callable<Void> {
+@MetaInfServices(SubcommandWithParent.class)
+public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.Option(names = {"--column_family"},
             description = "Table name")
   private String tableName;
 
-  @CommandLine.ParentCommand
-  private RDBParser parent;
+  @CommandLine.Option(names = {"--with-keys"},
+      description = "List Key -> Value instead of just Value.",
+      defaultValue = "false",
+      showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
+  private static boolean withKey;
 
   @CommandLine.Option(names = {"--length", "-l"},
           description = "Maximum number of items to list")
-  private int limit = 100;
+  private static int limit = 100;
+
+  @CommandLine.ParentCommand
+  private RDBParser parent;
 
   private HashMap<String, DBColumnFamilyDefinition> columnFamilyMap;
 
   private List<Object> scannedObjects;
 
-  private static List<Object> displayTable(RocksDB rocksDB,
-      DBColumnFamilyDefinition dbColumnFamilyDefinition,
-      List<ColumnFamilyHandle> list, int maxValueLimit) throws IOException {
+  private static List<Object> displayTable(RocksIterator iterator,
+   DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
     List<Object> outputs = new ArrayList<>();
-    ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
-            dbColumnFamilyDefinition.getTableName()
-                    .getBytes(StandardCharsets.UTF_8), list);
-    if (columnFamilyHandle==null){
-      throw new IllegalArgumentException("columnFamilyHandle is null");
-    }
-    RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle);
     iterator.seekToFirst();
-    while (iterator.isValid() && maxValueLimit > 0){
+    while (iterator.isValid() && limit > 0){
+      StringBuilder result = new StringBuilder();
+      if (withKey) {
+        Object key = dbColumnFamilyDefinition.getKeyCodec()
+            .fromPersistedFormat(iterator.key());
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        result.append(gson.toJson(key));
+        result.append(" -> ");
+      }
       Object o = dbColumnFamilyDefinition.getValueCodec()
               .fromPersistedFormat(iterator.value());
       outputs.add(o);
       Gson gson = new GsonBuilder().setPrettyPrinting().create();
-      String result = gson.toJson(o);
-      System.out.println(result);
-      maxValueLimit--;
+      result.append(gson.toJson(o));
+      System.out.println(result.toString());
       iterator.next();
     }
     return outputs;
@@ -125,10 +142,6 @@ public class DBScanner implements Callable<Void> {
     }
   }
 
-  public List<Object> getScannedObjects() {
-    return scannedObjects;
-  }
-
   @Override
   public Void call() throws Exception {
     List<ColumnFamilyDescriptor> cfs = new ArrayList<>();
@@ -146,17 +159,13 @@ public class DBScanner implements Callable<Void> {
     rocksDB = RocksDB.openReadOnly(parent.getDbPath(),
             cfs, columnFamilyHandleList);
     this.printAppropriateTable(columnFamilyHandleList,
-           rocksDB, parent.getDbPath(), limit);
+           rocksDB, parent.getDbPath());
     return null;
   }
 
   private void printAppropriateTable(
           List<ColumnFamilyHandle> columnFamilyHandleList,
-          RocksDB rocksDB, String dbPath, int maxValues) throws IOException {
-    if (maxValues < 1) {
-      throw new IllegalArgumentException(
-              "List length should be a positive number");
-    }
+          RocksDB rocksDB, String dbPath) throws IOException {
     dbPath = removeTrailingSlashIfNeeded(dbPath);
     this.constructColumnFamilyMap(DBDefinitionFactory.
             getDefinition(new File(dbPath).getName()));
@@ -166,8 +175,14 @@ public class DBScanner implements Callable<Void> {
       } else {
         DBColumnFamilyDefinition columnFamilyDefinition =
                 this.columnFamilyMap.get(tableName);
-        scannedObjects = displayTable(rocksDB,
-                columnFamilyDefinition, columnFamilyHandleList, maxValues);
+        ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
+                columnFamilyDefinition.getTableName()
+                        .getBytes(StandardCharsets.UTF_8), columnFamilyHandleList);
+        if (columnFamilyHandle == null) {
+          throw new IllegalArgumentException("columnFamilyHandle is null");
+        }
+        RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle);
+        scannedObjects = displayTable(iterator, columnFamilyDefinition);
       }
     } else {
       System.out.println("Incorrect db Path");
@@ -180,4 +195,10 @@ public class DBScanner implements Callable<Void> {
     }
     return dbPath;
   }
+
+  @Override
+  public Class<?> getParentType() {
+    return RDBParser.class;
+  }
 }
+

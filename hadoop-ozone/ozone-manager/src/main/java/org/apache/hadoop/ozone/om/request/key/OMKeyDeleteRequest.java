@@ -75,7 +75,9 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     OzoneManagerProtocolProtos.KeyArgs keyArgs = deleteKeyRequest.getKeyArgs();
 
     OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs =
-        keyArgs.toBuilder().setModificationTime(Time.now());
+        keyArgs.toBuilder().setModificationTime(Time.now())
+            .setKeyName(validateAndNormalizeKey(
+                ozoneManager.getEnableFileSystemPaths(), keyArgs.getKeyName()));
 
     return getOmRequest().toBuilder()
         .setDeleteKeyRequest(deleteKeyRequest.toBuilder()
@@ -88,20 +90,19 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
     DeleteKeyRequest deleteKeyRequest = getOmRequest().getDeleteKeyRequest();
 
-    OzoneManagerProtocolProtos.KeyArgs deleteKeyArgs =
+    OzoneManagerProtocolProtos.KeyArgs keyArgs =
         deleteKeyRequest.getKeyArgs();
+    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
 
-    String volumeName = deleteKeyArgs.getVolumeName();
-    String bucketName = deleteKeyArgs.getBucketName();
-    String keyName = deleteKeyArgs.getKeyName();
+    String volumeName = keyArgs.getVolumeName();
+    String bucketName = keyArgs.getBucketName();
+    String keyName = keyArgs.getKeyName();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumKeyDeletes();
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
-
-    Map<String, String> auditMap = buildKeyArgsAuditMap(deleteKeyArgs);
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -111,6 +112,10 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
     Result result = null;
     try {
+      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+
       // check Acl
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
