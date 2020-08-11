@@ -2226,6 +2226,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     Map<String, String> auditMap = bucket.audit(args.toAuditMap());
 
     args = bucket.update(args);
+
     try {
       metrics.incNumKeyLookups();
       return keyManager.lookupKey(args, getClientAddress());
