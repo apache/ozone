@@ -58,6 +58,10 @@ public class Freon extends GenericCli {
 
   public static final Logger LOG = LoggerFactory.getLogger(Freon.class);
 
+  public Freon() {
+    super(Freon.class);
+  }
+
   @Option(names = "--server",
       description = "Enable internal http server to provide metric "
           + "and profile endpoint")
