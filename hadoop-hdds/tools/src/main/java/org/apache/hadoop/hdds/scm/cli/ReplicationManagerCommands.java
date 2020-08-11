@@ -21,7 +21,10 @@ import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.cli.OzoneAdmin;
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
@@ -39,7 +42,9 @@ import picocli.CommandLine.Spec;
         ReplicationManagerStopSubcommand.class,
         ReplicationManagerStatusSubcommand.class
     })
-public class ReplicationManagerCommands implements Callable<Void> {
+@MetaInfServices(SubcommandWithParent.class)
+public class ReplicationManagerCommands implements Callable<Void>,
+    SubcommandWithParent {
 
   @Spec
   private CommandSpec spec;
@@ -48,5 +53,10 @@ public class ReplicationManagerCommands implements Callable<Void> {
   public Void call() throws Exception {
     GenericCli.missingSubcommand(spec);
     return null;
+  }
+
+  @Override
+  public Class<?> getParentType() {
+    return OzoneAdmin.class;
   }
 }

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,17 +15,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.admin;
+package org.apache.hadoop.hdds.cli;
 
-import org.apache.hadoop.hdds.cli.GenericCli;
-import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.cli.ReplicationManagerCommands;
-import org.apache.hadoop.hdds.scm.cli.SafeModeCommands;
-import org.apache.hadoop.hdds.scm.cli.TopologySubcommand;
-import org.apache.hadoop.hdds.scm.cli.container.ContainerCommands;
-import org.apache.hadoop.hdds.scm.cli.datanode.DatanodeCommands;
-import org.apache.hadoop.hdds.scm.cli.pipeline.PipelineCommands;
 import org.apache.hadoop.util.NativeCodeLoader;
 
 import org.apache.log4j.ConsoleAppender;
@@ -42,14 +34,6 @@ import picocli.CommandLine;
     hidden = true,
     description = "Developer tools for Ozone Admin operations",
     versionProvider = HddsVersionProvider.class,
-    subcommands = {
-        SafeModeCommands.class,
-        ContainerCommands.class,
-        PipelineCommands.class,
-        DatanodeCommands.class,
-        TopologySubcommand.class,
-        ReplicationManagerCommands.class
-    },
     mixinStandardHelpOptions = true)
 public class OzoneAdmin extends GenericCli {
 
@@ -70,9 +54,8 @@ public class OzoneAdmin extends GenericCli {
    * Main for the Ozone Admin shell Command handling.
    *
    * @param argv - System Args Strings[]
-   * @throws Exception
    */
-  public static void main(String[] argv) throws Exception {
+  public static void main(String[] argv) {
     LogManager.resetConfiguration();
     Logger.getRootLogger().setLevel(Level.INFO);
     Logger.getRootLogger()

@@ -27,6 +27,8 @@ import java.util.List;
 import java.util.TreeSet;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.cli.OzoneAdmin;
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
@@ -36,6 +38,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DECOMMI
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
+
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
 /**
@@ -46,7 +50,9 @@ import picocli.CommandLine;
     description = "Print a tree of the network topology as reported by SCM",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class TopologySubcommand extends ScmSubcommand {
+@MetaInfServices(SubcommandWithParent.class)
+public class TopologySubcommand extends ScmSubcommand
+    implements SubcommandWithParent {
 
   private static final List<HddsProtos.NodeState> STATES = new ArrayList<>();
 
@@ -65,6 +71,11 @@ public class TopologySubcommand extends ScmSubcommand {
   @CommandLine.Option(names = {"-f", "--full"},
       description = "Print Topology with full node infos")
   private boolean fullInfo;
+
+  @Override
+  public Class<?> getParentType() {
+    return OzoneAdmin.class;
+  }
 
   @Override
   protected void execute(ScmClient scmClient) throws IOException {

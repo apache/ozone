@@ -22,9 +22,12 @@ import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.cli.OzoneAdmin;
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
@@ -44,7 +47,8 @@ import picocli.CommandLine.Spec;
         CreateSubcommand.class,
         CloseSubcommand.class
     })
-public class ContainerCommands implements Callable<Void> {
+@MetaInfServices(SubcommandWithParent.class)
+public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
 
   @Spec
   private CommandSpec spec;
@@ -53,6 +57,11 @@ public class ContainerCommands implements Callable<Void> {
   public Void call() throws Exception {
     GenericCli.missingSubcommand(spec);
     return null;
+  }
+
+  @Override
+  public Class<?> getParentType() {
+    return OzoneAdmin.class;
   }
 
   public static void checkContainerExists(ScmClient scmClient, long containerId)
