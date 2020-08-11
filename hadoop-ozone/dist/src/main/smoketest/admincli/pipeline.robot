@@ -14,8 +14,7 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Smoketest ozone cluster startup
-Library             OperatingSystem
+Documentation       Test ozone admin pipeline command
 Library             BuiltIn
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
@@ -30,10 +29,13 @@ Create pipeline
     ${pipeline} =       Execute          echo "${output}" | grep 'is created' | cut -f1 -d' ' | cut -f2 -d'='
                         Set Suite Variable    ${PIPELINE}    ${pipeline}
 
-List pipeline
+List pipelines
     ${output} =         Execute          ozone admin pipeline list
-                        Should contain   ${output}   Type:
-                        Should contain   ${output}   Factor:ONE, State:
+                        Should contain   ${output}   Factor:ONE
+
+List pipelines with explicit host
+    ${output} =         Execute          ozone admin pipeline list --scm scm
+                        Should contain   ${output}   Factor:ONE
 
 Deactivate pipeline
                         Execute          ozone admin pipeline deactivate "${PIPELINE}"
