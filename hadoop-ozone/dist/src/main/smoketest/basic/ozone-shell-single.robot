@@ -18,25 +18,10 @@ Documentation       Test ozone shell CLI usage
 Library             OperatingSystem
 Resource            ../commonlib.robot
 Resource            ozone-shell-lib.robot
-Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 Test Timeout        2 minute
 Suite Setup         Generate prefix
 
 *** Test Cases ***
-RpcClient with port
-   Test ozone shell       o3://            om:9862     ${prefix}-rpcwoport
 
-RpcClient volume acls
-   Test Volume Acls       o3://            om:9862     ${prefix}-rpcwoport2
-
-RpcClient bucket acls
-    Test Bucket Acls      o3://            om:9862     ${prefix}-rpcwoport2
-
-RpcClient key acls
-    Test Key Acls         o3://            om:9862     ${prefix}-rpcwoport2
-
-RpcClient without host
-    Test ozone shell      o3://            ${EMPTY}    ${prefix}-rpcwport
-
-RpcClient without scheme
-    Test ozone shell      ${EMPTY}         ${EMPTY}    ${prefix}-rpcwoscheme
+Test ozone shell
+   Test ozone shell       ${EMPTY}            ${EMPTY}     ${prefix}-rpcbasic
