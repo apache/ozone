@@ -194,9 +194,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         new OzoneFSInputStream(adapter.readFile(key), statistics));
   }
 
-  @Deprecated
   protected void incrementCounter(Statistic statistic) {
-    //don't do anything in this default implementation.
+    incrementCounter(statistic, 1);
   }
 
   protected void incrementCounter(Statistic statistic, long count) {

@@ -220,13 +220,12 @@ public class BasicOzoneFileSystem extends FileSystem {
     return new OzoneFSInputStream(inputStream, statistics);
   }
 
-  @Deprecated
   protected void incrementCounter(Statistic statistic) {
-    //don't do anyting in this default implementation.
+    incrementCounter(statistic, 1);
   }
 
   protected void incrementCounter(Statistic statistic, long count) {
-    //don't do anyting in this default implementation.
+    //don't do anything in this default implementation.
   }
 
   @Override
