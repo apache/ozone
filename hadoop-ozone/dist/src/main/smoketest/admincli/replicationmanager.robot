@@ -22,7 +22,8 @@ Test Timeout        5 minutes
 *** Test Cases ***
 Check replicationmanager
     ${output} =         Execute          ozone admin replicationmanager status
-                        Should contain   ${output}   ReplicationManager is Not Running
+                        Should contain   ${output}   ReplicationManager
+                        Should contain   ${output}   Running
 
 Check replicationmanager with explicit host
     ${output} =         Execute          ozone admin replicationmanager status --scm scm
