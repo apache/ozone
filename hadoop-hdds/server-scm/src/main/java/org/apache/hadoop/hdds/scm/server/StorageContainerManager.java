@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -82,6 +83,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineActionHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineReportHandler;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.PipelineChoosePolicyFactory;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -199,6 +201,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    *  Network topology Map.
    */
   private NetworkTopology clusterMap;
+  private PipelineChoosePolicy pipelineChoosePolicy;
 
   /**
    * Creates a new StorageContainerManager. Configuration will be
@@ -422,6 +425,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               pipelineManager);
     }
 
+    pipelineChoosePolicy = PipelineChoosePolicyFactory.getPolicy(conf);
     if (configurator.getScmBlockManager() != null) {
       scmBlockManager = configurator.getScmBlockManager();
     } else {
@@ -1132,5 +1136,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       map.put(entry.getKey(), entry.getValue().getRight());
     }
     return map;
+  }
+
+  public PipelineChoosePolicy getPipelineChoosePolicy() {
+    return this.pipelineChoosePolicy;
   }
 }

@@ -289,6 +289,7 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT =
       "ozone.scm.pipeline.owner.container.count";
   public static final int OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT = 3;
+
   // Pipeline placement policy:
   // Upper limit for how many pipelines a datanode can engage in.
   public static final String OZONE_DATANODE_PIPELINE_LIMIT =

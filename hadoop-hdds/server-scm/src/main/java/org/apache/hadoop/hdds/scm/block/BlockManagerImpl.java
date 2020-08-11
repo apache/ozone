@@ -32,6 +32,8 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmOps;
+import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
+import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -77,6 +79,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
 
   private ObjectName mxBean;
   private SafeModePrecheck safeModePrecheck;
+  private PipelineChoosePolicy pipelineChoosePolicy;
 
   /**
    * Constructor.
@@ -90,7 +93,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     Objects.requireNonNull(scm, "SCM cannot be null");
     this.pipelineManager = scm.getPipelineManager();
     this.containerManager = scm.getContainerManager();
-
+    this.pipelineChoosePolicy = scm.getPipelineChoosePolicy();
     this.containerSize = (long)conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
@@ -222,9 +225,12 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
       }
 
       if (null == pipeline) {
-        // TODO: #CLUTIL Make the selection policy driven.
-        pipeline = availablePipelines
-            .get((int) (Math.random() * availablePipelines.size()));
+        PipelineRequestInformation pri =
+            PipelineRequestInformation.Builder.getBuilder()
+                .setSize(size)
+                .build();
+        pipeline = pipelineChoosePolicy.choosePipeline(
+            availablePipelines, pri);
       }
 
       // look for OPEN containers that match the criteria.
