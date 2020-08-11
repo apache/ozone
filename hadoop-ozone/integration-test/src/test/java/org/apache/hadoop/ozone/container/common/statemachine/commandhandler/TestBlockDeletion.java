@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.event.Level;
 
@@ -83,6 +84,7 @@ import static org.apache.hadoop.ozone
 /**
  * Tests for Block deletion.
  */
+@Ignore
 public class TestBlockDeletion {
   private static OzoneConfiguration conf = null;
   private static ObjectStore store;
@@ -273,7 +275,6 @@ public class TestBlockDeletion {
     scm.getReplicationManager().processContainersNow();
     // Wait for container statistics change
     Thread.sleep(1000);
-    System.out.println("Replication-Manager process containers");
     containerInfos = scm.getContainerManager().getContainers();
     containerInfos.stream().forEach(container -> {
       Assert.assertEquals(0, container.getUsedBytes());

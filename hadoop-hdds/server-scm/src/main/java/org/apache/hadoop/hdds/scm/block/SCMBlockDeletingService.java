@@ -110,7 +110,7 @@ public class SCMBlockDeletingService extends BackgroundService {
     for (PendingDeleteStatusList.PendingDeleteStatus deletionStatus :
         deletionStatusList.getPendingDeleteStatuses()) {
       LOG.debug(
-          "Block deletion txnID behinds in datanode {} for containerID {}."
+          "Block deletion txnID lagging in datanode {} for containerID {}."
               + " Datanode delete txnID: {}, SCM txnID: {}",
           dnDetails.getUuid(), deletionStatus.getContainerId(),
           deletionStatus.getDnDeleteTransactionId(),
