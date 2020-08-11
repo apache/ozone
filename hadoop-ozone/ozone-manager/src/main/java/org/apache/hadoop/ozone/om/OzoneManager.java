@@ -407,6 +407,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       ScmInfo scmInfo = getScmInfo(configuration);
       if (!(scmInfo.getClusterId().equals(omStorage.getClusterID()) && scmInfo
           .getScmId().equals(omStorage.getScmId()))) {
+        logVersionMismatch(conf, scmInfo);
         throw new OMException("SCM version info mismatch.",
             ResultCodes.SCM_VERSION_MISMATCH_ERROR);
       }
@@ -478,6 +479,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     ShutdownHookManager.get().addShutdownHook(shutdownHook,
         SHUTDOWN_HOOK_PRIORITY);
     omState = State.INITIALIZED;
+  }
+
+  private void logVersionMismatch(OzoneConfiguration conf, ScmInfo scmInfo) {
+    InetSocketAddress scmBlockAddress =
+        getScmAddressForBlockClients(conf);
+    if (!scmInfo.getClusterId().equals(omStorage.getClusterID())) {
+      LOG.error("clusterId from {} is {}, but is {} in {}",
+          scmBlockAddress, scmInfo.getClusterId(),
+          omStorage.getClusterID(), omStorage.getVersionFile());
+    }
+    if (!scmInfo.getScmId().equals(omStorage.getScmId())) {
+      LOG.error("scmId from {} is {}, but is {} in {}",
+          scmBlockAddress, scmInfo.getScmId(),
+          omStorage.getScmId(), omStorage.getVersionFile());
+    }
   }
 
   /**
