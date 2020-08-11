@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.RandomStringUtils;
 
 /**
@@ -77,7 +78,8 @@ public class ContentGenerator {
     }
   }
 
-  public byte[] getBuffer() {
+  @VisibleForTesting
+  byte[] getBuffer() {
     return buffer;
   }
 }
