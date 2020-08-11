@@ -25,6 +25,7 @@ ${CONTAINER}
 
 *** Keywords ***
 Create test data
+    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
                         Execute          ozone freon ockg -n1 -t1 -p container
 
 *** Test Cases ***
