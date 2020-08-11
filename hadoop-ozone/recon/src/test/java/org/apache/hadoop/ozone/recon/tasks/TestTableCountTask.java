@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMUpdateEventBuilder;
-import org.hadoop.ozone.recon.schema.StatsSchemaDefinition;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
@@ -72,11 +71,9 @@ public class TestTableCountTask extends AbstractReconSqlDBTest {
         initializeNewOmMetadataManager(temporaryFolder.newFolder()),
         temporaryFolder.newFolder());
     globalStatsDao = getDao(GlobalStatsDao.class);
-    StatsSchemaDefinition statsSchemaDefinition =
-        getSchemaDefinition(StatsSchemaDefinition.class);
     tableCountTask = new TableCountTask(globalStatsDao, getConfiguration(),
             omMetadataManager);
-    dslContext = statsSchemaDefinition.getDSLContext();
+    dslContext = getDslContext();
   }
 
   @Before

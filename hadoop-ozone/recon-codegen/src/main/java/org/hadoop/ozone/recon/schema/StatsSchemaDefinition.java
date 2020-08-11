@@ -66,13 +66,4 @@ public class StatsSchemaDefinition implements ReconSchemaDefinition {
             .primaryKey("key"))
         .execute();
   }
-
-  /**
-   * Returns the DSL context.
-   *
-   * @return dslContext
-   */
-  public DSLContext getDSLContext() {
-    return dslContext;
-  }
 }

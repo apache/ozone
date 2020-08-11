@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -54,6 +55,8 @@ public class TestOMDBUpdatesHandler {
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
+
+  private OMDBDefinition omdbDefinition = new OMDBDefinition();
 
   private OzoneConfiguration createNewTestPath() throws IOException {
     OzoneConfiguration configuration = new OzoneConfiguration();
@@ -231,9 +234,9 @@ public class TestOMDBUpdatesHandler {
     OMDBUpdatesHandler omdbUpdatesHandler =
         new OMDBUpdatesHandler(metaMgr);
 
-    assertEquals(String.class, omdbUpdatesHandler.getKeyType(
+    assertEquals(String.class, omdbDefinition.getKeyType(
         metaMgr.getKeyTable().getName()).get());
-    assertEquals(OzoneTokenIdentifier.class, omdbUpdatesHandler.getKeyType(
+    assertEquals(OzoneTokenIdentifier.class, omdbDefinition.getKeyType(
         metaMgr.getDelegationTokenTable().getName()).get());
   }
 
@@ -244,11 +247,11 @@ public class TestOMDBUpdatesHandler {
     OMDBUpdatesHandler omdbUpdatesHandler =
         new OMDBUpdatesHandler(metaMgr);
 
-    assertEquals(OmKeyInfo.class, omdbUpdatesHandler.getValueType(
+    assertEquals(OmKeyInfo.class, omdbDefinition.getValueType(
         metaMgr.getKeyTable().getName()).get());
-    assertEquals(OmVolumeArgs.class, omdbUpdatesHandler.getValueType(
+    assertEquals(OmVolumeArgs.class, omdbDefinition.getValueType(
         metaMgr.getVolumeTable().getName()).get());
-    assertEquals(OmBucketInfo.class, omdbUpdatesHandler.getValueType(
+    assertEquals(OmBucketInfo.class, omdbDefinition.getValueType(
         metaMgr.getBucketTable().getName()).get());
   }
 

@@ -49,7 +49,6 @@ public class TableCountTask implements ReconOmTask {
 
   private GlobalStatsDao globalStatsDao;
   private Configuration sqlConfiguration;
-  private HashMap<String, Long> objectCountMap;
   private ReconOMMetadataManager reconOMMetadataManager;
 
   @Inject
@@ -116,7 +115,7 @@ public class TableCountTask implements ReconOmTask {
   public Pair<String, Boolean> process(OMUpdateEventBatch events) {
     Iterator<OMDBUpdateEvent> eventIterator = events.getIterator();
 
-    initializeCountMap();
+    HashMap<String, Long> objectCountMap = initializeCountMap();
 
     while (eventIterator.hasNext()) {
       OMDBUpdateEvent<String, Object> omdbUpdateEvent = eventIterator.next();
@@ -157,13 +156,14 @@ public class TableCountTask implements ReconOmTask {
     return new ImmutablePair<>(getTaskName(), true);
   }
 
-  private void initializeCountMap() {
+  private HashMap<String, Long> initializeCountMap() {
     Collection<String> tables = getTaskTables();
-    objectCountMap = new HashMap<>(tables.size());
+    HashMap<String, Long> objectCountMap = new HashMap<>(tables.size());
     for (String tableName: tables) {
       String key = getRowKeyFromTable(tableName);
       objectCountMap.put(key, getCountForKey(key));
     }
+    return objectCountMap;
   }
 
   public static String getRowKeyFromTable(String tableName) {

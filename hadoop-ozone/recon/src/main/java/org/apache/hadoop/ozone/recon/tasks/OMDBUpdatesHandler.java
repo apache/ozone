@@ -32,7 +32,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
-import org.apache.ratis.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.WriteBatch;
 import org.slf4j.Logger;
@@ -91,8 +90,8 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
       valueBytes, OMDBUpdateEvent.OMDBUpdateAction action)
       throws IOException {
     String tableName = tablesNames.get(cfIndex);
-    Optional<Class> keyType = getKeyType(tableName);
-    Optional<Class> valueType = getValueType(tableName);
+    Optional<Class> keyType = omdbDefinition.getKeyType(tableName);
+    Optional<Class> valueType = omdbDefinition.getValueType(tableName);
     if (keyType.isPresent() && valueType.isPresent()) {
       OMDBUpdateEvent.OMUpdateEventBuilder builder =
           new OMDBUpdateEvent.OMUpdateEventBuilder<>();
@@ -267,26 +266,6 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
      * There are no use cases yet for this method in Recon. These will be
      * implemented as and when need arises.
      */
-  }
-
-  /**
-   * Return Key type class for the given table.
-   *
-   * @return keyType class.
-   */
-  @VisibleForTesting
-  Optional<Class> getKeyType(String name) {
-    return omdbDefinition.getKeyType(name);
-  }
-
-  /**
-   * Return Value type class for a given table.
-   * @param name table name
-   * @return Value type based on table name.
-   */
-  @VisibleForTesting
-  Optional<Class> getValueType(String name) {
-    return omdbDefinition.getValueType(name);
   }
 
   /**

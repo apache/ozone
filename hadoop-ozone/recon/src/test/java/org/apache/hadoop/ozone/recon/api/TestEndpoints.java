@@ -61,7 +61,6 @@ import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImp
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.TableCountTask;
 import org.apache.hadoop.test.LambdaTestUtils;
-import org.hadoop.ozone.recon.schema.StatsSchemaDefinition;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
@@ -105,7 +104,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private FileSizeCountTask fileSizeCountTask;
   private TableCountTask tableCountTask;
   private ReconStorageContainerManagerFacade reconScm;
-  private StatsSchemaDefinition statsSchemaDefinition;
   private boolean isSetupDone = false;
   private String pipelineId;
   private DatanodeDetails datanodeDetails;
@@ -115,6 +113,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private DatanodeDetailsProto datanodeDetailsProto;
   private Pipeline pipeline;
   private FileCountBySizeDao fileCountBySizeDao;
+  private DSLContext dslContext;
   private final String host1 = "host1.datanode";
   private final String host2 = "host2.datanode";
   private final String ip1 = "1.1.1.1";
@@ -178,7 +177,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     GlobalStatsDao globalStatsDao = getDao(GlobalStatsDao.class);
     UtilizationSchemaDefinition utilizationSchemaDefinition =
         getSchemaDefinition(UtilizationSchemaDefinition.class);
-    statsSchemaDefinition = getSchemaDefinition(StatsSchemaDefinition.class);
     Configuration sqlConfiguration =
         reconTestInjector.getInstance(Configuration.class);
     utilizationEndpoint = new UtilizationEndpoint(
@@ -191,6 +189,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         reconTestInjector.getInstance(OzoneStorageContainerManager.class);
     clusterStateEndpoint =
         new ClusterStateEndpoint(reconScm, globalStatsDao);
+    dslContext = getDslContext();
   }
 
   @Before
@@ -320,7 +319,6 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     // key = key_three
     writeDataToOm(reconOMMetadataManager, "key_three");
 
-    DSLContext dslContext = statsSchemaDefinition.getDSLContext();
     // Truncate global stats table before running each test
     dslContext.truncate(GLOBAL_STATS);
   }
