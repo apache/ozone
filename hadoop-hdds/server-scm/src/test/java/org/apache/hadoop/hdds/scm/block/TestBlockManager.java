@@ -91,8 +91,7 @@ public class TestBlockManager {
   private EventQueue eventQueue;
   private int numContainerPerOwnerInPipeline;
   private OzoneConfiguration conf;
-  private StorageClass storageClass =
-      new StaticStorageClassRegistry().getStorageClass("STANDARD");
+  private StorageClass storageClass = StaticStorageClassRegistry.STANDARD;
   private SCMMetadataStore scmMetadataStore;
 
   @Before

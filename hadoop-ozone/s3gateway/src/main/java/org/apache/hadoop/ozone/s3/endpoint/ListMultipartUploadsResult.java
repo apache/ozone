@@ -27,6 +27,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.ozone.s3.commontypes.IsoDateAdapter;
 
 /**
@@ -153,7 +154,8 @@ public class ListMultipartUploadsResult {
     private Owner initiator = NOT_SUPPORTED_OWNER;
 
     @XmlElement(name = "StorageClass")
-    private String storageClass = "STANDARD";
+    private String storageClass =
+        StaticStorageClassRegistry.STANDARD.getName();
 
     @XmlJavaTypeAdapter(IsoDateAdapter.class)
     @XmlElement(name = "Initiated")

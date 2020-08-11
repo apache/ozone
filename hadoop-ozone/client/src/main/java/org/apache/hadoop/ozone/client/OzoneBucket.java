@@ -361,7 +361,7 @@ public class OzoneBucket extends WithMetadata {
    */
   public OzoneOutputStream createKey(String key, long size)
       throws IOException {
-    return createKey(key, size, null,
+    return createKey(key, size, storageClass,
         new HashMap<>());
   }
 

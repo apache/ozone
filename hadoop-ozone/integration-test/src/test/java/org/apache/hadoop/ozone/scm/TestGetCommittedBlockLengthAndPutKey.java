@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.scm;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.StorageClassConverter;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -160,7 +161,8 @@ public class TestGetCommittedBlockLengthAndPutKey {
   public void tesPutKeyResposne() throws Exception {
     ContainerProtos.PutBlockResponseProto response;
     ContainerWithPipeline container = storageContainerLocationClient
-        .allocateContainer(OzoneConsts.OZONE, "REDUCED");
+        .allocateContainer(OzoneConsts.OZONE,
+            StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName());
     long containerID = container.getContainerInfo().getContainerID();
     Pipeline pipeline = container.getPipeline();
     XceiverClientSpi client = xceiverClientManager.acquireClient(pipeline);

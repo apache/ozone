@@ -182,8 +182,8 @@ public class SCMClientProtocolServer implements
 
   @Override
   public ContainerWithPipeline allocateContainer(
-      String storageClass,
-      String owner) throws IOException {
+      String owner,
+      String storageClass) throws IOException {
     ScmUtils.preCheck(ScmOps.allocateContainer, safeModePrecheck);
     getScm().checkAdminAccess(getRpcRemoteUsername());
 

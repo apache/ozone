@@ -440,6 +440,12 @@ public class KeyManagerImpl implements KeyManager {
         args.getDataSize() : scmBlockSize;
     final List<OmKeyLocationInfo> locations = new ArrayList<>();
 
+    String storageClass = args.getStorageClass();
+    if (StringUtils.isNoneBlank()) {
+      storageClass = useRatis ? StaticStorageClassRegistry.STANDARD.getName()
+          : StaticStorageClassRegistry.LEGACY.getName();
+    }
+
     String dbKeyName = metadataManager.getOzoneKey(
         args.getVolumeName(), args.getBucketName(), args.getKeyName());
 
@@ -463,7 +469,7 @@ public class KeyManagerImpl implements KeyManager {
     if (keyInfo == null) {
       // the key does not exist, create a new object, the new blocks are the
       // version 0
-      keyInfo = createKeyInfo(args, locations, args.getStorageClass(), size,
+      keyInfo = createKeyInfo(args, locations, storageClass, size,
           encInfo, bucketInfo);
     }
     openVersion = keyInfo.getLatestVersionLocations().getVersion();

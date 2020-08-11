@@ -499,7 +499,7 @@ public final class TestUtils {
         .setReplicationType(HddsProtos.ReplicationType.RATIS)
         .setReplicationFactor(HddsProtos.ReplicationFactor.THREE)
         .setState(state)
-        .setStorageClass(StaticStorageClassRegistry.STANDARD)
+        .setStorageClass(StaticStorageClassRegistry.STANDARD.getName())
         .setSequenceId(10000L)
         .setOwner("TEST")
         .build();

@@ -325,7 +325,7 @@ public class ContainerStateManager {
         .setOwner(owner)
         .setContainerID(containerID)
         .setDeleteTransactionId(0)
-        .setStorageClass(storageClass)
+        .setStorageClass(storageClass.getName())
         .build();
     addContainerInfo(containerID, containerInfo, pipelineManager, pipeline);
     if (LOG.isTraceEnabled()) {
@@ -454,7 +454,7 @@ public class ContainerStateManager {
         final ContainerInfo containerInfo = containers.getContainerInfo(id);
         if (containerInfo.getUsedBytes() + size <= this.containerSize
             && storageClass.getName().equals(
-                containerInfo.getStorageClass().getName())) {
+                containerInfo.getStorageClass())) {
           containerInfo.updateLastUsedTime();
           return containerInfo;
         }

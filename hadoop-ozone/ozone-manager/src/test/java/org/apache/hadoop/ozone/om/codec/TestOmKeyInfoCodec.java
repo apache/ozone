@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -60,7 +61,7 @@ public class TestOmKeyInfoCodec {
     return new OmKeyInfo.Builder()
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
-        .setStorageClass("STANDARD")
+        .setStorageClass(StaticStorageClassRegistry.STANDARD.getName())
         .setVolumeName(volume)
         .setBucketName(bucket)
         .setKeyName(keyName)

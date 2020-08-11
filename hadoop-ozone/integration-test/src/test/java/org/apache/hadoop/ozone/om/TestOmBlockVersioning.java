@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -100,7 +101,8 @@ public class TestOmBlockVersioning {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setStorageClass("REDUCED")
+        .setStorageClass(
+            StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName())
         .setDataSize(1000)
         .setRefreshPipeline(true)
         .setAcls(new ArrayList<>())

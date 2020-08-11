@@ -99,10 +99,10 @@ public class TestContainerStateManagerIntegration {
     // Allocate a container and verify the container info
     ContainerWithPipeline container1 = scm.getClientProtocolServer()
         .allocateContainer(
+            OzoneConsts.OZONE,
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)).getName(),
-            OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)).getName());
     StorageClass storageClass =
         StorageClassConverter.convert(null,
             container1.getPipeline().getFactor(),
@@ -143,10 +143,10 @@ public class TestContainerStateManagerIntegration {
     // Allocate a container and verify the container info
     ContainerWithPipeline container1 = scm.getClientProtocolServer()
         .allocateContainer(
+            OzoneConsts.OZONE,
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)).getName(),
-            OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)).getName());
     StorageClass storageClass =
         StorageClassConverter.convert(null,
             container1.getPipeline().getFactor(),
@@ -180,10 +180,10 @@ public class TestContainerStateManagerIntegration {
 
       ContainerWithPipeline container = scm.getClientProtocolServer()
           .allocateContainer(
+              OzoneConsts.OZONE,
               StorageClassConverter.convert(null,
                   SCMTestUtils.getReplicationFactor(conf),
-                  SCMTestUtils.getReplicationType(conf)).getName(),
-              OzoneConsts.OZONE);
+                  SCMTestUtils.getReplicationType(conf)).getName());
       if (i >= 5) {
         scm.getContainerManager().updateContainerState(container
                 .getContainerInfo().containerID(),
@@ -229,10 +229,10 @@ public class TestContainerStateManagerIntegration {
     long cid;
     ContainerWithPipeline container1 = scm.getClientProtocolServer().
         allocateContainer(
+            OzoneConsts.OZONE,
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)).getName(),
-            OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)).getName());
     cid = container1.getContainerInfo().getContainerID();
 
     // each getMatchingContainer call allocates a container in the
@@ -264,10 +264,10 @@ public class TestContainerStateManagerIntegration {
     long cid;
     ContainerWithPipeline container1 = scm.getClientProtocolServer().
         allocateContainer(
+            OzoneConsts.OZONE,
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)).getName(),
-            OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)).getName());
     cid = container1.getContainerInfo().getContainerID();
 
     StorageClass storageClass =
@@ -302,10 +302,10 @@ public class TestContainerStateManagerIntegration {
     long cid;
     ContainerWithPipeline container1 = scm.getClientProtocolServer().
         allocateContainer(
+            OzoneConsts.OZONE,
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)).getName(),
-            OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)).getName());
     cid = container1.getContainerInfo().getContainerID();
 
     StorageClass storageClass =
@@ -335,10 +335,10 @@ public class TestContainerStateManagerIntegration {
       throws IOException, InterruptedException {
     ContainerWithPipeline container1 = scm.getClientProtocolServer().
         allocateContainer(
+            OzoneConsts.OZONE,
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)).getName(),
-            OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)).getName());
     Map<Long, Long> container2MatchedCount = new ConcurrentHashMap<>();
 
     // allocate blocks using multiple threads
@@ -393,10 +393,10 @@ public class TestContainerStateManagerIntegration {
     // OPEN -> CLOSING -> CLOSED -> DELETING -> DELETED
     ContainerWithPipeline container1 = scm.getClientProtocolServer()
         .allocateContainer(
+            OzoneConsts.OZONE,
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)).getName(),
-            OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)).getName());
     containers = containerStateManager.getMatchingContainerIDs(
         OzoneConsts.OZONE,
         StorageClassConverter.convert(null,
@@ -494,10 +494,10 @@ public class TestContainerStateManagerIntegration {
 
     ContainerWithPipeline container = scm.getClientProtocolServer()
         .allocateContainer(
+            OzoneConsts.OZONE,
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)).getName(),
-            OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)).getName());
 
     ContainerID id = container.getContainerInfo().containerID();
 

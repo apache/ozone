@@ -529,7 +529,7 @@ public class SCMContainerManager implements ContainerManager {
       ContainerID cid = containerIDIterator.next();
       try {
         if (!getContainer(cid).getOwner().equals(owner) ||
-            !getContainer(cid).getStorageClass().getName().equals(
+            !getContainer(cid).getStorageClass().equals(
                 storageClass.getName())) {
           containerIDIterator.remove();
         }

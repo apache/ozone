@@ -36,6 +36,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.StorageClass;
+import org.apache.hadoop.hdds.StorageClassRegistry;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
@@ -122,6 +123,7 @@ public class ReplicationManager
    * ReplicationManager specific configuration.
    */
   private final ReplicationManagerConfiguration conf;
+  private final StorageClassRegistry storageClassRegistry;
 
   /**
    * ReplicationMonitor thread is the one which wakes up at configured
@@ -154,7 +156,8 @@ public class ReplicationManager
                             final PlacementPolicy containerPlacement,
                             final EventPublisher eventPublisher,
                             final LockManager<ContainerID> lockManager,
-                            final NodeManager nodeManager) {
+                            final NodeManager nodeManager,
+                            final StorageClassRegistry storageClassRegistry) {
     this.containerManager = containerManager;
     this.containerPlacement = containerPlacement;
     this.eventPublisher = eventPublisher;
@@ -164,6 +167,7 @@ public class ReplicationManager
     this.inflightReplication = new ConcurrentHashMap<>();
     this.inflightDeletion = new ConcurrentHashMap<>();
     this.nodeManager = nodeManager;
+    this.storageClassRegistry = storageClassRegistry;
   }
 
   /**
@@ -266,7 +270,8 @@ public class ReplicationManager
           .getContainerReplicas(container.containerID());
       final LifeCycleState state = container.getState();
 
-      StorageClass storageClass = container.getStorageClass();
+      StorageClass storageClass =
+          storageClassRegistry.getStorageClass(container.getStorageClass());
 
       /*
        * We don't take any action if the container is in OPEN state and

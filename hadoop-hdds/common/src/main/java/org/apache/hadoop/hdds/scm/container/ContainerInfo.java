@@ -25,7 +25,8 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Comparator;
 
-import org.apache.hadoop.hdds.StorageClass;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.StorageClassConverter;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
@@ -55,7 +56,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
   private ReplicationFactor replicationFactor;
   @Deprecated
   private ReplicationType replicationType;
-  private StorageClass storageClass;
+  private String storageClass;
   private long usedBytes;
   private long numberOfKeys;
   private Instant lastUsed;
@@ -116,7 +117,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
       long sequenceId,
       ReplicationFactor replicationFactor,
       ReplicationType repType,
-      StorageClass storageClass) {
+      String storageClass) {
     this.containerID = containerID;
     this.pipelineID = pipelineID;
     this.usedBytes = usedBytes;
@@ -140,6 +141,15 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
 
   public static ContainerInfo fromProtobuf(HddsProtos.ContainerInfoProto info) {
     ContainerInfo.Builder builder = new ContainerInfo.Builder();
+    String storageClass = null;
+    if (info.hasStorageClass()) {
+      storageClass = info.getStorageClass();
+    }
+    if (StringUtils.isBlank(storageClass)) {
+      storageClass = StorageClassConverter.convert(
+          null, info.getReplicationFactor(),
+          info.getReplicationType()).getName();
+    }
     return builder.setPipelineID(
         PipelineID.getFromProtobuf(info.getPipelineID()))
         .setUsedBytes(info.getUsedBytes())
@@ -151,6 +161,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
         .setDeleteTransactionId(info.getDeleteTransactionId())
         .setReplicationFactor(info.getReplicationFactor())
         .setReplicationType(info.getReplicationType())
+        .setStorageClass(storageClass)
         .build();
   }
 
@@ -230,7 +241,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     return replicationType;
   }
 
-  public StorageClass getStorageClass() {
+  public String getStorageClass() {
     return storageClass;
   }
 
@@ -249,7 +260,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
         .setContainerID(getContainerID())
         .setDeleteTransactionId(getDeleteTransactionId())
         .setPipelineID(getPipelineID().getProtobuf())
-        .setStorageClass(getStorageClass().getName())
+        .setStorageClass(getStorageClass())
         .setOwner(getOwner())
         .build();
   }
@@ -401,7 +412,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     throw new IOException(SERIALIZATION_ERROR_MSG);
   }
 
-  public void setStorageClass(StorageClass sc) {
+  public void setStorageClass(String sc) {
     this.storageClass = sc;
   }
 
@@ -420,7 +431,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
     private PipelineID pipelineID;
     private ReplicationFactor replicationFactor;
     private ReplicationType replicationType;
-    private StorageClass storageClass;
+    private String storageClass;
 
     public Builder setReplicationType(
         ReplicationType repType) {
@@ -479,12 +490,16 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
       return this;
     }
 
-    public Builder setStorageClass(StorageClass sc) {
+    public Builder setStorageClass(String sc) {
       this.storageClass = sc;
       return this;
     }
 
     public ContainerInfo build() {
+      if (StringUtils.isBlank(storageClass)) {
+        storageClass = StorageClassConverter.convert(null,
+            replicationFactor, replicationType).getName();
+      }
       return new ContainerInfo(containerID, state, pipelineID,
           used, keys, stateEnterTime, owner, deleteTransactionId,
           sequenceId, replicationFactor, replicationType, storageClass);

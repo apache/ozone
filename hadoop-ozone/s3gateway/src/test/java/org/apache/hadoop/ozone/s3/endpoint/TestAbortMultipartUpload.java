@@ -19,6 +19,7 @@
  */
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
@@ -52,7 +53,7 @@ public class TestAbortMultipartUpload {
 
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
-        "STANDARD");
+        StaticStorageClassRegistry.STANDARD.getName());
 
     ObjectEndpoint rest = new ObjectEndpoint();
     rest.setHeaders(headers);

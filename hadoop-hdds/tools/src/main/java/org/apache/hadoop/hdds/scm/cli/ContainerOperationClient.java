@@ -26,6 +26,7 @@ import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
@@ -71,7 +72,8 @@ public class ContainerOperationClient implements ScmClient {
   private final StorageContainerLocationProtocol
       storageContainerLocationClient;
 
-  private final String storageClass = "STANDARD";
+  private final String storageClass =
+      StaticStorageClassRegistry.STANDARD.getName();
 
   public XceiverClientManager getXceiverClientManager() {
     return xceiverClientManager;

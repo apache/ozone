@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -128,7 +129,8 @@ public class TestReplicationManager {
         containerPlacementPolicy,
         eventQueue,
         new LockManager<>(conf),
-        scmNodeManager);
+        scmNodeManager,
+        new StaticStorageClassRegistry());
     replicationManager.start();
     Thread.sleep(100L);
   }

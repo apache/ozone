@@ -44,7 +44,7 @@ public class ContainerInfoCodec implements Codec<ContainerInfo> {
       StorageClass calculatedStorageClass =
           StorageClassConverter.convert(null, info.getReplicationFactor(),
               info.getReplicationType());
-      info.setStorageClass(calculatedStorageClass);
+      info.setStorageClass(calculatedStorageClass.getName());
     }
     return info;
   }

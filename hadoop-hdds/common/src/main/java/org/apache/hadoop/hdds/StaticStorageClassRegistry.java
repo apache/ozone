@@ -19,6 +19,9 @@ package org.apache.hadoop.hdds;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Static StorageClassRegistry for POC purpose.
  */
@@ -42,7 +45,7 @@ public class StaticStorageClassRegistry implements StorageClassRegistry {
 
     @Override
     public String getName() {
-      return "REDUCED";
+      return "REDUCED_REDUNDANCY";
     }
   };
 
@@ -86,17 +89,25 @@ public class StaticStorageClassRegistry implements StorageClassRegistry {
     }
   };
 
+  private static final Map<String, StorageClass> STRING_STORAGE_CLASS_MAP =
+      new HashMap<>();
+  static {
+    STRING_STORAGE_CLASS_MAP.put(STANDARD.getName(), STANDARD);
+    STRING_STORAGE_CLASS_MAP.put(REDUCED_REDUNDANCY.getName(),
+        REDUCED_REDUNDANCY);
+    STRING_STORAGE_CLASS_MAP.put(LEGACY.getName(), LEGACY);
+  }
+
   @Override
   public StorageClass getStorageClass(String name) {
-    if (name.equals("STANDARD")) {
-      return STANDARD;
-    } else if (name.equals("REDUCED")) {
-      return REDUCED_REDUNDANCY;
-    } else if (name.equals("LEGACY")) {
-      return LEGACY;
-    } else {
+    StorageClass storageClass = STRING_STORAGE_CLASS_MAP.get(name);
+    if (storageClass == null) {
+      final StringBuilder systemStorageClassesStr = new StringBuilder();
+      STRING_STORAGE_CLASS_MAP.values().forEach(
+          v -> systemStorageClassesStr.append(" " + v.getName()));
       throw new UnsupportedOperationException("Storage class " + name
-          + " is not supported. Use STANDARD or REDUCED");
+          + " is not supported. Use" + systemStorageClassesStr);
     }
+    return storageClass;
   }
 }

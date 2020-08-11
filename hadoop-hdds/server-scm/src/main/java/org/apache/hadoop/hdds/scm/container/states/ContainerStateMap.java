@@ -27,7 +27,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.StorageClass;
+import org.apache.hadoop.hdds.StorageClassRegistry;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -92,6 +94,9 @@ public class ContainerStateMap {
   // protected by this lock.
   private final ReadWriteLock lock;
 
+  // TODO(baoloongmao): assign this froms configuration
+  private StorageClassRegistry storageClassRegistry =
+      new StaticStorageClassRegistry();
   /**
    * Create a ContainerStateMap.
    */
@@ -127,7 +132,8 @@ public class ContainerStateMap {
 
       lifeCycleStateMap.insert(info.getState(), id);
       ownerMap.insert(info.getOwner(), id);
-      storageClassMap.insert(info.getStorageClass(), id);
+      storageClassMap.insert(
+          storageClassRegistry.getStorageClass(info.getStorageClass()), id);
       replicaMap.put(id, ConcurrentHashMap.newKeySet());
 
       // Flush the cache of this container type, will be added later when
@@ -156,7 +162,9 @@ public class ContainerStateMap {
       final ContainerInfo info = containerMap.remove(containerID);
       lifeCycleStateMap.remove(info.getState(), containerID);
       ownerMap.remove(info.getOwner(), containerID);
-      storageClassMap.remove(info.getStorageClass(), containerID);
+      storageClassMap.remove(
+          storageClassRegistry.getStorageClass(
+              info.getStorageClass()), containerID);
       // Flush the cache of this container type.
       flushCache(info);
       LOG.trace("Removed container with {} successfully.", containerID);
@@ -494,7 +502,8 @@ public class ContainerStateMap {
       final ContainerQueryKey key = new ContainerQueryKey(
           containerInfo.getState(),
           containerInfo.getOwner(),
-          containerInfo.getStorageClass());
+          storageClassRegistry.getStorageClass(
+              containerInfo.getStorageClass()));
       resultCache.remove(key);
     }
   }

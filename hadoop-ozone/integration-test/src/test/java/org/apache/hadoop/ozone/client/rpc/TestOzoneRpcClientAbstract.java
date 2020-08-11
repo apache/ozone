@@ -1948,7 +1948,8 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     OmMultipartInfo omMultipartInfo =
-        bucket.initiateMultipartUpload(keyName, "LEGACY");
+        bucket.initiateMultipartUpload(keyName,
+            StaticStorageClassRegistry.LEGACY.getName());
 
     Assert.assertNotNull(omMultipartInfo.getUploadID());
 
@@ -1983,7 +1984,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneBucket bucket = volume.getBucket(bucketName);
 
     OmMultipartInfo omMultipartInfo = bucket.initiateMultipartUpload(keyName,
-        "LEGACY");
+        StaticStorageClassRegistry.LEGACY.getName());
 
     Assert.assertNotNull(omMultipartInfo.getUploadID());
 
