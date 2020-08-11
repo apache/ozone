@@ -34,7 +34,6 @@ import org.apache.hadoop.hdds.scm.cli.container.WithScmClient;
 import org.apache.hadoop.hdds.scm.cli.datanode.DatanodeCommands;
 import org.apache.hadoop.hdds.scm.cli.pipeline.PipelineCommands;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.apache.hadoop.ozone.admin.om.OMAdmin;
 import org.apache.hadoop.util.NativeCodeLoader;
 
 import org.apache.commons.lang3.StringUtils;
@@ -55,7 +54,6 @@ import picocli.CommandLine.Option;
     description = "Developer tools for Ozone Admin operations",
     versionProvider = HddsVersionProvider.class,
     subcommands = {
-        OMAdmin.class,
         SafeModeCommands.class,
         ContainerCommands.class,
         PipelineCommands.class,
@@ -70,6 +68,10 @@ public class OzoneAdmin extends GenericCli implements WithScmClient {
 
   @Option(names = {"--scm"}, description = "The destination scm (host:port)")
   private String scm = "";
+
+  public OzoneAdmin() {
+    super(OzoneAdmin.class);
+  }
 
   public OzoneConfiguration getOzoneConf() {
     if (ozoneConf == null) {

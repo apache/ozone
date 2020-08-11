@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,35 +15,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package org.apache.hadoop.ozone.debug;
-
-import org.apache.hadoop.hdds.cli.GenericCli;
-import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-
-import picocli.CommandLine;
+package org.apache.hadoop.hdds.cli;
 
 /**
- * Ozone Debug Command line tool.
+ * Defineds parent command for SPI based subcommand registration.
  */
-@CommandLine.Command(name = "ozone debug",
-        description = "Developer tools for Ozone Debug operations",
-        versionProvider = HddsVersionProvider.class,
-        mixinStandardHelpOptions = true)
-public class OzoneDebug extends GenericCli {
-
-  public OzoneDebug() {
-    super(OzoneDebug.class);
-  }
+public interface SubcommandWithParent {
 
   /**
-     * Main for the Ozone Debug shell Command handling.
-     *
-     * @param argv - System Args Strings[]
-     * @throws Exception
-     */
-  public static void main(String[] argv) throws Exception {
+   * Java type of the parent command.
+   */
+  Class<?> getParentType();
 
-    new OzoneDebug().run(argv);
-  }
 }
