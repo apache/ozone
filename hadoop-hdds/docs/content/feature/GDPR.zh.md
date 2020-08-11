@@ -1,8 +1,8 @@
 ---
-title: "GDPR in Ozone"
+title: "Ozone 中的 GDPR"
 date: "2019-September-17"
 weight: 5
-summary: GDPR in Ozone
+summary: Ozone 中的 GDPR
 icon: user
 ---
 <!---
@@ -22,21 +22,20 @@ icon: user
   limitations under the License.
 -->
 
+<div class="alert alert-warning">
 
-Enabling GDPR compliance in Ozone is very straight forward. During bucket
-creation, you can specify `--enforcegdpr=true` or `-g=true` and this will
-ensure the bucket is GDPR compliant. Thus, any key created under this bucket
-will automatically be GDPR compliant.
+注意：本页面翻译的信息可能滞后，最新的信息请参看英文版的相关页面。
 
-GDPR can only be enabled on a new bucket. For existing buckets, you would
-have to create a new GDPR compliant bucket and copy data from old bucket into
- new bucket to take advantage of GDPR.
+</div>
 
-Example to create a GDPR compliant bucket:
+在 Ozone 中遵守 GDPR 规范非常简单，只需要在创建桶时指定 `--enforcegdpr=true` 或  `-g=true` 参数，这样创建出的桶都是符合 GDPR 规范的，当然，在桶中创建的键也都自动符合。
+
+GDPR 只能在新桶上应用，对于已有的桶，要想使它符合 GDPR 规范，只能创建一个符合 GDPR 规范的新桶，然后把旧桶中的数据拷贝到新桶。
+
+创建符合 GDPR 规范的桶的示例：
 
 `ozone sh bucket create --enforcegdpr=true /hive/jan`
 
 `ozone sh bucket create -g=true /hive/jan`
 
-If you want to create an ordinary bucket then you can skip `--enforcegdpr`
-and `-g` flags.
+如果你想创建普通的桶，省略 `--enforcegdpr` 和 `-g` 参数即可。

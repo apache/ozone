@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
@@ -49,6 +50,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import org.apache.ratis.protocol.ClientId;
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
@@ -58,7 +60,9 @@ import picocli.CommandLine.Parameters;
 @Command(name = "chunkinfo",
         description = "returns chunk location"
                 + " information about an existing key")
-public class ChunkKeyHandler  extends KeyHandler {
+@MetaInfServices(SubcommandWithParent.class)
+public class ChunkKeyHandler extends KeyHandler implements
+    SubcommandWithParent {
 
   @Parameters(arity = "1..1", description = "key to be located")
     private String uri;
@@ -170,5 +174,8 @@ public class ChunkKeyHandler  extends KeyHandler {
     System.out.println(prettyJson);
   }
 
-
+  @Override
+  public Class<?> getParentType() {
+    return OzoneDebug.class;
+  }
 }

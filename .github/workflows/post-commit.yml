@@ -23,8 +23,10 @@ jobs:
     name: compile
     runs-on: ubuntu-18.04
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Cache for npm dependencies
+        uses: actions/cache@v2
         with:
           path: |
             ~/.pnpm-store
@@ -32,114 +34,127 @@ jobs:
           key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-
-      - uses: ./.github/buildenv
+      - name: Execute tests
+        uses: ./.github/buildenv
         with:
           args: ./hadoop-ozone/dev-support/checks/build.sh
   bats:
     runs-on: ubuntu-18.04
     steps:
-      - uses: actions/checkout@v2
-      - name: install bats
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Install bats
         run: |
           cd /tmp
           curl -LSs https://github.com/bats-core/bats-core/archive/v1.2.1.tar.gz | tar xzf -
           cd bats-core-1.2.1
           sudo ./install.sh /usr/local
-      - name: run tests
+      - name: Execute tests
         run: ./hadoop-ozone/dev-support/checks/${{ github.job }}.sh
       - name: Summary of failures
         run: cat target/${{ github.job }}/summary.txt
         if: always()
-      - uses: actions/upload-artifact@master
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
         if: always()
         with:
           name: ${{ github.job }}
           path: target/${{ github.job }}
+        continue-on-error: true
   rat:
-    name: rat
     runs-on: ubuntu-18.04
     steps:
-        - uses: actions/checkout@v2
-        - uses: ./.github/buildenv
-          with:
-             args: ./hadoop-ozone/dev-support/checks/rat.sh
-        - name: Summary of failures
-          run: cat target/${{ github.job }}/summary.txt
-          if: always()
-        - uses: actions/upload-artifact@v2
-          if: always()
-          with:
-            name: rat
-            path: target/rat
-          continue-on-error: true
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Execute tests
+        uses: ./.github/buildenv
+        with:
+          args: ./hadoop-ozone/dev-support/checks/rat.sh
+      - name: Summary of failures
+        run: cat target/${{ github.job }}/summary.txt
+        if: always()
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: rat
+          path: target/rat
+        continue-on-error: true
   author:
-    name: author
     runs-on: ubuntu-18.04
     steps:
-        - uses: actions/checkout@v2
-        - run: hadoop-ozone/dev-support/checks/author.sh
-        - name: Summary of failures
-          run: cat target/${{ github.job }}/summary.txt
-          if: always()
-        - uses: actions/upload-artifact@v2
-          if: always()
-          with:
-            name: author
-            path: target/author
-          continue-on-error: true
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Execute tests
+        run: hadoop-ozone/dev-support/checks/author.sh
+      - name: Summary of failures
+        run: cat target/${{ github.job }}/summary.txt
+        if: always()
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: author
+          path: target/author
+        continue-on-error: true
   unit:
-    name: unit
     runs-on: ubuntu-18.04
     steps:
-        - uses: actions/checkout@v2
-        - uses: ./.github/buildenv
-          with:
-             args: ./hadoop-ozone/dev-support/checks/unit.sh
-        - name: Summary of failures
-          run: cat target/${{ github.job }}/summary.txt
-          if: always()
-        - uses: actions/upload-artifact@v2
-          if: always()
-          with:
-            name: unit
-            path: target/unit
-          continue-on-error: true
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Execute tests
+        uses: ./.github/buildenv
+        with:
+          args: ./hadoop-ozone/dev-support/checks/unit.sh
+      - name: Summary of failures
+        run: cat target/${{ github.job }}/summary.txt
+        if: always()
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: unit
+          path: target/unit
+        continue-on-error: true
   checkstyle:
-    name: checkstyle
     runs-on: ubuntu-18.04
     steps:
-        - uses: actions/checkout@v2
-        - uses: ./.github/buildenv
-          with:
-             args: ./hadoop-ozone/dev-support/checks/checkstyle.sh
-        - name: Summary of failures
-          run: cat target/${{ github.job }}/summary.txt
-          if: always()
-        - uses: actions/upload-artifact@v2
-          if: always()
-          with:
-            name: checkstyle
-            path: target/checkstyle
-          continue-on-error: true
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Execute tests
+        uses: ./.github/buildenv
+        with:
+          args: ./hadoop-ozone/dev-support/checks/checkstyle.sh
+      - name: Summary of failures
+        run: cat target/${{ github.job }}/summary.txt
+        if: always()
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: checkstyle
+          path: target/checkstyle
+        continue-on-error: true
   findbugs:
-    name: findbugs
     runs-on: ubuntu-18.04
     steps:
-        - uses: actions/checkout@v2
-        - uses: ./.github/buildenv
-          with:
-             args: ./hadoop-ozone/dev-support/checks/findbugs.sh
-        - name: Summary of failures
-          run: cat target/${{ github.job }}/summary.txt
-          if: always()
-        - uses: actions/upload-artifact@v2
-          if: always()
-          with:
-            name: findbugs
-            path: target/findbugs
-          continue-on-error: true
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Execute tests
+        uses: ./.github/buildenv
+        with:
+          args: ./hadoop-ozone/dev-support/checks/findbugs.sh
+      - name: Summary of failures
+        run: cat target/${{ github.job }}/summary.txt
+        if: always()
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: findbugs
+          path: target/findbugs
+        continue-on-error: true
   acceptance:
-    name: acceptance
     runs-on: ubuntu-18.04
     strategy:
       matrix:
@@ -149,11 +164,13 @@ jobs:
           - misc
       fail-fast: false
     steps:
-      - uses: actions/cache@v2
+      - name: Cache for maven dependencies
+        uses: actions/cache@v2
         with:
           path: ~/.m2/repository
           key: maven-repo-${{ hashFiles('**/pom.xml') }}
-      - uses: actions/cache@v2
+      - name: Cache for npm dependencies
+        uses: actions/cache@v2
         with:
             path: |
               ~/.pnpm-store
@@ -161,7 +178,7 @@ jobs:
             key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
             restore-keys: |
               ${{ runner.os }}-pnpm-
-      - name: checkout to /mnt/ozone
+      - name: Checkout to /mnt/ozone
         run: |
           sudo chmod 777 /mnt
           git clone 'https://github.com/${{ github.repository }}.git' /mnt/ozone
@@ -173,12 +190,14 @@ jobs:
           fi
           git checkout FETCH_HEAD
           git reset --hard
-      - name: run a full build
+      - name: Run a full build
         run: |
           cd /mnt/ozone
           hadoop-ozone/dev-support/checks/build.sh -Pcoverage
-      - run: sudo pip install robotframework
-      - run: |
+      - name: Install robotframework
+        run: sudo pip install robotframework
+      - name: Execute tests
+        run: |
           cd /mnt/ozone/hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
           cd /mnt/ozone && hadoop-ozone/dev-support/checks/acceptance.sh
         env:
@@ -186,19 +205,20 @@ jobs:
           OZONE_ACCEPTANCE_SUITE: ${{ matrix.suite }}
           OZONE_WITH_COVERAGE: true
           OZONE_VOLUME_OWNER: 1000
-      - uses: actions/upload-artifact@v2
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
         if: always()
         with:
           name: acceptance-${{ matrix.suite }}
           path: /mnt/ozone/target/acceptance
         continue-on-error: true
-      - run: |
+      - name: Delete temporary build artifacts before caching
+        run: |
           #Never cache local artifacts
           rm -rf ~/.m2/repository/org/apache/hadoop/hdds
           rm -rf ~/.m2/repository/org/apache/hadoop/ozone
         if: always()
   integration:
-    name: integration
     runs-on: ubuntu-18.04
     strategy:
       matrix:
@@ -208,58 +228,66 @@ jobs:
           - ozone
       fail-fast: false
     steps:
-        - run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
-        - uses: actions/checkout@v2
-          with:
-            path: mnt/ozone
-        - uses: ./mnt/ozone/.github/buildenv
-          with:
-             args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
-        - name: Summary of failures
-          run: cat mnt/ozone/target/${{ github.job }}/summary.txt
-          if: always()
-        - uses: actions/upload-artifact@v2
-          if: always()
-          with:
-            name: it-${{ matrix.profile }}
-            path: mnt/ozone/target/integration
-          continue-on-error: true
+      - name: Setup link to SSD
+        run: sudo mkdir mnt && sudo mount --bind /mnt `pwd`/mnt && sudo chmod 777 mnt
+      - name: Checkout project
+        uses: actions/checkout@v2
+        with:
+          path: mnt/ozone
+      - name: Execute tests
+        uses: ./mnt/ozone/.github/buildenv
+        with:
+          args: ./mnt/ozone/hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }}
+      - name: Summary of failures
+        run: cat mnt/ozone/target/${{ github.job }}/summary.txt
+        if: always()
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: it-${{ matrix.profile }}
+          path: mnt/ozone/target/integration
+        continue-on-error: true
   coverage:
-    name: coverage
     runs-on: ubuntu-18.04
     needs:
-       - acceptance
-       - integration
-       - unit
+      - acceptance
+      - integration
+      - unit
     steps:
-       - uses: actions/checkout@v2
-       - uses: ./.github/buildenv
-         with:
-            args: ./hadoop-ozone/dev-support/checks/build.sh
-       - uses: actions/download-artifact@v2
-         with:
-            path: target/artifacts
-       - run: ./hadoop-ozone/dev-support/checks/coverage.sh
-       - uses: ./.github/buildenv
-         if: github.repository == 'apache/hadoop-ozone' && github.event_name != 'pull_request'
-         with:
-           args: ./hadoop-ozone/dev-support/checks/sonar.sh
-         env:
-           SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
-           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-       - name: Upload coverage to Codecov
-         uses: codecov/codecov-action@v1
-         with:
-           file: ./target/coverage/all.xml
-           name: codecov-umbrella
-           fail_ci_if_error: true
-       - uses: actions/upload-artifact@v2
-         with:
-           name: coverage
-           path: target/coverage
-         continue-on-error: true
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Run a full build
+        uses: ./.github/buildenv
+        with:
+          args: ./hadoop-ozone/dev-support/checks/build.sh
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+        with:
+          path: target/artifacts
+      - name: Calculate combined coverage
+        run: ./hadoop-ozone/dev-support/checks/coverage.sh
+      - name: Upload coverage to Sonar
+        uses: ./.github/buildenv
+        if: github.repository == 'apache/hadoop-ozone' && github.event_name != 'pull_request'
+        with:
+          args: ./hadoop-ozone/dev-support/checks/sonar.sh
+        env:
+          SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v1
+        with:
+          file: ./target/coverage/all.xml
+          name: codecov-umbrella
+          fail_ci_if_error: true
+      - name: Archive build results
+        uses: actions/upload-artifact@v2
+        with:
+          name: coverage
+          path: target/coverage
+        continue-on-error: true
   kubernetes:
-    name: kubernetes
     runs-on: ubuntu-18.04
     steps:
       - name: Cache for maven dependencies
@@ -312,7 +340,7 @@ jobs:
           cd /mnt/ozone/hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
           cd /mnt/ozone && hadoop-ozone/dev-support/checks/kubernetes.sh
       - name: Archive build results
-        uses: actions/upload-artifact@master
+        uses: actions/upload-artifact@v2
         if: always()
         with:
           name: kubernetes

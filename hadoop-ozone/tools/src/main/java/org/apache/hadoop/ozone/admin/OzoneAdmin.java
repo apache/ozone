@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.scm.cli.TopologySubcommand;
 import org.apache.hadoop.hdds.scm.cli.container.ContainerCommands;
 import org.apache.hadoop.hdds.scm.cli.datanode.DatanodeCommands;
 import org.apache.hadoop.hdds.scm.cli.pipeline.PipelineCommands;
-import org.apache.hadoop.ozone.admin.om.OMAdmin;
 import org.apache.hadoop.util.NativeCodeLoader;
 
 import org.apache.log4j.ConsoleAppender;
@@ -44,7 +43,6 @@ import picocli.CommandLine;
     description = "Developer tools for Ozone Admin operations",
     versionProvider = HddsVersionProvider.class,
     subcommands = {
-        OMAdmin.class,
         SafeModeCommands.class,
         ContainerCommands.class,
         PipelineCommands.class,
@@ -56,6 +54,10 @@ import picocli.CommandLine;
 public class OzoneAdmin extends GenericCli {
 
   private OzoneConfiguration ozoneConf;
+
+  public OzoneAdmin() {
+    super(OzoneAdmin.class);
+  }
 
   public OzoneConfiguration getOzoneConf() {
     if (ozoneConf == null) {

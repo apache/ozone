@@ -18,18 +18,29 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
-import org.apache.hadoop.hdds.utils.db.DBDefinition;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.rocksdb.*;
-import picocli.CommandLine;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.Callable;
+
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
+import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.ozone.OzoneConsts;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import org.kohsuke.MetaInfServices;
+import org.rocksdb.ColumnFamilyDescriptor;
+import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.Options;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksIterator;
+import picocli.CommandLine;
 
 /**
  * Parser for scm.db file.
@@ -38,7 +49,8 @@ import java.util.concurrent.Callable;
         name = "scan",
         description = "Parse specified metadataTable"
 )
-public class DBScanner implements Callable<Void> {
+@MetaInfServices(SubcommandWithParent.class)
+public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.Option(names = {"--column_family"},
             description = "Table name")
@@ -159,5 +171,10 @@ public class DBScanner implements Callable<Void> {
       dbPath = dbPath.substring(0, dbPath.length()-1);
     }
     return dbPath;
+  }
+
+  @Override
+  public Class<?> getParentType() {
+    return RDBParser.class;
   }
 }
