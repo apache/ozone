@@ -14,7 +14,6 @@
 .classpath
 .project
 .settings
-*.factorypath
 target
 build
 dependency-reduced-pom.xml
@@ -62,6 +61,5 @@ output.xml
 report.html
 
 hadoop-hdds/docs/public
-hadoop-ozone/recon/node_modules
 
 .mvn

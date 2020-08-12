@@ -124,7 +124,7 @@ const COLUMNS = [
     dataIndex: 'lastLeaderElection',
     key: 'lastLeaderElection',
     render: (lastLeaderElection: number) => lastLeaderElection > 0 ?
-      moment(lastLeaderElection).format('ll LTS') : 'NA',
+      moment(lastLeaderElection).format('lll') : 'NA',
     sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.lastLeaderElection - b.lastLeaderElection
   },
   {
