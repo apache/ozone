@@ -122,6 +122,9 @@ run cp  -r "${ROOT}/hadoop-ozone/fault-injection-test/network-tests/src/test/blo
 # Optional documentation, could be missing
 cp -r "${ROOT}/hadoop-hdds/docs/target/classes/docs" ./
 
+#copy byteman helpers
+run cp -r "${ROOT}/dev-support/byteman" "share/ozone/"
+
 #Copy docker compose files
 #compose files are preprocessed: properties (eg. project.version) are replaced first by maven.
 run cp -p -R "${ROOT}/hadoop-ozone/dist/target/compose" .
