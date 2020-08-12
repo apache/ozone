@@ -516,6 +516,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
     @Override
     public MiniOzoneCluster build() throws IOException {
+      // in case User does not set
+      setClusterId(UUID.randomUUID().toString());
+
       DefaultMetricsSystem.setMiniClusterMode(true);
       initializeConfiguration();
       StorageContainerManager scm = null;

@@ -203,7 +203,7 @@ public class TestContainerServer {
   public void testClientServerWithContainerDispatcher() throws Exception {
     XceiverServerGrpc server = null;
     XceiverClientGrpc client = null;
-    UUID scmId = UUID.randomUUID();
+    UUID clusterId = UUID.randomUUID();
     try {
       Pipeline pipeline = MockPipeline.createSingleNodePipeline();
       OzoneConfiguration conf = new OzoneConfiguration();
@@ -234,7 +234,7 @@ public class TestContainerServer {
       }
       HddsDispatcher dispatcher = new HddsDispatcher(
           conf, containerSet, volumeSet, handlers, context, metrics, null);
-      dispatcher.setScmId(scmId.toString());
+      dispatcher.setClusterId(clusterId.toString());
       dispatcher.init();
 
       server = new XceiverServerGrpc(datanodeDetails, conf, dispatcher,
@@ -292,7 +292,7 @@ public class TestContainerServer {
     }
 
     @Override
-    public void setScmId(String scmId) {
+    public void setClusterId(String clusterId) {
 
     }
 

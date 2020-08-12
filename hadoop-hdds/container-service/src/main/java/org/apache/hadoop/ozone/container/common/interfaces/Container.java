@@ -48,7 +48,7 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
    * @throws StorageContainerException
    */
   void create(VolumeSet volumeSet, VolumeChoosingPolicy volumeChoosingPolicy,
-              String scmId) throws StorageContainerException;
+              String clusterId) throws StorageContainerException;
 
   /**
    * Deletes the container.

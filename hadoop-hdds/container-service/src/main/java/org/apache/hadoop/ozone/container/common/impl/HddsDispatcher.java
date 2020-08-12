@@ -86,7 +86,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private final StateContext context;
   private final float containerCloseThreshold;
   private final ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics;
-  private String scmID;
+  private String clusterId;
   private ContainerMetrics metrics;
   private final TokenVerifier tokenVerifier;
   private final boolean isBlockTokenEnabled;
@@ -545,12 +545,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   }
 
   @Override
-  public void setScmId(String scmId) {
-    Preconditions.checkNotNull(scmId, "scmId Cannot be null");
-    if (this.scmID == null) {
-      this.scmID = scmId;
+  public void setClusterId(String clusterId) {
+    Preconditions.checkNotNull(clusterId, "clusterId Cannot be null");
+    if (this.clusterId == null) {
+      this.clusterId = clusterId;
       for (Map.Entry<ContainerType, Handler> handlerMap : handlers.entrySet()) {
-        handlerMap.getValue().setScmID(scmID);
+        handlerMap.getValue().setClusterId(this.clusterId);
       }
     }
   }

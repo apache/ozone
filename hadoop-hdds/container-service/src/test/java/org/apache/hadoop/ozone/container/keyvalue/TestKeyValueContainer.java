@@ -84,7 +84,7 @@ public class TestKeyValueContainer {
   public TemporaryFolder folder = new TemporaryFolder();
 
   private OzoneConfiguration conf;
-  private String scmId = UUID.randomUUID().toString();
+  private String clusterId = UUID.randomUUID().toString();
   private VolumeSet volumeSet;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
   private KeyValueContainerData keyValueContainerData;
@@ -131,7 +131,7 @@ public class TestKeyValueContainer {
         datanodeId.toString());
     keyValueContainer = new KeyValueContainer(
         keyValueContainerData, conf);
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
     KeyValueBlockIterator blockIterator = keyValueContainer.blockIterator();
     //As no blocks created, hasNext should return false.
     assertFalse(blockIterator.hasNext());
@@ -176,7 +176,7 @@ public class TestKeyValueContainer {
   public void testCreateContainer() throws Exception {
 
     // Create Container.
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
 
     keyValueContainerData = keyValueContainer.getContainerData();
 
@@ -198,7 +198,7 @@ public class TestKeyValueContainer {
 
     long containerId = keyValueContainer.getContainerData().getContainerID();
     // Create Container.
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
 
 
     keyValueContainerData = keyValueContainer
@@ -253,7 +253,7 @@ public class TestKeyValueContainer {
         .getVolumesList(), 1);
     String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
 
-    container.populatePathFields(scmId, containerVolume, hddsVolumeDir);
+    container.populatePathFields(clusterId, containerVolume, hddsVolumeDir);
     try (FileInputStream fis = new FileInputStream(folderToExport)) {
       container.importContainerData(fis, packer);
     }
@@ -288,8 +288,8 @@ public class TestKeyValueContainer {
   public void testDuplicateContainer() throws Exception {
     try {
       // Create Container.
-      keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
-      keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+      keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
+      keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
       fail("testDuplicateContainer failed");
     } catch (StorageContainerException ex) {
       GenericTestUtils.assertExceptionContains("ContainerFile already " +
@@ -305,7 +305,7 @@ public class TestKeyValueContainer {
     Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenThrow(DiskChecker.DiskOutOfSpaceException.class);
     try {
-      keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+      keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
       fail("testDiskFullExceptionCreateContainer failed");
     } catch (StorageContainerException ex) {
       GenericTestUtils.assertExceptionContains("disk out of space",
@@ -320,7 +320,7 @@ public class TestKeyValueContainer {
         .CLOSED);
     keyValueContainer = new KeyValueContainer(
         keyValueContainerData, conf);
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
     keyValueContainer.delete();
 
     String containerMetaDataPath = keyValueContainerData
@@ -338,7 +338,7 @@ public class TestKeyValueContainer {
 
   @Test
   public void testCloseContainer() throws Exception {
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
     keyValueContainer.close();
 
     keyValueContainerData = keyValueContainer
@@ -360,7 +360,7 @@ public class TestKeyValueContainer {
 
   @Test
   public void testReportOfUnhealthyContainer() throws Exception {
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
     Assert.assertNotNull(keyValueContainer.getContainerReport());
     keyValueContainer.markContainerUnhealthy();
     File containerFile = keyValueContainer.getContainerFile();
@@ -373,7 +373,7 @@ public class TestKeyValueContainer {
 
   @Test
   public void testUpdateContainer() throws IOException {
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
     Map<String, String> metadata = new HashMap<>();
     metadata.put(OzoneConsts.VOLUME, OzoneConsts.OZONE);
     metadata.put(OzoneConsts.OWNER, OzoneConsts.OZONE_SIMPLE_HDFS_USER);
@@ -399,7 +399,7 @@ public class TestKeyValueContainer {
       keyValueContainerData.setState(
           ContainerProtos.ContainerDataProto.State.CLOSED);
       keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
-      keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+      keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
       Map<String, String> metadata = new HashMap<>();
       metadata.put(OzoneConsts.VOLUME, OzoneConsts.OZONE);
       keyValueContainer.update(metadata, false);
@@ -417,7 +417,7 @@ public class TestKeyValueContainer {
     int initialSize = MetadataStoreBuilder.CACHED_OPTS.size();
 
     // Create Container 1
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
     Assert.assertTrue("Rocks DB options should be cached.",
         MetadataStoreBuilder.CACHED_OPTS.containsKey(conf));
 
@@ -430,7 +430,7 @@ public class TestKeyValueContainer {
         datanodeId.toString());
 
     keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
 
     assertEquals(initialSize + 1, MetadataStoreBuilder.CACHED_OPTS.size());
     Options cachedOpts = MetadataStoreBuilder.CACHED_OPTS.get(conf);

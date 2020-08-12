@@ -150,6 +150,7 @@ public abstract class TestOzoneRpcClientAbstract {
       remoteGroupName, READ, ACCESS);
 
   private static String scmId = UUID.randomUUID().toString();
+  private static String clusterId = UUID.randomUUID().toString();
 
   /**
    * Create a MiniOzoneCluster for testing.
@@ -161,6 +162,7 @@ public abstract class TestOzoneRpcClientAbstract {
         .setNumDatanodes(3)
         .setTotalPipelineNumLimit(10)
         .setScmId(scmId)
+        .setClusterId(clusterId)
         .build();
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);
@@ -212,6 +214,10 @@ public abstract class TestOzoneRpcClientAbstract {
 
   public static ObjectStore getStore() {
     return TestOzoneRpcClientAbstract.store;
+  }
+
+  public static String getClusterId() {
+    return clusterId;
   }
 
   public static void setScmId(String scmId) {
@@ -1172,7 +1178,7 @@ public abstract class TestOzoneRpcClientAbstract {
       String containreBaseDir =
           container.getContainerData().getVolume().getHddsRootDir().getPath();
       File chunksLocationPath = KeyValueContainerLocationUtil
-          .getChunksLocationPath(containreBaseDir, scmId, containerID);
+          .getChunksLocationPath(containreBaseDir, clusterId, containerID);
       byte[] corruptData = "corrupted data".getBytes();
       // Corrupt the contents of chunk files
       for (File file : FileUtils.listFiles(chunksLocationPath, null, false)) {

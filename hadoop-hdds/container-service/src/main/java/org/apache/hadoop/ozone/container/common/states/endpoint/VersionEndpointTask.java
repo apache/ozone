@@ -93,7 +93,7 @@ public class VersionEndpointTask implements
 
             for (Map.Entry<String, HddsVolume> entry : volumeMap.entrySet()) {
               HddsVolume hddsVolume = entry.getValue();
-              boolean result = HddsVolumeUtil.checkVolume(hddsVolume, scmId,
+              boolean result = HddsVolumeUtil.checkVolume(hddsVolume,
                   clusterId, LOG);
               if (!result) {
                 volumeSet.failVolume(hddsVolume.getHddsRootDir().getPath());
@@ -109,7 +109,7 @@ public class VersionEndpointTask implements
           }
 
           // Start the container services after getting the version information
-          ozoneContainer.start(scmId);
+          ozoneContainer.start(clusterId);
         }
         EndpointStateMachine.EndPointStates nextState =
             rpcEndPoint.getState().getNextState();

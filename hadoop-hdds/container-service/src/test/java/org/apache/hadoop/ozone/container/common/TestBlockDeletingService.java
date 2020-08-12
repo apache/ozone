@@ -140,7 +140,7 @@ public class TestBlockDeletingService {
       data.closeContainer();
       KeyValueContainer container = new KeyValueContainer(data, conf);
       container.create(new MutableVolumeSet(scmId, clusterID, conf),
-          new RoundRobinVolumeChoosingPolicy(), scmId);
+          new RoundRobinVolumeChoosingPolicy(), clusterID);
       containerSet.addContainer(container);
       data = (KeyValueContainerData) containerSet.getContainer(
           containerID).getContainerData();

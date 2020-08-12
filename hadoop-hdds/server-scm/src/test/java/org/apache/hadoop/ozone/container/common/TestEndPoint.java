@@ -180,10 +180,10 @@ public class TestEndPoint {
       // Now rpcEndpoint should remember the version it got from SCM
       Assert.assertNotNull(rpcEndPoint.getVersion());
 
-      // Now change server scmId, so datanode scmId  will be
-      // different from SCM server response scmId
-      String newScmId = UUID.randomUUID().toString();
-      scmServerImpl.setScmId(newScmId);
+      // Now change server clusterId, so datanode clusterId will be
+      // different from SCM server response clusterId
+      String newClusterId = UUID.randomUUID().toString();
+      scmServerImpl.setClusterId(newClusterId);
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
       newState = versionTask.call();
       Assert.assertEquals(EndpointStateMachine.EndPointStates.SHUTDOWN,
@@ -192,10 +192,9 @@ public class TestEndPoint {
           .getFailedVolumesList();
       Assert.assertTrue(volumesList.size() == 1);
       File expectedScmDir = new File(volumesList.get(0).getHddsRootDir(),
-          scmServerImpl.getScmId());
-      Assert.assertTrue(logCapturer.getOutput().contains("expected scm " +
-          "directory " + expectedScmDir.getAbsolutePath() + " does not " +
-          "exist"));
+          scmServerImpl.getClusterId());
+      Assert.assertTrue(logCapturer.getOutput()
+          .contains("Mismatched ClusterIDs"));
       Assert.assertTrue(ozoneContainer.getVolumeSet().getVolumesList().size()
           == 0);
       Assert.assertTrue(ozoneContainer.getVolumeSet().getFailedVolumesList()

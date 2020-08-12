@@ -126,7 +126,7 @@ public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
         KeyValueContainer keyValueContainer =
             new KeyValueContainer(keyValueContainerData, ozoneConfiguration);
 
-        keyValueContainer.create(volumeSet, volumeChoicePolicy, "scmid");
+        keyValueContainer.create(volumeSet, volumeChoicePolicy, "clusterId");
 
         containersPerThread.put(i, keyValueContainer);
       }

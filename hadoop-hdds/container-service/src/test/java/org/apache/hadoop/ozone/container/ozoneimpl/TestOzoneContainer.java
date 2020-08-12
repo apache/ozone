@@ -76,7 +76,7 @@ public class TestOzoneContainer {
   public TemporaryFolder folder = new TemporaryFolder();
 
   private OzoneConfiguration conf;
-  private String scmId = UUID.randomUUID().toString();
+  private String clusterId = UUID.randomUUID().toString();
   private MutableVolumeSet volumeSet;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
   private KeyValueContainerData keyValueContainerData;
@@ -138,7 +138,7 @@ public class TestOzoneContainer {
           datanodeDetails.getUuidString());
       keyValueContainer = new KeyValueContainer(
           keyValueContainerData, conf);
-      keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+      keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
       myVolume = keyValueContainer.getContainerData().getVolume();
 
       freeBytes = addBlocks(keyValueContainer, 2, 3);
@@ -233,7 +233,8 @@ public class TestOzoneContainer {
     // we expect an out of space Exception
     StorageContainerException e = LambdaTestUtils.intercept(
         StorageContainerException.class,
-        () -> keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId)
+        () -> keyValueContainer.create(volumeSet,
+            volumeChoosingPolicy, clusterId)
     );
     if (!DISK_OUT_OF_SPACE.equals(e.getResult())) {
       LOG.info("Unexpected error during container creation", e);

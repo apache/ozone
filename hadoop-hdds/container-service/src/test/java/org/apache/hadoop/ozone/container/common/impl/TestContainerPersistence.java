@@ -92,7 +92,7 @@ import static org.junit.Assert.fail;
 @RunWith(Parameterized.class)
 public class TestContainerPersistence {
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
-  private static final String SCM_ID = UUID.randomUUID().toString();
+  private static final String CLUSTER_ID = UUID.randomUUID().toString();
   private static Logger log =
       LoggerFactory.getLogger(TestContainerPersistence.class);
   private static String hddsPath;
@@ -181,7 +181,7 @@ public class TestContainerPersistence {
     data.addMetadata("VOLUME", "shire");
     data.addMetadata("owner)", "bilbo");
     KeyValueContainer container = new KeyValueContainer(data, conf);
-    container.create(volumeSet, volumeChoosingPolicy, SCM_ID);
+    container.create(volumeSet, volumeChoosingPolicy, CLUSTER_ID);
     commitBytesBefore = container.getContainerData()
         .getVolume().getCommittedBytes();
     cSet.addContainer(container);

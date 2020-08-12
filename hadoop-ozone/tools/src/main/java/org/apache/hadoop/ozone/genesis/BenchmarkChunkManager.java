@@ -83,7 +83,7 @@ public class BenchmarkChunkManager {
   private static final long CONTAINER_SIZE = OzoneConsts.GB;
   private static final long BLOCK_SIZE = 256 * OzoneConsts.MB;
 
-  private static final String SCM_ID = UUID.randomUUID().toString();
+  private static final String CLUSTER_ID = UUID.randomUUID().toString();
   private static final String DATANODE_ID = UUID.randomUUID().toString();
 
   /**
@@ -155,7 +155,8 @@ public class BenchmarkChunkManager {
             DATANODE_ID);
     KeyValueContainer container =
         new KeyValueContainer(containerData, state.config);
-    container.create(state.volumeSet, (volumes, any) -> volumes.get(0), SCM_ID);
+    container.create(state.volumeSet,
+        (volumes, any) -> volumes.get(0), CLUSTER_ID);
 
     final long blockCount = CONTAINER_SIZE / BLOCK_SIZE;
     final long chunkCount = BLOCK_SIZE / state.chunkSize;

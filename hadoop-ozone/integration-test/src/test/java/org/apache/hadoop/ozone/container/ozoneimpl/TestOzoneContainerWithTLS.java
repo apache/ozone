@@ -147,7 +147,7 @@ public class TestOzoneContainerWithTLS {
           OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT, false);
 
       container = new OzoneContainer(dn, conf, getContext(dn), caClient);
-      //Set scmId and manually start ozone container.
+      //Set clusterId and manually start ozone container.
       container.start(UUID.randomUUID().toString());
 
       XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf,

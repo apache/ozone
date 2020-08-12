@@ -52,14 +52,14 @@ import org.slf4j.LoggerFactory;
  * <p>
  * The disk layout per volume is as follows:
  * <p>../hdds/VERSION
- * <p>{@literal ../hdds/<<scmUuid>>/current/<<containerDir>>/<<containerID
+ * <p>{@literal ../hdds/<<clusterID>>/current/<<containerDir>>/<<containerID
  * >>/metadata}
- * <p>{@literal ../hdds/<<scmUuid>>/current/<<containerDir>>/<<containerID
+ * <p>{@literal ../hdds/<<clusterID>>/current/<<containerDir>>/<<containerID
  * >>/<<dataDir>>}
  * <p>
  * Each hdds volume has its own VERSION file. The hdds volume will have one
- * scmUuid directory for each SCM it is a part of (currently only one SCM is
- * supported).
+ * clusterID directory for each Cluster it is a part of (currently only one
+ * Cluster is supported).
  *
  * During DN startup, if the VERSION file exists, we verify that the
  * clusterID in the version file matches the clusterID from SCM.

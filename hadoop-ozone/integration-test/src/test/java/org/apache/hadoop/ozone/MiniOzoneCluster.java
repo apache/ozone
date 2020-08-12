@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.conf.StorageUnit;
@@ -310,7 +309,6 @@ public interface MiniOzoneCluster {
 
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
-      setClusterId(UUID.randomUUID().toString());
     }
 
     /**
@@ -321,9 +319,11 @@ public interface MiniOzoneCluster {
      * @return MiniOzoneCluster.Builder
      */
     public Builder setClusterId(String id) {
-      clusterId = id;
-      path = GenericTestUtils.getTempPath(
-          MiniOzoneClusterImpl.class.getSimpleName() + "-" + clusterId);
+      if (clusterId == null) {
+        clusterId = id;
+        path = GenericTestUtils.getTempPath(
+            MiniOzoneClusterImpl.class.getSimpleName() + "-" + clusterId);
+      }
       return this;
     }
 

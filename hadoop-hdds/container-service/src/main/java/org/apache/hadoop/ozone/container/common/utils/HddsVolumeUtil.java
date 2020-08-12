@@ -166,16 +166,15 @@ public final class HddsVolumeUtil {
   /**
    * Check Volume is in consistent state or not.
    * @param hddsVolume
-   * @param scmId
    * @param clusterId
    * @param logger
    * @return true - if volume is in consistent state, otherwise false.
    */
-  public static boolean checkVolume(HddsVolume hddsVolume, String scmId, String
+  public static boolean checkVolume(HddsVolume hddsVolume, String
       clusterId, Logger logger) {
     File hddsRoot = hddsVolume.getHddsRootDir();
     String volumeRoot = hddsRoot.getPath();
-    File scmDir = new File(hddsRoot, scmId);
+    File clusterDir = new File(hddsRoot, clusterId);
 
     try {
       hddsVolume.format(clusterId);
@@ -187,25 +186,25 @@ public final class HddsVolumeUtil {
 
     File[] hddsFiles = hddsRoot.listFiles();
 
-    if(hddsFiles == null) {
+    if (hddsFiles == null) {
       // This is the case for IOException, where listFiles returns null.
       // So, we fail the volume.
       return false;
     } else if (hddsFiles.length == 1) {
       // DN started for first time or this is a newly added volume.
-      // So we create scm directory.
-      if (!scmDir.mkdir()) {
-        logger.error("Unable to create scmDir {}", scmDir);
+      // So we create Cluster directory.
+      if (!clusterDir.mkdir()) {
+        logger.error("Unable to create clusterDir {}", clusterDir);
         return false;
       }
       return true;
-    } else if(hddsFiles.length == 2) {
-      // The files should be Version and SCM directory
-      if (scmDir.exists()) {
+    } else if (hddsFiles.length == 2) {
+      // The files should be Version and Cluster directory
+      if (clusterDir.exists()) {
         return true;
       } else {
-        logger.error("Volume {} is in Inconsistent state, expected scm " +
-                "directory {} does not exist", volumeRoot, scmDir
+        logger.error("Volume {} is in Inconsistent state, expected cluster " +
+                "directory {} does not exist", volumeRoot, clusterDir
             .getAbsolutePath());
         return false;
       }

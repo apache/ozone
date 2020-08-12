@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.Set;
 import java.util.Collections;
+import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.lang3.RandomUtils;
@@ -259,6 +260,8 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
     @Override
     public MiniOzoneChaosCluster build() throws IOException {
+      // in case User does not set
+      setClusterId(UUID.randomUUID().toString());
 
       DefaultMetricsSystem.setMiniClusterMode(true);
       initializeConfiguration();

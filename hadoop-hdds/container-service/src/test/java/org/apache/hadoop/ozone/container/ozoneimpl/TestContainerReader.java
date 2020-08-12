@@ -74,7 +74,7 @@ public class TestContainerReader {
 
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
   private UUID datanodeId;
-  private String scmId = UUID.randomUUID().toString();
+  private String clusterId = UUID.randomUUID().toString();
   private int blockCount = 10;
   private long blockLen = 1024;
 
@@ -105,7 +105,7 @@ public class TestContainerReader {
       KeyValueContainer keyValueContainer =
           new KeyValueContainer(keyValueContainerData,
               conf);
-      keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+      keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
 
 
       List<Long> blkNames;
@@ -251,7 +251,7 @@ public class TestContainerReader {
       KeyValueContainer keyValueContainer =
           new KeyValueContainer(keyValueContainerData,
               conf);
-      keyValueContainer.create(volumeSets, policy, scmId);
+      keyValueContainer.create(volumeSets, policy, clusterId);
 
       List<Long> blkNames;
       if (i % 2 == 0) {

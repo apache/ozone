@@ -64,7 +64,7 @@ public class TestBlockManagerImpl {
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
   private OzoneConfiguration config;
-  private String scmId = UUID.randomUUID().toString();
+  private String clusterId = UUID.randomUUID().toString();
   private VolumeSet volumeSet;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
   private KeyValueContainerData keyValueContainerData;
@@ -106,7 +106,7 @@ public class TestBlockManagerImpl {
     keyValueContainer = new KeyValueContainer(
         keyValueContainerData, config);
 
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
 
     // Creating BlockData
     blockID = new BlockID(1L, 1L);

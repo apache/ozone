@@ -43,6 +43,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
 
@@ -265,6 +266,9 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
     @Override
     public MiniOzoneCluster build() throws IOException {
+      // in case User does not set
+      setClusterId(UUID.randomUUID().toString());
+
       if (numOfActiveOMs > numOfOMs) {
         throw new IllegalArgumentException("Number of active OMs cannot be " +
             "more than the total number of OMs");

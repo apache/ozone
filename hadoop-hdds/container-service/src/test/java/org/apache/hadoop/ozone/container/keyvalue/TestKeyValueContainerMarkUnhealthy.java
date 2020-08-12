@@ -72,7 +72,7 @@ public class TestKeyValueContainerMarkUnhealthy {
   public ExpectedException thrown = ExpectedException.none();
 
   private OzoneConfiguration conf;
-  private String scmId = UUID.randomUUID().toString();
+  private String clusterId = UUID.randomUUID().toString();
   private VolumeSet volumeSet;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
   private KeyValueContainerData keyValueContainerData;
@@ -161,7 +161,7 @@ public class TestKeyValueContainerMarkUnhealthy {
   public void testMarkClosedContainerAsUnhealthy() throws IOException {
     // We need to create the container so the compact-on-close operation
     // does not NPE.
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
     keyValueContainer.close();
     keyValueContainer.markContainerUnhealthy();
     assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
@@ -174,7 +174,7 @@ public class TestKeyValueContainerMarkUnhealthy {
   public void testMarkQuasiClosedContainerAsUnhealthy() throws IOException {
     // We need to create the container so the sync-on-quasi-close operation
     // does not NPE.
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
     keyValueContainer.quasiClose();
     keyValueContainer.markContainerUnhealthy();
     assertThat(keyValueContainerData.getState(), is(UNHEALTHY));

@@ -103,7 +103,7 @@ public class TestHddsDispatcher {
     MutableVolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf);
 
     try {
-      UUID scmId = UUID.randomUUID();
+      UUID clusterId = UUID.randomUUID();
       ContainerSet containerSet = new ContainerSet();
 
       DatanodeStateMachine stateMachine = Mockito.mock(
@@ -117,7 +117,7 @@ public class TestHddsDispatcher {
           dd.getUuidString());
       Container container = new KeyValueContainer(containerData, conf);
       container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
-          scmId.toString());
+          clusterId.toString());
       containerSet.addContainer(container);
       ContainerMetrics metrics = ContainerMetrics.create(conf);
       Map<ContainerType, Handler> handlers = Maps.newHashMap();
@@ -129,7 +129,7 @@ public class TestHddsDispatcher {
       }
       HddsDispatcher hddsDispatcher = new HddsDispatcher(
           conf, containerSet, volumeSet, handlers, context, metrics, null);
-      hddsDispatcher.setScmId(scmId.toString());
+      hddsDispatcher.setClusterId(clusterId.toString());
       ContainerCommandResponseProto responseOne = hddsDispatcher
           .dispatch(getWriteChunkRequest(dd.getUuidString(), 1L, 1L), null);
       Assert.assertEquals(ContainerProtos.Result.SUCCESS,
@@ -158,11 +158,11 @@ public class TestHddsDispatcher {
     String testDir =
         GenericTestUtils.getTempPath(TestHddsDispatcher.class.getSimpleName());
     try {
-      UUID scmId = UUID.randomUUID();
+      UUID clusterId = UUID.randomUUID();
       OzoneConfiguration conf = new OzoneConfiguration();
       conf.set(HDDS_DATANODE_DIR_KEY, testDir);
       DatanodeDetails dd = randomDatanodeDetails();
-      HddsDispatcher hddsDispatcher = createDispatcher(dd, scmId, conf);
+      HddsDispatcher hddsDispatcher = createDispatcher(dd, clusterId, conf);
       ContainerCommandRequestProto writeChunkRequest =
           getWriteChunkRequest(dd.getUuidString(), 1L, 1L);
       // send read chunk request and make sure container does not exist
@@ -191,11 +191,11 @@ public class TestHddsDispatcher {
     String testDir =
         GenericTestUtils.getTempPath(TestHddsDispatcher.class.getSimpleName());
     try {
-      UUID scmId = UUID.randomUUID();
+      UUID clusterId = UUID.randomUUID();
       OzoneConfiguration conf = new OzoneConfiguration();
       conf.set(HDDS_DATANODE_DIR_KEY, testDir);
       DatanodeDetails dd = randomDatanodeDetails();
-      HddsDispatcher hddsDispatcher = createDispatcher(dd, scmId, conf);
+      HddsDispatcher hddsDispatcher = createDispatcher(dd, clusterId, conf);
       ContainerCommandRequestProto writeChunkRequest =
           getWriteChunkRequest(dd.getUuidString(), 1L, 1L);
 
@@ -232,11 +232,11 @@ public class TestHddsDispatcher {
     String testDir = GenericTestUtils.getTempPath(
         TestHddsDispatcher.class.getSimpleName());
     try {
-      UUID scmId = UUID.randomUUID();
+      UUID clusterId = UUID.randomUUID();
       OzoneConfiguration conf = new OzoneConfiguration();
       conf.set(HDDS_DATANODE_DIR_KEY, testDir);
       DatanodeDetails dd = randomDatanodeDetails();
-      HddsDispatcher hddsDispatcher = createDispatcher(dd, scmId, conf);
+      HddsDispatcher hddsDispatcher = createDispatcher(dd, clusterId, conf);
       ContainerCommandRequestProto writeChunkRequest = getWriteChunkRequest(
           dd.getUuidString(), 1L, 1L);
 
@@ -266,12 +266,12 @@ public class TestHddsDispatcher {
   /**
    * Creates HddsDispatcher instance with given infos.
    * @param dd datanode detail info.
-   * @param scmId UUID of scm id.
+   * @param clusterId UUID of cluster id.
    * @param conf configuration be used.
    * @return HddsDispatcher HddsDispatcher instance.
    * @throws IOException
    */
-  private HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
+  private HddsDispatcher createDispatcher(DatanodeDetails dd, UUID clusterId,
       OzoneConfiguration conf) throws IOException {
     ContainerSet containerSet = new ContainerSet();
     VolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf);
@@ -291,7 +291,7 @@ public class TestHddsDispatcher {
 
     HddsDispatcher hddsDispatcher = new HddsDispatcher(
         conf, containerSet, volumeSet, handlers, context, metrics, null);
-    hddsDispatcher.setScmId(scmId.toString());
+    hddsDispatcher.setClusterId(clusterId.toString());
     return hddsDispatcher;
   }
 

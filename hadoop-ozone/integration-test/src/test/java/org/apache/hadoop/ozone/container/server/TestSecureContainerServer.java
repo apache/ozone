@@ -142,8 +142,8 @@ public class TestSecureContainerServer {
             createReplicationService(controller)), (dn, p) -> {}, (p) -> {});
   }
 
-  private static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
-      OzoneConfiguration conf) throws IOException {
+  private static HddsDispatcher createDispatcher(DatanodeDetails dd,
+      UUID clusterId, OzoneConfiguration conf) throws IOException {
     ContainerSet containerSet = new ContainerSet();
     conf.set(HDDS_DATANODE_DIR_KEY,
         Paths.get(TEST_DIR, "dfs", "data", "hdds",
@@ -167,7 +167,7 @@ public class TestSecureContainerServer {
     HddsDispatcher hddsDispatcher = new HddsDispatcher(
         conf, containerSet, volumeSet, handlers, context, metrics,
         new BlockTokenVerifier(new SecurityConfig((conf)), caClient));
-    hddsDispatcher.setScmId(scmId.toString());
+    hddsDispatcher.setClusterId(clusterId.toString());
     return hddsDispatcher;
   }
 
