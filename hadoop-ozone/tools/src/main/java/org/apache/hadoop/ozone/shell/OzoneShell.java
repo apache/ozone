@@ -21,10 +21,6 @@ import java.util.function.Supplier;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.ozone.shell.bucket.BucketCommands;
-import org.apache.hadoop.ozone.shell.keys.KeyCommands;
-import org.apache.hadoop.ozone.shell.token.TokenCommands;
-import org.apache.hadoop.ozone.shell.volume.VolumeCommands;
 
 import picocli.CommandLine.Command;
 
@@ -33,15 +29,13 @@ import picocli.CommandLine.Command;
  */
 @Command(name = "ozone sh",
     description = "Shell for Ozone object store",
-    subcommands = {
-        VolumeCommands.class,
-        BucketCommands.class,
-        KeyCommands.class,
-        TokenCommands.class
-    },
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
 public class OzoneShell extends Shell {
+
+  public OzoneShell() {
+    super(OzoneShell.class);
+  }
 
   /**
    * Main for the ozShell Command handling.

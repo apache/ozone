@@ -18,18 +18,29 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
-import org.apache.hadoop.hdds.utils.db.DBDefinition;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.rocksdb.*;
-import picocli.CommandLine;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.Callable;
+
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
+import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.ozone.OzoneConsts;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import org.kohsuke.MetaInfServices;
+import org.rocksdb.ColumnFamilyDescriptor;
+import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.Options;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksIterator;
+import picocli.CommandLine;
 
 /**
  * Parser for scm.db file.
@@ -38,11 +49,18 @@ import java.util.concurrent.Callable;
         name = "scan",
         description = "Parse specified metadataTable"
 )
-public class DBScanner implements Callable<Void> {
+@MetaInfServices(SubcommandWithParent.class)
+public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.Option(names = {"--column_family"},
             description = "Table name")
   private String tableName;
+
+  @CommandLine.Option(names = {"--with-keys"},
+      description = "List Key -> Value instead of just Value.",
+      defaultValue = "false",
+      showDefaultValue = CommandLine.Help.Visibility.ALWAYS)
+  private boolean withKey;
 
   @CommandLine.ParentCommand
   private RDBParser parent;
@@ -51,21 +69,29 @@ public class DBScanner implements Callable<Void> {
 
   private static void displayTable(RocksDB rocksDB,
         DBColumnFamilyDefinition dbColumnFamilyDefinition,
-        List<ColumnFamilyHandle> list) throws IOException {
+        List<ColumnFamilyHandle> list, boolean withKey) throws IOException {
     ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
             dbColumnFamilyDefinition.getTableName()
                     .getBytes(StandardCharsets.UTF_8), list);
-    if (columnFamilyHandle==null){
+    if (columnFamilyHandle == null) {
       throw new IllegalArgumentException("columnFamilyHandle is null");
     }
     RocksIterator iterator = rocksDB.newIterator(columnFamilyHandle);
     iterator.seekToFirst();
     while (iterator.isValid()){
+      StringBuilder result = new StringBuilder();
+      if (withKey) {
+        Object key = dbColumnFamilyDefinition.getKeyCodec()
+            .fromPersistedFormat(iterator.key());
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        result.append(gson.toJson(key));
+        result.append(" -> ");
+      }
       Object o = dbColumnFamilyDefinition.getValueCodec()
               .fromPersistedFormat(iterator.value());
       Gson gson = new GsonBuilder().setPrettyPrinting().create();
-      String result = gson.toJson(o);
-      System.out.println(result);
+      result.append(gson.toJson(o));
+      System.out.println(result.toString());
       iterator.next();
     }
   }
@@ -132,7 +158,8 @@ public class DBScanner implements Callable<Void> {
       } else {
         DBColumnFamilyDefinition columnFamilyDefinition =
                 this.columnFamilyMap.get(tableName);
-        displayTable(rocksDB, columnFamilyDefinition, columnFamilyHandleList);
+        displayTable(rocksDB, columnFamilyDefinition, columnFamilyHandleList,
+            withKey);
       }
     } else {
       System.out.println("Incorrect db Path");
@@ -144,5 +171,10 @@ public class DBScanner implements Callable<Void> {
       dbPath = dbPath.substring(0, dbPath.length()-1);
     }
     return dbPath;
+  }
+
+  @Override
+  public Class<?> getParentType() {
+    return RDBParser.class;
   }
 }

@@ -86,7 +86,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final boolean isTracingEnabled;
 
   // Map which contains index and term for the ratis transactions which are
-  // stateMachine entries which are recived through applyTransaction.
+  // stateMachine entries which are received through applyTransaction.
   private ConcurrentMap<Long, Long> applyTransactionMap =
       new ConcurrentSkipListMap<>();
 
@@ -363,20 +363,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   public CompletableFuture<TermIndex> notifyInstallSnapshotFromLeader(
       RaftProtos.RoleInfoProto roleInfoProto, TermIndex firstTermIndexInLog) {
 
-    String leaderNodeId = RaftPeerId.valueOf(roleInfoProto.getSelf().getId())
-        .toString();
-
-    LOG.info("Received install snapshot notificaiton form OM leader: {} with " +
+    String leaderNodeId = RaftPeerId.valueOf(roleInfoProto.getFollowerInfo()
+        .getLeaderInfo().getId().getId()).toString();
+    LOG.info("Received install snapshot notification from OM leader: {} with " +
             "term index: {}", leaderNodeId, firstTermIndexInLog);
-
-    if (!roleInfoProto.getRole().equals(RaftProtos.RaftPeerRole.LEADER)) {
-      // A non-leader Ratis server should not send this notification.
-      LOG.error("Received Install Snapshot notification from non-leader OM " +
-          "node: {}. Ignoring the notification.", leaderNodeId);
-      return completeExceptionally(new OMException("Received notification to " +
-          "install snaphost from non-leader OM node",
-          OMException.ResultCodes.RATIS_ERROR));
-    }
 
     CompletableFuture<TermIndex> future = CompletableFuture.supplyAsync(
         () -> ozoneManager.installSnapshotFromLeader(leaderNodeId),

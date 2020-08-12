@@ -103,6 +103,7 @@ public class AbstractContainerReportHandler {
         containerInfo.updateSequenceId(
             replicaProto.getBlockCommitSequenceId());
       }
+
       if (containerInfo.getUsedBytes() < replicaProto.getUsed()) {
         containerInfo.setUsedBytes(replicaProto.getUsed());
       }
@@ -228,6 +229,8 @@ public class AbstractContainerReportHandler {
         .setDatanodeDetails(datanodeDetails)
         .setOriginNodeId(UUID.fromString(replicaProto.getOriginNodeId()))
         .setSequenceId(replicaProto.getBlockCommitSequenceId())
+        .setKeyCount(replicaProto.getKeyCount())
+        .setBytesUsed(replicaProto.getUsed())
         .build();
 
     if (replica.getState().equals(State.DELETED)) {

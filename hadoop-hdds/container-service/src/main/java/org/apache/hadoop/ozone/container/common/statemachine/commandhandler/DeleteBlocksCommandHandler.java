@@ -257,34 +257,35 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         }
       }
 
-      // Finally commit the DB counters.
-      BatchOperation batchOperation = containerDB.getStore().getBatchHandler()
-              .initBatchOperation();
-      Table<String, Long> metadataTable = containerDB.getStore()
-              .getMetadataTable();
-
-      // In memory is updated only when existing delete transactionID is
-      // greater.
-      if (delTX.getTxID() > containerData.getDeleteTransactionId()) {
-        // Update in DB pending delete key count and delete transaction ID.
+      if (newDeletionBlocks > 0) {
+        // Finally commit the DB counters.
+        BatchOperation batchOperation = containerDB.getStore().getBatchHandler()
+                .initBatchOperation();
+        Table<String, Long> metadataTable = containerDB.getStore()
+                .getMetadataTable();
+  
+        // In memory is updated only when existing delete transactionID is
+        // greater.
+        if (delTX.getTxID() > containerData.getDeleteTransactionId()) {
+          // Update in DB pending delete key count and delete transaction ID.
+          metadataTable.putWithBatch(batchOperation,
+                  OzoneConsts.DELETE_TRANSACTION_KEY_PREFIX, delTX.getTxID());
+        }
+  
+        long pendingDeleteBlocks = containerData.getNumPendingDeletionBlocks() +
+                newDeletionBlocks;
         metadataTable.putWithBatch(batchOperation,
-                OzoneConsts.DELETE_TRANSACTION_KEY_PREFIX, delTX.getTxID());
+                OzoneConsts.PENDING_DELETE_BLOCK_COUNT, pendingDeleteBlocks);
+  
+        containerDB.getStore().getBatchHandler()
+                .commitBatchOperation(batchOperation);
+  
+        // update pending deletion blocks count and delete transaction ID in
+        // in-memory container status
+        containerData.updateDeleteTransactionId(delTX.getTxID());
+
+        containerData.incrPendingDeletionBlocks(newDeletionBlocks);
       }
-
-      long pendingDeleteBlocks = containerData.getNumPendingDeletionBlocks() +
-              newDeletionBlocks;
-      metadataTable.putWithBatch(batchOperation,
-              OzoneConsts.PENDING_DELETE_BLOCK_COUNT, pendingDeleteBlocks);
-
-      containerDB.getStore().getBatchHandler()
-              .commitBatchOperation(batchOperation);
-
-
-      // update pending deletion blocks count and delete transaction ID in
-      // in-memory container status
-      containerData.updateDeleteTransactionId(delTX.getTxID());
-
-      containerData.incrPendingDeletionBlocks(newDeletionBlocks);
     }
   }
 

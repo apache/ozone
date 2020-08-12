@@ -52,6 +52,12 @@ public final class S3GatewayConfigKeys {
       OZONE_S3G_HTTP_AUTH_CONFIG_PREFIX + "kerberos.keytab";
   public static final String OZONE_S3G_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL =
       OZONE_S3G_HTTP_AUTH_CONFIG_PREFIX + "kerberos.principal";
+
+  public static final String OZONE_S3G_CLIENT_BUFFER_SIZE_KEY =
+      "ozone.s3g.client.buffer.size";
+  public static final String OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT =
+      "4KB";
+
   /**
    * Never constructed.
    */
