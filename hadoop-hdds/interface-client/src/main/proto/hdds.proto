@@ -43,11 +43,6 @@ message DatanodeDetailsProto {
     // network name, can be Ip address or host name, depends
     optional string networkName = 6;
     optional string networkLocation = 7; // Network topology location
-    // TODO(runitao): remove it in next release
-    // both version and setupTime are deprecated and moved into ExtendedDatanodeDetailsProto
-    // keep here just for backward compatibility
-    optional string version = 8;
-    optional int64 setupTime = 9;
     // TODO(runzhiwang): when uuid is gone, specify 1 as the index of uuid128 and mark as required
     optional UUID uuid128 = 100; // UUID with 128 bits assigned to the Datanode.
 }
