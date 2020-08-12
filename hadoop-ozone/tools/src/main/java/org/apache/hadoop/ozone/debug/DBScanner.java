@@ -110,7 +110,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     this.parent = parent;
   }
 
-  public void setLimit(int limit) {
+  public static void setLimit(int limit) {
     DBScanner.limit = limit;
   }
 

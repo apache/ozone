@@ -94,9 +94,9 @@ public class TestOmLDBCli {
     Assert.assertTrue(getKeyNames(dbScanner).contains("key1"));
     Assert.assertTrue(getKeyNames(dbScanner).contains("key5"));
     Assert.assertFalse(getKeyNames(dbScanner).contains("key6"));
-    dbScanner.setLimit(1);
+    DBScanner.setLimit(1);
     Assert.assertEquals(1, getKeyNames(dbScanner).size());
-    dbScanner.setLimit(-1);
+    DBScanner.setLimit(-1);
     try {
       getKeyNames(dbScanner);
       Assert.fail("IllegalArgumentException is expected");
