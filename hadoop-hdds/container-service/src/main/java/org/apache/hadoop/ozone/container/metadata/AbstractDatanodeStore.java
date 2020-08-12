@@ -88,14 +88,16 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
               .setDBOption(options)
               .build();
 
-      metadataTable = dbDef.getMetadataColumnFamily().getTable(this.store);
+      metadataTable = new DatanodeTable<>(
+              dbDef.getMetadataColumnFamily().getTable(this.store));
       checkTableStatus(metadataTable, metadataTable.getName());
 
-      blockDataTable = dbDef.getBlockDataColumnFamily().getTable(this.store);
+      blockDataTable = new DatanodeTable<>(
+              dbDef.getBlockDataColumnFamily().getTable(this.store));
       checkTableStatus(blockDataTable, blockDataTable.getName());
 
-      deletedBlocksTable =
-              dbDef.getDeletedBlocksColumnFamily().getTable(this.store);
+      deletedBlocksTable = new DatanodeTable<>(
+              dbDef.getDeletedBlocksColumnFamily().getTable(this.store));
       checkTableStatus(deletedBlocksTable, deletedBlocksTable.getName());
     }
   }

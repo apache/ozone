@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 
@@ -48,68 +47,39 @@ import java.util.List;
  * <p>
  * Note that this class will only apply prefixes to keys as parameters,
  * never as return types. This means that keys returned through iterators
- * like {@link SchemaOneDeletedBlocksTable#getSequentialRangeKVs},
- * {@link SchemaOneDeletedBlocksTable#getRangeKVs}, and
- * {@link SchemaOneDeletedBlocksTable#iterator} will return keys prefixed
+ * like {@link SchemaOneDeletedBlocksTable#getSequentialRangeKVs}, and
+ * {@link SchemaOneDeletedBlocksTable#getRangeKVs} will return keys prefixed
  * with {@link SchemaOneDeletedBlocksTable#DELETED_KEY_PREFIX}.
  */
-public class SchemaOneDeletedBlocksTable implements Table<String,
+public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
         ChunkInfoList> {
   public static final String DELETED_KEY_PREFIX = "#deleted#";
 
-  private final Table<String, ChunkInfoList> table;
-
   public SchemaOneDeletedBlocksTable(Table<String, ChunkInfoList> table) {
-    this.table = table;
+    super(table);
   }
 
   @Override
   public void put(String key, ChunkInfoList value) throws IOException {
-    table.put(prefix(key), value);
+    super.put(prefix(key), value);
   }
 
   @Override
   public void putWithBatch(BatchOperation batch, String key,
                            ChunkInfoList value)
           throws IOException {
-    table.putWithBatch(batch, prefix(key), value);
-  }
-
-  @Override
-  public boolean isEmpty() throws IOException {
-    return table.isEmpty();
+    super.putWithBatch(batch, prefix(key), value);
   }
 
   @Override
   public void delete(String key) throws IOException {
-    table.delete(prefix(key));
+    super.delete(prefix(key));
   }
 
   @Override
   public void deleteWithBatch(BatchOperation batch, String key)
           throws IOException {
-    table.deleteWithBatch(batch, prefix(key));
-  }
-
-  /**
-   * Because the actual underlying table in this schema version is the
-   * default table where all keys are stored, this method will iterate
-   * through all keys in the database.
-   */
-  @Override
-  public TableIterator<String, ? extends KeyValue<String, ChunkInfoList>>
-      iterator() {
-    return table.iterator();
-  }
-
-  @Override
-  public String getName() throws IOException {
-    return table.getName();
-  }
-
-  @Override
-  public long getEstimatedKeyCount() throws IOException {
-    return table.getEstimatedKeyCount();
+    super.deleteWithBatch(batch, prefix(key));
   }
 
   @Override
@@ -117,27 +87,27 @@ public class SchemaOneDeletedBlocksTable implements Table<String,
                             CacheValue<ChunkInfoList> cacheValue) {
     CacheKey<String> prefixedCacheKey =
             new CacheKey<>(prefix(cacheKey.getCacheKey()));
-    table.addCacheEntry(prefixedCacheKey, cacheValue);
+    super.addCacheEntry(prefixedCacheKey, cacheValue);
   }
 
   @Override
   public boolean isExist(String key) throws IOException {
-    return table.isExist(prefix(key));
+    return super.isExist(prefix(key));
   }
 
   @Override
   public ChunkInfoList get(String key) throws IOException {
-    return table.get(prefix(key));
+    return super.get(prefix(key));
   }
 
   @Override
   public ChunkInfoList getIfExist(String key) throws IOException {
-    return table.getIfExist(prefix(key));
+    return super.getIfExist(prefix(key));
   }
 
   @Override
   public ChunkInfoList getReadCopy(String key) throws IOException {
-    return table.getReadCopy(prefix(key));
+    return super.getReadCopy(prefix(key));
   }
 
   /**
@@ -153,7 +123,7 @@ public class SchemaOneDeletedBlocksTable implements Table<String,
     // Deleted blocks will always have the #deleted# key prefix and nothing
     // else in this schema version. Ignore any user passed prefixes that could
     // collide with this, returning results that are not deleted blocks.
-    return table.getRangeKVs(prefix(startKey), count, getDeletedFilter());
+    return super.getRangeKVs(prefix(startKey), count, getDeletedFilter());
   }
 
   /**
@@ -169,13 +139,8 @@ public class SchemaOneDeletedBlocksTable implements Table<String,
     // Deleted blocks will always have the #deleted# key prefix and nothing
     // else in this schema version. Ignore any user passed prefixes that could
     // collide with this, returning results that are not deleted blocks.
-    return table.getSequentialRangeKVs(prefix(startKey), count,
+    return super.getSequentialRangeKVs(prefix(startKey), count,
             getDeletedFilter());
-  }
-
-  @Override
-  public void close() throws Exception {
-    table.close();
   }
 
   private static String prefix(String key) {
