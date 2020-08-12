@@ -317,7 +317,7 @@ public class ReplicationManager
        * and bytes used statistics if needed.
        */
       if (state == LifeCycleState.CLOSED) {
-        checkAndUpdateContainerState(container, replicas);
+        checkAndUpdateContainerInfo(container, replicas);
       }
 
       /*
@@ -777,7 +777,7 @@ public class ReplicationManager
    * Check and update Container key count and used bytes based on it's replica's
    * data.
    */
-  private void checkAndUpdateContainerState(final ContainerInfo container,
+  private void checkAndUpdateContainerInfo(final ContainerInfo container,
       final Set<ContainerReplica> replicas) {
     // check container key count and bytes used
     long maxUsedBytes = 0;
