@@ -74,7 +74,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   private List<Object> scannedObjects;
 
   private static List<Object> displayTable(RocksIterator iterator,
-   DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
+      DBColumnFamilyDefinition dbColumnFamilyDefinition) throws IOException {
     List<Object> outputs = new ArrayList<>();
     iterator.seekToFirst();
     while (iterator.isValid() && limit > 0){
@@ -92,6 +92,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
       Gson gson = new GsonBuilder().setPrettyPrinting().create();
       result.append(gson.toJson(o));
       System.out.println(result.toString());
+      limit--;
       iterator.next();
     }
     return outputs;
@@ -110,7 +111,11 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   }
 
   public void setLimit(int limit) {
-    this.limit = limit;
+    DBScanner.limit = limit;
+  }
+
+  public List<Object> getScannedObjects() {
+    return scannedObjects;
   }
 
   private static ColumnFamilyHandle getColumnFamilyHandle(
@@ -166,6 +171,10 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
   private void printAppropriateTable(
           List<ColumnFamilyHandle> columnFamilyHandleList,
           RocksDB rocksDB, String dbPath) throws IOException {
+    if (limit < 1) {
+      throw new IllegalArgumentException(
+              "List length should be a positive number");
+    }
     dbPath = removeTrailingSlashIfNeeded(dbPath);
     this.constructColumnFamilyMap(DBDefinitionFactory.
             getDefinition(new File(dbPath).getName()));
@@ -177,7 +186,8 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
                 this.columnFamilyMap.get(tableName);
         ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
                 columnFamilyDefinition.getTableName()
-                        .getBytes(StandardCharsets.UTF_8), columnFamilyHandleList);
+                        .getBytes(StandardCharsets.UTF_8),
+                columnFamilyHandleList);
         if (columnFamilyHandle == null) {
           throw new IllegalArgumentException("columnFamilyHandle is null");
         }

@@ -75,15 +75,15 @@ public class TestOmLDBCli {
     }
     // Dummy om.db with only keyTable
     dbStore = DBStoreBuilder.newBuilder(conf)
-            .setName("om.db")
-            .setPath(newFolder.toPath())
-            .addTable("keyTable")
-            .build();
+      .setName("om.db")
+      .setPath(newFolder.toPath())
+      .addTable("keyTable")
+      .build();
     // insert 5 keys
     for (int i = 0; i<5; i++) {
       OmKeyInfo value = TestOMRequestUtils.createOmKeyInfo("sampleVol",
           "sampleBuck", "key" + (i+1), HddsProtos.ReplicationType.STAND_ALONE,
-              HddsProtos.ReplicationFactor.ONE);
+          HddsProtos.ReplicationFactor.ONE);
       String key = "key"+ (i);
       Table<byte[], byte[]> keyTable = dbStore.getTable("keyTable");
       keyTable.put(key.getBytes(), value.getProtobuf().toByteArray());
@@ -106,7 +106,7 @@ public class TestOmLDBCli {
   }
 
   private static List<String> getKeyNames(DBScanner dbScanner)
-      throws Exception {
+            throws Exception {
     keyNames.clear();
     dbScanner.setTableName("keyTable");
     dbScanner.call();
