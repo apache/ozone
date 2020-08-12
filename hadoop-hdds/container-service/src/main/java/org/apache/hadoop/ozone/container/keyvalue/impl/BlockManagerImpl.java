@@ -83,6 +83,20 @@ public class BlockManagerImpl implements BlockManager {
    * @throws IOException
    */
   public long putBlock(Container container, BlockData data) throws IOException {
+    return putBlock(container, data, true);
+  }
+  /**
+   * Puts or overwrites a block.
+   *
+   * @param container - Container for which block need to be added.
+   * @param data     - BlockData.
+   * @param incrKeyCount - for FilePerBlockStrategy, increase key count only
+   *                     when the whole block file is written.
+   * @return length of the block.
+   * @throws IOException
+   */
+  public long putBlock(Container container, BlockData data,
+      boolean incrKeyCount) throws IOException {
     Preconditions.checkNotNull(data, "BlockData cannot be null for put " +
         "operation.");
     Preconditions.checkState(data.getContainerID() >= 0, "Container Id " +
@@ -129,14 +143,18 @@ public class BlockManagerImpl implements BlockManager {
           Longs.toByteArray(container.getContainerData().getBytesUsed()));
 
       // Set Block Count for a container.
-      batch.put(DB_BLOCK_COUNT_KEY,
-          Longs.toByteArray(container.getContainerData().getKeyCount() + 1));
+      if (incrKeyCount) {
+        batch.put(DB_BLOCK_COUNT_KEY,
+            Longs.toByteArray(container.getContainerData().getKeyCount() + 1));
+      }
 
       db.getStore().writeBatch(batch);
 
       container.updateBlockCommitSequenceId(bcsId);
       // Increment block count finally here for in-memory.
-      container.getContainerData().incrKeyCount();
+      if (incrKeyCount) {
+        container.getContainerData().incrKeyCount();
+      }
       if (LOG.isDebugEnabled()) {
         LOG.debug(
             "Block " + data.getBlockID() + " successfully committed with bcsId "
