@@ -206,7 +206,7 @@ public class BasicOzoneFileSystem extends FileSystem {
 
   @Override
   public FSDataInputStream open(Path f, int bufferSize) throws IOException {
-    incrementCounter(Statistic.INVOCATION_OPEN);
+    incrementCounter(Statistic.INVOCATION_OPEN, 1);
     statistics.incrementReadOps(1);
     LOG.trace("open() path:{}", f);
     final String key = pathToKey(f);
@@ -219,7 +219,11 @@ public class BasicOzoneFileSystem extends FileSystem {
   }
 
   protected void incrementCounter(Statistic statistic) {
-    //don't do anyting in this default implementation.
+    incrementCounter(statistic, 1);
+  }
+
+  protected void incrementCounter(Statistic statistic, long count) {
+    //don't do anything in this default implementation.
   }
 
   @Override
@@ -228,7 +232,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       short replication, long blockSize,
       Progressable progress) throws IOException {
     LOG.trace("create() path:{}", f);
-    incrementCounter(Statistic.INVOCATION_CREATE);
+    incrementCounter(Statistic.INVOCATION_CREATE, 1);
     statistics.incrementWriteOps(1);
     final String key = pathToKey(f);
     return createOutputStream(key, replication, overwrite, true);
@@ -242,7 +246,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       short replication,
       long blockSize,
       Progressable progress) throws IOException {
-    incrementCounter(Statistic.INVOCATION_CREATE_NON_RECURSIVE);
+    incrementCounter(Statistic.INVOCATION_CREATE_NON_RECURSIVE, 1);
     statistics.incrementWriteOps(1);
     final String key = pathToKey(path);
     return createOutputStream(key,
@@ -300,7 +304,7 @@ public class BasicOzoneFileSystem extends FileSystem {
    */
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
-    incrementCounter(Statistic.INVOCATION_RENAME);
+    incrementCounter(Statistic.INVOCATION_RENAME, 1);
     statistics.incrementWriteOps(1);
     super.checkPath(src);
     super.checkPath(dst);
@@ -477,16 +481,9 @@ public class BasicOzoneFileSystem extends FileSystem {
     }
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * OFS supports volume and bucket deletion, recursive or non-recursive.
-   * e.g. delete(new Path("/volume1"), true)
-   * But root deletion is explicitly disallowed for safety concerns.
-   */
   @Override
   public boolean delete(Path f, boolean recursive) throws IOException {
-    incrementCounter(Statistic.INVOCATION_DELETE);
+    incrementCounter(Statistic.INVOCATION_DELETE, 1);
     statistics.incrementWriteOps(1);
     LOG.debug("Delete path {} - recursive {}", f, recursive);
     FileStatus status;
@@ -566,7 +563,7 @@ public class BasicOzoneFileSystem extends FileSystem {
 
   @Override
   public FileStatus[] listStatus(Path f) throws IOException {
-    incrementCounter(Statistic.INVOCATION_LIST_STATUS);
+    incrementCounter(Statistic.INVOCATION_LIST_STATUS, 1);
     statistics.incrementReadOps(1);
     LOG.trace("listStatus() path:{}", f);
     int numEntries = LISTING_PAGE_SIZE;
@@ -703,7 +700,7 @@ public class BasicOzoneFileSystem extends FileSystem {
 
   @Override
   public FileStatus getFileStatus(Path f) throws IOException {
-    incrementCounter(Statistic.INVOCATION_GET_FILE_STATUS);
+    incrementCounter(Statistic.INVOCATION_GET_FILE_STATUS, 1);
     statistics.incrementReadOps(1);
     LOG.trace("getFileStatus() path:{}", f);
     Path qualifiedPath = f.makeQualified(uri, workingDir);
