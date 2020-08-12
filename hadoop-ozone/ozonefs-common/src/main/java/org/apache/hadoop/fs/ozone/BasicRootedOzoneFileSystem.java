@@ -50,6 +50,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.Iterator;
@@ -61,6 +62,8 @@ import java.util.stream.Collectors;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_USER_DIR;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_EMPTY;
@@ -183,7 +186,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
   @Override
   public FSDataInputStream open(Path path, int bufferSize) throws IOException {
-    incrementCounter(Statistic.INVOCATION_OPEN);
+    incrementCounter(Statistic.INVOCATION_OPEN, 1);
     statistics.incrementReadOps(1);
     LOG.trace("open() path: {}", path);
     final String key = pathToKey(path);
@@ -192,6 +195,10 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   }
 
   protected void incrementCounter(Statistic statistic) {
+    incrementCounter(statistic, 1);
+  }
+
+  protected void incrementCounter(Statistic statistic, long count) {
     //don't do anything in this default implementation.
   }
 
@@ -201,7 +208,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       short replication, long blockSize,
       Progressable progress) throws IOException {
     LOG.trace("create() path:{}", f);
-    incrementCounter(Statistic.INVOCATION_CREATE);
+    incrementCounter(Statistic.INVOCATION_CREATE, 1);
     statistics.incrementWriteOps(1);
     final String key = pathToKey(f);
     return createOutputStream(key, replication, overwrite, true);
@@ -215,7 +222,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       short replication,
       long blockSize,
       Progressable progress) throws IOException {
-    incrementCounter(Statistic.INVOCATION_CREATE_NON_RECURSIVE);
+    incrementCounter(Statistic.INVOCATION_CREATE_NON_RECURSIVE, 1);
     statistics.incrementWriteOps(1);
     final String key = pathToKey(path);
     return createOutputStream(key,
@@ -255,9 +262,11 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
 
     @Override
-    boolean processKeyPath(String keyPath) throws IOException {
-      String newPath = dstPath.concat(keyPath.substring(srcPath.length()));
-      adapterImpl.rename(this.bucket, keyPath, newPath);
+    boolean processKeyPath(List<String> keyPathList) throws IOException {
+      for (String keyPath : keyPathList) {
+        String newPath = dstPath.concat(keyPath.substring(srcPath.length()));
+        adapterImpl.rename(this.bucket, keyPath, newPath);
+      }
       return true;
     }
   }
@@ -277,7 +286,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
    */
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
-    incrementCounter(Statistic.INVOCATION_RENAME);
+    incrementCounter(Statistic.INVOCATION_RENAME, 1);
     statistics.incrementWriteOps(1);
     if (src.equals(dst)) {
       return true;
@@ -423,17 +432,12 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
 
     @Override
-    boolean processKeyPath(String keyPath) {
-      if (keyPath.equals("")) {
-        LOG.trace("Skipping deleting root directory");
-        return true;
-      } else {
-        LOG.trace("Deleting: {}", keyPath);
-        boolean succeed = adapterImpl.deleteObject(this.bucket, keyPath);
-        // if recursive delete is requested ignore the return value of
-        // deleteObject and issue deletes for other keys.
-        return recursive || succeed;
-      }
+    boolean processKeyPath(List<String> keyPathList) {
+      LOG.trace("Deleting keys: {}", keyPathList);
+      boolean succeed = adapterImpl.deleteObjects(this.bucket, keyPathList);
+      // if recursive delete is requested ignore the return value of
+      // deleteObject and issue deletes for other keys.
+      return recursive || succeed;
     }
   }
 
@@ -458,9 +462,16 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * OFS supports volume and bucket deletion, recursive or non-recursive.
+   * e.g. delete(new Path("/volume1"), true)
+   * But root deletion is explicitly disallowed for safety concerns.
+   */
   @Override
   public boolean delete(Path f, boolean recursive) throws IOException {
-    incrementCounter(Statistic.INVOCATION_DELETE);
+    incrementCounter(Statistic.INVOCATION_DELETE, 1);
     statistics.incrementWriteOps(1);
     LOG.debug("Delete path {} - recursive {}", f, recursive);
     FileStatus status;
@@ -600,7 +611,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
   @Override
   public FileStatus[] listStatus(Path f) throws IOException {
-    incrementCounter(Statistic.INVOCATION_LIST_STATUS);
+    incrementCounter(Statistic.INVOCATION_LIST_STATUS, 1);
     statistics.incrementReadOps(1);
     LOG.trace("listStatus() path:{}", f);
     int numEntries = LISTING_PAGE_SIZE;
@@ -714,7 +725,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
   @Override
   public FileStatus getFileStatus(Path f) throws IOException {
-    incrementCounter(Statistic.INVOCATION_GET_FILE_STATUS);
+    incrementCounter(Statistic.INVOCATION_GET_FILE_STATUS, 1);
     statistics.incrementReadOps(1);
     LOG.trace("getFileStatus() path:{}", f);
     Path qualifiedPath = f.makeQualified(uri, workingDir);
@@ -824,7 +835,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
      * @return true if we should continue iteration of keys, false otherwise.
      * @throws IOException
      */
-    abstract boolean processKeyPath(String keyPath) throws IOException;
+    abstract boolean processKeyPath(List<String> keyPathList)
+        throws IOException;
 
     /**
      * Iterates through all the keys prefixed with the input path's key and
@@ -838,6 +850,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
      */
     boolean iterate() throws IOException {
       LOG.trace("Iterating path: {}", path);
+      List<String> keyPathList = new ArrayList<>();
+      int batchSize = getConf().getInt(OZONE_FS_ITERATE_BATCH_SIZE,
+          OZONE_FS_ITERATE_BATCH_SIZE_DEFAULT);
       if (status.isDirectory()) {
         LOG.trace("Iterating directory: {}", pathKey);
         OFSPath ofsPath = new OFSPath(pathKey);
@@ -850,14 +865,27 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           //  outside AdapterImpl. - Maybe a refactor later.
           String keyPath = ofsPathPrefix + key.getName();
           LOG.trace("iterating key path: {}", keyPath);
-          if (!processKeyPath(keyPath)) {
+          if (!key.getName().equals("")) {
+            keyPathList.add(keyPath);
+          }
+          if (keyPathList.size() >= batchSize) {
+            if (!processKeyPath(keyPathList)) {
+              return false;
+            } else {
+              keyPathList.clear();
+            }
+          }
+        }
+        if (keyPathList.size() > 0) {
+          if (!processKeyPath(keyPathList)) {
             return false;
           }
         }
         return true;
       } else {
         LOG.trace("iterating file: {}", path);
-        return processKeyPath(pathKey);
+        keyPathList.add(pathKey);
+        return processKeyPath(keyPathList);
       }
     }
 
