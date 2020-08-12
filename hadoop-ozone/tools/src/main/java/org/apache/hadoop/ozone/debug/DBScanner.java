@@ -53,7 +53,8 @@ import picocli.CommandLine;
 public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.Option(names = {"--column_family"},
-            description = "Table name")
+      required = true,
+      description = "Table name")
   private String tableName;
 
   @CommandLine.Option(names = {"--with-keys"},
