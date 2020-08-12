@@ -83,6 +83,19 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
 
 
   /**
+   * Skip checking cache and get the value mapped to the given key in byte
+   * array or returns null if the key is not found.
+   *
+   * @param key metadata key
+   * @return value in byte array or null if the key is not found.
+   * @throws IOException on Failure
+   */
+  default VALUE getSkipCache(KEY key) throws IOException {
+    throw new NotImplementedException("getSkipCache is not implemented");
+  }
+
+
+  /**
    * Returns the value mapped to the given key in byte array or returns null
    * if the key is not found.
    *
