@@ -37,11 +37,6 @@ public final class MetadataKeyFilters {
             .addFilter(OzoneConsts.DELETING_KEY_PREFIX);
   }
 
-  public static KeyPrefixFilter getBCSIDFilter() {
-    return new MetadataKeyFilters.KeyPrefixFilter()
-            .addFilter(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID);
-  }
-
   /**
    * @return A {@link KeyPrefixFilter} that ignores all keys beginning with
    * #. This uses the convention that key prefixes are surrounded by
