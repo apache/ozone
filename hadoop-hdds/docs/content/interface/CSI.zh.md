@@ -26,12 +26,12 @@ summary: Ozone 支持 容器存储接口 (CSI) 协议。你可以通过 Ozone CS
 
 获取更多 CSI 的信息，可以参考[SCI spec](https://github.com/container-storage-interface/spec/blob/master/spec.md)
 
-CSI 定义了一个简单的 包含3个接口(Identity, Controller, Node)的 GRPC 接口，它定义了容器编排器如何请求创建新的存储空间或挂载新创建的存储，
+CSI 定义了一个简单的，包含3个接口（Identity， Controller， Node）的 GRPC 接口，它定义了容器编排器如何请求创建新的存储空间或挂载新创建的存储，
 但没有定义如何挂载存储。
 
 ![CSI](CSI.png)
 
-默认情况下，Ozone CSI 服务使用 S3 FUSE 驱动程序（[goofys](https://github.com/kahing/goofys))安装 Ozone 桶。
+默认情况下，Ozone CSI 服务使用 S3 FUSE 驱动程序（[goofys](https://github.com/kahing/goofys)）挂载 Ozone 桶。
 其他挂载方式（如专用 NFS 服务或本机FUSE驱动程序）的实现正在进行中。
 
 
