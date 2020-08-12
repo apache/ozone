@@ -45,7 +45,7 @@ public class SimpleConfiguration extends SimpleConfigurationParent {
   @Config(key = "wait", type = ConfigType.TIME, timeUnit =
       TimeUnit.SECONDS, defaultValue = "30m", description = "Wait time (To "
       + "test TIME config type)", tags = ConfigTag.MANAGEMENT)
-  private long waitTime = 1;
+  private long waitTime;
 
   @PostConstruct
   public void validate() {

@@ -420,5 +420,10 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       return new TypedKeyValue(rawIterator.next(), keyType,
           valueType);
     }
+
+    @Override
+    public void removeFromDB() throws IOException {
+      rawIterator.removeFromDB();
+    }
   }
 }

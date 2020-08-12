@@ -19,9 +19,9 @@
 package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT_KEY;
-import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_KEY_COUNT_TABLE;
-import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_KEY_TABLE;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconContainerDBProvider.getNewDBStore;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY_COUNT;
 import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
@@ -30,7 +30,6 @@ import java.io.File;
 import java.io.IOException;
 import java.sql.Timestamp;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 import javax.inject.Inject;
@@ -39,10 +38,8 @@ import javax.inject.Singleton;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
-import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -50,7 +47,6 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
-import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,9 +66,6 @@ public class ContainerDBServiceProviderImpl
   private GlobalStatsDao globalStatsDao;
 
   @Inject
-  private ContainerSchemaManager containerSchemaManager;
-
-  @Inject
   private OzoneConfiguration configuration;
 
   @Inject
@@ -80,9 +73,6 @@ public class ContainerDBServiceProviderImpl
 
   @Inject
   private Configuration sqlConfiguration;
-
-  @Inject
-  private ReconUtils reconUtils;
 
   @Inject
   public ContainerDBServiceProviderImpl(DBStore dbStore,
@@ -115,13 +105,19 @@ public class ContainerDBServiceProviderImpl
       throws IOException {
 
     File oldDBLocation = containerDbStore.getDbLocation();
-    containerDbStore = getNewDBStore(configuration, reconUtils);
+    try {
+      containerDbStore.close();
+    } catch (Exception e) {
+      LOG.warn("Unable to close old Recon container key DB at {}.",
+          containerDbStore.getDbLocation().getAbsolutePath());
+    }
+    containerDbStore = getNewDBStore(configuration);
     LOG.info("Creating new Recon Container DB at {}",
         containerDbStore.getDbLocation().getAbsolutePath());
     initializeTables();
 
     if (oldDBLocation.exists()) {
-      LOG.info("Cleaning up old Recon Container DB at {}.",
+      LOG.info("Cleaning up old Recon Container key DB at {}.",
           oldDBLocation.getAbsolutePath());
       FileUtils.deleteDirectory(oldDBLocation);
     }
@@ -142,10 +138,9 @@ public class ContainerDBServiceProviderImpl
    */
   private void initializeTables() {
     try {
-      this.containerKeyTable = containerDbStore.getTable(CONTAINER_KEY_TABLE,
-          ContainerKeyPrefix.class, Integer.class);
-      this.containerKeyCountTable = containerDbStore
-          .getTable(CONTAINER_KEY_COUNT_TABLE, Long.class, Long.class);
+      this.containerKeyTable = CONTAINER_KEY.getTable(containerDbStore);
+      this.containerKeyCountTable =
+          CONTAINER_KEY_COUNT.getTable(containerDbStore);
     } catch (IOException e) {
       LOG.error("Unable to create Container Key tables.", e);
     }
@@ -356,10 +351,6 @@ public class ContainerDBServiceProviderImpl
       containers.put(containerID, containerMetadata);
     }
     return containers;
-  }
-
-  public List<UnhealthyContainers> getMissingContainers() {
-    return containerSchemaManager.getAllMissingContainers();
   }
 
   @Override

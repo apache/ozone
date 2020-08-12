@@ -22,6 +22,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -33,11 +34,13 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
+
 /**
  * Response for set owner request.
  */
+@CleanupTableInfo(cleanupTables = {VOLUME_TABLE})
 public class OMVolumeSetOwnerResponse extends OMClientResponse {
-
   private String oldOwner;
   private UserVolumeInfo oldOwnerVolumeList;
   private UserVolumeInfo newOwnerVolumeList;
@@ -55,8 +58,8 @@ public class OMVolumeSetOwnerResponse extends OMClientResponse {
   }
 
   /**
-   * For when the request is not successful or it is a replay transaction.
-   * Or when newOwner is the same as oldOwner.
+   * For when the request is not successful or when newOwner is the same as
+   * oldOwner.
    * For other successful requests, the other constructor should be used.
    */
   public OMVolumeSetOwnerResponse(@Nonnull OMResponse omResponse) {

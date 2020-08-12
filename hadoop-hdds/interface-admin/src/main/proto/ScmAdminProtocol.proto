@@ -61,7 +61,7 @@ message ScmContainerLocationRequest {
   optional ReplicationManagerStatusRequestProto seplicationManagerStatusRequest = 23;
   optional GetPipelineRequestProto getPipelineRequest = 24;
   optional GetContainerWithPipelineBatchRequestProto getContainerWithPipelineBatchRequest = 25;
-
+  optional GetSafeModeRuleStatusesRequestProto getSafeModeRuleStatusesRequest = 26;
 }
 
 message ScmContainerLocationResponse {
@@ -95,6 +95,7 @@ message ScmContainerLocationResponse {
   optional ReplicationManagerStatusResponseProto replicationManagerStatusResponse = 23;
   optional GetPipelineResponseProto getPipelineResponse = 24;
   optional GetContainerWithPipelineBatchResponseProto getContainerWithPipelineBatchResponse = 25;
+  optional GetSafeModeRuleStatusesResponseProto getSafeModeRuleStatusesResponse = 26;
   enum Status {
     OK = 1;
     CONTAINER_ALREADY_EXISTS = 2;
@@ -124,6 +125,7 @@ enum Type {
   GetReplicationManagerStatus = 18;
   GetPipeline = 19;
   GetContainerWithPipelineBatch = 20;
+  GetSafeModeRuleStatuses = 21;
 }
 
 /**
@@ -174,6 +176,19 @@ message GetContainerWithPipelineResponseProto {
 message GetContainerWithPipelineBatchRequestProto {
   repeated int64 containerIDs = 1;
   optional string traceID = 2;
+}
+
+message GetSafeModeRuleStatusesRequestProto {
+}
+
+message SafeModeRuleStatusProto {
+  required string ruleName = 1;
+  required bool validate = 2;
+  required string statusText = 3;
+}
+
+message GetSafeModeRuleStatusesResponseProto {
+  repeated SafeModeRuleStatusProto safeModeRuleStatusesProto = 1;
 }
 
 message GetContainerWithPipelineBatchResponseProto {

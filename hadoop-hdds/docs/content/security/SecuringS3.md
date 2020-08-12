@@ -2,7 +2,10 @@
 title: "Securing S3"
 date: "2019-April-03"
 summary: Ozone supports S3 protocol, and uses AWS Signature Version 4 protocol which allows a seamless S3 experience.
-weight: 4
+weight: 5
+menu:
+   main:
+      parent: Security
 icon: cloud
 ---
 <!---
@@ -38,14 +41,14 @@ The user needs to `kinit` first and once they have authenticated via kerberos
 ```bash
 ozone s3 getsecret
 ```
-This command will talk to ozone, validate the user via kerberos and generate
+This command will talk to ozone, validate the user via Kerberos and generate
 the AWS credentials. The values will be printed out on the screen. You can
 set these values up in your _.aws_ file for automatic access while working
 against Ozone S3 buckets.
 
 <div class="alert alert-danger" role="alert">
- Please note: These S3 crediantials are like your kerberos passswords
- that give compelete access to your buckets.
+ Please note: These S3 credentials are like your Kerberos passwords
+ that give complete access to your buckets.
 </div>
 
 

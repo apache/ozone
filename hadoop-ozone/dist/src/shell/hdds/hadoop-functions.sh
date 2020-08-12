@@ -999,7 +999,7 @@ function hadoop_connect_to_hosts
   # shellcheck disable=SC2124
   local params="$@"
   local worker_file
-  local tmpslvnames
+  local tmp_worker_names
 
   #
   # ssh (or whatever) to a host
@@ -1030,10 +1030,10 @@ function hadoop_connect_to_hosts
     else
       # no spaces allowed in the pdsh arg host list
       # shellcheck disable=SC2086
-      tmpslvnames=$(echo ${HADOOP_WORKER_NAMES} | tr -s ' ' ,)
+      tmp_worker_names=$(echo ${HADOOP_WORKER_NAMES} | tr -s ' ' ,)
       PDSH_SSH_ARGS_APPEND="${HADOOP_SSH_OPTS}" pdsh \
         -f "${HADOOP_SSH_PARALLEL}" \
-        -w "${tmpslvnames}" $"${@// /\\ }" 2>&1
+        -w "${tmp_worker_names}" $"${@// /\\ }" 2>&1
     fi
   else
     if [[ -z "${HADOOP_WORKER_NAMES}" ]]; then
@@ -2699,14 +2699,14 @@ function hadoop_generic_java_subcmd_handler
 
     hadoop_verify_secure_prereq
     hadoop_setup_secure_service
-    priv_outfile="${HADOOP_LOG_DIR}/privileged-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.out"
-    priv_errfile="${HADOOP_LOG_DIR}/privileged-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.err"
-    priv_pidfile="${HADOOP_PID_DIR}/privileged-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}.pid"
-    daemon_outfile="${HADOOP_LOG_DIR}/hadoop-${HADOOP_SECURE_USER}-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.out"
-    daemon_pidfile="${HADOOP_PID_DIR}/hadoop-${HADOOP_SECURE_USER}-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}.pid"
+    priv_outfile="${HADOOP_LOG_DIR}/ozone-privileged-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.out"
+    priv_errfile="${HADOOP_LOG_DIR}/ozone-privileged-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.err"
+    priv_pidfile="${HADOOP_PID_DIR}/ozone-privileged-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}.pid"
+    daemon_outfile="${HADOOP_LOG_DIR}/ozone-${HADOOP_SECURE_USER}-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.out"
+    daemon_pidfile="${HADOOP_PID_DIR}/ozone-${HADOOP_SECURE_USER}-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}.pid"
   else
-    daemon_outfile="${HADOOP_LOG_DIR}/hadoop-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.out"
-    daemon_pidfile="${HADOOP_PID_DIR}/hadoop-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}.pid"
+    daemon_outfile="${HADOOP_LOG_DIR}/ozone-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.out"
+    daemon_pidfile="${HADOOP_PID_DIR}/ozone-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}.pid"
   fi
 
   # are we actually in daemon mode?
@@ -2714,9 +2714,9 @@ function hadoop_generic_java_subcmd_handler
   if [[ "${HADOOP_DAEMON_MODE}" != "default" ]]; then
     HADOOP_ROOT_LOGGER="${HADOOP_DAEMON_ROOT_LOGGER}"
     if [[ "${HADOOP_SUBCMD_SECURESERVICE}" = true ]]; then
-      HADOOP_LOGFILE="hadoop-${HADOOP_SECURE_USER}-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.log"
+      HADOOP_LOGFILE="ozone-${HADOOP_SECURE_USER}-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.log"
     else
-      HADOOP_LOGFILE="hadoop-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.log"
+      HADOOP_LOGFILE="ozone-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.log"
     fi
   fi
 

@@ -72,13 +72,20 @@ public class HadoopNestedDirGenerator extends BaseFreonGenerator
 
   @Override
   public Void call() throws Exception {
-
-    init();
-    OzoneConfiguration configuration = createOzoneConfiguration();
-    fileSystem = FileSystem.get(URI.create(rootPath), configuration);
-    runTests(this::createDir);
+    String s;
+    if (depth <= 0) {
+      s = "Invalid depth value, depth value should be greater than zero!";
+      print(s);
+    } else if (span < 0) {
+      s = "Invalid span value, span value should be greater or equal to zero!";
+      print(s);
+    } else {
+      init();
+      OzoneConfiguration configuration = createOzoneConfiguration();
+      fileSystem = FileSystem.get(URI.create(rootPath), configuration);
+      runTests(this::createDir);
+    }
     return null;
-
   }
 
   /*
@@ -109,5 +116,8 @@ public class HadoopNestedDirGenerator extends BaseFreonGenerator
       Path dir = new Path(rootPath.concat("/").concat(childDir));
       fileSystem.mkdirs(dir.getParent());
     }
+    String message = "\nSuccessfully created directories. " +
+            "Total Directories with level = " + depth + " and span = " + span;
+    print(message);
   }
 }

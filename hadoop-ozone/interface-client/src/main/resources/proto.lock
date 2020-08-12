@@ -1,0 +1,3458 @@
+{
+  "definitions": [
+    {
+      "protopath": "OmClientProtocol.proto",
+      "def": {
+        "enums": [
+          {
+            "name": "Type",
+            "enum_fields": [
+              {
+                "name": "CreateVolume",
+                "integer": 11
+              },
+              {
+                "name": "SetVolumeProperty",
+                "integer": 12
+              },
+              {
+                "name": "CheckVolumeAccess",
+                "integer": 13
+              },
+              {
+                "name": "InfoVolume",
+                "integer": 14
+              },
+              {
+                "name": "DeleteVolume",
+                "integer": 15
+              },
+              {
+                "name": "ListVolume",
+                "integer": 16
+              },
+              {
+                "name": "CreateBucket",
+                "integer": 21
+              },
+              {
+                "name": "InfoBucket",
+                "integer": 22
+              },
+              {
+                "name": "SetBucketProperty",
+                "integer": 23
+              },
+              {
+                "name": "DeleteBucket",
+                "integer": 24
+              },
+              {
+                "name": "ListBuckets",
+                "integer": 25
+              },
+              {
+                "name": "CreateKey",
+                "integer": 31
+              },
+              {
+                "name": "LookupKey",
+                "integer": 32
+              },
+              {
+                "name": "RenameKey",
+                "integer": 33
+              },
+              {
+                "name": "DeleteKey",
+                "integer": 34
+              },
+              {
+                "name": "ListKeys",
+                "integer": 35
+              },
+              {
+                "name": "CommitKey",
+                "integer": 36
+              },
+              {
+                "name": "AllocateBlock",
+                "integer": 37
+              },
+              {
+                "name": "DeleteKeys",
+                "integer": 38
+              },
+              {
+                "name": "InitiateMultiPartUpload",
+                "integer": 45
+              },
+              {
+                "name": "CommitMultiPartUpload",
+                "integer": 46
+              },
+              {
+                "name": "CompleteMultiPartUpload",
+                "integer": 47
+              },
+              {
+                "name": "AbortMultiPartUpload",
+                "integer": 48
+              },
+              {
+                "name": "GetS3Secret",
+                "integer": 49
+              },
+              {
+                "name": "ListMultiPartUploadParts",
+                "integer": 50
+              },
+              {
+                "name": "ServiceList",
+                "integer": 51
+              },
+              {
+                "name": "DBUpdates",
+                "integer": 53
+              },
+              {
+                "name": "GetDelegationToken",
+                "integer": 61
+              },
+              {
+                "name": "RenewDelegationToken",
+                "integer": 62
+              },
+              {
+                "name": "CancelDelegationToken",
+                "integer": 63
+              },
+              {
+                "name": "GetFileStatus",
+                "integer": 70
+              },
+              {
+                "name": "CreateDirectory",
+                "integer": 71
+              },
+              {
+                "name": "CreateFile",
+                "integer": 72
+              },
+              {
+                "name": "LookupFile",
+                "integer": 73
+              },
+              {
+                "name": "ListStatus",
+                "integer": 74
+              },
+              {
+                "name": "AddAcl",
+                "integer": 75
+              },
+              {
+                "name": "RemoveAcl",
+                "integer": 76
+              },
+              {
+                "name": "SetAcl",
+                "integer": 77
+              },
+              {
+                "name": "GetAcl",
+                "integer": 78
+              },
+              {
+                "name": "PurgeKeys",
+                "integer": 81
+              },
+              {
+                "name": "ListMultipartUploads",
+                "integer": 82
+              },
+              {
+                "name": "ListTrash",
+                "integer": 91
+              },
+              {
+                "name": "RecoverTrash",
+                "integer": 92
+              }
+            ]
+          },
+          {
+            "name": "Status",
+            "enum_fields": [
+              {
+                "name": "OK",
+                "integer": 1
+              },
+              {
+                "name": "VOLUME_NOT_UNIQUE",
+                "integer": 2
+              },
+              {
+                "name": "VOLUME_NOT_FOUND",
+                "integer": 3
+              },
+              {
+                "name": "VOLUME_NOT_EMPTY",
+                "integer": 4
+              },
+              {
+                "name": "VOLUME_ALREADY_EXISTS",
+                "integer": 5
+              },
+              {
+                "name": "USER_NOT_FOUND",
+                "integer": 6
+              },
+              {
+                "name": "USER_TOO_MANY_VOLUMES",
+                "integer": 7
+              },
+              {
+                "name": "BUCKET_NOT_FOUND",
+                "integer": 8
+              },
+              {
+                "name": "BUCKET_NOT_EMPTY",
+                "integer": 9
+              },
+              {
+                "name": "BUCKET_ALREADY_EXISTS",
+                "integer": 10
+              },
+              {
+                "name": "KEY_ALREADY_EXISTS",
+                "integer": 11
+              },
+              {
+                "name": "KEY_NOT_FOUND",
+                "integer": 12
+              },
+              {
+                "name": "INVALID_KEY_NAME",
+                "integer": 13
+              },
+              {
+                "name": "ACCESS_DENIED",
+                "integer": 14
+              },
+              {
+                "name": "INTERNAL_ERROR",
+                "integer": 15
+              },
+              {
+                "name": "KEY_ALLOCATION_ERROR",
+                "integer": 16
+              },
+              {
+                "name": "KEY_DELETION_ERROR",
+                "integer": 17
+              },
+              {
+                "name": "KEY_RENAME_ERROR",
+                "integer": 18
+              },
+              {
+                "name": "METADATA_ERROR",
+                "integer": 19
+              },
+              {
+                "name": "OM_NOT_INITIALIZED",
+                "integer": 20
+              },
+              {
+                "name": "SCM_VERSION_MISMATCH_ERROR",
+                "integer": 21
+              },
+              {
+                "name": "INITIATE_MULTIPART_UPLOAD_ERROR",
+                "integer": 24
+              },
+              {
+                "name": "MULTIPART_UPLOAD_PARTFILE_ERROR",
+                "integer": 25
+              },
+              {
+                "name": "NO_SUCH_MULTIPART_UPLOAD_ERROR",
+                "integer": 26
+              },
+              {
+                "name": "MISMATCH_MULTIPART_LIST",
+                "integer": 27
+              },
+              {
+                "name": "MISSING_UPLOAD_PARTS",
+                "integer": 28
+              },
+              {
+                "name": "COMPLETE_MULTIPART_UPLOAD_ERROR",
+                "integer": 29
+              },
+              {
+                "name": "ENTITY_TOO_SMALL",
+                "integer": 30
+              },
+              {
+                "name": "ABORT_MULTIPART_UPLOAD_FAILED",
+                "integer": 31
+              },
+              {
+                "name": "S3_SECRET_NOT_FOUND",
+                "integer": 32
+              },
+              {
+                "name": "INVALID_AUTH_METHOD",
+                "integer": 33
+              },
+              {
+                "name": "INVALID_TOKEN",
+                "integer": 34
+              },
+              {
+                "name": "TOKEN_EXPIRED",
+                "integer": 35
+              },
+              {
+                "name": "TOKEN_ERROR_OTHER",
+                "integer": 36
+              },
+              {
+                "name": "LIST_MULTIPART_UPLOAD_PARTS_FAILED",
+                "integer": 37
+              },
+              {
+                "name": "SCM_IN_SAFE_MODE",
+                "integer": 38
+              },
+              {
+                "name": "INVALID_REQUEST",
+                "integer": 39
+              },
+              {
+                "name": "BUCKET_ENCRYPTION_KEY_NOT_FOUND",
+                "integer": 40
+              },
+              {
+                "name": "UNKNOWN_CIPHER_SUITE",
+                "integer": 41
+              },
+              {
+                "name": "INVALID_KMS_PROVIDER",
+                "integer": 42
+              },
+              {
+                "name": "TOKEN_CREATION_ERROR",
+                "integer": 43
+              },
+              {
+                "name": "FILE_NOT_FOUND",
+                "integer": 44
+              },
+              {
+                "name": "DIRECTORY_NOT_FOUND",
+                "integer": 45
+              },
+              {
+                "name": "FILE_ALREADY_EXISTS",
+                "integer": 46
+              },
+              {
+                "name": "NOT_A_FILE",
+                "integer": 47
+              },
+              {
+                "name": "PERMISSION_DENIED",
+                "integer": 48
+              },
+              {
+                "name": "TIMEOUT",
+                "integer": 49
+              },
+              {
+                "name": "PREFIX_NOT_FOUND",
+                "integer": 50
+              },
+              {
+                "name": "RATIS_ERROR",
+                "integer": 52
+              },
+              {
+                "name": "INVALID_PATH_IN_ACL_REQUEST",
+                "integer": 53
+              },
+              {
+                "name": "USER_MISMATCH",
+                "integer": 54
+              },
+              {
+                "name": "INVALID_PART",
+                "integer": 55
+              },
+              {
+                "name": "INVALID_PART_ORDER",
+                "integer": 56
+              },
+              {
+                "name": "SCM_GET_PIPELINE_EXCEPTION",
+                "integer": 57
+              },
+              {
+                "name": "INVALID_BUCKET_NAME",
+                "integer": 58
+              },
+              {
+                "name": "CANNOT_CREATE_DIRECTORY_AT_ROOT",
+                "integer": 59
+              },
+              {
+                "name": "DIRECTORY_ALREADY_EXISTS",
+                "integer": 60
+              },
+              {
+                "name": "INVALID_VOLUME_NAME",
+                "integer": 61
+              },
+              {
+                "name": "PARTIAL_DELETE",
+                "integer": 62
+              }
+            ]
+          },
+          {
+            "name": "ListVolumeRequest.Scope",
+            "enum_fields": [
+              {
+                "name": "USER_VOLUMES",
+                "integer": 1
+              },
+              {
+                "name": "VOLUMES_BY_USER",
+                "integer": 2
+              },
+              {
+                "name": "VOLUMES_BY_CLUSTER",
+                "integer": 3
+              }
+            ]
+          },
+          {
+            "name": "StorageTypeProto",
+            "enum_fields": [
+              {
+                "name": "DISK",
+                "integer": 1
+              },
+              {
+                "name": "SSD",
+                "integer": 2
+              },
+              {
+                "name": "ARCHIVE",
+                "integer": 3
+              },
+              {
+                "name": "RAM_DISK",
+                "integer": 4
+              }
+            ]
+          },
+          {
+            "name": "CipherSuiteProto",
+            "enum_fields": [
+              {
+                "name": "UNKNOWN",
+                "integer": 1
+              },
+              {
+                "name": "AES_CTR_NOPADDING",
+                "integer": 2
+              }
+            ]
+          },
+          {
+            "name": "CryptoProtocolVersionProto",
+            "enum_fields": [
+              {
+                "name": "UNKNOWN_PROTOCOL_VERSION",
+                "integer": 1
+              },
+              {
+                "name": "ENCRYPTION_ZONES",
+                "integer": 2
+              }
+            ]
+          },
+          {
+            "name": "OzoneObj.ObjectType",
+            "enum_fields": [
+              {
+                "name": "VOLUME",
+                "integer": 1
+              },
+              {
+                "name": "BUCKET",
+                "integer": 2
+              },
+              {
+                "name": "KEY",
+                "integer": 3
+              },
+              {
+                "name": "PREFIX",
+                "integer": 4
+              }
+            ]
+          },
+          {
+            "name": "OzoneObj.StoreType",
+            "enum_fields": [
+              {
+                "name": "OZONE",
+                "integer": 1
+              },
+              {
+                "name": "S3",
+                "integer": 2
+              }
+            ]
+          },
+          {
+            "name": "OzoneAclInfo.OzoneAclType",
+            "enum_fields": [
+              {
+                "name": "USER",
+                "integer": 1
+              },
+              {
+                "name": "GROUP",
+                "integer": 2
+              },
+              {
+                "name": "WORLD",
+                "integer": 3
+              },
+              {
+                "name": "ANONYMOUS",
+                "integer": 4
+              },
+              {
+                "name": "CLIENT_IP",
+                "integer": 5
+              }
+            ]
+          },
+          {
+            "name": "OzoneAclInfo.OzoneAclScope",
+            "enum_fields": [
+              {
+                "name": "ACCESS"
+              },
+              {
+                "name": "DEFAULT",
+                "integer": 1
+              }
+            ]
+          },
+          {
+            "name": "OMTokenProto.Type",
+            "enum_fields": [
+              {
+                "name": "DELEGATION_TOKEN",
+                "integer": 1
+              },
+              {
+                "name": "S3AUTHINFO",
+                "integer": 2
+              }
+            ]
+          },
+          {
+            "name": "ServicePort.Type",
+            "enum_fields": [
+              {
+                "name": "RPC",
+                "integer": 1
+              },
+              {
+                "name": "HTTP",
+                "integer": 2
+              },
+              {
+                "name": "HTTPS",
+                "integer": 3
+              },
+              {
+                "name": "RATIS",
+                "integer": 4
+              }
+            ]
+          }
+        ],
+        "messages": [
+          {
+            "name": "OMRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "cmdType",
+                "type": "Type"
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "clientId",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "userInfo",
+                "type": "UserInfo"
+              },
+              {
+                "id": 11,
+                "name": "createVolumeRequest",
+                "type": "CreateVolumeRequest"
+              },
+              {
+                "id": 12,
+                "name": "setVolumePropertyRequest",
+                "type": "SetVolumePropertyRequest"
+              },
+              {
+                "id": 13,
+                "name": "checkVolumeAccessRequest",
+                "type": "CheckVolumeAccessRequest"
+              },
+              {
+                "id": 14,
+                "name": "infoVolumeRequest",
+                "type": "InfoVolumeRequest"
+              },
+              {
+                "id": 15,
+                "name": "deleteVolumeRequest",
+                "type": "DeleteVolumeRequest"
+              },
+              {
+                "id": 16,
+                "name": "listVolumeRequest",
+                "type": "ListVolumeRequest"
+              },
+              {
+                "id": 21,
+                "name": "createBucketRequest",
+                "type": "CreateBucketRequest"
+              },
+              {
+                "id": 22,
+                "name": "infoBucketRequest",
+                "type": "InfoBucketRequest"
+              },
+              {
+                "id": 23,
+                "name": "setBucketPropertyRequest",
+                "type": "SetBucketPropertyRequest"
+              },
+              {
+                "id": 24,
+                "name": "deleteBucketRequest",
+                "type": "DeleteBucketRequest"
+              },
+              {
+                "id": 25,
+                "name": "listBucketsRequest",
+                "type": "ListBucketsRequest"
+              },
+              {
+                "id": 31,
+                "name": "createKeyRequest",
+                "type": "CreateKeyRequest"
+              },
+              {
+                "id": 32,
+                "name": "lookupKeyRequest",
+                "type": "LookupKeyRequest"
+              },
+              {
+                "id": 33,
+                "name": "renameKeyRequest",
+                "type": "RenameKeyRequest"
+              },
+              {
+                "id": 34,
+                "name": "deleteKeyRequest",
+                "type": "DeleteKeyRequest"
+              },
+              {
+                "id": 35,
+                "name": "listKeysRequest",
+                "type": "ListKeysRequest"
+              },
+              {
+                "id": 36,
+                "name": "commitKeyRequest",
+                "type": "CommitKeyRequest"
+              },
+              {
+                "id": 37,
+                "name": "allocateBlockRequest",
+                "type": "AllocateBlockRequest"
+              },
+              {
+                "id": 38,
+                "name": "deleteKeysRequest",
+                "type": "DeleteKeysRequest"
+              },
+              {
+                "id": 45,
+                "name": "initiateMultiPartUploadRequest",
+                "type": "MultipartInfoInitiateRequest"
+              },
+              {
+                "id": 46,
+                "name": "commitMultiPartUploadRequest",
+                "type": "MultipartCommitUploadPartRequest"
+              },
+              {
+                "id": 47,
+                "name": "completeMultiPartUploadRequest",
+                "type": "MultipartUploadCompleteRequest"
+              },
+              {
+                "id": 48,
+                "name": "abortMultiPartUploadRequest",
+                "type": "MultipartUploadAbortRequest"
+              },
+              {
+                "id": 49,
+                "name": "getS3SecretRequest",
+                "type": "GetS3SecretRequest"
+              },
+              {
+                "id": 50,
+                "name": "listMultipartUploadPartsRequest",
+                "type": "MultipartUploadListPartsRequest"
+              },
+              {
+                "id": 51,
+                "name": "serviceListRequest",
+                "type": "ServiceListRequest"
+              },
+              {
+                "id": 53,
+                "name": "dbUpdatesRequest",
+                "type": "DBUpdatesRequest"
+              },
+              {
+                "id": 61,
+                "name": "getDelegationTokenRequest",
+                "type": "hadoop.common.GetDelegationTokenRequestProto"
+              },
+              {
+                "id": 62,
+                "name": "renewDelegationTokenRequest",
+                "type": "hadoop.common.RenewDelegationTokenRequestProto"
+              },
+              {
+                "id": 63,
+                "name": "cancelDelegationTokenRequest",
+                "type": "hadoop.common.CancelDelegationTokenRequestProto"
+              },
+              {
+                "id": 64,
+                "name": "updateGetDelegationTokenRequest",
+                "type": "UpdateGetDelegationTokenRequest"
+              },
+              {
+                "id": 65,
+                "name": "updatedRenewDelegationTokenRequest",
+                "type": "UpdateRenewDelegationTokenRequest"
+              },
+              {
+                "id": 70,
+                "name": "getFileStatusRequest",
+                "type": "GetFileStatusRequest"
+              },
+              {
+                "id": 71,
+                "name": "createDirectoryRequest",
+                "type": "CreateDirectoryRequest"
+              },
+              {
+                "id": 72,
+                "name": "createFileRequest",
+                "type": "CreateFileRequest"
+              },
+              {
+                "id": 73,
+                "name": "lookupFileRequest",
+                "type": "LookupFileRequest"
+              },
+              {
+                "id": 74,
+                "name": "listStatusRequest",
+                "type": "ListStatusRequest"
+              },
+              {
+                "id": 75,
+                "name": "addAclRequest",
+                "type": "AddAclRequest"
+              },
+              {
+                "id": 76,
+                "name": "removeAclRequest",
+                "type": "RemoveAclRequest"
+              },
+              {
+                "id": 77,
+                "name": "setAclRequest",
+                "type": "SetAclRequest"
+              },
+              {
+                "id": 78,
+                "name": "getAclRequest",
+                "type": "GetAclRequest"
+              },
+              {
+                "id": 81,
+                "name": "purgeKeysRequest",
+                "type": "PurgeKeysRequest"
+              },
+              {
+                "id": 82,
+                "name": "updateGetS3SecretRequest",
+                "type": "UpdateGetS3SecretRequest"
+              },
+              {
+                "id": 83,
+                "name": "listMultipartUploadsRequest",
+                "type": "ListMultipartUploadsRequest"
+              },
+              {
+                "id": 91,
+                "name": "listTrashRequest",
+                "type": "ListTrashRequest"
+              },
+              {
+                "id": 92,
+                "name": "RecoverTrashRequest",
+                "type": "RecoverTrashRequest"
+              }
+            ]
+          },
+          {
+            "name": "OMResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "cmdType",
+                "type": "Type"
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "success",
+                "type": "bool",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "true"
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "name": "message",
+                "type": "string"
+              },
+              {
+                "id": 5,
+                "name": "status",
+                "type": "Status"
+              },
+              {
+                "id": 6,
+                "name": "leaderOMNodeId",
+                "type": "string"
+              },
+              {
+                "id": 11,
+                "name": "createVolumeResponse",
+                "type": "CreateVolumeResponse"
+              },
+              {
+                "id": 12,
+                "name": "setVolumePropertyResponse",
+                "type": "SetVolumePropertyResponse"
+              },
+              {
+                "id": 13,
+                "name": "checkVolumeAccessResponse",
+                "type": "CheckVolumeAccessResponse"
+              },
+              {
+                "id": 14,
+                "name": "infoVolumeResponse",
+                "type": "InfoVolumeResponse"
+              },
+              {
+                "id": 15,
+                "name": "deleteVolumeResponse",
+                "type": "DeleteVolumeResponse"
+              },
+              {
+                "id": 16,
+                "name": "listVolumeResponse",
+                "type": "ListVolumeResponse"
+              },
+              {
+                "id": 21,
+                "name": "createBucketResponse",
+                "type": "CreateBucketResponse"
+              },
+              {
+                "id": 22,
+                "name": "infoBucketResponse",
+                "type": "InfoBucketResponse"
+              },
+              {
+                "id": 23,
+                "name": "setBucketPropertyResponse",
+                "type": "SetBucketPropertyResponse"
+              },
+              {
+                "id": 24,
+                "name": "deleteBucketResponse",
+                "type": "DeleteBucketResponse"
+              },
+              {
+                "id": 25,
+                "name": "listBucketsResponse",
+                "type": "ListBucketsResponse"
+              },
+              {
+                "id": 31,
+                "name": "createKeyResponse",
+                "type": "CreateKeyResponse"
+              },
+              {
+                "id": 32,
+                "name": "lookupKeyResponse",
+                "type": "LookupKeyResponse"
+              },
+              {
+                "id": 33,
+                "name": "renameKeyResponse",
+                "type": "RenameKeyResponse"
+              },
+              {
+                "id": 34,
+                "name": "deleteKeyResponse",
+                "type": "DeleteKeyResponse"
+              },
+              {
+                "id": 35,
+                "name": "listKeysResponse",
+                "type": "ListKeysResponse"
+              },
+              {
+                "id": 36,
+                "name": "commitKeyResponse",
+                "type": "CommitKeyResponse"
+              },
+              {
+                "id": 37,
+                "name": "allocateBlockResponse",
+                "type": "AllocateBlockResponse"
+              },
+              {
+                "id": 38,
+                "name": "deleteKeysResponse",
+                "type": "DeleteKeysResponse"
+              },
+              {
+                "id": 45,
+                "name": "initiateMultiPartUploadResponse",
+                "type": "MultipartInfoInitiateResponse"
+              },
+              {
+                "id": 46,
+                "name": "commitMultiPartUploadResponse",
+                "type": "MultipartCommitUploadPartResponse"
+              },
+              {
+                "id": 47,
+                "name": "completeMultiPartUploadResponse",
+                "type": "MultipartUploadCompleteResponse"
+              },
+              {
+                "id": 48,
+                "name": "abortMultiPartUploadResponse",
+                "type": "MultipartUploadAbortResponse"
+              },
+              {
+                "id": 49,
+                "name": "getS3SecretResponse",
+                "type": "GetS3SecretResponse"
+              },
+              {
+                "id": 50,
+                "name": "listMultipartUploadPartsResponse",
+                "type": "MultipartUploadListPartsResponse"
+              },
+              {
+                "id": 51,
+                "name": "ServiceListResponse",
+                "type": "ServiceListResponse"
+              },
+              {
+                "id": 52,
+                "name": "dbUpdatesResponse",
+                "type": "DBUpdatesResponse"
+              },
+              {
+                "id": 61,
+                "name": "getDelegationTokenResponse",
+                "type": "GetDelegationTokenResponseProto"
+              },
+              {
+                "id": 62,
+                "name": "renewDelegationTokenResponse",
+                "type": "RenewDelegationTokenResponseProto"
+              },
+              {
+                "id": 63,
+                "name": "cancelDelegationTokenResponse",
+                "type": "CancelDelegationTokenResponseProto"
+              },
+              {
+                "id": 70,
+                "name": "getFileStatusResponse",
+                "type": "GetFileStatusResponse"
+              },
+              {
+                "id": 71,
+                "name": "createDirectoryResponse",
+                "type": "CreateDirectoryResponse"
+              },
+              {
+                "id": 72,
+                "name": "createFileResponse",
+                "type": "CreateFileResponse"
+              },
+              {
+                "id": 73,
+                "name": "lookupFileResponse",
+                "type": "LookupFileResponse"
+              },
+              {
+                "id": 74,
+                "name": "listStatusResponse",
+                "type": "ListStatusResponse"
+              },
+              {
+                "id": 75,
+                "name": "addAclResponse",
+                "type": "AddAclResponse"
+              },
+              {
+                "id": 76,
+                "name": "removeAclResponse",
+                "type": "RemoveAclResponse"
+              },
+              {
+                "id": 77,
+                "name": "setAclResponse",
+                "type": "SetAclResponse"
+              },
+              {
+                "id": 78,
+                "name": "getAclResponse",
+                "type": "GetAclResponse"
+              },
+              {
+                "id": 81,
+                "name": "purgeKeysResponse",
+                "type": "PurgeKeysResponse"
+              },
+              {
+                "id": 82,
+                "name": "listMultipartUploadsResponse",
+                "type": "ListMultipartUploadsResponse"
+              },
+              {
+                "id": 91,
+                "name": "listTrashResponse",
+                "type": "ListTrashResponse"
+              },
+              {
+                "id": 92,
+                "name": "RecoverTrashResponse",
+                "type": "RecoverTrashResponse"
+              }
+            ]
+          },
+          {
+            "name": "ListTrashRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "startKeyName",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "keyPrefix",
+                "type": "string"
+              },
+              {
+                "id": 5,
+                "name": "maxKeys",
+                "type": "int32"
+              }
+            ]
+          },
+          {
+            "name": "ListTrashResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "deletedKeys",
+                "type": "RepeatedKeyInfo",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "RecoverTrashRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "keyName",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "destinationBucket",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "RecoverTrashResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "response",
+                "type": "bool"
+              }
+            ]
+          },
+          {
+            "name": "VolumeInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "adminName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "ownerName",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "volume",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "quotaInBytes",
+                "type": "uint64"
+              },
+              {
+                "id": 5,
+                "name": "metadata",
+                "type": "hadoop.hdds.KeyValue",
+                "is_repeated": true
+              },
+              {
+                "id": 6,
+                "name": "volumeAcls",
+                "type": "OzoneAclInfo",
+                "is_repeated": true
+              },
+              {
+                "id": 7,
+                "name": "creationTime",
+                "type": "uint64"
+              },
+              {
+                "id": 8,
+                "name": "objectID",
+                "type": "uint64"
+              },
+              {
+                "id": 9,
+                "name": "updateID",
+                "type": "uint64"
+              },
+              {
+                "id": 10,
+                "name": "modificationTime",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "UserInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "userName",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "remoteAddress",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "hostName",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "UpdateGetDelegationTokenRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "getDelegationTokenResponse",
+                "type": "GetDelegationTokenResponseProto"
+              },
+              {
+                "id": 2,
+                "name": "tokenRenewInterval",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "UpdateRenewDelegationTokenRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "renewDelegationTokenRequest",
+                "type": "hadoop.common.RenewDelegationTokenRequestProto"
+              },
+              {
+                "id": 2,
+                "name": "renewDelegationTokenResponse",
+                "type": "RenewDelegationTokenResponseProto"
+              }
+            ]
+          },
+          {
+            "name": "CreateVolumeRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeInfo",
+                "type": "VolumeInfo"
+              }
+            ]
+          },
+          {
+            "name": "CreateVolumeResponse"
+          },
+          {
+            "name": "UserVolumeInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeNames",
+                "type": "string",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "objectID",
+                "type": "uint64"
+              },
+              {
+                "id": 3,
+                "name": "updateID",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "SetVolumePropertyRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "ownerName",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "quotaInBytes",
+                "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "modificationTime",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "SetVolumePropertyResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "response",
+                "type": "bool"
+              }
+            ]
+          },
+          {
+            "name": "CheckVolumeAccessRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "userAcl",
+                "type": "OzoneAclInfo"
+              }
+            ]
+          },
+          {
+            "name": "CheckVolumeAccessResponse"
+          },
+          {
+            "name": "InfoVolumeRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "InfoVolumeResponse",
+            "fields": [
+              {
+                "id": 2,
+                "name": "volumeInfo",
+                "type": "VolumeInfo"
+              }
+            ]
+          },
+          {
+            "name": "DeleteVolumeRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "DeleteVolumeResponse"
+          },
+          {
+            "name": "ListVolumeRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "scope",
+                "type": "Scope"
+              },
+              {
+                "id": 2,
+                "name": "userName",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "prefix",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "prevKey",
+                "type": "string"
+              },
+              {
+                "id": 5,
+                "name": "maxKeys",
+                "type": "uint32"
+              }
+            ]
+          },
+          {
+            "name": "ListVolumeResponse",
+            "fields": [
+              {
+                "id": 2,
+                "name": "volumeInfo",
+                "type": "VolumeInfo",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "BucketInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "acls",
+                "type": "OzoneAclInfo",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "isVersionEnabled",
+                "type": "bool",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "false"
+                  }
+                ]
+              },
+              {
+                "id": 5,
+                "name": "storageType",
+                "type": "StorageTypeProto",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "DISK"
+                  }
+                ]
+              },
+              {
+                "id": 6,
+                "name": "creationTime",
+                "type": "uint64"
+              },
+              {
+                "id": 7,
+                "name": "metadata",
+                "type": "hadoop.hdds.KeyValue",
+                "is_repeated": true
+              },
+              {
+                "id": 8,
+                "name": "beinfo",
+                "type": "BucketEncryptionInfoProto"
+              },
+              {
+                "id": 9,
+                "name": "objectID",
+                "type": "uint64"
+              },
+              {
+                "id": 10,
+                "name": "updateID",
+                "type": "uint64"
+              },
+              {
+                "id": 11,
+                "name": "modificationTime",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "BucketEncryptionInfoProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "suite",
+                "type": "CipherSuiteProto"
+              },
+              {
+                "id": 3,
+                "name": "cryptoProtocolVersion",
+                "type": "CryptoProtocolVersionProto"
+              }
+            ]
+          },
+          {
+            "name": "FileEncryptionInfoProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "suite",
+                "type": "CipherSuiteProto"
+              },
+              {
+                "id": 2,
+                "name": "cryptoProtocolVersion",
+                "type": "CryptoProtocolVersionProto"
+              },
+              {
+                "id": 3,
+                "name": "key",
+                "type": "bytes"
+              },
+              {
+                "id": 4,
+                "name": "iv",
+                "type": "bytes"
+              },
+              {
+                "id": 5,
+                "name": "keyName",
+                "type": "string"
+              },
+              {
+                "id": 6,
+                "name": "ezKeyVersionName",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "PerFileEncryptionInfoProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "key",
+                "type": "bytes"
+              },
+              {
+                "id": 2,
+                "name": "iv",
+                "type": "bytes"
+              },
+              {
+                "id": 3,
+                "name": "ezKeyVersionName",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "DataEncryptionKeyProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyId",
+                "type": "uint32"
+              },
+              {
+                "id": 3,
+                "name": "nonce",
+                "type": "bytes"
+              },
+              {
+                "id": 4,
+                "name": "encryptionKey",
+                "type": "bytes"
+              },
+              {
+                "id": 5,
+                "name": "expiryDate",
+                "type": "uint64"
+              },
+              {
+                "id": 6,
+                "name": "encryptionAlgorithm",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "BucketArgs",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string"
+              },
+              {
+                "id": 5,
+                "name": "isVersionEnabled",
+                "type": "bool"
+              },
+              {
+                "id": 6,
+                "name": "storageType",
+                "type": "StorageTypeProto"
+              },
+              {
+                "id": 7,
+                "name": "metadata",
+                "type": "hadoop.hdds.KeyValue",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "PrefixInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "name",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "acls",
+                "type": "OzoneAclInfo",
+                "is_repeated": true
+              },
+              {
+                "id": 3,
+                "name": "metadata",
+                "type": "hadoop.hdds.KeyValue",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "objectID",
+                "type": "uint64"
+              },
+              {
+                "id": 5,
+                "name": "updateID",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "OzoneObj",
+            "fields": [
+              {
+                "id": 1,
+                "name": "resType",
+                "type": "ObjectType"
+              },
+              {
+                "id": 2,
+                "name": "storeType",
+                "type": "StoreType",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "S3"
+                  }
+                ]
+              },
+              {
+                "id": 3,
+                "name": "path",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "OzoneAclInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "type",
+                "type": "OzoneAclType"
+              },
+              {
+                "id": 2,
+                "name": "name",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "rights",
+                "type": "bytes"
+              },
+              {
+                "id": 4,
+                "name": "aclScope",
+                "type": "OzoneAclScope",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "ACCESS"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "GetAclRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "obj",
+                "type": "OzoneObj"
+              }
+            ]
+          },
+          {
+            "name": "GetAclResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "acls",
+                "type": "OzoneAclInfo",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "AddAclRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "obj",
+                "type": "OzoneObj"
+              },
+              {
+                "id": 2,
+                "name": "acl",
+                "type": "OzoneAclInfo"
+              }
+            ]
+          },
+          {
+            "name": "AddAclResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "response",
+                "type": "bool"
+              }
+            ]
+          },
+          {
+            "name": "RemoveAclRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "obj",
+                "type": "OzoneObj"
+              },
+              {
+                "id": 2,
+                "name": "acl",
+                "type": "OzoneAclInfo"
+              }
+            ]
+          },
+          {
+            "name": "RemoveAclResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "response",
+                "type": "bool"
+              }
+            ]
+          },
+          {
+            "name": "SetAclRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "obj",
+                "type": "OzoneObj"
+              },
+              {
+                "id": 2,
+                "name": "acl",
+                "type": "OzoneAclInfo",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "SetAclResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "response",
+                "type": "bool"
+              }
+            ]
+          },
+          {
+            "name": "CreateBucketRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "bucketInfo",
+                "type": "BucketInfo"
+              }
+            ]
+          },
+          {
+            "name": "CreateBucketResponse"
+          },
+          {
+            "name": "InfoBucketRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "InfoBucketResponse",
+            "fields": [
+              {
+                "id": 2,
+                "name": "bucketInfo",
+                "type": "BucketInfo"
+              }
+            ]
+          },
+          {
+            "name": "SetBucketPropertyRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "bucketArgs",
+                "type": "BucketArgs"
+              }
+            ]
+          },
+          {
+            "name": "SetBucketPropertyResponse"
+          },
+          {
+            "name": "DeleteBucketRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "DeleteBucketResponse"
+          },
+          {
+            "name": "ListBucketsRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "startKey",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "prefix",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "count",
+                "type": "int32"
+              }
+            ]
+          },
+          {
+            "name": "ListBucketsResponse",
+            "fields": [
+              {
+                "id": 2,
+                "name": "bucketInfo",
+                "type": "BucketInfo",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "KeyArgs",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "keyName",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "dataSize",
+                "type": "uint64"
+              },
+              {
+                "id": 5,
+                "name": "type",
+                "type": "hadoop.hdds.ReplicationType"
+              },
+              {
+                "id": 6,
+                "name": "factor",
+                "type": "hadoop.hdds.ReplicationFactor"
+              },
+              {
+                "id": 7,
+                "name": "keyLocations",
+                "type": "KeyLocation",
+                "is_repeated": true
+              },
+              {
+                "id": 8,
+                "name": "isMultipartKey",
+                "type": "bool"
+              },
+              {
+                "id": 9,
+                "name": "multipartUploadID",
+                "type": "string"
+              },
+              {
+                "id": 10,
+                "name": "multipartNumber",
+                "type": "uint32"
+              },
+              {
+                "id": 11,
+                "name": "metadata",
+                "type": "hadoop.hdds.KeyValue",
+                "is_repeated": true
+              },
+              {
+                "id": 12,
+                "name": "acls",
+                "type": "OzoneAclInfo",
+                "is_repeated": true
+              },
+              {
+                "id": 13,
+                "name": "modificationTime",
+                "type": "uint64"
+              },
+              {
+                "id": 14,
+                "name": "sortDatanodes",
+                "type": "bool"
+              },
+              {
+                "id": 15,
+                "name": "fileEncryptionInfo",
+                "type": "FileEncryptionInfoProto"
+              }
+            ]
+          },
+          {
+            "name": "KeyLocation",
+            "fields": [
+              {
+                "id": 1,
+                "name": "blockID",
+                "type": "hadoop.hdds.BlockID"
+              },
+              {
+                "id": 3,
+                "name": "offset",
+                "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "length",
+                "type": "uint64"
+              },
+              {
+                "id": 5,
+                "name": "createVersion",
+                "type": "uint64"
+              },
+              {
+                "id": 6,
+                "name": "token",
+                "type": "hadoop.common.TokenProto"
+              },
+              {
+                "id": 7,
+                "name": "pipeline",
+                "type": "hadoop.hdds.Pipeline"
+              }
+            ]
+          },
+          {
+            "name": "KeyLocationList",
+            "fields": [
+              {
+                "id": 1,
+                "name": "version",
+                "type": "uint64"
+              },
+              {
+                "id": 2,
+                "name": "keyLocations",
+                "type": "KeyLocation",
+                "is_repeated": true
+              },
+              {
+                "id": 3,
+                "name": "fileEncryptionInfo",
+                "type": "FileEncryptionInfoProto"
+              }
+            ]
+          },
+          {
+            "name": "KeyInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "keyName",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "dataSize",
+                "type": "uint64"
+              },
+              {
+                "id": 5,
+                "name": "type",
+                "type": "hadoop.hdds.ReplicationType"
+              },
+              {
+                "id": 6,
+                "name": "factor",
+                "type": "hadoop.hdds.ReplicationFactor"
+              },
+              {
+                "id": 7,
+                "name": "keyLocationList",
+                "type": "KeyLocationList",
+                "is_repeated": true
+              },
+              {
+                "id": 8,
+                "name": "creationTime",
+                "type": "uint64"
+              },
+              {
+                "id": 9,
+                "name": "modificationTime",
+                "type": "uint64"
+              },
+              {
+                "id": 10,
+                "name": "latestVersion",
+                "type": "uint64"
+              },
+              {
+                "id": 11,
+                "name": "metadata",
+                "type": "hadoop.hdds.KeyValue",
+                "is_repeated": true
+              },
+              {
+                "id": 12,
+                "name": "fileEncryptionInfo",
+                "type": "FileEncryptionInfoProto"
+              },
+              {
+                "id": 13,
+                "name": "acls",
+                "type": "OzoneAclInfo",
+                "is_repeated": true
+              },
+              {
+                "id": 14,
+                "name": "objectID",
+                "type": "uint64"
+              },
+              {
+                "id": 15,
+                "name": "updateID",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "RepeatedKeyInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyInfo",
+                "type": "KeyInfo",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "OzoneFileStatusProto",
+            "fields": [
+              {
+                "id": 2,
+                "name": "keyInfo",
+                "type": "KeyInfo"
+              },
+              {
+                "id": 3,
+                "name": "blockSize",
+                "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "isDirectory",
+                "type": "bool"
+              }
+            ]
+          },
+          {
+            "name": "GetFileStatusRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyArgs",
+                "type": "KeyArgs"
+              }
+            ]
+          },
+          {
+            "name": "GetFileStatusResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "status",
+                "type": "OzoneFileStatusProto"
+              }
+            ]
+          },
+          {
+            "name": "CreateDirectoryRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyArgs",
+                "type": "KeyArgs"
+              }
+            ]
+          },
+          {
+            "name": "CreateDirectoryResponse"
+          },
+          {
+            "name": "CreateFileRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyArgs",
+                "type": "KeyArgs"
+              },
+              {
+                "id": 2,
+                "name": "isRecursive",
+                "type": "bool"
+              },
+              {
+                "id": 3,
+                "name": "isOverwrite",
+                "type": "bool"
+              },
+              {
+                "id": 4,
+                "name": "clientID",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "CreateFileResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyInfo",
+                "type": "KeyInfo"
+              },
+              {
+                "id": 2,
+                "name": "ID",
+                "type": "uint64"
+              },
+              {
+                "id": 3,
+                "name": "openVersion",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "LookupFileRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyArgs",
+                "type": "KeyArgs"
+              }
+            ]
+          },
+          {
+            "name": "LookupFileResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyInfo",
+                "type": "KeyInfo"
+              }
+            ]
+          },
+          {
+            "name": "ListStatusRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyArgs",
+                "type": "KeyArgs"
+              },
+              {
+                "id": 2,
+                "name": "recursive",
+                "type": "bool"
+              },
+              {
+                "id": 3,
+                "name": "startKey",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "numEntries",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "ListStatusResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "statuses",
+                "type": "OzoneFileStatusProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "CreateKeyRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyArgs",
+                "type": "KeyArgs"
+              },
+              {
+                "id": 2,
+                "name": "clientID",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "CreateKeyResponse",
+            "fields": [
+              {
+                "id": 2,
+                "name": "keyInfo",
+                "type": "KeyInfo"
+              },
+              {
+                "id": 3,
+                "name": "ID",
+                "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "openVersion",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "LookupKeyRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyArgs",
+                "type": "KeyArgs"
+              }
+            ]
+          },
+          {
+            "name": "LookupKeyResponse",
+            "fields": [
+              {
+                "id": 2,
+                "name": "keyInfo",
+                "type": "KeyInfo"
+              },
+              {
+                "id": 3,
+                "name": "ID",
+                "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "openVersion",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "RenameKeyRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyArgs",
+                "type": "KeyArgs"
+              },
+              {
+                "id": 2,
+                "name": "toKeyName",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "RenameKeyResponse"
+          },
+          {
+            "name": "DeleteKeyRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyArgs",
+                "type": "KeyArgs"
+              }
+            ]
+          },
+          {
+            "name": "DeleteKeysRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "deleteKeys",
+                "type": "DeleteKeyArgs"
+              }
+            ]
+          },
+          {
+            "name": "DeleteKeyArgs",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "keys",
+                "type": "string",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "DeleteKeysResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "unDeletedKeys",
+                "type": "DeleteKeyArgs"
+              },
+              {
+                "id": 2,
+                "name": "status",
+                "type": "bool"
+              }
+            ]
+          },
+          {
+            "name": "DeleteKeyResponse",
+            "fields": [
+              {
+                "id": 2,
+                "name": "keyInfo",
+                "type": "KeyInfo"
+              },
+              {
+                "id": 3,
+                "name": "ID",
+                "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "openVersion",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "DeletedKeys",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "keys",
+                "type": "string",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "PurgeKeysRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "deletedKeys",
+                "type": "DeletedKeys",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "PurgeKeysResponse"
+          },
+          {
+            "name": "OMTokenProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "type",
+                "type": "Type"
+              },
+              {
+                "id": 2,
+                "name": "version",
+                "type": "uint32"
+              },
+              {
+                "id": 3,
+                "name": "owner",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "renewer",
+                "type": "string"
+              },
+              {
+                "id": 5,
+                "name": "realUser",
+                "type": "string"
+              },
+              {
+                "id": 6,
+                "name": "issueDate",
+                "type": "uint64"
+              },
+              {
+                "id": 7,
+                "name": "maxDate",
+                "type": "uint64"
+              },
+              {
+                "id": 8,
+                "name": "sequenceNumber",
+                "type": "uint32"
+              },
+              {
+                "id": 9,
+                "name": "masterKeyId",
+                "type": "uint32"
+              },
+              {
+                "id": 10,
+                "name": "expiryDate",
+                "type": "uint64"
+              },
+              {
+                "id": 11,
+                "name": "omCertSerialId",
+                "type": "string"
+              },
+              {
+                "id": 12,
+                "name": "accessKeyId",
+                "type": "string"
+              },
+              {
+                "id": 13,
+                "name": "signature",
+                "type": "string"
+              },
+              {
+                "id": 14,
+                "name": "strToSign",
+                "type": "string"
+              },
+              {
+                "id": 15,
+                "name": "omServiceId",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "SecretKeyProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyId",
+                "type": "uint32"
+              },
+              {
+                "id": 2,
+                "name": "expiryDate",
+                "type": "uint64"
+              },
+              {
+                "id": 3,
+                "name": "privateKeyBytes",
+                "type": "bytes"
+              },
+              {
+                "id": 4,
+                "name": "publicKeyBytes",
+                "type": "bytes"
+              }
+            ]
+          },
+          {
+            "name": "ListKeysRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "startKey",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "prefix",
+                "type": "string"
+              },
+              {
+                "id": 5,
+                "name": "count",
+                "type": "int32"
+              }
+            ]
+          },
+          {
+            "name": "ListKeysResponse",
+            "fields": [
+              {
+                "id": 2,
+                "name": "keyInfo",
+                "type": "KeyInfo",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "CommitKeyRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyArgs",
+                "type": "KeyArgs"
+              },
+              {
+                "id": 2,
+                "name": "clientID",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "CommitKeyResponse"
+          },
+          {
+            "name": "AllocateBlockRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyArgs",
+                "type": "KeyArgs"
+              },
+              {
+                "id": 2,
+                "name": "clientID",
+                "type": "uint64"
+              },
+              {
+                "id": 3,
+                "name": "excludeList",
+                "type": "hadoop.hdds.ExcludeListProto"
+              },
+              {
+                "id": 4,
+                "name": "keyLocation",
+                "type": "KeyLocation"
+              }
+            ]
+          },
+          {
+            "name": "AllocateBlockResponse",
+            "fields": [
+              {
+                "id": 2,
+                "name": "keyLocation",
+                "type": "KeyLocation"
+              }
+            ]
+          },
+          {
+            "name": "ServiceListRequest"
+          },
+          {
+            "name": "DBUpdatesRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "sequenceNumber",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "ServiceListResponse",
+            "fields": [
+              {
+                "id": 2,
+                "name": "serviceInfo",
+                "type": "ServiceInfo",
+                "is_repeated": true
+              },
+              {
+                "id": 3,
+                "name": "caCertificate",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "DBUpdatesResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "sequenceNumber",
+                "type": "uint64"
+              },
+              {
+                "id": 2,
+                "name": "data",
+                "type": "bytes",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "ServicePort",
+            "fields": [
+              {
+                "id": 1,
+                "name": "type",
+                "type": "Type"
+              },
+              {
+                "id": 2,
+                "name": "value",
+                "type": "uint32"
+              }
+            ]
+          },
+          {
+            "name": "OMRoleInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "nodeId",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "serverRole",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "ServiceInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "nodeType",
+                "type": "hadoop.hdds.NodeType"
+              },
+              {
+                "id": 2,
+                "name": "hostname",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "servicePorts",
+                "type": "ServicePort",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "omRole",
+                "type": "OMRoleInfo"
+              }
+            ]
+          },
+          {
+            "name": "MultipartInfoInitiateRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyArgs",
+                "type": "KeyArgs"
+              }
+            ]
+          },
+          {
+            "name": "MultipartInfoInitiateResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "keyName",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "multipartUploadID",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "MultipartKeyInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "uploadID",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "creationTime",
+                "type": "uint64"
+              },
+              {
+                "id": 3,
+                "name": "type",
+                "type": "hadoop.hdds.ReplicationType"
+              },
+              {
+                "id": 4,
+                "name": "factor",
+                "type": "hadoop.hdds.ReplicationFactor"
+              },
+              {
+                "id": 5,
+                "name": "partKeyInfoList",
+                "type": "PartKeyInfo",
+                "is_repeated": true
+              },
+              {
+                "id": 6,
+                "name": "objectID",
+                "type": "uint64"
+              },
+              {
+                "id": 7,
+                "name": "updateID",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "PartKeyInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "partName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "partNumber",
+                "type": "uint32"
+              },
+              {
+                "id": 3,
+                "name": "partKeyInfo",
+                "type": "KeyInfo"
+              }
+            ]
+          },
+          {
+            "name": "MultipartCommitUploadPartRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyArgs",
+                "type": "KeyArgs"
+              },
+              {
+                "id": 2,
+                "name": "clientID",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "MultipartCommitUploadPartResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "partName",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "MultipartUploadCompleteRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyArgs",
+                "type": "KeyArgs"
+              },
+              {
+                "id": 2,
+                "name": "partsList",
+                "type": "Part",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "MultipartUploadCompleteResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volume",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "bucket",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "key",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "hash",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "Part",
+            "fields": [
+              {
+                "id": 1,
+                "name": "partNumber",
+                "type": "uint32"
+              },
+              {
+                "id": 2,
+                "name": "partName",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "MultipartUploadAbortRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyArgs",
+                "type": "KeyArgs"
+              }
+            ]
+          },
+          {
+            "name": "MultipartUploadAbortResponse"
+          },
+          {
+            "name": "MultipartUploadListPartsRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volume",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "bucket",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "key",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "uploadID",
+                "type": "string"
+              },
+              {
+                "id": 5,
+                "name": "partNumbermarker",
+                "type": "uint32"
+              },
+              {
+                "id": 6,
+                "name": "maxParts",
+                "type": "uint32"
+              }
+            ]
+          },
+          {
+            "name": "MultipartUploadListPartsResponse",
+            "fields": [
+              {
+                "id": 2,
+                "name": "type",
+                "type": "hadoop.hdds.ReplicationType"
+              },
+              {
+                "id": 3,
+                "name": "factor",
+                "type": "hadoop.hdds.ReplicationFactor"
+              },
+              {
+                "id": 4,
+                "name": "nextPartNumberMarker",
+                "type": "uint32"
+              },
+              {
+                "id": 5,
+                "name": "isTruncated",
+                "type": "bool"
+              },
+              {
+                "id": 6,
+                "name": "partsList",
+                "type": "PartInfo",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "ListMultipartUploadsRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volume",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "bucket",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "prefix",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "ListMultipartUploadsResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "isTruncated",
+                "type": "bool"
+              },
+              {
+                "id": 2,
+                "name": "uploadsList",
+                "type": "MultipartUploadInfo",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "MultipartUploadInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "keyName",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "uploadId",
+                "type": "string"
+              },
+              {
+                "id": 5,
+                "name": "creationTime",
+                "type": "uint64"
+              },
+              {
+                "id": 6,
+                "name": "type",
+                "type": "hadoop.hdds.ReplicationType"
+              },
+              {
+                "id": 7,
+                "name": "factor",
+                "type": "hadoop.hdds.ReplicationFactor"
+              }
+            ]
+          },
+          {
+            "name": "PartInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "partNumber",
+                "type": "uint32"
+              },
+              {
+                "id": 2,
+                "name": "partName",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "modificationTime",
+                "type": "uint64"
+              },
+              {
+                "id": 4,
+                "name": "size",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "GetDelegationTokenResponseProto",
+            "fields": [
+              {
+                "id": 2,
+                "name": "response",
+                "type": "hadoop.common.GetDelegationTokenResponseProto"
+              }
+            ]
+          },
+          {
+            "name": "RenewDelegationTokenResponseProto",
+            "fields": [
+              {
+                "id": 2,
+                "name": "response",
+                "type": "hadoop.common.RenewDelegationTokenResponseProto"
+              }
+            ]
+          },
+          {
+            "name": "CancelDelegationTokenResponseProto",
+            "fields": [
+              {
+                "id": 2,
+                "name": "response",
+                "type": "hadoop.common.CancelDelegationTokenResponseProto"
+              }
+            ]
+          },
+          {
+            "name": "S3Secret",
+            "fields": [
+              {
+                "id": 1,
+                "name": "kerberosID",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "awsSecret",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "GetS3SecretRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "kerberosID",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "GetS3SecretResponse",
+            "fields": [
+              {
+                "id": 2,
+                "name": "s3Secret",
+                "type": "S3Secret"
+              }
+            ]
+          },
+          {
+            "name": "UpdateGetS3SecretRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "kerberosID",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "awsSecret",
+                "type": "string"
+              }
+            ]
+          }
+        ],
+        "services": [
+          {
+            "name": "OzoneManagerService",
+            "rpcs": [
+              {
+                "name": "submitRequest",
+                "in_type": "OMRequest",
+                "out_type": "OMResponse"
+              }
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "path": "hdds.proto"
+          },
+          {
+            "path": "Security.proto"
+          }
+        ],
+        "package": {
+          "name": "hadoop.ozone"
+        },
+        "options": [
+          {
+            "name": "java_package",
+            "value": "org.apache.hadoop.ozone.protocol.proto"
+          },
+          {
+            "name": "java_outer_classname",
+            "value": "OzoneManagerProtocolProtos"
+          },
+          {
+            "name": "java_generic_services",
+            "value": "true"
+          },
+          {
+            "name": "java_generate_equals_and_hash",
+            "value": "true"
+          }
+        ]
+      }
+    },
+    {
+      "protopath": "Security.proto",
+      "def": {
+        "messages": [
+          {
+            "name": "TokenProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "identifier",
+                "type": "bytes"
+              },
+              {
+                "id": 2,
+                "name": "password",
+                "type": "bytes"
+              },
+              {
+                "id": 3,
+                "name": "kind",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "service",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "CredentialsKVProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "alias",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "token",
+                "type": "hadoop.common.TokenProto"
+              },
+              {
+                "id": 3,
+                "name": "secret",
+                "type": "bytes"
+              }
+            ]
+          },
+          {
+            "name": "CredentialsProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "tokens",
+                "type": "hadoop.common.CredentialsKVProto",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "secrets",
+                "type": "hadoop.common.CredentialsKVProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "GetDelegationTokenRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "renewer",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "GetDelegationTokenResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "token",
+                "type": "hadoop.common.TokenProto"
+              }
+            ]
+          },
+          {
+            "name": "RenewDelegationTokenRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "token",
+                "type": "hadoop.common.TokenProto"
+              }
+            ]
+          },
+          {
+            "name": "RenewDelegationTokenResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "newExpiryTime",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "CancelDelegationTokenRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "token",
+                "type": "hadoop.common.TokenProto"
+              }
+            ]
+          },
+          {
+            "name": "CancelDelegationTokenResponseProto"
+          }
+        ],
+        "package": {
+          "name": "hadoop.common"
+        },
+        "options": [
+          {
+            "name": "java_package",
+            "value": "org.apache.hadoop.ozone.security.proto"
+          },
+          {
+            "name": "java_outer_classname",
+            "value": "SecurityProtos"
+          },
+          {
+            "name": "java_generic_services",
+            "value": "true"
+          },
+          {
+            "name": "java_generate_equals_and_hash",
+            "value": "true"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -129,6 +129,15 @@ public class CsiServer extends GenericCli implements Callable<Void> {
         tags = ConfigTag.STORAGE)
     private String volumeOwner;
 
+    @Config(key = "mount.command",
+        defaultValue = "goofys --endpoint %s %s %s",
+        description =
+            "This is the mount command which is used to publish volume."
+                + " these %s will be replicated by s3gAddress, volumeId "
+                + " and target path.",
+        tags = ConfigTag.STORAGE)
+    private String mountCommand;
+
     public String getSocketPath() {
       return socketPath;
     }
@@ -137,11 +146,9 @@ public class CsiServer extends GenericCli implements Callable<Void> {
       return volumeOwner;
     }
 
-
     public void setVolumeOwner(String volumeOwner) {
       this.volumeOwner = volumeOwner;
     }
-
 
     public void setSocketPath(String socketPath) {
       this.socketPath = socketPath;
@@ -150,7 +157,6 @@ public class CsiServer extends GenericCli implements Callable<Void> {
     public long getDefaultVolumeSize() {
       return defaultVolumeSize;
     }
-
 
     public void setDefaultVolumeSize(long defaultVolumeSize) {
       this.defaultVolumeSize = defaultVolumeSize;
@@ -162,6 +168,10 @@ public class CsiServer extends GenericCli implements Callable<Void> {
 
     public void setS3gAddress(String s3gAddress) {
       this.s3gAddress = s3gAddress;
+    }
+
+    public String getMountCommand() {
+      return mountCommand;
     }
   }
 }

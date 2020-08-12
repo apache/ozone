@@ -23,7 +23,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 
-import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -171,7 +170,7 @@ public final class KeyValueContainerUtil {
           containerDB.getStore().get(DB_PENDING_DELETE_BLOCK_COUNT_KEY);
       if (pendingDeleteBlockCount != null) {
         kvContainerData.incrPendingDeletionBlocks(
-            Ints.fromByteArray(pendingDeleteBlockCount));
+            Longs.fromByteArray(pendingDeleteBlockCount));
       } else {
         // Set pending deleted block count.
         MetadataKeyFilters.KeyPrefixFilter filter =
@@ -231,10 +230,22 @@ public final class KeyValueContainerUtil {
   private static void initializeUsedBytesAndBlockCount(
       KeyValueContainerData kvContainerData) throws IOException {
 
+    MetadataKeyFilters.KeyPrefixFilter filter =
+            new MetadataKeyFilters.KeyPrefixFilter();
+
+    // Ignore all blocks except those with no prefix, or those with
+    // #deleting# prefix.
+    filter.addFilter(OzoneConsts.DELETED_KEY_PREFIX, true)
+          .addFilter(OzoneConsts.DELETE_TRANSACTION_KEY_PREFIX, true)
+          .addFilter(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX, true)
+          .addFilter(OzoneConsts.BLOCK_COUNT, true)
+          .addFilter(OzoneConsts.CONTAINER_BYTES_USED, true)
+          .addFilter(OzoneConsts.PENDING_DELETE_BLOCK_COUNT, true);
+
     long blockCount = 0;
     try (KeyValueBlockIterator blockIter = new KeyValueBlockIterator(
         kvContainerData.getContainerID(),
-        new File(kvContainerData.getContainerPath()))) {
+        new File(kvContainerData.getContainerPath()), filter)) {
       long usedBytes = 0;
 
 

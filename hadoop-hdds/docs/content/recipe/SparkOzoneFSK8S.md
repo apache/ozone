@@ -31,7 +31,7 @@ This recipe shows how Ozone object store can be used from Spark using:
 ## Requirements
 
 Download latest Spark and Ozone distribution and extract them. This method is
-tested with the `spark-2.4.0-bin-hadoop2.7` distribution.
+tested with the `spark-2.4.6-bin-hadoop2.7` distribution.
 
 You also need the following:
 
@@ -47,13 +47,13 @@ First of all create a docker image with the Spark image creator.
 Execute the following from the Spark distribution
 
 ```bash
-./bin/docker-image-tool.sh -r myrepo -t 2.4.0 build
+./bin/docker-image-tool.sh -r myrepo -t 2.4.6 build
 ```
 
 _Note_: if you use Minikube add the `-m` flag to use the docker daemon of the Minikube image:
 
 ```bash
-./bin/docker-image-tool.sh -m -r myrepo -t 2.4.0 build
+./bin/docker-image-tool.sh -m -r myrepo -t 2.4.6 build
 ```
 
 `./bin/docker-image-tool.sh` is an official Spark tool to create container images and this step will create multiple Spark container images with the name _myrepo/spark_. The first container will be used as a base container in the following steps.
@@ -73,40 +73,34 @@ And create a custom `core-site.xml`.
 ```xml
 <configuration>
     <property>
-        <name>fs.o3fs.impl</name>
-        <value>org.apache.hadoop.fs.ozone.BasicOzoneFileSystem</value>
-    </property>
-    <property>
         <name>fs.AbstractFileSystem.o3fs.impl</name>
         <value>org.apache.hadoop.fs.ozone.OzFs</value>
      </property>
 </configuration>
 ```
 
-_Note_: You may also use `org.apache.hadoop.fs.ozone.OzoneFileSystem` without the `Basic` prefix. The `Basic` version doesn't support FS statistics and encryption zones but can work together with older hadoop versions.
-
-Copy the `ozonefs.jar` file from an ozone distribution (__use the legacy version!__)
+Copy the `ozonefs.jar` file from an ozone distribution (__use the hadoop2 version!__)
 
 ```
-kubectl cp om-0:/opt/hadoop/share/ozone/lib/hadoop-ozone-filesystem-lib-legacy-0.4.0-SNAPSHOT.jar .
+kubectl cp om-0:/opt/hadoop/share/ozone/lib/hadoop-ozone-filesystem-hadoop2-VERSION.jar hadoop-ozone-filesystem-hadoop2.jar
 ```
 
 
 Create a new Dockerfile and build the image:
 ```
-FROM myrepo/spark:2.4.0
+FROM myrepo/spark:2.4.6
 ADD core-site.xml /opt/hadoop/conf/core-site.xml
 ADD ozone-site.xml /opt/hadoop/conf/ozone-site.xml
 ENV HADOOP_CONF_DIR=/opt/hadoop/conf
 ENV SPARK_EXTRA_CLASSPATH=/opt/hadoop/conf
-ADD hadoop-ozone-filesystem-lib-legacy-0.4.0-SNAPSHOT.jar /opt/hadoop-ozone-filesystem-lib-legacy.jar
+ADD hadoop-ozone-filesystem-hadoop2.jar /opt/hadoop-ozone-filesystem-hadoop2.jar
 ```
 
 ```bash
 docker build -t myrepo/spark-ozone
 ```
 
-For remote kubernetes cluster you may need to push it:
+For remote Kubernetes cluster you may need to push it:
 
 ```bash
 docker push myrepo/spark-ozone
@@ -118,7 +112,6 @@ Download any text file and put it to the `/tmp/alice.txt` first.
 
 ```bash
 kubectl port-forward s3g-0 9878:9878
-ozone sh volume create /s3v
 aws s3api --endpoint http://localhost:9878 create-bucket --bucket=test
 aws s3api --endpoint http://localhost:9878 put-object --bucket test --key alice.txt --body /tmp/alice.txt
 ```
@@ -133,8 +126,8 @@ kubectl create clusterrolebinding spark-role --clusterrole=edit --serviceaccount
 
 Execute the following spark-submit command, but change at least the following values:
 
- * the kubernetes master url (you can check your _~/.kube/config_ to find the actual value)
- * the kubernetes namespace (_yournamespace_ in this example)
+ * the Kubernetes master url (you can check your _~/.kube/config_ to find the actual value)
+ * the Kubernetes namespace (_yournamespace_ in this example)
  * serviceAccountName (you can use the _spark_ value if you followed the previous steps)
  * container.image (in this example this is _myrepo/spark-ozone_. This is pushed to the registry in the previous steps)
 
@@ -149,9 +142,9 @@ bin/spark-submit \
     --conf spark.kubernetes.authenticate.driver.serviceAccountName=spark \
     --conf spark.kubernetes.container.image=myrepo/spark-ozone \
     --conf spark.kubernetes.container.image.pullPolicy=Always \
-    --jars /opt/hadoop-ozone-filesystem-lib-legacy.jar \
+    --jars /opt/hadoop-ozone-filesystem-hadoop2.jar \
     local:///opt/spark/examples/jars/spark-examples_2.11-2.4.0.jar \
-    o3fs://test.s3v/alice.txt
+    o3fs://test.s3v.ozone-om-0.ozone-om:9862/alice.txt
 ```
 
 Check the available `spark-word-count-...` pods with `kubectl get pod`

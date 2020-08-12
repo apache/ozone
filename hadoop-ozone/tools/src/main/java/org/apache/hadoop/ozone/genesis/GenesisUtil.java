@@ -31,7 +31,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
@@ -39,8 +40,6 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.MetadataStore;
 import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
-import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -100,7 +99,7 @@ public final class GenesisUtil {
     return builder.build();
   }
 
-  public static DatanodeDetails createDatanodeDetails(String uuid) {
+  public static DatanodeDetails createDatanodeDetails(UUID uuid) {
     String ipAddress =
         RANDOM.nextInt(256) + "." + RANDOM.nextInt(256) + "." + RANDOM
             .nextInt(256) + "." + RANDOM.nextInt(256);
@@ -150,14 +149,15 @@ public final class GenesisUtil {
 
   static void addPipelines(HddsProtos.ReplicationFactor factor,
       int numPipelines, ConfigurationSource conf) throws Exception {
-    DBStore dbStore = DBStoreBuilder.createDBStore(conf, new SCMDBDefinition());
+    SCMMetadataStore scmMetadataStore =
+            new SCMMetadataStoreImpl((OzoneConfiguration)conf);
 
     Table<PipelineID, Pipeline> pipelineTable =
-        SCMDBDefinition.PIPELINES.getTable(dbStore);
+        scmMetadataStore.getPipelineTable();
     List<DatanodeDetails> nodes = new ArrayList<>();
     for (int i = 0; i < factor.getNumber(); i++) {
       nodes
-          .add(GenesisUtil.createDatanodeDetails(UUID.randomUUID().toString()));
+          .add(GenesisUtil.createDatanodeDetails(UUID.randomUUID()));
     }
     for (int i = 0; i < numPipelines; i++) {
       Pipeline pipeline =
@@ -171,8 +171,7 @@ public final class GenesisUtil {
       pipelineTable.put(pipeline.getId(),
           pipeline);
     }
-
-    dbStore.close();
+    scmMetadataStore.getStore().close();
   }
 
   static OzoneManager getOm(OzoneConfiguration conf)

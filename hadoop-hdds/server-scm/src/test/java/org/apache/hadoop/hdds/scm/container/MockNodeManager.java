@@ -92,6 +92,7 @@ public class MockNodeManager implements NodeManager {
   private final Node2ContainerMap node2ContainerMap;
   private NetworkTopology clusterMap;
   private ConcurrentMap<String, Set<String>> dnsToUuidMap;
+  private int numHealthyDisksPerDatanode;
 
   public MockNodeManager(NetworkTopologyImpl clusterMap,
                          List<DatanodeDetails> nodes,
@@ -121,6 +122,7 @@ public class MockNodeManager implements NodeManager {
     }
     safemode = false;
     this.commandMap = new HashMap<>();
+    numHealthyDisksPerDatanode = 1;
   }
 
   public MockNodeManager(boolean initializeFakeNodes, int nodeCount) {
@@ -567,6 +569,15 @@ public class MockNodeManager implements NodeManager {
 
   public void setNetworkTopology(NetworkTopology topology) {
     this.clusterMap = topology;
+  }
+
+  @Override
+  public int getNumHealthyVolumes(List<DatanodeDetails> dnList) {
+    return numHealthyDisksPerDatanode;
+  }
+
+  public void setNumHealthyVolumes(int value) {
+    numHealthyDisksPerDatanode = value;
   }
 
   /**

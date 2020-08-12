@@ -1,7 +1,10 @@
 ---
 title: "Securing Datanodes"
 date: "2019-April-03"
-weight: 2
+weight: 3
+menu:
+   main:
+      parent: Security
 summary:  Explains different modes of securing data nodes. These range from kerberos to auto approval.
 icon: th
 ---

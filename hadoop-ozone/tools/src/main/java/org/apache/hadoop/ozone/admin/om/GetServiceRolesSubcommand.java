@@ -19,9 +19,11 @@
 package org.apache.hadoop.ozone.admin.om;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.client.OzoneClientException;
-import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import picocli.CommandLine;
 
 import java.util.List;
@@ -45,21 +47,33 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
       required = true)
   private String omServiceId;
 
+  private OzoneManagerProtocol ozoneManagerClient;
+
   @Override
   public Void call() throws Exception {
     try {
-      ClientProtocol client = parent.createClient(omServiceId);
-      getOmServerRoles(client.getOmRoleInfos());
+      ozoneManagerClient =  parent.createOmClient(omServiceId);
+      getOmServerRoles(ozoneManagerClient.getServiceList());
     } catch (OzoneClientException ex) {
       System.out.printf("Error: %s", ex.getMessage());
+    } finally {
+      if (ozoneManagerClient != null) {
+        ozoneManagerClient.close();
+      }
     }
     return null;
   }
 
-  private void getOmServerRoles(List<OMRoleInfo> roleInfos) {
-    for (OMRoleInfo roleInfo : roleInfos) {
-      System.out.println(
-          roleInfo.getNodeId() + " : " + roleInfo.getServerRole());
+  private void getOmServerRoles(List<ServiceInfo> serviceList) {
+    for (ServiceInfo serviceInfo : serviceList) {
+      OMRoleInfo omRoleInfo = serviceInfo.getOmRoleInfo();
+      if (omRoleInfo != null &&
+          serviceInfo.getNodeType() == HddsProtos.NodeType.OM) {
+        System.out.println(
+            serviceInfo.getOmRoleInfo().getNodeId() + " : " +
+                serviceInfo.getOmRoleInfo().getServerRole() + " (" +
+                serviceInfo.getHostname() + ")");
+      }
     }
   }
 }

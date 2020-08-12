@@ -17,13 +17,16 @@
  */
 package org.apache.hadoop.hdds.scm.cli;
 
+import java.util.Map;
 import java.util.concurrent.Callable;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
 
@@ -43,6 +46,10 @@ public class SafeModeCheckSubcommand implements Callable<Void> {
   @ParentCommand
   private SafeModeCommands parent;
 
+  @CommandLine.Option(names = {"--verbose"},
+      description = "Show detailed status of rules.")
+  private boolean verbose;
+
   @Override
   public Void call() throws Exception {
     try (ScmClient scmClient = parent.getParent().createScmClient()) {
@@ -52,6 +59,14 @@ public class SafeModeCheckSubcommand implements Callable<Void> {
       // Output data list
       if(execReturn){
         LOG.info("SCM is in safe mode.");
+        if (verbose) {
+          for (Map.Entry<String, Pair<Boolean, String>> entry :
+              scmClient.getSafeModeRuleStatuses().entrySet()) {
+            Pair<Boolean, String> value = entry.getValue();
+            LOG.info("validated:{}, {}, {}",
+                value.getLeft(), entry.getKey(), value.getRight());
+          }
+        }
       } else {
         LOG.info("SCM is out of safe mode.");
       }

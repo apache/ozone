@@ -30,6 +30,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -52,7 +53,7 @@ import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.keys.KeyHandler;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
-
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
@@ -62,7 +63,9 @@ import picocli.CommandLine.Parameters;
 @Command(name = "chunkinfo",
         description = "returns chunk location"
                 + " information about an existing key")
-public class ChunkKeyHandler  extends KeyHandler {
+@MetaInfServices(SubcommandWithParent.class)
+public class ChunkKeyHandler extends KeyHandler implements
+    SubcommandWithParent {
 
   @Parameters(arity = "1..1", description = "key to be located")
     private String uri;
@@ -194,4 +197,10 @@ public class ChunkKeyHandler  extends KeyHandler {
     String prettyJson = gson2.toJson(result);
     System.out.println(prettyJson);
   }
+
+  @Override
+  public Class<?> getParentType() {
+    return OzoneDebug.class;
+  }
+
 }

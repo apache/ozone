@@ -38,7 +38,7 @@ public class TestS3MultipartUploadCommitPartRequest
     extends TestS3MultipartRequest {
 
   @Test
-  public void testPreExecute() {
+  public void testPreExecute() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();

@@ -18,6 +18,7 @@ package org.apache.hadoop.hdds.scm.container;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -250,8 +251,8 @@ public class TestContainerStateManagerIntegration {
     // next container should be the same as first container
     ContainerInfo info = containerManager
         .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-            container1.getPipeline(), Collections.singletonList(new
-                ContainerID(1)));
+            container1.getPipeline(),
+            new HashSet<>(Collections.singletonList(new ContainerID(1))));
     Assert.assertNotEquals(container1.getContainerInfo().getContainerID(),
         info.getContainerID());
   }
@@ -275,8 +276,9 @@ public class TestContainerStateManagerIntegration {
 
     ContainerInfo info = containerManager
         .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
-            container1.getPipeline(), Arrays.asList(new ContainerID(1), new
-                ContainerID(2), new ContainerID(3)));
+            container1.getPipeline(),
+            new HashSet<>(Arrays.asList(new ContainerID(1), new
+                ContainerID(2), new ContainerID(3))));
     Assert.assertEquals(info.getContainerID(), 4);
   }
 
@@ -410,10 +412,10 @@ public class TestContainerStateManagerIntegration {
   public void testReplicaMap() throws Exception {
     DatanodeDetails dn1 = DatanodeDetails.newBuilder().setHostName("host1")
         .setIpAddress("1.1.1.1")
-        .setUuid(UUID.randomUUID().toString()).build();
+        .setUuid(UUID.randomUUID()).build();
     DatanodeDetails dn2 = DatanodeDetails.newBuilder().setHostName("host2")
         .setIpAddress("2.2.2.2")
-        .setUuid(UUID.randomUUID().toString()).build();
+        .setUuid(UUID.randomUUID()).build();
 
     // Test 1: no replica's exist
     ContainerID containerID = ContainerID.valueof(RandomUtils.nextLong());

@@ -121,16 +121,6 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
             OMException.ResultCodes.BUCKET_NOT_FOUND);
       }
 
-      // Check if this transaction is a replay of ratis logs.
-      // If a replay, then the response has already been returned to the
-      // client. So take no further action and return a dummy OMClientResponse.
-      if (isReplay(ozoneManager, dbBucketInfo, transactionLogIndex)) {
-        LOG.debug("Replayed Transaction {} ignored. Request: {}",
-            transactionLogIndex, setBucketPropertyRequest);
-        return new OMBucketSetPropertyResponse(
-            createReplayOMResponse(omResponse));
-      }
-
       OmBucketInfo.Builder bucketInfoBuilder = OmBucketInfo.newBuilder();
       bucketInfoBuilder.setVolumeName(dbBucketInfo.getVolumeName())
           .setBucketName(dbBucketInfo.getBucketName())
@@ -190,7 +180,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       success = false;
       exception = ex;
       omClientResponse = new OMBucketSetPropertyResponse(
-          createErrorOMResponse(omResponse, exception), omBucketInfo);
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

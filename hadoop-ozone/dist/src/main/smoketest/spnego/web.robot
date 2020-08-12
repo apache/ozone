@@ -30,6 +30,11 @@ ${OM_SERVICE_LIST_URL}       http://om:9874/serviceList
 ${SCM_URL}       http://scm:9876
 ${RECON_URL}       http://recon:9888
 
+${SCM_CONF_URL}     http://scm:9876/conf
+${SCM_JMX_URL}      http://scm:9876/jmx
+${SCM_STACKS_URL}   http://scm:9876/stacks
+
+
 *** Keywords ***
 Verify SPNEGO enabled URL
     [arguments]                      ${url}
@@ -59,6 +64,15 @@ Test OM Service List
 
 Test SCM portal
     Verify SPNEGO enabled URL       ${SCM_URL}
+
+Test SCM conf
+    Verify SPNEGO enabled URL       ${SCM_CONF_URL}
+
+Test SCM jmx
+    Verify SPNEGO enabled URL       ${SCM_JMX_URL}
+
+Test SCM stacks
+    Verify SPNEGO enabled URL       ${SCM_STACKS_URL}
 
 Test Recon portal
     Verify SPNEGO enabled URL       ${RECON_URL}
