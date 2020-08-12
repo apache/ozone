@@ -178,6 +178,19 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   /**
+   * Skip checking cache and get the value mapped to the given key in byte
+   * array or returns null if the key is not found.
+   *
+   * @param key metadata key
+   * @return value in byte array or null if the key is not found.
+   * @throws IOException on Failure
+   */
+  @Override
+  public VALUE getSkipCache(KEY key) throws IOException {
+    return getFromTable(key);
+  }
+
+  /**
    * This method returns the value if it exists in cache, if it 
    * does not, get the value from the underlying rockdb table. If it 
    * exists in cache, it returns the same reference of the cached value.

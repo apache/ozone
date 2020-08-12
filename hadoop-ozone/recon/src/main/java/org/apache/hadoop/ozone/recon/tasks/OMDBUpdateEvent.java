@@ -22,7 +22,7 @@ import java.util.Objects;
 
 /**
  * A class used to encapsulate a single OM DB update event.
- * Currently only PUT and DELETE are supported.
+ * Currently PUT, DELETE and UPDATE are supported.
  * @param <KEY> Type of Key.
  * @param <VALUE> Type of Value.
  */
