@@ -34,6 +34,10 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true)
 public class Insight extends GenericCli {
 
+  public Insight() {
+    super(Insight.class);
+  }
+
   public static void main(String[] args) throws Exception {
     new Insight().run(args);
   }

@@ -17,7 +17,14 @@
  */
 package org.apache.hadoop.ozone.shell;
 
-import com.google.common.base.Strings;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.PrintStream;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
+
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
@@ -33,9 +40,15 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.ToolRunner;
+
+import com.google.common.base.Strings;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
+import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
+import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -50,19 +63,6 @@ import picocli.CommandLine.IExceptionHandler2;
 import picocli.CommandLine.ParameterException;
 import picocli.CommandLine.ParseResult;
 import picocli.CommandLine.RunLast;
-
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.PrintStream;
-import java.util.Arrays;
-import java.util.List;
-import java.util.UUID;
-
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
-import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
-import static org.junit.Assert.fail;
 
 /**
  * This class tests Ozone sh shell command.
@@ -346,11 +346,7 @@ public class TestOzoneShellHA {
    */
   @Test
   public void testOzoneShCmdURIs() {
-    // Test case 1: ozone sh volume create /volume
-    // Expectation: Failure.
-    String[] args = new String[] {"volume", "create", "/volume"};
-    executeWithError(ozoneShell, args,
-        "Service ID or host name must not be omitted");
+
 
     // Get leader OM node RPC address from ozone.om.address.omServiceId.omNode
     String omLeaderNodeId = getLeaderOMNodeId();
@@ -367,7 +363,7 @@ public class TestOzoneShellHA {
     // TODO: Fix this behavior, then uncomment the execute() below.
     String setOmAddress = "--set=" + OMConfigKeys.OZONE_OM_ADDRESS_KEY + "="
         + omLeaderNodeAddr;
-    args = new String[] {setOmAddress,
+    String[] args = new String[] {setOmAddress,
         "volume", "create", "o3://" + omLeaderNodeAddrWithoutPort + "/volume2"};
     //execute(ozoneShell, args);
 
@@ -389,15 +385,14 @@ public class TestOzoneShellHA {
     executeWithError(ozoneShell, args, "does not use port information");
 
     // Test case 6: ozone sh bucket create /volume/bucket
-    // Expectation: Failure.
-    args = new String[] {"bucket", "create", "/volume/bucket"};
-    executeWithError(ozoneShell, args,
-        "Service ID or host name must not be omitted");
+    // Expectation: Success.
+    args = new String[] {"bucket", "create", "/volume/bucket-one"};
+    execute(ozoneShell, args);
 
     // Test case 7: ozone sh bucket create o3://om1/volume/bucket
     // Expectation: Success.
     args = new String[] {
-        "bucket", "create", "o3://" + omServiceId + "/volume/bucket"};
+        "bucket", "create", "o3://" + omServiceId + "/volume/bucket-two"};
     execute(ozoneShell, args);
   }
 

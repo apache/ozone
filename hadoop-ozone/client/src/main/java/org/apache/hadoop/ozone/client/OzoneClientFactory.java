@@ -137,13 +137,17 @@ public final class OzoneClientFactory {
     // configuration, we don't fall back to default ozone.om.address defined
     // in ozone-default.xml.
 
-    if (OmUtils.isServiceIdsDefined(config)) {
+    String[] serviceIds = config.getTrimmedStrings(OZONE_OM_SERVICE_IDS_KEY);
+    if (serviceIds.length > 1) {
       throw new IOException("Following ServiceID's " +
           config.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY) + " are" +
           " defined in the configuration. Use the method getRpcClient which " +
           "takes serviceID and configuration as param");
+    } else if (serviceIds.length == 1) {
+      return getRpcClient(getClientProtocol(config, serviceIds[0]), config);
+    } else {
+      return getRpcClient(getClientProtocol(config), config);
     }
-    return getRpcClient(getClientProtocol(config), config);
   }
 
   /**
