@@ -142,36 +142,37 @@ public final class OzoneQuota {
    * Parses a user provided string and returns the
    * Quota Object.
    *
-   * @param quotaInBytesStr Volume quota in bytes String
+   * @param quotaInBytes Volume quota in bytes
    * @param quotaInCounts Volume quota in counts
    *
    * @return OzoneQuota object
    */
-  public static OzoneQuota parseQuota(String quotaInBytesStr,
+  public static OzoneQuota parseQuota(String quotaInBytes,
       long quotaInCounts) {
 
-    if ((quotaInBytesStr == null) || (quotaInBytesStr.isEmpty())) {
+    if ((quotaInBytes == null) || (quotaInBytes.isEmpty())) {
       throw new IllegalArgumentException(
           "Quota string cannot be null or empty.");
     }
 
-    String uppercase = quotaInBytesStr.toUpperCase()
+    String uppercase = quotaInBytes.toUpperCase()
         .replaceAll("\\s+", "");
     String size = "";
     int nSize;
     Units currUnit = Units.MB;
     boolean found = false;
-    if (uppercase.endsWith(OZONE_QUOTA_MB)) {
-      size = uppercase
-          .substring(0, uppercase.length() - OZONE_QUOTA_MB.length());
-      currUnit = Units.MB;
-      found = true;
-    }
 
     if (uppercase.endsWith(OZONE_QUOTA_KB)) {
       size = uppercase
           .substring(0, uppercase.length() - OZONE_QUOTA_KB.length());
       currUnit = Units.KB;
+      found = true;
+    }
+
+    if (uppercase.endsWith(OZONE_QUOTA_MB)) {
+      size = uppercase
+          .substring(0, uppercase.length() - OZONE_QUOTA_MB.length());
+      currUnit = Units.MB;
       found = true;
     }
 
@@ -198,7 +199,7 @@ public final class OzoneQuota {
 
     if (!found) {
       throw new IllegalArgumentException("Quota unit not recognized. " +
-          "Supported values are BYTES, MB, GB and TB.");
+          "Supported values are BYTES, KB, MB, GB and TB.");
     }
 
     nSize = Integer.parseInt(size);

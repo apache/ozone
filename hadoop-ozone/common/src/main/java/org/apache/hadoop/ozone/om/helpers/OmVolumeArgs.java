@@ -64,10 +64,9 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
   @SuppressWarnings({"checkstyle:ParameterNumber", "This is invoked from a " +
       "builder."})
   private OmVolumeArgs(String adminName, String ownerName, String volume,
-                       long quotaInBytes, long quotaInCounts,
-                       Map<String, String> metadata, OmOzoneAclMap aclMap,
-                       long creationTime, long modificationTime, long objectID,
-                       long updateID) {
+      long quotaInBytes, long quotaInCounts, Map<String, String> metadata,
+      OmOzoneAclMap aclMap, long creationTime, long modificationTime,
+      long objectID, long updateID) {
     this.adminName = adminName;
     this.ownerName = ownerName;
     this.volume = volume;
