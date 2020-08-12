@@ -41,9 +41,7 @@
           }
         ],
         "containers": 80,
-        "leaderCount": 2,
-        "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1574728775759
+        "leaderCount": 2
       },
       {
         "hostname": "localhost2.storage.enterprise.com",
@@ -70,9 +68,7 @@
           }
         ],
         "containers": 8192,
-        "leaderCount": 1,
-        "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1574724805059
+        "leaderCount": 1
       },
       {
         "hostname": "localhost3.storage.enterprise.com",
@@ -105,9 +101,7 @@
           }
         ],
         "containers": 43,
-        "leaderCount": 2,
-        "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1343544679543
+        "leaderCount": 2
       },
       {
         "hostname": "localhost4.storage.enterprise.com",
@@ -121,9 +115,7 @@
         },
         "pipelines": [],
         "containers": 0,
-        "leaderCount": 0,
-        "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1074724802059
+        "leaderCount": 0
       },
       {
         "hostname": "localhost5.storage.enterprise.com",
@@ -150,9 +142,7 @@
           }
         ],
         "containers": 643,
-        "leaderCount": 2,
-        "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1574724816029
+        "leaderCount": 2
       },
       {
         "hostname": "localhost6.storage.enterprise.com",
@@ -179,9 +169,7 @@
           }
         ],
         "containers": 5,
-        "leaderCount": 1,
-        "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1574724802059
+        "leaderCount": 1
       },
       {
         "hostname": "localhost7.storage.enterprise.com",
@@ -214,9 +202,7 @@
           }
         ],
         "containers": 64,
-        "leaderCount": 2,
-        "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1574724676009
+        "leaderCount": 2
       },
       {
         "hostname": "localhost8.storage.enterprise.com",
@@ -243,9 +229,7 @@
           }
         ],
         "containers": 21,
-        "leaderCount": 1,
-        "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1574724276050
+        "leaderCount": 1
       },
       {
         "hostname": "localhost9.storage.enterprise.com",
@@ -272,9 +256,7 @@
           }
         ],
         "containers": 897,
-        "leaderCount": 1,
-        "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1574724573011
+        "leaderCount": 1
       },
       {
         "hostname": "localhost10.storage.enterprise.com",
@@ -307,9 +289,7 @@
           }
         ],
         "containers": 6754,
-        "leaderCount": 2,
-        "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1574723756059
+        "leaderCount": 2
       },
       {
         "hostname": "localhost11.storage.enterprise.com",
@@ -336,9 +316,7 @@
           }
         ],
         "containers": 78,
-        "leaderCount": 2,
-        "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1474724705783
+        "leaderCount": 2
       },
       {
         "hostname": "localhost12.storage.enterprise.com",
@@ -365,9 +343,7 @@
           }
         ],
         "containers": 543,
-        "leaderCount": 1,
-        "version": "0.6.0-SNAPSHOT",
-        "setupTime": 1574724706232
+        "leaderCount": 1
       }
     ]
   },
