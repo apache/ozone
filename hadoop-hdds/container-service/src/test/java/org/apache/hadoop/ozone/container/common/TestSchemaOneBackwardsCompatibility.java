@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.testutils.BlockDeletingServiceTestImpl;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -106,6 +107,38 @@ public class TestSchemaOneBackwardsCompatibility {
     }
 
     dbFile = potentialDBFiles[0];
+  }
+
+  /**
+   * Because all tables in schema version one map back to the default table,
+   * directly iterating any of the table instances should be forbidden.
+   * Otherwise, the iterators for each table would read the entire default
+   * table, return all database contents, and yield unexpected results.
+   * @throws Exception
+   */
+  @Test
+  public void testDirectTableIterationDisabled() throws Exception {
+    KeyValueContainerData kvData = newKvData();
+    KeyValueContainerUtil.parseKVContainerData(kvData, conf);
+
+    try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(kvData, conf)) {
+      DatanodeStore store = refCountedDB.getStore();
+
+      assertTableIteratorUnsupported(store.getMetadataTable());
+      assertTableIteratorUnsupported(store.getBlockDataTable());
+      assertTableIteratorUnsupported(store.getDeletedBlocksTable());
+    }
+  }
+
+  private void assertTableIteratorUnsupported(Table<?, ?> table) {
+    try {
+      table.iterator();
+      Assert.fail("Table iterator should have thrown " +
+              "UnsupportedOperationException.");
+    }
+    catch (UnsupportedOperationException ex) {
+      // Exception thrown as expected.
+    }
   }
 
   /**
