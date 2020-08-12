@@ -131,7 +131,7 @@ public class BlockManagerImpl implements BlockManager {
       db.getStore().getBlockDataTable().putWithBatch(
               batch, Long.toString(data.getLocalID()), data);
       db.getStore().getMetadataTable().putWithBatch(
-              batch, OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX, bcsId);
+              batch, OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID, bcsId);
 
       // Set Bytes used, this bytes used will be updated for every write and
       // only get committed for every put block. In this way, when datanode

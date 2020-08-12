@@ -269,7 +269,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         if (delTX.getTxID() > containerData.getDeleteTransactionId()) {
           // Update in DB pending delete key count and delete transaction ID.
           metadataTable.putWithBatch(batchOperation,
-                  OzoneConsts.DELETE_TRANSACTION_KEY_PREFIX, delTX.getTxID());
+                  OzoneConsts.DELETE_TRANSACTION_KEY, delTX.getTxID());
         }
   
         long pendingDeleteBlocks = containerData.getNumPendingDeletionBlocks() +

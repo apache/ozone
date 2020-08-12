@@ -386,7 +386,7 @@ public class TestKeyValueBlockIterator {
         blockIndex++;
         BlockData blockData = new BlockData(blockID);
         blockData.setChunks(chunkList);
-        String localID = OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX +
+        String localID = OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID +
                 blockID.getLocalID();
         blockDataTable.put(localID, blockData);
       }

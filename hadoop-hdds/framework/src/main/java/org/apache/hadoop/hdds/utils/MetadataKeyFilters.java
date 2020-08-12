@@ -39,7 +39,7 @@ public final class MetadataKeyFilters {
 
   public static KeyPrefixFilter getBCSIDFilter() {
     return new MetadataKeyFilters.KeyPrefixFilter()
-            .addFilter(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
+            .addFilter(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID);
   }
 
   /**

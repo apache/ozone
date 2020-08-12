@@ -193,7 +193,7 @@ public final class KeyValueContainerUtil {
 
       // Set delete transaction id.
       Long delTxnId =
-          metadataTable.get(OzoneConsts.DELETE_TRANSACTION_KEY_PREFIX);
+          metadataTable.get(OzoneConsts.DELETE_TRANSACTION_KEY);
       if (delTxnId != null) {
         kvContainerData
             .updateDeleteTransactionId(delTxnId);
@@ -201,7 +201,7 @@ public final class KeyValueContainerUtil {
 
       // Set BlockCommitSequenceId.
       Long bcsId = metadataTable.get(
-          OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
+          OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID);
       if (bcsId != null) {
         kvContainerData
             .updateBlockCommitSequenceId(bcsId);
