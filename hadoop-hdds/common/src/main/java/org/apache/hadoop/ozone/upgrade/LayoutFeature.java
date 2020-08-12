@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,7 +16,30 @@
  * limitations under the License.
  */
 
+package org.apache.hadoop.ozone.upgrade;
+
+import java.util.Optional;
+
 /**
- * Package contains classes related to S3 security responses.
+ * Generic Layout feature interface for Ozone.
  */
-package org.apache.hadoop.ozone.om.response.s3.security;
+public interface LayoutFeature {
+  String name();
+
+  int layoutVersion();
+
+  String description();
+
+  default Optional<? extends UpgradeAction> onFinalizeAction() {
+    return Optional.empty();
+  }
+
+  /**
+   * Generic UpgradeAction interface. An operation that is run on specific
+   * upgrade states like post finalize, pre-downgrade etc.
+   * @param <T>
+   */
+  interface UpgradeAction<T> {
+    void executeAction(T arg);
+  }
+}
