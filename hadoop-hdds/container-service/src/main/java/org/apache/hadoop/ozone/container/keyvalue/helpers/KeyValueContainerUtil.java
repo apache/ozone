@@ -54,10 +54,26 @@ public final class KeyValueContainerUtil {
       KeyValueContainerUtil.class);
 
   /**
-   * creates metadata path, chunks path and  metadata DB for the specified
-   * container.
    *
    * @param containerMetaDataPath
+   * @throws IOException
+   */
+
+  /**
+   * creates metadata path, chunks path and metadata DB for the specified
+   * container.
+   *
+   * @param containerMetaDataPath Path to the container's metadata directory.
+   * @param chunksPath Path were chunks for this container should be stored.
+   * @param dbFile Path to the container's .db file.
+   * @param schemaVersion The schema version of the container. Since this
+   * method is used when creating new containers, the
+   * {@link OzoneConsts#SCHEMA_LATEST} variable can be
+   * used to construct the container. If this method has
+   * not been updated after a schema version addition
+   * and does not recognize the latest SchemaVersion, an
+   * {@link IllegalArgumentException} is thrown.
+   * @param conf The configuration to use for this container.
    * @throws IOException
    */
   public static void createContainerMetaData(File containerMetaDataPath, File
