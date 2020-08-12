@@ -389,13 +389,17 @@ public class SCMContainerManager implements ContainerManager {
         ContainerID containerIdObject = new ContainerID(containerID);
         ContainerInfo containerInfo =
             containerStore.get(containerIdObject);
-        if (containerInfo == null) {
+        ContainerInfo containerInfoInMem = containerStateManager
+            .getContainer(containerIdObject);
+        if (containerInfo == null || containerInfoInMem == null) {
           throw new SCMException(
               "Failed to increment number of deleted blocks for container "
                   + containerID + ", reason : " + "container doesn't exist.",
               SCMException.ResultCodes.FAILED_TO_FIND_CONTAINER);
         }
         containerInfo.updateDeleteTransactionId(entry.getValue());
+        containerInfo.setNumberOfKeys(containerInfoInMem.getNumberOfKeys());
+        containerInfo.setUsedBytes(containerInfoInMem.getUsedBytes());
         containerStore
             .putWithBatch(batchOperation, containerIdObject, containerInfo);
       }

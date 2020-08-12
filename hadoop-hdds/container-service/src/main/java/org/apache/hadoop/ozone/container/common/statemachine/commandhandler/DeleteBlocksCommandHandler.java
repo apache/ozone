@@ -253,28 +253,30 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         }
       }
 
-      // Finally commit the DB counters.
-      BatchOperation batchOperation = new BatchOperation();
+      if (newDeletionBlocks > 0) {
+        // Finally commit the DB counters.
+        BatchOperation batchOperation = new BatchOperation();
 
-      // In memory is updated only when existing delete transactionID is
-      // greater.
-      if (delTX.getTxID() > containerData.getDeleteTransactionId()) {
-        // Update in DB pending delete key count and delete transaction ID.
-        batchOperation.put(DB_CONTAINER_DELETE_TRANSACTION_KEY,
-            Longs.toByteArray(delTX.getTxID()));
+        // In memory is updated only when existing delete transactionID is
+        // greater.
+        if (delTX.getTxID() > containerData.getDeleteTransactionId()) {
+          // Update in DB pending delete key count and delete transaction ID.
+          batchOperation.put(DB_CONTAINER_DELETE_TRANSACTION_KEY,
+              Longs.toByteArray(delTX.getTxID()));
+        }
+
+        batchOperation.put(DB_PENDING_DELETE_BLOCK_COUNT_KEY, Longs.toByteArray(
+            containerData.getNumPendingDeletionBlocks() + newDeletionBlocks));
+
+        containerDB.getStore().writeBatch(batchOperation);
+
+
+        // update pending deletion blocks count and delete transaction ID in
+        // in-memory container status
+        containerData.updateDeleteTransactionId(delTX.getTxID());
+
+        containerData.incrPendingDeletionBlocks(newDeletionBlocks);
       }
-
-      batchOperation.put(DB_PENDING_DELETE_BLOCK_COUNT_KEY, Longs.toByteArray(
-          containerData.getNumPendingDeletionBlocks() + newDeletionBlocks));
-
-      containerDB.getStore().writeBatch(batchOperation);
-
-
-      // update pending deletion blocks count and delete transaction ID in
-      // in-memory container status
-      containerData.updateDeleteTransactionId(delTX.getTxID());
-
-      containerData.incrPendingDeletionBlocks(newDeletionBlocks);
     }
   }
 
