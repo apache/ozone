@@ -57,7 +57,7 @@ public final class Genesis {
           + "BenchMarkRocksDbStore}")
   private static String[] benchmarks;
 
-  @Option(names = "-t", defaultValue = "4",
+  @Option(names = "-t", defaultValue = "1",
       description = "Number of threads to use for the benchmark.\n"
           + "This option can be overridden by threads mentioned in benchmark.")
   private static int numThreads;
@@ -90,7 +90,7 @@ public final class Genesis {
       }
     }
     optionsBuilder.warmupIterations(2)
-        .measurementIterations(20)
+        .measurementIterations(3)
         .addProfiler(StackProfiler.class)
         .addProfiler(GCProfiler.class)
         .shouldDoGC(true)

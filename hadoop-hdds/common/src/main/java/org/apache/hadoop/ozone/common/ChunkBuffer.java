@@ -17,15 +17,16 @@
  */
 package org.apache.hadoop.ozone.common;
 
-import org.apache.hadoop.hdds.scm.ByteStringConversion;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.Supplier;
+
+import org.apache.hadoop.hdds.scm.ByteStringConversion;
+
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 /** Buffer for a block chunk. */
 public interface ChunkBuffer {
@@ -44,9 +45,10 @@ public interface ChunkBuffer {
    *   When increment <= 0, entire buffer is allocated in the beginning.
    */
   static ChunkBuffer allocate(int capacity, int increment) {
-    if (increment > 0 && increment < capacity) {
-      return new IncrementalChunkBuffer(capacity, increment, false);
-    }
+    System.out.println("allocate");
+//    if (increment > 0 && increment < capacity) {
+//      return new IncrementalChunkBuffer(capacity, increment, false);
+//    }
     return new ChunkBufferImplWithByteBuffer(ByteBuffer.allocate(capacity));
   }
 
@@ -87,6 +89,12 @@ public interface ChunkBuffer {
   default ChunkBuffer put(byte[] b) {
     return put(ByteBuffer.wrap(b));
   }
+
+  /** Similar to {@link ByteBuffer#put(byte[])}. */
+  default ChunkBuffer put(byte b) {
+    byte[] buf = new byte[1];
+    buf[0] = (byte) b;
+    return put(buf, 0, 1);  }
 
   /** Similar to {@link ByteBuffer#put(byte[], int, int)}. */
   default ChunkBuffer put(byte[] b, int offset, int length) {

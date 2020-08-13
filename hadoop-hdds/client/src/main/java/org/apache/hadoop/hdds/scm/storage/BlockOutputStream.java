@@ -17,45 +17,43 @@
  */
 
 package org.apache.hadoop.hdds.scm.storage;
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
+import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
+import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.writeChunkAsync;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
-import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
-import org.apache.hadoop.hdds.client.BlockID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-
-import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls
-    .putBlockAsync;
-import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls
-    .writeChunkAsync;
 
 /**
  * An {@link OutputStream} used by the REST service in combination with the
@@ -119,6 +117,9 @@ public class BlockOutputStream extends OutputStream {
 
   private final List<DatanodeDetails> failedServers;
   private final Checksum checksum;
+
+  private int currentBufferRemaining;
+  private ChunkBuffer currentBuffer;
 
   /**
    * Creates a new BlockOutputStream.
@@ -209,9 +210,12 @@ public class BlockOutputStream extends OutputStream {
   @Override
   public void write(int b) throws IOException {
     checkOpen();
-    byte[] buf = new byte[1];
-    buf[0] = (byte) b;
-    write(buf, 0, 1);
+    if (currentBufferRemaining == 0) {
+      allocateNewBuffer();
+    }
+    currentBuffer.put((byte) b);
+    currentBufferRemaining--;
+    doFlushOrWatchIfNeeded();
   }
 
   @Override
@@ -229,6 +233,9 @@ public class BlockOutputStream extends OutputStream {
     }
 
     while (len > 0) {
+      if (currentBufferRemaining == 0) {
+        allocateNewBuffer();
+      }
       // Allocate a buffer if needed. The buffer will be allocated only
       // once as needed and will be reused again for multiple blockOutputStream
       // entries.
@@ -236,21 +243,32 @@ public class BlockOutputStream extends OutputStream {
           bytesPerChecksum);
       final int writeLen = Math.min(currentBuffer.remaining(), len);
       currentBuffer.put(b, off, writeLen);
-      if (!currentBuffer.hasRemaining()) {
+      currentBufferRemaining -= writeLen;
+      if (currentBufferRemaining == 0) {
         writeChunk(currentBuffer);
       }
       off += writeLen;
       len -= writeLen;
       writtenDataLength += writeLen;
-      if (shouldFlush()) {
-        updateFlushLength();
-        executePutBlock(false, false);
-      }
-      // Data in the bufferPool can not exceed streamBufferMaxSize
-      if (isBufferPoolFull()) {
-        handleFullBuffer();
-      }
+      doFlushOrWatchIfNeeded();
     }
+  }
+
+  private void doFlushOrWatchIfNeeded() throws IOException {
+    if (currentBufferRemaining == 0
+        & (bufferPool.getNumberOfUsedBuffers() + 1) % 4 == 0) {
+      updateFlushLength();
+      executePutBlock(false, false);
+    }
+    // Data in the bufferPool can not exceed streamBufferMaxSize
+    if (currentBufferRemaining == 0 && bufferPool.getNumberOfUsedBuffers() == bufferPool.getCapacity() - 1) {
+      handleFullBuffer();
+    }
+  }
+
+  private void allocateNewBuffer() {
+    currentBuffer = bufferPool.allocateBuffer(bytesPerChecksum);
+    currentBufferRemaining = currentBuffer.remaining();
   }
 
   private boolean shouldFlush() {
