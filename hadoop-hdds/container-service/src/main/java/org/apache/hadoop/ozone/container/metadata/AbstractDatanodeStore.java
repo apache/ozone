@@ -102,9 +102,9 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
       blockDataTableWithIterator =
               dbDef.getBlockDataColumnFamily().getTable(this.store);
-      checkTableStatus(blockDataTable, blockDataTable.getName());
 
       blockDataTable = new DatanodeTable<>(blockDataTableWithIterator);
+      checkTableStatus(blockDataTable, blockDataTable.getName());
 
       deletedBlocksTable = new DatanodeTable<>(
               dbDef.getDeletedBlocksColumnFamily().getTable(this.store));

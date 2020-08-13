@@ -92,7 +92,10 @@ public class TestKeyValueBlockIterator {
             layout,
             (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
             UUID.randomUUID().toString());
-
+    // Init the container.
+    container = new KeyValueContainer(containerData, conf);
+    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), UUID
+            .randomUUID().toString());
     datanodeStore = BlockUtils.getDB(containerData, conf).getStore();
   }
 
@@ -358,11 +361,6 @@ public class TestKeyValueBlockIterator {
    */
   private Map<String, List<Long>> createContainerWithBlocks(long containerId,
             Map<String, Integer> prefixCounts) throws Exception {
-    // Init the container.
-    container = new KeyValueContainer(containerData, conf);
-    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), UUID
-        .randomUUID().toString());
-
     // Create required block data.
     Map<String, List<Long>> blockIDs = new HashMap<>();
     try(ReferenceCountedDB metadataStore = BlockUtils.getDB(containerData,
