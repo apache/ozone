@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.request;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OmUtils;
@@ -46,11 +45,9 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.nio.file.Paths;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 
 /**
@@ -299,7 +296,7 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
   }
 
-  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
+
   public static String validateAndNormalizeKey(String keyName)
       throws OMException {
     String normalizedKeyName = OmUtils.normalizeKey(keyName);
