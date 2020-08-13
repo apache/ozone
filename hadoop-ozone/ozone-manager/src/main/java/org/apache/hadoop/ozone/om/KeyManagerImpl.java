@@ -124,6 +124,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BL
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
@@ -919,10 +920,30 @@ public class KeyManagerImpl implements KeyManager {
     // underlying table using an iterator. That automatically creates a
     // snapshot of the data, so we don't need these locks at a higher level
     // when we iterate.
+
+    startKey = normalizeListKeyPath(startKey);
+    keyPrefix = normalizeListKeyPath(keyPrefix);
+
     List<OmKeyInfo> keyList = metadataManager.listKeys(volumeName, bucketName,
         startKey, keyPrefix, maxKeys);
     refreshPipeline(keyList);
     return keyList;
+  }
+
+  private String normalizeListKeyPath(String keyPath) {
+
+    String normalizeKeyPath = keyPath;
+    if (enableFileSystemPaths) {
+      // For empty strings do nothing.
+      if (StringUtils.isBlank(keyPath)) {
+        return keyPath;
+      }
+      normalizeKeyPath = OmUtils.normalizeKey(keyPath);
+      if (keyPath.endsWith(OM_KEY_PREFIX)) {
+        normalizeKeyPath = normalizeKeyPath + OM_KEY_PREFIX;
+      }
+    }
+    return normalizeKeyPath;
   }
 
   @Override
