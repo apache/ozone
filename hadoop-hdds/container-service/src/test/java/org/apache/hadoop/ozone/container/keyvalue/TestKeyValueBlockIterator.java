@@ -167,31 +167,31 @@ public class TestKeyValueBlockIterator {
   @Test
   public void testKeyValueBlockIteratorWithHasNext() throws Exception {
     List<Long> blockIDs = createContainerWithBlocks(CONTAINER_ID, 2);
-    try(BlockIterator<BlockData> keyValueBlockIterator =
+    try(BlockIterator<BlockData> blockIter =
                 datanodeStore.getBlockIterator()) {
 
       // Even calling multiple times hasNext() should not move entry forward.
-      assertTrue(keyValueBlockIterator.hasNext());
-      assertTrue(keyValueBlockIterator.hasNext());
-      assertTrue(keyValueBlockIterator.hasNext());
-      assertTrue(keyValueBlockIterator.hasNext());
-      assertTrue(keyValueBlockIterator.hasNext());
+      assertTrue(blockIter.hasNext());
+      assertTrue(blockIter.hasNext());
+      assertTrue(blockIter.hasNext());
+      assertTrue(blockIter.hasNext());
+      assertTrue(blockIter.hasNext());
       assertEquals((long)blockIDs.get(0),
-              keyValueBlockIterator.nextBlock().getLocalID());
+              blockIter.nextBlock().getLocalID());
 
-      assertTrue(keyValueBlockIterator.hasNext());
-      assertTrue(keyValueBlockIterator.hasNext());
-      assertTrue(keyValueBlockIterator.hasNext());
-      assertTrue(keyValueBlockIterator.hasNext());
-      assertTrue(keyValueBlockIterator.hasNext());
-      assertEquals((long)blockIDs.get(1), keyValueBlockIterator.nextBlock().getLocalID());
+      assertTrue(blockIter.hasNext());
+      assertTrue(blockIter.hasNext());
+      assertTrue(blockIter.hasNext());
+      assertTrue(blockIter.hasNext());
+      assertTrue(blockIter.hasNext());
+      assertEquals((long)blockIDs.get(1), blockIter.nextBlock().getLocalID());
 
-      keyValueBlockIterator.seekToFirst();
-      assertEquals((long)blockIDs.get(0), keyValueBlockIterator.nextBlock().getLocalID());
-      assertEquals((long)blockIDs.get(1), keyValueBlockIterator.nextBlock().getLocalID());
+      blockIter.seekToFirst();
+      assertEquals((long)blockIDs.get(0), blockIter.nextBlock().getLocalID());
+      assertEquals((long)blockIDs.get(1), blockIter.nextBlock().getLocalID());
 
       try {
-        keyValueBlockIterator.nextBlock();
+        blockIter.nextBlock();
       } catch (NoSuchElementException ex) {
         GenericTestUtils.assertExceptionContains("Block Iterator reached end " +
             "for ContainerID " + CONTAINER_ID, ex);

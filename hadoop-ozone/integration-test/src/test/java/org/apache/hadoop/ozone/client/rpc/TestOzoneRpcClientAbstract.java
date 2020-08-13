@@ -991,10 +991,10 @@ public abstract class TestOzoneRpcClientAbstract {
         (KeyValueContainerData)(datanodeService.getDatanodeStateMachine()
             .getContainer().getContainerSet().getContainer(containerID)
             .getContainerData());
-    DatanodeStore store =
+    DatanodeStore datanodeStore =
             BlockUtils.getDB(containerData, cluster.getConf()).getStore();
     try (BlockIterator<BlockData> keyValueBlockIterator =
-                store.getBlockIterator()) {
+                datanodeStore.getBlockIterator()) {
       while (keyValueBlockIterator.hasNext()) {
         BlockData blockData = keyValueBlockIterator.nextBlock();
         if (blockData.getBlockID().getLocalID() == localID) {
@@ -1154,10 +1154,10 @@ public abstract class TestOzoneRpcClientAbstract {
     // the container.
     KeyValueContainerData containerData =
         (KeyValueContainerData) container.getContainerData();
-    DatanodeStore store =
+    DatanodeStore datanodeStore =
             BlockUtils.getDB(containerData, cluster.getConf()).getStore();
     try (BlockIterator<BlockData> keyValueBlockIterator =
-                 store.getBlockIterator()) {
+                 datanodeStore.getBlockIterator()) {
 
       // Find the block corresponding to the key we put. We use the localID of
       // the BlockData to identify out key.

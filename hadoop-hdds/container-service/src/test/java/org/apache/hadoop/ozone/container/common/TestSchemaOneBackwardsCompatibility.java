@@ -135,8 +135,7 @@ public class TestSchemaOneBackwardsCompatibility {
       table.iterator();
       Assert.fail("Table iterator should have thrown " +
               "UnsupportedOperationException.");
-    }
-    catch (UnsupportedOperationException ex) {
+    } catch (UnsupportedOperationException ex) {
       // Exception thrown as expected.
     }
   }
