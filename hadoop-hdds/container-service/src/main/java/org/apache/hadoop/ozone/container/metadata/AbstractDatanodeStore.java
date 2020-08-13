@@ -58,6 +58,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
           LoggerFactory.getLogger(AbstractDatanodeStore.class);
   private DBStore store;
   private final AbstractDatanodeDBDefinition dbDef;
+  private final long containerID;
 
   /**
    * Constructs the metadata store and starts the DB services.
@@ -65,10 +66,11 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
    * @param config - Ozone Configuration.
    * @throws IOException - on Failure.
    */
-  protected AbstractDatanodeStore(ConfigurationSource config,
+  protected AbstractDatanodeStore(ConfigurationSource config, long containerID,
                                   AbstractDatanodeDBDefinition dbDef)
           throws IOException {
     this.dbDef = dbDef;
+    this.containerID = containerID;
     start(config);
   }
 
@@ -145,13 +147,14 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   @Override
   public BlockIterator<BlockData> getBlockIterator() {
-    return new KeyValueBlockIterator(blockDataTableWithIterator.iterator());
+    return new KeyValueBlockIterator(containerID,
+            blockDataTableWithIterator.iterator());
   }
 
   @Override
   public BlockIterator<BlockData> getBlockIterator(KeyPrefixFilter filter) {
-    return new KeyValueBlockIterator(blockDataTableWithIterator.iterator(),
-            filter);
+    return new KeyValueBlockIterator(containerID,
+            blockDataTableWithIterator.iterator(), filter);
   }
 
   @Override
@@ -201,16 +204,18 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
             MetadataKeyFilters.getUnprefixedKeyFilter();
     private final KeyPrefixFilter blockFilter;
     private BlockData nextBlock;
+    private final long containerID;
 
     /**
      * KeyValueBlockIterator to iterate unprefixed blocks in a container.
      * @param iterator - The underlying iterator to apply the block filter to.
      */
-    KeyValueBlockIterator(
+    KeyValueBlockIterator(long containerID,
             TableIterator<String, ? extends Table.KeyValue<String, BlockData>>
                     iterator) {
-      blockIterator = iterator;
-      blockFilter = DEFAULT_BLOCK_FILTER;
+      this.containerID = containerID;
+      this.blockIterator = iterator;
+      this.blockFilter = DEFAULT_BLOCK_FILTER;
     }
 
     /**
@@ -218,11 +223,12 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
      * @param iterator - The underlying iterator to apply the block filter to.
      * @param filter - Block filter, filter to be applied for blocks
      */
-    KeyValueBlockIterator(
+    KeyValueBlockIterator(long containerID,
             TableIterator<String, ? extends Table.KeyValue<String, BlockData>>
                     iterator, KeyPrefixFilter filter) {
-      blockIterator = iterator;
-      blockFilter = filter;
+      this.containerID = containerID;
+      this.blockIterator = iterator;
+      this.blockFilter = filter;
     }
 
     /**
@@ -240,9 +246,8 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       if(hasNext()) {
         return nextBlock();
       }
-//      throw new NoSuchElementException("Block Iterator reached end for " +
-//              "ContainerID " + containerId);
-      throw new NoSuchElementException("Block Iterator reached end");
+      throw new NoSuchElementException("Block Iterator reached end for " +
+              "ContainerID " + containerID);
     }
 
     @Override
@@ -256,10 +261,8 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
         if (blockFilter.filterKey(null, keyBytes, null)) {
           nextBlock = keyValue.getValue();
           if (LOG.isTraceEnabled()) {
-//            LOG.trace("Block matching with filter found: blockID is : {} for " +
-//                    "containerID {}", nextBlock.getLocalID(), containerId);
-            LOG.trace("Block matching with filter found: blockID is : {}",
-                    nextBlock.getLocalID());
+            LOG.trace("Block matching with filter found: blockID is : {} for " +
+                    "containerID {}", nextBlock.getLocalID(), containerID);
           }
           return true;
         }

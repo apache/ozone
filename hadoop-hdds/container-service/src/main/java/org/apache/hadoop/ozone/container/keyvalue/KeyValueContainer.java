@@ -129,9 +129,9 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       // This method is only called when creating new containers.
       // Therefore, always use the newest schema version.
       containerData.setSchemaVersion(OzoneConsts.SCHEMA_LATEST);
-      KeyValueContainerUtil.createContainerMetaData(containerMetaDataPath,
-          chunksPath, dbFile, containerData.getSchemaVersion(),
-              config);
+      KeyValueContainerUtil.createContainerMetaData(containerID,
+              containerMetaDataPath, chunksPath, dbFile,
+              containerData.getSchemaVersion(), config);
 
       //Set containerData for the KeyValueContainer.
       containerData.setChunksPath(chunksPath.getPath());

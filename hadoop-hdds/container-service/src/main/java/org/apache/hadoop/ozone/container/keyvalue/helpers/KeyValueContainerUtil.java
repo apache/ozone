@@ -77,9 +77,9 @@ public final class KeyValueContainerUtil {
    * @param conf The configuration to use for this container.
    * @throws IOException
    */
-  public static void createContainerMetaData(File containerMetaDataPath, File
-      chunksPath, File dbFile, String schemaVersion, ConfigurationSource conf)
-          throws IOException {
+  public static void createContainerMetaData(long containerID,
+      File containerMetaDataPath, File chunksPath, File dbFile,
+      String schemaVersion, ConfigurationSource conf) throws IOException {
     Preconditions.checkNotNull(containerMetaDataPath);
     Preconditions.checkNotNull(conf);
 
@@ -102,9 +102,11 @@ public final class KeyValueContainerUtil {
 
     DatanodeStore store;
     if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
-      store = new DatanodeStoreSchemaOneImpl(conf, dbFile.getAbsolutePath());
+      store = new DatanodeStoreSchemaOneImpl(conf,
+              containerID, dbFile.getAbsolutePath());
     } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
-      store = new DatanodeStoreSchemaTwoImpl(conf, dbFile.getAbsolutePath());
+      store = new DatanodeStoreSchemaTwoImpl(conf,
+              containerID, dbFile.getAbsolutePath());
     } else {
       throw new IllegalArgumentException(
               "Unrecognized schema version for container: " + schemaVersion);

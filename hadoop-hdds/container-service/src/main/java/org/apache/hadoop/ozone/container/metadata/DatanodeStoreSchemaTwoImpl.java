@@ -36,8 +36,9 @@ public class DatanodeStoreSchemaTwoImpl extends AbstractDatanodeStore {
    * @param config - Ozone Configuration.
    * @throws IOException - on Failure.
    */
-  public DatanodeStoreSchemaTwoImpl(ConfigurationSource config, String dbPath)
+  public DatanodeStoreSchemaTwoImpl(ConfigurationSource config,
+                                    long containerID, String dbPath)
           throws IOException {
-    super(config, new DatanodeSchemaTwoDBDefinition(dbPath));
+    super(config, containerID, new DatanodeSchemaTwoDBDefinition(dbPath));
   }
 }
