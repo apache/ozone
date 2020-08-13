@@ -25,8 +25,10 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -42,6 +44,8 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
@@ -247,6 +251,88 @@ public class TestOzoneFSWithObjectStoreCreate {
     ozoneInputStream.close();
 
     Assert.assertEquals(inputString, new String(read));
+  }
+
+  @Test
+  public void testListKeysWithNotNormalizedPath() throws Exception {
+
+    OzoneVolume ozoneVolume =
+        cluster.getRpcClient().getObjectStore().getVolume(volumeName);
+
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+
+    String key1 = "/dir1///dir2/file1/";
+    String key2 = "/dir1///dir2/file2/";
+    String key3 = "/dir1///dir2/file3/";
+
+    LinkedList<String> keys = new LinkedList<>();
+    keys.add("dir1/");
+    keys.add("dir1/dir2/");
+    keys.add(OmUtils.normalizeKey(key1));
+    keys.add(OmUtils.normalizeKey(key2));
+    keys.add(OmUtils.normalizeKey(key3));
+
+    int length = 10;
+    byte[] input = new byte[length];
+    Arrays.fill(input, (byte)96);
+
+    createKey(ozoneBucket, key1, 10, input);
+    createKey(ozoneBucket, key2, 10, input);
+    createKey(ozoneBucket, key3, 10, input);
+
+    // Iterator with key name as prefix.
+
+    Iterator<? extends OzoneKey > ozoneKeyIterator =
+        ozoneBucket.listKeys("/dir1//");
+
+    checkKeyList(ozoneKeyIterator, keys);
+
+    // Iterator with with normalized key prefix.
+    ozoneKeyIterator =
+        ozoneBucket.listKeys("dir1/");
+
+    checkKeyList(ozoneKeyIterator, keys);
+
+    // Iterator with key name as previous key.
+    ozoneKeyIterator = ozoneBucket.listKeys(null,
+        "/dir1///dir2/file1/");
+
+    // Remove keys before //dir1/dir2/file1
+    keys.remove("dir1/");
+    keys.remove("dir1/dir2/");
+    keys.remove("dir1/dir2/file1");
+
+    checkKeyList(ozoneKeyIterator, keys);
+
+    // Iterator with  normalized key as previous key.
+    ozoneKeyIterator = ozoneBucket.listKeys(null,
+        OmUtils.normalizeKey(key1));
+
+    checkKeyList(ozoneKeyIterator, keys);
+  }
+
+  private void checkKeyList(Iterator<? extends OzoneKey > ozoneKeyIterator,
+      List<String> keys) {
+
+    LinkedList<String> outputKeys = new LinkedList<>();
+    while (ozoneKeyIterator.hasNext()) {
+      OzoneKey ozoneKey = ozoneKeyIterator.next();
+      outputKeys.add(ozoneKey.getName());
+    }
+
+    Assert.assertEquals(keys, outputKeys);
+  }
+
+  private void createKey(OzoneBucket ozoneBucket, String key, long length,
+      byte[] input)
+      throws Exception {
+
+    OzoneOutputStream ozoneOutputStream =
+        ozoneBucket.createKey(key, length);
+
+    ozoneOutputStream.write(input);
+    ozoneOutputStream.write(input, 0, 10);
+    ozoneOutputStream.close();
   }
 
   private void checkPath(Path path) {
