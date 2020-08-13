@@ -322,7 +322,7 @@ public class TestOzoneFileSystem {
     // not exist
     FileStatus fileStatus = o3fs.getFileStatus(parent);
     Assert.assertTrue(fileStatus.isDirectory());
-    assertEquals(parent.toString(), fileStatus.getPath());
+    assertEquals(parent.toString(), fileStatus.getPath().toUri().getPath());
   }
 
 
