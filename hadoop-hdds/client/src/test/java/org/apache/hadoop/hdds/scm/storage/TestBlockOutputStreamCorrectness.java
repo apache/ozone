@@ -96,15 +96,17 @@ public class TestBlockOutputStreamCorrectness {
 
     Random random = new Random(SEED);
 
-    int max = 1 * 1024 * 1024 / writeUnitSize;
+    int max = 50 * 1024 * 1024 / writeUnitSize;
 
     byte[] writeBuffer = new byte[writeUnitSize];
-    for (int i = 0; i < max; i++) {
-      random.nextBytes(writeBuffer);
+    for (int t = 0; t < max; t++) {
       if (writeUnitSize > 1) {
+        for (int i = 0; i < writeBuffer.length; i++) {
+          writeBuffer[i] = (byte) random.nextInt();
+        }
         outputStream.write(writeBuffer, 0, writeBuffer.length);
       } else {
-        outputStream.write(writeBuffer[0]);
+        outputStream.write((byte) random.nextInt());
       }
     }
     outputStream.close();
@@ -113,7 +115,9 @@ public class TestBlockOutputStreamCorrectness {
   private class MockXceiverClientSpi extends XceiverClientSpi {
 
     private final Pipeline pipeline;
+
     private Random expectedRandomStream = new Random(SEED);
+
     private AtomicInteger counter = new AtomicInteger();
 
     public MockXceiverClientSpi(Pipeline pipeline) {
@@ -164,16 +168,17 @@ public class TestBlockOutputStreamCorrectness {
       case WriteChunk:
         ByteString data = request.getWriteChunk().getData();
         final byte[] writePayload = data.toByteArray();
-        byte[] expected = new byte[writePayload.length];
-        expectedRandomStream.nextBytes(expected);
-        Assert.assertArrayEquals(expected, writePayload);
-
+        for (int i = 0; i < writePayload.length; i++) {
+          byte expectedByte = (byte) expectedRandomStream.nextInt();
+          Assert.assertEquals(expectedByte,
+              writePayload[i]);
+        }
       }
-
       final XceiverClientReply result = new XceiverClientReply(
           CompletableFuture.completedFuture(builder.build()));
       result.setLogIndex(counter.incrementAndGet());
       return result;
+
     }
 
     @Override
