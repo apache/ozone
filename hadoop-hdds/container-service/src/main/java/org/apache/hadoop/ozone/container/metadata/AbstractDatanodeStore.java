@@ -17,20 +17,25 @@
  */
 package org.apache.hadoop.ozone.container.metadata;
 
+import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
+import org.apache.hadoop.hdds.utils.db.*;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
+import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueBlockIterator;
 import org.rocksdb.DBOptions;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Closeable;
 import java.io.IOException;
+import java.util.NoSuchElementException;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
@@ -45,6 +50,8 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   private Table<String, Long> metadataTable;
 
   private Table<String, BlockData> blockDataTable;
+
+  private Table<String, BlockData> blockDataTableWithIterator;
 
   private Table<String, ChunkInfoList> deletedBlocksTable;
 
@@ -92,9 +99,11 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
               dbDef.getMetadataColumnFamily().getTable(this.store));
       checkTableStatus(metadataTable, metadataTable.getName());
 
-      blockDataTable = new DatanodeTable<>(
-              dbDef.getBlockDataColumnFamily().getTable(this.store));
+      blockDataTableWithIterator =
+              dbDef.getBlockDataColumnFamily().getTable(this.store);
       checkTableStatus(blockDataTable, blockDataTable.getName());
+
+      blockDataTable = new DatanodeTable<>(blockDataTableWithIterator);
 
       deletedBlocksTable = new DatanodeTable<>(
               dbDef.getDeletedBlocksColumnFamily().getTable(this.store));
@@ -136,6 +145,17 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
+  public BlockIterator<BlockData> getBlockIterator() {
+    return new KeyValueBlockIterator(blockDataTableWithIterator.iterator());
+  }
+
+  @Override
+  public BlockIterator<BlockData> getBlockIterator(KeyPrefixFilter filter) {
+    return new KeyValueBlockIterator(blockDataTableWithIterator.iterator(),
+            filter);
+  }
+
+  @Override
   public void flushDB() throws IOException {
     store.flushDB();
   }
@@ -159,6 +179,107 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
     if (table == null) {
       LOG.error(String.format(logMessage, name));
       throw new IOException(String.format(errMsg, name));
+    }
+  }
+
+  /**
+   * Block Iterator for KeyValue Container. This block iterator returns blocks
+   * which match with the {@link MetadataKeyFilters.KeyPrefixFilter}. If no
+   * filter is specified, then default filter used is
+   * {@link MetadataKeyFilters#getUnprefixedKeyFilter()}
+   */
+  @InterfaceAudience.Public
+  private static class KeyValueBlockIterator implements
+          BlockIterator<BlockData>, Closeable {
+
+    private static final Logger LOG = LoggerFactory.getLogger(
+            KeyValueBlockIterator.class);
+
+    private final TableIterator<String, ? extends Table.KeyValue<String,
+            BlockData>>
+            blockIterator;
+    private static final KeyPrefixFilter DEFAULT_BLOCK_FILTER =
+            MetadataKeyFilters.getUnprefixedKeyFilter();
+    private final KeyPrefixFilter blockFilter;
+    private BlockData nextBlock;
+
+    /**
+     * KeyValueBlockIterator to iterate unprefixed blocks in a container.
+     * @param iterator - The underlying iterator to apply the block filter to.
+     */
+    KeyValueBlockIterator(
+            TableIterator<String, ? extends Table.KeyValue<String, BlockData>>
+                    iterator) {
+      blockIterator = iterator;
+      blockFilter = DEFAULT_BLOCK_FILTER;
+    }
+
+    /**
+     * KeyValueBlockIterator to iterate blocks in a container.
+     * @param iterator - The underlying iterator to apply the block filter to.
+     * @param filter - Block filter, filter to be applied for blocks
+     */
+    KeyValueBlockIterator(
+            TableIterator<String, ? extends Table.KeyValue<String, BlockData>>
+                    iterator, KeyPrefixFilter filter) {
+      blockIterator = iterator;
+      blockFilter = filter;
+    }
+
+    /**
+     * This method returns blocks matching with the filter.
+     * @return next block or null if no more blocks
+     * @throws IOException
+     */
+    @Override
+    public BlockData nextBlock() throws IOException, NoSuchElementException {
+      if (nextBlock != null) {
+        BlockData currentBlock = nextBlock;
+        nextBlock = null;
+        return currentBlock;
+      }
+      if(hasNext()) {
+        return nextBlock();
+      }
+      throw new NoSuchElementException("Block Iterator reached end for " +
+              "ContainerID " + containerId);
+    }
+
+    @Override
+    public boolean hasNext() throws IOException {
+      if (nextBlock != null) {
+        return true;
+      }
+      while (blockIterator.hasNext()) {
+        Table.KeyValue<String, BlockData> keyValue = blockIterator.next();
+        byte[] keyBytes = StringUtils.string2Bytes(keyValue.getKey());
+        if (blockFilter.filterKey(null, keyBytes, null)) {
+          nextBlock = keyValue.getValue();
+          if (LOG.isTraceEnabled()) {
+            LOG.trace("Block matching with filter found: blockID is : {} for " +
+                    "containerID {}", nextBlock.getLocalID(), containerId);
+          }
+          return true;
+        }
+      }
+      return false;
+    }
+
+    @Override
+    public void seekToFirst() {
+      nextBlock = null;
+      blockIterator.seekToFirst();
+    }
+
+    @Override
+    public void seekToLast() {
+      nextBlock = null;
+      blockIterator.seekToLast();
+    }
+
+    @Override
+    public void close() throws IOException {
+      blockIterator.close();
     }
   }
 }

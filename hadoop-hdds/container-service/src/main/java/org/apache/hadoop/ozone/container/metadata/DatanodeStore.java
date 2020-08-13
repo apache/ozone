@@ -19,11 +19,13 @@ package org.apache.hadoop.ozone.container.metadata;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
+import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 
 import java.io.IOException;
 
@@ -84,4 +86,9 @@ public interface DatanodeStore {
   void flushDB() throws IOException;
 
   void compactDB() throws IOException;
+
+  BlockIterator<BlockData> getBlockIterator();
+
+  BlockIterator<BlockData>
+      getBlockIterator(MetadataKeyFilters.KeyPrefixFilter filter);
 }
