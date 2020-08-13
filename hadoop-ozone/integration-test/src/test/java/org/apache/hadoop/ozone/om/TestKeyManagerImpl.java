@@ -428,7 +428,6 @@ public class TestKeyManagerImpl {
   }
 
   @Test
-  @Ignore
   // TODO this test relies on KeyManagerImpl.createFile which is dead code.
   // Move the test case out of this file, update the implementation.
   public void testCheckAccessForFileKey() throws Exception {
@@ -1381,7 +1380,7 @@ public class TestKeyManagerImpl {
   private RequestContext currentUserReads() throws IOException {
     return RequestContext.newBuilder()
         .setClientUgi(UserGroupInformation.getCurrentUser())
-        .setAclRights(ACLType.READ_ACL)
+        .setAclRights(ACLType.READ)
         .setAclType(ACLIdentityType.USER)
         .build();
   }
