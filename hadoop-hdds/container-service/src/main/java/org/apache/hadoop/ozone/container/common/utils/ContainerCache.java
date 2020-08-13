@@ -146,9 +146,11 @@ public final class ContainerCache extends LRUMap {
         DatanodeStore store;
 
         if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
-          store = new DatanodeStoreSchemaOneImpl(conf, containerDBPath);
+          store = new DatanodeStoreSchemaOneImpl(conf,
+                  containerID, containerDBPath);
         } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
-          store = new DatanodeStoreSchemaTwoImpl(conf, containerDBPath);
+          store = new DatanodeStoreSchemaTwoImpl(conf,
+                  containerID, containerDBPath);
         } else {
           throw new IllegalArgumentException(
                   "Unrecognized database schema version: " + schemaVersion);

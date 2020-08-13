@@ -119,31 +119,6 @@ public class TestKeyValueContainer {
     keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
   }
 
-  @Test
-  public void testBlockIterator() throws Exception{
-    keyValueContainerData = new KeyValueContainerData(100L,
-        layout,
-        (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
-        datanodeId.toString());
-    keyValueContainer = new KeyValueContainer(
-        keyValueContainerData, conf);
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
-    KeyValueBlockIterator blockIterator = keyValueContainer.blockIterator();
-    //As no blocks created, hasNext should return false.
-    assertFalse(blockIterator.hasNext());
-    int blockCount = 10;
-    addBlocks(blockCount);
-    blockIterator = keyValueContainer.blockIterator();
-    assertTrue(blockIterator.hasNext());
-    BlockData blockData;
-    int blockCounter = 0;
-    while(blockIterator.hasNext()) {
-      blockData = blockIterator.nextBlock();
-      assertEquals(blockCounter++, blockData.getBlockID().getLocalID());
-    }
-    assertEquals(blockCount, blockCounter);
-  }
-
   private void addBlocks(int count) throws Exception {
     long containerId = keyValueContainerData.getContainerID();
 

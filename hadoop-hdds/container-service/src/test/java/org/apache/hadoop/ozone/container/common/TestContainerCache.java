@@ -53,7 +53,7 @@ public class TestContainerCache {
   private void createContainerDB(OzoneConfiguration conf, File dbFile)
       throws Exception {
     DatanodeStore store = new DatanodeStoreSchemaTwoImpl(
-            conf, dbFile.getAbsolutePath());
+            conf, 1, dbFile.getAbsolutePath());
 
     // we close since the SCM pre-creates containers.
     // we will open and put Db handle into a cache when keys are being created

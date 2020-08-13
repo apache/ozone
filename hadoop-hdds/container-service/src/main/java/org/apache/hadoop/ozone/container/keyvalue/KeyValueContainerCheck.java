@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
+import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
@@ -231,8 +232,7 @@ public class KeyValueContainerCheck {
 
     try(ReferenceCountedDB db =
             BlockUtils.getDB(onDiskContainerData, checkConfig);
-        KeyValueBlockIterator kvIter = new KeyValueBlockIterator(containerID,
-            new File(onDiskContainerData.getContainerPath()))) {
+        BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator()) {
 
       while(kvIter.hasNext()) {
         BlockData block = kvIter.nextBlock();
