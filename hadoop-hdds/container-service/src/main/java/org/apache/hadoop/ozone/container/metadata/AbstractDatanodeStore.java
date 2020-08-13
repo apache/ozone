@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.utils.db.*;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueBlockIterator;
 import org.rocksdb.DBOptions;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
@@ -241,8 +240,9 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       if(hasNext()) {
         return nextBlock();
       }
-      throw new NoSuchElementException("Block Iterator reached end for " +
-              "ContainerID " + containerId);
+//      throw new NoSuchElementException("Block Iterator reached end for " +
+//              "ContainerID " + containerId);
+      throw new NoSuchElementException("Block Iterator reached end");
     }
 
     @Override
@@ -256,8 +256,10 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
         if (blockFilter.filterKey(null, keyBytes, null)) {
           nextBlock = keyValue.getValue();
           if (LOG.isTraceEnabled()) {
-            LOG.trace("Block matching with filter found: blockID is : {} for " +
-                    "containerID {}", nextBlock.getLocalID(), containerId);
+//            LOG.trace("Block matching with filter found: blockID is : {} for " +
+//                    "containerID {}", nextBlock.getLocalID(), containerId);
+            LOG.trace("Block matching with filter found: blockID is : {}",
+                    nextBlock.getLocalID());
           }
           return true;
         }

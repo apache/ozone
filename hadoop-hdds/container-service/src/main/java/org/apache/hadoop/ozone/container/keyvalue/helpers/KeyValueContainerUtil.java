@@ -26,8 +26,9 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueBlockIterator;
+import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
 import com.google.common.base.Preconditions;
@@ -241,59 +242,60 @@ public final class KeyValueContainerUtil {
     }
 
     if (!isBlockMetadataSet) {
-      initializeUsedBytesAndBlockCount(kvContainerData);
+      initializeUsedBytesAndBlockCount(kvContainerData, config);
     }
   }
 
 
   /**
    * Initialize bytes used and block count.
-   * @param kvContainerData
+   * @param kvData
    * @throws IOException
    */
   private static void initializeUsedBytesAndBlockCount(
-      KeyValueContainerData kvContainerData) throws IOException {
+      KeyValueContainerData kvData, ConfigurationSource config)
+          throws IOException {
 
     final String errorMessage = "Failed to parse block data for" +
-            " Container " + kvContainerData.getContainerID();
+            " Container " + kvData.getContainerID();
 
     long blockCount = 0;
     long usedBytes = 0;
 
-    File dbFile = new File(kvContainerData.getContainerPath());
+    try(ReferenceCountedDB db = BlockUtils.getDB(kvData, config)) {
+      // Count all regular blocks.
+      try (BlockIterator<BlockData> blockIter =
+                   db.getStore().getBlockIterator(
+                           MetadataKeyFilters.getUnprefixedKeyFilter())) {
 
-    // Count all regular blocks.
-    try (KeyValueBlockIterator blockIter = new KeyValueBlockIterator(
-        kvContainerData.getContainerID(), dbFile,
-        MetadataKeyFilters.getUnprefixedKeyFilter())) {
+        while (blockIter.hasNext()) {
+          blockCount++;
+          try {
+            usedBytes += blockIter.nextBlock().getSize();
+          } catch (IOException ex) {
+            LOG.error(errorMessage);
+          }
+        }
+      }
 
-      while (blockIter.hasNext()) {
-        blockCount++;
-        try {
-          usedBytes += blockIter.nextBlock().getSize();
-        } catch (IOException ex) {
-          LOG.error(errorMessage);
+      // Count all deleting blocks.
+      try (BlockIterator<BlockData> blockIter =
+                   db.getStore().getBlockIterator(
+                           MetadataKeyFilters.getDeletingKeyFilter())) {
+
+        while (blockIter.hasNext()) {
+          blockCount++;
+          try {
+            usedBytes += blockIter.nextBlock().getSize();
+          } catch (IOException ex) {
+            LOG.error(errorMessage);
+          }
         }
       }
     }
 
-    // Count all deleting blocks.
-    try (KeyValueBlockIterator blockIter = new KeyValueBlockIterator(
-            kvContainerData.getContainerID(), dbFile,
-            MetadataKeyFilters.getDeletingKeyFilter())) {
-
-      while (blockIter.hasNext()) {
-        blockCount++;
-        try {
-          usedBytes += blockIter.nextBlock().getSize();
-        } catch (IOException ex) {
-          LOG.error(errorMessage);
-        }
-      }
-    }
-
-    kvContainerData.setBytesUsed(usedBytes);
-    kvContainerData.setKeyCount(blockCount);
+    kvData.setBytesUsed(usedBytes);
+    kvData.setKeyCount(blockCount);
   }
 
   /**

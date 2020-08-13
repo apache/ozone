@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.common.interfaces;
 
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.NoSuchElementException;
 
@@ -27,7 +28,7 @@ import java.util.NoSuchElementException;
  * interface.
  * @param <T>
  */
-public interface BlockIterator<T> {
+public interface BlockIterator<T> extends Closeable {
 
   /**
    * This checks if iterator has next element. If it has returns true,
@@ -52,6 +53,4 @@ public interface BlockIterator<T> {
    * @throws IOException
    */
   T nextBlock() throws IOException, NoSuchElementException;
-
-
 }

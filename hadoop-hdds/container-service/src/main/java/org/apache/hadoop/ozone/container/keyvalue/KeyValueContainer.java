@@ -130,7 +130,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       // Therefore, always use the newest schema version.
       containerData.setSchemaVersion(OzoneConsts.SCHEMA_LATEST);
       KeyValueContainerUtil.createContainerMetaData(containerMetaDataPath,
-          chunksPath, dbFile, containerData.getSchemaVersion(), config);
+          chunksPath, dbFile, containerData.getSchemaVersion(),
+              config);
 
       //Set containerData for the KeyValueContainer.
       containerData.setChunksPath(chunksPath.getPath());

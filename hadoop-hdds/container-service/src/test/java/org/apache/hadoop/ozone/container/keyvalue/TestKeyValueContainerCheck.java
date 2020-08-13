@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
@@ -164,8 +165,8 @@ import static org.junit.Assert.assertFalse;
     containerData.setDbFile(dbFile);
     try (ReferenceCountedDB ignored =
             BlockUtils.getDB(containerData, conf);
-        KeyValueBlockIterator kvIter = new KeyValueBlockIterator(containerID,
-            new File(containerData.getContainerPath()))) {
+        BlockIterator<BlockData> kvIter =
+                ignored.getStore().getBlockIterator()) {
       BlockData block = kvIter.nextBlock();
       assertFalse(block.getChunks().isEmpty());
       ContainerProtos.ChunkInfo c = block.getChunks().get(0);
