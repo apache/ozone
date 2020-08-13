@@ -157,6 +157,19 @@ class RDBTable implements Table<byte[], byte[]> {
     }
   }
 
+  /**
+   * Skip checking cache and get the value mapped to the given key in byte
+   * array or returns null if the key is not found.
+   *
+   * @param bytes metadata key
+   * @return value in byte array or null if the key is not found.
+   * @throws IOException on Failure
+   */
+  @Override
+  public byte[] getSkipCache(byte[] bytes) throws IOException {
+    return get(bytes);
+  }
+
   @Override
   public byte[] getIfExist(byte[] key) throws IOException {
     try {
