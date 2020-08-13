@@ -246,7 +246,7 @@ public class BlockOutputStream extends OutputStream {
       if (currentBufferRemaining == 0) {
         allocateNewBuffer();
       }
-      final int writeLen = Math.min(currentBuffer.remaining(), len);
+      final int writeLen = Math.min(currentBufferRemaining, len);
       currentBuffer.put(b, off, writeLen);
       currentBufferRemaining -= writeLen;
       if (currentBufferRemaining == 0) {
@@ -261,14 +261,12 @@ public class BlockOutputStream extends OutputStream {
 
   private void doFlushOrWatchIfNeeded() throws IOException {
     if (currentBufferRemaining == 0) {
-      if ((bufferPool.getNumberOfUsedBuffers() + 1) % flushPeriod == 0) {
+      if (bufferPool.getNumberOfUsedBuffers() % 4 == 0) {
         updateFlushLength();
         executePutBlock(false, false);
       }
-
       // Data in the bufferPool can not exceed streamBufferMaxSize
-      if (bufferPool.getNumberOfUsedBuffers()
-          == bufferPool.getCapacity() - 1) {
+      if (bufferPool.getNumberOfUsedBuffers() == bufferPool.getCapacity()) {
         handleFullBuffer();
       }
     }

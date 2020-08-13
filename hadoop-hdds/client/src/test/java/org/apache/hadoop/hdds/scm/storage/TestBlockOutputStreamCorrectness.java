@@ -61,6 +61,8 @@ public class TestBlockOutputStreamCorrectness {
 
   private static final long SEED = 18480315L;
 
+  private int writeUnitSize = 10;
+
   @Test
   public void test() throws IOException {
     List<DatanodeDetails> nodes = new ArrayList<>();
@@ -92,8 +94,6 @@ public class TestBlockOutputStreamCorrectness {
         ChecksumType.NONE,
         256 * 1024);
 
-    int writeUnitSize = 100 * 1024;
-
     Random random = new Random(SEED);
 
     int max = 1 * 1024 * 1024 / writeUnitSize;
@@ -101,12 +101,16 @@ public class TestBlockOutputStreamCorrectness {
     byte[] writeBuffer = new byte[writeUnitSize];
     for (int i = 0; i < max; i++) {
       random.nextBytes(writeBuffer);
-      outputStream.write(writeBuffer, 0, writeBuffer.length);
+      if (writeUnitSize > 1) {
+        outputStream.write(writeBuffer, 0, writeBuffer.length);
+      } else {
+        outputStream.write(writeBuffer[0]);
+      }
     }
     outputStream.close();
   }
 
-  private static class MockXceiverClientSpi extends XceiverClientSpi {
+  private class MockXceiverClientSpi extends XceiverClientSpi {
 
     private final Pipeline pipeline;
     private Random expectedRandomStream = new Random(SEED);
@@ -163,6 +167,7 @@ public class TestBlockOutputStreamCorrectness {
         byte[] expected = new byte[writePayload.length];
         expectedRandomStream.nextBytes(expected);
         Assert.assertArrayEquals(expected, writePayload);
+
       }
 
       final XceiverClientReply result = new XceiverClientReply(

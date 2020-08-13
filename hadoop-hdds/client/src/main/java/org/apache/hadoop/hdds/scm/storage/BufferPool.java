@@ -74,11 +74,12 @@ public class BufferPool {
   public ChunkBuffer allocateBuffer(int increment) {
     currentBufferIndex++;
     Preconditions.checkArgument(currentBufferIndex <= capacity - 1);
-    if (currentBufferIndex < bufferList.size() - 1) {
-      return getBuffer(currentBufferIndex + 1);
+    if (currentBufferIndex < bufferList.size()) {
+      return getBuffer(currentBufferIndex);
     } else {
       final ChunkBuffer newBuffer = ChunkBuffer.allocate(bufferSize, increment);
       bufferList.add(newBuffer);
+      Preconditions.checkArgument(bufferList.size() <= capacity);
       return newBuffer;
     }
   }
@@ -124,7 +125,7 @@ public class BufferPool {
   }
 
   public int getNumberOfUsedBuffers() {
-    return currentBufferIndex;
+    return currentBufferIndex + 1;
   }
 
   public int getCapacity() {
