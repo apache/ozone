@@ -654,7 +654,6 @@ public class KeyManagerImpl implements KeyManager {
     String keyName = OMClientRequest.validateAndNormalizeKey(
         enableFileSystemPaths, args.getKeyName());
 
-
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     OmKeyInfo value = null;

@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
 
@@ -320,9 +321,11 @@ public class TestOzoneFileSystem {
 
     // Deleting the only child should create the parent dir key if it does
     // not exist
-    String parentKey = o3fs.pathToKey(parent) + "/";
-    OzoneKeyDetails parentKeyInfo = getKey(parent, true);
-    assertEquals(parentKey, parentKeyInfo.getName());
+    String parentKey = o3fs.pathToKey(parent);
+    OzoneFileStatus fileStatus =
+        cluster.getClient().getObjectStore().getVolume(volumeName)
+        .getBucket(bucketName).getFileStatus(parentKey);
+    assertEquals(parent.toString(), fileStatus.getPath());
   }
 
 
