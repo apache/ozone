@@ -454,12 +454,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  public KeyValueBlockIterator blockIterator() throws IOException{
-    return new KeyValueBlockIterator(containerData.getContainerID(), new File(
-        containerData.getContainerPath()));
-  }
-
-  @Override
   public void importContainerData(InputStream input,
       ContainerPacker<KeyValueContainerData> packer) throws IOException {
     writeLock();
