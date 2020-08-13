@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -65,6 +66,35 @@ public class TestBlockOutputStreamCorrectness {
 
   @Test
   public void test() throws IOException {
+
+    final BufferPool bufferPool = new BufferPool(4 * 1024 * 1024, 32 / 4);
+
+    for (int block = 0; block < 10; block++) {
+      BlockOutputStream outputStream =
+          createBlockOutputStream(bufferPool);
+
+      Random random = new Random(SEED);
+
+      int max = 256 * 1024 * 1024 / writeUnitSize;
+
+      byte[] writeBuffer = new byte[writeUnitSize];
+      for (int t = 0; t < max; t++) {
+        if (writeUnitSize > 1) {
+          for (int i = 0; i < writeBuffer.length; i++) {
+            writeBuffer[i] = (byte) random.nextInt();
+          }
+          outputStream.write(writeBuffer, 0, writeBuffer.length);
+        } else {
+          outputStream.write((byte) random.nextInt());
+        }
+      }
+      outputStream.close();
+    }
+  }
+
+  @NotNull
+  private BlockOutputStream createBlockOutputStream(BufferPool bufferPool)
+      throws IOException {
     List<DatanodeDetails> nodes = new ArrayList<>();
     nodes.add(MockDatanodeDetails.randomDatanodeDetails());
     nodes.add(MockDatanodeDetails.randomDatanodeDetails());
@@ -90,26 +120,10 @@ public class TestBlockOutputStreamCorrectness {
         16 * 1024 * 1024,
         true,
         32 * 1024 * 1024,
-        new BufferPool(4 * 1024 * 1024, 32 / 4),
+        bufferPool,
         ChecksumType.NONE,
         256 * 1024);
-
-    Random random = new Random(SEED);
-
-    int max = 50 * 1024 * 1024 / writeUnitSize;
-
-    byte[] writeBuffer = new byte[writeUnitSize];
-    for (int t = 0; t < max; t++) {
-      if (writeUnitSize > 1) {
-        for (int i = 0; i < writeBuffer.length; i++) {
-          writeBuffer[i] = (byte) random.nextInt();
-        }
-        outputStream.write(writeBuffer, 0, writeBuffer.length);
-      } else {
-        outputStream.write((byte) random.nextInt());
-      }
-    }
-    outputStream.close();
+    return outputStream;
   }
 
   private class MockXceiverClientSpi extends XceiverClientSpi {

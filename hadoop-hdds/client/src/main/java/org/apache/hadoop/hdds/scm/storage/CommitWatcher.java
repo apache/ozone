@@ -37,6 +37,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
@@ -96,7 +97,15 @@ public class CommitWatcher {
       long length = buffers.stream().mapToLong(ChunkBuffer::position).sum();
       totalAckDataLength += length;
       // clear the future object from the future Map
-      Preconditions.checkNotNull(futureMap.remove(totalAckDataLength));
+      final CompletableFuture<ContainerCommandResponseProto> remove =
+          futureMap.remove(totalAckDataLength);
+      if (remove == null) {
+        LOG.error("Could't find required future for " + totalAckDataLength);
+        for (Long key : futureMap.keySet()) {
+          LOG.error("Existing acknowledged data: " + key);
+        }
+      }
+      Preconditions.checkNotNull(remove);
       for (ChunkBuffer byteBuffer : buffers) {
         bufferPool.releaseBuffer(byteBuffer);
       }

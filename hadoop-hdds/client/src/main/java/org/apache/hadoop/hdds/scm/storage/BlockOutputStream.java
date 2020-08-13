@@ -163,7 +163,7 @@ public class BlockOutputStream extends OutputStream {
     flushPeriod = (int) (streamBufferFlushSize / streamBufferSize);
 
     Preconditions
-        .checkArgument(flushPeriod * streamBufferSize == streamBufferFlushSize);
+        .checkArgument((long) flushPeriod * streamBufferSize == streamBufferFlushSize);
 
     // A single thread executor handle the responses of async requests
     responseExecutor = Executors.newSingleThreadExecutor();
@@ -261,7 +261,7 @@ public class BlockOutputStream extends OutputStream {
 
   private void doFlushOrWatchIfNeeded() throws IOException {
     if (currentBufferRemaining == 0) {
-      if (bufferPool.getNumberOfUsedBuffers() % 4 == 0) {
+      if (bufferPool.getNumberOfUsedBuffers() % flushPeriod == 0) {
         updateFlushLength();
         executePutBlock(false, false);
       }
