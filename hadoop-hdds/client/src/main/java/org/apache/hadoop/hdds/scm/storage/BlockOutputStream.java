@@ -118,7 +118,11 @@ public class BlockOutputStream extends OutputStream {
   private final List<DatanodeDetails> failedServers;
   private final Checksum checksum;
 
+  //number of buffers used before doing a flush/putBlock.
+  int flushPeriod;
+  //bytes remaining to write in the current buffer.
   private int currentBufferRemaining;
+  //current buffer allocated to write
   private ChunkBuffer currentBuffer;
 
   /**
@@ -154,6 +158,12 @@ public class BlockOutputStream extends OutputStream {
     this.streamBufferFlushDelay = streamBufferFlushDelay;
     this.bufferPool = bufferPool;
     this.bytesPerChecksum = bytesPerChecksum;
+
+    //number of buffers used before doing a flush
+    flushPeriod = (int) (streamBufferFlushSize / streamBufferSize);
+
+    Preconditions
+        .checkArgument(flushPeriod * streamBufferSize == streamBufferFlushSize);
 
     // A single thread executor handle the responses of async requests
     responseExecutor = Executors.newSingleThreadExecutor();
@@ -236,11 +246,6 @@ public class BlockOutputStream extends OutputStream {
       if (currentBufferRemaining == 0) {
         allocateNewBuffer();
       }
-      // Allocate a buffer if needed. The buffer will be allocated only
-      // once as needed and will be reused again for multiple blockOutputStream
-      // entries.
-      final ChunkBuffer currentBuffer = bufferPool.allocateBufferIfNeeded(
-          bytesPerChecksum);
       final int writeLen = Math.min(currentBuffer.remaining(), len);
       currentBuffer.put(b, off, writeLen);
       currentBufferRemaining -= writeLen;
@@ -255,14 +260,17 @@ public class BlockOutputStream extends OutputStream {
   }
 
   private void doFlushOrWatchIfNeeded() throws IOException {
-    if (currentBufferRemaining == 0
-        & (bufferPool.getNumberOfUsedBuffers() + 1) % 4 == 0) {
-      updateFlushLength();
-      executePutBlock(false, false);
-    }
-    // Data in the bufferPool can not exceed streamBufferMaxSize
-    if (currentBufferRemaining == 0 && bufferPool.getNumberOfUsedBuffers() == bufferPool.getCapacity() - 1) {
-      handleFullBuffer();
+    if (currentBufferRemaining == 0) {
+      if ((bufferPool.getNumberOfUsedBuffers() + 1) % flushPeriod == 0) {
+        updateFlushLength();
+        executePutBlock(false, false);
+      }
+
+      // Data in the bufferPool can not exceed streamBufferMaxSize
+      if (bufferPool.getNumberOfUsedBuffers()
+          == bufferPool.getCapacity() - 1) {
+        handleFullBuffer();
+      }
     }
   }
 
