@@ -43,7 +43,7 @@ final class ChunkBufferImplWithByteBuffer implements ChunkBuffer {
   }
 
   @Override
-  public int remaining() {;
+  public int remaining() {
     return buffer.remaining();
   }
 

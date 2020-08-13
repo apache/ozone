@@ -271,10 +271,6 @@ public class BlockOutputStream extends OutputStream {
     currentBufferRemaining = currentBuffer.remaining();
   }
 
-  private boolean shouldFlush() {
-    return bufferPool.computeBufferData() % streamBufferFlushSize == 0;
-  }
-
   private void updateFlushLength() {
     totalDataFlushedLength = writtenDataLength;
   }
