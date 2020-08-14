@@ -17,24 +17,25 @@
 
 package org.apache.hadoop.hdds.utils;
 
+import java.util.Comparator;
 import java.util.PriorityQueue;
 
 /**
  * A priority queue that stores a number of {@link BackgroundTask}.
  */
-public class BackgroundTaskQueue {
+public class BackgroundTaskQueue<T> {
 
-  private final PriorityQueue<BackgroundTask> tasks;
+  private final PriorityQueue<BackgroundTask<T>> tasks;
 
   public BackgroundTaskQueue() {
-    tasks = new PriorityQueue<>((task1, task2)
-        -> task1.getPriority() - task2.getPriority());
+    tasks = new PriorityQueue<>(
+        Comparator.comparingInt(BackgroundTask::getPriority));
   }
 
   /**
    * @return the head task in this queue.
    */
-  public synchronized BackgroundTask poll() {
+  public synchronized BackgroundTask<T> poll() {
     return tasks.poll();
   }
 
@@ -44,7 +45,7 @@ public class BackgroundTaskQueue {
    *
    * @param task
    */
-  public synchronized void add(BackgroundTask task) {
+  public synchronized void add(BackgroundTask<T> task) {
     tasks.add(task);
   }
 
