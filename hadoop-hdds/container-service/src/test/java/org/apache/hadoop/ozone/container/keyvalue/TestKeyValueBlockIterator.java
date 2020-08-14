@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
@@ -66,7 +65,7 @@ public class TestKeyValueBlockIterator {
   private MutableVolumeSet volumeSet;
   private OzoneConfiguration conf;
   private File testRoot;
-  private DatanodeStore datanodeStore;
+  private ReferenceCountedDB db;
   private final ChunkLayOutVersion layout;
 
   public TestKeyValueBlockIterator(ChunkLayOutVersion layout) {
@@ -96,12 +95,14 @@ public class TestKeyValueBlockIterator {
     container = new KeyValueContainer(containerData, conf);
     container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), UUID
             .randomUUID().toString());
-    datanodeStore = BlockUtils.getDB(containerData, conf).getStore();
+    db = BlockUtils.getDB(containerData, conf);
   }
 
 
   @After
-  public void tearDown() {
+  public void tearDown() throws Exception {
+    db.close();
+    db.cleanup();
     volumeSet.shutdown();
     FileUtil.fullyDelete(testRoot);
   }
@@ -117,7 +118,7 @@ public class TestKeyValueBlockIterator {
     // Default filter used is all unprefixed blocks.
     List<Long> unprefixedBlockIDs = blockIDs.get("");
     try(BlockIterator<BlockData> keyValueBlockIterator =
-                datanodeStore.getBlockIterator()) {
+                db.getStore().getBlockIterator()) {
 
       Iterator<Long> blockIDIter = unprefixedBlockIDs.iterator();
       while (keyValueBlockIterator.hasNext()) {
@@ -149,7 +150,7 @@ public class TestKeyValueBlockIterator {
   public void testKeyValueBlockIteratorWithNextBlock() throws Exception {
     List<Long> blockIDs = createContainerWithBlocks(CONTAINER_ID, 2);
     try(BlockIterator<BlockData> keyValueBlockIterator =
-                datanodeStore.getBlockIterator()) {
+                db.getStore().getBlockIterator()) {
       assertEquals((long)blockIDs.get(0),
               keyValueBlockIterator.nextBlock().getLocalID());
       assertEquals((long)blockIDs.get(1),
@@ -168,7 +169,7 @@ public class TestKeyValueBlockIterator {
   public void testKeyValueBlockIteratorWithHasNext() throws Exception {
     List<Long> blockIDs = createContainerWithBlocks(CONTAINER_ID, 2);
     try(BlockIterator<BlockData> blockIter =
-                datanodeStore.getBlockIterator()) {
+                db.getStore().getBlockIterator()) {
 
       // Even calling multiple times hasNext() should not move entry forward.
       assertTrue(blockIter.hasNext());
@@ -206,7 +207,7 @@ public class TestKeyValueBlockIterator {
     Map<String, List<Long>> blockIDs = createContainerWithBlocks(CONTAINER_ID,
             normalBlocks, deletingBlocks);
     try(BlockIterator<BlockData> keyValueBlockIterator =
-                datanodeStore.getBlockIterator(
+                db.getStore().getBlockIterator(
                         MetadataKeyFilters.getDeletingKeyFilter())) {
       List<Long> deletingBlockIDs =
               blockIDs.get(OzoneConsts.DELETING_KEY_PREFIX);
@@ -229,7 +230,7 @@ public class TestKeyValueBlockIterator {
     String containerPath = new File(containerData.getMetadataPath())
         .getParent();
     try(BlockIterator<BlockData> keyValueBlockIterator =
-                datanodeStore.getBlockIterator()) {
+                db.getStore().getBlockIterator()) {
       //As all blocks are deleted blocks, blocks does not match with normal key
       // filter.
       assertFalse(keyValueBlockIterator.hasNext());
@@ -287,7 +288,7 @@ public class TestKeyValueBlockIterator {
   private void testWithFilter(MetadataKeyFilters.KeyPrefixFilter filter,
                               List<Long> expectedIDs) throws Exception {
     try(BlockIterator<BlockData> iterator =
-                datanodeStore.getBlockIterator(filter)) {
+                db.getStore().getBlockIterator(filter)) {
       // Test seek.
       iterator.seekToFirst();
       long firstID = iterator.nextBlock().getLocalID();
