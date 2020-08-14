@@ -56,6 +56,11 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   private final int heavyNodeCriteria;
   private static final int REQUIRED_RACKS = 2;
 
+  public static final String MULTIPLE_RACK_PIPELINE_MSG =
+      "The cluster has multiple racks, but all nodes with available " +
+      "pipeline capacity are on a single rack. There are insufficient " +
+      "cross rack nodes available to create a pipeline";
+
   /**
    * Constructs a pipeline placement with considering network topology,
    * load balancing and rack awareness.
@@ -168,11 +173,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       boolean multipleRacks = multipleRacksAvailable(healthyNodes);
       boolean multipleRacksAfterFilter = multipleRacksAvailable(healthyList);
       if (multipleRacks && !multipleRacksAfterFilter) {
-        msg = "The cluster has multiple racks, but all nodes with available " +
-            "pipeline capacity are on a single rack. There are insufficient " +
-            "cross rack nodes available to create a pipeline";
-        LOG.debug(msg);
-        throw new SCMException(msg,
+        LOG.debug(MULTIPLE_RACK_PIPELINE_MSG);
+        throw new SCMException(MULTIPLE_RACK_PIPELINE_MSG,
             SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
       }
     }
