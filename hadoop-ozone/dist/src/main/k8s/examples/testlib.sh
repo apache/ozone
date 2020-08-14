@@ -93,7 +93,10 @@ regenerate_resources() {
 
   PARENT_OF_PARENT=$(realpath ../..)
 
-  if [ $(basename $PARENT_OF_PARENT) == "k8s" ]; then
+  if [[ -n ${OZONE_ROOT} ]]; then
+    # use explicit OZONE_ROOT
+    :
+  elif [ $(basename $PARENT_OF_PARENT) == "k8s" ]; then
     #running from src dir
     OZONE_ROOT=$(realpath ../../../../../target/ozone-0.6.0-SNAPSHOT)
   else
