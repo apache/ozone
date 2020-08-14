@@ -62,7 +62,7 @@ public class TestBlockOutputStreamCorrectness {
 
   private static final long SEED = 18480315L;
 
-  private int writeUnitSize = 10;
+  private int writeUnitSize = 1;
 
   @Test
   public void test() throws IOException {

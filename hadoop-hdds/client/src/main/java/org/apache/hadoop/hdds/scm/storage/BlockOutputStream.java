@@ -225,6 +225,10 @@ public class BlockOutputStream extends OutputStream {
     }
     currentBuffer.put((byte) b);
     currentBufferRemaining--;
+    if (currentBufferRemaining == 0) {
+      writeChunk(currentBuffer);
+    }
+    writtenDataLength++;
     doFlushOrWatchIfNeeded();
   }
 

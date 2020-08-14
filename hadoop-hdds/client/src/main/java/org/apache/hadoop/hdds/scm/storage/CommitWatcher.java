@@ -100,7 +100,7 @@ public class CommitWatcher {
       final CompletableFuture<ContainerCommandResponseProto> remove =
           futureMap.remove(totalAckDataLength);
       if (remove == null) {
-        LOG.error("Could't find required future for " + totalAckDataLength);
+        LOG.error("Couldn't find required future for " + totalAckDataLength);
         for (Long key : futureMap.keySet()) {
           LOG.error("Existing acknowledged data: " + key);
         }
