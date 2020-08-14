@@ -53,4 +53,19 @@ public class TestContentGenerator {
     generator.write(output);
     Assert.assertArrayEquals(generator.getBuffer(), output.toByteArray());
   }
+
+  @Test
+  public void writeWithDistinctSizes() throws IOException {
+    ContentGenerator generator = new ContentGenerator(20, 8, 3);
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+    generator.write(output);
+
+    byte[] expected = new byte[20];
+    byte[] buffer = generator.getBuffer();
+    System.arraycopy(buffer, 0, expected, 0, buffer.length);
+    System.arraycopy(buffer, 0, expected, 8, buffer.length);
+    System.arraycopy(buffer, 0, expected, 16, 4);
+    Assert.assertArrayEquals(expected, output.toByteArray());
+  }
 }

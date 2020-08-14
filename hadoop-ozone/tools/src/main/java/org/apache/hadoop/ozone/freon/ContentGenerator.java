@@ -40,7 +40,7 @@ public class ContentGenerator {
   private int bufferSize;
 
   /**
-   * Number of bytes to write in one call. Should be less than the bufferSize.
+   * Number of bytes to write in one call. Should be no larger than the bufferSize.
    */
   private final int copyBufferSize;
 
@@ -70,9 +70,9 @@ public class ContentGenerator {
           outputStream.write(buffer[i]);
         }
       } else {
-        for (int i = 0; i < nrRemaining; i += copyBufferSize) {
+        for (int i = 0; i < curSize; i += copyBufferSize) {
           outputStream.write(buffer, i,
-              Math.min(copyBufferSize, (int) (nrRemaining - i)));
+              Math.min(copyBufferSize, curSize - i));
         }
       }
     }
