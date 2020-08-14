@@ -40,7 +40,9 @@ public class ContentGenerator {
   private int bufferSize;
 
   /**
-   * Number of bytes to write in one call. Should be no larger than the bufferSize.
+   * Number of bytes to write in one call.
+   * <p>
+   * Should be no larger than the bufferSize.
    */
   private final int copyBufferSize;
 
