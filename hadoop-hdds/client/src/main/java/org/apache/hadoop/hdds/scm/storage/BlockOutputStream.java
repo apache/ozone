@@ -160,6 +160,8 @@ public class BlockOutputStream extends OutputStream {
     this.bytesPerChecksum = bytesPerChecksum;
 
     //number of buffers used before doing a flush
+    currentBuffer = bufferPool.getCurrentBuffer();
+    currentBufferRemaining = currentBuffer != null ? currentBuffer.remaining() : 0;
     flushPeriod = (int) (streamBufferFlushSize / streamBufferSize);
 
     Preconditions
@@ -358,6 +360,8 @@ public class BlockOutputStream extends OutputStream {
   // only contain data which have not been sufficiently replicated
   private void adjustBuffersOnException() {
     commitWatcher.releaseBuffersOnException();
+    currentBuffer = bufferPool.getCurrentBuffer();
+    currentBufferRemaining = currentBuffer != null ? currentBuffer.remaining() : 0;
   }
 
   /**
@@ -387,6 +391,9 @@ public class BlockOutputStream extends OutputStream {
       setIoException(ioe);
       throw getIoException();
     }
+    currentBuffer = bufferPool.getCurrentBuffer();
+    currentBufferRemaining = currentBuffer != null ? currentBuffer.remaining() : 0;
+
   }
 
   /**
