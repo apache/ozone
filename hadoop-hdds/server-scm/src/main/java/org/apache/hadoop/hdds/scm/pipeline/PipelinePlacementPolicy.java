@@ -125,6 +125,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     // get nodes in HEALTHY state
     List<DatanodeDetails> healthyNodes =
         nodeManager.getNodes(HddsProtos.NodeState.HEALTHY);
+    boolean multipleRacks = multipleRacksAvailable(healthyNodes);
     if (excludedNodes != null) {
       healthyNodes.removeAll(excludedNodes);
     }
@@ -170,7 +171,6 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     }
 
     if (!checkAllNodesAreEqual(nodeManager.getClusterNetworkTopologyMap())) {
-      boolean multipleRacks = multipleRacksAvailable(healthyNodes);
       boolean multipleRacksAfterFilter = multipleRacksAvailable(healthyList);
       if (multipleRacks && !multipleRacksAfterFilter) {
         LOG.debug(MULTIPLE_RACK_PIPELINE_MSG);
