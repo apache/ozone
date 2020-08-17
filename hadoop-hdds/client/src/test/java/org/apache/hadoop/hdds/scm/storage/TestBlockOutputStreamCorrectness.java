@@ -137,7 +137,7 @@ public class TestBlockOutputStreamCorrectness {
 
     private AtomicInteger counter = new AtomicInteger();
 
-    public MockXceiverClientSpi(Pipeline pipeline) {
+    MockXceiverClientSpi(Pipeline pipeline) {
       super();
       this.pipeline = pipeline;
     }
@@ -163,7 +163,9 @@ public class TestBlockOutputStreamCorrectness {
     }
 
     @Override
-    public XceiverClientReply sendCommandAsync(ContainerCommandRequestProto request)
+    public XceiverClientReply sendCommandAsync(
+        ContainerCommandRequestProto request
+    )
         throws IOException, ExecutionException, InterruptedException {
 
       final ContainerCommandResponseProto.Builder builder =
@@ -182,6 +184,7 @@ public class TestBlockOutputStreamCorrectness {
                         request.getPutBlock().getBlockData().getSize())
                     .build())
             .build());
+        break;
       case WriteChunk:
         ByteString data = request.getWriteChunk().getData();
         final byte[] writePayload = data.toByteArray();
@@ -190,6 +193,9 @@ public class TestBlockOutputStreamCorrectness {
           Assert.assertEquals(expectedByte,
               writePayload[i]);
         }
+        break;
+      default:
+        //no-op
       }
       final XceiverClientReply result = new XceiverClientReply(
           CompletableFuture.completedFuture(builder.build()));

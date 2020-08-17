@@ -119,7 +119,7 @@ public class BlockOutputStream extends OutputStream {
   private final Checksum checksum;
 
   //number of buffers used before doing a flush/putBlock.
-  int flushPeriod;
+  private int flushPeriod;
   //bytes remaining to write in the current buffer.
   private int currentBufferRemaining;
   //current buffer allocated to write
@@ -161,11 +161,13 @@ public class BlockOutputStream extends OutputStream {
 
     //number of buffers used before doing a flush
     currentBuffer = bufferPool.getCurrentBuffer();
-    currentBufferRemaining = currentBuffer != null ? currentBuffer.remaining() : 0;
+    currentBufferRemaining =
+        currentBuffer != null ? currentBuffer.remaining() : 0;
     flushPeriod = (int) (streamBufferFlushSize / streamBufferSize);
 
     Preconditions
-        .checkArgument((long) flushPeriod * streamBufferSize == streamBufferFlushSize);
+        .checkArgument(
+            (long) flushPeriod * streamBufferSize == streamBufferFlushSize);
 
     // A single thread executor handle the responses of async requests
     responseExecutor = Executors.newSingleThreadExecutor();
@@ -361,7 +363,8 @@ public class BlockOutputStream extends OutputStream {
   private void adjustBuffersOnException() {
     commitWatcher.releaseBuffersOnException();
     currentBuffer = bufferPool.getCurrentBuffer();
-    currentBufferRemaining = currentBuffer != null ? currentBuffer.remaining() : 0;
+    currentBufferRemaining =
+        currentBuffer != null ? currentBuffer.remaining() : 0;
   }
 
   /**
@@ -392,7 +395,8 @@ public class BlockOutputStream extends OutputStream {
       throw getIoException();
     }
     currentBuffer = bufferPool.getCurrentBuffer();
-    currentBufferRemaining = currentBuffer != null ? currentBuffer.remaining() : 0;
+    currentBufferRemaining =
+        currentBuffer != null ? currentBuffer.remaining() : 0;
 
   }
 
@@ -512,7 +516,7 @@ public class BlockOutputStream extends OutputStream {
     checkOpen();
     // flush the last chunk data residing on the currentBuffer
     if (totalDataFlushedLength < writtenDataLength) {
-      final ChunkBuffer currentBuffer = bufferPool.getCurrentBuffer();
+      currentBuffer = bufferPool.getCurrentBuffer();
       Preconditions.checkArgument(currentBuffer.position() > 0);
       if (currentBuffer.hasRemaining()) {
         writeChunk(currentBuffer);
