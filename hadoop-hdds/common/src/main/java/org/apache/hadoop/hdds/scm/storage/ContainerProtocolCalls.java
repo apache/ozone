@@ -299,7 +299,7 @@ public final class ContainerProtocolCalls  {
       builder.setEncodedToken(encodedToken);
     }
     ContainerCommandRequestProto request = builder.build();
-    return xceiverClient. sendCommandAsync(request);
+    return xceiverClient.sendCommandAsync(request);
   }
 
   /**

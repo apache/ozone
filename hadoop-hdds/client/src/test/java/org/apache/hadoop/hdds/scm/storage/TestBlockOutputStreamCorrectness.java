@@ -126,6 +126,9 @@ public class TestBlockOutputStreamCorrectness {
     return outputStream;
   }
 
+  /**
+   * XCeiverClient which simulates responses.
+   */
   private class MockXceiverClientSpi extends XceiverClientSpi {
 
     private final Pipeline pipeline;
