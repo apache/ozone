@@ -60,6 +60,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdds-docs</artifactId>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>io.dropwizard.metrics</groupId>
