@@ -200,9 +200,9 @@ public final class OzoneConsts {
 
 
   /**
-   * Max OM Quota size of 1024 PB.
+   * Max OM Quota size of Long.MAX_VALUE.
    */
-  public static final long MAX_QUOTA_IN_BYTES = 1024L * 1024 * TB;
+  public static final long MAX_QUOTA_IN_BYTES = Long.MAX_VALUE;
 
   /**
    * Quota RESET default is -1, which means quota is not set.
