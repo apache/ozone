@@ -107,7 +107,7 @@ public class TestCloseContainerHandler {
         cluster.getOzoneManager().lookupKey(keyArgs).getKeyLocationVersions()
             .get(0).getBlocksLatestVersionOnly().get(0);
 
-    ContainerID containerId = ContainerID.valueof(
+    ContainerID containerId = ContainerID.valueOf(
         omKeyLocationInfo.getContainerID());
     ContainerInfo container = cluster.getStorageContainerManager()
         .getContainerManager().getContainer(containerId);

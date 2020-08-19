@@ -45,7 +45,7 @@ public class ContainerActionsHandler implements
     DatanodeDetails dd = containerReportFromDatanode.getDatanodeDetails();
     for (ContainerAction action : containerReportFromDatanode.getReport()
         .getContainerActionsList()) {
-      ContainerID containerId = ContainerID.valueof(action.getContainerID());
+      ContainerID containerId = ContainerID.valueOf(action.getContainerID());
       switch (action.getAction()) {
       case CLOSE:
         if (LOG.isDebugEnabled()) {

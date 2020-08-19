@@ -23,12 +23,14 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
@@ -37,7 +39,9 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,6 +64,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   /**
    *
    */
+  //Can we move this lock to ContainerStateManager?
   private final ReadWriteLock lock;
 
   /**
@@ -93,67 +98,13 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   }
 
   @Override
-  public Set<ContainerID> getContainerIDs() {
-    lock.readLock().lock();
-    try {
-      return containerStateManager.getContainerIDs();
-    } finally {
-      lock.readLock().unlock();
-    }
-  }
-
-  @Override
-  public Set<ContainerInfo> getContainers() {
-    lock.readLock().lock();
-    try {
-      return containerStateManager.getContainerIDs().stream().map(id -> {
-        try {
-          return containerStateManager.getContainer(id);
-        } catch (ContainerNotFoundException e) {
-          // How can this happen? o_O
-          return null;
-        }
-      }).filter(Objects::nonNull).collect(Collectors.toSet());
-    } finally {
-      lock.readLock().unlock();
-    }
-  }
-
-  @Override
-  public ContainerInfo getContainer(final ContainerID containerID)
+  public ContainerInfo getContainer(final ContainerID id)
       throws ContainerNotFoundException {
     lock.readLock().lock();
     try {
-      return containerStateManager.getContainer(containerID);
-    } finally {
-      lock.readLock().unlock();
-    }
-  }
-
-  @Override
-  public Set<ContainerInfo> getContainers(final LifeCycleState state) {
-    lock.readLock().lock();
-    try {
-      return containerStateManager.getContainerIDs(state).stream().map(id -> {
-        try {
-          return containerStateManager.getContainer(id);
-        } catch (ContainerNotFoundException e) {
-          // How can this happen? o_O
-          return null;
-        }
-      }).filter(Objects::nonNull).collect(Collectors.toSet());
-    } finally {
-      lock.readLock().unlock();
-    }
-  }
-
-  @Override
-  public boolean exists(final ContainerID containerID) {
-    lock.readLock().lock();
-    try {
-      return (containerStateManager.getContainer(containerID) != null);
-    } catch (ContainerNotFoundException ex) {
-      return false;
+      return Optional.ofNullable(containerStateManager
+          .getContainer(id.getProtobuf()))
+          .orElseThrow(() -> new ContainerNotFoundException("ID " + id));
     } finally {
       lock.readLock().unlock();
     }
@@ -164,23 +115,28 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
                                             final int count) {
     lock.readLock().lock();
     try {
-      final long startId = startID == null ? 0 : startID.getId();
+      final long start = startID == null ? 0 : startID.getId();
       final List<ContainerID> containersIds =
           new ArrayList<>(containerStateManager.getContainerIDs());
       Collections.sort(containersIds);
       return containersIds.stream()
-          .filter(id -> id.getId() > startId)
-          .limit(count)
-          .map(id -> {
-            try {
-              return containerStateManager.getContainer(id);
-            } catch (ContainerNotFoundException ex) {
-              // This can never happen, as we hold lock no one else can remove
-              // the container after we got the container ids.
-              LOG.warn("Container Missing.", ex);
-              return null;
-            }
-          }).collect(Collectors.toList());
+          .filter(id -> id.getId() > start).limit(count)
+          .map(ContainerID::getProtobuf)
+          .map(containerStateManager::getContainer)
+          .collect(Collectors.toList());
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+  @Override
+  public List<ContainerInfo> listContainers(final LifeCycleState state) {
+    lock.readLock().lock();
+    try {
+      return containerStateManager.getContainerIDs(state).stream()
+          .map(ContainerID::getProtobuf)
+          .map(containerStateManager::getContainer)
+          .filter(Objects::nonNull).collect(Collectors.toList());
     } finally {
       lock.readLock().unlock();
     }
@@ -201,8 +157,8 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
             replicationFactor + ", State:PipelineState.OPEN");
       }
 
-      final ContainerID containerID = containerStateManager
-          .getNextContainerID();
+      // TODO: Replace this with Distributed unique id generator.
+      final ContainerID containerID = ContainerID.valueOf(UniqueId.next());
       final Pipeline pipeline = pipelines.get(
           (int) containerID.getId() % pipelines.size());
 
@@ -222,43 +178,65 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
       if (LOG.isTraceEnabled()) {
         LOG.trace("New container allocated: {}", containerInfo);
       }
-      return containerStateManager.getContainer(containerID);
+      return containerStateManager.getContainer(containerID.getProtobuf());
     } finally {
       lock.writeLock().unlock();
     }
   }
 
   @Override
-  public void deleteContainer(final ContainerID containerID)
-      throws ContainerNotFoundException {
-    throw new UnsupportedOperationException("Not yet implemented!");
-  }
-
-  @Override
-  public void updateContainerState(final ContainerID containerID,
+  public void updateContainerState(final ContainerID id,
                                    final LifeCycleEvent event)
+      throws IOException, InvalidStateTransitionException {
+    final HddsProtos.ContainerID cid = id.getProtobuf();
+    lock.writeLock().lock();
+    try {
+      checkIfContainerExist(cid);
+      containerStateManager.updateContainerState(cid, event);
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  @Override
+  public Set<ContainerReplica> getContainerReplicas(final ContainerID id)
       throws ContainerNotFoundException {
-    throw new UnsupportedOperationException("Not yet implemented!");
+    lock.readLock().lock();
+    try {
+      return Optional.ofNullable(containerStateManager
+          .getContainerReplicas(id.getProtobuf()))
+          .orElseThrow(() -> new ContainerNotFoundException("ID " + id));
+    } finally {
+      lock.readLock().unlock();
+    }
   }
 
   @Override
-  public Set<ContainerReplica> getContainerReplicas(
-      final ContainerID containerID) throws ContainerNotFoundException {
-    throw new UnsupportedOperationException("Not yet implemented!");
-  }
-
-  @Override
-  public void updateContainerReplica(final ContainerID containerID,
+  public void updateContainerReplica(final ContainerID id,
                                      final ContainerReplica replica)
       throws ContainerNotFoundException {
-    throw new UnsupportedOperationException("Not yet implemented!");
+    final HddsProtos.ContainerID cid = id.getProtobuf();
+    lock.writeLock().lock();
+    try {
+      checkIfContainerExist(cid);
+      containerStateManager.updateContainerReplica(cid, replica);
+    } finally {
+      lock.writeLock().unlock();
+    }
   }
 
   @Override
-  public void removeContainerReplica(final ContainerID containerID,
+  public void removeContainerReplica(final ContainerID id,
                                      final ContainerReplica replica)
       throws ContainerNotFoundException, ContainerReplicaNotFoundException {
-    throw new UnsupportedOperationException("Not yet implemented!");
+    final HddsProtos.ContainerID cid = id.getProtobuf();
+    lock.writeLock().lock();
+    try {
+      checkIfContainerExist(cid);
+      containerStateManager.removeContainerReplica(cid, replica);
+    } finally {
+      lock.writeLock().unlock();
+    }
   }
 
   @Override
@@ -277,6 +255,27 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
   public void notifyContainerReportProcessing(final boolean isFullReport,
                                               final boolean success) {
     throw new UnsupportedOperationException("Not yet implemented!");
+  }
+
+  @Override
+  public void deleteContainer(final ContainerID id)
+      throws IOException {
+    final HddsProtos.ContainerID cid = id.getProtobuf();
+    lock.writeLock().lock();
+    try {
+      checkIfContainerExist(cid);
+      containerStateManager.removeContainer(cid);
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  private void checkIfContainerExist(final HddsProtos.ContainerID id)
+      throws ContainerNotFoundException {
+    if (!containerStateManager.contains(id)) {
+      throw new ContainerNotFoundException("Container with id #" +
+          id.getId() + " not found.");
+    }
   }
 
   @Override

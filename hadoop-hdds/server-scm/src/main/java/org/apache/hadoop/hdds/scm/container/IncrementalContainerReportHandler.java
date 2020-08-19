@@ -71,7 +71,7 @@ public class IncrementalContainerReportHandler extends
     for (ContainerReplicaProto replicaProto :
         report.getReport().getReportList()) {
       try {
-        final ContainerID id = ContainerID.valueof(
+        final ContainerID id = ContainerID.valueOf(
             replicaProto.getContainerID());
         if (!replicaProto.getState().equals(
             ContainerReplicaProto.State.DELETED)) {

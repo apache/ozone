@@ -20,9 +20,11 @@ package org.apache.hadoop.hdds.scm.container;
 import java.io.IOException;
 import java.util.Set;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 
 /**
  * A ContainerStateManager is responsible for keeping track of all the
@@ -94,10 +96,9 @@ public interface ContainerStateManagerV2 {
    ************************************************************************/
 
   /**
-   * Returns a new container ID which can be used for allocating a new
-   * container.
+   *
    */
-  ContainerID getNextContainerID();
+  boolean contains(HddsProtos.ContainerID containerID);
 
   /**
    * Returns the ID of all the managed containers.
@@ -114,20 +115,45 @@ public interface ContainerStateManagerV2 {
   /**
    *
    */
-  ContainerInfo getContainer(ContainerID containerID)
-      throws ContainerNotFoundException;
+  ContainerInfo getContainer(HddsProtos.ContainerID id);
 
   /**
    *
    */
-  Set<ContainerReplica> getContainerReplicas(ContainerID containerID)
-      throws ContainerNotFoundException;
+  Set<ContainerReplica> getContainerReplicas(HddsProtos.ContainerID id);
+
+  /**
+   *
+   */
+  void updateContainerReplica(HddsProtos.ContainerID id,
+                              ContainerReplica replica);
+
+  /**
+   *
+   */
+  void removeContainerReplica(HddsProtos.ContainerID id,
+                              ContainerReplica replica);
 
   /**
    *
    */
   @Replicate
   void addContainer(ContainerInfoProto containerInfo)
+      throws IOException;
+
+  /**
+   *
+   */
+  @Replicate
+  void updateContainerState(HddsProtos.ContainerID id,
+                            HddsProtos.LifeCycleEvent event)
+      throws IOException, InvalidStateTransitionException;
+
+  /**
+   *
+   */
+  @Replicate
+  void removeContainer(HddsProtos.ContainerID containerInfo)
       throws IOException;
 
   /**

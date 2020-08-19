@@ -182,7 +182,7 @@ public class TestDataScrubber {
     ContainerManager cm = cluster.getStorageContainerManager()
         .getContainerManager();
     Set<ContainerReplica> replicas = cm.getContainerReplicas(
-        ContainerID.valueof(c.getContainerData().getContainerID()));
+        ContainerID.valueOf(c.getContainerData().getContainerID()));
     Assert.assertEquals(1, replicas.size());
     ContainerReplica r = replicas.iterator().next();
     Assert.assertEquals(StorageContainerDatanodeProtocolProtos.

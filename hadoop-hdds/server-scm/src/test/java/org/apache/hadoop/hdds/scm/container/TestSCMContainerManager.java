@@ -287,7 +287,7 @@ public class TestSCMContainerManager {
   @Test
   public void testgetNoneExistentContainer() {
     try {
-      containerManager.getContainer(ContainerID.valueof(
+      containerManager.getContainer(ContainerID.valueOf(
           random.nextInt() & Integer.MAX_VALUE));
       Assert.fail();
     } catch (ContainerNotFoundException ex) {
