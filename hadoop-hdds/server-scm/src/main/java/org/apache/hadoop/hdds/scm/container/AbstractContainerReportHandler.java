@@ -103,11 +103,10 @@ public class AbstractContainerReportHandler {
         containerInfo.updateSequenceId(
             replicaProto.getBlockCommitSequenceId());
       }
-
-      if (containerInfo.getUsedBytes() < replicaProto.getUsed()) {
+      if (containerInfo.getUsedBytes() != replicaProto.getUsed()) {
         containerInfo.setUsedBytes(replicaProto.getUsed());
       }
-      if (containerInfo.getNumberOfKeys() < replicaProto.getKeyCount()) {
+      if (containerInfo.getNumberOfKeys() != replicaProto.getKeyCount()) {
         containerInfo.setNumberOfKeys(replicaProto.getKeyCount());
       }
     }

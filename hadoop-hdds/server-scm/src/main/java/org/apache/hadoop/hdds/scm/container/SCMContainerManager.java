@@ -398,8 +398,6 @@ public class SCMContainerManager implements ContainerManager {
               SCMException.ResultCodes.FAILED_TO_FIND_CONTAINER);
         }
         containerInfo.updateDeleteTransactionId(entry.getValue());
-        containerInfo.setNumberOfKeys(containerInfoInMem.getNumberOfKeys());
-        containerInfo.setUsedBytes(containerInfoInMem.getUsedBytes());
         containerStore
             .putWithBatch(batchOperation, containerIdObject, containerInfo);
       }
