@@ -19,13 +19,9 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.ScmUtils;
-import org.apache.hadoop.hdds.scm.server.ratis.SCMRatisServer;
 
-import java.io.File;
 import java.util.Collection;
 
 /**
@@ -40,16 +36,6 @@ public final class SCMHAUtils {
   public static boolean isSCMHAEnabled(ConfigurationSource conf) {
     return conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
         ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
-  }
-
-  public static File createSCMRatisDir(ConfigurationSource conf)
-      throws  IllegalArgumentException {
-    String scmRatisDir = SCMRatisServer.getSCMRatisDirectory(conf);
-    if (scmRatisDir == null || scmRatisDir.isEmpty()) {
-      throw new IllegalArgumentException(HddsConfigKeys.OZONE_METADATA_DIRS +
-          " must be defined.");
-    }
-    return ScmUtils.createSCMDir(scmRatisDir);
   }
 
   /**
