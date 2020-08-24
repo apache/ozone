@@ -266,6 +266,8 @@ public final class ContainerStateManagerImpl
         containers.addContainer(container);
         pipelineManager.addContainerToPipeline(pipelineID, containerID);
       } catch (Exception ex) {
+        LOG.warn("Exception {} occurred while add Container {}.",
+            ex, containerInfo);
         containers.removeContainer(containerID);
         containerStore.delete(containerID);
         throw ex;
@@ -279,6 +281,7 @@ public final class ContainerStateManagerImpl
     return containers.contains(ContainerID.getFromProtobuf(id));
   }
 
+  @Override
   public void updateContainerState(final HddsProtos.ContainerID containerID,
                                    final LifeCycleEvent event)
       throws IOException, InvalidStateTransitionException {
@@ -291,6 +294,16 @@ public final class ContainerStateManagerImpl
           info.getState(), event);
       if (newState.getNumber() > oldState.getNumber()) {
         containers.updateState(id, info.getState(), newState);
+
+        // cleanup pipeline if container switch from open to un-open
+        if (oldState == OPEN && newState != OPEN) {
+          pipelineManager.removeContainerFromPipeline(info.getPipelineID(),
+                                                      id);
+        }
+
+        // update RocksDB
+        info.setState(newState);
+        containerStore.put(id, info);
       }
     }
   }
@@ -334,8 +347,12 @@ public final class ContainerStateManagerImpl
     throw new UnsupportedOperationException("Not yet implemented!");
   }
 
-  public void removeContainer(final HddsProtos.ContainerID id) {
-    containers.removeContainer(ContainerID.getFromProtobuf(id));
+  @Override
+  public void removeContainer(final HddsProtos.ContainerID id)
+      throws IOException {
+    ContainerID containerID = ContainerID.getFromProtobuf(id);
+    containers.removeContainer(containerID);
+    containerStore.delete(containerID);
   }
 
   @Override
