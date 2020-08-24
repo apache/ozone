@@ -37,5 +37,5 @@ while IFS= read -r number &&
         "https://api.github.com/repos/apache/hadoop-ozone/pulls/$number"
 done < <(curl -H "Content-Type: application/json" \
      --header "authorization: Bearer $GITHUB_TOKEN" \
-     "https://api.github.com/search/issues?q=repo:apache/hadoop-ozone+type:pr+updated:<$(date -d "-1 month" +%Y-%m-%d)+label:pending+is:open" \
+     "https://api.github.com/search/issues?q=repo:apache/hadoop-ozone+type:pr+updated:<$(date -d "-21 days" +%Y-%m-%d)+label:pending+is:open" \
      | jq -r '.items[] | (.number,.title)')
