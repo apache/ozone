@@ -1001,7 +1001,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
                  keyValueTableIterator = getOpenKeyTable().iterator()) {
-      while (keyValueTableIterator.hasNext()) {
+
+      while (keyValueTableIterator.hasNext() && keyBlocksList.size() < count) {
         KeyValue<String, OmKeyInfo> openKeyValue = keyValueTableIterator.next();
         OmKeyInfo keyInfo = openKeyValue.getValue();
 
