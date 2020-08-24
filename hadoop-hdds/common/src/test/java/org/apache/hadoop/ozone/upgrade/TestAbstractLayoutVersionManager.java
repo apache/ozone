@@ -41,9 +41,9 @@ public class TestAbstractLayoutVersionManager {
   @Test
   public void testInit() {
     versionManager.init(1,
-        getTestLayoutFeatures(2, 2));
+        getTestLayoutFeatures(2));
     assertEquals(2, versionManager.features.size());
-    assertEquals(4, versionManager.featureMap.size());
+    assertEquals(2, versionManager.featureMap.size());
     assertEquals(1, versionManager.getMetadataLayoutVersion());
     assertEquals(2, versionManager.getSoftwareLayoutVersion());
     assertTrue(versionManager.needsFinalization());
@@ -51,34 +51,31 @@ public class TestAbstractLayoutVersionManager {
 
   @Test
   public void testNeedsFinalization() {
-    versionManager.init(2, getTestLayoutFeatures(2, 1));
+    versionManager.init(2, getTestLayoutFeatures(2));
     assertFalse(versionManager.needsFinalization());
   }
 
-  private LayoutFeature[] getTestLayoutFeatures(int num, int numPerVersion) {
-    LayoutFeature[] lfs = new LayoutFeature[num * numPerVersion];
+  private LayoutFeature[] getTestLayoutFeatures(int num) {
+    LayoutFeature[] lfs = new LayoutFeature[num];
     int k = 0;
     for (int i = 1; i <= num; i++) {
-      for (int j = 1; j <= numPerVersion; j++) {
-        int finalI = i;
-        int finalJ = j;
-        lfs[k++] = new LayoutFeature() {
-          @Override
-          public String name() {
-            return "LF-" + finalI + "-" + finalJ;
-          }
+      int finalI = i;
+      lfs[k++] = new LayoutFeature() {
+        @Override
+        public String name() {
+          return "LF-" + finalI;
+        }
 
-          @Override
-          public int layoutVersion() {
-            return finalI;
-          }
+        @Override
+        public int layoutVersion() {
+          return finalI;
+        }
 
-          @Override
-          public String description() {
-            return null;
-          }
-        };
-      }
+        @Override
+        public String description() {
+          return null;
+        }
+      };
     }
     return lfs;
   }
