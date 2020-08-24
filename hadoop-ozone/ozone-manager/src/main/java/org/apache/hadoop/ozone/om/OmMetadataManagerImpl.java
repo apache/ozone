@@ -964,37 +964,62 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public List<BlockGroup> getPendingDeletionKeys(final int keyCount)
       throws IOException {
-    List<BlockGroup> keyBlocksList = Lists.newArrayList();
-    try (TableIterator<String, ? extends KeyValue<String, RepeatedOmKeyInfo>>
-             keyIter = getDeletedTable().iterator()) {
-      int currentCount = 0;
-      while (keyIter.hasNext() && currentCount < keyCount) {
-        KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
-        if (kv != null) {
-          RepeatedOmKeyInfo infoList = kv.getValue();
-          // Get block keys as a list.
-          for(OmKeyInfo info : infoList.getOmKeyInfoList()){
-            OmKeyLocationInfoGroup latest = info.getLatestVersionLocations();
-            List<BlockID> item = latest.getLocationList().stream()
-                .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))
-                .collect(Collectors.toList());
-            BlockGroup keyBlocks = BlockGroup.newBuilder()
-                .setKeyName(kv.getKey())
-                .addAllBlockIDs(item)
-                .build();
-            keyBlocksList.add(keyBlocks);
-            currentCount++;
-          }
-        }
-      }
-    }
-    return keyBlocksList;
+//    List<BlockGroup> keyBlocksList = Lists.newArrayList();
+//    try (TableIterator<String, ? extends KeyValue<String, RepeatedOmKeyInfo>>
+//             keyIter = getDeletedTable().iterator()) {
+//      int currentCount = 0;
+//      while (keyIter.hasNext() && currentCount < keyCount) {
+//        KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
+//        if (kv != null) {
+//          RepeatedOmKeyInfo infoList = kv.getValue();
+//          // Get block keys as a list.
+//          for(OmKeyInfo info : infoList.getOmKeyInfoList()){
+//            OmKeyLocationInfoGroup latest = info.getLatestVersionLocations();
+//            List<BlockID> item = latest.getLocationList().stream()
+//                .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))
+//                .collect(Collectors.toList());
+//            BlockGroup keyBlocks = BlockGroup.newBuilder()
+//                .setKeyName(kv.getKey())
+//                .addAllBlockIDs(item)
+//                .build();
+//            keyBlocksList.add(keyBlocks);
+//            currentCount++;
+//          }
+//        }
+//      }
+//    }
+//    return keyBlocksList;
   }
 
   @Override
-  public List<BlockGroup> getExpiredOpenKeys() throws IOException {
+  public List<BlockGroup> getExpiredOpenKeys(int count) throws IOException {
     List<BlockGroup> keyBlocksList = Lists.newArrayList();
-    // TODO: Fix the getExpiredOpenKeys, Not part of this patch.
+
+    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+                 keyValueTableIterator = getOpenKeyTable().iterator()) {
+      while (keyValueTableIterator.hasNext()) {
+        KeyValue<String, OmKeyInfo> openKeyValue = keyValueTableIterator.next();
+        OmKeyInfo keyInfo = openKeyValue.getValue();
+
+        final Duration oneWeek = ChronoUnit.WEEKS.getDuration();
+        Duration age = Duration.between(Instant.now(),
+                Instant.ofEpochMilli(keyInfo.getCreationTime()));
+
+        // TODO : Determine if this needs to be customizable parameter.
+        if (age.compareTo(oneWeek) > 0) {
+          OmKeyLocationInfoGroup latest = keyInfo.getLatestVersionLocations();
+          List<BlockID> blockIDs = latest.getLocationList().stream()
+                  .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))
+                  .collect(Collectors.toList());
+          BlockGroup blockGroup = BlockGroup.newBuilder()
+                  .setKeyName(openKeyValue.getKey())
+                  .addAllBlockIDs(blockIDs)
+                  .build();
+          keyBlocksList.add(blockGroup);
+        }
+      }
+    }
+
     return keyBlocksList;
   }
 
