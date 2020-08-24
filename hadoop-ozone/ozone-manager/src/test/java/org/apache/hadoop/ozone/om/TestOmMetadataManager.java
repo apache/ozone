@@ -17,11 +17,13 @@
 
 package org.apache.hadoop.ozone.om;
 import com.google.common.base.Optional;
+import com.sun.xml.internal.ws.policy.SimpleAssertion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -33,8 +35,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import java.util.List;
-import java.util.TreeSet;
+import javax.xml.crypto.dsig.keyinfo.KeyInfo;
+import java.util.*;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
@@ -519,6 +521,56 @@ public class TestOmMetadataManager {
 
 
 
+  }
+
+  @Test
+  public void testGetExpiredOpenKeys() throws Exception {
+    final String bucketName = "bucket";
+    final String volumeName = "volume";
+    final int numExpiredOpenKeys = 4;
+    final int numUnexpiredOpenKeys = 1;
+
+    // TODO : Determine if we need to test with keys added to the cache as well.
+
+    Set<String> expiredKeys = new HashSet<>();
+    for (int i = 0; i < numExpiredOpenKeys; i++) {
+      OmKeyInfo keyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
+              bucketName, "expired" + i, HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.ONE);
+
+      TestOMRequestUtils.addKeyToTable(true, false,
+              keyInfo, 1000L, 0L, omMetadataManager);
+
+      expiredKeys.add(keyInfo.getKeyName());
+    }
+
+    Set<String> unexpiredKeys = new HashSet<>();
+    for (int i = 0; i < numUnexpiredOpenKeys; i++) {
+      OmKeyInfo keyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
+              bucketName, "unexpired" + i, HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.ONE);
+
+      TestOMRequestUtils.addKeyToTable(true, false,
+              keyInfo, 1000L, 0L, omMetadataManager);
+
+      unexpiredKeys.add(keyInfo.getKeyName());
+    }
+
+    List<BlockGroup> someExpiredBlocks =
+            omMetadataManager.getExpiredOpenKeys(numExpiredOpenKeys - 1);
+
+    Assert.assertEquals(numExpiredOpenKeys - 1, someExpiredBlocks.size());
+    for (BlockGroup blockGroup: someExpiredBlocks) {
+      Assert.assertTrue(expiredKeys.contains(blockGroup.getGroupID()));
+    }
+
+    List<BlockGroup> allExpiredBlocks =
+            omMetadataManager.getExpiredOpenKeys(numExpiredOpenKeys + 1);
+
+    Assert.assertEquals(numUnexpiredOpenKeys, someExpiredBlocks.size());
+    for (BlockGroup blockGroup: allExpiredBlocks) {
+      Assert.assertTrue(unexpiredKeys.contains(blockGroup.getGroupID()));
+    }
   }
 
   private void addKeysToOM(String volumeName, String bucketName,

@@ -77,7 +77,7 @@ public class OpenKeyCleanupService extends BackgroundService {
     @Override
     public BackgroundTaskResult call() throws Exception {
       try {
-        List<BlockGroup> keyBlocksList = keyManager.getExpiredOpenKeys();
+        List<BlockGroup> keyBlocksList = keyManager.getExpiredOpenKeys(0);
         if (keyBlocksList.size() > 0) {
           int toDeleteSize = keyBlocksList.size();
           LOG.debug("Found {} to-delete open keys in OM", toDeleteSize);
