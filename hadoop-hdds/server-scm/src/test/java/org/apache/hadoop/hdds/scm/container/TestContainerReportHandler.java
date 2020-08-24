@@ -640,7 +640,7 @@ public class TestContainerReportHandler {
       final ContainerID containerId, final ContainerReplicaProto.State state,
       final String originNodeId) {
     return getContainerReportsProto(containerId, state, originNodeId,
-        100000000L, 2000000000L);
+        2000000000L, 100000000L);
   }
 
   private static ContainerReportsProto getContainerReportsProto(
