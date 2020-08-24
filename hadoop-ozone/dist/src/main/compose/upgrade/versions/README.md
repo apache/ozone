@@ -12,4 +12,4 @@
   limitations under the License. See accompanying LICENSE file.
 -->
 
-The scripts in this directory define version-specific behavior required for [`testlib.sh`](../../testlib.sh).  For example the `ozone admin` command was renamed from `ozone scmcli` in 0.6.0.
+The scripts in this directory define version-specific behavior required for [`testlib.sh`](../../testlib.sh).  For example the `ozone admin` command was renamed from `ozone scmcli` in 1.0.0.
