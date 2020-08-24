@@ -20,11 +20,9 @@ package org.apache.hadoop.ozone.upgrade;
 
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.TreeMap;
 
 import com.google.common.base.Preconditions;
@@ -33,16 +31,16 @@ import com.google.common.base.Preconditions;
  * Layout Version Manager containing generic method implementations.
  */
 @SuppressWarnings("visibilitymodifier")
-public abstract class AbstractLayoutVersionManager {
+public abstract class AbstractLayoutVersionManager implements
+    LayoutVersionManager {
 
-  protected static int metadataLayoutVersion; // MLV.
-  protected static int softwareLayoutVersion; // SLV.
-  protected static TreeMap<Integer, Set<LayoutFeature>> features =
-      new TreeMap<>();
-  protected static Map<String, LayoutFeature> featureMap = new HashMap<>();
-  protected static volatile boolean isInitialized = false;
+  protected int metadataLayoutVersion; // MLV.
+  protected int softwareLayoutVersion; // SLV.
+  protected TreeMap<Integer, LayoutFeature> features = new TreeMap<>();
+  protected Map<String, LayoutFeature> featureMap = new HashMap<>();
+  protected volatile boolean isInitialized = false;
 
-  protected static void init(int version, LayoutFeature[] lfs) {
+  protected void init(int version, LayoutFeature[] lfs) {
     if (!isInitialized) {
       metadataLayoutVersion = version;
       initializeFeatures(lfs);
@@ -51,60 +49,58 @@ public abstract class AbstractLayoutVersionManager {
     }
   }
 
-  protected static void initializeFeatures(LayoutFeature[] lfs) {
+  protected void initializeFeatures(LayoutFeature[] lfs) {
     Arrays.stream(lfs).forEach(f -> {
       Preconditions.checkArgument(!featureMap.containsKey(f.name()));
-      features.computeIfAbsent(f.layoutVersion(), v -> new HashSet<>());
-      features.get(f.layoutVersion()).add(f);
+      Preconditions.checkArgument(!features.containsKey(f.layoutVersion()));
+      features.put(f.layoutVersion(), f);
       featureMap.put(f.name(), f);
     });
   }
 
-  public static int getMetadataLayoutVersion() {
+  public int getMetadataLayoutVersion() {
     return metadataLayoutVersion;
   }
 
-  public static int getSoftwareLayoutVersion() {
+  public int getSoftwareLayoutVersion() {
     return softwareLayoutVersion;
   }
 
-  public static boolean needsFinalization() {
+  public boolean needsFinalization() {
     return metadataLayoutVersion < softwareLayoutVersion;
   }
 
-  public static boolean isAllowed(LayoutFeature layoutFeature) {
+  public boolean isAllowed(LayoutFeature layoutFeature) {
     return layoutFeature.layoutVersion() <= metadataLayoutVersion;
   }
 
-  public static boolean isAllowed(String featureName) {
+  public boolean isAllowed(String featureName) {
     return featureMap.containsKey(featureName) &&
         isAllowed(featureMap.get(featureName));
   }
 
-  public static LayoutFeature getFeature(String name) {
+  public LayoutFeature getFeature(String name) {
     return featureMap.get(name);
   }
 
-  public synchronized static void doFinalize(Object param) {
+  public synchronized void doFinalize(Object param) {
     if (needsFinalization()){
-      Iterator<Map.Entry<Integer, Set<LayoutFeature>>> iterator = features
+      Iterator<Map.Entry<Integer, LayoutFeature>> iterator = features
           .tailMap(metadataLayoutVersion + 1).entrySet().iterator();
       while (iterator.hasNext()) {
-        Map.Entry<Integer, Set<LayoutFeature>> f = iterator.next();
-        for (LayoutFeature lf : f.getValue()) {
-          Optional<? extends LayoutFeature.UpgradeAction> upgradeAction =
-              lf.onFinalizeAction();
-          upgradeAction.ifPresent(action -> action.executeAction(param));
-          // ToDo : Handle shutdown while iterating case (resume from last
-          //  feature).
-        }
+        Map.Entry<Integer, LayoutFeature> f = iterator.next();
+        Optional<? extends LayoutFeature.UpgradeAction> upgradeAction =
+            f.getValue().onFinalizeAction();
+        upgradeAction.ifPresent(action -> action.executeAction(param));
+        // ToDo : Handle shutdown while iterating case (resume from last
+        //  feature).
         metadataLayoutVersion = f.getKey();
       }
       // ToDo : Persist new MLV.
     }
   }
 
-  protected static synchronized void reset() {
+  protected synchronized void reset() {
     metadataLayoutVersion = 0;
     softwareLayoutVersion = 0;
     featureMap.clear();

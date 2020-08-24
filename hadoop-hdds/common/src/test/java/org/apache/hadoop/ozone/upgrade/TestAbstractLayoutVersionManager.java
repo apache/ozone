@@ -30,26 +30,29 @@ import org.junit.Test;
  */
 public class TestAbstractLayoutVersionManager {
 
+  private AbstractLayoutVersionManager versionManager =
+      new MockVersionManager();
+
   @Before
   public void setUp() {
-    AbstractLayoutVersionManager.reset();
+    versionManager.reset();
   }
 
   @Test
   public void testInit() {
-    AbstractLayoutVersionManager.init(1,
+    versionManager.init(1,
         getTestLayoutFeatures(2, 2));
-    assertEquals(2, AbstractLayoutVersionManager.features.size());
-    assertEquals(4, AbstractLayoutVersionManager.featureMap.size());
-    assertEquals(1, AbstractLayoutVersionManager.getMetadataLayoutVersion());
-    assertEquals(2, AbstractLayoutVersionManager.getSoftwareLayoutVersion());
-    assertTrue(AbstractLayoutVersionManager.needsFinalization());
+    assertEquals(2, versionManager.features.size());
+    assertEquals(4, versionManager.featureMap.size());
+    assertEquals(1, versionManager.getMetadataLayoutVersion());
+    assertEquals(2, versionManager.getSoftwareLayoutVersion());
+    assertTrue(versionManager.needsFinalization());
   }
 
   @Test
   public void testNeedsFinalization() {
-    AbstractLayoutVersionManager.init(2, getTestLayoutFeatures(2, 1));
-    assertFalse(AbstractLayoutVersionManager.needsFinalization());
+    versionManager.init(2, getTestLayoutFeatures(2, 1));
+    assertFalse(versionManager.needsFinalization());
   }
 
   private LayoutFeature[] getTestLayoutFeatures(int num, int numPerVersion) {
@@ -78,5 +81,8 @@ public class TestAbstractLayoutVersionManager {
       }
     }
     return lfs;
+  }
+
+  static class MockVersionManager extends AbstractLayoutVersionManager {
   }
 }

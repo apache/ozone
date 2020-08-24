@@ -51,27 +51,42 @@ public class TestOMLayoutFeatureAspect {
         temporaryFolder.newFolder().getAbsolutePath());
   }
 
+  /**
+   * This is an example of an "API" that uses a new Layout feature (EC) that is
+   * not yet supported by the current layout version. The following can be
+   * "guarded" by just adding the following annotation, thereby keeping the
+   * method logic and upgrade logic separate.
+   */
   @OMLayoutFeatureAPI(CREATE_EC)
-  public String testECMethod() throws Exception {
+  public String ecMethod() throws Exception {
     return "ec";
   }
 
+  /**
+   * This is an example of an "API" that uses a Layout feature (EC) that is
+   * supported by the current layout version.
+   */
   @OMLayoutFeatureAPI(INITIAL_VERSION)
-  public String testBasicMethod() throws Exception {
+  public String basicMethod() throws Exception {
     return "basic";
   }
 
+  /**
+   * This unit test invokes the above 2 layout feature APIs. The first one
+   * should fail, and the second one should pass.
+   * @throws Exception
+   */
   @Test
   public void testCheckLayoutFeature() throws Exception {
-    OMVersionManager.init(new OMStorage(configuration));
+    OMLayoutVersionManager.initialize(new OMStorage(configuration));
     TestOMLayoutFeatureAspect testObj = new TestOMLayoutFeatureAspect();
     try {
-      testObj.testECMethod();
+      testObj.ecMethod();
       Assert.fail();
     } catch (OMException ex) {
       assertEquals(NOT_SUPPORTED_OPERATION, ex.getResult());
     }
-    String s = testObj.testBasicMethod();
+    String s = testObj.basicMethod();
     assertEquals("basic", s);
   }
 }

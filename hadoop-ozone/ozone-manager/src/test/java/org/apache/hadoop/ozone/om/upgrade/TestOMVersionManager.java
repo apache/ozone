@@ -43,12 +43,15 @@ public class TestOMVersionManager {
   public void testOMLayoutVersionManager() throws IOException {
     OMStorage omStorage = mock(OMStorage.class);
     when(omStorage.getLayoutVersion()).thenReturn(0);
-    OMVersionManager.init(omStorage);
-    assertTrue(OMVersionManager.isAllowed(INITIAL_VERSION));
-    assertFalse(OMVersionManager.isAllowed(CREATE_EC));
-    assertEquals(0, OMVersionManager.getMetadataLayoutVersion());
-    assertTrue(OMVersionManager.needsFinalization());
-    OMVersionManager.doFinalize(mock(OzoneManager.class));
+    OMLayoutVersionManager omVersionManager =
+        OMLayoutVersionManager.initialize(omStorage);
+    assertTrue(omVersionManager.isAllowed(INITIAL_VERSION));
+    assertFalse(omVersionManager.isAllowed(CREATE_EC));
+    assertEquals(0, omVersionManager.getMetadataLayoutVersion());
+    assertTrue(omVersionManager.needsFinalization());
+    omVersionManager.doFinalize(mock(OzoneManager.class));
+    assertFalse(omVersionManager.needsFinalization());
+    assertEquals(2, omVersionManager.getMetadataLayoutVersion());
   }
 
   @Test

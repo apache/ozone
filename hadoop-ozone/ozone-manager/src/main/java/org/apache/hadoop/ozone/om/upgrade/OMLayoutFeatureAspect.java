@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_
 
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
+import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
@@ -34,17 +35,19 @@ import org.aspectj.lang.reflect.MethodSignature;
  */
 @Aspect
 public class OMLayoutFeatureAspect {
+
   @Before("@annotation(OMLayoutFeatureAPI) && execution(* *(..))")
   public void checkLayoutFeature(JoinPoint joinPoint) throws Throwable {
     String featureName = ((MethodSignature) joinPoint.getSignature())
         .getMethod().getAnnotation(OMLayoutFeatureAPI.class).value().name();
-    if (!OMVersionManager.isAllowed(featureName)) {
-      LayoutFeature layoutFeature = OMVersionManager.getFeature(featureName);
+    LayoutVersionManager lvm = OMLayoutVersionManager.getInstance();
+    if (!lvm.isAllowed(featureName)) {
+      LayoutFeature layoutFeature = lvm.getFeature(featureName);
       throw new OMException(String.format("Operation %s cannot be invoked " +
           "before finalization. Current layout version = %d, feature's layout" +
               " version = %d",
           featureName,
-          OMVersionManager.getMetadataLayoutVersion(),
+          lvm.getMetadataLayoutVersion(),
           layoutFeature.layoutVersion()), NOT_SUPPORTED_OPERATION);
     }
   }

@@ -18,19 +18,51 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.LAYOUT_VERSION_UNSUPPORTED;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 
 import org.apache.hadoop.ozone.common.Storage;
+import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureCatalog.OMLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager;
+import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
+
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * Class to manage layout versions and features for Ozone Manager.
  */
-public final class OMVersionManager extends AbstractLayoutVersionManager {
+public final class OMLayoutVersionManager extends AbstractLayoutVersionManager {
 
-  private OMVersionManager() {
+  private static OMLayoutVersionManager omVersionManager;
+
+  private OMLayoutVersionManager() {
+  }
+
+  /**
+   * Read only instance to OM Version Manager.
+   * @return version manager instance.
+   */
+  public static synchronized LayoutVersionManager getInstance() {
+    if (omVersionManager == null) {
+      throw new RuntimeException("OM Layout Version Manager not yet " +
+          "initialized.");
+    }
+    return omVersionManager;
+  }
+
+
+  /**
+   * Initialize OM version manager from storage.
+   * @return version manager instance.
+   */
+  public static OMLayoutVersionManager initialize(OMStorage omStorage)
+      throws OMException {
+    if (omVersionManager == null) {
+      omVersionManager = new OMLayoutVersionManager();
+      omVersionManager.init(omStorage);
+    }
+    return omVersionManager;
   }
 
   /**
@@ -38,15 +70,22 @@ public final class OMVersionManager extends AbstractLayoutVersionManager {
    * @param storage to read the current layout version.
    * @throws OMException on error.
    */
-  public static synchronized void init(Storage storage) throws OMException {
+  private void init(Storage storage) throws OMException {
     init(storage.getLayoutVersion(), OMLayoutFeature.values());
     if (metadataLayoutVersion > softwareLayoutVersion) {
       throw new OMException(
           String.format("Cannot initialize VersionManager. Metadata " +
                   "layout version (%d) > software layout version (%d)",
               metadataLayoutVersion, softwareLayoutVersion),
-          LAYOUT_VERSION_UNSUPPORTED);
+          NOT_SUPPORTED_OPERATION);
     }
   }
 
+  @VisibleForTesting
+  protected static void resetLayoutVersionManager() {
+    if (omVersionManager != null) {
+      omVersionManager.reset();
+      omVersionManager = null;
+    }
+  }
 }

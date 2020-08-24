@@ -33,7 +33,7 @@ public class OMLayoutFeatureCatalog {
   public enum OMLayoutFeature implements LayoutFeature {
     INITIAL_VERSION(0, "Initial Layout Version"),
     CREATE_EC(1, ""),
-    NEW_FEATURE(1, "new feature", new NewOmFeatureUpgradeAction());
+    NEW_FEATURE(2, "new feature", new NewOmFeatureUpgradeAction());
 
 
     private int layoutVersion;
