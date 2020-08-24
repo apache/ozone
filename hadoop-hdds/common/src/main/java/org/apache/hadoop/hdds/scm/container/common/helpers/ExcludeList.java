@@ -91,7 +91,7 @@ public class ExcludeList {
       HddsProtos.ExcludeListProto excludeListProto) {
     ExcludeList excludeList = new ExcludeList();
     excludeListProto.getContainerIdsList().forEach(id -> {
-      excludeList.addConatinerId(ContainerID.valueof(id));
+      excludeList.addConatinerId(ContainerID.valueOf(id));
     });
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
     excludeListProto.getDatanodesList().forEach(dn -> {

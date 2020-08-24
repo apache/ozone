@@ -113,7 +113,7 @@ public class AbstractReconContainerManagerTest {
     Pipeline pipeline = getRandomPipeline();
     getPipelineManager().addPipeline(pipeline);
 
-    ContainerID containerID = new ContainerID(100L);
+    ContainerID containerID = ContainerID.valueOf(100L);
     ContainerInfo containerInfo =
         new ContainerInfo.Builder()
             .setContainerID(containerID.getId())
@@ -140,7 +140,7 @@ public class AbstractReconContainerManagerTest {
 
   protected ContainerWithPipeline getTestContainer(LifeCycleState state)
       throws IOException {
-    ContainerID containerID = new ContainerID(100L);
+    ContainerID containerID = ContainerID.valueOf(100L);
     Pipeline pipeline = getRandomPipeline();
     pipelineManager.addPipeline(pipeline);
     ContainerInfo containerInfo =
@@ -159,7 +159,7 @@ public class AbstractReconContainerManagerTest {
   protected ContainerWithPipeline getTestContainer(long id,
                                                    LifeCycleState state)
       throws IOException {
-    ContainerID containerID = new ContainerID(id);
+    ContainerID containerID = ContainerID.valueOf(id);
     Pipeline pipeline = getRandomPipeline();
     pipelineManager.addPipeline(pipeline);
     ContainerInfo containerInfo =

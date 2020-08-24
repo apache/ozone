@@ -119,7 +119,7 @@ public class SCMContainerManager implements ContainerManager {
       try {
         if (container.getState() == LifeCycleState.OPEN) {
           pipelineManager.addContainerToPipeline(container.getPipelineID(),
-              ContainerID.valueof(container.getContainerID()));
+              ContainerID.valueOf(container.getContainerID()));
         }
       } catch (PipelineNotFoundException ex) {
         LOG.warn("Found a Container {} which is in {} state with pipeline {} " +
@@ -205,7 +205,9 @@ public class SCMContainerManager implements ContainerManager {
   public boolean exists(ContainerID containerID) {
     lock.lock();
     try {
-      return (containerStateManager.getContainer(containerID) != null);
+      Preconditions.checkNotNull(
+          containerStateManager.getContainer(containerID));
+      return true;
     } catch (ContainerNotFoundException e) {
       return false;
     } finally {
@@ -279,7 +281,7 @@ public class SCMContainerManager implements ContainerManager {
         // PipelineStateManager.
         pipelineManager.removeContainerFromPipeline(
             containerInfo.getPipelineID(),
-            new ContainerID(containerInfo.getContainerID()));
+            containerInfo.containerID());
         throw ex;
       }
       return containerInfo;
@@ -386,7 +388,7 @@ public class SCMContainerManager implements ContainerManager {
       for (Map.Entry<Long, Long> entry : deleteTransactionMap.entrySet()) {
         long containerID = entry.getKey();
 
-        ContainerID containerIdObject = new ContainerID(containerID);
+        ContainerID containerIdObject = ContainerID.valueOf(containerID);
         ContainerInfo containerInfo =
             containerStore.get(containerIdObject);
         if (containerInfo == null) {
@@ -474,7 +476,7 @@ public class SCMContainerManager implements ContainerManager {
       throws IOException {
     try {
       containerStore
-          .put(new ContainerID(containerInfo.getContainerID()), containerInfo);
+          .put(containerInfo.containerID(), containerInfo);
       // Incrementing here, as allocateBlock to create a container calls
       // getMatchingContainer() and finally calls this API to add newly
       // created container to DB.

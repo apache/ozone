@@ -100,7 +100,7 @@ public class TestReconContainerManager
 
   @Test
   public void testCheckAndAddNewContainer() throws IOException {
-    ContainerID containerID = new ContainerID(100L);
+    ContainerID containerID = ContainerID.valueOf(100L);
     ReconContainerManager containerManager = getContainerManager();
     assertFalse(containerManager.exists(containerID));
     DatanodeDetails datanodeDetails = randomDatanodeDetails();

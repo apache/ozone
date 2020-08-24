@@ -174,7 +174,7 @@ public final class TestHelper {
     for (long containerID : containerIdList) {
       ContainerInfo container =
           cluster.getStorageContainerManager().getContainerManager()
-              .getContainer(ContainerID.valueof(containerID));
+              .getContainer(ContainerID.valueOf(containerID));
       Pipeline pipeline =
           cluster.getStorageContainerManager().getPipelineManager()
               .getPipeline(container.getPipelineID());
@@ -250,7 +250,7 @@ public final class TestHelper {
     for (long containerID : containerIdList) {
       ContainerInfo container =
           cluster.getStorageContainerManager().getContainerManager()
-              .getContainer(ContainerID.valueof(containerID));
+              .getContainer(ContainerID.valueOf(containerID));
       Pipeline pipeline =
           cluster.getStorageContainerManager().getPipelineManager()
               .getPipeline(container.getPipelineID());
@@ -271,7 +271,7 @@ public final class TestHelper {
         // send the order to close the container
         cluster.getStorageContainerManager().getEventQueue()
             .fireEvent(SCMEvents.CLOSE_CONTAINER,
-                ContainerID.valueof(containerID));
+                ContainerID.valueOf(containerID));
       }
     }
     int index = 0;

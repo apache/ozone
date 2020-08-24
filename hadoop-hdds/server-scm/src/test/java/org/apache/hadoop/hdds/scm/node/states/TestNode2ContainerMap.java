@@ -52,7 +52,7 @@ public class TestNode2ContainerMap {
       TreeSet<ContainerID> currentSet = new TreeSet<>();
       for (int cnIndex = 1; cnIndex <= CONTAINER_COUNT; cnIndex++) {
         long currentCnIndex = (long) (dnIndex * CONTAINER_COUNT) + cnIndex;
-        currentSet.add(new ContainerID(currentCnIndex));
+        currentSet.add(ContainerID.valueOf(currentCnIndex));
       }
       testData.put(UUID.randomUUID(), currentSet);
     }
@@ -206,7 +206,7 @@ public class TestNode2ContainerMap {
     TreeSet<ContainerID> addedContainers = new TreeSet<>();
     for (int x = 1; x <= newCount; x++) {
       long cTemp = last.getId() + x;
-      addedContainers.add(new ContainerID(cTemp));
+      addedContainers.add(ContainerID.valueOf(cTemp));
     }
 
     // This set is the super set of existing containers and new containers.
@@ -250,7 +250,7 @@ public class TestNode2ContainerMap {
     for (int x = 0; x < removeCount; x++) {
       int startBase = (int) first.getId();
       long cTemp = r.nextInt(values.size());
-      removedContainers.add(new ContainerID(cTemp + startBase));
+      removedContainers.add(ContainerID.valueOf(cTemp + startBase));
     }
 
     // This set is a new set with some containers removed.
@@ -282,7 +282,7 @@ public class TestNode2ContainerMap {
     Set<ContainerID> insertedSet = new TreeSet<>();
     // Insert nodes from 1..30
     for (int x = 1; x <= 30; x++) {
-      insertedSet.add(new ContainerID(x));
+      insertedSet.add(ContainerID.valueOf(x));
     }
 
 
@@ -296,7 +296,7 @@ public class TestNode2ContainerMap {
     for (int x = 0; x < removeCount; x++) {
       int startBase = (int) first.getId();
       long cTemp = r.nextInt(values.size());
-      removedContainers.add(new ContainerID(cTemp + startBase));
+      removedContainers.add(ContainerID.valueOf(cTemp + startBase));
     }
 
     Set<ContainerID> newSet = new TreeSet<>(values);

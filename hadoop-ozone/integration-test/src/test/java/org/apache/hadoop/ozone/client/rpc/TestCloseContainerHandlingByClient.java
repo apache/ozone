@@ -374,7 +374,7 @@ public class TestCloseContainerHandlingByClient {
     long containerID = locationInfos.get(0).getContainerID();
     ContainerInfo container =
         cluster.getStorageContainerManager().getContainerManager()
-            .getContainer(ContainerID.valueof(containerID));
+            .getContainer(ContainerID.valueOf(containerID));
     Pipeline pipeline =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(container.getPipelineID());

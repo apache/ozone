@@ -162,7 +162,7 @@ public class ReconContainerManager extends SCMContainerManager {
           containerInfo.containerID(), ex);
       getPipelineManager().removeContainerFromPipeline(
           containerInfo.getPipelineID(),
-          new ContainerID(containerInfo.getContainerID()));
+          ContainerID.valueOf(containerInfo.getContainerID()));
       throw ex;
     } finally {
       getLock().unlock();

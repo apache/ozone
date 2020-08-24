@@ -162,7 +162,7 @@ public class TestPipelineManagerImpl {
     PipelineID pipelineID = pipeline.getId();
 
     pipelineManager.openPipeline(pipelineID);
-    pipelineManager.addContainerToPipeline(pipelineID, ContainerID.valueof(1));
+    pipelineManager.addContainerToPipeline(pipelineID, ContainerID.valueOf(1));
     Assert.assertTrue(pipelineManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE,
@@ -262,7 +262,7 @@ public class TestPipelineManagerImpl {
     // Open the pipeline
     pipelineManager.openPipeline(pipeline.getId());
     pipelineManager
-        .addContainerToPipeline(pipeline.getId(), ContainerID.valueof(1));
+        .addContainerToPipeline(pipeline.getId(), ContainerID.valueOf(1));
     Assert.assertTrue(pipelineManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE,

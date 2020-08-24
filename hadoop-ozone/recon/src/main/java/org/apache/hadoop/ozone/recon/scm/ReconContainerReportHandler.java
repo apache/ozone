@@ -56,7 +56,7 @@ public class ReconContainerReportHandler extends ContainerReportHandler {
 
     List<ContainerReplicaProto> reportsList = containerReport.getReportsList();
     for (ContainerReplicaProto containerReplicaProto : reportsList) {
-      final ContainerID id = ContainerID.valueof(
+      final ContainerID id = ContainerID.valueOf(
           containerReplicaProto.getContainerID());
       try {
         containerManager.checkAndAddNewContainer(id,

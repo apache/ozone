@@ -70,7 +70,7 @@ public class ReconIncrementalContainerReportHandler
     for (ContainerReplicaProto replicaProto :
         report.getReport().getReportList()) {
       try {
-        final ContainerID id = ContainerID.valueof(
+        final ContainerID id = ContainerID.valueOf(
             replicaProto.getContainerID());
         try {
           containerManager.checkAndAddNewContainer(id, replicaProto.getState(),
