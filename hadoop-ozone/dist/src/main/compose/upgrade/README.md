@@ -26,4 +26,4 @@ current version is run with the `ozone-runner` image using locally built
 source code.
 
 Currently the test script only supports a single version upgrade (eg.
-from 0.5.0 to 0.6.0).
+from 0.5.0 to 1.0.0).
