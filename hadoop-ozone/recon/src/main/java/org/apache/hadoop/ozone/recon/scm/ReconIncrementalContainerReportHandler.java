@@ -73,7 +73,7 @@ public class ReconIncrementalContainerReportHandler
         final ContainerID id = ContainerID.valueof(
             replicaProto.getContainerID());
         try {
-          containerManager.checkAndAddNewContainer(id,
+          containerManager.checkAndAddNewContainer(id, replicaProto.getState(),
               report.getDatanodeDetails());
         } catch (IOException ioEx) {
           LOG.error("Exception while checking and adding new container.", ioEx);

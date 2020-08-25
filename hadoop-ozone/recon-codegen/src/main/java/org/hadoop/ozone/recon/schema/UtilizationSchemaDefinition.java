@@ -63,14 +63,14 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
     Connection conn = dataSource.getConnection();
     dslContext = DSL.using(conn);
     if (!TABLE_EXISTS_CHECK.test(conn, FILE_COUNT_BY_SIZE_TABLE_NAME)) {
-      createFileSizeCountTable(conn);
+      createFileSizeCountTable();
     }
     if (!TABLE_EXISTS_CHECK.test(conn, CLUSTER_GROWTH_DAILY_TABLE_NAME)) {
-      createClusterGrowthTable(conn);
+      createClusterGrowthTable();
     }
   }
 
-  private void createClusterGrowthTable(Connection conn) {
+  private void createClusterGrowthTable() {
     dslContext.createTableIfNotExists(CLUSTER_GROWTH_DAILY_TABLE_NAME)
         .column("timestamp", SQLDataType.TIMESTAMP)
         .column("datanode_id", SQLDataType.INTEGER)
@@ -85,7 +85,7 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
         .execute();
   }
 
-  private void createFileSizeCountTable(Connection conn) {
+  private void createFileSizeCountTable() {
     dslContext.createTableIfNotExists(FILE_COUNT_BY_SIZE_TABLE_NAME)
         .column("volume", SQLDataType.VARCHAR(64))
         .column("bucket", SQLDataType.VARCHAR(64))
@@ -96,6 +96,11 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
         .execute();
   }
 
+  /**
+   * Returns the DSL context.
+   *
+   * @return dslContext
+   */
   public DSLContext getDSLContext() {
     return dslContext;
   }

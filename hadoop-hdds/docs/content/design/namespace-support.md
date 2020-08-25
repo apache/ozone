@@ -1,9 +1,9 @@
 ---
-title: Ozone Manager HA
-summary: Support HA for Ozone Manager with the help of RATIS
+title: Ozone FS namespace
+summary: Use additional prefix table for indexed data retrieval
 date: 2020-01-20
 jira: HDDS-2939
-status: accepted
+status: implementing
 author: Supratim Deka, Anu Engineer
 ---
 <!--

@@ -20,19 +20,18 @@ package org.apache.hadoop.hdds.ratis;
 
 import java.io.IOException;
 import java.security.cert.X509Certificate;
-import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
+import org.apache.hadoop.hdds.ratis.retrypolicy.RetryPolicyCreator;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -40,7 +39,6 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.client.RaftClientConfigKeys;
-import org.apache.ratis.client.retry.RequestTypeDependentRetryPolicy;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.grpc.GrpcFactory;
@@ -50,20 +48,10 @@ import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
-import org.apache.ratis.protocol.GroupMismatchException;
-import org.apache.ratis.protocol.StateMachineException;
-import org.apache.ratis.protocol.NotReplicatedException;
-import org.apache.ratis.protocol.TimeoutIOException;
-import org.apache.ratis.protocol.exceptions.ResourceUnavailableException;
-import org.apache.ratis.retry.ExponentialBackoffRetry;
-import org.apache.ratis.retry.MultipleLinearRandomRetry;
-import org.apache.ratis.retry.ExceptionDependentRetry;
-import org.apache.ratis.retry.RetryPolicies;
 import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,10 +64,6 @@ public final class RatisHelper {
 
   // Prefix for Ratis Server GRPC and Ratis client conf.
   public static final String HDDS_DATANODE_RATIS_PREFIX_KEY = "hdds.ratis";
-
-  private static final Class[] NO_RETRY_EXCEPTIONS =
-      new Class[] {NotReplicatedException.class, GroupMismatchException.class,
-          StateMachineException.class};
 
   /* TODO: use a dummy id for all groups for the moment.
    *       It should be changed to a unique id for each group.
@@ -288,74 +272,17 @@ public final class RatisHelper {
     return tlsConfig;
   }
 
-  /**
-   * Table mapping exception type to retry policy used for the exception in
-   * write and watch request.
-   * ---------------------------------------------------------------------------
-   * |        Exception            | RetryPolicy for     | RetryPolicy for     |
-   * |                             | Write request       | Watch request       |
-   * |-------------------------------------------------------------------------|
-   * | NotReplicatedException      | NO_RETRY            | NO_RETRY            |
-   * |-------------------------------------------------------------------------|
-   * | GroupMismatchException      | NO_RETRY            | NO_RETRY            |
-   * |-------------------------------------------------------------------------|
-   * | StateMachineException       | NO_RETRY            | NO_RETRY            |
-   * |-------------------------------------------------------------------------|
-   * | TimeoutIOException          | EXPONENTIAL_BACKOFF | NO_RETRY            |
-   * |-------------------------------------------------------------------------|
-   * | ResourceUnavailableException| EXPONENTIAL_BACKOFF | EXPONENTIAL_BACKOFF |
-   * |-------------------------------------------------------------------------|
-   * | Others                      | MULTILINEAR_RANDOM  | MULTILINEAR_RANDOM  |
-   * |                             | _RETRY             | _RETRY               |
-   * ---------------------------------------------------------------------------
-   */
   public static RetryPolicy createRetryPolicy(ConfigurationSource conf) {
-    RatisClientConfig ratisClientConfig = conf
-        .getObject(RatisClientConfig.class);
-    ExponentialBackoffRetry exponentialBackoffRetry =
-        createExponentialBackoffPolicy(ratisClientConfig);
-    MultipleLinearRandomRetry multipleLinearRandomRetry =
-        MultipleLinearRandomRetry
-            .parseCommaSeparated(ratisClientConfig.getMultilinearPolicy());
-
-    return RequestTypeDependentRetryPolicy.newBuilder()
-        .setRetryPolicy(RaftProtos.RaftClientRequestProto.TypeCase.WRITE,
-            createExceptionDependentPolicy(exponentialBackoffRetry,
-                multipleLinearRandomRetry, exponentialBackoffRetry))
-        .setRetryPolicy(RaftProtos.RaftClientRequestProto.TypeCase.WATCH,
-            createExceptionDependentPolicy(exponentialBackoffRetry,
-                multipleLinearRandomRetry, RetryPolicies.noRetry()))
-        .setTimeout(RaftProtos.RaftClientRequestProto.TypeCase.WRITE,
-            toTimeDuration(ratisClientConfig.getWriteRequestTimeout()))
-        .setTimeout(RaftProtos.RaftClientRequestProto.TypeCase.WATCH,
-            toTimeDuration(ratisClientConfig.getWatchRequestTimeout()))
-        .build();
-  }
-
-  private static ExponentialBackoffRetry createExponentialBackoffPolicy(
-      RatisClientConfig ratisClientConfig) {
-    return ExponentialBackoffRetry.newBuilder()
-        .setBaseSleepTime(
-            toTimeDuration(ratisClientConfig.getExponentialPolicyBaseSleep()))
-        .setMaxSleepTime(
-            toTimeDuration(ratisClientConfig.getExponentialPolicyMaxSleep()))
-        .build();
-  }
-
-  private static ExceptionDependentRetry createExceptionDependentPolicy(
-      ExponentialBackoffRetry exponentialBackoffRetry,
-      MultipleLinearRandomRetry multipleLinearRandomRetry,
-      RetryPolicy timeoutPolicy) {
-    ExceptionDependentRetry.Builder builder =
-        ExceptionDependentRetry.newBuilder();
-    for (Class c : NO_RETRY_EXCEPTIONS) {
-      builder.setExceptionToPolicy(c, RetryPolicies.noRetry());
+    try {
+      RatisClientConfig scmClientConfig =
+          conf.getObject(RatisClientConfig.class);
+      Class<? extends RetryPolicyCreator> policyClass = getClass(
+          scmClientConfig.getRetryPolicy(),
+          RetryPolicyCreator.class);
+      return policyClass.newInstance().create(conf);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
-    return builder.setExceptionToPolicy(ResourceUnavailableException.class,
-            exponentialBackoffRetry)
-        .setExceptionToPolicy(TimeoutIOException.class, timeoutPolicy)
-        .setDefaultPolicy(multipleLinearRandomRetry)
-        .build();
   }
 
   public static Long getMinReplicatedIndex(
@@ -364,12 +291,17 @@ public final class RatisHelper {
         .min(Long::compareTo).orElse(null);
   }
 
-  private static TimeDuration toTimeDuration(Duration duration) {
-    return toTimeDuration(duration.toMillis());
+  private static <U> Class<? extends U> getClass(String name,
+      Class<U> xface) {
+    try {
+      Class<?> theClass = Class.forName(name);
+      if (!xface.isAssignableFrom(theClass)) {
+        throw new RuntimeException(theClass + " not " + xface.getName());
+      } else {
+        return theClass.asSubclass(xface);
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
-
-  private static TimeDuration toTimeDuration(long milliseconds) {
-    return TimeDuration.valueOf(milliseconds, TimeUnit.MILLISECONDS);
-  }
-
 }

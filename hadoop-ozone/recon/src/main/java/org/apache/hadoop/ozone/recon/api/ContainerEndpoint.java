@@ -157,7 +157,7 @@ public class ContainerEndpoint {
         // Directly calling get() on the Key table instead of iterating since
         // only full keys are supported now. When we change to using a prefix
         // of the key, this needs to change to prefix seek.
-        OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(
+        OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().getSkipCache(
             containerKeyPrefix.getKeyPrefix());
         if (null != omKeyInfo) {
           // Filter keys by version.

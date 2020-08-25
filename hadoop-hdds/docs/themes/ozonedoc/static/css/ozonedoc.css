@@ -167,3 +167,12 @@ h1 {
 .card {
   padding: 20px;
 }
+
+img {
+  padding: 40px;
+}
+
+table.table {
+  margin: 20px;
+  margin-bottom: 40px;
+}
