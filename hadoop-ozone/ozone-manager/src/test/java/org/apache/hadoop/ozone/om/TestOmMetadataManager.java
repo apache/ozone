@@ -548,8 +548,8 @@ public class TestOmMetadataManager {
       TestOMRequestUtils.addKeyToTable(true, false,
               keyInfo, clientID, 0L, omMetadataManager);
 
-      String groupID = String.join("/", "", volumeName, bucketName,
-              keyInfo.getKeyName(), "" + clientID);
+      String groupID = omMetadataManager.getOpenKey(volumeName, bucketName,
+              keyInfo.getKeyName(), clientID);
       expiredKeys.add(groupID);
     }
 
@@ -563,8 +563,8 @@ public class TestOmMetadataManager {
       TestOMRequestUtils.addKeyToTable(true, false,
               keyInfo, clientID, 0L, omMetadataManager);
 
-      String groupID = String.join("/", "",  volumeName, bucketName,
-              keyInfo.getKeyName(), "" + clientID);
+      String groupID = omMetadataManager.getOpenKey(volumeName, bucketName,
+              keyInfo.getKeyName(), clientID);
       unexpiredKeys.add(groupID);
     }
 
