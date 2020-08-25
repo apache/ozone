@@ -998,6 +998,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public List<BlockGroup> getExpiredOpenKeys(int count) throws IOException {
     List<BlockGroup> keyBlocksList = Lists.newArrayList();
+    final Duration expirationDuration =
+            Duration.of(openKeyExpireThresholdMS, ChronoUnit.MILLIS);
 
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
                  keyValueTableIterator = getOpenKeyTable().iterator()) {
@@ -1006,10 +1008,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         KeyValue<String, OmKeyInfo> openKeyValue = keyValueTableIterator.next();
         OmKeyInfo keyInfo = openKeyValue.getValue();
 
-        final Duration expirationDuration =
-                Duration.of(openKeyExpireThresholdMS, ChronoUnit.MILLIS);
-        Duration openKeyAge = Duration.between(Instant.now(),
-                Instant.ofEpochMilli(keyInfo.getCreationTime()));
+        Duration openKeyAge =
+                Duration.between(
+                        Instant.ofEpochMilli(keyInfo.getCreationTime()),
+                        Instant.now());
 
         if (openKeyAge.compareTo(expirationDuration) > 0) {
           OmKeyLocationInfoGroup latest = keyInfo.getLatestVersionLocations();

@@ -36,6 +36,8 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import javax.xml.crypto.dsig.keyinfo.KeyInfo;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
@@ -529,21 +531,29 @@ public class TestOmMetadataManager {
     final String volumeName = "volume";
     final int numExpiredOpenKeys = 4;
     final int numUnexpiredOpenKeys = 1;
+    final long clientID = 1000L;
+    // Age assigned to keys to cause them to be expired.
+    final long expiredAgeMillis =
+            Instant.now().minus(14, ChronoUnit.DAYS).toEpochMilli();
 
     // TODO : Determine if we need to test with keys added to the cache as well.
 
+    // Add expired keys to open key table.
     Set<String> expiredKeys = new HashSet<>();
     for (int i = 0; i < numExpiredOpenKeys; i++) {
       OmKeyInfo keyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
               bucketName, "expired" + i, HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.ONE);
+              HddsProtos.ReplicationFactor.ONE, 0L, expiredAgeMillis);
 
       TestOMRequestUtils.addKeyToTable(true, false,
-              keyInfo, 1000L, 0L, omMetadataManager);
+              keyInfo, clientID, 0L, omMetadataManager);
 
-      expiredKeys.add(keyInfo.getKeyName());
+      String groupID = String.join("/", "", volumeName, bucketName,
+              keyInfo.getKeyName(), "" + clientID);
+      expiredKeys.add(groupID);
     }
 
+    // Add unexpired keys to open key table.
     Set<String> unexpiredKeys = new HashSet<>();
     for (int i = 0; i < numUnexpiredOpenKeys; i++) {
       OmKeyInfo keyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
@@ -551,11 +561,14 @@ public class TestOmMetadataManager {
               HddsProtos.ReplicationFactor.ONE);
 
       TestOMRequestUtils.addKeyToTable(true, false,
-              keyInfo, 1000L, 0L, omMetadataManager);
+              keyInfo, clientID, 0L, omMetadataManager);
 
-      unexpiredKeys.add(keyInfo.getKeyName());
+      String groupID = String.join("/", "",  volumeName, bucketName,
+              keyInfo.getKeyName(), "" + clientID);
+      unexpiredKeys.add(groupID);
     }
 
+    // Test retrieving fewer expired keys than actually exist.
     List<BlockGroup> someExpiredBlocks =
             omMetadataManager.getExpiredOpenKeys(numExpiredOpenKeys - 1);
 
@@ -564,12 +577,22 @@ public class TestOmMetadataManager {
       Assert.assertTrue(expiredKeys.contains(blockGroup.getGroupID()));
     }
 
+    // Test attempting to retrieving more expired keys than actually exist.
     List<BlockGroup> allExpiredBlocks =
             omMetadataManager.getExpiredOpenKeys(numExpiredOpenKeys + 1);
 
-    Assert.assertEquals(numUnexpiredOpenKeys, someExpiredBlocks.size());
+    Assert.assertEquals(numExpiredOpenKeys, allExpiredBlocks.size());
     for (BlockGroup blockGroup: allExpiredBlocks) {
-      Assert.assertTrue(unexpiredKeys.contains(blockGroup.getGroupID()));
+      Assert.assertTrue(expiredKeys.contains(blockGroup.getGroupID()));
+    }
+
+    // Test retrieving exact amount of expired keys that exist.
+    allExpiredBlocks =
+            omMetadataManager.getExpiredOpenKeys(numExpiredOpenKeys);
+
+    Assert.assertEquals(numExpiredOpenKeys, allExpiredBlocks.size());
+    for (BlockGroup blockGroup: allExpiredBlocks) {
+      Assert.assertTrue(expiredKeys.contains(blockGroup.getGroupID()));
     }
   }
 
