@@ -230,4 +230,5 @@ public interface StorageContainerLocationProtocol extends Closeable {
    */
   boolean getReplicationManagerStatus() throws IOException;
 
+  List<String> getScmRatisStatus() throws IOException;
 }

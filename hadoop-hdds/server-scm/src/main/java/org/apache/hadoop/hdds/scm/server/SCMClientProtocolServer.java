@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -83,6 +84,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_K
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
+
+import org.apache.ratis.protocol.RaftPeer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -558,6 +561,13 @@ public class SCMClientProtocolServer implements
     AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
         SCMAction.GET_REPLICATION_MANAGER_STATUS, null));
     return scm.getReplicationManager().isRunning();
+  }
+
+  @Override
+  public List<String> getScmRatisStatus() throws IOException {
+    return scm.getScmHAManager()
+        .getRatisServer().getRaftPeers()
+        .stream().map(peer -> peer.getAddress()).collect(Collectors.toList());
   }
 
   /**

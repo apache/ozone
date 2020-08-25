@@ -246,5 +246,5 @@ public interface ScmClient extends Closeable {
    */
   boolean getReplicationManagerStatus() throws IOException;
 
-
+  public List<String> getScmRatisStatus() throws IOException;
 }

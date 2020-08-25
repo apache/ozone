@@ -112,7 +112,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
 
   @Override
   public List<ContainerInfo> listContainers(final ContainerID startID,
-                                            final int count) {
+      final int count) {
     lock.readLock().lock();
     try {
       final long start = startID == null ? 0 : startID.getId();
@@ -186,7 +186,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
 
   @Override
   public void updateContainerState(final ContainerID id,
-                                   final LifeCycleEvent event)
+      final LifeCycleEvent event)
       throws IOException, InvalidStateTransitionException {
     final HddsProtos.ContainerID cid = id.getProtobuf();
     lock.writeLock().lock();
@@ -213,7 +213,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
 
   @Override
   public void updateContainerReplica(final ContainerID id,
-                                     final ContainerReplica replica)
+      final ContainerReplica replica)
       throws ContainerNotFoundException {
     final HddsProtos.ContainerID cid = id.getProtobuf();
     lock.writeLock().lock();
@@ -227,7 +227,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
 
   @Override
   public void removeContainerReplica(final ContainerID id,
-                                     final ContainerReplica replica)
+      final ContainerReplica replica)
       throws ContainerNotFoundException, ContainerReplicaNotFoundException {
     final HddsProtos.ContainerID cid = id.getProtobuf();
     lock.writeLock().lock();
@@ -253,7 +253,7 @@ public class ContainerManagerImpl implements ContainerManagerV2 {
 
   @Override
   public void notifyContainerReportProcessing(final boolean isFullReport,
-                                              final boolean success) {
+      final boolean success) {
     throw new UnsupportedOperationException("Not yet implemented!");
   }
 
