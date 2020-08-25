@@ -76,6 +76,9 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Ozone file system tests that are not covered by contract tests.
+ *
+ * Note: When adding new test(s), please append it in testFileSystem() to
+ * avoid test run time regression.
  */
 @RunWith(Parameterized.class)
 public class TestOzoneFileSystem {
