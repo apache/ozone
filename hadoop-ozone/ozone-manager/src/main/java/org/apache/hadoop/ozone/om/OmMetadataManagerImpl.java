@@ -997,6 +997,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public List<BlockGroup> getExpiredOpenKeys(int count) throws IOException {
+    // Only check for expired keys in the open key table, not its cache.
+    // If a key expires while it is in the cache, it will be cleaned
+    // up after the cache is flushed.
     List<BlockGroup> keyBlocksList = Lists.newArrayList();
     final Duration expirationDuration =
             Duration.of(openKeyExpireThresholdMS, ChronoUnit.MILLIS);
@@ -1013,7 +1016,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
                         Instant.ofEpochMilli(keyInfo.getCreationTime()),
                         Instant.now());
 
-        if (openKeyAge.compareTo(expirationDuration) > 0) {
+        if (openKeyAge.compareTo(expirationDuration) >= 0) {
           OmKeyLocationInfoGroup latest = keyInfo.getLatestVersionLocations();
           List<BlockID> blockIDs = latest.getLocationList().stream()
                   .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))

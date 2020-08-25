@@ -536,9 +536,9 @@ public class TestOmMetadataManager {
     final long expiredAgeMillis =
             Instant.now().minus(14, ChronoUnit.DAYS).toEpochMilli();
 
-    // TODO : Determine if we need to test with keys added to the cache as well.
-
     // Add expired keys to open key table.
+    // The method under test does not check for expired open keys in the
+    // cache, since they will be picked up once the cache is flushed.
     Set<String> expiredKeys = new HashSet<>();
     for (int i = 0; i < numExpiredOpenKeys; i++) {
       OmKeyInfo keyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
