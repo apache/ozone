@@ -93,6 +93,7 @@ public class BasicRootedOzoneClientAdapterImpl {
   static final Logger LOG =
       LoggerFactory.getLogger(BasicRootedOzoneClientAdapterImpl.class);
 
+  private ObjectStore objectStore;
   private ClientProtocol proxy;
   private ReplicationType replicationType;
   private ReplicationFactor replicationFactor;
@@ -180,7 +181,7 @@ public class BasicRootedOzoneClientAdapterImpl {
       } else {
         ozoneClient = OzoneClientFactory.getRpcClient(conf);
       }
-      ObjectStore objectStore = ozoneClient.getObjectStore();
+      objectStore = ozoneClient.getObjectStore();
       proxy = objectStore.getClientProxy();
       this.replicationType = ReplicationType.valueOf(replicationTypeConf);
       this.replicationFactor = ReplicationFactor.valueOf(replicationCountConf);

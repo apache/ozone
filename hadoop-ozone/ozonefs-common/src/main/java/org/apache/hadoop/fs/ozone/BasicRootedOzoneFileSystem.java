@@ -686,7 +686,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   public Collection<FileStatus> getTrashRoots(boolean allUsers) {
     // Since get all trash roots for one or more users requires listing all
     // volumes and buckets, we will let adapter impl handle it.
-    return adapterImpl.getTrashRoots(allUsers, this);
+    return impl.getTrashRoots(allUsers, this);
   }
 
   /**
