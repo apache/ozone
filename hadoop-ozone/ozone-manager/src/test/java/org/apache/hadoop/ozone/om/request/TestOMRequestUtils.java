@@ -136,7 +136,7 @@ public final class TestOMRequestUtils {
     OmKeyInfo omKeyInfo = createOmKeyInfo(volumeName, bucketName, keyName,
         replicationType, replicationFactor);
 
-    addKeyToTable(openKeyTable,addToCache, omKeyInfo, clientID, trxnLogIndex,
+    addKeyToTable(openKeyTable, addToCache, omKeyInfo, clientID, trxnLogIndex,
             omMetadataManager);
 
   }
@@ -149,7 +149,8 @@ public final class TestOMRequestUtils {
   public static void addKeyToTable(boolean openKeyTable, boolean addToCache,
                                    OmKeyInfo omKeyInfo,  long clientID,
                                    long trxnLogIndex,
-                                   OMMetadataManager omMetadataManager) throws Exception {
+                                   OMMetadataManager omMetadataManager)
+          throws Exception {
 
     String volumeName = omKeyInfo.getVolumeName();
     String bucketName = omKeyInfo.getBucketName();

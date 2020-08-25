@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om;
 import com.google.common.base.Optional;
-import com.sun.xml.internal.ws.policy.SimpleAssertion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -35,7 +34,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import javax.xml.crypto.dsig.keyinfo.KeyInfo;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
