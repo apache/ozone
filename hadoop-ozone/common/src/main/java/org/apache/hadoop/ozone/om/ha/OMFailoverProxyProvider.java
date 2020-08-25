@@ -174,8 +174,13 @@ public class OMFailoverProxyProvider implements
         LegacyHadoopConfigurationSource.asHadoopConfiguration(conf);
     RPC.setProtocolEngine(hadoopConf, OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
+
+    // FailoverOnNetworkException ensures that the IPC layer does not attempt
+    // retries on the same OM in case of connection exception. This retry
+    // policy essentially results in TRY_ONCE_THEN_FAIL.
     RetryPolicy connectionRetryPolicy = RetryPolicies
         .failoverOnNetworkException(0);
+    
     return RPC.getProtocolProxy(OzoneManagerProtocolPB.class, omVersion,
         omAddress, ugi, hadoopConf, NetUtils.getDefaultSocketFactory(
             hadoopConf), (int) OmUtils.getOMClientRpcTimeOut(conf),
