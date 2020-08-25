@@ -38,7 +38,7 @@
     </tr>
     <tr>
         <td>Node Manager: Safe mode status</td>
-        <td>{{$ctrl.scmmetrics.InSafeMode}}</td>
+        <td>{{$ctrl.overview.jmx.InSafeMode}}</td>
     </tr>
     </tbody>
 </table>
@@ -47,7 +47,7 @@
 
 <table class="table table-bordered table-striped" class="col-md-6">
     <tbody>
-    <tr ng-repeat="typestat in $ctrl.scmmetrics.RuleStatusMetrics">
+    <tr ng-repeat="typestat in $ctrl.overview.jmx.RuleStatusMetrics">
         <td>{{typestat.key}}</td>
         <td>{{typestat.value}}</td>
     </tr>
