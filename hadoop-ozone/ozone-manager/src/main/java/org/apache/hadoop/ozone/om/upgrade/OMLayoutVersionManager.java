@@ -56,7 +56,8 @@ public final class OMLayoutVersionManager extends AbstractLayoutVersionManager {
    * Initialize OM version manager from storage.
    * @return version manager instance.
    */
-  public static OMLayoutVersionManager initialize(OMStorage omStorage)
+  public static synchronized OMLayoutVersionManager initialize(
+      OMStorage omStorage)
       throws OMException {
     if (omVersionManager == null) {
       omVersionManager = new OMLayoutVersionManager();
@@ -82,7 +83,7 @@ public final class OMLayoutVersionManager extends AbstractLayoutVersionManager {
   }
 
   @VisibleForTesting
-  protected static void resetLayoutVersionManager() {
+  protected synchronized static void resetLayoutVersionManager() {
     if (omVersionManager != null) {
       omVersionManager.reset();
       omVersionManager = null;

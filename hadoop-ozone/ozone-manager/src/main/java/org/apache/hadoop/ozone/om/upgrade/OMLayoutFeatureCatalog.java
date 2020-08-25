@@ -67,5 +67,27 @@ public class OMLayoutFeatureCatalog {
       return omUpgradeAction;
     }
   }
+
+  /**
+   * This is an example of an "API" that uses a new Layout feature (EC) that is
+   * not yet supported by the current layout version. The following can be
+   * "guarded" by just adding the following annotation, thereby keeping the
+   * method logic and upgrade logic separate.
+   */
+  @OMLayoutFeatureAPI(OMLayoutFeature.CREATE_EC)
+  public String ecMethod() {
+    // Blah Blah EC Blah....
+    return "ec";
+  }
+
+  /**
+   * This is an example of an "API" that uses a Layout feature (EC) that is
+   * supported by the current layout version.
+   */
+  @OMLayoutFeatureAPI(OMLayoutFeature.INITIAL_VERSION)
+  public String basicMethod() {
+    // Blah Blah Basic Blah....
+    return "basic";
+  }
 }
 

@@ -19,8 +19,6 @@
 package org.apache.hadoop.ozone.om.upgrade;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureCatalog.OMLayoutFeature.CREATE_EC;
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureCatalog.OMLayoutFeature.INITIAL_VERSION;
 import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
@@ -52,26 +50,6 @@ public class TestOMLayoutFeatureAspect {
   }
 
   /**
-   * This is an example of an "API" that uses a new Layout feature (EC) that is
-   * not yet supported by the current layout version. The following can be
-   * "guarded" by just adding the following annotation, thereby keeping the
-   * method logic and upgrade logic separate.
-   */
-  @OMLayoutFeatureAPI(CREATE_EC)
-  public String ecMethod() throws Exception {
-    return "ec";
-  }
-
-  /**
-   * This is an example of an "API" that uses a Layout feature (EC) that is
-   * supported by the current layout version.
-   */
-  @OMLayoutFeatureAPI(INITIAL_VERSION)
-  public String basicMethod() throws Exception {
-    return "basic";
-  }
-
-  /**
    * This unit test invokes the above 2 layout feature APIs. The first one
    * should fail, and the second one should pass.
    * @throws Exception
@@ -79,12 +57,13 @@ public class TestOMLayoutFeatureAspect {
   @Test
   public void testCheckLayoutFeature() throws Exception {
     OMLayoutVersionManager.initialize(new OMStorage(configuration));
-    TestOMLayoutFeatureAspect testObj = new TestOMLayoutFeatureAspect();
+    OMLayoutFeatureCatalog testObj = new OMLayoutFeatureCatalog();
     try {
       testObj.ecMethod();
       Assert.fail();
-    } catch (OMException ex) {
-      assertEquals(NOT_SUPPORTED_OPERATION, ex.getResult());
+    } catch (Exception ex) {
+      OMException omEx = (OMException) ex;
+      assertEquals(NOT_SUPPORTED_OPERATION, omEx.getResult());
     }
     String s = testObj.basicMethod();
     assertEquals("basic", s);

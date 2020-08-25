@@ -83,7 +83,7 @@ public abstract class AbstractLayoutVersionManager implements
     return featureMap.get(name);
   }
 
-  public synchronized void doFinalize(Object param) {
+  public void doFinalize(Object param) {
     if (needsFinalization()){
       Iterator<Map.Entry<Integer, LayoutFeature>> iterator = features
           .tailMap(metadataLayoutVersion + 1).entrySet().iterator();
@@ -100,7 +100,7 @@ public abstract class AbstractLayoutVersionManager implements
     }
   }
 
-  protected synchronized void reset() {
+  protected void reset() {
     metadataLayoutVersion = 0;
     softwareLayoutVersion = 0;
     featureMap.clear();
