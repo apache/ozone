@@ -468,7 +468,6 @@ public class BasicRootedOzoneClientAdapterImpl {
    * @param keyNameList key name list to be deleted
    * @return true if the key deletion is successful, false otherwise
    */
-  @Override
   public boolean deleteObjects(List<String> keyNameList) {
     if (keyNameList.size() == 0) {
       return true;
@@ -597,7 +596,6 @@ public class BasicRootedOzoneClientAdapterImpl {
     return ret;
   }
 
-  @Override
   public Iterator<BasicKeyInfo> listKeys(String pathStr) {
     incrementCounter(Statistic.OBJECTS_LIST, 1);
     OFSPath ofsPath = new OFSPath(pathStr);
