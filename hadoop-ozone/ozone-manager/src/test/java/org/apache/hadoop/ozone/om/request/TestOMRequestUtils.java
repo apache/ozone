@@ -134,7 +134,7 @@ public final class TestOMRequestUtils {
       OMMetadataManager omMetadataManager) throws Exception {
 
     OmKeyInfo omKeyInfo = createOmKeyInfo(volumeName, bucketName, keyName,
-        replicationType, replicationFactor);
+        replicationType, replicationFactor, trxnLogIndex);
 
     addKeyToTable(openKeyTable, addToCache, omKeyInfo, clientID, trxnLogIndex,
             omMetadataManager);
@@ -158,19 +158,19 @@ public final class TestOMRequestUtils {
 
     if (openKeyTable) {
       String ozoneKey = omMetadataManager.getOpenKey(volumeName, bucketName,
-              keyName, clientID);
+          keyName, clientID);
       if (addToCache) {
         omMetadataManager.getOpenKeyTable().addCacheEntry(
-                new CacheKey<>(ozoneKey),
-                new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+            new CacheKey<>(ozoneKey),
+            new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
       }
       omMetadataManager.getOpenKeyTable().put(ozoneKey, omKeyInfo);
     } else {
       String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
-              keyName);
+          keyName);
       if (addToCache) {
         omMetadataManager.getKeyTable().addCacheEntry(new CacheKey<>(ozoneKey),
-                new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+            new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
       }
       omMetadataManager.getKeyTable().put(ozoneKey, omKeyInfo);
     }
@@ -224,7 +224,17 @@ public final class TestOMRequestUtils {
       String keyName, HddsProtos.ReplicationType replicationType,
       HddsProtos.ReplicationFactor replicationFactor) {
     return createOmKeyInfo(volumeName, bucketName, keyName, replicationType,
-        replicationFactor, 0L, Time.now());
+        replicationFactor, 0L);
+  }
+
+  /**
+   * Create OmKeyInfo.
+   */
+  public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
+      String keyName, HddsProtos.ReplicationType replicationType,
+      HddsProtos.ReplicationFactor replicationFactor, long objectID) {
+    return createOmKeyInfo(volumeName, bucketName, keyName, replicationType,
+            replicationFactor, objectID, Time.now());
   }
 
   /**

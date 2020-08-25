@@ -34,10 +34,15 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 
@@ -530,9 +535,14 @@ public class TestOmMetadataManager {
     final int numExpiredOpenKeys = 4;
     final int numUnexpiredOpenKeys = 1;
     final long clientID = 1000L;
-    // Age assigned to keys to cause them to be expired.
+    // To create expired keys, they will be assigned a creation time twice as
+    // old as the minimum expiration time.
+    final long minExpiredTimeSeconds = ozoneConfiguration.getInt(
+            OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS,
+            OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT);
     final long expiredAgeMillis =
-            Instant.now().minus(14, ChronoUnit.DAYS).toEpochMilli();
+            Instant.now().minus(minExpiredTimeSeconds * 2,
+                    ChronoUnit.SECONDS).toEpochMilli();
 
     // Add expired keys to open key table.
     // The method under test does not check for expired open keys in the

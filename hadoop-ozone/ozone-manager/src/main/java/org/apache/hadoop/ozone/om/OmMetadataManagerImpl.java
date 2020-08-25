@@ -1008,20 +1008,22 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
       while (keyValueTableIterator.hasNext() && keyBlocksList.size() < count) {
         KeyValue<String, OmKeyInfo> openKeyValue = keyValueTableIterator.next();
-        OmKeyInfo keyInfo = openKeyValue.getValue();
+        String openKey = openKeyValue.getKey();
+        OmKeyInfo openKeyInfo = openKeyValue.getValue();
 
         Duration openKeyAge =
                 Duration.between(
-                        Instant.ofEpochMilli(keyInfo.getCreationTime()),
+                        Instant.ofEpochMilli(openKeyInfo.getCreationTime()),
                         Instant.now());
 
         if (openKeyAge.compareTo(expirationDuration) >= 0) {
-          OmKeyLocationInfoGroup latest = keyInfo.getLatestVersionLocations();
+          OmKeyLocationInfoGroup latest =
+                  openKeyInfo.getLatestVersionLocations();
           List<BlockID> blockIDs = latest.getLocationList().stream()
                   .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))
                   .collect(Collectors.toList());
           BlockGroup blockGroup = BlockGroup.newBuilder()
-                  .setKeyName(openKeyValue.getKey())
+                  .setKeyName(openKey)
                   .addAllBlockIDs(blockIDs)
                   .build();
           keyBlocksList.add(blockGroup);
