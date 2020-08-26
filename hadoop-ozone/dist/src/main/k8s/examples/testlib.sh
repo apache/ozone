@@ -77,6 +77,13 @@ start_k8s_env() {
    wait_for_startup
 }
 
+get_logs() {
+  mkdir -p logs
+  for pod in $(kubectl get pods -o custom-columns=NAME:.metadata.name | tail -n +2); do
+    kubectl logs "${pod}" > "logs/pod-${pod}.log"
+  done
+}
+
 stop_k8s_env() {
    if [ ! "$KEEP_RUNNING" ]; then
      kubectl delete -f .

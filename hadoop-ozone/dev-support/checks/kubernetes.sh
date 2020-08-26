@@ -31,6 +31,6 @@ mkdir -p "$REPORT_DIR"
 cd "$DIST_DIR/kubernetes/examples" || exit 1
 ./test-all.sh
 RES=$?
-cp result/* "$REPORT_DIR/"
+cp -r result/* "$REPORT_DIR/"
 cp "$REPORT_DIR/log.html" "$REPORT_DIR/summary.html"
 exit $RES
