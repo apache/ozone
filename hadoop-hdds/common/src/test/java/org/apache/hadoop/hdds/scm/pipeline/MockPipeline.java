@@ -76,7 +76,7 @@ public final class MockPipeline {
     List<DatanodeDetails> nodes = new ArrayList<>();
     nodes.add(MockDatanodeDetails.randomDatanodeDetails());
     nodes.add(MockDatanodeDetails.randomDatanodeDetails());
-    nodes.add(MockDatanodeDetails.randomDatanodeDetails());;
+    nodes.add(MockDatanodeDetails.randomDatanodeDetails());
 
     return Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)

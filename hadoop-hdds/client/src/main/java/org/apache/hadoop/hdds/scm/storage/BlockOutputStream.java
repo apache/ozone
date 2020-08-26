@@ -178,8 +178,8 @@ public class BlockOutputStream extends OutputStream {
     checksum = new Checksum(checksumType, bytesPerChecksum);
   }
 
-  private void refreshCurrentBuffer(BufferPool bufferPool) {
-    currentBuffer = bufferPool.getCurrentBuffer();
+  private void refreshCurrentBuffer(BufferPool pool) {
+    currentBuffer = pool.getCurrentBuffer();
     currentBufferRemaining =
         currentBuffer != null ? currentBuffer.remaining() : 0;
   }
