@@ -102,7 +102,7 @@ public class TestStorageContainerManagerHttpServer {
 
     StorageContainerManagerHttpServer server = null;
     try {
-      server = new StorageContainerManagerHttpServer(conf);
+      server = new StorageContainerManagerHttpServer(conf, null);
       server.start();
 
       Assert.assertTrue(implies(policy.isHttpEnabled(),

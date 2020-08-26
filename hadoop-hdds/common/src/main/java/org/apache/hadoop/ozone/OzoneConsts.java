@@ -79,6 +79,10 @@ public final class OzoneConsts {
   public static final String OZONE_USER = "user";
   public static final String OZONE_REQUEST = "request";
 
+  // SCM Http server endpoints
+  public static final String OZONE_SCM_DB_CHECKPOINT_HTTP_ENDPOINT =
+      "/dbCheckpoint";
+
   // OM Http server endpoints
   public static final String OZONE_OM_SERVICE_LIST_HTTP_ENDPOINT =
       "/serviceList";
@@ -230,6 +234,8 @@ public final class OzoneConsts {
   // The ServiceListJSONServlet context attribute where OzoneManager
   // instance gets stored.
   public static final String OM_CONTEXT_ATTRIBUTE = "ozone.om";
+
+  public static final String SCM_CONTEXT_ATTRIBUTE = "ozone.scm";
 
   private OzoneConsts() {
     // Never Constructed

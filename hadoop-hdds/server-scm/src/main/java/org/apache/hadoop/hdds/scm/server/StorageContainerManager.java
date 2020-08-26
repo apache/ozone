@@ -216,7 +216,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     this(conf, new SCMConfigurator());
   }
 
-
   /**
    * This constructor offers finer control over how SCM comes up.
    * To use this, user needs to create a SCMConfigurator and set various
@@ -333,7 +332,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         eventQueue);
     blockProtocolServer = new SCMBlockProtocolServer(conf, this);
     clientProtocolServer = new SCMClientProtocolServer(conf, this);
-    httpServer = new StorageContainerManagerHttpServer(conf);
+    httpServer = new StorageContainerManagerHttpServer(conf, this);
 
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.RETRIABLE_DATANODE_COMMAND, scmNodeManager);
@@ -367,6 +366,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmSafeModeManager.emitSafeModeStatus();
     registerMXBean();
     registerMetricsSource(this);
+  }
+
+  public OzoneConfiguration getConfiguration() {
+    return configuration;
   }
 
   /**

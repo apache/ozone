@@ -352,6 +352,11 @@ public final class ScmConfigKeys {
   public static final String HDDS_TRACING_ENABLED = "hdds.tracing.enabled";
   public static final boolean HDDS_TRACING_ENABLED_DEFAULT = false;
 
+  public static final String SCM_DB_CHECKPOINT_TRANSFER_RATE_KEY =
+      "ozone.scm.db.checkpoint.transfer.bandwidthPerSec";
+  public static final long SCM_DB_CHECKPOINT_TRANSFER_RATE_DEFAULT =
+      0;  //no throttling
+
   /**
    * Never constructed.
    */
