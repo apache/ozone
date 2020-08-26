@@ -162,7 +162,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
   private String jsonDir;
 
 
-  @Option(names = {"-sc", "--storageClass"},
+  @Option(names = {"-sc", "--storage-class"},
       description = "StorageClass")
   private String storageClass =
       StaticStorageClassRegistry.LEGACY.getName();
