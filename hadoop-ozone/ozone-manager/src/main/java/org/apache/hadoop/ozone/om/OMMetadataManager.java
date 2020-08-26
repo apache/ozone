@@ -244,15 +244,14 @@ public interface OMMetadataManager {
   List<BlockGroup> getPendingDeletionKeys(int count) throws IOException;
 
   /**
-   * Returns a list of all still open key info. Which contains the info about
-   * the key name and all its associated block IDs. A pending open key has
-   * prefix #open# in OM DB.
+   * Returns the names of up to {@code count} open keys that are older than
+   * the configured expiration age.
    *
    * @param count The maximum number of open keys to return.
-   * @return a list of {@link BlockGroup} representing keys and blocks.
+   * @return a list of {@link String} representing names of open expired keys.
    * @throws IOException
    */
-  List<BlockGroup> getExpiredOpenKeys(int count) throws IOException;
+  List<String> getExpiredOpenKeys(int count) throws IOException;
 
   /**
    * Returns the user Table.

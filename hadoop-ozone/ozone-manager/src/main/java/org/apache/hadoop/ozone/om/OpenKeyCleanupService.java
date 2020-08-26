@@ -76,42 +76,13 @@ public class OpenKeyCleanupService extends BackgroundService {
 
     @Override
     public BackgroundTaskResult call() throws Exception {
+      // This method is currently never used. It will be implemented in
+      // HDDS-4122, and integrated into the rest of the code base in HDDS-4123.
       try {
-        // When this method is fully implemented and called as part of a
-        // later fix, update the number of expired keys retrieved to be read
-        // from the configuration.
-        List<BlockGroup> keyBlocksList = keyManager.getExpiredOpenKeys(0);
-        if (keyBlocksList.size() > 0) {
-          int toDeleteSize = keyBlocksList.size();
-          LOG.debug("Found {} to-delete open keys in OM", toDeleteSize);
-          List<DeleteBlockGroupResult> results =
-              scmClient.deleteKeyBlocks(keyBlocksList);
-          int deletedSize = 0;
-          for (DeleteBlockGroupResult result : results) {
-            if (result.isSuccess()) {
-              try {
-                keyManager.deleteExpiredOpenKey(result.getObjectKey());
-                if (LOG.isDebugEnabled()) {
-                  LOG.debug("Key {} deleted from OM DB", result.getObjectKey());
-                }
-                deletedSize += 1;
-              } catch (IOException e) {
-                LOG.warn("Failed to delete hanging-open key {}",
-                    result.getObjectKey(), e);
-              }
-            } else {
-              LOG.warn("Deleting open Key {} failed because some of the blocks"
-                      + " were failed to delete, failed blocks: {}",
-                  result.getObjectKey(),
-                  StringUtils.join(",", result.getFailedBlocks()));
-            }
-          }
-          LOG.info("Found {} expired open key entries, successfully " +
-              "cleaned up {} entries", toDeleteSize, deletedSize);
-          return results::size;
-        } else {
-          LOG.debug("No hanging open key found in OM");
-        }
+        // The new API for deleting expired open keys in OM HA will differ
+        // significantly from the old implementation.
+        // The old implementation has been removed so the code compiles.
+        List<String> keyBlocksList = keyManager.getExpiredOpenKeys(0);
       } catch (IOException e) {
         LOG.error("Unable to get hanging open keys, retry in"
             + " next interval", e);

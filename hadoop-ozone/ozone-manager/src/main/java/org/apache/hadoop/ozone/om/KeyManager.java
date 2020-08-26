@@ -182,15 +182,15 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   List<BlockGroup> getPendingDeletionKeys(int count) throws IOException;
 
   /**
-   * Returns a list of all still open key info. Which contains the info about
-   * the key name and all its associated block IDs. A pending open key has
-   * prefix #open# in OM DB.
+   * Returns the names of up to {@code count} open keys that are older than
+   * the configured expiration age.
    *
-   * @param count The maximum number of expired opne keys to return.
-   * @return a list of {@link BlockGroup} representing keys and blocks.
+   * @param count The maximum number of expired open keys to return.
+   * @return a list of {@link String} representing the names of expired
+   * open keys.
    * @throws IOException
    */
-  List<BlockGroup> getExpiredOpenKeys(int count) throws IOException;
+  List<String> getExpiredOpenKeys(int count) throws IOException;
 
   /**
    * Deletes a expired open key by its name. Called when a hanging key has been

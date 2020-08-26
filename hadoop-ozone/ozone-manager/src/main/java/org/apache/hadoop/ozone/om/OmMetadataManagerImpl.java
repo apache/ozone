@@ -995,18 +995,18 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public List<BlockGroup> getExpiredOpenKeys(int count) throws IOException {
+  public List<String> getExpiredOpenKeys(int count) throws IOException {
     // Only check for expired keys in the open key table, not its cache.
     // If a key expires while it is in the cache, it will be cleaned
     // up after the cache is flushed.
-    List<BlockGroup> keyBlocksList = Lists.newArrayList();
     final Duration expirationDuration =
             Duration.of(openKeyExpireThresholdMS, ChronoUnit.MILLIS);
+    List<String> expiredKeys = Lists.newArrayList();
 
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
                  keyValueTableIterator = getOpenKeyTable().iterator()) {
 
-      while (keyValueTableIterator.hasNext() && keyBlocksList.size() < count) {
+      while (keyValueTableIterator.hasNext() && expiredKeys.size() < count) {
         KeyValue<String, OmKeyInfo> openKeyValue = keyValueTableIterator.next();
         String openKey = openKeyValue.getKey();
         OmKeyInfo openKeyInfo = openKeyValue.getValue();
@@ -1017,21 +1017,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
                         Instant.now());
 
         if (openKeyAge.compareTo(expirationDuration) >= 0) {
-          OmKeyLocationInfoGroup latest =
-                  openKeyInfo.getLatestVersionLocations();
-          List<BlockID> blockIDs = latest.getLocationList().stream()
-                  .map(b -> new BlockID(b.getContainerID(), b.getLocalID()))
-                  .collect(Collectors.toList());
-          BlockGroup blockGroup = BlockGroup.newBuilder()
-                  .setKeyName(openKey)
-                  .addAllBlockIDs(blockIDs)
-                  .build();
-          keyBlocksList.add(blockGroup);
+          expiredKeys.add(openKey);
         }
       }
     }
 
-    return keyBlocksList;
+    return expiredKeys;
   }
 
   @Override

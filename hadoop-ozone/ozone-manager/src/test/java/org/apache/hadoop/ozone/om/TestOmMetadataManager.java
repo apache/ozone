@@ -562,7 +562,6 @@ public class TestOmMetadataManager {
     }
 
     // Add unexpired keys to open key table.
-    Set<String> unexpiredKeys = new HashSet<>();
     for (int i = 0; i < numUnexpiredOpenKeys; i++) {
       OmKeyInfo keyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
               bucketName, "unexpired" + i, HddsProtos.ReplicationType.RATIS,
@@ -573,34 +572,33 @@ public class TestOmMetadataManager {
 
       String groupID = omMetadataManager.getOpenKey(volumeName, bucketName,
               keyInfo.getKeyName(), clientID);
-      unexpiredKeys.add(groupID);
     }
 
     // Test retrieving fewer expired keys than actually exist.
-    List<BlockGroup> someExpiredBlocks =
+    List<String> someExpiredKeys =
             omMetadataManager.getExpiredOpenKeys(numExpiredOpenKeys - 1);
 
-    Assert.assertEquals(numExpiredOpenKeys - 1, someExpiredBlocks.size());
-    for (BlockGroup blockGroup: someExpiredBlocks) {
-      Assert.assertTrue(expiredKeys.contains(blockGroup.getGroupID()));
+    Assert.assertEquals(numExpiredOpenKeys - 1, someExpiredKeys.size());
+    for (String key: someExpiredKeys) {
+      Assert.assertTrue(expiredKeys.contains(key));
     }
 
     // Test attempting to retrieving more expired keys than actually exist.
-    List<BlockGroup> allExpiredBlocks =
+    List<String> allExpiredKeys =
             omMetadataManager.getExpiredOpenKeys(numExpiredOpenKeys + 1);
 
-    Assert.assertEquals(numExpiredOpenKeys, allExpiredBlocks.size());
-    for (BlockGroup blockGroup: allExpiredBlocks) {
-      Assert.assertTrue(expiredKeys.contains(blockGroup.getGroupID()));
+    Assert.assertEquals(numExpiredOpenKeys, allExpiredKeys.size());
+    for (String key: allExpiredKeys) {
+      Assert.assertTrue(expiredKeys.contains(key));
     }
 
     // Test retrieving exact amount of expired keys that exist.
-    allExpiredBlocks =
+    allExpiredKeys =
             omMetadataManager.getExpiredOpenKeys(numExpiredOpenKeys);
 
-    Assert.assertEquals(numExpiredOpenKeys, allExpiredBlocks.size());
-    for (BlockGroup blockGroup: allExpiredBlocks) {
-      Assert.assertTrue(expiredKeys.contains(blockGroup.getGroupID()));
+    Assert.assertEquals(numExpiredOpenKeys, allExpiredKeys.size());
+    for (String key: allExpiredKeys) {
+      Assert.assertTrue(expiredKeys.contains(key));
     }
   }
 
