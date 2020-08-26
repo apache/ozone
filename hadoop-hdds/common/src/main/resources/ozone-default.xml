@@ -2432,6 +2432,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.s3g.client.buffer.size</name>
+    <tag>OZONE, S3GATEWAY</tag>
+    <value>4KB</value>
+    <description>
+      The size of the buffer which is for read block. (4KB by default).
+    </description>
+  </property>
+  <property>
     <name>ssl.server.keystore.keypassword</name>
     <tag>OZONE, SECURITY, MANAGEMENT</tag>
     <value></value>

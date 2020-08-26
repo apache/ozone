@@ -19,16 +19,12 @@
 package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT_KEY;
-import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_KEY_COUNT_TABLE;
-import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_KEY_TABLE;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconContainerDBProvider.getNewDBStore;
-import static org.jooq.impl.DSL.currentTimestamp;
-import static org.jooq.impl.DSL.select;
-import static org.jooq.impl.DSL.using;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY_COUNT;
 
 import java.io.File;
 import java.io.IOException;
-import java.sql.Timestamp;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -41,7 +37,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
-import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -68,9 +63,6 @@ public class ContainerDBServiceProviderImpl
   private GlobalStatsDao globalStatsDao;
 
   @Inject
-  private ContainerSchemaManager containerSchemaManager;
-
-  @Inject
   private OzoneConfiguration configuration;
 
   @Inject
@@ -78,9 +70,6 @@ public class ContainerDBServiceProviderImpl
 
   @Inject
   private Configuration sqlConfiguration;
-
-  @Inject
-  private ReconUtils reconUtils;
 
   @Inject
   public ContainerDBServiceProviderImpl(DBStore dbStore,
@@ -113,13 +102,19 @@ public class ContainerDBServiceProviderImpl
       throws IOException {
 
     File oldDBLocation = containerDbStore.getDbLocation();
-    containerDbStore = getNewDBStore(configuration, reconUtils);
+    try {
+      containerDbStore.close();
+    } catch (Exception e) {
+      LOG.warn("Unable to close old Recon container key DB at {}.",
+          containerDbStore.getDbLocation().getAbsolutePath());
+    }
+    containerDbStore = getNewDBStore(configuration);
     LOG.info("Creating new Recon Container DB at {}",
         containerDbStore.getDbLocation().getAbsolutePath());
     initializeTables();
 
     if (oldDBLocation.exists()) {
-      LOG.info("Cleaning up old Recon Container DB at {}.",
+      LOG.info("Cleaning up old Recon Container key DB at {}.",
           oldDBLocation.getAbsolutePath());
       FileUtils.deleteDirectory(oldDBLocation);
     }
@@ -140,10 +135,9 @@ public class ContainerDBServiceProviderImpl
    */
   private void initializeTables() {
     try {
-      this.containerKeyTable = containerDbStore.getTable(CONTAINER_KEY_TABLE,
-          ContainerKeyPrefix.class, Integer.class);
-      this.containerKeyCountTable = containerDbStore
-          .getTable(CONTAINER_KEY_COUNT_TABLE, Long.class, Long.class);
+      this.containerKeyTable = CONTAINER_KEY.getTable(containerDbStore);
+      this.containerKeyCountTable =
+          CONTAINER_KEY_COUNT.getTable(containerDbStore);
     } catch (IOException e) {
       LOG.error("Unable to create Container Key tables.", e);
     }
@@ -155,7 +149,7 @@ public class ContainerDBServiceProviderImpl
    *
    * @param containerKeyPrefix the containerID, key-prefix tuple.
    * @param count Count of the keys matching that prefix.
-   * @throws IOException
+   * @throws IOException on failure.
    */
   @Override
   public void storeContainerKeyMapping(ContainerKeyPrefix containerKeyPrefix,
@@ -169,7 +163,7 @@ public class ContainerDBServiceProviderImpl
    *
    * @param containerID the containerID.
    * @param count count of the keys within the given containerID.
-   * @throws IOException
+   * @throws IOException on failure.
    */
   @Override
   public void storeContainerKeyCount(Long containerID, Long count)
@@ -182,7 +176,7 @@ public class ContainerDBServiceProviderImpl
    *
    * @param containerID the given containerID.
    * @return count of keys within the given containerID.
-   * @throws IOException
+   * @throws IOException on failure.
    */
   @Override
   public long getKeyCountForContainer(Long containerID) throws IOException {
@@ -195,7 +189,7 @@ public class ContainerDBServiceProviderImpl
    *
    * @param containerID the given containerID.
    * @return if the given ContainerID exists or not.
-   * @throws IOException
+   * @throws IOException on failure.
    */
   @Override
   public boolean doesContainerExists(Long containerID) throws IOException {
@@ -208,7 +202,7 @@ public class ContainerDBServiceProviderImpl
    *
    * @param containerKeyPrefix the containerID, key-prefix tuple.
    * @return count of keys matching the containerID, key-prefix.
-   * @throws IOException
+   * @throws IOException on failure.
    */
   @Override
   public Integer getCountForContainerKeyPrefix(
@@ -308,7 +302,7 @@ public class ContainerDBServiceProviderImpl
    * @param prevContainer containerID after which the
    *                      list of containers are scanned.
    * @return Map of containerID -> containerMetadata.
-   * @throws IOException
+   * @throws IOException on failure.
    */
   @Override
   public Map<Long, ContainerMetadata> getContainers(int limit,
@@ -388,20 +382,8 @@ public class ContainerDBServiceProviderImpl
    */
   @Override
   public void storeContainerCount(Long count) {
-    // Get the current timestamp
-    Timestamp now =
-        using(sqlConfiguration).fetchValue(select(currentTimestamp()));
-    GlobalStats containerCountRecord =
-        globalStatsDao.fetchOneByKey(CONTAINER_COUNT_KEY);
-    GlobalStats globalStatsRecord =
-        new GlobalStats(CONTAINER_COUNT_KEY, count, now);
-
-    // Insert a new record for CONTAINER_COUNT_KEY if it does not exist
-    if (containerCountRecord == null) {
-      globalStatsDao.insert(globalStatsRecord);
-    } else {
-      globalStatsDao.update(globalStatsRecord);
-    }
+    ReconUtils.upsertGlobalStatsTable(sqlConfiguration, globalStatsDao,
+        CONTAINER_COUNT_KEY, count);
   }
 
   /**

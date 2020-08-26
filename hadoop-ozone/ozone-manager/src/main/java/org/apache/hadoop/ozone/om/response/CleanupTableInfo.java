@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 package org.apache.hadoop.ozone.om.response;
-import org.apache.hadoop.classification.InterfaceStability;
+
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Inherited;

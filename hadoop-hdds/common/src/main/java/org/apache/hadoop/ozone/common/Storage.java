@@ -168,7 +168,7 @@ public abstract class Storage {
    *
    * @return the version file path
    */
-  private File getVersionFile() {
+  public File getVersionFile() {
     return new File(getCurrentDir(), STORAGE_FILE_VERSION);
   }
 

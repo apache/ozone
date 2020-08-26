@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import javax.annotation.PostConstruct;
+import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -47,6 +49,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
@@ -73,8 +77,9 @@ import com.google.common.annotations.VisibleForTesting;
 import static javax.ws.rs.core.HttpHeaders.CONTENT_LENGTH;
 import static javax.ws.rs.core.HttpHeaders.LAST_MODIFIED;
 import org.apache.commons.io.IOUtils;
-
 import org.apache.commons.lang3.tuple.Pair;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ENTITY_TOO_SMALL;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
@@ -102,6 +107,7 @@ public class ObjectEndpoint extends EndpointBase {
   private HttpHeaders headers;
 
   private List<String> customizableGetHeaders = new ArrayList<>();
+  private int bufferSize;
 
   public ObjectEndpoint() {
     customizableGetHeaders.add("Content-Type");
@@ -110,6 +116,16 @@ public class ObjectEndpoint extends EndpointBase {
     customizableGetHeaders.add("Cache-Control");
     customizableGetHeaders.add("Content-Disposition");
     customizableGetHeaders.add("Content-Encoding");
+  }
+
+  @Inject
+  private OzoneConfiguration ozoneConfiguration;
+
+  @PostConstruct
+  public void init() {
+    bufferSize = (int) ozoneConfiguration.getStorageSize(
+        OZONE_S3G_CLIENT_BUFFER_SIZE_KEY,
+        OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT, StorageUnit.BYTES);
   }
 
   /**
@@ -255,7 +271,8 @@ public class ObjectEndpoint extends EndpointBase {
           try (S3WrapperInputStream s3WrapperInputStream =
               new S3WrapperInputStream(
                   key.getInputStream())) {
-            s3WrapperInputStream.copyLarge(dest, startOffset, copyLength);
+            IOUtils.copyLarge(s3WrapperInputStream, dest, startOffset,
+                copyLength, new byte[bufferSize]);
           }
         };
         responseBuilder = Response
@@ -396,7 +413,6 @@ public class ObjectEndpoint extends EndpointBase {
     return Response
         .status(Status.NO_CONTENT)
         .build();
-
   }
 
   /**
@@ -533,16 +549,9 @@ public class ObjectEndpoint extends EndpointBase {
             if (range != null) {
               RangeHeader rangeHeader =
                   RangeHeaderParserUtil.parseRangeHeader(range, 0);
-
-              long copyLength = rangeHeader.getEndOffset() -
-                  rangeHeader.getStartOffset();
-
-              try (S3WrapperInputStream s3WrapperInputStream =
-                  new S3WrapperInputStream(
-                  sourceObject.getInputStream())) {
-                s3WrapperInputStream.copyLarge(ozoneOutputStream,
-                    rangeHeader.getStartOffset(), copyLength);
-              }
+              IOUtils.copyLarge(sourceObject, ozoneOutputStream,
+                  rangeHeader.getStartOffset(),
+                  rangeHeader.getEndOffset() - rangeHeader.getStartOffset());
             } else {
               IOUtils.copy(sourceObject, ozoneOutputStream);
             }
@@ -572,7 +581,6 @@ public class ObjectEndpoint extends EndpointBase {
       }
       throw ex;
     }
-
   }
 
   /**

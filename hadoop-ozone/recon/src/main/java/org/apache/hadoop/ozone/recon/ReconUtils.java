@@ -29,6 +29,7 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.Timestamp;
 import java.util.zip.GZIPOutputStream;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -44,8 +45,14 @@ import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
+import static org.jooq.impl.DSL.currentTimestamp;
+import static org.jooq.impl.DSL.select;
+import static org.jooq.impl.DSL.using;
 
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
+import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
+import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -266,4 +273,29 @@ public class ReconUtils {
         new File(reconDbDir.getPath(), lastKnownSnapshotFileName);
   }
 
+  /**
+   * Upsert row in GlobalStats table.
+   *
+   * @param sqlConfiguration
+   * @param globalStatsDao
+   * @param key
+   * @param count
+   */
+  public static void upsertGlobalStatsTable(Configuration sqlConfiguration,
+                                            GlobalStatsDao globalStatsDao,
+                                            String key,
+                                            Long count) {
+    // Get the current timestamp
+    Timestamp now =
+        using(sqlConfiguration).fetchValue(select(currentTimestamp()));
+    GlobalStats record = globalStatsDao.fetchOneByKey(key);
+    GlobalStats newRecord = new GlobalStats(key, count, now);
+
+    // Insert a new record for key if it does not exist
+    if (record == null) {
+      globalStatsDao.insert(newRecord);
+    } else {
+      globalStatsDao.update(newRecord);
+    }
+  }
 }

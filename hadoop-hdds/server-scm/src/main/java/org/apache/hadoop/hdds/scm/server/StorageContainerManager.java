@@ -34,7 +34,6 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.StaticStorageClassRegistry;
@@ -44,6 +43,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -84,6 +84,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineActionHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineReportHandler;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.PipelineChoosePolicyFactory;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
@@ -117,6 +118,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.protobuf.BlockingService;
+import org.apache.commons.lang3.tuple.Pair;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.slf4j.Logger;
@@ -201,9 +203,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       new StaticStorageClassRegistry();
 
   /**
-   *  Network topology Map.
+   * Network topology Map.
    */
   private NetworkTopology clusterMap;
+  private PipelineChoosePolicy pipelineChoosePolicy;
 
   /**
    * Creates a new StorageContainerManager. Configuration will be
@@ -427,6 +430,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               pipelineManager);
     }
 
+    pipelineChoosePolicy = PipelineChoosePolicyFactory.getPolicy(conf);
     if (configurator.getScmBlockManager() != null) {
       scmBlockManager = configurator.getScmBlockManager();
     } else {
@@ -1142,5 +1146,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public StorageClassRegistry getStorageClassRegistry() {
     return storageClassRegistry;
+  }
+
+  public PipelineChoosePolicy getPipelineChoosePolicy() {
+    return this.pipelineChoosePolicy;
   }
 }
