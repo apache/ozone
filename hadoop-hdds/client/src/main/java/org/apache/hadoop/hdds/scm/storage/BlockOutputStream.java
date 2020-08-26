@@ -160,9 +160,7 @@ public class BlockOutputStream extends OutputStream {
     this.bytesPerChecksum = bytesPerChecksum;
 
     //number of buffers used before doing a flush
-    currentBuffer = bufferPool.getCurrentBuffer();
-    currentBufferRemaining =
-        currentBuffer != null ? currentBuffer.remaining() : 0;
+    refreshCurrentBuffer(bufferPool);
     flushPeriod = (int) (streamBufferFlushSize / streamBufferSize);
 
     Preconditions
@@ -180,6 +178,11 @@ public class BlockOutputStream extends OutputStream {
     checksum = new Checksum(checksumType, bytesPerChecksum);
   }
 
+  private void refreshCurrentBuffer(BufferPool bufferPool) {
+    currentBuffer = bufferPool.getCurrentBuffer();
+    currentBufferRemaining =
+        currentBuffer != null ? currentBuffer.remaining() : 0;
+  }
 
   public BlockID getBlockID() {
     return blockID.get();
@@ -292,6 +295,7 @@ public class BlockOutputStream extends OutputStream {
   private boolean isBufferPoolFull() {
     return bufferPool.computeBufferData() == streamBufferMaxSize;
   }
+
   /**
    * Will be called on the retryPath in case closedContainerException/
    * TimeoutException.
@@ -362,9 +366,7 @@ public class BlockOutputStream extends OutputStream {
   // only contain data which have not been sufficiently replicated
   private void adjustBuffersOnException() {
     commitWatcher.releaseBuffersOnException();
-    currentBuffer = bufferPool.getCurrentBuffer();
-    currentBufferRemaining =
-        currentBuffer != null ? currentBuffer.remaining() : 0;
+    refreshCurrentBuffer(bufferPool);
   }
 
   /**
@@ -394,9 +396,7 @@ public class BlockOutputStream extends OutputStream {
       setIoException(ioe);
       throw getIoException();
     }
-    currentBuffer = bufferPool.getCurrentBuffer();
-    currentBufferRemaining =
-        currentBuffer != null ? currentBuffer.remaining() : 0;
+    refreshCurrentBuffer(bufferPool);
 
   }
 
@@ -516,7 +516,7 @@ public class BlockOutputStream extends OutputStream {
     checkOpen();
     // flush the last chunk data residing on the currentBuffer
     if (totalDataFlushedLength < writtenDataLength) {
-      currentBuffer = bufferPool.getCurrentBuffer();
+      refreshCurrentBuffer(bufferPool);
       Preconditions.checkArgument(currentBuffer.position() > 0);
       if (currentBuffer.hasRemaining()) {
         writeChunk(currentBuffer);

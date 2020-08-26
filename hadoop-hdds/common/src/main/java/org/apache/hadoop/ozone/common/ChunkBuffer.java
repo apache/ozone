@@ -90,7 +90,8 @@ public interface ChunkBuffer {
   default ChunkBuffer put(byte b) {
     byte[] buf = new byte[1];
     buf[0] = (byte) b;
-    return put(buf, 0, 1);  }
+    return put(buf, 0, 1);
+  }
 
   /** Similar to {@link ByteBuffer#put(byte[], int, int)}. */
   default ChunkBuffer put(byte[] b, int offset, int length) {
