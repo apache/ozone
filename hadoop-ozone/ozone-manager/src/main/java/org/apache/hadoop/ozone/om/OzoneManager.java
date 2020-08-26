@@ -141,6 +141,7 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.snapshot.OzoneManagerSnapshotProvider;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -1140,6 +1141,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     metadataManager.start(configuration);
     startSecretManagerIfNecessary();
+
+    OMLayoutVersionManager omVersionManager =
+        OMLayoutVersionManager.initialize(omStorage);
 
     if (certClient != null) {
       caCertPem = CertificateCodec.getPEMEncodedString(
