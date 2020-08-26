@@ -390,6 +390,19 @@ public class MockNodeManager implements NodeManager {
     }
   }
 
+  public void setNodeState(DatanodeDetails dn, HddsProtos.NodeState state) {
+    healthyNodes.remove(dn);
+    staleNodes.remove(dn);
+    deadNodes.remove(dn);
+    if (state == HEALTHY) {
+      healthyNodes.add(dn);
+    } else if (state == STALE) {
+      staleNodes.add(dn);
+    } else {
+      deadNodes.add(dn);
+    }
+  }
+
   /**
    * Closes this stream and releases any system resources associated with it. If
    * the stream is already closed then invoking this method has no effect.

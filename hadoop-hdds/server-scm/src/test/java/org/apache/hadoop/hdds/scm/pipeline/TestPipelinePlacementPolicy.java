@@ -44,7 +44,9 @@ import org.apache.hadoop.hdds.scm.node.states.Node2PipelineMap;
 
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -437,6 +439,85 @@ public class TestPipelinePlacementPolicy {
         placementPolicy.validateContainerPlacement(dns, 3);
     assertTrue(status.isPolicySatisfied());
     assertEquals(0, status.misReplicationCount());
+  }
+
+  @Test
+  public void test3NodesInSameRackReturnedWhenOnlyOneHealthyRackIsPresent()
+      throws Exception {
+    List<DatanodeDetails> dns = setupSkewedRacks();
+
+    int nodesRequired = HddsProtos.ReplicationFactor.THREE.getNumber();
+    // Set the only node on rack1 stale. This makes the cluster effectively a
+    // single rack.
+    nodeManager.setNodeState(dns.get(0), HddsProtos.NodeState.STALE);
+
+    // As there is only 1 rack alive, the 3 DNs on /rack2 should be returned
+    List<DatanodeDetails> pickedDns =  placementPolicy.chooseDatanodes(
+        new ArrayList<>(), new ArrayList<>(), nodesRequired, 0);
+
+    assertEquals(3, pickedDns.size());
+    assertTrue(pickedDns.contains(dns.get(1)));
+    assertTrue(pickedDns.contains(dns.get(2)));
+    assertTrue(pickedDns.contains(dns.get(3)));
+  }
+
+  @Rule
+  public ExpectedException thrownExp = ExpectedException.none();
+
+  @Test
+  public void testExceptionIsThrownWhenRackAwarePipelineCanNotBeCreated()
+      throws Exception {
+    thrownExp.expect(SCMException.class);
+    thrownExp.expectMessage(PipelinePlacementPolicy.MULTIPLE_RACK_PIPELINE_MSG);
+
+    List<DatanodeDetails> dns = setupSkewedRacks();
+
+    // Set the first node to its pipeline limit. This means there are only
+    // 3 hosts on a single rack available for new pipelines
+    insertHeavyNodesIntoNodeManager(dns, 1);
+    int nodesRequired = HddsProtos.ReplicationFactor.THREE.getNumber();
+
+    placementPolicy.chooseDatanodes(
+        new ArrayList<>(), new ArrayList<>(), nodesRequired, 0);
+  }
+
+  @Test
+  public void testExceptionThrownRackAwarePipelineCanNotBeCreatedExcludedNode()
+      throws Exception {
+    thrownExp.expect(SCMException.class);
+    thrownExp.expectMessage(PipelinePlacementPolicy.MULTIPLE_RACK_PIPELINE_MSG);
+
+    List<DatanodeDetails> dns = setupSkewedRacks();
+
+    // Set the first node to its pipeline limit. This means there are only
+    // 3 hosts on a single rack available for new pipelines
+    insertHeavyNodesIntoNodeManager(dns, 1);
+    int nodesRequired = HddsProtos.ReplicationFactor.THREE.getNumber();
+
+    List<DatanodeDetails> excluded = new ArrayList<>();
+    excluded.add(dns.get(0));
+    placementPolicy.chooseDatanodes(
+        excluded, new ArrayList<>(), nodesRequired, 0);
+  }
+
+  private List<DatanodeDetails> setupSkewedRacks() {
+    cluster = initTopology();
+
+    List<DatanodeDetails> dns = new ArrayList<>();
+    dns.add(MockDatanodeDetails
+        .createDatanodeDetails("host1", "/rack1"));
+    dns.add(MockDatanodeDetails
+        .createDatanodeDetails("host2", "/rack2"));
+    dns.add(MockDatanodeDetails
+        .createDatanodeDetails("host3", "/rack2"));
+    dns.add(MockDatanodeDetails
+        .createDatanodeDetails("host4", "/rack2"));
+
+    nodeManager = new MockNodeManager(cluster, dns,
+        false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
+    placementPolicy = new PipelinePlacementPolicy(
+        nodeManager, stateManager, conf);
+    return dns;
   }
 
   private boolean checkDuplicateNodesUUID(List<DatanodeDetails> nodes) {
