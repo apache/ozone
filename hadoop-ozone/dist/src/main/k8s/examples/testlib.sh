@@ -17,14 +17,14 @@
 
 retry() {
    n=0
-   until [ $n -ge 30 ]
+   until [ $n -ge 100 ]
    do
       "$@" && break
       n=$[$n+1]
       echo "$n '$@' is failed..."
       sleep ${RETRY_SLEEP:-3}
    done
-   if [ $n -eq 30 ]; then
+   if [ $n -eq 100 ]; then
       return 255
    fi
 }
