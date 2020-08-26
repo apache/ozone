@@ -23,8 +23,8 @@ import java.util.HashMap;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.StaticStorageClassRegistry;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import org.apache.commons.lang3.RandomStringUtils;
-
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
@@ -125,7 +124,7 @@ public class TestOzoneManagerRestart {
 
     // Get Volume.
     ozoneVolume = objectStore.getVolume(volumeName);
-    Assert.assertTrue(ozoneVolume.getName().equals(volumeName));
+    Assert. assertTrue(ozoneVolume.getName().equals(volumeName));
 
   }
 

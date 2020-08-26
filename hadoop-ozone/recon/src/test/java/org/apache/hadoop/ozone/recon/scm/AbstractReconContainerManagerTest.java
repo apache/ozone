@@ -150,7 +150,8 @@ public class AbstractReconContainerManagerTest {
             .setNumberOfKeys(10)
             .setPipelineID(pipeline.getId())
             .setState(OPEN)
-            .setStorageClass(StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName())
+            .setStorageClass(
+                StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName())
             .setOwner("test")
             .setState(state)
 
