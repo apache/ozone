@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
+package org.apache.hadoop.ozone.om.upgrade;
+
 /**
- * Package contains classes related to S3 security responses.
+ * This package contains OM  Upgrade related classes.
  */
-package org.apache.hadoop.ozone.om.response.s3.security;
