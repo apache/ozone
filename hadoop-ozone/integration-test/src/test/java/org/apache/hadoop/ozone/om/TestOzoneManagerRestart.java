@@ -124,7 +124,7 @@ public class TestOzoneManagerRestart {
 
     // Get Volume.
     ozoneVolume = objectStore.getVolume(volumeName);
-    Assert. assertTrue(ozoneVolume.getName().equals(volumeName));
+    Assert.assertTrue(ozoneVolume.getName().equals(volumeName));
 
   }
 
