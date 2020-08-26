@@ -18,10 +18,7 @@
 
 package org.apache.hadoop.ozone.om;
 
-import org.apache.hadoop.ozone.common.BlockGroup;
-import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
@@ -82,7 +79,7 @@ public class OpenKeyCleanupService extends BackgroundService {
         // The new API for deleting expired open keys in OM HA will differ
         // significantly from the old implementation.
         // The old implementation has been removed so the code compiles.
-        List<String> keyBlocksList = keyManager.getExpiredOpenKeys(0);
+        keyManager.getExpiredOpenKeys(0);
       } catch (IOException e) {
         LOG.error("Unable to get hanging open keys, retry in"
             + " next interval", e);
