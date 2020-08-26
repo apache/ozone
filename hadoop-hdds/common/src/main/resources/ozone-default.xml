@@ -2503,4 +2503,9 @@
       filesystem semantics.
     </description>
   </property>
+  <property>
+    <name>ozone.storage.class</name>
+    <tag>OZONE, OM</tag>
+    <value>STANDARD</value>
+  </property>
 </configuration>

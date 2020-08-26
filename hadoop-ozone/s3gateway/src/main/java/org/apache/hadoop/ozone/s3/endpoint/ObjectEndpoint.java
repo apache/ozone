@@ -152,7 +152,7 @@ public class ObjectEndpoint extends EndpointBase {
       if (copyHeader != null) {
         //Copy object, as copy source available.
         CopyObjectResponse copyObjectResponse = copyObject(
-            copyHeader, bucketName, keyPath, storageType,
+            copyHeader, bucketName, keyPath, s3StorageType.name(),
             storageTypeDefault);
         return Response.status(Status.OK).entity(copyObjectResponse).header(
             "Connection", "close").build();

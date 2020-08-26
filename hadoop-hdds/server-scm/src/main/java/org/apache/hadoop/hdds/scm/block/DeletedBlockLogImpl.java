@@ -30,6 +30,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto;
@@ -76,6 +77,8 @@ public class DeletedBlockLogImpl
   private final Lock lock;
   // Maps txId to set of DNs which are successful in committing the transaction
   private Map<Long, Set<UUID>> transactionToDNsCommitMap;
+  private final StaticStorageClassRegistry registry =
+      new StaticStorageClassRegistry();
 
   public DeletedBlockLogImpl(ConfigurationSource conf,
                              ContainerManager containerManager,
@@ -211,7 +214,10 @@ public class DeletedBlockLogImpl
           // corresponding nodes commit the txn. It is required to check that
           // the nodes returned in the pipeline match the replication factor.
           if (min(replicas.size(), dnsWithCommittedTxn.size())
-              >= container.getReplicationFactor().getNumber()) {
+              >= registry.getStorageClass(container.getStorageClass())
+              .getOpenStateConfiguration()
+              .getReplicationFactor()
+              .getNumber()) {
             List<UUID> containerDns = replicas.stream()
                 .map(ContainerReplica::getDatanodeDetails)
                 .map(DatanodeDetails::getUuid)

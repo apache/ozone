@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.scm;
 
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.StorageClassConverter;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -167,9 +168,7 @@ public class TestContainerSmallFile {
     ContainerWithPipeline container =
         storageContainerLocationClient.allocateContainer(
             OzoneConsts.OZONE,
-            StorageClassConverter.convert(
-                null, HddsProtos.ReplicationFactor.ONE,
-                SCMTestUtils.getReplicationType(ozoneConfig)).getName()
+            StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName()
         );
     XceiverClientSpi client = xceiverClientManager
         .acquireClient(container.getPipeline());

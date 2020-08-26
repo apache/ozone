@@ -554,7 +554,9 @@ public class ReplicationManager
           .map(ContainerReplica::getDatanodeDetails)
           .collect(Collectors.toList());
       if (source.size() > 0) {
-        final int replicationFactor = container
+        final int replicationFactor = this.storageClassRegistry
+            .getStorageClass(container.getStorageClass())
+            .getOpenStateConfiguration()
             .getReplicationFactor().getNumber();
         // Want to check if the container is mis-replicated after considering
         // inflight add and delete.

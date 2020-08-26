@@ -198,10 +198,10 @@ public class TestStorageContainerManager {
       try {
         ContainerWithPipeline container3 = mockClientServer
             .allocateContainer(
+                OzoneConsts.OZONE,
                 StorageClassConverter.convert(null,
                     HddsProtos.ReplicationFactor.ONE,
-                    SCMTestUtils.getReplicationType(ozoneConf)).getName(),
-                OzoneConsts.OZONE);
+                    SCMTestUtils.getReplicationType(ozoneConf)).getName());
         if (expectPermissionDenied) {
           fail("Operation should fail, expecting an IOException here.");
         } else {

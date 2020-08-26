@@ -614,17 +614,13 @@ public abstract class TestOzoneRpcClientAbstract {
         .setKeyName(keyName)
         .setRefreshPipeline(true)
         .build();
-    HddsProtos.ReplicationType replicationType =
-        HddsProtos.ReplicationType.valueOf(type.toString());
-    HddsProtos.ReplicationFactor replicationFactor =
-        HddsProtos.ReplicationFactor.valueOf(factor.getValue());
     OmKeyInfo keyInfo = ozoneManager.lookupKey(keyArgs);
     for (OmKeyLocationInfo info:
         keyInfo.getLatestVersionLocations().getLocationList()) {
       ContainerInfo container =
           storageContainerLocationClient.getContainer(info.getContainerID());
-      if (!container.getReplicationFactor().equals(replicationFactor) || (
-          container.getReplicationType() != replicationType)) {
+      if (!StorageClassConverter.convert(null, factor, type).getName()
+          .equals(container.getStorageClass())) {
         return false;
       }
     }
@@ -717,7 +713,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
       OzoneOutputStream out = bucket.createKey(keyName,
           value.getBytes().length,
-          StaticStorageClassRegistry.LEGACY.getName(),
+          StaticStorageClassRegistry.REDUCED_REDUNDANCY.getName(),
           new HashMap<>());
       out.write(value.getBytes());
       out.close();
@@ -2101,7 +2097,7 @@ public abstract class TestOzoneRpcClientAbstract {
         ozoneMultipartUploadPartListParts.getStorageClass())
         .getOpenStateConfiguration()
         .getReplicationType();
-    Assert.assertEquals(STAND_ALONE, actualType);
+    Assert.assertEquals(STAND_ALONE.name(), actualType.name());
     Assert.assertEquals(3,
         ozoneMultipartUploadPartListParts.getPartInfoList().size());
 
@@ -2157,7 +2153,7 @@ public abstract class TestOzoneRpcClientAbstract {
         .getOpenStateConfiguration()
         .getReplicationType();
 
-    Assert.assertEquals(STAND_ALONE, actualType);
+    Assert.assertEquals(STAND_ALONE.name(), actualType.name());
 
     Assert.assertEquals(2,
         ozoneMultipartUploadPartListParts.getPartInfoList().size());
@@ -2263,7 +2259,7 @@ public abstract class TestOzoneRpcClientAbstract {
         ozoneMultipartUploadPartListParts.getStorageClass())
         .getOpenStateConfiguration()
         .getReplicationType();
-    Assert.assertEquals(STAND_ALONE, actualType);
+    Assert.assertEquals(STAND_ALONE.name(), actualType.name());
 
     // As we don't have any parts with greater than partNumberMarker and list
     // is not truncated, so it should return false here.

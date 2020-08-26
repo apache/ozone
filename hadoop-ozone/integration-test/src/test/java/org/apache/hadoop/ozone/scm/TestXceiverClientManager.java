@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.scm;
 
 import com.google.common.cache.Cache;
+import org.apache.hadoop.hdds.StaticStorageClassRegistry;
 import org.apache.hadoop.hdds.StorageClassConverter;
 import org.apache.hadoop.hdds.scm.XceiverClientManager.ScmClientConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -103,10 +104,10 @@ public class TestXceiverClientManager {
 
     ContainerWithPipeline container2 = storageContainerLocationClient
         .allocateContainer(
+            OzoneConsts.OZONE,
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)).getName(),
-            OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)).getName());
     XceiverClientSpi client2 = clientManager
         .acquireClient(container2.getPipeline());
     Assert.assertEquals(1, client2.getRefcount());
@@ -148,10 +149,10 @@ public class TestXceiverClientManager {
 
     ContainerWithPipeline container2 =
         storageContainerLocationClient.allocateContainer(
+            OzoneConsts.OZONE,
             StorageClassConverter.convert(null,
                 HddsProtos.ReplicationFactor.ONE,
-                SCMTestUtils.getReplicationType(conf)).getName(),
-            OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)).getName());
     XceiverClientSpi client2 = clientManager
         .acquireClient(container2.getPipeline());
     Assert.assertEquals(1, client2.getRefcount());
@@ -211,10 +212,10 @@ public class TestXceiverClientManager {
 
     ContainerWithPipeline container2 =
         storageContainerLocationClient.allocateContainer(
+            OzoneConsts.OZONE,
             StorageClassConverter.convert(null,
                 SCMTestUtils.getReplicationFactor(conf),
-                SCMTestUtils.getReplicationType(conf)).getName(),
-            OzoneConsts.OZONE);
+                SCMTestUtils.getReplicationType(conf)).getName());
     XceiverClientSpi client2 = clientManager
         .acquireClient(container2.getPipeline());
     Assert.assertEquals(1, client2.getRefcount());
@@ -263,11 +264,15 @@ public class TestXceiverClientManager {
     Assert.assertEquals(2, client1.getRefcount());
 
     // client should be invalidated in the cache
+    StaticStorageClassRegistry registry = new StaticStorageClassRegistry();
     clientManager.releaseClient(client1, true);
     Assert.assertEquals(1, client1.getRefcount());
     Assert.assertNull(cache.getIfPresent(
         container1.getContainerInfo().getPipelineID().getId().toString()
-            + container1.getContainerInfo().getReplicationType()));
+            + registry.getStorageClass(container1.getContainerInfo()
+            .getStorageClass())
+            .getOpenStateConfiguration()
+            .getReplicationType()));
 
     // new client should be added in cache
     XceiverClientSpi client2 =
@@ -280,6 +285,9 @@ public class TestXceiverClientManager {
     Assert.assertEquals(0, client1.getRefcount());
     Assert.assertNotNull(cache.getIfPresent(
         container1.getContainerInfo().getPipelineID().getId().toString()
-            + container1.getContainerInfo().getReplicationType()));
+            + registry.getStorageClass(container1.getContainerInfo()
+            .getStorageClass())
+            .getOpenStateConfiguration()
+            .getReplicationType()));
   }
 }

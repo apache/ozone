@@ -249,7 +249,10 @@ public class SCMClientProtocolServer implements
     if (pipeline == null) {
       pipeline = scm.getPipelineManager().createPipeline(
           HddsProtos.ReplicationType.STAND_ALONE,
-          container.getReplicationFactor(),
+          scm.getStorageClassRegistry()
+              .getStorageClass(container.getStorageClass())
+              .getOpenStateConfiguration()
+              .getReplicationFactor(),
           scm.getContainerManager()
               .getContainerReplicas(cid).stream()
               .map(ContainerReplica::getDatanodeDetails)
