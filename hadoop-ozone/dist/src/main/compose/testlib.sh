@@ -63,7 +63,7 @@ find_tests(){
 ## @description wait until safemode exit (or 180 seconds)
 wait_for_safemode_exit(){
   # version-dependent
-  : ${OZONE_ADMIN_COMMAND:=admin}
+  : ${OZONE_SAFEMODE_STATUS_COMMAND:=ozone admin safemode status --verbose}
 
   #Reset the timer
   SECONDS=0
