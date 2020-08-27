@@ -46,7 +46,7 @@ public class UpdateVolumeHandler extends VolumeHandler {
 
   @Option(names = {"--quota", "-q"},
       description = "Bucket counts of the volume to set (eg. 5)")
-  private long quotaInCounts = OzoneConsts.QUOTA_COUNT_RESET;
+  private long quotaInCounts = OzoneConsts.QUOTA_RESET;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)

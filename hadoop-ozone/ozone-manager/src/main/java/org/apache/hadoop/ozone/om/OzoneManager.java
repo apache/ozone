@@ -3593,7 +3593,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setModificationTime(time)
         .setOwnerName(userName)
         .setAdminName(userName)
-        .setQuotaInBytes(OzoneConsts.MAX_QUOTA_IN_BYTES);
+        .setQuotaInBytes(OzoneConsts.QUOTA_RESET);
 
     // Provide ACLType of ALL which is default acl rights for user and group.
     List<OzoneAcl> listOfAcls = new ArrayList<>();
