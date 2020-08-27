@@ -637,9 +637,9 @@ public final class PipelineManagerV2Impl implements PipelineManager {
    * @throws NotLeaderException when it's not the current leader.
    */
   private void checkLeader() throws NotLeaderException {
-    if (!scmhaManager.isLeader()) {
-      throw scmhaManager.triggerNotLeaderException();
-    }
+//    if (!scmhaManager.isLeader()) {
+//      throw scmhaManager.triggerNotLeaderException();
+//    }
   }
 
   private void setBackgroundPipelineCreator(
