@@ -17,6 +17,6 @@
  */
 
 /**
- * Generic helper class to make instantiate picocli based cli tools.
+ * Command-line tools for HDDS.
  */
 package org.apache.hadoop.hdds.cli;

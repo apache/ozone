@@ -14,22 +14,19 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Test ozone admin datanode command
+Documentation       Test ozone admin command
 Library             BuiltIn
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
 
 *** Test Cases ***
-List datanodes
-    ${output} =         Execute          ozone admin datanode list
-                        Should contain   ${output}   Datanode:
-                        Should contain   ${output}   Related pipelines:
-
 Incomplete command
-    ${output} =         Execute And Ignore Error     ozone admin datanode
+    ${output} =         Execute And Ignore Error     ozone admin
                         Should contain   ${output}   Incomplete command
-                        Should contain   ${output}   list
-
-List datanodes on unknown host
-    ${output} =         Execute And Ignore Error     ozone admin --verbose datanode list --scm unknown-host
-                        Should contain   ${output}   Invalid host name
+                        Should contain   ${output}   container
+                        Should contain   ${output}   datanode
+                        Should contain   ${output}   om
+                        Should contain   ${output}   pipeline
+                        Should contain   ${output}   replicationmanager
+                        Should contain   ${output}   safemode
+                        Should contain   ${output}   printTopology

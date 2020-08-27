@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,9 +17,10 @@
  */
 package org.apache.hadoop.hdds.scm.cli.container;
 
-import java.util.concurrent.Callable;
+import java.io.IOException;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .ContainerWithPipeline;
@@ -28,7 +29,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.ParentCommand;
 
 /**
  * This is the handler that process container creation command.
@@ -38,27 +38,19 @@ import picocli.CommandLine.ParentCommand;
     description = "Create container",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class CreateSubcommand implements Callable<Void> {
+public class CreateSubcommand extends ScmSubcommand {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(CreateSubcommand.class);
 
-  @ParentCommand
-  private ContainerCommands parent;
-
   @Option(description = "Owner of the new container", defaultValue = "OZONE",
-      required = false, names = {
-      "-o", "--owner"})
-
+      names = { "-o", "--owner"})
   private String owner;
 
   @Override
-  public Void call() throws Exception {
-    try (ScmClient scmClient = parent.getParent().createScmClient()) {
-      ContainerWithPipeline container = scmClient.createContainer(owner);
-      LOG.info("Container {} is created.",
-          container.getContainerInfo().getContainerID());
-      return null;
-    }
+  public void execute(ScmClient scmClient) throws IOException {
+    ContainerWithPipeline container = scmClient.createContainer(owner);
+    LOG.info("Container {} is created.",
+        container.getContainerInfo().getContainerID());
   }
 }
