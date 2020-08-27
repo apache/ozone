@@ -123,6 +123,11 @@ public final class OMTransactionInfo {
     return Objects.hash(term, transactionIndex);
   }
 
+  @Override
+  public String toString() {
+    return generateTransactionInfo();
+  }
+
   /**
    * Return transaction info persisted in OM DB.
    * @param metadataManager

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -21,11 +21,12 @@ import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.scm.cli.container.WithScmClient;
+import org.apache.hadoop.hdds.cli.OzoneAdmin;
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.Spec;
 
 /**
@@ -43,21 +44,20 @@ import picocli.CommandLine.Spec;
         CreatePipelineSubcommand.class,
         ClosePipelineSubcommand.class
     })
-public class PipelineCommands implements Callable<Void> {
+@MetaInfServices(SubcommandWithParent.class)
+public class PipelineCommands implements Callable<Void>, SubcommandWithParent {
 
   @Spec
   private CommandSpec spec;
-
-  @ParentCommand
-  private WithScmClient parent;
-
-  public WithScmClient getParent() {
-    return parent;
-  }
 
   @Override
   public Void call() throws Exception {
     GenericCli.missingSubcommand(spec);
     return null;
+  }
+
+  @Override
+  public Class<?> getParentType() {
+    return OzoneAdmin.class;
   }
 }

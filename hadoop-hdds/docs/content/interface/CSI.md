@@ -1,6 +1,9 @@
 ---
 title: CSI Protocol
-weight: 3
+weight: 6
+menu:
+   main:
+      parent: "Client Interfaces"
 summary: Ozone supports Container Storage Interface(CSI) protocol. You can use Ozone by mounting an Ozone volume by Ozone CSI.
 ---
 
@@ -21,9 +24,17 @@ summary: Ozone supports Container Storage Interface(CSI) protocol. You can use O
   limitations under the License.
 -->
 
-`Container Storage Interface` (CSI) will enable storage vendors (SP) to develop a plugin once and have it work across a number of container orchestration (CO) systems.
+`Container Storage Interface` (CSI) will enable storage vendors (SP) to develop a plugin once and have it work across a number of container orchestration (CO) systems like Kubernetes or Yarn.
 
 To get more information about CSI at [SCI spec](https://github.com/container-storage-interface/spec/blob/master/spec.md)
+
+CSI defined a simple GRPC interface with 3 interfaces (Identity, Controller, Node). It defined how the Container Orchestrator can request the creation of a new storage space or the mount of the newly created storage but doesn't define how the storage can be mounted.
+
+![CSI](CSI.png)
+
+By default Ozone CSI service uses a S3 fuse driver ([goofys](https://github.com/kahing/goofys)) to mount the created Ozone bucket. Implementation of other mounting options such as a dedicated NFS server or native Fuse driver is work in progress.
+
+
 
 Ozone CSI is an implementation of CSI, it can make possible of using Ozone as a storage volume for a container. 
 

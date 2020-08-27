@@ -243,8 +243,8 @@ public class FileSizeCountTask implements ReconOmTask {
                                     Map<FileSizeCountKey, Long>
                                         fileSizeCountMap) {
     if (omKeyInfo == null) {
-      LOG.warn("Unexpected error while handling DELETE key event. Key not " +
-          "found in Recon OM DB : {}", key);
+      LOG.warn("Deleting a key not found while handling DELETE key event. Key" +
+          " not found in Recon OM DB : {}", key);
     } else {
       FileSizeCountKey countKey = getFileSizeCountKey(omKeyInfo);
       Long count = fileSizeCountMap.containsKey(countKey) ?

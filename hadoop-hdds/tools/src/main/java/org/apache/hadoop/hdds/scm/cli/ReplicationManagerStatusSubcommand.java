@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -22,39 +22,31 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.ParentCommand;
 
-import java.util.concurrent.Callable;
+import java.io.IOException;
 
 /**
- * This is the handler that process safe mode check command.
+ * Handler to query status of replication manager.
  */
 @Command(
     name = "status",
     description = "Check if ReplicationManager is running or not",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class ReplicationManagerStatusSubcommand implements Callable<Void> {
+public class ReplicationManagerStatusSubcommand extends ScmSubcommand {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReplicationManagerStatusSubcommand.class);
 
-  @ParentCommand
-  private ReplicationManagerCommands parent;
-
   @Override
-  public Void call() throws Exception {
-    try (ScmClient scmClient = parent.getParent().createScmClient()) {
+  public void execute(ScmClient scmClient) throws IOException {
+    boolean execReturn = scmClient.getReplicationManagerStatus();
 
-      boolean execReturn = scmClient.getReplicationManagerStatus();
-
-      // Output data list
-      if(execReturn){
-        LOG.info("ReplicationManager is Running.");
-      } else {
-        LOG.info("ReplicationManager is Not Running.");
-      }
-      return null;
+    // Output data list
+    if(execReturn){
+      LOG.info("ReplicationManager is Running.");
+    } else {
+      LOG.info("ReplicationManager is Not Running.");
     }
   }
 }

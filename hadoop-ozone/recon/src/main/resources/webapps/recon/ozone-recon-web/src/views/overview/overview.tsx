@@ -180,7 +180,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
             <OverviewCard loading={loading} title='Buckets' data={buckets.toString()} icon='folder-open'/>
           </Col>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
-            <OverviewCard loading={loading} title='Keys (Estimated)' data={keys.toString()} icon='file-text'/>
+            <OverviewCard loading={loading} title='Keys' data={keys.toString()} icon='file-text'/>
           </Col>
         </Row>
       </div>
