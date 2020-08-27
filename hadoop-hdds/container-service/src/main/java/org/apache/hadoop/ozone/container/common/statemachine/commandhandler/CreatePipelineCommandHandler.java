@@ -17,8 +17,8 @@
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import java.io.IOException;
-import java.util.Collection;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -64,6 +64,28 @@ public class CreatePipelineCommandHandler implements CommandHandler {
     this.conf = conf;
   }
 
+  private void incSuggestedLeaderCount(
+      final List<Integer> priorityList,
+      final List<DatanodeDetails> peers,
+      final DatanodeDetails dn) {
+    if (peers == null || peers.isEmpty()) {
+      return;
+    }
+
+    DatanodeDetails maxPriorityPeer = null;
+    int maxPriority = Integer.MIN_VALUE;
+    for (int i = 0; i < priorityList.size(); i++) {
+      if (maxPriority < priorityList.get(i)) {
+        maxPriority = priorityList.get(i);
+        maxPriorityPeer = peers.get(i);
+      }
+    }
+
+    if (maxPriorityPeer.getUuid().equals(dn.getUuid())) {
+      dn.incSuggestedLeaderCount();
+    }
+  }
+
   /**
    * Handles a given SCM command.
    *
@@ -82,18 +104,22 @@ public class CreatePipelineCommandHandler implements CommandHandler {
     final CreatePipelineCommandProto createCommand =
         ((CreatePipelineCommand)command).getProto();
     final HddsProtos.PipelineID pipelineID = createCommand.getPipelineID();
-    final Collection<DatanodeDetails> peers =
+    final List<DatanodeDetails> peers =
         createCommand.getDatanodeList().stream()
             .map(DatanodeDetails::getFromProtoBuf)
             .collect(Collectors.toList());
+    final List<Integer> priorityList = createCommand.getPriorityList();
+
+    incSuggestedLeaderCount(priorityList, peers, dn);
 
     try {
       XceiverServerSpi server = ozoneContainer.getWriteChannel();
       if (!server.isExist(pipelineID)) {
         final RaftGroupId groupId = RaftGroupId.valueOf(
             PipelineID.getFromProtobuf(pipelineID).getId());
-        final RaftGroup group = RatisHelper.newRaftGroup(groupId, peers);
-        server.addGroup(pipelineID, peers);
+        final RaftGroup group =
+            RatisHelper.newRaftGroup(groupId, peers, priorityList);
+        server.addGroup(pipelineID, peers, priorityList);
         peers.stream().filter(
             d -> !d.getUuid().equals(dn.getUuid()))
             .forEach(d -> {

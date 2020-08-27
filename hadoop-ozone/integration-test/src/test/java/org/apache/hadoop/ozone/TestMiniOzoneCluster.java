@@ -102,7 +102,7 @@ public class TestMiniOzoneCluster {
     FileUtils.deleteQuietly(READ_TMP);
   }
 
-  @Test(timeout = 30000)
+  @Test(timeout = 60000)
   public void testStartMultipleDatanodes() throws Exception {
     final int numberOfNodes = 3;
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -290,7 +290,7 @@ public class TestMiniOzoneCluster {
    * Test that a DN can register with SCM even if it was started before the SCM.
    * @throws Exception
    */
-  @Test (timeout = 60000)
+  @Test (timeout = 100000)
   public void testDNstartAfterSCM() throws Exception {
     // Start a cluster with 3 DN
     cluster = MiniOzoneCluster.newBuilder(conf)

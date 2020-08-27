@@ -61,6 +61,7 @@ public final class Pipeline {
   private UUID leaderId;
   // Timestamp for pipeline upon creation
   private Instant creationTimestamp;
+  private UUID suggestedLeader;
 
   /**
    * The immutable properties of pipeline object is used in
@@ -121,6 +122,14 @@ public final class Pipeline {
    */
   public Instant getCreationTimestamp() {
     return creationTimestamp;
+  }
+
+  public void setSuggestedLeader(UUID suggestedLeader) {
+    this.suggestedLeader = suggestedLeader;
+  }
+
+  public UUID getSuggestedLeader() {
+    return suggestedLeader;
   }
 
   /**
@@ -392,6 +401,7 @@ public final class Pipeline {
     private List<DatanodeDetails> nodesInOrder = null;
     private UUID leaderId = null;
     private Instant creationTimestamp = null;
+    private UUID suggestedLeaderId = null;
 
     public Builder() {}
 
@@ -404,6 +414,7 @@ public final class Pipeline {
       this.nodesInOrder = pipeline.nodesInOrder.get();
       this.leaderId = pipeline.getLeaderId();
       this.creationTimestamp = pipeline.getCreationTimestamp();
+      this.suggestedLeaderId = pipeline.getSuggestedLeader();
     }
 
     public Builder setId(PipelineID id1) {
@@ -447,6 +458,11 @@ public final class Pipeline {
       return this;
     }
 
+    public Builder setSuggestedLeader(UUID suggestedLeader) {
+      this.suggestedLeaderId = suggestedLeader;
+      return this;
+    }
+
     public Pipeline build() {
       Preconditions.checkNotNull(id);
       Preconditions.checkNotNull(type);
@@ -484,6 +500,9 @@ public final class Pipeline {
         // This branch is for pipeline clone
         pipeline.setNodesInOrder(nodesInOrder);
       }
+
+      pipeline.setSuggestedLeader(suggestedLeaderId);
+
       return pipeline;
     }
   }

@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -39,6 +40,7 @@ public class CreatePipelineCommand
   private final ReplicationFactor factor;
   private final ReplicationType type;
   private final List<DatanodeDetails> nodelist;
+  private final List<Integer> priorityList;
 
   public CreatePipelineCommand(final PipelineID pipelineID,
       final ReplicationType type, final ReplicationFactor factor,
@@ -48,16 +50,34 @@ public class CreatePipelineCommand
     this.factor = factor;
     this.type = type;
     this.nodelist = datanodeList;
+    this.priorityList = new ArrayList<>();
+    for (DatanodeDetails dn : datanodeList) {
+      priorityList.add(0);
+    }
+  }
+
+  public CreatePipelineCommand(final PipelineID pipelineID,
+      final ReplicationType type, final ReplicationFactor factor,
+      final List<DatanodeDetails> datanodeList,
+      final List<Integer> priorityList) {
+    super();
+    this.pipelineID = pipelineID;
+    this.factor = factor;
+    this.type = type;
+    this.nodelist = datanodeList;
+    this.priorityList = priorityList;
   }
 
   public CreatePipelineCommand(long cmdId, final PipelineID pipelineID,
       final ReplicationType type, final ReplicationFactor factor,
-      final List<DatanodeDetails> datanodeList) {
+      final List<DatanodeDetails> datanodeList,
+      final List<Integer> priorityList) {
     super(cmdId);
     this.pipelineID = pipelineID;
     this.factor = factor;
     this.type = type;
     this.nodelist = datanodeList;
+    this.priorityList = priorityList;
   }
 
   /**
@@ -80,6 +100,7 @@ public class CreatePipelineCommand
         .addAllDatanode(nodelist.stream()
             .map(DatanodeDetails::getProtoBufMessage)
             .collect(Collectors.toList()))
+        .addAllPriority(priorityList)
         .build();
   }
 
@@ -91,7 +112,8 @@ public class CreatePipelineCommand
         createPipelineProto.getType(), createPipelineProto.getFactor(),
         createPipelineProto.getDatanodeList().stream()
             .map(DatanodeDetails::getFromProtoBuf)
-            .collect(Collectors.toList()));
+            .collect(Collectors.toList()),
+        createPipelineProto.getPriorityList());
   }
 
   public PipelineID getPipelineID() {

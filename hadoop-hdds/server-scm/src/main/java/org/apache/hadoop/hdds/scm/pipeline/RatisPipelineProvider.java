@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -52,6 +53,9 @@ public class RatisPipelineProvider extends PipelineProvider {
   private final PipelinePlacementPolicy placementPolicy;
   private int pipelineNumberLimit;
   private int maxPipelinePerDatanode;
+
+  private static final Integer HIGH_PRIORITY = 1;
+  private static final Integer LOW_PRIORITY = 0;
 
   RatisPipelineProvider(NodeManager nodeManager,
       PipelineStateManager stateManager, ConfigurationSource conf,
@@ -98,8 +102,40 @@ public class RatisPipelineProvider extends PipelineProvider {
     return false;
   }
 
+  private DatanodeDetails getSuggestedLeader(List<DatanodeDetails> dns) {
+    int minLeaderCount = Integer.MAX_VALUE;
+    DatanodeDetails suggestedLeader = null;
+
+    for (int i = 0; i < dns.size(); i++) {
+      DatanodeDetails dn = dns.get(i);
+      if (dn.getSuggestedLeaderCount() < minLeaderCount) {
+        minLeaderCount = dn.getSuggestedLeaderCount();
+        suggestedLeader = dn;
+      }
+    }
+
+    return suggestedLeader;
+  }
+
+  private List<Integer> getPriorityList(
+      List<DatanodeDetails> dns, DatanodeDetails suggestedLeader) {
+    List<Integer> priorityList = new ArrayList<>();
+
+    for (int i = 0; i < dns.size(); i++) {
+      if (dns.get(i).getUuid().equals(suggestedLeader.getUuid())) {
+        dns.get(i).incSuggestedLeaderCount();
+        priorityList.add(HIGH_PRIORITY);
+      } else {
+        priorityList.add(LOW_PRIORITY);
+      }
+    }
+
+    return priorityList;
+  }
+
   @Override
-  public Pipeline create(ReplicationFactor factor) throws IOException {
+  public synchronized Pipeline create(ReplicationFactor factor)
+      throws IOException {
     if (exceedPipelineNumberLimit(factor)) {
       throw new SCMException("Ratis pipeline number meets the limit: " +
           pipelineNumberLimit + " factor : " +
@@ -121,18 +157,23 @@ public class RatisPipelineProvider extends PipelineProvider {
       throw new IllegalStateException("Unknown factor: " + factor.name());
     }
 
+    DatanodeDetails suggestedLeader = getSuggestedLeader(dns);
+
     Pipeline pipeline = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setState(PipelineState.ALLOCATED)
         .setType(ReplicationType.RATIS)
         .setFactor(factor)
         .setNodes(dns)
+        .setSuggestedLeader(suggestedLeader.getUuid())
         .build();
+
+    List<Integer> priorityList = getPriorityList(dns, suggestedLeader);
 
     // Send command to datanodes to create pipeline
     final CreatePipelineCommand createCommand =
         new CreatePipelineCommand(pipeline.getId(), pipeline.getType(),
-            factor, dns);
+            factor, dns, priorityList);
 
     dns.forEach(node -> {
       LOG.info("Sending CreatePipelineCommand for pipeline:{} to datanode:{}",
