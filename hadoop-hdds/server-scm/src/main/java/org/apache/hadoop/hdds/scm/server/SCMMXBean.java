@@ -66,4 +66,8 @@ public interface SCMMXBean extends ServiceRuntimeInfo {
   Map<String, Integer> getContainerStateCount();
 
   Map<String, String> getRuleStatusMetrics();
+
+  String getScmId();
+
+  String getClusterId();
 }
