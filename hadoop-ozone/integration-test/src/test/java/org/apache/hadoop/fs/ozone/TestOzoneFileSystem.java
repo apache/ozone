@@ -76,6 +76,9 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Ozone file system tests that are not covered by contract tests.
+ *
+ * Note: When adding new test(s), please append it in testFileSystem() to
+ * avoid test run time regression.
  */
 @RunWith(Parameterized.class)
 public class TestOzoneFileSystem {
@@ -107,7 +110,6 @@ public class TestOzoneFileSystem {
   private int rootItemCount;
   private Trash trash;
 
-  @Test(timeout = 300_000)
   public void testCreateFileShouldCheckExistenceOfDirWithSameName()
       throws Exception {
     /*
@@ -120,7 +122,6 @@ public class TestOzoneFileSystem {
      *
      * Op 3. create file -> /d1/d2/d3 (d3 as a file inside /d1/d2)
      */
-    setupOzoneFileSystem();
 
     Path parent = new Path("/d1/d2/d3/d4/");
     Path file1 = new Path(parent, "key1");
@@ -154,6 +155,9 @@ public class TestOzoneFileSystem {
     } catch (FileAlreadyExistsException fae) {
       // ignore as its expected
     }
+
+    // Cleanup
+    fs.delete(new Path("/d1/"), true);
   }
 
   /**
@@ -161,14 +165,11 @@ public class TestOzoneFileSystem {
    * directories. Has roughly the semantics of Unix @{code mkdir -p}.
    * {@link FileSystem#mkdirs(Path)}
    */
-  @Test(timeout = 300_000)
   public void testMakeDirsWithAnExistingDirectoryPath() throws Exception {
     /*
      * Op 1. create file -> /d1/d2/d3/d4/k1 (d3 is a sub-dir inside /d1/d2)
      * Op 2. create dir -> /d1/d2
      */
-    setupOzoneFileSystem();
-
     Path parent = new Path("/d1/d2/d3/d4/");
     Path file1 = new Path(parent, "key1");
     try (FSDataOutputStream outputStream = fs.create(file1, false)) {
@@ -178,11 +179,11 @@ public class TestOzoneFileSystem {
     Path subdir = new Path("/d1/d2/");
     boolean status = fs.mkdirs(subdir);
     assertTrue("Shouldn't send error if dir exists", status);
+    // Cleanup
+    fs.delete(new Path("/d1"), true);
   }
 
-  @Test
   public void testCreateWithInvalidPaths() throws Exception {
-    setupOzoneFileSystem();
     Path parent = new Path("../../../../../d1/d2/");
     Path file1 = new Path(parent, "key1");
     checkInvalidPath(file1);
@@ -211,6 +212,11 @@ public class TestOzoneFileSystem {
 
     testOzoneFsServiceLoader();
     o3fs = (OzoneFileSystem) fs;
+
+    testCreateFileShouldCheckExistenceOfDirWithSameName();
+    testMakeDirsWithAnExistingDirectoryPath();
+    testCreateWithInvalidPaths();
+    testListStatusWithIntermediateDir();
 
     testRenameToTrashDisabled();
 
@@ -459,9 +465,7 @@ public class TestOzoneFileSystem {
         3, fileStatuses.length);
   }
 
-  @Test
   public void testListStatusWithIntermediateDir() throws Exception {
-    setupOzoneFileSystem();
     String keyName = "object-dir/object-name";
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
