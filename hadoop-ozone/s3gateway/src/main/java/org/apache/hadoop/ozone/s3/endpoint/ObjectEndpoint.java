@@ -59,7 +59,6 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
@@ -206,9 +205,9 @@ public class ObjectEndpoint extends EndpointBase {
               keyPath);
           os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
               "when calling the PutObject/MPU PartUpload operation: " +
-              OZONE_OM_ENABLE_FILESYSTEM_PATHS + " is enabled Keys are " +
-              "considered as Unix Paths. Path has Violated FS Semantics which " +
-              "caused put operation to fail.");
+              OZONE_OM_ENABLE_FILESYSTEM_PATHS + " is enabled Keys are" +
+              " considered as Unix Paths. Path has Violated FS Semantics " +
+              "which caused put operation to fail.");
           throw os3Exception;
         }
       }
@@ -541,8 +540,8 @@ public class ObjectEndpoint extends EndpointBase {
         os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
             "when calling the CompleteMultipartUpload operation: " +
             OZONE_OM_ENABLE_FILESYSTEM_PATHS + " is enabled Keys are " +
-            "considered as Unix Paths. " +
-            "A directory already exists with a give KeyName caused failure for MPU");
+            "considered as Unix Paths. A directory already exists with a " +
+            "given KeyName caused failure for MPU");
         throw os3Exception;
       }
       throw ex;
