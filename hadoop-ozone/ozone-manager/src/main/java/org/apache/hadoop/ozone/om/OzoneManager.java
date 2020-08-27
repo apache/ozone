@@ -309,6 +309,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private KeyProviderCryptoExtension kmsProvider = null;
   private static String keyProviderUriKeyName =
       CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH;
+  private final OMLayoutVersionManager versionManager;
 
   private boolean allowListAllVolumes;
   // Adding parameters needed for VolumeRequests here, so that during request
@@ -348,6 +349,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     omStorage = new OMStorage(conf);
     omId = omStorage.getOmId();
+
+    versionManager = OMLayoutVersionManager.initialize(omStorage);
 
     // In case of single OM Node Service there will be no OM Node ID
     // specified, set it to value from om storage
@@ -1141,8 +1144,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metadataManager.start(configuration);
     startSecretManagerIfNecessary();
 
-    OMLayoutVersionManager omVersionManager =
-        OMLayoutVersionManager.initialize(omStorage);
 
     if (certClient != null) {
       caCertPem = CertificateCodec.getPEMEncodedString(
@@ -3642,4 +3643,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   }
 
+  public OMLayoutVersionManager getVersionManager() {
+    return versionManager;
+  }
 }

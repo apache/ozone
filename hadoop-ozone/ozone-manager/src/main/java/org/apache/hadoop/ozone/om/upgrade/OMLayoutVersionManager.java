@@ -36,6 +36,8 @@ public final class OMLayoutVersionManager extends AbstractLayoutVersionManager {
 
   private static OMLayoutVersionManager omVersionManager;
 
+  private OmVersionFactory omVersionFactory;
+
   private OMLayoutVersionManager() {
   }
 
@@ -80,6 +82,7 @@ public final class OMLayoutVersionManager extends AbstractLayoutVersionManager {
               metadataLayoutVersion, softwareLayoutVersion),
           NOT_SUPPORTED_OPERATION);
     }
+    omVersionFactory = new OmVersionFactory();
   }
 
   @VisibleForTesting
@@ -89,4 +92,9 @@ public final class OMLayoutVersionManager extends AbstractLayoutVersionManager {
       omVersionManager = null;
     }
   }
+
+  public OmVersionFactory getVersionFactory() {
+    return omVersionFactory;
+  }
+
 }

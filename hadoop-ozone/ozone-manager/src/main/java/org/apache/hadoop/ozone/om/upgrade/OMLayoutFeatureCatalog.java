@@ -35,7 +35,6 @@ public class OMLayoutFeatureCatalog {
     CREATE_EC(1, ""),
     NEW_FEATURE(2, "new feature", new NewOmFeatureUpgradeAction());
 
-
     private int layoutVersion;
     private String description;
     private Optional<OmUpgradeAction> omUpgradeAction = Optional.empty();
