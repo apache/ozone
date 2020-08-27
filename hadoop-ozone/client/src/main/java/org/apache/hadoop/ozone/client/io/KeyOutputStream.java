@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -345,7 +346,8 @@ public class KeyOutputStream extends OutputStream {
     if (bufferedDataLen > 0) {
       // If the data is still cached in the underlying stream, we need to
       // allocate new block and write this data in the datanode.
-      handleRetry(exception, bufferedDataLen);
+      handleRetry(exception, bufferedDataLen,
+          !(t instanceof ContainerNotOpenException));
       // reset the retryCount after handling the exception
       retryCount = 0;
     }
@@ -356,7 +358,8 @@ public class KeyOutputStream extends OutputStream {
     closed = true;
   }
 
-  private void handleRetry(IOException exception, long len) throws IOException {
+  private void handleRetry(IOException exception, long len,
+      boolean shouldIncrementRetryCount) throws IOException {
     RetryPolicy retryPolicy = retryPolicyMap
         .get(HddsClientUtils.checkForException(exception).getClass());
     if (retryPolicy == null) {
@@ -395,7 +398,9 @@ public class KeyOutputStream extends OutputStream {
         setExceptionAndThrow(ioe);
       }
     }
-    retryCount++;
+    if (shouldIncrementRetryCount) {
+      retryCount++;
+    }
     if (LOG.isTraceEnabled()) {
       LOG.trace("Retrying Write request. Already tried {} time(s); " +
           "retry policy is {} ", retryCount, retryPolicy);
