@@ -14,22 +14,32 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Test ozone admin datanode command
+Documentation       Test ozone admin safemode command
 Library             BuiltIn
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
 
 *** Test Cases ***
-List datanodes
-    ${output} =         Execute          ozone admin datanode list
-                        Should contain   ${output}   Datanode:
-                        Should contain   ${output}   Related pipelines:
+Check safemode
+    ${output} =         Execute          ozone admin safemode status
+                        Should contain   ${output}   SCM is out of safe mode
+
+Check safemode with explicit host
+    ${output} =         Execute          ozone admin safemode status --scm scm
+                        Should contain   ${output}   SCM is out of safe mode
+
+Wait for safemode exit
+    ${output} =         Execute          ozone admin safemode wait -t 2
+                        Should contain   ${output}   SCM is out of safe mode
 
 Incomplete command
-    ${output} =         Execute And Ignore Error     ozone admin datanode
+    ${output} =         Execute And Ignore Error     ozone admin safemode
                         Should contain   ${output}   Incomplete command
-                        Should contain   ${output}   list
+                        Should contain   ${output}   status
+                        Should contain   ${output}   exit
+                        Should contain   ${output}   wait
 
-List datanodes on unknown host
-    ${output} =         Execute And Ignore Error     ozone admin --verbose datanode list --scm unknown-host
+Check safemode on unknown host
+    ${output} =         Execute And Ignore Error     ozone admin --verbose safemode status --scm unknown-host
                         Should contain   ${output}   Invalid host name
+
