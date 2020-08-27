@@ -516,7 +516,9 @@ public class BlockOutputStream extends OutputStream {
     if (totalDataFlushedLength < writtenDataLength) {
       refreshCurrentBuffer(bufferPool);
       Preconditions.checkArgument(currentBuffer.position() > 0);
-      writeChunkIfNeeded();
+      if (currentBuffer.hasRemaining()) {
+        writeChunk(currentBuffer);
+      }
       // This can be a partially filled chunk. Since we are flushing the buffer
       // here, we just limit this buffer to the current position. So that next
       // write will happen in new buffer
