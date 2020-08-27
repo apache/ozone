@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.cli.container;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.cli.GenericParentCommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
@@ -53,10 +54,6 @@ public class InfoSubcommand implements Callable<Void> {
   @Parameters(description = "Decimal id of the container.")
   private long containerID;
 
-  @CommandLine.Option(names = {"--verbose"},
-      description = "Show detailed info of the container.")
-  private boolean verbose;
-
   @Override
   public Void call() throws Exception {
     try (ScmClient scmClient = parent.getParent().createScmClient()) {
@@ -66,6 +63,8 @@ public class InfoSubcommand implements Callable<Void> {
 
       // Print container report info.
       LOG.info("Container id: {}", containerID);
+      boolean verbose = parent.getParent() instanceof GenericParentCommand &&
+          ((GenericParentCommand) parent.getParent()).isVerbose();
       if (verbose) {
         LOG.info("Pipeline Info: {}", container.getPipeline());
       } else {
