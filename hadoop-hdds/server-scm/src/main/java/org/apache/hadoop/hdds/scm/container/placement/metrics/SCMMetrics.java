@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.placement.metrics;
 
+import org.apache.hadoop.hdds.utils.DBCheckpointMetrics;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
@@ -30,7 +31,7 @@ import com.google.common.annotations.VisibleForTesting;
  * This class is for maintaining StorageContainerManager statistics.
  */
 @Metrics(about="Storage Container Manager Metrics", context="dfs")
-public class SCMMetrics {
+public class SCMMetrics implements DBCheckpointMetrics {
   public static final String SOURCE_NAME =
       SCMMetrics.class.getSimpleName();
 

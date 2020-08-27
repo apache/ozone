@@ -38,7 +38,7 @@ public class RDBCheckpointManager {
 
   private final Checkpoint checkpoint;
   private final RocksDB db;
-  public static final String RDB_CHECKPOINT_DIR_PREFIX = "rdb_checkpoint_";
+  public static final String RDB_CHECKPOINT_DIR_PREFIX = "checkpoint_";
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBCheckpointManager.class);
   private String checkpointNamePrefix = "";

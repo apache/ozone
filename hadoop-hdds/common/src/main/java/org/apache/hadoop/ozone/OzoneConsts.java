@@ -79,10 +79,6 @@ public final class OzoneConsts {
   public static final String OZONE_USER = "user";
   public static final String OZONE_REQUEST = "request";
 
-  // SCM Http server endpoints
-  public static final String OZONE_SCM_DB_CHECKPOINT_HTTP_ENDPOINT =
-      "/dbCheckpoint";
-
   // OM Http server endpoints
   public static final String OZONE_OM_SERVICE_LIST_HTTP_ENDPOINT =
       "/serviceList";

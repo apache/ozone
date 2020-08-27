@@ -142,7 +142,7 @@ public class RDBStore implements DBStore {
       }
 
       //Initialize checkpoint manager
-      checkPointManager = new RDBCheckpointManager(db, "rdb");
+      checkPointManager = new RDBCheckpointManager(db, dbLocation.getName());
       rdbMetrics = RDBMetrics.create();
 
     } catch (RocksDBException e) {

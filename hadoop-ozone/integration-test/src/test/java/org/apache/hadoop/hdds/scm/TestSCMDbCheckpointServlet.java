@@ -119,6 +119,9 @@ public class TestSCMDbCheckpointServlet {
           mock(SCMDBCheckpointServlet.class);
 
       doCallRealMethod().when(scmDbCheckpointServletMock).init();
+      doCallRealMethod().when(scmDbCheckpointServletMock).initialize(
+          cluster.getStorageContainerManager().getScmMetadataStore().getStore(),
+          cluster.getStorageContainerManager().getMetrics());
 
       HttpServletRequest requestMock = mock(HttpServletRequest.class);
       HttpServletResponse responseMock = mock(HttpServletResponse.class);

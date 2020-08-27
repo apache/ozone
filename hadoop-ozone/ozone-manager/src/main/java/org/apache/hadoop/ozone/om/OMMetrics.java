@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.utils.DBCheckpointMetrics;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
@@ -32,7 +33,7 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
  */
 @InterfaceAudience.Private
 @Metrics(about="Ozone Manager Metrics", context="dfs")
-public class OMMetrics {
+public class OMMetrics implements DBCheckpointMetrics {
   private static final String SOURCE_NAME =
       OMMetrics.class.getSimpleName();
 
@@ -788,6 +789,11 @@ public class OMMetrics {
   @VisibleForTesting
   public long getNumCheckpoints() {
     return numCheckpoints.value();
+  }
+
+  @VisibleForTesting
+  public long getNumCheckpointFails() {
+    return numCheckpointFails.value();
   }
 
   @VisibleForTesting

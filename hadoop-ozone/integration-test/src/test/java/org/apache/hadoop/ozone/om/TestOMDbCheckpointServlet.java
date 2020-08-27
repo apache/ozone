@@ -70,7 +70,7 @@ public class TestOMDbCheckpointServlet {
   private String omId;
 
   @Rule
-  public Timeout timeout = new Timeout(60000);
+  public Timeout timeout = new Timeout(240000);
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -110,13 +110,15 @@ public class TestOMDbCheckpointServlet {
 
   @Test
   public void testDoGet() throws ServletException, IOException {
-
     File tempFile = null;
     try {
       OMDBCheckpointServlet omDbCheckpointServletMock =
           mock(OMDBCheckpointServlet.class);
 
       doCallRealMethod().when(omDbCheckpointServletMock).init();
+      doCallRealMethod().when(omDbCheckpointServletMock).initialize(
+          cluster.getOzoneManager().getMetadataManager().getStore(),
+          cluster.getOzoneManager().getMetrics());
 
       HttpServletRequest requestMock = mock(HttpServletRequest.class);
       HttpServletResponse responseMock = mock(HttpServletResponse.class);
