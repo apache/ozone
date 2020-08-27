@@ -41,7 +41,6 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -91,6 +90,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -221,8 +221,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   @Override
   public OMClientResponse handleWriteRequest(OMRequest omRequest,
       long transactionLogIndex) {
-    OMClientRequest omClientRequest =
-        OzoneManagerRatisUtils.createClientRequest(omRequest);
+    OMClientRequest omClientRequest = impl.getVersionManager()
+        .getVersionFactory().getClientRequest(omRequest);
     OMClientResponse omClientResponse =
         omClientRequest.validateAndUpdateCache(getOzoneManager(),
             transactionLogIndex, ozoneManagerDoubleBuffer::add);
@@ -289,6 +289,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     if (omRequest.getClientId() == null) {
       throw new OMException("ClientId is null",
           OMException.ResultCodes.INVALID_REQUEST);
+    }
+
+    if (omRequest.getLayoutVersion() == null) {
+      throw new OMException("LayoutVersion for request is null.",
+          OMException.ResultCodes.INTERNAL_ERROR);
     }
   }
 

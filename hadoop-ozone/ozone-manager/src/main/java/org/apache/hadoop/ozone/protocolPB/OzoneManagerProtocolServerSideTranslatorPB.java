@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.OmVersionFactory;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -61,6 +62,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   private final AtomicLong transactionIndex = new AtomicLong(0L);
   private final OzoneProtocolMessageDispatcher<OMRequest, OMResponse>
       dispatcher;
+  private final OmVersionFactory omVersionFactory;
 
   /**
    * Constructs an instance of the server handler.
@@ -99,6 +101,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     dispatcher = new OzoneProtocolMessageDispatcher<>("OzoneProtocol",
         metrics, LOG);
 
+    omVersionFactory = ozoneManager.getVersionManager().getVersionFactory();
   }
 
   /**
@@ -125,7 +128,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         if (omRatisServer.isLeader()) {
           try {
             OMClientRequest omClientRequest =
-                OzoneManagerRatisUtils.createClientRequest(request);
+                omVersionFactory.getClientRequest(request);
             request = omClientRequest.preExecute(ozoneManager);
           } catch (IOException ex) {
             // As some of the preExecute returns error. So handle here.
@@ -218,7 +221,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         return handler.handleReadRequest(request);
       } else {
         OMClientRequest omClientRequest =
-            OzoneManagerRatisUtils.createClientRequest(request);
+            omVersionFactory.getClientRequest(request);
         request = omClientRequest.preExecute(ozoneManager);
         index = transactionIndex.incrementAndGet();
         omClientResponse = handler.handleWriteRequest(request, index);
