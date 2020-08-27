@@ -227,16 +227,18 @@ public class BlockOutputStream extends OutputStream {
   @Override
   public void write(int b) throws IOException {
     checkOpen();
-    if (currentBufferRemaining == 0) {
-      allocateNewBuffer();
-    }
+    allocateNewBufferIfNeeded();
     currentBuffer.put((byte) b);
     currentBufferRemaining--;
+    writeChunkIfNeeded();
+    writtenDataLength++;
+    doFlushOrWatchIfNeeded();
+  }
+
+  private void writeChunkIfNeeded() throws IOException {
     if (currentBufferRemaining == 0) {
       writeChunk(currentBuffer);
     }
-    writtenDataLength++;
-    doFlushOrWatchIfNeeded();
   }
 
   @Override
@@ -254,15 +256,11 @@ public class BlockOutputStream extends OutputStream {
     }
 
     while (len > 0) {
-      if (currentBufferRemaining == 0) {
-        allocateNewBuffer();
-      }
+      allocateNewBufferIfNeeded();
       final int writeLen = Math.min(currentBufferRemaining, len);
       currentBuffer.put(b, off, writeLen);
       currentBufferRemaining -= writeLen;
-      if (currentBufferRemaining == 0) {
-        writeChunk(currentBuffer);
-      }
+      writeChunkIfNeeded();
       off += writeLen;
       len -= writeLen;
       writtenDataLength += writeLen;
@@ -283,9 +281,11 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
-  private void allocateNewBuffer() {
-    currentBuffer = bufferPool.allocateBuffer(bytesPerChecksum);
-    currentBufferRemaining = currentBuffer.remaining();
+  private void allocateNewBufferIfNeeded() {
+    if (currentBufferRemaining == 0) {
+      currentBuffer = bufferPool.allocateBuffer(bytesPerChecksum);
+      currentBufferRemaining = currentBuffer.remaining();
+    }
   }
 
   private void updateFlushLength() {
@@ -314,11 +314,9 @@ public class BlockOutputStream extends OutputStream {
     Preconditions.checkArgument(len <= streamBufferMaxSize);
     int count = 0;
     while (len > 0) {
-      ChunkBuffer buffer = bufferPool.getBuffer(count);
-      long writeLen = Math.min(buffer.position(), len);
-      if (!buffer.hasRemaining()) {
-        writeChunk(buffer);
-      }
+      refreshCurrentBuffer(bufferPool);
+      long writeLen = Math.min(currentBuffer.position(), len);
+      writeChunkIfNeeded();
       len -= writeLen;
       count++;
       writtenDataLength += writeLen;
@@ -518,9 +516,7 @@ public class BlockOutputStream extends OutputStream {
     if (totalDataFlushedLength < writtenDataLength) {
       refreshCurrentBuffer(bufferPool);
       Preconditions.checkArgument(currentBuffer.position() > 0);
-      if (currentBuffer.hasRemaining()) {
-        writeChunk(currentBuffer);
-      }
+      writeChunkIfNeeded();
       // This can be a partially filled chunk. Since we are flushing the buffer
       // here, we just limit this buffer to the current position. So that next
       // write will happen in new buffer
