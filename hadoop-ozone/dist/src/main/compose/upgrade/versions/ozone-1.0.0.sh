@@ -16,3 +16,4 @@
 # limitations under the License.
 
 export OZONE_ADMIN_COMMAND=admin
+export OZONE_SAFEMODE_STATUS_COMMAND='ozone admin safemode status --verbose'
