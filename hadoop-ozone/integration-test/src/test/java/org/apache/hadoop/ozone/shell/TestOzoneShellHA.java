@@ -456,8 +456,7 @@ public class TestOzoneShellHA {
       String hostPrefix, OzoneConfiguration configuration) {
 
     OzoneConfiguration clientConf = new OzoneConfiguration(configuration);
-    clientConf.set("fs.ofs.impl",
-        "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
+    // fs.ofs.impl should be loaded from META-INF, no need to explicitly set it
     clientConf.set(FS_DEFAULT_NAME_KEY, hostPrefix);
     clientConf.setInt(FS_TRASH_INTERVAL_KEY, 60);
     return clientConf;
