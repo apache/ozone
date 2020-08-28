@@ -568,9 +568,6 @@ public class TestOmMetadataManager {
 
       TestOMRequestUtils.addKeyToTable(true, false,
               keyInfo, clientID, 0L, omMetadataManager);
-
-      String groupID = omMetadataManager.getOpenKey(volumeName, bucketName,
-              keyInfo.getKeyName(), clientID);
     }
 
     // Test retrieving fewer expired keys than actually exist.
