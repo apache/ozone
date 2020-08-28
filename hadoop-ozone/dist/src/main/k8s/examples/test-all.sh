@@ -31,13 +31,18 @@ RESULT=0
 IFS=$'\n'
 # shellcheck disable=SC2044
 for test in $(find "$SCRIPT_DIR" -name test.sh | grep "${OZONE_TEST_SELECTOR:-""}" |sort); do
-  echo ""
-  echo "#### Executing tests of $(dirname "$test") #####"
-  echo ""
   TEST_DIR="$(dirname $test)"
+  TEST_NAME="$(basename "$TEST_DIR")"
+
+  echo ""
+  echo "#### Executing tests of ${TEST_DIR} #####"
+  echo ""
   cd "$TEST_DIR" || continue
   ./test.sh
-  cp "$TEST_DIR"/result/output.xml "$ALL_RESULT_DIR"/"$(basename "$TEST_DIR")".xml
+
+  cp "$TEST_DIR"/result/output.xml "$ALL_RESULT_DIR"/"${TEST_NAME}".xml
+  mkdir -p "$ALL_RESULT_DIR"/"${TEST_NAME}"
+  mv "$TEST_DIR"/logs/*log "$ALL_RESULT_DIR"/"${TEST_NAME}"/
 done
 
 rebot -N "smoketests" -d "$ALL_RESULT_DIR/" "$ALL_RESULT_DIR/*.xml"

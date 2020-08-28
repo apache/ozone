@@ -60,6 +60,7 @@ enum Type {
   CommitKey = 36;
   AllocateBlock = 37;
   DeleteKeys = 38;
+  RenameKeys = 39;
 
   InitiateMultiPartUpload = 45;
   CommitMultiPartUpload = 46;
@@ -126,6 +127,7 @@ message OMRequest {
   optional CommitKeyRequest                 commitKeyRequest               = 36;
   optional AllocateBlockRequest             allocateBlockRequest           = 37;
   optional DeleteKeysRequest                deleteKeysRequest              = 38;
+  optional RenameKeysRequest                renameKeysRequest              = 39;
 
   optional MultipartInfoInitiateRequest     initiateMultiPartUploadRequest = 45;
   optional MultipartCommitUploadPartRequest commitMultiPartUploadRequest   = 46;
@@ -198,6 +200,7 @@ message OMResponse {
   optional CommitKeyResponse                 commitKeyResponse             = 36;
   optional AllocateBlockResponse             allocateBlockResponse         = 37;
   optional DeleteKeysResponse                deleteKeysResponse            = 38;
+  optional RenameKeysResponse                renameKeysResponse            = 39;
 
   optional MultipartInfoInitiateResponse   initiateMultiPartUploadResponse = 45;
   optional MultipartCommitUploadPartResponse commitMultiPartUploadResponse = 46;
@@ -308,6 +311,9 @@ enum Status {
     DETECTED_LOOP_IN_BUCKET_LINKS = 63;
 
     NOT_SUPPORTED_OPERATION = 64;
+
+    PARTIAL_RENAME = 65;
+
 }
 
 /**
@@ -837,6 +843,26 @@ message LookupKeyResponse {
     optional uint64 ID = 3;
     // TODO : allow specifiying a particular version to read.
     optional uint64 openVersion = 4;
+}
+
+message RenameKeysRequest {
+    required RenameKeysArgs renameKeysArgs = 1;
+}
+
+message RenameKeysArgs {
+    required string volumeName = 1;
+    required string bucketName = 2;
+    repeated RenameKeysMap renameKeysMap = 3;
+}
+
+message RenameKeysMap {
+    required string fromKeyName = 1;
+    required string toKeyName = 2;
+}
+
+message RenameKeysResponse{
+    repeated RenameKeysMap unRenamedKeys = 1;
+    optional bool status = 2;
 }
 
 message RenameKeyRequest{
