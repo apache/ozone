@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyDeleteRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRenameRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeysRenameRequest;
 import org.apache.hadoop.ozone.om.request.key.OMTrashRecoverRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequest;
@@ -129,6 +130,8 @@ public final class OzoneManagerRatisUtils {
       return new OMKeysDeleteRequest(omRequest);
     case RenameKey:
       return new OMKeyRenameRequest(omRequest);
+    case RenameKeys:
+      return new OMKeysRenameRequest(omRequest);
     case CreateDirectory:
       return new OMDirectoryCreateRequest(omRequest);
     case CreateFile:
