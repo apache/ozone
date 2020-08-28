@@ -823,7 +823,7 @@
   </property>
   <property>
     <name>ozone.scm.pipeline.per.raft.log.disk</name>
-    <value>1</value>
+    <value>2</value>
     <tag>OZONE, SCM, PIPELINE</tag>
     <description>Number of pipelines to be created per raft log disk.
     </description>

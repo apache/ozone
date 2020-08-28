@@ -350,7 +350,12 @@ public class ReplicationNodeManagerMock implements NodeManager {
   }
 
   @Override
-  public int getNumRaftLogVolumes(List<DatanodeDetails> dnList) {
+  public int maxPipelineLimit(DatanodeDetails dn) {
+    return 0;
+  }
+
+  @Override
+  public int maxPipelineLimit(List<DatanodeDetails> dn) {
     return 0;
   }
 }

@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
@@ -103,6 +104,8 @@ public class SCMNodeManager implements NodeManager {
   private final boolean useHostname;
   private final ConcurrentHashMap<String, Set<String>> dnsToUuidMap =
       new ConcurrentHashMap<>();
+  private final int numPipelinesPerRaftLogDisk;
+  private final int heavyNodeCriteria;
 
   /**
    * Constructs SCM machine Manager.
@@ -130,6 +133,11 @@ public class SCMNodeManager implements NodeManager {
     this.useHostname = conf.getBoolean(
         DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
         DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+    this.numPipelinesPerRaftLogDisk =
+        conf.getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_PER_RAFT_LOG_DISK,
+            ScmConfigKeys.OZONE_SCM_PIPELINE_PER_RAFT_LOG_DISK_DEFAULT);
+    String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
+    this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);;
   }
 
   private void registerMXBean() {
@@ -533,23 +541,40 @@ public class SCMNodeManager implements NodeManager {
   }
 
   /**
-   * Returns the max of no raft log volumes reported out of the set
-   * of datanodes constituting the pipeline.
+   * Returns the pipeline limit for the datanode.
+   * if the datanode pipeline limit is set, consider that as the max
+   * pipeline limit.
+   * In case, the pipeline limit is not set, the max pipeline limit
+   * will be based on the no of raft log volume reported and provided
+   * that it has atleast one healthy data volume.
    */
   @Override
-  public int getNumRaftLogVolumes(List<DatanodeDetails> dnList) {
-    List<Integer> volumeCountList = new ArrayList<>(dnList.size());
-    for (DatanodeDetails dn : dnList) {
-      try {
-        volumeCountList.add(nodeStateManager.getNode(dn).
-            getRaftLogVolumeCount());
-      } catch (NodeNotFoundException e) {
-        LOG.warn("Cannot generate NodeStat, datanode {} not found.",
-            dn.getUuid());
+  public int maxPipelineLimit(DatanodeDetails dn) {
+    try {
+      if (heavyNodeCriteria > 0) {
+        return heavyNodeCriteria;
+      } else if (nodeStateManager.getNode(dn).getHealthyVolumeCount() > 0) {
+        return numPipelinesPerRaftLogDisk *
+            nodeStateManager.getNode(dn).getRaftLogVolumeCount();
       }
+    } catch (NodeNotFoundException e) {
+      LOG.warn("Cannot generate NodeStat, datanode {} not found.",
+          dn.getUuid());
     }
-    Preconditions.checkArgument(!volumeCountList.isEmpty());
-    return Collections.max(volumeCountList);
+    return 0;
+  }
+
+  /**
+   * Returns the pipeline limit for set of datanodes.
+   */
+  @Override
+  public int maxPipelineLimit(List<DatanodeDetails> dnList) {
+    List<Integer> pipelineCountList = new ArrayList<>(dnList.size());
+    for (DatanodeDetails dn : dnList) {
+        pipelineCountList.add(maxPipelineLimit(dn));
+    }
+    Preconditions.checkArgument(!pipelineCountList.isEmpty());
+    return Collections.min(pipelineCountList);
   }
 
   /**

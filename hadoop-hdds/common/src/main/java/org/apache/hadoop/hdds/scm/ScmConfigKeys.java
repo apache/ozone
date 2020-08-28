@@ -311,7 +311,7 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_PER_RAFT_LOG_DISK =
       "ozone.scm.pipeline.per.raft.log.disk";
 
-  public static final int OZONE_SCM_PIPELINE_PER_RAFT_LOG_DISK_DEFAULT = 1;
+  public static final int OZONE_SCM_PIPELINE_PER_RAFT_LOG_DISK_DEFAULT = 2;
   // Max timeout for pipeline to stay at ALLOCATED state before scrubbed.
   public static final String OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT =
       "ozone.scm.pipeline.allocated.timeout";

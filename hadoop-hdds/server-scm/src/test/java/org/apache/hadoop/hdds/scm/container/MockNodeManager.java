@@ -68,6 +68,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
  * Test Helper for testing container Mapping.
  */
 public class MockNodeManager implements NodeManager {
+  public final static int NUM_PIPELINE_PER_RAFT_LOG_DISK = 2;
   private final static NodeData[] NODES = {
       new NodeData(10L * OzoneConsts.TB, OzoneConsts.GB),
       new NodeData(64L * OzoneConsts.TB, 100 * OzoneConsts.GB),
@@ -592,9 +593,17 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public int getNumRaftLogVolumes(List<DatanodeDetails> dnList) {
-    return numRaftLogDisksPerDatanode;
+  public int maxPipelineLimit(DatanodeDetails dn) {
+    // by default 1 single node pipeline and 1 three node pipeline
+    return numRaftLogDisksPerDatanode * NUM_PIPELINE_PER_RAFT_LOG_DISK;
   }
+
+  @Override
+  public int maxPipelineLimit(List<DatanodeDetails> dn) {
+    // by default 1 single node pipeline and 1 three node pipeline
+    return numRaftLogDisksPerDatanode * NUM_PIPELINE_PER_RAFT_LOG_DISK;
+  }
+
 
   public void setNumHealthyVolumes(int value) {
     numHealthyDisksPerDatanode = value;
