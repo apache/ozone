@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.debug;
 
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDB;
@@ -36,7 +37,7 @@ import java.util.concurrent.Callable;
         name = "drop_column_family",
         description = "drop column family in db."
 )
-public class DropTable implements Callable<Void> {
+public class DropTable implements Callable<Void>, SubcommandWithParent {
 
   @CommandLine.Option(names = {"--column_family"},
       description = "Table name")
@@ -64,5 +65,10 @@ public class DropTable implements Callable<Void> {
       rocksDB.dropColumnFamily(toBeDeletedCf);
     }
     return null;
+  }
+
+  @Override
+  public Class<?> getParentType() {
+    return RDBParser.class;
   }
 }
