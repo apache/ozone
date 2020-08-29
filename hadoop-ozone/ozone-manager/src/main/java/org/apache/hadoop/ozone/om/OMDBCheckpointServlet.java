@@ -48,6 +48,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       return;
     }
 
-    initialize(om.getMetadataManager().getStore(), om.getMetrics());
+    initialize(om.getMetadataManager().getStore(),
+        om.getMetrics().getDBCheckpointMetrics());
   }
 }

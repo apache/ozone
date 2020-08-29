@@ -20,36 +20,76 @@ package org.apache.hadoop.hdds.utils;
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.metrics2.MetricsSystem;
+import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
+
 
 /**
  * This interface is for maintaining DB checkpoint statistics.
  */
 @InterfaceAudience.Private
 @Metrics(about="DB checkpoint Metrics", context="dfs")
-public interface DBCheckpointMetrics {
+public class DBCheckpointMetrics {
+  private static final String SOURCE_NAME =
+      DBCheckpointMetrics.class.getSimpleName();
+
+  // Metrics to track checkpoint statistics from last run.
+  private @Metric MutableGaugeLong lastCheckpointCreationTimeTaken;
+  private @Metric MutableGaugeLong lastCheckpointStreamingTimeTaken;
+  private @Metric MutableCounterLong numCheckpoints;
+  private @Metric MutableCounterLong numCheckpointFails;
+
+  public DBCheckpointMetrics() {
+  }
+
+  public static DBCheckpointMetrics create(String parent) {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    return ms.register(SOURCE_NAME,
+        parent,
+        new DBCheckpointMetrics());
+  }
 
   @VisibleForTesting
-  void setLastCheckpointCreationTimeTaken(long val);
+  public void setLastCheckpointCreationTimeTaken(long val) {
+    this.lastCheckpointCreationTimeTaken.set(val);
+  }
 
   @VisibleForTesting
-  void setLastCheckpointStreamingTimeTaken(long val);
+  public void setLastCheckpointStreamingTimeTaken(long val) {
+    this.lastCheckpointStreamingTimeTaken.set(val);
+  }
 
   @VisibleForTesting
-  void incNumCheckpoints();
+  public void incNumCheckpoints() {
+    numCheckpoints.incr();
+  }
 
   @VisibleForTesting
-  void incNumCheckpointFails();
+  public void incNumCheckpointFails() {
+    numCheckpointFails.incr();
+  }
 
   @VisibleForTesting
-  long getLastCheckpointCreationTimeTaken();
+  public long getLastCheckpointCreationTimeTaken() {
+    return lastCheckpointCreationTimeTaken.value();
+  }
 
   @VisibleForTesting
-  long getLastCheckpointStreamingTimeTaken();
+  public long getNumCheckpoints() {
+    return numCheckpoints.value();
+  }
 
   @VisibleForTesting
-  long getNumCheckpoints();
+  public long getNumCheckpointFails() {
+    return numCheckpointFails.value();
+  }
 
   @VisibleForTesting
-  long getNumCheckpointFails();
+  public long getLastCheckpointStreamingTimeTaken() {
+    return lastCheckpointStreamingTimeTaken.value();
+  }
 }

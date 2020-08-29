@@ -25,13 +25,11 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 
-import com.google.common.annotations.VisibleForTesting;
-
 /**
  * This class is for maintaining StorageContainerManager statistics.
  */
 @Metrics(about="Storage Container Manager Metrics", context="dfs")
-public class SCMMetrics implements DBCheckpointMetrics {
+public class SCMMetrics {
   public static final String SOURCE_NAME =
       SCMMetrics.class.getSimpleName();
 
@@ -55,12 +53,14 @@ public class SCMMetrics implements DBCheckpointMetrics {
   @Metric private MutableCounterLong containerReportReadCount;
   @Metric private MutableCounterLong containerReportWriteCount;
 
-  @Metric private MutableGaugeLong lastCheckpointCreationTimeTaken;
-  @Metric private MutableGaugeLong lastCheckpointStreamingTimeTaken;
-  @Metric private MutableCounterLong numCheckpoints;
-  @Metric private MutableCounterLong numCheckpointFails;
+  private DBCheckpointMetrics dbCheckpointMetrics;
+
+  public DBCheckpointMetrics getDBCheckpointMetrics() {
+    return dbCheckpointMetrics;
+  }
 
   public SCMMetrics() {
+    dbCheckpointMetrics = DBCheckpointMetrics.create("SCM Metrics");
   }
 
   public static SCMMetrics create() {
@@ -95,42 +95,6 @@ public class SCMMetrics implements DBCheckpointMetrics {
 
   public void setLastContainerReportWriteCount(long writeCount) {
     this.lastContainerReportWriteCount.set(writeCount);
-  }
-
-  public void setLastCheckpointCreationTimeTaken(long val) {
-    this.lastCheckpointCreationTimeTaken.set(val);
-  }
-
-  public void setLastCheckpointStreamingTimeTaken(long val) {
-    this.lastCheckpointStreamingTimeTaken.set(val);
-  }
-
-  public void incNumCheckpoints() {
-    numCheckpoints.incr();
-  }
-
-  public void incNumCheckpointFails() {
-    numCheckpointFails.incr();
-  }
-
-  @VisibleForTesting
-  public long getLastCheckpointCreationTimeTaken() {
-    return lastCheckpointCreationTimeTaken.value();
-  }
-
-  @VisibleForTesting
-  public long getNumCheckpoints() {
-    return numCheckpoints.value();
-  }
-
-  @VisibleForTesting
-  public long getNumCheckpointFails() {
-    return numCheckpointFails.value();
-  }
-
-  @VisibleForTesting
-  public long getLastCheckpointStreamingTimeTaken() {
-    return lastCheckpointStreamingTimeTaken.value();
   }
 
   public void incrContainerReportSize(long size) {

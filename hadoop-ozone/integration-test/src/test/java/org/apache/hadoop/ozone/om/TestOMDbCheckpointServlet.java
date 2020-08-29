@@ -44,10 +44,10 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.writeOmDBCheckpointToStream;
-import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import static org.junit.Assert.assertNotNull;
-import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -62,12 +62,12 @@ import static org.mockito.Mockito.when;
  * Class used for testing the OM DB Checkpoint provider servlet.
  */
 public class TestOMDbCheckpointServlet {
-  private MiniOzoneCluster cluster = null;
-  private OMMetrics omMetrics;
-  private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
-  private String omId;
+  private static MiniOzoneCluster cluster = null;
+  private static OMMetrics omMetrics;
+  private static OzoneConfiguration conf;
+  private static String clusterId;
+  private static String scmId;
+  private static String omId;
 
   @Rule
   public Timeout timeout = new Timeout(240000);
@@ -81,8 +81,8 @@ public class TestOMDbCheckpointServlet {
    *
    * @throws IOException
    */
-  @Before
-  public void init() throws Exception {
+  @BeforeClass
+  public static void init() throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
@@ -93,6 +93,7 @@ public class TestOMDbCheckpointServlet {
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setOmId(omId)
+        .setNumDatanodes(1)
         .build();
     cluster.waitForClusterToBeReady();
     omMetrics = cluster.getOzoneManager().getMetrics();
@@ -101,8 +102,8 @@ public class TestOMDbCheckpointServlet {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
-  public void shutdown() {
+  @AfterClass
+  public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -118,7 +119,7 @@ public class TestOMDbCheckpointServlet {
       doCallRealMethod().when(omDbCheckpointServletMock).init();
       doCallRealMethod().when(omDbCheckpointServletMock).initialize(
           cluster.getOzoneManager().getMetadataManager().getStore(),
-          cluster.getOzoneManager().getMetrics());
+          cluster.getOzoneManager().getMetrics().getDBCheckpointMetrics());
 
       HttpServletRequest requestMock = mock(HttpServletRequest.class);
       HttpServletResponse responseMock = mock(HttpServletResponse.class);
@@ -160,16 +161,20 @@ public class TestOMDbCheckpointServlet {
           responseMock);
 
       omDbCheckpointServletMock.init();
-      long initialCheckpointCount = omMetrics.getNumCheckpoints();
+      long initialCheckpointCount =
+          omMetrics.getDBCheckpointMetrics().getNumCheckpoints();
 
       omDbCheckpointServletMock.doGet(requestMock, responseMock);
 
       Assert.assertTrue(tempFile.length() > 0);
       Assert.assertTrue(
-          omMetrics.getLastCheckpointCreationTimeTaken() > 0);
+          omMetrics.getDBCheckpointMetrics().
+              getLastCheckpointCreationTimeTaken() > 0);
       Assert.assertTrue(
-          omMetrics.getLastCheckpointStreamingTimeTaken() > 0);
-      Assert.assertTrue(omMetrics.getNumCheckpoints() > initialCheckpointCount);
+          omMetrics.getDBCheckpointMetrics().
+              getLastCheckpointStreamingTimeTaken() > 0);
+      Assert.assertTrue(omMetrics.getDBCheckpointMetrics().
+          getNumCheckpoints() > initialCheckpointCount);
     } finally {
       FileUtils.deleteQuietly(tempFile);
     }

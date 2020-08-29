@@ -47,6 +47,7 @@ public class SCMDBCheckpointServlet extends DBCheckpointServlet {
       return;
     }
 
-    initialize(scm.getScmMetadataStore().getStore(), scm.getMetrics());
+    initialize(scm.getScmMetadataStore().getStore(),
+        scm.getMetrics().getDBCheckpointMetrics());
   }
 }

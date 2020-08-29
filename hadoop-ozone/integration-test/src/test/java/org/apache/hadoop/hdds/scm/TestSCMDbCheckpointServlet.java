@@ -25,19 +25,13 @@ import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
 import org.apache.hadoop.hdds.scm.server.SCMDBCheckpointServlet;
-import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 
@@ -45,10 +39,8 @@ import org.apache.commons.io.FileUtils;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
-import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.writeOmDBCheckpointToStream;
 import org.junit.After;
 import org.junit.Assert;
-import static org.junit.Assert.assertNotNull;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -121,7 +113,8 @@ public class TestSCMDbCheckpointServlet {
       doCallRealMethod().when(scmDbCheckpointServletMock).init();
       doCallRealMethod().when(scmDbCheckpointServletMock).initialize(
           cluster.getStorageContainerManager().getScmMetadataStore().getStore(),
-          cluster.getStorageContainerManager().getMetrics());
+          cluster.getStorageContainerManager().getMetrics()
+              .getDBCheckpointMetrics());
 
       HttpServletRequest requestMock = mock(HttpServletRequest.class);
       HttpServletResponse responseMock = mock(HttpServletResponse.class);
@@ -163,85 +156,23 @@ public class TestSCMDbCheckpointServlet {
           responseMock);
 
       scmDbCheckpointServletMock.init();
-      long initialCheckpointCount = scmMetrics.getNumCheckpoints();
+      long initialCheckpointCount =
+          scmMetrics.getDBCheckpointMetrics().getNumCheckpoints();
 
       scmDbCheckpointServletMock.doGet(requestMock, responseMock);
 
       Assert.assertTrue(tempFile.length() > 0);
       Assert.assertTrue(
-          scmMetrics.getLastCheckpointCreationTimeTaken() > 0);
+          scmMetrics.getDBCheckpointMetrics().
+              getLastCheckpointCreationTimeTaken() > 0);
       Assert.assertTrue(
-          scmMetrics.getLastCheckpointStreamingTimeTaken() > 0);
-      Assert.assertTrue(scmMetrics.getNumCheckpoints() >
-          initialCheckpointCount);
+          scmMetrics.getDBCheckpointMetrics().
+              getLastCheckpointStreamingTimeTaken() > 0);
+      Assert.assertTrue(scmMetrics.getDBCheckpointMetrics().
+          getNumCheckpoints() > initialCheckpointCount);
     } finally {
       FileUtils.deleteQuietly(tempFile);
     }
 
-  }
-
-  @Test
-  public void testWriteCheckpointToOutputStream() throws Exception {
-
-    FileInputStream fis = null;
-    FileOutputStream fos = null;
-
-    try {
-      String testDirName = folder.newFolder().getAbsolutePath();
-      File file = new File(testDirName + "/temp1.txt");
-      FileWriter writer = new FileWriter(file);
-      writer.write("Test data 1");
-      writer.close();
-
-      file = new File(testDirName + "/temp2.txt");
-      writer = new FileWriter(file);
-      writer.write("Test data 2");
-      writer.close();
-
-      File outputFile =
-          new File(Paths.get(testDirName, "output_file.tgz").toString());
-      TestDBCheckpoint dbCheckpoint = new TestDBCheckpoint(
-          Paths.get(testDirName));
-      writeOmDBCheckpointToStream(dbCheckpoint,
-          new FileOutputStream(outputFile));
-      assertNotNull(outputFile);
-    } finally {
-      IOUtils.closeStream(fis);
-      IOUtils.closeStream(fos);
-    }
-  }
-}
-
-class TestDBCheckpoint implements DBCheckpoint {
-
-  private Path checkpointFile;
-
-  TestDBCheckpoint(Path checkpointFile) {
-    this.checkpointFile = checkpointFile;
-  }
-
-  @Override
-  public Path getCheckpointLocation() {
-    return checkpointFile;
-  }
-
-  @Override
-  public long getCheckpointTimestamp() {
-    return 0;
-  }
-
-  @Override
-  public long getLatestSequenceNumber() {
-    return 0;
-  }
-
-  @Override
-  public long checkpointCreationTimeTaken() {
-    return 0;
-  }
-
-  @Override
-  public void cleanupCheckpoint() throws IOException {
-    FileUtils.deleteDirectory(checkpointFile.toFile());
   }
 }
