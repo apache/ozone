@@ -152,7 +152,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
 
     Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneKey));
 
-    omKeyDeleteResponse.addToDBBatch(omMetadataManager, batchOperation);
+    omKeyDeleteResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);

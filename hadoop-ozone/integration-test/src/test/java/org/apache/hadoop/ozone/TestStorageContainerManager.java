@@ -26,7 +26,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys
 import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.junit.Assert.fail;
-import org.junit.Ignore;
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
@@ -109,7 +108,6 @@ import com.google.common.collect.Maps;
 /**
  * Test class that exercises the StorageContainerManager.
  */
-@Ignore
 public class TestStorageContainerManager {
   private static XceiverClientManager xceiverClientManager;
   private static final Logger LOG = LoggerFactory.getLogger(
@@ -119,7 +117,7 @@ public class TestStorageContainerManager {
    * Set the timeout for every test.
    */
   @Rule
-  public Timeout testTimeout = new Timeout(300000);
+  public Timeout testTimeout = new Timeout(900000);
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
@@ -525,7 +523,7 @@ public class TestStorageContainerManager {
   /**
    * Test datanode heartbeat well processed with a 4-layer network topology.
    */
-  @Test(timeout = 60000)
+  @Test(timeout = 180000)
   public void testScmProcessDatanodeHeartbeat() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     String scmId = UUID.randomUUID().toString();
@@ -593,7 +591,10 @@ public class TestStorageContainerManager {
           new TestStorageContainerManagerHelper(cluster, conf);
 
       helper.createKeys(10, 4096);
-      Thread.sleep(5000);
+      GenericTestUtils.waitFor(() -> {
+        return cluster.getStorageContainerManager().getContainerManager().
+            getContainers() != null;
+      }, 1000, 10000);
 
       StorageContainerManager scm = cluster.getStorageContainerManager();
       List<ContainerInfo> containers = cluster.getStorageContainerManager()
@@ -604,8 +605,18 @@ public class TestStorageContainerManager {
       // Stop processing HB
       scm.getDatanodeProtocolServer().stop();
 
-      scm.getContainerManager().updateContainerState(selectedContainer
-          .containerID(), HddsProtos.LifeCycleEvent.FINALIZE);
+      LOG.info(
+          "Current Container State is {}", selectedContainer.getState());
+      try {
+        scm.getContainerManager().updateContainerState(selectedContainer
+            .containerID(), HddsProtos.LifeCycleEvent.FINALIZE);
+      } catch (SCMException ex) {
+        if (selectedContainer.getState() != HddsProtos.LifeCycleState.CLOSING) {
+          ex.printStackTrace();
+          throw(ex);
+        }
+      }
+
       cluster.restartStorageContainerManager(false);
       scm = cluster.getStorageContainerManager();
       EventPublisher publisher = mock(EventPublisher.class);
@@ -616,7 +627,6 @@ public class TestStorageContainerManager {
       modifiersField.setAccessible(true);
       modifiersField.setInt(f, f.getModifiers() & ~Modifier.FINAL);
       f.set(replicationManager, publisher);
-      Thread.sleep(10000);
 
       UUID dnUuid = cluster.getHddsDatanodes().iterator().next()
           .getDatanodeDetails().getUuid();
@@ -627,6 +637,13 @@ public class TestStorageContainerManager {
 
       CommandForDatanode commandForDatanode = new CommandForDatanode(
           dnUuid, closeContainerCommand);
+
+      GenericTestUtils.waitFor(() -> {
+        return replicationManager.isRunning();
+      }, 1000, 25000);
+
+      // Give ReplicationManager some time to process the containers.
+      Thread.sleep(5000);
 
       verify(publisher).fireEvent(eq(SCMEvents.DATANODE_COMMAND), argThat(new
           CloseContainerCommandMatcher(dnUuid, commandForDatanode)));

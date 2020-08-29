@@ -14,17 +14,22 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Smoketest ozone cluster startup
-Library             OperatingSystem
+Documentation       Test ozone admin datanode command
 Library             BuiltIn
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
 
-*** Variables ***
-
-
 *** Test Cases ***
-Run list datanodes
+List datanodes
     ${output} =         Execute          ozone admin datanode list
                         Should contain   ${output}   Datanode:
                         Should contain   ${output}   Related pipelines:
+
+Incomplete command
+    ${output} =         Execute And Ignore Error     ozone admin datanode
+                        Should contain   ${output}   Incomplete command
+                        Should contain   ${output}   list
+
+List datanodes on unknown host
+    ${output} =         Execute And Ignore Error     ozone admin --verbose datanode list --scm unknown-host
+                        Should contain   ${output}   Invalid host name

@@ -36,7 +36,7 @@ import org.junit.Test;
 public class TestOMKeyAclRequest extends TestOMKeyRequest {
 
   @Test
-  public void testReplayRequest() throws Exception {
+  public void testAclRequest() throws Exception {
     // Manually add volume, bucket and key to DB
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
@@ -59,13 +59,6 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
-    // Replay the original request
-    OMClientResponse replayResponse = omKeyAddAclRequest
-        .validateAndUpdateCache(ozoneManager, 2,
-            ozoneManagerDoubleBufferHelper);
-
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
-        replayResponse.getOMResponse().getStatus());
   }
 
   /**

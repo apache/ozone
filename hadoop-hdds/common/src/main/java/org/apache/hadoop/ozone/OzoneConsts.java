@@ -24,6 +24,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.thirdparty.io.grpc.Context;
 import org.apache.ratis.thirdparty.io.grpc.Metadata;
 
+import java.util.regex.Pattern;
+
 import static org.apache.ratis.thirdparty.io.grpc.Metadata.ASCII_STRING_MARSHALLER;
 
 /**
@@ -85,6 +87,7 @@ public final class OzoneConsts {
 
   // Ozone File System scheme
   public static final String OZONE_URI_SCHEME = "o3fs";
+  public static final String OZONE_OFS_URI_SCHEME = "ofs";
 
   public static final String OZONE_RPC_SCHEME = "o3";
   public static final String OZONE_HTTP_SCHEME = "http";
@@ -279,6 +282,7 @@ public final class OzoneConsts {
   public static final String RESOURCE_TYPE = "resourceType";
   public static final String IS_VERSION_ENABLED = "isVersionEnabled";
   public static final String CREATION_TIME = "creationTime";
+  public static final String MODIFICATION_TIME = "modificationTime";
   public static final String DATA_SIZE = "dataSize";
   public static final String REPLICATION_TYPE = "replicationType";
   public static final String REPLICATION_FACTOR = "replicationFactor";
@@ -289,9 +293,15 @@ public final class OzoneConsts {
   public static final String MAX_PARTS = "maxParts";
   public static final String S3_BUCKET = "s3Bucket";
   public static final String S3_GETSECRET_USER = "S3GetSecretUser";
+  public static final String RENAMED_KEYS_MAP = "renamedKeysMap";
+  public static final String UNRENAMED_KEYS_MAP = "unRenamedKeysMap";
   public static final String MULTIPART_UPLOAD_PART_NUMBER = "partNumber";
   public static final String MULTIPART_UPLOAD_PART_NAME = "partName";
   public static final String BUCKET_ENCRYPTION_KEY = "bucketEncryptionKey";
+  public static final String DELETED_KEYS_LIST = "deletedKeysList";
+  public static final String UNDELETED_KEYS_LIST = "unDeletedKeysList";
+  public static final String SOURCE_VOLUME = "sourceVolume";
+  public static final String SOURCE_BUCKET = "sourceBucket";
 
 
 
@@ -336,9 +346,29 @@ public final class OzoneConsts {
   public static final String GDPR_SECRET = "secret";
   public static final String GDPR_ALGORITHM = "algorithm";
 
+  /**
+   * Block key name as illegal characters
+   *
+   * This regular expression is used to check if key name
+   * contains illegal characters when creating/renaming key.
+   *
+   * Avoid the following characters in a key name:
+   * "\", "{", "}", "^", "<", ">", "#", "|", "%", "`", "[", "]", "~", "?"
+   * and Non-printable ASCII characters (128–255 decimal characters).
+   * https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html
+   */
+  public static final Pattern KEYNAME_ILLEGAL_CHARACTER_CHECK_REGEX  =
+          Pattern.compile("^[^^{}<>^?%~#`\\[\\]\\|\\\\(\\x80-\\xff)]+$");
+
+  public static final String FS_FILE_COPYING_TEMP_SUFFIX= "._COPYING_";
 
   // Transaction Info
   public static final String TRANSACTION_INFO_KEY = "#TRANSACTIONINFO";
   public static final String TRANSACTION_INFO_SPLIT_KEY = "#";
 
+  public static final String CONTAINER_DB_TYPE_ROCKSDB = "RocksDB";
+  public static final String CONTAINER_DB_TYPE_LEVELDB = "LevelDB";
+
+  // An on-disk transient marker file used when replacing DB with checkpoint
+  public static final String DB_TRANSIENT_MARKER = "dbInconsistentMarker";
 }

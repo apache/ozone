@@ -34,12 +34,14 @@ import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketSetAclRequest;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeysDeleteRequest;
 import org.apache.hadoop.ozone.om.request.key.OMAllocateBlockRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyDeleteRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRenameRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeysRenameRequest;
 import org.apache.hadoop.ozone.om.request.key.OMTrashRecoverRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequest;
@@ -124,8 +126,12 @@ public final class OzoneManagerRatisUtils {
       return new OMKeyCommitRequest(omRequest);
     case DeleteKey:
       return new OMKeyDeleteRequest(omRequest);
+    case DeleteKeys:
+      return new OMKeysDeleteRequest(omRequest);
     case RenameKey:
       return new OMKeyRenameRequest(omRequest);
+    case RenameKeys:
+      return new OMKeysRenameRequest(omRequest);
     case CreateDirectory:
       return new OMDirectoryCreateRequest(omRequest);
     case CreateFile:
@@ -225,15 +231,35 @@ public final class OzoneManagerRatisUtils {
   }
 
   /**
-   * Obtain Transaction info from downloaded snapshot DB.
+   * Obtain OMTransactionInfo from Checkpoint.
+   */
+  public static OMTransactionInfo getTrxnInfoFromCheckpoint(
+      OzoneConfiguration conf, Path dbPath) throws Exception {
+
+    if (dbPath != null) {
+      Path dbDir = dbPath.getParent();
+      Path dbFile = dbPath.getFileName();
+      if (dbDir != null && dbFile != null) {
+        return getTransactionInfoFromDB(conf, dbDir, dbFile.toString());
+      }
+    }
+    
+    throw new IOException("Checkpoint " + dbPath + " does not have proper " +
+        "DB location");
+  }
+
+  /**
+   * Obtain Transaction info from DB.
    * @param tempConfig
+   * @param dbDir path to DB
    * @return OMTransactionInfo
    * @throws Exception
    */
-  public static OMTransactionInfo getTransactionInfoFromDownloadedSnapshot(
-      OzoneConfiguration tempConfig, Path dbDir) throws Exception {
-    DBStore dbStore =
-        OmMetadataManagerImpl.loadDB(tempConfig, dbDir.toFile());
+  private static OMTransactionInfo getTransactionInfoFromDB(
+      OzoneConfiguration tempConfig, Path dbDir, String dbName)
+      throws Exception {
+    DBStore dbStore = OmMetadataManagerImpl.loadDB(tempConfig, dbDir.toFile(),
+        dbName);
 
     Table<String, OMTransactionInfo> transactionInfoTable =
         dbStore.getTable(TRANSACTION_INFO_TABLE,
@@ -242,8 +268,11 @@ public final class OzoneManagerRatisUtils {
     OMTransactionInfo omTransactionInfo =
         transactionInfoTable.get(TRANSACTION_INFO_KEY);
     dbStore.close();
-    OzoneManager.LOG.info("Downloaded checkpoint with OMTransactionInfo {}",
-        omTransactionInfo);
+
+    if (omTransactionInfo == null) {
+      throw new IOException("Failed to read OMTransactionInfo from DB " +
+          dbName + " at " + dbDir);
+    }
     return omTransactionInfo;
   }
 

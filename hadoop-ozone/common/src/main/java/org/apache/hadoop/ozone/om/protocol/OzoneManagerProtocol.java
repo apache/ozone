@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -38,6 +39,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
+import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -217,12 +219,30 @@ public interface OzoneManagerProtocol
   void renameKey(OmKeyArgs args, String toKeyName) throws IOException;
 
   /**
+   * Rename existing keys within a bucket.
+   * @param omRenameKeys Includes volume, bucket, and fromKey toKey name map
+   *                     and fromKey name toKey info Map.
+   * @throws IOException
+   */
+  void renameKeys(OmRenameKeys omRenameKeys) throws IOException;
+
+  /**
    * Deletes an existing key.
    *
    * @param args the args of the key.
    * @throws IOException
    */
   void deleteKey(OmKeyArgs args) throws IOException;
+
+  /**
+   * Deletes existing key/keys. This interface supports delete
+   * multiple keys and a single key. Used by deleting files
+   * through OzoneFileSystem.
+   *
+   * @param deleteKeys
+   * @throws IOException
+   */
+  void deleteKeys(OmDeleteKeys deleteKeys) throws IOException;
 
   /**
    * Deletes an existing empty bucket from volume.

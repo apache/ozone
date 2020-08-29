@@ -25,12 +25,12 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -176,7 +176,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
   @Override
   public InputStream readFile(String key) throws IOException {
-    incrementCounter(Statistic.OBJECTS_READ);
+    incrementCounter(Statistic.OBJECTS_READ, 1);
     try {
       return bucket.readFile(key).getInputStream();
     } catch (OMException ex) {
@@ -190,14 +190,14 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     }
   }
 
-  protected void incrementCounter(Statistic objectsRead) {
+  protected void incrementCounter(Statistic objectsRead, long count) {
     //noop: Use OzoneClientAdapterImpl which supports statistics.
   }
 
   @Override
   public OzoneFSOutputStream createFile(String key, short replication,
       boolean overWrite, boolean recursive) throws IOException {
-    incrementCounter(Statistic.OBJECTS_CREATED);
+    incrementCounter(Statistic.OBJECTS_CREATED, 1);
     try {
       OzoneOutputStream ozoneOutputStream = null;
       if (replication == ReplicationFactor.ONE.getValue()
@@ -224,8 +224,13 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
   @Override
   public void renameKey(String key, String newKeyName) throws IOException {
-    incrementCounter(Statistic.OBJECTS_RENAMED);
+    incrementCounter(Statistic.OBJECTS_RENAMED, 1);
     bucket.renameKey(key, newKeyName);
+  }
+
+  @Override
+  public void rename(String pathStr, String newPath) throws IOException {
+    throw new IOException("Please use renameKey instead for o3fs.");
   }
 
   /**
@@ -237,7 +242,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   @Override
   public boolean createDirectory(String keyName) throws IOException {
     LOG.trace("creating dir for key:{}", keyName);
-    incrementCounter(Statistic.OBJECTS_CREATED);
+    incrementCounter(Statistic.OBJECTS_CREATED, 1);
     try {
       bucket.createDirectory(keyName);
     } catch (OMException e) {
@@ -259,8 +264,26 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   public boolean deleteObject(String keyName) {
     LOG.trace("issuing delete for key {}", keyName);
     try {
-      incrementCounter(Statistic.OBJECTS_DELETED);
+      incrementCounter(Statistic.OBJECTS_DELETED, 1);
       bucket.deleteKey(keyName);
+      return true;
+    } catch (IOException ioe) {
+      LOG.error("delete key failed {}", ioe.getMessage());
+      return false;
+    }
+  }
+
+  /**
+   * Helper method to delete an object specified by key name in bucket.
+   *
+   * @param keyNameList key name list to be deleted
+   * @return true if the key is deleted, false otherwise
+   */
+  @Override
+  public boolean deleteObjects(List<String> keyNameList) {
+    try {
+      incrementCounter(Statistic.OBJECTS_DELETED, keyNameList.size());
+      bucket.deleteKeys(keyNameList);
       return true;
     } catch (IOException ioe) {
       LOG.error("delete key failed {}", ioe.getMessage());
@@ -272,7 +295,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       Path qualifiedPath, String userName)
       throws IOException {
     try {
-      incrementCounter(Statistic.OBJECTS_QUERY);
+      incrementCounter(Statistic.OBJECTS_QUERY, 1);
       OzoneFileStatus status = bucket.getFileStatus(key);
       return toFileStatusAdapter(status, userName, uri, qualifiedPath);
 
@@ -288,7 +311,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
 
   @Override
   public Iterator<BasicKeyInfo> listKeys(String pathKey) {
-    incrementCounter(Statistic.OBJECTS_LIST);
+    incrementCounter(Statistic.OBJECTS_LIST, 1);
     return new IteratorAdapter(bucket.listKeys(pathKey));
   }
 
@@ -296,7 +319,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       String startKey, long numEntries, URI uri,
       Path workingDir, String username) throws IOException {
     try {
-      incrementCounter(Statistic.OBJECTS_LIST);
+      incrementCounter(Statistic.OBJECTS_LIST, 1);
       List<OzoneFileStatus> statuses = bucket
           .listStatus(keyName, recursive, startKey, numEntries);
 

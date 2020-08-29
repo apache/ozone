@@ -38,9 +38,10 @@ import org.yaml.snakeyaml.nodes.Tag;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static java.lang.Math.max;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_BLOCK_COUNT_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.CHUNKS_PATH;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_CONTAINER_BYTES_USED_KEY;
@@ -65,14 +66,14 @@ public class KeyValueContainerData extends ContainerData {
   private String metadataPath;
 
   //Type of DB used to store key to chunks mapping
-  private String containerDBType;
+  private String containerDBType = CONTAINER_DB_TYPE_ROCKSDB;
 
   private File dbFile = null;
 
   /**
    * Number of pending deletion blocks in KeyValueContainer.
    */
-  private final AtomicInteger numPendingDeletionBlocks;
+  private final AtomicLong numPendingDeletionBlocks;
 
   private long deleteTransactionId;
 
@@ -97,7 +98,7 @@ public class KeyValueContainerData extends ContainerData {
       long size, String originPipelineId, String originNodeId) {
     super(ContainerProtos.ContainerType.KeyValueContainer, id, layOutVersion,
         size, originPipelineId, originNodeId);
-    this.numPendingDeletionBlocks = new AtomicInteger(0);
+    this.numPendingDeletionBlocks = new AtomicLong(0);
     this.deleteTransactionId = 0;
   }
 
@@ -105,7 +106,7 @@ public class KeyValueContainerData extends ContainerData {
     super(source);
     Preconditions.checkArgument(source.getContainerType()
         == ContainerProtos.ContainerType.KeyValueContainer);
-    this.numPendingDeletionBlocks = new AtomicInteger(0);
+    this.numPendingDeletionBlocks = new AtomicLong(0);
     this.deleteTransactionId = 0;
   }
 
@@ -187,7 +188,7 @@ public class KeyValueContainerData extends ContainerData {
    *
    * @param numBlocks increment number
    */
-  public void incrPendingDeletionBlocks(int numBlocks) {
+  public void incrPendingDeletionBlocks(long numBlocks) {
     this.numPendingDeletionBlocks.addAndGet(numBlocks);
   }
 
@@ -196,14 +197,14 @@ public class KeyValueContainerData extends ContainerData {
    *
    * @param numBlocks decrement number
    */
-  public void decrPendingDeletionBlocks(int numBlocks) {
+  public void decrPendingDeletionBlocks(long numBlocks) {
     this.numPendingDeletionBlocks.addAndGet(-1 * numBlocks);
   }
 
   /**
    * Get the number of pending deletion blocks.
    */
-  public int getNumPendingDeletionBlocks() {
+  public long getNumPendingDeletionBlocks() {
     return this.numPendingDeletionBlocks.get();
   }
 

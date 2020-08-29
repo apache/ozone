@@ -49,6 +49,8 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
   private final List<ByteBuffer> buffers;
   /** Is this a duplicated buffer? (for debug only) */
   private final boolean isDuplicated;
+  /** The index of the first non-full buffer. */
+  private int firstNonFullIndex = 0;
 
   IncrementalChunkBuffer(int limit, int increment, boolean isDuplicated) {
     Preconditions.checkArgument(limit >= 0);
@@ -130,12 +132,14 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
 
   /** @return the index of the first non-full buffer. */
   private int firstNonFullIndex() {
-    for (int i = 0; i < buffers.size(); i++) {
+    for (int i = firstNonFullIndex; i < buffers.size(); i++) {
       if (getAtIndex(i).position() != increment) {
-        return i;
+        firstNonFullIndex = i;
+        return firstNonFullIndex;
       }
     }
-    return buffers.size();
+    firstNonFullIndex = buffers.size();
+    return firstNonFullIndex;
   }
 
   @Override
@@ -181,12 +185,14 @@ final class IncrementalChunkBuffer implements ChunkBuffer {
   @Override
   public ChunkBuffer rewind() {
     buffers.forEach(ByteBuffer::rewind);
+    firstNonFullIndex = 0;
     return this;
   }
 
   @Override
   public ChunkBuffer clear() {
     buffers.forEach(ByteBuffer::clear);
+    firstNonFullIndex = 0;
     return this;
   }
 

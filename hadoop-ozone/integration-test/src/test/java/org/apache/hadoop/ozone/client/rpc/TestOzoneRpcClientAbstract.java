@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -87,6 +88,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
@@ -107,6 +109,9 @@ import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PARTIAL_RENAME;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
@@ -118,7 +123,7 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import org.junit.Ignore;
+
 import org.junit.Test;
 
 /**
@@ -163,8 +168,6 @@ public abstract class TestOzoneRpcClientAbstract {
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);
     store = ozClient.getObjectStore();
-    String volumeName = HddsClientUtils.getS3VolumeName(conf);
-    store.createVolume(volumeName);
     storageContainerLocationClient =
         cluster.getStorageContainerLocationClient();
     ozoneManager = cluster.getOzoneManager();
@@ -235,6 +238,22 @@ public abstract class TestOzoneRpcClientAbstract {
     // should match the OM's RPC address.
     Assert.assertTrue(omProxies.get(0).getAddress().equals(
         ozoneManager.getOmRpcServerAddr()));
+  }
+
+  @Test
+  public void testDefaultS3GVolumeExists() throws Exception {
+    String s3VolumeName = HddsClientUtils.getS3VolumeName(cluster.getConf());
+    OzoneVolume ozoneVolume = store.getVolume(s3VolumeName);
+    Assert.assertEquals(ozoneVolume.getName(), s3VolumeName);
+    OMMetadataManager omMetadataManager =
+        cluster.getOzoneManager().getMetadataManager();
+    long transactionID = Long.MAX_VALUE -1 >> 8;
+    long objectID = transactionID << 8;
+    OmVolumeArgs omVolumeArgs =
+        cluster.getOzoneManager().getMetadataManager().getVolumeTable().get(
+            omMetadataManager.getVolumeKey(s3VolumeName));
+    Assert.assertEquals(objectID, omVolumeArgs.getObjectID());
+    Assert.assertEquals(transactionID, omVolumeArgs.getUpdateID());
   }
 
   @Test
@@ -750,7 +769,6 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
 
-  @Ignore("Debug Jenkins Timeout")
   @Test
   public void testPutKeyRatisThreeNodesParallel() throws IOException,
       InterruptedException {
@@ -1187,7 +1205,7 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(keyName, key.getName());
     bucket.deleteKey(keyName);
 
-    OzoneTestUtils.expectOmException(ResultCodes.KEY_NOT_FOUND,
+    OzoneTestUtils.expectOmException(KEY_NOT_FOUND,
         () -> bucket.getKey(keyName));
   }
 
@@ -1202,13 +1220,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
-    OzoneOutputStream out = bucket.createKey(fromKeyName,
-        value.getBytes().length, STAND_ALONE,
-        ONE, new HashMap<>());
-    out.write(value.getBytes());
-    out.close();
-    OzoneKey key = bucket.getKey(fromKeyName);
-    Assert.assertEquals(fromKeyName, key.getName());
+    createTestKey(bucket, fromKeyName, value);
 
     // Rename to empty string should fail.
     OMException oe = null;
@@ -1229,15 +1241,79 @@ public abstract class TestOzoneRpcClientAbstract {
     } catch (OMException e) {
       oe = e;
     }
-    Assert.assertEquals(ResultCodes.KEY_NOT_FOUND, oe.getResult());
+    Assert.assertEquals(KEY_NOT_FOUND, oe.getResult());
 
-    key = bucket.getKey(toKeyName);
+    OzoneKey key = bucket.getKey(toKeyName);
     Assert.assertEquals(toKeyName, key.getName());
   }
 
-  // Listing all volumes in the cluster feature has to be fixed after HDDS-357.
-  // TODO: fix this
-  @Ignore
+  @Test
+  public void testKeysRename() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName1 = "dir/file1";
+    String keyName2 = "dir/file2";
+
+    String newKeyName1 = "dir/key1";
+    String newKeyName2 = "dir/key2";
+
+    String value = "sample value";
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    createTestKey(bucket, keyName1, value);
+    createTestKey(bucket, keyName2, value);
+
+    Map<String, String> keyMap = new HashMap();
+    keyMap.put(keyName1, newKeyName1);
+    keyMap.put(keyName2, newKeyName2);
+    bucket.renameKeys(keyMap);
+
+    // new key should exist
+    Assert.assertEquals(newKeyName1, bucket.getKey(newKeyName1).getName());
+    Assert.assertEquals(newKeyName2, bucket.getKey(newKeyName2).getName());
+
+    // old key should not exist
+    assertKeyRenamedEx(bucket, keyName1);
+    assertKeyRenamedEx(bucket, keyName2);
+  }
+
+  @Test
+  public void testKeysRenameFail() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName1 = "dir/file1";
+    String keyName2 = "dir/file2";
+
+    String newKeyName1 = "dir/key1";
+    String newKeyName2 = "dir/key2";
+
+    String value = "sample value";
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // Create only keyName1 to test the partial failure of renameKeys.
+    createTestKey(bucket, keyName1, value);
+
+    Map<String, String> keyMap = new HashMap();
+    keyMap.put(keyName1, newKeyName1);
+    keyMap.put(keyName2, newKeyName2);
+
+    try {
+      bucket.renameKeys(keyMap);
+    } catch (OMException ex) {
+      Assert.assertEquals(PARTIAL_RENAME, ex.getResult());
+    }
+
+    // newKeyName1 should exist
+    Assert.assertEquals(newKeyName1, bucket.getKey(newKeyName1).getName());
+    // newKeyName2 should not exist
+    assertKeyRenamedEx(bucket, keyName2);
+  }
+
   @Test
   public void testListVolume() throws IOException {
     String volBase = "vol-" + RandomStringUtils.randomNumeric(3);
@@ -1742,7 +1818,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     String uploadID = "random";
     OzoneTestUtils
-        .expectOmException(ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR, () ->
+        .expectOmException(NO_SUCH_MULTIPART_UPLOAD_ERROR, () ->
             bucket
                 .createMultipartKey(keyName, sampleData.length(), 1, uploadID));
   }
@@ -1901,8 +1977,105 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
 
-    OzoneTestUtils.expectOmException(ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR,
+    OzoneTestUtils.expectOmException(NO_SUCH_MULTIPART_UPLOAD_ERROR,
         () -> bucket.abortMultipartUpload(keyName, "random"));
+  }
+
+  @Test
+  public void testAbortUploadFailWithInProgressPartUpload() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    OmMultipartInfo omMultipartInfo = bucket.initiateMultipartUpload(keyName,
+        STAND_ALONE, ONE);
+
+    Assert.assertNotNull(omMultipartInfo.getUploadID());
+
+    // Do not close output stream.
+    byte[] data = "data".getBytes(UTF_8);
+    OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
+        data.length, 1, omMultipartInfo.getUploadID());
+    ozoneOutputStream.write(data, 0, data.length);
+
+    // Abort before completing part upload.
+    bucket.abortMultipartUpload(keyName, omMultipartInfo.getUploadID());
+
+    try {
+      ozoneOutputStream.close();
+      fail("testAbortUploadFailWithInProgressPartUpload failed");
+    } catch (IOException ex) {
+      assertTrue(ex instanceof OMException);
+      assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR,
+          ((OMException) ex).getResult());
+    }
+  }
+
+  @Test
+  public void testCommitPartAfterCompleteUpload() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    OmMultipartInfo omMultipartInfo = bucket.initiateMultipartUpload(keyName,
+        STAND_ALONE, ONE);
+
+    Assert.assertNotNull(omMultipartInfo.getUploadID());
+
+    String uploadID = omMultipartInfo.getUploadID();
+
+    // upload part 1.
+    byte[] data = generateData(5 * 1024 * 1024,
+        (byte) RandomUtils.nextLong());
+    OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
+        data.length, 1, uploadID);
+    ozoneOutputStream.write(data, 0, data.length);
+    ozoneOutputStream.close();
+
+    OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
+        ozoneOutputStream.getCommitUploadPartInfo();
+
+    // Do not close output stream for part 2.
+    ozoneOutputStream = bucket.createMultipartKey(keyName,
+        data.length, 2, omMultipartInfo.getUploadID());
+    ozoneOutputStream.write(data, 0, data.length);
+
+    Map<Integer, String> partsMap = new LinkedHashMap<>();
+    partsMap.put(1, omMultipartCommitUploadPartInfo.getPartName());
+    OmMultipartUploadCompleteInfo omMultipartUploadCompleteInfo =
+        bucket.completeMultipartUpload(keyName,
+        uploadID, partsMap);
+
+    Assert.assertNotNull(omMultipartCommitUploadPartInfo);
+
+    byte[] fileContent = new byte[data.length];
+    OzoneInputStream inputStream = bucket.readKey(keyName);
+    inputStream.read(fileContent);
+    StringBuilder sb = new StringBuilder(data.length);
+
+    // Combine all parts data, and check is it matching with get key data.
+    String part1 = new String(data);
+    sb.append(part1);
+    Assert.assertEquals(sb.toString(), new String(fileContent));
+
+    try {
+      ozoneOutputStream.close();
+      fail("testCommitPartAfterCompleteUpload failed");
+    } catch (IOException ex) {
+      assertTrue(ex instanceof OMException);
+      assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR,
+          ((OMException) ex).getResult());
+    }
   }
 
 
@@ -2132,7 +2305,7 @@ public abstract class TestOzoneRpcClientAbstract {
   @Test
   public void testListPartsWithInvalidUploadID() throws Exception {
     OzoneTestUtils
-        .expectOmException(ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR, () -> {
+        .expectOmException(NO_SUCH_MULTIPART_UPLOAD_ERROR, () -> {
           String volumeName = UUID.randomUUID().toString();
           String bucketName = UUID.randomUUID().toString();
           String keyName = UUID.randomUUID().toString();
@@ -2576,6 +2749,28 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertNotNull(omMultipartUploadCompleteInfo.getHash());
   }
 
+  private void createTestKey(OzoneBucket bucket, String keyName,
+                             String keyValue) throws IOException {
+    OzoneOutputStream out = bucket.createKey(keyName,
+        keyValue.getBytes().length, STAND_ALONE,
+        ONE, new HashMap<>());
+    out.write(keyValue.getBytes());
+    out.close();
+    OzoneKey key = bucket.getKey(keyName);
+    Assert.assertEquals(keyName, key.getName());
+  }
+
+  private void assertKeyRenamedEx(OzoneBucket bucket, String keyName)
+      throws Exception {
+    OMException oe = null;
+    try {
+      bucket.getKey(keyName);
+    } catch (OMException e) {
+      oe = e;
+    }
+    Assert.assertEquals(KEY_NOT_FOUND, oe.getResult());
+  }
+
   /**
    * Tests GDPR encryption/decryption.
    * 1. Create GDPR Enabled bucket.
@@ -2727,11 +2922,14 @@ public abstract class TestOzoneRpcClientAbstract {
         keyName);
     RepeatedOmKeyInfo deletedKeys =
         omMetadataManager.getDeletedTable().get(objectKey);
-    Map<String, String> deletedKeyMetadata =
-        deletedKeys.getOmKeyInfoList().get(0).getMetadata();
-    Assert.assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_FLAG));
-    Assert.assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_SECRET));
-    Assert.assertFalse(
-        deletedKeyMetadata.containsKey(OzoneConsts.GDPR_ALGORITHM));
+    if (deletedKeys != null) {
+      Map<String, String> deletedKeyMetadata =
+          deletedKeys.getOmKeyInfoList().get(0).getMetadata();
+      Assert.assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_FLAG));
+      Assert.assertFalse(
+          deletedKeyMetadata.containsKey(OzoneConsts.GDPR_SECRET));
+      Assert.assertFalse(
+          deletedKeyMetadata.containsKey(OzoneConsts.GDPR_ALGORITHM));
+    }
   }
 }

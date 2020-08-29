@@ -18,6 +18,7 @@ package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -65,7 +66,7 @@ public class SCMContainerManager implements ContainerManager {
 
   private final ContainerStateManager containerStateManager;
 
-  private final int numContainerPerOwnerInPipeline;
+  private final int numContainerPerVolume;
 
   private final SCMContainerManagerMetrics scmContainerManagerMetrics;
 
@@ -97,7 +98,7 @@ public class SCMContainerManager implements ContainerManager {
     this.lock = new ReentrantLock();
     this.pipelineManager = pipelineManager;
     this.containerStateManager = new ContainerStateManager(conf);
-    this.numContainerPerOwnerInPipeline = conf
+    this.numContainerPerVolume = conf
         .getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
             ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
 
@@ -388,13 +389,17 @@ public class SCMContainerManager implements ContainerManager {
         ContainerID containerIdObject = new ContainerID(containerID);
         ContainerInfo containerInfo =
             containerStore.get(containerIdObject);
-        if (containerInfo == null) {
+        ContainerInfo containerInfoInMem = containerStateManager
+            .getContainer(containerIdObject);
+        if (containerInfo == null || containerInfoInMem == null) {
           throw new SCMException(
               "Failed to increment number of deleted blocks for container "
                   + containerID + ", reason : " + "container doesn't exist.",
               SCMException.ResultCodes.FAILED_TO_FIND_CONTAINER);
         }
         containerInfo.updateDeleteTransactionId(entry.getValue());
+        containerInfo.setNumberOfKeys(containerInfoInMem.getNumberOfKeys());
+        containerInfo.setUsedBytes(containerInfoInMem.getUsedBytes());
         containerStore
             .putWithBatch(batchOperation, containerIdObject, containerInfo);
       }
@@ -416,14 +421,14 @@ public class SCMContainerManager implements ContainerManager {
    */
   public ContainerInfo getMatchingContainer(final long sizeRequired,
       String owner, Pipeline pipeline) {
-    return getMatchingContainer(sizeRequired, owner, pipeline, Collections
-        .emptyList());
+    return getMatchingContainer(sizeRequired, owner, pipeline,
+        Collections.emptySet());
   }
 
   @SuppressWarnings("squid:S2445")
   public ContainerInfo getMatchingContainer(final long sizeRequired,
                                             String owner, Pipeline pipeline,
-                                            List<ContainerID>
+                                            Collection<ContainerID>
                                                       excludedContainers) {
     NavigableSet<ContainerID> containerIDs;
     ContainerInfo containerInfo;
@@ -431,7 +436,8 @@ public class SCMContainerManager implements ContainerManager {
       synchronized (pipeline) {
         containerIDs = getContainersForOwner(pipeline, owner);
 
-        if (containerIDs.size() < numContainerPerOwnerInPipeline) {
+        if (containerIDs.size() < numContainerPerVolume * pipelineManager.
+                getNumHealthyVolumes(pipeline)) {
           containerInfo =
                   containerStateManager.allocateContainer(
                           pipelineManager, owner, pipeline);

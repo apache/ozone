@@ -19,6 +19,7 @@
 package org.apache.hadoop.fs.ozone;
 
 import com.google.common.base.Preconditions;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CreateFlag;
@@ -27,7 +28,9 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.Options.Rename;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.permission.FsPermission;
@@ -37,6 +40,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
@@ -49,6 +53,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -61,6 +67,8 @@ import java.util.stream.Collectors;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_USER_DIR;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 
@@ -200,7 +208,7 @@ public class BasicOzoneFileSystem extends FileSystem {
 
   @Override
   public FSDataInputStream open(Path f, int bufferSize) throws IOException {
-    incrementCounter(Statistic.INVOCATION_OPEN);
+    incrementCounter(Statistic.INVOCATION_OPEN, 1);
     statistics.incrementReadOps(1);
     LOG.trace("open() path:{}", f);
     final String key = pathToKey(f);
@@ -213,7 +221,11 @@ public class BasicOzoneFileSystem extends FileSystem {
   }
 
   protected void incrementCounter(Statistic statistic) {
-    //don't do anyting in this default implementation.
+    incrementCounter(statistic, 1);
+  }
+
+  protected void incrementCounter(Statistic statistic, long count) {
+    //don't do anything in this default implementation.
   }
 
   @Override
@@ -222,7 +234,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       short replication, long blockSize,
       Progressable progress) throws IOException {
     LOG.trace("create() path:{}", f);
-    incrementCounter(Statistic.INVOCATION_CREATE);
+    incrementCounter(Statistic.INVOCATION_CREATE, 1);
     statistics.incrementWriteOps(1);
     final String key = pathToKey(f);
     return createOutputStream(key, replication, overwrite, true);
@@ -236,7 +248,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       short replication,
       long blockSize,
       Progressable progress) throws IOException {
-    incrementCounter(Statistic.INVOCATION_CREATE_NON_RECURSIVE);
+    incrementCounter(Statistic.INVOCATION_CREATE_NON_RECURSIVE, 1);
     statistics.incrementWriteOps(1);
     final String key = pathToKey(path);
     return createOutputStream(key,
@@ -269,9 +281,12 @@ public class BasicOzoneFileSystem extends FileSystem {
     }
 
     @Override
-    boolean processKey(String key) throws IOException {
-      String newKeyName = dstKey.concat(key.substring(srcKey.length()));
-      adapter.renameKey(key, newKeyName);
+    boolean processKey(List<String> keyList) throws IOException {
+      // TODO RenameKey needs to be changed to batch operation
+      for(String key : keyList) {
+        String newKeyName = dstKey.concat(key.substring(srcKey.length()));
+        adapter.renameKey(key, newKeyName);
+      }
       return true;
     }
   }
@@ -291,7 +306,7 @@ public class BasicOzoneFileSystem extends FileSystem {
    */
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
-    incrementCounter(Statistic.INVOCATION_RENAME);
+    incrementCounter(Statistic.INVOCATION_RENAME, 1);
     statistics.incrementWriteOps(1);
     super.checkPath(src);
     super.checkPath(dst);
@@ -389,6 +404,34 @@ public class BasicOzoneFileSystem extends FileSystem {
     return result;
   }
 
+  /**
+   * Intercept rename to trash calls from TrashPolicyDefault,
+   * convert them to delete calls instead.
+   */
+  @Deprecated
+  protected void rename(final Path src, final Path dst,
+      final Rename... options) throws IOException {
+    boolean hasMoveToTrash = false;
+    if (options != null) {
+      for (Rename option : options) {
+        if (option == Rename.TO_TRASH) {
+          hasMoveToTrash = true;
+          break;
+        }
+      }
+    }
+    if (!hasMoveToTrash) {
+      // if doesn't have TO_TRASH option, just pass the call to super
+      super.rename(src, dst, options);
+    } else {
+      // intercept when TO_TRASH is found
+      LOG.info("Move to trash is disabled for o3fs, deleting instead: {}. "
+          + "Files or directories will NOT be retained in trash. "
+          + "Ignore the following TrashPolicyDefault message, if any.", src);
+      delete(src, true);
+    }
+  }
+
   private class DeleteIterator extends OzoneListingIterator {
     private boolean recursive;
 
@@ -404,17 +447,12 @@ public class BasicOzoneFileSystem extends FileSystem {
     }
 
     @Override
-    boolean processKey(String key) throws IOException {
-      if (key.equals("")) {
-        LOG.trace("Skipping deleting root directory");
-        return true;
-      } else {
-        LOG.trace("deleting key:{}", key);
-        boolean succeed = adapter.deleteObject(key);
-        // if recursive delete is requested ignore the return value of
-        // deleteObject and issue deletes for other keys.
-        return recursive || succeed;
-      }
+    boolean processKey(List<String> key) throws IOException {
+      LOG.trace("deleting key:{}", key);
+      boolean succeed = adapter.deleteObjects(key);
+      // if recursive delete is requested ignore the return value of
+      // deleteObject and issue deletes for other keys.
+      return recursive || succeed;
     }
   }
 
@@ -447,7 +485,7 @@ public class BasicOzoneFileSystem extends FileSystem {
 
   @Override
   public boolean delete(Path f, boolean recursive) throws IOException {
-    incrementCounter(Statistic.INVOCATION_DELETE);
+    incrementCounter(Statistic.INVOCATION_DELETE, 1);
     statistics.incrementWriteOps(1);
     LOG.debug("Delete path {} - recursive {}", f, recursive);
     FileStatus status;
@@ -527,7 +565,7 @@ public class BasicOzoneFileSystem extends FileSystem {
 
   @Override
   public FileStatus[] listStatus(Path f) throws IOException {
-    incrementCounter(Statistic.INVOCATION_LIST_STATUS);
+    incrementCounter(Statistic.INVOCATION_LIST_STATUS, 1);
     statistics.incrementReadOps(1);
     LOG.trace("listStatus() path:{}", f);
     int numEntries = LISTING_PAGE_SIZE;
@@ -596,6 +634,52 @@ public class BasicOzoneFileSystem extends FileSystem {
   }
 
   /**
+   * Get the root directory of Trash for a path.
+   * Returns /.Trash/<username>
+   * Caller appends either Current or checkpoint timestamp for trash destination
+   * @param path the trash root of the path to be determined.
+   * @return trash root
+   */
+  @Override
+  public Path getTrashRoot(Path path) {
+    final Path pathToTrash = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
+    return new Path(pathToTrash, getUsername());
+  }
+
+  /**
+   * Get all the trash roots for current user or all users.
+   *
+   * @param allUsers return trash roots for all users if true.
+   * @return all the trash root directories.
+   *         Returns .Trash of users if {@code /.Trash/$USER} exists.
+   */
+  @Override
+  public Collection<FileStatus> getTrashRoots(boolean allUsers) {
+    Path trashRoot = new Path(OZONE_URI_DELIMITER, TRASH_PREFIX);
+    List<FileStatus> ret = new ArrayList<>();
+    try {
+      if (!allUsers) {
+        Path userTrash = new Path(trashRoot, userName);
+        if (exists(userTrash) && getFileStatus(userTrash).isDirectory()) {
+          ret.add(getFileStatus(userTrash));
+        }
+      } else {
+        if (exists(trashRoot)) {
+          FileStatus[] candidates = listStatus(trashRoot);
+          for (FileStatus candidate : candidates) {
+            if (candidate.isDirectory()) {
+              ret.add(candidate);
+            }
+          }
+        }
+      }
+    } catch (IOException ex) {
+      LOG.warn("Can't get all trash roots", ex);
+    }
+    return ret;
+  }
+
+  /**
    * Creates a directory. Directory is represented using a key with no value.
    *
    * @param path directory path to be created
@@ -618,7 +702,7 @@ public class BasicOzoneFileSystem extends FileSystem {
 
   @Override
   public FileStatus getFileStatus(Path f) throws IOException {
-    incrementCounter(Statistic.INVOCATION_GET_FILE_STATUS);
+    incrementCounter(Statistic.INVOCATION_GET_FILE_STATUS, 1);
     statistics.incrementReadOps(1);
     LOG.trace("getFileStatus() path:{}", f);
     Path qualifiedPath = f.makeQualified(uri, workingDir);
@@ -663,9 +747,15 @@ public class BasicOzoneFileSystem extends FileSystem {
       path = new Path(workingDir, path);
     }
     // removing leading '/' char
-    String key = path.toUri().getPath().substring(1);
+    String key = path.toUri().getPath();
+
+    if (OzoneFSUtils.isValidName(key)) {
+      key = path.toUri().getPath();
+    } else {
+      throw new InvalidPathException("Invalid path Name" + key);
+    }
     LOG.trace("path for key:{} is:{}", key, path);
-    return key;
+    return key.substring(1);
   }
 
   /**
@@ -722,7 +812,7 @@ public class BasicOzoneFileSystem extends FileSystem {
      * @return true if we should continue iteration of keys, false otherwise.
      * @throws IOException
      */
-    abstract boolean processKey(String key) throws IOException;
+    abstract boolean processKey(List<String> key) throws IOException;
 
     /**
      * Iterates thorugh all the keys prefixed with the input path's key and
@@ -736,19 +826,35 @@ public class BasicOzoneFileSystem extends FileSystem {
      */
     boolean iterate() throws IOException {
       LOG.trace("Iterating path {}", path);
+      List<String> keyList = new ArrayList<>();
+      int batchSize = getConf().getInt(OZONE_FS_ITERATE_BATCH_SIZE,
+          OZONE_FS_ITERATE_BATCH_SIZE_DEFAULT);
       if (status.isDirectory()) {
         LOG.trace("Iterating directory:{}", pathKey);
         while (keyIterator.hasNext()) {
           BasicKeyInfo key = keyIterator.next();
           LOG.trace("iterating key:{}", key.getName());
-          if (!processKey(key.getName())) {
+          if (!key.getName().equals("")) {
+            keyList.add(key.getName());
+          }
+          if (keyList.size() >= batchSize) {
+            if (!processKey(keyList)) {
+              return false;
+            } else {
+              keyList.clear();
+            }
+          }
+        }
+        if (keyList.size() > 0) {
+          if (!processKey(keyList)) {
             return false;
           }
         }
         return true;
       } else {
         LOG.trace("iterating file:{}", path);
-        return processKey(pathKey);
+        keyList.add(pathKey);
+        return processKey(keyList);
       }
     }
 

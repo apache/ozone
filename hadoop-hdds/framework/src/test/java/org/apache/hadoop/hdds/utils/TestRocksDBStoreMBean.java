@@ -53,9 +53,6 @@ public class TestRocksDBStoreMBean {
   @Before
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-
-    conf.set(OzoneConfigKeys.OZONE_METADATA_STORE_IMPL,
-        OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_ROCKSDB);
   }
   
 

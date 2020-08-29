@@ -24,6 +24,8 @@ Test Timeout        5 minutes
 
 *** Variables ***
 ${ENDPOINT_URL}     http://s3g:9878
+${TEMPDIR}          /tmp
+${TEST_FILE}        NOTICE.txt
 
 *** Keywords ***
 Setup volume names
@@ -37,6 +39,19 @@ Secure S3 test Success
     ${output} =         Execute          aws s3api --endpoint-url ${ENDPOINT_URL} create-bucket --bucket bucket-test123
     ${output} =         Execute          aws s3api --endpoint-url ${ENDPOINT_URL} list-buckets
                         Should contain   ${output}         bucket-test123
+
+Secure S3 put-object test
+    ${testFilePath} =       Set Variable            ${TEMPDIR}/${TEST_FILE}
+                            Copy File               ${TEST_FILE}            ${testFilePath}
+    ${output} =             Execute                 aws s3api --endpoint ${ENDPOINT_URL} put-object --bucket=bucket-test123 --key=tmp1/tmp2/NOTICE.txt --body=${testFilePath}
+    ${output} =             Execute                 aws s3api --endpoint ${ENDPOINT_URL} list-objects --bucket=bucket-test123
+                            Should contain   ${output}         tmp1/tmp2/NOTICE.txt
+    ${output} =             Execute                 aws s3api --endpoint ${ENDPOINT_URL} put-object --bucket=bucket-test123 --key=tmp3//tmp4/NOTICE.txt --body=${testFilePath}
+    ${output} =             Execute                 aws s3api --endpoint ${ENDPOINT_URL} list-objects --bucket=bucket-test123
+                            Should contain   ${output}         tmp3//tmp4/NOTICE.txt
+    ${output} =             Execute                 aws s3api --endpoint ${ENDPOINT_URL} put-object --bucket=bucket-test123 --key=//tmp5/tmp6/NOTICE.txt --body=${testFilePath}
+    ${output} =             Execute                 aws s3api --endpoint ${ENDPOINT_URL} list-objects --bucket=bucket-test123
+                            Should contain   ${output}         //tmp5/tmp6/NOTICE.txt
 
 Secure S3 test Failure
     Run Keyword         Setup dummy credentials for S3

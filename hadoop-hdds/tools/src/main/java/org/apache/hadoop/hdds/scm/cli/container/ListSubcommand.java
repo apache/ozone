@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,9 +19,9 @@ package org.apache.hadoop.hdds.scm.cli.container;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 
@@ -36,7 +36,6 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Help.Visibility;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.ParentCommand;
 
 /**
  * This is the handler that process container list command.
@@ -46,22 +45,19 @@ import picocli.CommandLine.ParentCommand;
     description = "List containers",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class ListSubcommand implements Callable<Void> {
+public class ListSubcommand extends ScmSubcommand {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ListSubcommand.class);
 
-  @ParentCommand
-  private ContainerCommands parent;
-
   @Option(names = {"-s", "--start"},
-      description = "Container id to start the iteration", required = false)
-  private long startId = 0;
+      description = "Container id to start the iteration")
+  private long startId;
 
   @Option(names = {"-c", "--count"},
       description = "Maximum number of containers to list",
       defaultValue = "20", showDefaultValue = Visibility.ALWAYS)
-  private int count = 20;
+  private int count;
 
   private static final ObjectWriter WRITER;
 
@@ -83,17 +79,13 @@ public class ListSubcommand implements Callable<Void> {
   }
 
   @Override
-  public Void call() throws Exception {
-    try (ScmClient scmClient = parent.getParent().createScmClient()) {
+  public void execute(ScmClient scmClient) throws IOException {
+    List<ContainerInfo> containerList =
+        scmClient.listContainer(startId, count);
 
-      List<ContainerInfo> containerList =
-          scmClient.listContainer(startId, count);
-
-      // Output data list
-      for (ContainerInfo container : containerList) {
-        outputContainerInfo(container);
-      }
-      return null;
+    // Output data list
+    for (ContainerInfo container : containerList) {
+      outputContainerInfo(container);
     }
   }
 }

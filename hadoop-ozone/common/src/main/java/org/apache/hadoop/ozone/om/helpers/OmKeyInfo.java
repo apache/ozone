@@ -148,21 +148,17 @@ public final class OmKeyInfo extends WithObjectID {
   public void updateLocationInfoList(List<OmKeyLocationInfo> locationInfoList) {
     long latestVersion = getLatestVersionLocations().getVersion();
     OmKeyLocationInfoGroup keyLocationInfoGroup = getLatestVersionLocations();
-    List<OmKeyLocationInfo> currentList =
-        keyLocationInfoGroup.getLocationList();
-    List<OmKeyLocationInfo> latestVersionList =
-        keyLocationInfoGroup.getBlocksLatestVersionOnly();
     // Updates the latest locationList in the latest version only with
     // given locationInfoList here.
     // TODO : The original allocated list and the updated list here may vary
     // as the containers on the Datanode on which the blocks were pre allocated
     // might get closed. The diff of blocks between these two lists here
     // need to be garbage collected in case the ozone client dies.
-    currentList.removeAll(latestVersionList);
+    keyLocationInfoGroup.removeBlocks(latestVersion);
     // set each of the locationInfo object to the latest version
-    locationInfoList.stream().forEach(omKeyLocationInfo -> omKeyLocationInfo
+    locationInfoList.forEach(omKeyLocationInfo -> omKeyLocationInfo
         .setCreateVersion(latestVersion));
-    currentList.addAll(locationInfoList);
+    keyLocationInfoGroup.addAll(latestVersion, locationInfoList);
   }
 
   /**
@@ -381,13 +377,26 @@ public final class OmKeyInfo extends WithObjectID {
     }
   }
 
+  /**
+   * For network transmit.
+   * @return
+   */
   public KeyInfo getProtobuf() {
+    return getProtobuf(false);
+  }
+
+  /**
+   *
+   * @param ignorePipeline true for persist to DB, false for network transmit.
+   * @return
+   */
+  public KeyInfo getProtobuf(boolean ignorePipeline) {
     long latestVersion = keyLocationVersions.size() == 0 ? -1 :
         keyLocationVersions.get(keyLocationVersions.size() - 1).getVersion();
 
     List<KeyLocationList> keyLocations = new ArrayList<>();
     for (OmKeyLocationInfoGroup locationInfoGroup : keyLocationVersions) {
-      keyLocations.add(locationInfoGroup.getProtobuf());
+      keyLocations.add(locationInfoGroup.getProtobuf(ignorePipeline));
     }
 
     KeyInfo.Builder kb = KeyInfo.newBuilder()
@@ -397,8 +406,8 @@ public final class OmKeyInfo extends WithObjectID {
         .setDataSize(dataSize)
         .setFactor(factor)
         .setType(type)
-        .addAllKeyLocationList(keyLocations)
         .setLatestVersion(latestVersion)
+        .addAllKeyLocationList(keyLocations)
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
         .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
@@ -505,12 +514,10 @@ public final class OmKeyInfo extends WithObjectID {
         .setObjectID(objectID).setUpdateID(updateID);
 
 
-    keyLocationVersions.forEach(keyLocationVersion -> {
-      List<OmKeyLocationInfo> keyLocationInfos = new ArrayList<>();
-      keyLocationInfos.addAll(keyLocationVersion.getLocationList());
-      builder.addOmKeyLocationInfoGroup(new OmKeyLocationInfoGroup(
-          keyLocationVersion.getVersion(), keyLocationInfos));
-    });
+    keyLocationVersions.forEach(keyLocationVersion ->
+        builder.addOmKeyLocationInfoGroup(
+            new OmKeyLocationInfoGroup(keyLocationVersion.getVersion(),
+                keyLocationVersion.getLocationList())));
 
     acls.forEach(acl -> builder.addAcl(new OzoneAcl(acl.getType(),
             acl.getName(), (BitSet) acl.getAclBitSet().clone(),

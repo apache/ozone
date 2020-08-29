@@ -223,6 +223,13 @@ public class OMException extends IOException {
 
     INVALID_VOLUME_NAME,
 
-    REPLAY // When ratis logs are replayed.
+    PARTIAL_DELETE,
+
+    DETECTED_LOOP_IN_BUCKET_LINKS,
+
+    NOT_SUPPORTED_OPERATION,
+
+    PARTIAL_RENAME
+
   }
 }

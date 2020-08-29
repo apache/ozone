@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
@@ -50,7 +49,6 @@ import static org.junit.Assert.fail;
  * This class is to test all the public facing APIs of Ozone Client with an
  * active OM Ratis server.
  */
-@Ignore
 public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
   private static OzoneConfiguration conf;
   /**
@@ -65,6 +63,8 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
+        false);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
     conf.setBoolean(OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY,
         true);

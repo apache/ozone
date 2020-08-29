@@ -197,7 +197,7 @@ public final class OMFileRequest {
   /**
    * Return codes used by verifyFilesInPath method.
    */
-  enum OMDirectoryResult {
+  public enum OMDirectoryResult {
 
     // In below examples path is assumed as "a/b/c" in volume volume1 and
     // bucket b1.

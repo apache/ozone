@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.protocol;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -27,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.security.KerberosInfo;
 
@@ -201,6 +203,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
    */
   boolean inSafeMode() throws IOException;
 
+  Map<String, Pair<Boolean, String>> getSafeModeRuleStatuses()
+      throws IOException;
   /**
    * Force SCM out of Safe mode.
    *

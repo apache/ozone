@@ -1,7 +1,10 @@
 ---
 title: "Datanodes"
 date: "2017-09-14"
-weight: 4
+weight: 7
+menu: 
+  main:
+     parent: Architecture
 summary: Ozone supports Amazon's Simple Storage Service (S3) protocol. In fact, You can use S3 clients and S3 SDK based applications without any modifications with Ozone.
 ---
 <!---
