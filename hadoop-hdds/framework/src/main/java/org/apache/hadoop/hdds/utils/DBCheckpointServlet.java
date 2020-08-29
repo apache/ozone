@@ -56,9 +56,10 @@ public class DBCheckpointServlet extends HttpServlet {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DBCheckpointServlet.class);
+  private static final long serialVersionUID = 1L;
 
-  private DBStore dbStore;
-  private DBCheckpointMetrics dbMetrics;
+  private transient DBStore dbStore;
+  private transient DBCheckpointMetrics dbMetrics;
 
   public void initialize(DBStore store, DBCheckpointMetrics metrics)
       throws ServletException {
