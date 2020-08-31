@@ -105,14 +105,18 @@ public class SCMBlockLocationFailoverProxyProvider implements
     } else {
       for (String scmAddress : scmAddressList) {
         LOG.info("SCM Address for proxy is {}", scmAddress);
-        if (scmAddress.contains(":")) {
-          resultList.add(NetUtils.createSocketAddr(scmAddress));
-        } else {
-          final int port = getPortNumberFromConfigKeys(conf,
-              ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY)
-              .orElse(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT);
-          resultList.add(NetUtils.createSocketAddr(scmAddress + ":" + port));
+        int indexOfComma = scmAddress.lastIndexOf(":");
+
+        // ip:port -> ip
+        // This port is used by Datanodes to connect to SCM.
+        if (indexOfComma != -1) {
+          scmAddress = scmAddress.substring(0, indexOfComma);
         }
+
+        final int port = getPortNumberFromConfigKeys(conf,
+            ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY)
+            .orElse(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT);
+        resultList.add(NetUtils.createSocketAddr(scmAddress + ":" + port));
       }
     }
     return resultList;
