@@ -2,6 +2,11 @@
 title: 概览
 date: "2017-10-10"
 weight: 1
+menu: 
+  main:
+     name: "ArchitectureOverview"
+     title: "概览"
+     parent: 概念
 summary: 介绍 Ozone 的整体和各个组件。
 ---
 

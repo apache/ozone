@@ -2,6 +2,9 @@
 title: "Java API"
 date: "2017-09-14"
 weight: 1
+menu:
+   main:
+      parent: "编程接口"
 summary: Ozone 有一套基于原生 RPC 的 API，其它协议都由这个最底层的 API 扩展而来，它也是所有 Ozone 支持的协议中性能最好、功能最全的。
 ---
 <!---
