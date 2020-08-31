@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.UUID;
@@ -352,4 +353,10 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     return asyncReply;
   }
 
+  @Override
+  public Map<DatanodeDetails, ContainerCommandResponseProto>
+      sendCommandOnAllNodes(ContainerCommandRequestProto request) {
+    throw new UnsupportedOperationException(
+            "Operation Not supported for ratis client");
+  }
 }
