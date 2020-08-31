@@ -45,6 +45,9 @@ public interface ChunkBuffer {
    *   When increment <= 0, entire buffer is allocated in the beginning.
    */
   static ChunkBuffer allocate(int capacity, int increment) {
+    if (increment > 0 && increment < capacity) {
+      return new IncrementalChunkBuffer(capacity, increment, false);
+    }
     return new ChunkBufferImplWithByteBuffer(ByteBuffer.allocate(capacity));
   }
 
