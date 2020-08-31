@@ -130,11 +130,11 @@ public class TestDiscardPreallocatedBlocks{
     Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     // With the initial size provided, it should have pre allocated 2 blocks
     Assert.assertEquals(2, keyOutputStream.getStreamEntries().size());
-    long containerID_1 = keyOutputStream.getStreamEntries().get(0)
+    long containerID1 = keyOutputStream.getStreamEntries().get(0)
             .getBlockID().getContainerID();
-    long containerID_2 = keyOutputStream.getStreamEntries().get(1)
+    long containerID2 = keyOutputStream.getStreamEntries().get(1)
             .getBlockID().getContainerID();
-    Assert.assertEquals(containerID_1, containerID_2);
+    Assert.assertEquals(containerID1, containerID2);
     String dataString =
         ContainerTestHelper.getFixedLengthString(keyString, (1 * blockSize));
     byte[] data = dataString.getBytes(UTF_8);
