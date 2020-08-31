@@ -214,7 +214,7 @@ function ozonecmd_case
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
     ;;
     admin)
-      HADOOP_CLASSNAME=org.apache.hadoop.ozone.admin.OzoneAdmin
+      HADOOP_CLASSNAME=org.apache.hadoop.hdds.cli.OzoneAdmin
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
     ;;
     debug)
