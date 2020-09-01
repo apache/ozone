@@ -43,11 +43,13 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForBlockClients;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 
 /**
  * Failover proxy provider for SCM.
@@ -99,25 +101,23 @@ public class SCMBlockLocationFailoverProxyProvider implements
     Collection<String> scmAddressList =
         conf.getTrimmedStringCollection(OZONE_SCM_NAMES);
     Collection<InetSocketAddress> resultList = new ArrayList<>();
-    if (scmAddressList.isEmpty()) {
-      // fall back
-      resultList.add(getScmAddressForBlockClients(conf));
-    } else {
+    if (!scmAddressList.isEmpty()) {
+      final int port = getPortNumberFromConfigKeys(conf,
+          ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY)
+          .orElse(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT);
       for (String scmAddress : scmAddressList) {
         LOG.info("SCM Address for proxy is {}", scmAddress);
-        int indexOfComma = scmAddress.lastIndexOf(":");
 
-        // ip:port -> ip
-        // This port is used by Datanodes to connect to SCM.
-        if (indexOfComma != -1) {
-          scmAddress = scmAddress.substring(0, indexOfComma);
+        Optional<String> hostname = getHostName(scmAddress);
+        if (hostname.isPresent()) {
+          resultList.add(NetUtils.createSocketAddr(
+              hostname.get() + ":" + port));
         }
-
-        final int port = getPortNumberFromConfigKeys(conf,
-            ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY)
-            .orElse(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT);
-        resultList.add(NetUtils.createSocketAddr(scmAddress + ":" + port));
       }
+    }
+    if (resultList.isEmpty()) {
+      // fall back
+      resultList.add(getScmAddressForBlockClients(conf));
     }
     return resultList;
   }

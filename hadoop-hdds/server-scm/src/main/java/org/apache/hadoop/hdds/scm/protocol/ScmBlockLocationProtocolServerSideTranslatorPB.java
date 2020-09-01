@@ -105,7 +105,8 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
 
   private String getSuggestedLeader() throws ServiceException {
     if (!(impl instanceof SCMBlockProtocolServer)) {
-      throw new ServiceException("Should be SCMBlockProtocolServer");
+      throw new ServiceException("Should be SCMBlockProtocolServer." +
+          " Current protocol is " + impl.toString());
     } else {
       return ((SCMBlockProtocolServer) impl).getScm().getSuggestedLeader();
     }
