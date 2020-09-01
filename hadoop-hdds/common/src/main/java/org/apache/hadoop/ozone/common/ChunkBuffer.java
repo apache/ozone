@@ -17,9 +17,6 @@
  */
 package org.apache.hadoop.ozone.common;
 
-import org.apache.hadoop.hdds.scm.ByteStringConversion;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
@@ -27,26 +24,15 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import org.apache.hadoop.hdds.scm.ByteStringConversion;
+
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+
 /** Buffer for a block chunk. */
 public interface ChunkBuffer {
 
   /** Similar to {@link ByteBuffer#allocate(int)}. */
   static ChunkBuffer allocate(int capacity) {
-    return allocate(capacity, 0);
-  }
-
-  /**
-   * Similar to {@link ByteBuffer#allocate(int)}
-   * except that it can specify the increment.
-   *
-   * @param increment
-   *   the increment size so that this buffer is allocated incrementally.
-   *   When increment <= 0, entire buffer is allocated in the beginning.
-   */
-  static ChunkBuffer allocate(int capacity, int increment) {
-    if (increment > 0 && increment < capacity) {
-      return new IncrementalChunkBuffer(capacity, increment, false);
-    }
     return new ChunkBufferImplWithByteBuffer(ByteBuffer.allocate(capacity));
   }
 

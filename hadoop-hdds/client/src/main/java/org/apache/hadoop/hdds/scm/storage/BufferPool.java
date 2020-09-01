@@ -18,15 +18,16 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.scm.ByteStringConversion;
-import org.apache.hadoop.ozone.common.ChunkBuffer;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+
+import org.apache.hadoop.hdds.scm.ByteStringConversion;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
+
+import com.google.common.base.Preconditions;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 /**
  * This class creates and manages pool of n buffers.
@@ -34,26 +35,59 @@ import java.util.function.Function;
 public class BufferPool {
 
   private List<ChunkBuffer> bufferList;
-  private int currentBufferIndex;
+
+  /**
+   * Size of one buffer..
+   */
   private final int bufferSize;
+  /**
+   * Number of buffers in the pool.
+   */
   private final int capacity;
+  /**
+   * Maximum allowed size
+   * <p>
+   * It should be <= capacity * buffersize.
+   */
+  private final int maxSize;
+  /**
+   * Pointer to the index of the current buffer in the list.
+   */
+  private int currentBufferIndex;
+
   private final Function<ByteBuffer, ByteString> byteStringConversion;
 
-  public BufferPool(int bufferSize, int capacity) {
-    this(bufferSize, capacity,
+  public BufferPool(
+      int bufferSize,
+      int capacity
+  ) {
+    this(bufferSize, capacity, bufferSize * capacity);
+  }
+
+  public BufferPool(
+      int bufferSize,
+      int capacity,
+      int sizeLimit
+  ) {
+    this(bufferSize, capacity, sizeLimit,
         ByteStringConversion.createByteBufferConversion(null));
   }
 
-  public BufferPool(int bufferSize, int capacity,
-      Function<ByteBuffer, ByteString> byteStringConversion){
+  public BufferPool(
+      int bufferSize,
+      int capacity,
+      int sizeLimit,
+      Function<ByteBuffer, ByteString> byteStringConversion
+  ) {
     this.capacity = capacity;
     this.bufferSize = bufferSize;
     bufferList = new ArrayList<>(capacity);
+    this.maxSize = sizeLimit;
     currentBufferIndex = -1;
     this.byteStringConversion = byteStringConversion;
   }
 
-  public Function<ByteBuffer, ByteString> byteStringConversion(){
+  public Function<ByteBuffer, ByteString> byteStringConversion() {
     return byteStringConversion;
   }
 
@@ -79,7 +113,11 @@ public class BufferPool {
     if (currentBufferIndex < bufferList.size() - 1) {
       buffer = getBuffer(currentBufferIndex + 1);
     } else {
-      buffer = ChunkBuffer.allocate(bufferSize, increment);
+      int effectiveBufferSize =
+          Math.min(bufferSize, maxSize - bufferList.size() * bufferSize);
+      Preconditions.checkArgument(effectiveBufferSize > 0,
+          "Buffer allocation is requested, but buffer is limited by maxSize");
+      buffer = ChunkBuffer.allocate(effectiveBufferSize);
       bufferList.add(buffer);
     }
     Preconditions.checkArgument(bufferList.size() <= capacity);

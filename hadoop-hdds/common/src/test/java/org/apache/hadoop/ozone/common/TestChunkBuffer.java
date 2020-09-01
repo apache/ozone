@@ -17,12 +17,6 @@
  */
 package org.apache.hadoop.ozone.common;
 
-import org.apache.hadoop.hdds.utils.MockGatheringChannel;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.junit.Assert;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -32,6 +26,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ThreadLocalRandom;
+
+import org.apache.hadoop.hdds.utils.MockGatheringChannel;
+
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.junit.Assert;
+import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 
 /**
  * Test {@link ChunkBuffer} implementations.
@@ -54,24 +55,6 @@ public class TestChunkBuffer {
     final byte[] expected = new byte[n];
     ThreadLocalRandom.current().nextBytes(expected);
     runTestImpl(expected, 0, ChunkBuffer.allocate(n));
-  }
-
-  @Test(timeout = 1_000)
-  public void testIncrementalChunkBuffer() {
-    runTestIncrementalChunkBuffer(1, 1);
-    runTestIncrementalChunkBuffer(4, 8);
-    runTestIncrementalChunkBuffer(16, 1 << 10);
-    for(int i = 0; i < 10; i++) {
-      final int a = ThreadLocalRandom.current().nextInt(100) + 1;
-      final int b = ThreadLocalRandom.current().nextInt(100) + 1;
-      runTestIncrementalChunkBuffer(Math.min(a, b), Math.max(a, b));
-    }
-  }
-
-  private static void runTestIncrementalChunkBuffer(int increment, int n) {
-    final byte[] expected = new byte[n];
-    ThreadLocalRandom.current().nextBytes(expected);
-    runTestImpl(expected, increment, ChunkBuffer.allocate(n, increment));
   }
 
   @Test(timeout = 1_000)

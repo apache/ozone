@@ -122,6 +122,7 @@ public class BlockOutputStreamEntryPool {
     this.bufferPool =
         new BufferPool(streamBufferSize,
             (int) (streamBufferMaxSize / streamBufferSize),
+            (int) Math.min(blockSize, streamBufferMaxSize),
             xceiverClientManager.byteBufferToByteStringConversion());
   }
 
