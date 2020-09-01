@@ -23,6 +23,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Deque;
 import java.util.LinkedList;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * Reflection utilities for configuration injection.
@@ -239,5 +241,53 @@ public final class ConfigurationReflectionUtil {
         }
       }
     }
+  }
+
+  public static Optional<String> getDefaultValue(Class<?> configClass,
+      String fieldName) {
+    Config annotation = findFieldConfigAnnotationByName(configClass,
+        fieldName);
+    if (annotation != null) {
+      return Optional.of(annotation.defaultValue());
+    }
+    return Optional.empty();
+  }
+
+  public static Optional<String> getKey(Class<?> configClass,
+      String fieldName) {
+    ConfigGroup configGroup =
+        configClass.getAnnotation(ConfigGroup.class);
+
+    Config annotation = findFieldConfigAnnotationByName(configClass,
+        fieldName);
+    if (annotation != null) {
+      String key = annotation.key();
+      if (configGroup != null) {
+        key = configGroup.prefix() + "." + annotation.key();
+      }
+      return Optional.of(key);
+    }
+    return Optional.empty();
+  }
+
+  public static Optional<ConfigType> getType(Class<?> configClass,
+      String fieldName) {
+    Config config = findFieldConfigAnnotationByName(configClass,
+        fieldName);
+    if (config != null) {
+      return Optional.of(config.type());
+    }
+    return Optional.empty();
+  }
+
+  private static Config findFieldConfigAnnotationByName(Class<?> configClass,
+      String fieldName) {
+    Optional<Field> field = Stream.of(configClass.getDeclaredFields())
+        .filter(f -> f.getName().equals(fieldName))
+        .findFirst();
+    if (field.isPresent()) {
+      return field.get().getAnnotation(Config.class);
+    }
+    return null;
   }
 }
