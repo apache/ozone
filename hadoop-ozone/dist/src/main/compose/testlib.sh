@@ -247,3 +247,39 @@ generate_report(){
      exit 1
   fi
 }
+
+## @description  Copy results of a single test environment to the "all tests" dir.
+copy_results() {
+  local test_dir="$1"
+  local all_result_dir="$2"
+
+  local result_dir="${test_dir}/result"
+  local test_dir_name=$(basename ${test_dir})
+  if [[ -n "$(find "${result_dir}" -name "*.xml")" ]]; then
+    rebot --nostatusrc -N "${test_dir_name}" -o "${all_result_dir}/${test_dir_name}.xml" "${result_dir}/*.xml"
+  fi
+
+  cp "${result_dir}"/docker-*.log "${all_result_dir}"/
+  if [[ -n "$(find "${result_dir}" -name "*.out")" ]]; then
+    cp "${result_dir}"/*.out* "${all_result_dir}"/
+  fi
+}
+
+run_test_script() {
+  local d="$1"
+
+  echo "Executing test in ${d}"
+
+  #required to read the .env file from the right location
+  cd "${d}" || return
+
+  ret=0
+  if ! ./test.sh; then
+    ret=1
+    echo "ERROR: Test execution of ${d} is FAILED!!!!"
+  fi
+
+  cd - > /dev/null
+
+  return ${ret}
+}
