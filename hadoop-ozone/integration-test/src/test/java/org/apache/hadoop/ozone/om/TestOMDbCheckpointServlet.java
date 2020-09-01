@@ -43,7 +43,7 @@ import org.apache.commons.io.FileUtils;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
-import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.writeOmDBCheckpointToStream;
+import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.writeDBCheckpointToStream;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import static org.junit.Assert.assertNotNull;
@@ -203,7 +203,7 @@ public class TestOMDbCheckpointServlet {
           new File(Paths.get(testDirName, "output_file.tgz").toString());
       TestDBCheckpoint dbCheckpoint = new TestDBCheckpoint(
           Paths.get(testDirName));
-      writeOmDBCheckpointToStream(dbCheckpoint,
+      writeDBCheckpointToStream(dbCheckpoint,
           new FileOutputStream(outputFile));
       assertNotNull(outputFile);
     } finally {

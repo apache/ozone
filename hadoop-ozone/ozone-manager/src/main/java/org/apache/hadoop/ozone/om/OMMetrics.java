@@ -131,10 +131,6 @@ public class OMMetrics {
 
   private DBCheckpointMetrics dbCheckpointMetrics;
 
-  public DBCheckpointMetrics getDBCheckpointMetrics() {
-    return dbCheckpointMetrics;
-  }
-
   public OMMetrics() {
     dbCheckpointMetrics = DBCheckpointMetrics.create("OM Metrics");
   }
@@ -144,6 +140,10 @@ public class OMMetrics {
     return ms.register(SOURCE_NAME,
         "Ozone Manager Metrics",
         new OMMetrics());
+  }
+
+  public DBCheckpointMetrics getDBCheckpointMetrics() {
+    return dbCheckpointMetrics;
   }
 
   public void incNumS3BucketCreates() {

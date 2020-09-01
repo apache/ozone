@@ -119,7 +119,7 @@ public class DBCheckpointServlet extends HttpServlet {
                file.toString() + ".tgz\"");
 
       Instant start = Instant.now();
-      writeOmDBCheckpointToStream(checkpoint,
+      writeDBCheckpointToStream(checkpoint,
           response.getOutputStream());
       Instant end = Instant.now();
 
@@ -152,7 +152,7 @@ public class DBCheckpointServlet extends HttpServlet {
    * @param destination desination output stream.
    * @throws IOException
    */
-  public static void writeOmDBCheckpointToStream(DBCheckpoint checkpoint,
+  public static void writeDBCheckpointToStream(DBCheckpoint checkpoint,
       OutputStream destination)
       throws IOException {
 
