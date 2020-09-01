@@ -17,14 +17,14 @@
 
 retry() {
    n=0
-   until [ $n -ge 30 ]
+   until [ $n -ge 100 ]
    do
       "$@" && break
       n=$[$n+1]
       echo "$n '$@' is failed..."
       sleep ${RETRY_SLEEP:-3}
    done
-   if [ $n -eq 30 ]; then
+   if [ $n -eq 100 ]; then
       return 255
    fi
 }
@@ -75,6 +75,13 @@ start_k8s_env() {
    print_phase "Applying k8s resources from $1"
    kubectl apply -f .
    wait_for_startup
+}
+
+get_logs() {
+  mkdir -p logs
+  for pod in $(kubectl get pods -o custom-columns=NAME:.metadata.name | tail -n +2); do
+    kubectl logs "${pod}" > "logs/pod-${pod}.log"
+  done
 }
 
 stop_k8s_env() {

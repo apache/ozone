@@ -20,10 +20,13 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
@@ -561,5 +564,36 @@ public final class ContainerProtocolCalls  {
         validator = (request, response) -> validateContainerResponse(response);
     validators.add(validator);
     return validators;
+  }
+
+  public static HashMap<DatanodeDetails, GetBlockResponseProto>
+      getBlockFromAllNodes(
+      XceiverClientSpi xceiverClient,
+      DatanodeBlockID datanodeBlockID) throws IOException,
+          InterruptedException {
+    GetBlockRequestProto.Builder readBlockRequest = GetBlockRequestProto
+            .newBuilder()
+            .setBlockID(datanodeBlockID);
+    HashMap<DatanodeDetails, GetBlockResponseProto> datanodeToResponseMap
+            = new HashMap<>();
+    String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
+    ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto
+            .newBuilder()
+            .setCmdType(Type.GetBlock)
+            .setContainerID(datanodeBlockID.getContainerID())
+            .setDatanodeUuid(id)
+            .setGetBlock(readBlockRequest);
+    String encodedToken = getEncodedBlockToken(getService(datanodeBlockID));
+    if (encodedToken != null) {
+      builder.setEncodedToken(encodedToken);
+    }
+    ContainerCommandRequestProto request = builder.build();
+    Map<DatanodeDetails, ContainerCommandResponseProto> responses =
+            xceiverClient.sendCommandOnAllNodes(request);
+    for(Map.Entry<DatanodeDetails, ContainerCommandResponseProto> entry:
+           responses.entrySet()){
+      datanodeToResponseMap.put(entry.getKey(), entry.getValue().getGetBlock());
+    }
+    return datanodeToResponseMap;
   }
 }

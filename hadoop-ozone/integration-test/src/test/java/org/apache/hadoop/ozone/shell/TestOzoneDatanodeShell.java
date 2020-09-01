@@ -130,7 +130,7 @@ public class TestOzoneDatanodeShell {
   @Test
   public void testDatanodeInvalidParamCommand() {
     LOG.info("Running testDatanodeIncompleteCommand");
-    String expectedError = "Unknown option: -invalidParam";
+    String expectedError = "Unknown option: '-invalidParam'";
     //executing 'ozone datanode -invalidParam'
     String[] args = new String[]{"-invalidParam"};
 

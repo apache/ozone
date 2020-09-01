@@ -19,9 +19,10 @@
 package org.apache.hadoop.ozone.debug;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+
+import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
 /**
@@ -30,19 +31,12 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ContainerChunkInfo {
   private String containerPath;
-  private List<DatanodeDetails> dataNodeList;
   private List<ChunkDetails> chunkInfos;
-  private List<String> files;
-  private List<ChunkDataNodeDetails> chunkDataNodeDetails;
+  private HashSet<String> files;
   private UUID pipelineID;
   private Pipeline pipeline;
 
-  public void setChunkDataNodeDetails(List<ChunkDataNodeDetails>
-                                              chunkDataNodeDetails) {
-    this.chunkDataNodeDetails = chunkDataNodeDetails;
-  }
-
-  public void setFiles(List<String> files) {
+  public void setFiles(HashSet<String> files) {
     this.files = files;
   }
 
@@ -66,9 +60,6 @@ public class ContainerChunkInfo {
     this.chunkInfos = chunkInfos;
   }
 
-  public void setDataNodeList(List<DatanodeDetails> dataNodeList) {
-    this.dataNodeList = dataNodeList;
-  }
 
   @Override
   public String toString() {
@@ -76,8 +67,6 @@ public class ContainerChunkInfo {
             + "containerPath='"
             + containerPath
             + '\''
-            + ", dataNodeList="
-            + dataNodeList
             + ", chunkInfos="
             + chunkInfos
             + ", pipeline="
@@ -85,8 +74,6 @@ public class ContainerChunkInfo {
             + '}'
             + "files="
             + files
-            + "chunkdatanodeDetails="
-            + chunkDataNodeDetails
             + "PipelineID="
             + pipelineID;
   }
