@@ -65,6 +65,10 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_LOG_W
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_RECON_HEARTBEAT_RPC_RETRY_COUNT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_RECON_HEARTBEAT_RPC_RETRY_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.sanitizeUserArgs;
@@ -322,6 +326,28 @@ public final class HddsServerUtil {
   public static long getScmRpcTimeOutInMilliseconds(ConfigurationSource conf) {
     return conf.getTimeDuration(OZONE_SCM_HEARTBEAT_RPC_TIMEOUT,
         OZONE_SCM_HEARTBEAT_RPC_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
+  }
+
+  /**
+   * Max retry count of rpcProxy for EndpointStateMachine of SCM.
+   *
+   * @param conf - Ozone Config
+   * @return - Max retry count.
+   */
+  public static int getScmRpcRetryCount(ConfigurationSource conf) {
+    return conf.getInt(OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT,
+        OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT_DEFAULT);
+  }
+
+  /**
+   * Max retry count of rpcProxy for EndpointStateMachine of Recon.
+   *
+   * @param conf - Ozone Config
+   * @return - Max retry count.
+   */
+  public static int getReconRpcRetryCount(ConfigurationSource conf) {
+    return conf.getInt(OZONE_RECON_HEARTBEAT_RPC_RETRY_COUNT,
+        OZONE_RECON_HEARTBEAT_RPC_RETRY_COUNT_DEFAULT);
   }
 
   /**

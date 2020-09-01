@@ -978,6 +978,22 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.heartbeat.rpc-retry-count</name>
+    <value>30</value>
+    <tag>OZONE, MANAGEMENT</tag>
+    <description>
+      Retry count for the RPC from Datanode to SCM.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.heartbeat.rpc-retry-count</name>
+    <value>30</value>
+    <tag>OZONE, MANAGEMENT</tag>
+    <description>
+      Retry count for the RPC from Datanode to Recon.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.heartbeat.thread.interval</name>
     <value>3s</value>
     <tag>OZONE, MANAGEMENT</tag>
