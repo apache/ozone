@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -27,7 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.ParentCommand;
+import picocli.CommandLine.Mixin;
 
 /**
  * This is the handler that process safe mode wait command.
@@ -45,21 +45,20 @@ public class SafeModeWaitSubcommand implements Callable<Void> {
   @Option(description =
       "Define timeout (in second) to wait until (exit code 1) "
           + "or until safemode is ended (exit code 0).", defaultValue = "30",
-      required = false, names = {
-      "-t", "--timeout"})
+      names = { "-t", "--timeout"})
   private long timeoutSeconds;
 
   private long startTestTime;
 
-  @ParentCommand
-  private SafeModeCommands parent;
+  @Mixin
+  private ScmOption scmOption;
 
   @Override
   public Void call() throws Exception {
     startTestTime = System.currentTimeMillis();
 
     while (getRemainingTimeInSec() > 0) {
-      try (ScmClient scmClient = parent.getParent().createScmClient()) {
+      try (ScmClient scmClient = scmOption.createScmClient()) {
         while (getRemainingTimeInSec() > 0) {
 
           boolean isSafeModeActive = scmClient.inSafeMode();

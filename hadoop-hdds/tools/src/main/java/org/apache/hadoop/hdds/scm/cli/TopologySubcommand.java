@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,18 +18,19 @@
 
 package org.apache.hadoop.hdds.scm.cli;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.TreeSet;
-import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.cli.OzoneAdmin;
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.cli.container.WithScmClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
@@ -37,9 +38,9 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DECOMMI
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
+
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
-import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Spec;
 
 /**
  * Handler of printTopology command.
@@ -49,22 +50,18 @@ import picocli.CommandLine.Spec;
     description = "Print a tree of the network topology as reported by SCM",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class TopologySubcommand implements Callable<Void> {
+@MetaInfServices(SubcommandWithParent.class)
+public class TopologySubcommand extends ScmSubcommand
+    implements SubcommandWithParent {
 
-  @Spec
-  private CommandSpec spec;
-
-  @CommandLine.ParentCommand
-  private WithScmClient parent;
-
-  private static List<HddsProtos.NodeState> stateArray = new ArrayList<>();
+  private static final List<HddsProtos.NodeState> STATES = new ArrayList<>();
 
   static {
-    stateArray.add(HEALTHY);
-    stateArray.add(STALE);
-    stateArray.add(DEAD);
-    stateArray.add(DECOMMISSIONING);
-    stateArray.add(DECOMMISSIONED);
+    STATES.add(HEALTHY);
+    STATES.add(STALE);
+    STATES.add(DEAD);
+    STATES.add(DECOMMISSIONING);
+    STATES.add(DECOMMISSIONED);
   }
 
   @CommandLine.Option(names = {"-o", "--order"},
@@ -76,22 +73,24 @@ public class TopologySubcommand implements Callable<Void> {
   private boolean fullInfo;
 
   @Override
-  public Void call() throws Exception {
-    try (ScmClient scmClient = parent.createScmClient()) {
-      for (HddsProtos.NodeState state : stateArray) {
-        List<HddsProtos.Node> nodes = scmClient.queryNode(state,
-            HddsProtos.QueryScope.CLUSTER, "");
-        if (nodes != null && nodes.size() > 0) {
-          // show node state
-          System.out.println("State = " + state.toString());
-          if (order) {
-            printOrderedByLocation(nodes);
-          } else {
-            printNodesWithLocation(nodes);
-          }
+  public Class<?> getParentType() {
+    return OzoneAdmin.class;
+  }
+
+  @Override
+  protected void execute(ScmClient scmClient) throws IOException {
+    for (HddsProtos.NodeState state : STATES) {
+      List<HddsProtos.Node> nodes = scmClient.queryNode(state,
+          HddsProtos.QueryScope.CLUSTER, "");
+      if (nodes != null && !nodes.isEmpty()) {
+        // show node state
+        System.out.println("State = " + state.toString());
+        if (order) {
+          printOrderedByLocation(nodes);
+        } else {
+          printNodesWithLocation(nodes);
         }
       }
-      return null;
     }
   }
 
@@ -124,7 +123,7 @@ public class TopologySubcommand implements Callable<Void> {
     StringBuilder sb = new StringBuilder();
     for (int i = 0; i < ports.size(); i++) {
       HddsProtos.Port port = ports.get(i);
-      sb.append(port.getName() + "=" + port.getValue());
+      sb.append(port.getName()).append("=").append(port.getValue());
       if (i < ports.size() - 1) {
         sb.append(",");
       }

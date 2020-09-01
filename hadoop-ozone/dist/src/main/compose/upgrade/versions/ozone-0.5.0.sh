@@ -16,3 +16,4 @@
 # limitations under the License.
 
 export OZONE_ADMIN_COMMAND=scmcli
+export OZONE_SAFEMODE_STATUS_COMMAND='ozone scmcli safemode status'

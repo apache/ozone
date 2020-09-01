@@ -19,6 +19,9 @@ package org.apache.hadoop.ozone.om;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -992,10 +995,34 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public List<BlockGroup> getExpiredOpenKeys() throws IOException {
-    List<BlockGroup> keyBlocksList = Lists.newArrayList();
-    // TODO: Fix the getExpiredOpenKeys, Not part of this patch.
-    return keyBlocksList;
+  public List<String> getExpiredOpenKeys(int count) throws IOException {
+    // Only check for expired keys in the open key table, not its cache.
+    // If a key expires while it is in the cache, it will be cleaned
+    // up after the cache is flushed.
+    final Duration expirationDuration =
+            Duration.of(openKeyExpireThresholdMS, ChronoUnit.MILLIS);
+    List<String> expiredKeys = Lists.newArrayList();
+
+    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+                 keyValueTableIterator = getOpenKeyTable().iterator()) {
+
+      while (keyValueTableIterator.hasNext() && expiredKeys.size() < count) {
+        KeyValue<String, OmKeyInfo> openKeyValue = keyValueTableIterator.next();
+        String openKey = openKeyValue.getKey();
+        OmKeyInfo openKeyInfo = openKeyValue.getValue();
+
+        Duration openKeyAge =
+                Duration.between(
+                        Instant.ofEpochMilli(openKeyInfo.getCreationTime()),
+                        Instant.now());
+
+        if (openKeyAge.compareTo(expirationDuration) >= 0) {
+          expiredKeys.add(openKey);
+        }
+      }
+    }
+
+    return expiredKeys;
   }
 
   @Override

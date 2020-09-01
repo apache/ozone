@@ -130,4 +130,22 @@ public class OzoneFileStatus {
   public int hashCode() {
     return Objects.hash(getTrimmedName());
   }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append(getClass().getSimpleName());
+    sb.append("{");
+    if (keyInfo == null) {
+      sb.append("<root>");
+    } else {
+      sb.append(getTrimmedName());
+      if (isDirectory) {
+        sb.append(" (dir)");
+      }
+    }
+    sb.append("}");
+    return sb.toString();
+  }
+
 }

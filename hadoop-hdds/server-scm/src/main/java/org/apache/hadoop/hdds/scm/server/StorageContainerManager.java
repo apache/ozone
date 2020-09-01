@@ -1141,4 +1141,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public PipelineChoosePolicy getPipelineChoosePolicy() {
     return this.pipelineChoosePolicy;
   }
+
+  public String getScmId() {
+    return getScmStorageConfig().getScmId();
+  }
+
+  public String getClusterId() {
+    return getScmStorageConfig().getClusterID();
+  }
 }

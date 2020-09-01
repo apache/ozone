@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.hdds.scm.cli;
 
+import java.io.IOException;
 import java.util.Map;
-import java.util.concurrent.Callable;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -28,7 +28,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.ParentCommand;
 
 /**
  * This is the handler that process safe mode check command.
@@ -38,39 +37,32 @@ import picocli.CommandLine.ParentCommand;
     description = "Check if SCM is in safe mode",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class SafeModeCheckSubcommand implements Callable<Void> {
+public class SafeModeCheckSubcommand extends ScmSubcommand {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SafeModeCheckSubcommand.class);
-
-  @ParentCommand
-  private SafeModeCommands parent;
 
   @CommandLine.Option(names = {"--verbose"},
       description = "Show detailed status of rules.")
   private boolean verbose;
 
   @Override
-  public Void call() throws Exception {
-    try (ScmClient scmClient = parent.getParent().createScmClient()) {
+  public void execute(ScmClient scmClient) throws IOException {
+    boolean execReturn = scmClient.inSafeMode();
 
-      boolean execReturn = scmClient.inSafeMode();
-
-      // Output data list
-      if(execReturn){
-        LOG.info("SCM is in safe mode.");
-        if (verbose) {
-          for (Map.Entry<String, Pair<Boolean, String>> entry :
-              scmClient.getSafeModeRuleStatuses().entrySet()) {
-            Pair<Boolean, String> value = entry.getValue();
-            LOG.info("validated:{}, {}, {}",
-                value.getLeft(), entry.getKey(), value.getRight());
-          }
+    // Output data list
+    if(execReturn){
+      LOG.info("SCM is in safe mode.");
+      if (verbose) {
+        for (Map.Entry<String, Pair<Boolean, String>> entry :
+            scmClient.getSafeModeRuleStatuses().entrySet()) {
+          Pair<Boolean, String> value = entry.getValue();
+          LOG.info("validated:{}, {}, {}",
+              value.getLeft(), entry.getKey(), value.getRight());
         }
-      } else {
-        LOG.info("SCM is out of safe mode.");
       }
-      return null;
+    } else {
+      LOG.info("SCM is out of safe mode.");
     }
   }
 }

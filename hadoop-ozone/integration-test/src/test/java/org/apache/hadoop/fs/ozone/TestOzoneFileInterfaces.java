@@ -357,15 +357,18 @@ public class TestOzoneFileInterfaces {
     String dirPath = RandomStringUtils.randomAlphanumeric(5);
     Path path = createPath("/" + dirPath);
     paths.add(path);
+
+    long mkdirs = statistics.getLong(
+        StorageStatistics.CommonStatisticNames.OP_MKDIRS);
     assertTrue("Makedirs returned with false for the path " + path,
         fs.mkdirs(path));
+    assertCounter(++mkdirs, StorageStatistics.CommonStatisticNames.OP_MKDIRS);
 
     long listObjects = statistics.getLong(Statistic.OBJECTS_LIST.getSymbol());
     long omListStatus = omMetrics.getNumListStatus();
     FileStatus[] statusList = fs.listStatus(createPath("/"));
     assertEquals(1, statusList.length);
-    assertEquals(++listObjects,
-        statistics.getLong(Statistic.OBJECTS_LIST.getSymbol()).longValue());
+    assertCounter(++listObjects, Statistic.OBJECTS_LIST.getSymbol());
     assertEquals(++omListStatus, omMetrics.getNumListStatus());
     assertEquals(fs.getFileStatus(path), statusList[0]);
 
@@ -374,11 +377,11 @@ public class TestOzoneFileInterfaces {
     paths.add(path);
     assertTrue("Makedirs returned with false for the path " + path,
         fs.mkdirs(path));
+    assertCounter(++mkdirs, StorageStatistics.CommonStatisticNames.OP_MKDIRS);
 
     statusList = fs.listStatus(createPath("/"));
     assertEquals(2, statusList.length);
-    assertEquals(++listObjects,
-        statistics.getLong(Statistic.OBJECTS_LIST.getSymbol()).longValue());
+    assertCounter(++listObjects, Statistic.OBJECTS_LIST.getSymbol());
     assertEquals(++omListStatus, omMetrics.getNumListStatus());
     for (Path p : paths) {
       assertTrue(Arrays.asList(statusList).contains(fs.getFileStatus(p)));
@@ -527,5 +530,9 @@ public class TestOzoneFileInterfaces {
     assertEquals(0, status.getLen());
 
     return status;
+  }
+
+  private void assertCounter(long value, String key) {
+    assertEquals(value, statistics.getLong(key).longValue());
   }
 }

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,15 +15,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.cli.container;
+package org.apache.hadoop.hdds.scm.cli;
 
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import picocli.CommandLine;
+
+import java.io.IOException;
+import java.util.concurrent.Callable;
 
 /**
- * Command which provides a SCM client based on the current config.
+ * Base class for admin commands that connect via SCM client.
  */
-public interface WithScmClient {
+public abstract class ScmSubcommand implements Callable<Void> {
 
-  ScmClient createScmClient();
+  @CommandLine.Mixin
+  private ScmOption scmOption;
 
+  protected abstract void execute(ScmClient client) throws IOException;
+
+  @Override
+  public final Void call() throws Exception {
+    try (ScmClient scmClient = scmOption.createScmClient()) {
+      execute(scmClient);
+      return null;
+    }
+  }
 }

@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-CORE-SITE.XML_fs.o3fs.impl=org.apache.hadoop.fs.ozone.OzoneFileSystem
 CORE-SITE.XML_fs.defaultFS=o3fs://bucket.volume.id1
 OZONE-SITE.XML_ozone.om.service.ids=id1
 OZONE-SITE.XML_ozone.om.internal.service.id=id1
