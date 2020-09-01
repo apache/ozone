@@ -298,10 +298,10 @@ public class TestWatchForCommit {
             xceiverClient.getPipeline()));
     reply.getResponse().get();
     Assert.assertEquals(3, ratisClient.getCommitInfoMap().size());
-    List<DatanodeDetails> datanodeDetails = pipeline.getNodes();
+    List<DatanodeDetails> nodesInPipeline = pipeline.getNodes();
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       // shutdown the ratis follower
-      if (datanodeDetails.contains(dn.getDatanodeDetails())
+      if (nodesInPipeline.contains(dn.getDatanodeDetails())
           && ContainerTestHelper.isRatisFollower(dn, pipeline)) {
         cluster.shutdownHddsDatanode(dn.getDatanodeDetails());
         break;
