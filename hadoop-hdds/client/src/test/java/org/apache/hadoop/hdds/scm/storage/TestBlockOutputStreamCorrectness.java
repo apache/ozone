@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -26,6 +27,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -209,6 +211,13 @@ public class TestBlockOutputStreamCorrectness {
     @Override
     public long getReplicatedMinCommitIndex() {
       return 0;
+    }
+
+    @Override
+    public Map<DatanodeDetails, ContainerCommandResponseProto>
+        sendCommandOnAllNodes(ContainerCommandRequestProto request
+    ) throws IOException, InterruptedException {
+      return null;
     }
   }
 
