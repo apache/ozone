@@ -236,11 +236,15 @@ public final class OzoneConsts {
   public static final String ORIGIN_NODE_ID = "originNodeId";
   public static final String SCHEMA_VERSION = "schemaVersion";
 
-  // Supported .container database schema versions.
+  // Supported .container datanode schema versions.
+  // Since containers in older schema versions are currently not reformatted to
+  // newer schema versions, a datanode may have containers with a mix of schema
+  // versions, requiring this property to be tracked on a per container basis.
   // V1: All data in default column family.
   public static final String SCHEMA_V1 = "1";
   // V2: Metadata, block data, and deleted blocks in their own column families.
   public static final String SCHEMA_V2 = "2";
+  // Most recent schema version that all new containers should be created with.
   public static final String SCHEMA_LATEST = SCHEMA_V2;
 
   // Supported store types.
