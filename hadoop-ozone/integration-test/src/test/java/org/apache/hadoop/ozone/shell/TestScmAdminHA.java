@@ -26,9 +26,10 @@ import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import picocli.CommandLine;
-import picocli.CommandLine.RunLast;
 
+/**
+ * This class tests ozone admin scm commands.
+ */
 public class TestScmAdminHA {
   private static OzoneAdmin ozoneAdmin;
   private static OzoneConfiguration conf;
@@ -69,7 +70,8 @@ public class TestScmAdminHA {
 
   @Test
   public void testGetRatisStatus() {
-    InetSocketAddress address = cluster.getStorageContainerManager().getClientRpcAddress();
+    InetSocketAddress address =
+        cluster.getStorageContainerManager().getClientRpcAddress();
     String hostPort = address.getHostName() + ":" + address.getPort();
     String[] args = {"--scm", hostPort, "scm", "status"};
     ozoneAdmin.execute(args);

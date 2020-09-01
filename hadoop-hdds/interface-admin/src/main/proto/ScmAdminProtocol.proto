@@ -96,7 +96,6 @@ message ScmContainerLocationResponse {
   optional GetPipelineResponseProto getPipelineResponse = 24;
   optional GetContainerWithPipelineBatchResponseProto getContainerWithPipelineBatchResponse = 25;
   optional GetSafeModeRuleStatusesResponseProto getSafeModeRuleStatusesResponse = 26;
-
   enum Status {
     OK = 1;
     CONTAINER_ALREADY_EXISTS = 2;

@@ -229,4 +229,5 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @return True if ReplicationManager is running, false otherwise.
    */
   boolean getReplicationManagerStatus() throws IOException;
+
 }
