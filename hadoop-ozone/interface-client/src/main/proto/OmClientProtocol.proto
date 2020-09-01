@@ -126,6 +126,7 @@ message OMRequest {
   optional CommitKeyRequest                 commitKeyRequest               = 36;
   optional AllocateBlockRequest             allocateBlockRequest           = 37;
   optional DeleteKeysRequest                deleteKeysRequest              = 38;
+  optional DeleteOpenKeysRequest            deleteOpenKeysRequest          = 39;
 
   optional MultipartInfoInitiateRequest     initiateMultiPartUploadRequest = 45;
   optional MultipartCommitUploadPartRequest commitMultiPartUploadRequest   = 46;
@@ -890,6 +891,10 @@ message PurgeKeysRequest {
 
 message PurgeKeysResponse {
 
+}
+
+message DeleteOpenKeysRequest {
+  repeated DeletedKeys expiredOpenKeys = 1;
 }
 
 message OMTokenProto {

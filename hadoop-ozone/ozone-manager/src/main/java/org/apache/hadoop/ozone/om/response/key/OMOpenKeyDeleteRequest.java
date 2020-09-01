@@ -39,6 +39,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.security.Key;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -56,12 +58,12 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
 
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
-    // Wrapper for list of key names.
-    OzoneManagerProtocolProtos.OpenKeyDeleteRequest openKeyDeleteRequest =
-            getOmRequest().getOpenKeyDeleteRequest();
+
+    OzoneManagerProtocolProtos.DeleteOpenKeyRequest openKeyDeleteRequest =
+            getOmRequest().getDeleteOpenKeyRequest();
 
     List<DeletedKeys> expiredOpenKeys =
-            openKeyDeleteRequest.getDeletedOpenKeys();
+            openKeyDeleteRequest.getExpiredOpenKeys();
 
     // TODO: Audit logging to track operations.
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
@@ -80,15 +82,16 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
     IOException exception = null;
     OMClientResponse omClientResponse = null;
     Result result = null;
+    List<OmKeyInfo> deletedKeys = new ArrayList<>();
+
     try {
       for (DeletedKeys expiredOpenKeysPerBucket: expiredOpenKeys) {
-        updateCache(ozoneManager, trxnLogIndex, expiredOpenKeysPerBucket);
+        deletedKeys.addAll(updateCache(ozoneManager, trxnLogIndex,
+                expiredOpenKeysPerBucket));
       }
 
-      omResponse.setDeleteOpenKeyResponse(
-              OzoneManagerProtocolProtos.OpenKeyDeleteResponse.newBuilder());
-      omClientResponse = new OMOpenKeyDeleteResponse(omResponse, omKeyInfo,
-              ozoneManager.isRatisEnabled());
+     omClientResponse = new OMOpenKeyDeleteResponse(omResponse.build(),
+             deletedKeys, ozoneManager.isRatisEnabled());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -126,8 +129,11 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
-  private void updateCache(OzoneManager ozoneManager, long trxnLogIndex,
+  private List<OmKeyInfo> updateCache(OzoneManager ozoneManager,
+                                    long trxnLogIndex,
                            DeletedKeys expiredKeysInBucket) throws IOException {
+
+    List<OmKeyInfo> deletedKeys = new ArrayList<>();
 
     boolean acquiredLock = false;
     String volumeName = expiredKeysInBucket.getVolumeName();
@@ -146,6 +152,7 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
         if (omKeyInfo != null) {
           // Set the UpdateID to current transactionLogIndex
           omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+          deletedKeys.add(omKeyInfo);
 
           // Update table cache.
           omMetadataManager.getKeyTable().addCacheEntry(
@@ -163,5 +170,7 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
                 bucketName);
       }
     }
+
+    return deletedKeys;
   }
 }
