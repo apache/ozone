@@ -110,6 +110,8 @@ import static org.apache.hadoop.hdds.client.ReplicationType.STAND_ALONE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PARTIAL_RENAME;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
@@ -121,6 +123,7 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+
 import org.junit.Test;
 
 /**
@@ -1202,7 +1205,7 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(keyName, key.getName());
     bucket.deleteKey(keyName);
 
-    OzoneTestUtils.expectOmException(ResultCodes.KEY_NOT_FOUND,
+    OzoneTestUtils.expectOmException(KEY_NOT_FOUND,
         () -> bucket.getKey(keyName));
   }
 
@@ -1217,13 +1220,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
-    OzoneOutputStream out = bucket.createKey(fromKeyName,
-        value.getBytes().length, STAND_ALONE,
-        ONE, new HashMap<>());
-    out.write(value.getBytes());
-    out.close();
-    OzoneKey key = bucket.getKey(fromKeyName);
-    Assert.assertEquals(fromKeyName, key.getName());
+    createTestKey(bucket, fromKeyName, value);
 
     // Rename to empty string should fail.
     OMException oe = null;
@@ -1244,10 +1241,77 @@ public abstract class TestOzoneRpcClientAbstract {
     } catch (OMException e) {
       oe = e;
     }
-    Assert.assertEquals(ResultCodes.KEY_NOT_FOUND, oe.getResult());
+    Assert.assertEquals(KEY_NOT_FOUND, oe.getResult());
 
-    key = bucket.getKey(toKeyName);
+    OzoneKey key = bucket.getKey(toKeyName);
     Assert.assertEquals(toKeyName, key.getName());
+  }
+
+  @Test
+  public void testKeysRename() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName1 = "dir/file1";
+    String keyName2 = "dir/file2";
+
+    String newKeyName1 = "dir/key1";
+    String newKeyName2 = "dir/key2";
+
+    String value = "sample value";
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    createTestKey(bucket, keyName1, value);
+    createTestKey(bucket, keyName2, value);
+
+    Map<String, String> keyMap = new HashMap();
+    keyMap.put(keyName1, newKeyName1);
+    keyMap.put(keyName2, newKeyName2);
+    bucket.renameKeys(keyMap);
+
+    // new key should exist
+    Assert.assertEquals(newKeyName1, bucket.getKey(newKeyName1).getName());
+    Assert.assertEquals(newKeyName2, bucket.getKey(newKeyName2).getName());
+
+    // old key should not exist
+    assertKeyRenamedEx(bucket, keyName1);
+    assertKeyRenamedEx(bucket, keyName2);
+  }
+
+  @Test
+  public void testKeysRenameFail() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName1 = "dir/file1";
+    String keyName2 = "dir/file2";
+
+    String newKeyName1 = "dir/key1";
+    String newKeyName2 = "dir/key2";
+
+    String value = "sample value";
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // Create only keyName1 to test the partial failure of renameKeys.
+    createTestKey(bucket, keyName1, value);
+
+    Map<String, String> keyMap = new HashMap();
+    keyMap.put(keyName1, newKeyName1);
+    keyMap.put(keyName2, newKeyName2);
+
+    try {
+      bucket.renameKeys(keyMap);
+    } catch (OMException ex) {
+      Assert.assertEquals(PARTIAL_RENAME, ex.getResult());
+    }
+
+    // newKeyName1 should exist
+    Assert.assertEquals(newKeyName1, bucket.getKey(newKeyName1).getName());
+    // newKeyName2 should not exist
+    assertKeyRenamedEx(bucket, keyName2);
   }
 
   @Test
@@ -2683,6 +2747,28 @@ public abstract class TestOzoneRpcClientAbstract {
         .getVolumeName());
     Assert.assertEquals(omMultipartUploadCompleteInfo.getKey(), keyName);
     Assert.assertNotNull(omMultipartUploadCompleteInfo.getHash());
+  }
+
+  private void createTestKey(OzoneBucket bucket, String keyName,
+                             String keyValue) throws IOException {
+    OzoneOutputStream out = bucket.createKey(keyName,
+        keyValue.getBytes().length, STAND_ALONE,
+        ONE, new HashMap<>());
+    out.write(keyValue.getBytes());
+    out.close();
+    OzoneKey key = bucket.getKey(keyName);
+    Assert.assertEquals(keyName, key.getName());
+  }
+
+  private void assertKeyRenamedEx(OzoneBucket bucket, String keyName)
+      throws Exception {
+    OMException oe = null;
+    try {
+      bucket.getKey(keyName);
+    } catch (OMException e) {
+      oe = e;
+    }
+    Assert.assertEquals(KEY_NOT_FOUND, oe.getResult());
   }
 
   /**

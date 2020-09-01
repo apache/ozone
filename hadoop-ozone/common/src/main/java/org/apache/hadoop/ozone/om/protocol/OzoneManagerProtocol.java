@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
+import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -216,6 +217,14 @@ public interface OzoneManagerProtocol
    * @throws IOException
    */
   void renameKey(OmKeyArgs args, String toKeyName) throws IOException;
+
+  /**
+   * Rename existing keys within a bucket.
+   * @param omRenameKeys Includes volume, bucket, and fromKey toKey name map
+   *                     and fromKey name toKey info Map.
+   * @throws IOException
+   */
+  void renameKeys(OmRenameKeys omRenameKeys) throws IOException;
 
   /**
    * Deletes an existing key.
