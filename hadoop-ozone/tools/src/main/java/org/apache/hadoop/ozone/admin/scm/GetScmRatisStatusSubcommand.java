@@ -28,7 +28,7 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
     name = "status",
-    description = "",
+    description = "List all SCMs and their respective Ratis server status",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class GetScmRatisStatusSubcommand implements Callable<Void> {
