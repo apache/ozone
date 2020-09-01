@@ -60,7 +60,7 @@ public final class ScmInfo {
     }
 
     /**
-     * Set peer address in Scm HA
+     * Set peer address in Scm HA.
      * @param status ratis peer address in the format of [ip|hostname]:port
      * @return  Builder for scmInfo
      */
@@ -101,7 +101,7 @@ public final class ScmInfo {
   }
 
   /**
-   * Gets the list of peer status (currently address) in Scm HA
+   * Gets the list of peer status (currently address) in Scm HA.
    * @return List of peer address
    */
   public List<String> getRatisPeerStatus() {

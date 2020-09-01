@@ -469,12 +469,6 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .addAllSafeModeRuleStatusesProto(proto).build();
   }
 
-  // public ScmHARatisStatusResponseProto getScmHARatisStatusResponseProto(
-  //     ScmHARatisStatusRequestProto requestProto) throws IOException {
-  //   List<String> address = impl.getScmRatisStatus();
-  //   return ScmHARatisStatusResponseProto.newBuilder().addAllRaftPeerAddress(address).build();
-  // }
-
   public ForceExitSafeModeResponseProto forceExitSafeMode(
       ForceExitSafeModeRequestProto request)
       throws IOException {

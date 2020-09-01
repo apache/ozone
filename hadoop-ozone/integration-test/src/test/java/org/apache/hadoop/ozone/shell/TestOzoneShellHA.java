@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.shell;
 
 import com.google.common.base.Strings;
-import java.net.InetSocketAddress;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
