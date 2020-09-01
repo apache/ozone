@@ -61,8 +61,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse.Status;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmHARatisStatusRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmHARatisStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
@@ -273,14 +271,6 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setGetSafeModeRuleStatusesResponse(getSafeModeRuleStatues(
                 request.getGetSafeModeRuleStatusesRequest()))
             .build();
-      case ScmHAStatus:
-        return
-            ScmContainerLocationResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setStatus(Status.OK)
-            .setGetScmHARatisStatusResponse(
-                getScmHARatisStatusResponseProto(request.getGetScmHARatisStatusRequest())
-            ).build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -451,6 +441,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return HddsProtos.GetScmInfoResponseProto.newBuilder()
         .setClusterId(scmInfo.getClusterId())
         .setScmId(scmInfo.getScmId())
+        .addAllPeerStatus(scmInfo.getRatisPeerStatus())
         .build();
 
   }
@@ -478,11 +469,11 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .addAllSafeModeRuleStatusesProto(proto).build();
   }
 
-  public ScmHARatisStatusResponseProto getScmHARatisStatusResponseProto(
-      ScmHARatisStatusRequestProto requestProto) throws IOException {
-    List<String> address = impl.getScmRatisStatus();
-    return ScmHARatisStatusResponseProto.newBuilder().addAllRaftPeerAddress(address).build();
-  }
+  // public ScmHARatisStatusResponseProto getScmHARatisStatusResponseProto(
+  //     ScmHARatisStatusRequestProto requestProto) throws IOException {
+  //   List<String> address = impl.getScmRatisStatus();
+  //   return ScmHARatisStatusResponseProto.newBuilder().addAllRaftPeerAddress(address).build();
+  // }
 
   public ForceExitSafeModeResponseProto forceExitSafeMode(
       ForceExitSafeModeRequestProto request)

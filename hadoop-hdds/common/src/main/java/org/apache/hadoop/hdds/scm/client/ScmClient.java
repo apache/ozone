@@ -246,5 +246,8 @@ public interface ScmClient extends Closeable {
    */
   boolean getReplicationManagerStatus() throws IOException;
 
-  public List<String> getScmRatisStatus() throws IOException;
+  /**
+   * returns the list of ratis peer status. Currently only include peer address.
+   */
+  List<String> getScmRatisStatus() throws IOException;
 }

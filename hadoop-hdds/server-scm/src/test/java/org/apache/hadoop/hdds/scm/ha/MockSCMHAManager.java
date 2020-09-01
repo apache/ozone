@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -105,6 +106,14 @@ public final class MockSCMHAManager implements SCMHAManager {
   @Override
   public void shutdown() throws IOException {
     ratisServer.stop();
+  }
+
+  @Override
+  public List<String> getRatisStatus() {
+    return Arrays.asList(
+        "180.3.14.5:2333",
+        "180.3.14.21:2333",
+        "180.3.14.145:2333");
   }
 
   /**

@@ -9,7 +9,7 @@ import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
 
 @CommandLine.Command(
-    name = "scmha",
+    name = "scm",
     description = "Ozone Storage Container Manager specific admin operations",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,

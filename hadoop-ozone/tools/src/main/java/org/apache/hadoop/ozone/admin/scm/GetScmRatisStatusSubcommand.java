@@ -7,7 +7,7 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine;
 
 @CommandLine.Command(
-    name = "listratisstatus",
+    name = "status",
     description = "",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)

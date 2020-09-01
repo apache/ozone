@@ -201,6 +201,7 @@ message GetScmInfoRequestProto {
 message GetScmInfoResponseProto {
     required string clusterId = 1;
     required string scmId = 2;
+    repeated string peerStatus = 3;
 }
 
 

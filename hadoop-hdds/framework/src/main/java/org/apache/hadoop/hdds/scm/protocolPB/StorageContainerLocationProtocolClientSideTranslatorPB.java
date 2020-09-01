@@ -60,8 +60,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest.Builder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmHARatisStatusRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmHARatisStatusResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
@@ -446,7 +444,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .getGetScmInfoResponse();
     ScmInfo.Builder builder = new ScmInfo.Builder()
         .setClusterId(resp.getClusterId())
-        .setScmId(resp.getScmId());
+        .setScmId(resp.getScmId())
+        .setRatisPeerStatus(resp.getPeerStatusList());
+
     return builder.build();
 
   }
@@ -534,16 +534,6 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
             .getReplicationManagerStatusResponse();
     return response.getIsRunning();
 
-  }
-
-  @Override
-  public List<String> getScmRatisStatus() throws IOException {
-    ScmHARatisStatusRequestProto request = ScmHARatisStatusRequestProto.getDefaultInstance();
-    ScmHARatisStatusResponseProto response =
-        submitRequest(Type.ScmHAStatus,
-            builder ->
-              builder.setGetScmHARatisStatusRequest(request)).getGetScmHARatisStatusResponse();
-    return response.getRaftPeerAddressList();
   }
 
   @Override

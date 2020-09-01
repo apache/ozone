@@ -62,7 +62,6 @@ message ScmContainerLocationRequest {
   optional GetPipelineRequestProto getPipelineRequest = 24;
   optional GetContainerWithPipelineBatchRequestProto getContainerWithPipelineBatchRequest = 25;
   optional GetSafeModeRuleStatusesRequestProto getSafeModeRuleStatusesRequest = 26;
-  optional ScmHARatisStatusRequestProto getScmHARatisStatusRequest = 27;
 }
 
 message ScmContainerLocationResponse {
@@ -97,7 +96,6 @@ message ScmContainerLocationResponse {
   optional GetPipelineResponseProto getPipelineResponse = 24;
   optional GetContainerWithPipelineBatchResponseProto getContainerWithPipelineBatchResponse = 25;
   optional GetSafeModeRuleStatusesResponseProto getSafeModeRuleStatusesResponse = 26;
-  optional ScmHARatisStatusResponseProto getScmHARatisStatusResponse = 27;
 
   enum Status {
     OK = 1;
@@ -129,7 +127,6 @@ enum Type {
   GetPipeline = 19;
   GetContainerWithPipelineBatch = 20;
   GetSafeModeRuleStatuses = 21;
-  ScmHAStatus = 22;
 }
 
 /**
@@ -345,13 +342,6 @@ message ReplicationManagerStatusRequestProto {
 
 message ReplicationManagerStatusResponseProto {
   required bool isRunning = 1;
-}
-
-message ScmHARatisStatusRequestProto {
-}
-
-message ScmHARatisStatusResponseProto {
-  repeated string raftPeerAddress = 3;
 }
 
 /**
