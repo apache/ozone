@@ -30,10 +30,10 @@ import java.util.List;
 import java.util.concurrent.Callable;
 
 /**
- * Handler of om status command.
+ * Handler of om roles command.
  */
 @CommandLine.Command(
-    name = "status", aliases = "getserviceroles",
+    name = "roles", aliases = "getserviceroles",
     description = "List all OMs and their respective Ratis server roles",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
