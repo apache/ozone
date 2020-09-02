@@ -22,6 +22,10 @@ jobs:
   build:
     name: compile
     runs-on: ubuntu-18.04
+    strategy:
+      matrix:
+        java: [ 8, 11 ]
+      fail-fast: false
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
@@ -34,10 +38,17 @@ jobs:
           key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-
-      - name: Execute tests
-        uses: ./.github/buildenv
+      - name: Cache for maven dependencies
+        uses: actions/cache@v2
         with:
-          args: ./hadoop-ozone/dev-support/checks/build.sh
+          path: ~/.m2/repository
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
+      - name: Setup java
+        uses: actions/setup-java@v1
+        with:
+          java-version: ${{ matrix.java }}
+      - name: Run a full build
+        run: hadoop-ozone/dev-support/checks/build.sh
   bats:
     runs-on: ubuntu-18.04
     steps:
