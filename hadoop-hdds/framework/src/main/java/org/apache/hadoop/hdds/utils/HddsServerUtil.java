@@ -67,8 +67,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_T
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_RECON_HEARTBEAT_RPC_RETRY_COUNT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_RECON_HEARTBEAT_RPC_RETRY_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.sanitizeUserArgs;
@@ -337,17 +335,6 @@ public final class HddsServerUtil {
   public static int getScmRpcRetryCount(ConfigurationSource conf) {
     return conf.getInt(OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT,
         OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT_DEFAULT);
-  }
-
-  /**
-   * Max retry count of rpcProxy for EndpointStateMachine of Recon.
-   *
-   * @param conf - Ozone Config
-   * @return - Max retry count.
-   */
-  public static int getReconRpcRetryCount(ConfigurationSource conf) {
-    return conf.getInt(OZONE_RECON_HEARTBEAT_RPC_RETRY_COUNT,
-        OZONE_RECON_HEARTBEAT_RPC_RETRY_COUNT_DEFAULT);
   }
 
   /**

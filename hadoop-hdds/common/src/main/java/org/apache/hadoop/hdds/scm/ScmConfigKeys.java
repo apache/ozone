@@ -244,12 +244,7 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT =
       "ozone.scm.heartbeat.rpc-retry-count";
   public static final int OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT_DEFAULT =
-      30;
-
-  public static final String OZONE_RECON_HEARTBEAT_RPC_RETRY_COUNT =
-      "ozone.recon.heartbeat.rpc-retry-count";
-  public static final int OZONE_RECON_HEARTBEAT_RPC_RETRY_COUNT_DEFAULT =
-      30;
+      15;
 
   /**
    * Defines how frequently we will log the missing of heartbeat to a specific

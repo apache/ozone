@@ -47,7 +47,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import static java.util.Collections.unmodifiableList;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcTimeOutInMilliseconds;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcRetryCount;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getReconRpcRetryCount;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -197,7 +196,7 @@ public class SCMConnectionManager
 
       RetryPolicy retryPolicy =
           RetryPolicies.retryUpToMaximumCountWithFixedSleep(
-              getReconRpcRetryCount(conf),
+              getScmRpcRetryCount(conf),
               1000, TimeUnit.MILLISECONDS);
       ReconDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
           ReconDatanodeProtocolPB.class, version,
