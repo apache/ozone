@@ -443,7 +443,6 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .setScmId(scmInfo.getScmId())
         .addAllPeerStatus(scmInfo.getRatisPeerStatus())
         .build();
-
   }
 
   public InSafeModeResponseProto inSafeMode(

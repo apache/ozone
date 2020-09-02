@@ -24,5 +24,5 @@ Test Timeout        5 minutes
 
 *** Test Cases ***
 Run scm status
-    ${output} =         Execute          ozone admin scm status
-                        Should contain   ${output}   [180.3.14.5:2333, 180.3.14.21:2333, 180.3.14.145:2333]
+    ${output} =         Execute          ozone admin scm roles
+                        Should contain   ${output}  []

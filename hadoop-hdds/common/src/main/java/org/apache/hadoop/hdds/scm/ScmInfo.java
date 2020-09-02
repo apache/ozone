@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.scm;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * ScmInfo wraps the result returned from SCM#getScmInfo which
@@ -37,7 +38,11 @@ public final class ScmInfo {
   public static class Builder {
     private String clusterId;
     private String scmId;
-    private List<String> peerStatus = new ArrayList<>();
+    private List<String> peerStatus;
+
+    public Builder() {
+      peerStatus = new ArrayList<>();
+    }
 
     /**
      * sets the cluster id.
@@ -72,10 +77,6 @@ public final class ScmInfo {
     public ScmInfo build() {
       return new ScmInfo(clusterId, scmId, peerStatus);
     }
-  }
-
-  private ScmInfo(String clusterId, String scmId) {
-    this(clusterId, scmId, Collections.emptyList());
   }
 
   private ScmInfo(String clusterId, String scmId, List<String> peerStatus) {

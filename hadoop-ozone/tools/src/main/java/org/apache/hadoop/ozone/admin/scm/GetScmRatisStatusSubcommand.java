@@ -27,7 +27,7 @@ import picocli.CommandLine;
  * Handler of scm status command.
  */
 @CommandLine.Command(
-    name = "status",
+    name = "roles",
     description = "List all SCMs and their respective Ratis server status",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)

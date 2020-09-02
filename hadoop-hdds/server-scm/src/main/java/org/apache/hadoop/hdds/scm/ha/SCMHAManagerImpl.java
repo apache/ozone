@@ -150,14 +150,11 @@ public class SCMHAManagerImpl implements SCMHAManager {
 
   @Override
   public List<String> getRatisStatus() {
-    if (getRatisServer().getRaftPeers() != null) {
-      return getRatisServer()
-          .getRaftPeers()
-          .stream()
-          .map(peer -> peer.getAddress()).collect(Collectors.toList());
-    } else {
-      return Collections.emptyList();
-    }
+    return getRatisServer()
+            .getRaftPeers()
+            .stream()
+            .map(peer -> peer.getAddress() == null ? "" : peer.getAddress())
+            .collect(Collectors.toList());
   }
 
   /**
