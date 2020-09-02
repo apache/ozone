@@ -39,11 +39,13 @@ import org.junit.Test;
 import org.mockito.Mockito;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static junit.framework.TestCase.assertEquals;
 import static org.apache.hadoop.hdds.scm.TestUtils.getReplicas;
 import static org.apache.hadoop.hdds.scm.TestUtils.getContainer;
 
@@ -483,9 +485,167 @@ public class TestContainerReportHandler {
     Assert.assertEquals(LifeCycleState.CLOSED, containerOne.getState());
   }
 
+  @Test
+  public void openContainerKeyAndBytesUsedUpdatedToMinimumOfAllReplicas()
+      throws SCMException {
+    final ContainerReportHandler reportHandler = new ContainerReportHandler(
+        nodeManager, containerManager);
+    final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
+        NodeState.HEALTHY).iterator();
+
+    final DatanodeDetails datanodeOne = nodeIterator.next();
+    final DatanodeDetails datanodeTwo = nodeIterator.next();
+    final DatanodeDetails datanodeThree = nodeIterator.next();
+
+    final ContainerReplicaProto.State replicaState
+        = ContainerReplicaProto.State.OPEN;
+    final ContainerInfo containerOne = getContainer(LifeCycleState.OPEN);
+
+    final Set<ContainerID> containerIDSet = new HashSet<>();
+    containerIDSet.add(containerOne.containerID());
+
+    containerStateManager.loadContainer(containerOne);
+    // Container loaded, no replicas reported from DNs. Expect zeros for
+    // usage values.
+    assertEquals(0L, containerOne.getUsedBytes());
+    assertEquals(0L, containerOne.getNumberOfKeys());
+
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        datanodeOne, 50L, 60L), publisher);
+
+    // Single replica reported - ensure values are updated
+    assertEquals(50L, containerOne.getUsedBytes());
+    assertEquals(60L, containerOne.getNumberOfKeys());
+
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        datanodeTwo, 50L, 60L), publisher);
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        datanodeThree, 50L, 60L), publisher);
+
+    // All 3 DNs are reporting the same values. Counts should be as expected.
+    assertEquals(50L, containerOne.getUsedBytes());
+    assertEquals(60L, containerOne.getNumberOfKeys());
+
+    // Now each DN reports a different lesser value. Counts should be the min
+    // reported.
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        datanodeOne, 1L, 10L), publisher);
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        datanodeTwo, 2L, 11L), publisher);
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        datanodeThree, 3L, 12L), publisher);
+
+    // All 3 DNs are reporting different values. The actual value should be the
+    // minimum.
+    assertEquals(1L, containerOne.getUsedBytes());
+    assertEquals(10L, containerOne.getNumberOfKeys());
+
+    // Have the lowest value report a higher value and ensure the new value
+    // is the minimum
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        datanodeOne, 3L, 12L), publisher);
+
+    assertEquals(2L, containerOne.getUsedBytes());
+    assertEquals(11L, containerOne.getNumberOfKeys());
+  }
+
+  @Test
+  public void notOpenContainerKeyAndBytesUsedUpdatedToMaximumOfAllReplicas()
+      throws SCMException {
+    final ContainerReportHandler reportHandler = new ContainerReportHandler(
+        nodeManager, containerManager);
+    final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
+        NodeState.HEALTHY).iterator();
+
+    final DatanodeDetails datanodeOne = nodeIterator.next();
+    final DatanodeDetails datanodeTwo = nodeIterator.next();
+    final DatanodeDetails datanodeThree = nodeIterator.next();
+
+    final ContainerReplicaProto.State replicaState
+        = ContainerReplicaProto.State.CLOSED;
+    final ContainerInfo containerOne = getContainer(LifeCycleState.CLOSED);
+
+    final Set<ContainerID> containerIDSet = new HashSet<>();
+    containerIDSet.add(containerOne.containerID());
+
+    containerStateManager.loadContainer(containerOne);
+    // Container loaded, no replicas reported from DNs. Expect zeros for
+    // usage values.
+    assertEquals(0L, containerOne.getUsedBytes());
+    assertEquals(0L, containerOne.getNumberOfKeys());
+
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        datanodeOne, 50L, 60L), publisher);
+
+    // Single replica reported - ensure values are updated
+    assertEquals(50L, containerOne.getUsedBytes());
+    assertEquals(60L, containerOne.getNumberOfKeys());
+
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        datanodeTwo, 50L, 60L), publisher);
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        datanodeThree, 50L, 60L), publisher);
+
+    // All 3 DNs are reporting the same values. Counts should be as expected.
+    assertEquals(50L, containerOne.getUsedBytes());
+    assertEquals(60L, containerOne.getNumberOfKeys());
+
+    // Now each DN reports a different lesser value. Counts should be the max
+    // reported.
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        datanodeOne, 1L, 10L), publisher);
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        datanodeTwo, 2L, 11L), publisher);
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        datanodeThree, 3L, 12L), publisher);
+
+    // All 3 DNs are reporting different values. The actual value should be the
+    // maximum.
+    assertEquals(3L, containerOne.getUsedBytes());
+    assertEquals(12L, containerOne.getNumberOfKeys());
+
+    // Have the highest value report a lower value and ensure the new value
+    // is the new maximumu
+    reportHandler.onMessage(getContainerReportFromDatanode(
+        containerOne.containerID(), replicaState,
+        datanodeThree, 1L, 10L), publisher);
+
+    assertEquals(2L, containerOne.getUsedBytes());
+    assertEquals(11L, containerOne.getNumberOfKeys());
+  }
+
+  private ContainerReportFromDatanode getContainerReportFromDatanode(
+      ContainerID containerId, ContainerReplicaProto.State state,
+      DatanodeDetails dn, long bytesUsed, long keyCount) {
+    ContainerReportsProto containerReport = getContainerReportsProto(
+        containerId, state, dn.getUuidString(), bytesUsed, keyCount);
+
+    return new ContainerReportFromDatanode(dn, containerReport);
+  }
+
   private static ContainerReportsProto getContainerReportsProto(
       final ContainerID containerId, final ContainerReplicaProto.State state,
       final String originNodeId) {
+    return getContainerReportsProto(containerId, state, originNodeId,
+        2000000000L, 100000000L);
+  }
+
+  private static ContainerReportsProto getContainerReportsProto(
+      final ContainerID containerId, final ContainerReplicaProto.State state,
+      final String originNodeId, final long usedBytes, final long keyCount) {
     final ContainerReportsProto.Builder crBuilder =
         ContainerReportsProto.newBuilder();
     final ContainerReplicaProto replicaProto =
@@ -495,8 +655,8 @@ public class TestContainerReportHandler {
             .setOriginNodeId(originNodeId)
             .setFinalhash("e16cc9d6024365750ed8dbd194ea46d2")
             .setSize(5368709120L)
-            .setUsed(2000000000L)
-            .setKeyCount(100000000L)
+            .setUsed(usedBytes)
+            .setKeyCount(keyCount)
             .setReadCount(100000000L)
             .setWriteCount(100000000L)
             .setReadBytes(2000000000L)

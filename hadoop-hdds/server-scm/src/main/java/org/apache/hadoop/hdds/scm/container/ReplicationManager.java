@@ -313,14 +313,6 @@ public class ReplicationManager
               .noneMatch(r -> r.getDatanodeDetails().equals(action.datanode)));
 
       /*
-       * If the container is in CLOSED state, check and update it's key count
-       * and bytes used statistics if needed.
-       */
-      if (state == LifeCycleState.CLOSED) {
-        checkAndUpdateContainerInfo(container, replicas);
-      }
-
-      /*
        * We don't have to take any action if the container is healthy.
        *
        * According to ReplicationMonitor container is considered healthy if
@@ -771,32 +763,6 @@ public class ReplicationManager
     unhealthyReplicas.stream().findFirst().ifPresent(replica ->
         sendDeleteCommand(container, replica.getDatanodeDetails(), false));
 
-  }
-
-  /**
-   * Check and update Container key count and used bytes based on it's replica's
-   * data.
-   */
-  private void checkAndUpdateContainerInfo(final ContainerInfo container,
-      final Set<ContainerReplica> replicas) {
-    // check container key count and bytes used
-    long maxUsedBytes = 0;
-    long maxKeyCount = 0;
-    ContainerReplica[] rps = replicas.toArray(new ContainerReplica[0]);
-    for (int i = 0; i < rps.length; i++) {
-      maxUsedBytes = Math.max(maxUsedBytes, rps[i].getBytesUsed());
-      maxKeyCount = Math.max(maxKeyCount, rps[i].getKeyCount());
-    }
-    if (maxKeyCount < container.getNumberOfKeys()) {
-      LOG.debug("Container {} key count changed from {} to {}",
-          container.containerID(), container.getNumberOfKeys(), maxKeyCount);
-      container.setNumberOfKeys(maxKeyCount);
-    }
-    if (maxUsedBytes < container.getUsedBytes()) {
-      LOG.debug("Container {} used bytes changed from {} to {}",
-          container.containerID(), container.getUsedBytes(), maxUsedBytes);
-      container.setUsedBytes(maxUsedBytes);
-    }
   }
 
   /**
