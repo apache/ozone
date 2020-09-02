@@ -59,7 +59,7 @@ public class StatsSchemaDefinition implements ReconSchemaDefinition {
    */
   private void createGlobalStatsTable() {
     dslContext.createTableIfNotExists(GLOBAL_STATS_TABLE_NAME)
-        .column("key", SQLDataType.VARCHAR(255))
+        .column("key", SQLDataType.VARCHAR(255).nullable(false))
         .column("value", SQLDataType.BIGINT)
         .column("last_updated_timestamp", SQLDataType.TIMESTAMP)
         .constraint(DSL.constraint("pk_key")
