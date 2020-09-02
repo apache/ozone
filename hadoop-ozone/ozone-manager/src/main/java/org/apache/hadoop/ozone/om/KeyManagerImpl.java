@@ -940,9 +940,8 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public List<BlockGroup> getExpiredOpenKeys() throws IOException {
-    return metadataManager.getExpiredOpenKeys();
-
+  public List<String> getExpiredOpenKeys(int count) throws IOException {
+    return metadataManager.getExpiredOpenKeys(count);
   }
 
   @Override
