@@ -19,9 +19,7 @@
 package org.apache.hadoop.hdds.scm;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * ScmInfo wraps the result returned from SCM#getScmInfo which

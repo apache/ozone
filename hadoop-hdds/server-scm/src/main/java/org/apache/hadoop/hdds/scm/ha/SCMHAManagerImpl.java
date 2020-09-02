@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
