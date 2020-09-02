@@ -19,53 +19,91 @@ package org.apache.hadoop.hdds.conf;
 
 import org.junit.Assert;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Optional;
 
 /**
  * Test the configuration reflection utility class.
  */
+@RunWith(Parameterized.class)
 public class TestConfigurationReflectionUtil {
+
+  private final ConfigType type;
+  private final String key;
+  private final String defaultValue;
+  private Class testClass;
+  private String fieldName;
+  private boolean typePresent;
+  private boolean keyPresent;
+  private boolean defaultValuePresent;
+
+  @Parameterized.Parameters
+  public static Collection<Object[]> data() {
+    return Arrays.asList(new Object[][]{
+        {ConfigurationExample.class, "waitTime",
+            ConfigType.TIME, true,
+            "ozone.scm.client.wait", true,
+            "30m", true},
+        {ConfigurationExampleGrandParent.class, "number",
+            ConfigType.AUTO, true,
+            "number", true,
+            "2", true},
+        {ConfigurationExample.class, "secure",
+            ConfigType.AUTO, true,
+            "ozone.scm.client.secure", true,
+            "true", true},
+        {ConfigurationExample.class, "no-such-field",
+            null, false,
+            "", false,
+            "", false},
+        {ConfigFileAppender.class, "document",
+            null, false,
+            "", false,
+            "", false},
+    });
+  }
+
+  public TestConfigurationReflectionUtil(Class testClass, String fieldName,
+      ConfigType type, boolean typePresent,
+      String key, boolean keyPresent,
+      String defaultValue, boolean defaultValuePresent) {
+    this.testClass = testClass;
+    this.fieldName = fieldName;
+    this.typePresent = typePresent;
+    this.type = type;
+    this.key = key;
+    this.keyPresent = keyPresent;
+    this.defaultValue = defaultValue;
+    this.defaultValuePresent = defaultValuePresent;
+  }
 
   @Test
   public void testClassWithConfigGroup() {
     Optional<ConfigType> actualType =
         ConfigurationReflectionUtil.getType(
-            ConfigurationExample.class, "waitTime");
-    Assert.assertTrue(actualType.isPresent());
-    Assert.assertEquals(ConfigType.TIME, actualType.get());
+            testClass, fieldName);
+    Assert.assertEquals(typePresent, actualType.isPresent());
+    if (typePresent) {
+      Assert.assertEquals(type, actualType.get());
+    }
 
     Optional<String> actualKey =
         ConfigurationReflectionUtil.getKey(
-        ConfigurationExample.class, "waitTime");
-    Assert.assertTrue(actualKey.isPresent());
-    Assert.assertEquals("ozone.scm.client.wait", actualKey.get());
-
+            testClass, fieldName);
+    Assert.assertEquals(keyPresent, actualKey.isPresent());
+    if (keyPresent) {
+      Assert.assertEquals(key, actualKey.get());
+    }
     Optional<String> actualDefaultValue =
         ConfigurationReflectionUtil.getDefaultValue(
-            ConfigurationExample.class, "waitTime");
-    Assert.assertTrue(actualDefaultValue.isPresent());
-    Assert.assertEquals("30m", actualDefaultValue.get());
-  }
-
-  @Test
-  public void testClassWithoutConfigGroup() {
-    Optional<ConfigType> actualType =
-        ConfigurationReflectionUtil.getType(
-            ConfigurationExampleGrandParent.class, "number");
-    Assert.assertTrue(actualType.isPresent());
-    Assert.assertEquals(ConfigType.AUTO, actualType.get());
-
-    Optional<String> actualKey =
-        ConfigurationReflectionUtil.getKey(
-            ConfigurationExampleGrandParent.class, "number");
-    Assert.assertTrue(actualKey.isPresent());
-    Assert.assertEquals("number", actualKey.get());
-
-    Optional<String> actualDefaultValue =
-        ConfigurationReflectionUtil.getDefaultValue(
-            ConfigurationExampleGrandParent.class, "number");
-    Assert.assertTrue(actualDefaultValue.isPresent());
-    Assert.assertEquals("2", actualDefaultValue.get());
+            testClass, fieldName);
+    Assert.assertEquals(defaultValuePresent, actualDefaultValue.isPresent());
+    if (defaultValuePresent) {
+      Assert.assertEquals(defaultValue, actualDefaultValue.get());
+    }
   }
 }

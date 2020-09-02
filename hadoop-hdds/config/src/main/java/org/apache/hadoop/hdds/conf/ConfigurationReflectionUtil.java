@@ -245,12 +245,8 @@ public final class ConfigurationReflectionUtil {
 
   public static Optional<String> getDefaultValue(Class<?> configClass,
       String fieldName) {
-    Config annotation = findFieldConfigAnnotationByName(configClass,
-        fieldName);
-    if (annotation != null) {
-      return Optional.of(annotation.defaultValue());
-    }
-    return Optional.empty();
+    return findFieldConfigAnnotationByName(configClass, fieldName)
+        .map(Config::defaultValue);
   }
 
   public static Optional<String> getKey(Class<?> configClass,
@@ -258,36 +254,37 @@ public final class ConfigurationReflectionUtil {
     ConfigGroup configGroup =
         configClass.getAnnotation(ConfigGroup.class);
 
-    Config annotation = findFieldConfigAnnotationByName(configClass,
-        fieldName);
-    if (annotation != null) {
-      String key = annotation.key();
-      if (configGroup != null) {
-        key = configGroup.prefix() + "." + annotation.key();
-      }
-      return Optional.of(key);
-    }
-    return Optional.empty();
+    return findFieldConfigAnnotationByName(configClass,
+        fieldName).map(
+            config -> configGroup == null ? config.key()
+                : configGroup.prefix() + "." + config.key());
   }
 
   public static Optional<ConfigType> getType(Class<?> configClass,
       String fieldName) {
-    Config config = findFieldConfigAnnotationByName(configClass,
-        fieldName);
-    if (config != null) {
-      return Optional.of(config.type());
-    }
-    return Optional.empty();
+    return findFieldConfigAnnotationByName(configClass, fieldName)
+        .map(Config::type);
   }
 
-  private static Config findFieldConfigAnnotationByName(Class<?> configClass,
-      String fieldName) {
-    Optional<Field> field = Stream.of(configClass.getDeclaredFields())
-        .filter(f -> f.getName().equals(fieldName))
-        .findFirst();
-    if (field.isPresent()) {
-      return field.get().getAnnotation(Config.class);
+  private static Optional<Config> findFieldConfigAnnotationByName(
+      final Class<?> configClass, String fieldName) {
+    Class<?> theClass = configClass;
+    while (theClass != null) {
+      Optional<Config> config = Stream.of(theClass.getDeclaredFields())
+          .filter(f -> f.getName().equals(fieldName))
+          .findFirst()
+          .map(f -> f.getAnnotation(Config.class));
+
+      if (config.isPresent()) {
+        return config;
+      }
+
+      if (!theClass.getSuperclass().equals(Object.class)) {
+        theClass = theClass.getSuperclass();
+      } else {
+        theClass = null;
+      }
     }
-    return null;
+    return Optional.empty();
   }
 }
