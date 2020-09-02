@@ -48,8 +48,8 @@
             </li>
         {{ else }}
             <li class="{{ if $currentPage.IsMenuCurrent "main" . }}active{{ end }}">
-                {{ if eq .URL "/" }}
-                   <a href="{{ "index.html" | relURL }}">
+                {{ if not (strings.HasSuffix .URL ".html")}}
+                   <a href="{{ "index.html" | relLangURL }}">
                 {{ else }}
                    <a href="{{ .URL | relURL }}">
                 {{ end }}
