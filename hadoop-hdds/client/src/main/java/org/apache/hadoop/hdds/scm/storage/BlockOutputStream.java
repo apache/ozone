@@ -314,9 +314,11 @@ public class BlockOutputStream extends OutputStream {
     Preconditions.checkArgument(len <= streamBufferMaxSize);
     int count = 0;
     while (len > 0) {
-      refreshCurrentBuffer(bufferPool);
-      long writeLen = Math.min(currentBuffer.position(), len);
-      writeChunkIfNeeded();
+      ChunkBuffer buffer = bufferPool.getBuffer(count);
+      long writeLen = Math.min(buffer.position(), len);
+      if (!buffer.hasRemaining()) {
+        writeChunk(buffer);
+      }
       len -= writeLen;
       count++;
       writtenDataLength += writeLen;
