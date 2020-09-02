@@ -95,7 +95,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         return;
       }
       LOG.debug("Processing block deletion command.");
-      invocationCount++;
 
       // move blocks to deleting state.
       // this is a metadata update, the actual deletion happens in another
@@ -177,6 +176,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       updateCommandStatus(context, command, statusUpdater, LOG);
       long endTime = Time.monotonicNow();
       totalTime += endTime - startTime;
+      invocationCount++;
     }
   }
 
