@@ -44,7 +44,7 @@ public class TestConfigurationReflectionUtil {
     Optional<String> actualDefaultValue =
         ConfigurationReflectionUtil.getDefaultValue(
             ConfigurationExample.class, "waitTime");
-    Assert.assertTrue(actualKey.isPresent());
+    Assert.assertTrue(actualDefaultValue.isPresent());
     Assert.assertEquals("30m", actualDefaultValue.get());
   }
 
@@ -65,7 +65,7 @@ public class TestConfigurationReflectionUtil {
     Optional<String> actualDefaultValue =
         ConfigurationReflectionUtil.getDefaultValue(
             ConfigurationExampleGrandParent.class, "number");
-    Assert.assertTrue(actualKey.isPresent());
+    Assert.assertTrue(actualDefaultValue.isPresent());
     Assert.assertEquals("2", actualDefaultValue.get());
   }
 }
