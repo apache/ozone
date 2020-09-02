@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -28,6 +29,9 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -76,7 +80,7 @@ public class AbstractContainerReportHandler {
     // Synchronized block should be replaced by container lock,
     // once we have introduced lock inside ContainerInfo.
     synchronized (containerManager.getContainer(containerId)) {
-      updateContainerStats(containerId, replicaProto);
+      updateContainerStats(datanodeDetails, containerId, replicaProto);
       updateContainerState(datanodeDetails, containerId, replicaProto);
       updateContainerReplica(datanodeDetails, containerId, replicaProto);
     }
@@ -90,7 +94,8 @@ public class AbstractContainerReportHandler {
    * @param replicaProto Container Replica information
    * @throws ContainerNotFoundException If the container is not present
    */
-  private void updateContainerStats(final ContainerID containerId,
+  private void updateContainerStats(final DatanodeDetails datanodeDetails,
+                                    final ContainerID containerId,
                                     final ContainerReplicaProto replicaProto)
       throws ContainerNotFoundException {
 
@@ -103,14 +108,44 @@ public class AbstractContainerReportHandler {
         containerInfo.updateSequenceId(
             replicaProto.getBlockCommitSequenceId());
       }
-
-      if (containerInfo.getUsedBytes() < replicaProto.getUsed()) {
-        containerInfo.setUsedBytes(replicaProto.getUsed());
+      List<ContainerReplica> otherReplicas =
+          getOtherReplicas(containerId, datanodeDetails);
+      long usedBytes = replicaProto.getUsed();
+      long keyCount = replicaProto.getKeyCount();
+      for (ContainerReplica r : otherReplicas) {
+        // Open containers are generally growing in key count and size, the
+        // overall size should be the min of all reported replicas.
+        if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)) {
+          usedBytes = Math.min(usedBytes, r.getBytesUsed());
+          keyCount = Math.min(keyCount, r.getKeyCount());
+        } else {
+          // Containers which are not open can only shrink in size, so use the
+          // largest values reported.
+          usedBytes = Math.max(usedBytes, r.getBytesUsed());
+          keyCount = Math.max(keyCount, r.getKeyCount());
+        }
       }
-      if (containerInfo.getNumberOfKeys() < replicaProto.getKeyCount()) {
-        containerInfo.setNumberOfKeys(replicaProto.getKeyCount());
+
+      if (containerInfo.getUsedBytes() != usedBytes) {
+        containerInfo.setUsedBytes(usedBytes);
+      }
+      if (containerInfo.getNumberOfKeys() != keyCount) {
+        containerInfo.setNumberOfKeys(keyCount);
       }
     }
+  }
+
+  private List<ContainerReplica> getOtherReplicas(ContainerID containerId,
+      DatanodeDetails exclude) throws ContainerNotFoundException {
+    List<ContainerReplica> filteredReplicas = new ArrayList<>();
+    Set<ContainerReplica> replicas
+        = containerManager.getContainerReplicas(containerId);
+    for (ContainerReplica r : replicas) {
+      if (!r.getDatanodeDetails().equals(exclude)) {
+        filteredReplicas.add(r);
+      }
+    }
+    return filteredReplicas;
   }
 
   /**

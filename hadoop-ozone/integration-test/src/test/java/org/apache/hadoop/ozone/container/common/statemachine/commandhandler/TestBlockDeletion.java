@@ -270,11 +270,8 @@ public class TestBlockDeletion {
     });
 
     om.deleteKey(keyArgs);
-    // Want for blocks to be deleted
+    // Wait for blocks to be deleted and container reports to be processed
     Thread.sleep(5000);
-    scm.getReplicationManager().processContainersNow();
-    // Wait for container statistics change
-    Thread.sleep(1000);
     containerInfos = scm.getContainerManager().getContainers();
     containerInfos.stream().forEach(container -> {
       Assert.assertEquals(0, container.getUsedBytes());
