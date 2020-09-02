@@ -81,8 +81,8 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
    */
   private void createContainerHistoryTable() {
     dslContext.createTableIfNotExists(CONTAINER_HISTORY_TABLE_NAME)
-        .column(CONTAINER_ID, SQLDataType.BIGINT)
-        .column("datanode_host", SQLDataType.VARCHAR(1024))
+        .column(CONTAINER_ID, SQLDataType.BIGINT.nullable(false))
+        .column("datanode_host", SQLDataType.VARCHAR(766).nullable(false))
         .column("first_report_timestamp", SQLDataType.BIGINT)
         .column("last_report_timestamp", SQLDataType.BIGINT)
         .constraint(DSL.constraint("pk_container_id_datanode_host")
