@@ -567,7 +567,8 @@ public class ObjectEndpoint extends EndpointBase {
                         + rangeHeader.getStartOffset() + " actual: " + skipped);
               }
               IOUtils.copyLarge(sourceObject, ozoneOutputStream, 0,
-                  rangeHeader.getEndOffset() - rangeHeader.getStartOffset());
+                  rangeHeader.getEndOffset() - rangeHeader.getStartOffset()
+                      + 1);
             } else {
               IOUtils.copy(sourceObject, ozoneOutputStream);
             }
