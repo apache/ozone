@@ -72,8 +72,8 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
 
   private void createClusterGrowthTable() {
     dslContext.createTableIfNotExists(CLUSTER_GROWTH_DAILY_TABLE_NAME)
-        .column("timestamp", SQLDataType.TIMESTAMP)
-        .column("datanode_id", SQLDataType.INTEGER)
+        .column("timestamp", SQLDataType.TIMESTAMP.nullable(false))
+        .column("datanode_id", SQLDataType.INTEGER.nullable(false))
         .column("datanode_host", SQLDataType.VARCHAR(1024))
         .column("rack_id", SQLDataType.VARCHAR(1024))
         .column("available_size", SQLDataType.BIGINT)
@@ -87,9 +87,9 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
 
   private void createFileSizeCountTable() {
     dslContext.createTableIfNotExists(FILE_COUNT_BY_SIZE_TABLE_NAME)
-        .column("volume", SQLDataType.VARCHAR(64))
-        .column("bucket", SQLDataType.VARCHAR(64))
-        .column("file_size", SQLDataType.BIGINT)
+        .column("volume", SQLDataType.VARCHAR(64).nullable(false))
+        .column("bucket", SQLDataType.VARCHAR(64).nullable(false))
+        .column("file_size", SQLDataType.BIGINT.nullable(false))
         .column("count", SQLDataType.BIGINT)
         .constraint(DSL.constraint("pk_volume_bucket_file_size")
             .primaryKey("volume", "bucket", "file_size"))
