@@ -259,8 +259,8 @@ public class BlockManagerImpl implements BlockManager {
       // are not atomic. Leaving it here since the impact is refusing
       // to delete a Block which might have just gotten inserted after
       // the get check.
-      byte[] blockKey = Longs.toByteArray(blockID.getLocalID());
 
+      // Throw an exception if block data not found in the block data table.
       getBlockByID(db, blockID);
 
       // Update DB to delete block and set block count and bytes used.

@@ -112,8 +112,7 @@ public class TestKeyValueBlockIterator {
     int deletingBlocks = 5;
     int normalBlocks = 5;
     Map<String, List<Long>> blockIDs = createContainerWithBlocks(CONTAINER_ID,
-            normalBlocks,
-            deletingBlocks);
+            normalBlocks, deletingBlocks);
 
     // Default filter used is all unprefixed blocks.
     List<Long> unprefixedBlockIDs = blockIDs.get("");
@@ -214,8 +213,8 @@ public class TestKeyValueBlockIterator {
       int counter = 0;
       while (keyValueBlockIterator.hasNext()) {
         BlockData blockData = keyValueBlockIterator.nextBlock();
-        assertEquals(blockData.getLocalID(),
-                (long)deletingBlockIDs.get(counter));
+        assertEquals((long)deletingBlockIDs.get(counter),
+                blockData.getLocalID());
         counter++;
       }
 
@@ -313,33 +312,32 @@ public class TestKeyValueBlockIterator {
   }
 
   /**
-   * Creates a container with specified number of unprefixed (normal) blocks.
+   * Creates a container with specified number of unprefixed blocks.
    * @param containerId
-   * @param normalBlocks
+   * @param unprefixedBlocks
    * @return The list of block IDs of normal blocks that were created.
    * @throws Exception
    */
   private List<Long> createContainerWithBlocks(long containerId,
-            int normalBlocks) throws Exception {
-    return createContainerWithBlocks(containerId, normalBlocks, 0).get("");
+            int unprefixedBlocks) throws Exception {
+    return createContainerWithBlocks(containerId, unprefixedBlocks, 0).get("");
   }
 
   /**
-   * Creates a container with specified number of normal blocks and deleted
+   * Creates a container with specified number of unprefixed blocks and deleted
    * blocks.
-   * deleting blocks, then it will insert deleted blocks.
    * @param containerId
-   * @param normalBlocks
+   * @param unprefixedBlocks
    * @param deletingBlocks
    * @return Each key prefix mapped to the sorted list of block IDs of blocks
    * created whose keys had that prefix.
    * @throws Exception
    */
   private Map<String, List<Long>> createContainerWithBlocks(long containerId,
-            int normalBlocks, int deletingBlocks) throws Exception {
+            int unprefixedBlocks, int deletingBlocks) throws Exception {
 
     Map<String, Integer> prefixes = new HashMap<>();
-    prefixes.put("", normalBlocks);
+    prefixes.put("", unprefixedBlocks);
     prefixes.put(OzoneConsts.DELETING_KEY_PREFIX, deletingBlocks);
     return createContainerWithBlocks(containerId, prefixes);
   }

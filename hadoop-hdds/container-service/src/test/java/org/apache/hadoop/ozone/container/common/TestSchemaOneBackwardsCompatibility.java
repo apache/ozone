@@ -309,14 +309,6 @@ public class TestSchemaOneBackwardsCompatibility {
       Assert.assertEquals(TestDB.NUM_PENDING_DELETION_BLOCKS,
               numPostUpgradeDeletesFound);
     }
-
-
-    try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
-      List<? extends Table.KeyValue<String, ChunkInfoList>> deletedBlocks =
-              refCountedDB.getStore().getDeletedBlocksTable()
-                      .getRangeKVs(null, 100);
-
-    }
   }
 
   private void runBlockDeletingService() throws Exception {

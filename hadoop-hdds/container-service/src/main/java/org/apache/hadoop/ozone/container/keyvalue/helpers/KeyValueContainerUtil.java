@@ -198,7 +198,7 @@ public final class KeyValueContainerUtil {
           metadataTable.get(OzoneConsts.PENDING_DELETE_BLOCK_COUNT);
       if (pendingDeleteBlockCount != null) {
         kvContainerData.incrPendingDeletionBlocks(
-                pendingDeleteBlockCount.intValue());
+                pendingDeleteBlockCount);
       } else {
         // Set pending deleted block count.
         MetadataKeyFilters.KeyPrefixFilter filter =
