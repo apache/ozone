@@ -84,7 +84,7 @@ public class TestConfigurationReflectionUtil {
   }
 
   @Test
-  public void testClassWithConfigGroup() {
+  public void testForGivenClasses() {
     Optional<ConfigType> actualType =
         ConfigurationReflectionUtil.getType(
             testClass, fieldName);
