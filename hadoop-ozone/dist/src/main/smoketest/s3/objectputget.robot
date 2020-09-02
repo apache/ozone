@@ -31,22 +31,22 @@ ${BUCKET}             generated
 
 Put object to s3
                         Execute                    echo "Randomtext" > /tmp/testfile
-    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key putobject/f1 --body /tmp/testfile
-    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix putobject/
+    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/f1 --body /tmp/testfile
+    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/putobject/
                         Should contain             ${result}         f1
 
                         Execute                    touch -f /tmp/zerobyte
-    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key putobject/zerobyte --body /tmp/zerobyte
-    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix putobject/
+    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/putobject/zerobyte --body /tmp/zerobyte
+    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/putobject/
                         Should contain             ${result}         zerobyte
 
 #This test depends on the previous test case. Can't be executes alone
 Get object from s3
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 /tmp/testfile.result
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/f1 /tmp/testfile.result
     Compare files               /tmp/testfile              /tmp/testfile.result
 
 Get Partial object from s3 with both start and endoffset
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=0-4 /tmp/testfile1.result
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/f1 --range bytes=0-4 /tmp/testfile1.result
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 0-4/11
                                 Should contain             ${result}        AcceptRanges
@@ -54,7 +54,7 @@ Get Partial object from s3 with both start and endoffset
     ${actualData} =             Execute                    cat /tmp/testfile1.result
                                 Should Be Equal            ${expectedData}            ${actualData}
 
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=2-4 /tmp/testfile1.result1
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/f1 --range bytes=2-4 /tmp/testfile1.result1
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 2-4/11
                                 Should contain             ${result}        AcceptRanges
@@ -63,7 +63,7 @@ Get Partial object from s3 with both start and endoffset
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 # end offset greater than file size and start with in file length
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=2-1000 /tmp/testfile1.result2
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/f1 --range bytes=2-1000 /tmp/testfile1.result2
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 2-10/11
                                 Should contain             ${result}        AcceptRanges
@@ -72,12 +72,12 @@ Get Partial object from s3 with both start and endoffset
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 Get Partial object from s3 with both start and endoffset(start offset and endoffset is greater than file size)
-    ${result} =                 Execute AWSS3APICli and checkrc        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=10000-10000 /tmp/testfile2.result   255
+    ${result} =                 Execute AWSS3APICli and checkrc        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/f1 --range bytes=10000-10000 /tmp/testfile2.result   255
                                 Should contain             ${result}        InvalidRange
 
 
 Get Partial object from s3 with both start and endoffset(end offset is greater than file size)
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=0-10000 /tmp/testfile2.result
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/f1 --range bytes=0-10000 /tmp/testfile2.result
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 0-10/11
                                 Should contain             ${result}        AcceptRanges
@@ -86,7 +86,7 @@ Get Partial object from s3 with both start and endoffset(end offset is greater t
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 Get Partial object from s3 with only start offset
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=0- /tmp/testfile3.result
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/f1 --range bytes=0- /tmp/testfile3.result
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 0-10/11
                                 Should contain             ${result}        AcceptRanges
@@ -95,7 +95,7 @@ Get Partial object from s3 with only start offset
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 Get Partial object from s3 with both start and endoffset which are equal
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=0-0 /tmp/testfile4.result
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/f1 --range bytes=0-0 /tmp/testfile4.result
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 0-0/11
                                 Should contain             ${result}        AcceptRanges
@@ -103,7 +103,7 @@ Get Partial object from s3 with both start and endoffset which are equal
     ${actualData} =             Execute                    cat /tmp/testfile4.result
                                 Should Be Equal            ${expectedData}            ${actualData}
 
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=4-4 /tmp/testfile5.result
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/f1 --range bytes=4-4 /tmp/testfile5.result
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 4-4/11
                                 Should contain             ${result}        AcceptRanges
@@ -112,7 +112,7 @@ Get Partial object from s3 with both start and endoffset which are equal
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 Get Partial object from s3 to get last n bytes
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=-4 /tmp/testfile6.result
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/f1 --range bytes=-4 /tmp/testfile6.result
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 7-10/11
                                 Should contain             ${result}        AcceptRanges
@@ -121,7 +121,7 @@ Get Partial object from s3 to get last n bytes
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 # if end is greater than file length, returns whole file
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=-10000 /tmp/testfile7.result
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/f1 --range bytes=-10000 /tmp/testfile7.result
                                 Should contain             ${result}        ContentRange
                                 Should contain             ${result}        bytes 0-10/11
                                 Should contain             ${result}        AcceptRanges
@@ -130,14 +130,14 @@ Get Partial object from s3 to get last n bytes
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 Incorrect values for end and start offset
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=-11-10000 /tmp/testfile8.result
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/f1 --range bytes=-11-10000 /tmp/testfile8.result
                                 Should not contain         ${result}        ContentRange
                                 Should contain             ${result}        AcceptRanges
     ${expectedData} =           Execute                    cat /tmp/testfile
     ${actualData} =             Execute                    cat /tmp/testfile8.result
                                 Should Be Equal            ${expectedData}            ${actualData}
 
-    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key putobject/f1 --range bytes=11-8 /tmp/testfile9.result
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/f1 --range bytes=11-8 /tmp/testfile9.result
                                 Should not contain         ${result}        ContentRange
                                 Should contain             ${result}        AcceptRanges
     ${expectedData} =           Execute                    cat /tmp/testfile
@@ -145,11 +145,11 @@ Incorrect values for end and start offset
                                 Should Be Equal            ${expectedData}            ${actualData}
 
 Zero byte file
-    ${result} =                 Execute AWSS3APICli and checkrc        get-object --bucket ${BUCKET} --key putobject/zerobyte --range bytes=0-0 /tmp/testfile2.result   255
+    ${result} =                 Execute AWSS3APICli and checkrc        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/zerobyte --range bytes=0-0 /tmp/testfile2.result   255
                                 Should contain             ${result}        InvalidRange
 
-    ${result} =                 Execute AWSS3APICli and checkrc        get-object --bucket ${BUCKET} --key putobject/zerobyte --range bytes=0-1 /tmp/testfile2.result   255
+    ${result} =                 Execute AWSS3APICli and checkrc        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/zerobyte --range bytes=0-1 /tmp/testfile2.result   255
                                 Should contain             ${result}        InvalidRange
 
-    ${result} =                 Execute AWSS3APICli and checkrc        get-object --bucket ${BUCKET} --key putobject/zerobyte --range bytes=0-10000 /tmp/testfile2.result   255
+    ${result} =                 Execute AWSS3APICli and checkrc        get-object --bucket ${BUCKET} --key ${PREFIX}/putobject/zerobyte --range bytes=0-10000 /tmp/testfile2.result   255
                                 Should contain             ${result}        InvalidRange
