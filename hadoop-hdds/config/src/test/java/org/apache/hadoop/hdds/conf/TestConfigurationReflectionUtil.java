@@ -35,11 +35,11 @@ public class TestConfigurationReflectionUtil {
   private final ConfigType type;
   private final String key;
   private final String defaultValue;
-  private Class testClass;
-  private String fieldName;
-  private boolean typePresent;
-  private boolean keyPresent;
-  private boolean defaultValuePresent;
+  private final Class testClass;
+  private final String fieldName;
+  private final boolean typePresent;
+  private final boolean keyPresent;
+  private final boolean defaultValuePresent;
 
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
@@ -67,7 +67,9 @@ public class TestConfigurationReflectionUtil {
     });
   }
 
-  public TestConfigurationReflectionUtil(Class testClass, String fieldName,
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public TestConfigurationReflectionUtil(
+      Class testClass, String fieldName,
       ConfigType type, boolean typePresent,
       String key, boolean keyPresent,
       String defaultValue, boolean defaultValuePresent) {
