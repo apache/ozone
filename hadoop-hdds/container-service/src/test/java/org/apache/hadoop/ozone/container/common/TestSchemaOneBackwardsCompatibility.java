@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
@@ -38,6 +39,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.SchemaOneDeletedBlocksTable;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.testutils.BlockDeletingServiceTestImpl;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -143,6 +145,8 @@ public class TestSchemaOneBackwardsCompatibility {
   /**
    * Counts the number of deleted, pending delete, and regular blocks in the
    * database, and checks that they match the expected values.
+   * Also makes sure that internal prefixes used to manage data in the schema
+   * one deleted blocks table are removed from keys in iterator results.
    * @throws IOException
    */
   @Test
@@ -158,7 +162,28 @@ public class TestSchemaOneBackwardsCompatibility {
 
       assertEquals(TestDB.KEY_COUNT - TestDB.NUM_PENDING_DELETION_BLOCKS,
               countUnprefixedBlocks(refCountedDB));
+
+      // Test that deleted block keys do not have a visible prefix when iterating.
+      final String prefix = SchemaOneDeletedBlocksTable.DELETED_KEY_PREFIX;
+      Table<String, ChunkInfoList> deletedBlocksTable =
+              refCountedDB.getStore().getDeletedBlocksTable();
+
+      // Test rangeKVs.
+      List<? extends Table.KeyValue<String, ChunkInfoList>> deletedBlocks =
+              deletedBlocksTable.getRangeKVs(null, 100);
+
+      for (Table.KeyValue<String, ChunkInfoList> kv: deletedBlocks) {
+        assertFalse(kv.getKey().contains(prefix));
+      }
+
+      // Test sequentialRangeKVs.
+      deletedBlocks = deletedBlocksTable.getRangeKVs(null, 100);
+
+      for (Table.KeyValue<String, ChunkInfoList> kv: deletedBlocks) {
+        assertFalse(kv.getKey().contains(prefix));
+      }
     }
+
   }
 
   /**
