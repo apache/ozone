@@ -17,22 +17,24 @@
  */
 package org.apache.hadoop.ozone.insight.datanode;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.server.http.HttpConfig;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.insight.BaseInsightPoint;
+import org.apache.hadoop.ozone.insight.Component;
+import org.apache.hadoop.ozone.insight.Component.Type;
 import org.apache.hadoop.ozone.insight.InsightPoint;
 import org.apache.hadoop.ozone.insight.LoggerSource;
 import org.apache.hadoop.ozone.insight.MetricGroupDisplay;
 
-import static org.apache.hadoop.ozone.insight.datanode.PipelineComponentUtil.getPipelineIdFromFilters;
-import static org.apache.hadoop.ozone.insight.datanode.PipelineComponentUtil.withDatanodesFromPipeline;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HTTPS_BIND_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HTTP_BIND_PORT_DEFAULT;
 
 /**
  * Insight definition for HddsDispatcher.
@@ -40,38 +42,57 @@ import static org.apache.hadoop.ozone.insight.datanode.PipelineComponentUtil.wit
 public class DatanodeDispatcherInsight extends BaseInsightPoint
     implements InsightPoint {
 
+  private static final String DATANODE_FILTER = "datanode";
+
   private OzoneConfiguration conf;
 
   public DatanodeDispatcherInsight(
-      OzoneConfiguration conf) {
+      OzoneConfiguration conf
+  ) {
     this.conf = conf;
   }
 
-  @Override
-  public List<LoggerSource> getRelatedLoggers(boolean verbose,
-      Map<String, String> filters) {
-
-    List<LoggerSource> result = new ArrayList<>();
-
-    try (ScmClient scmClient = createScmClient(conf)) {
-      withDatanodesFromPipeline(scmClient,
-          getPipelineIdFromFilters(filters),
-          dn -> {
-            result
-                .add(new LoggerSource(dn,
-                    HddsDispatcher.class.getCanonicalName(),
-                    defaultLevel(verbose)));
-            return null;
-          });
-    } catch (IOException e) {
-      throw new UncheckedIOException("Can't enumerate required logs", e);
+  public Component getDatanodeFromFilter(Map<String, String> filters) {
+    if (filters == null || !filters.containsKey(DATANODE_FILTER)) {
+      throw new IllegalArgumentException("datanode"
+          + " filter should be specified (-f " + "datanode"
+          + "=<host_or_ip)");
     }
+
+    String policyStr = conf.get(OzoneConfigKeys.OZONE_HTTP_POLICY_KEY,
+        OzoneConfigKeys.OZONE_HTTP_POLICY_DEFAULT);
+    HttpConfig.Policy policy = HttpConfig.Policy.fromString(policyStr);
+
+    final int port = policy.isHttpEnabled() ?
+        HDDS_DATANODE_HTTP_BIND_PORT_DEFAULT :
+        HDDS_DATANODE_HTTPS_BIND_PORT_DEFAULT;
+
+    return new Component(Type.DATANODE, null,
+        filters.get("datanode"), port);
+  }
+
+  @Override
+  public List<LoggerSource> getRelatedLoggers(
+      boolean verbose,
+      Map<String, String> filters
+  ) {
+    List<LoggerSource> result = new ArrayList<>();
+    result.add(new LoggerSource(
+        getDatanodeFromFilter(filters),
+        HddsDispatcher.class.getCanonicalName(),
+        defaultLevel(verbose)));
     return result;
   }
 
   @Override
   public List<MetricGroupDisplay> getMetrics(Map<String, String> filters) {
-    return new ArrayList<>();
+    List<MetricGroupDisplay> result = new ArrayList<>();
+
+    addProtocolMessageMetrics(result, "hdds_dispatcher",
+        getDatanodeFromFilter(filters),
+        ContainerProtos.Type.values());
+
+    return result;
   }
 
   @Override
