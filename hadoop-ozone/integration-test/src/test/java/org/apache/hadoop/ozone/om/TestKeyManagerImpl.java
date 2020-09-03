@@ -210,7 +210,8 @@ public class TestKeyManagerImpl {
   @After
   public void cleanupTest() throws IOException {
     List<OzoneFileStatus> fileStatuses = keyManager
-        .listStatus(createBuilder().setKeyName("").build(), true, "", 100000);
+        .listStatus(createBuilder().setKeyName("").build(), true, "", 100000,
+                null);
     for (OzoneFileStatus fileStatus : fileStatuses) {
       if (fileStatus.isFile()) {
         keyManager.deleteKey(
@@ -833,17 +834,17 @@ public class TestKeyManagerImpl {
     OmKeyArgs rootDirArgs = createKeyArgs("");
     // Get entries in both TableCache and DB
     List<OzoneFileStatus> fileStatuses =
-        keyManager.listStatus(rootDirArgs, true, "", 1000);
+        keyManager.listStatus(rootDirArgs, true, "", 1000, null);
     Assert.assertEquals(100, fileStatuses.size());
 
     // Get entries with startKey=prefixKeyInDB
     fileStatuses =
-        keyManager.listStatus(rootDirArgs, true, prefixKeyInDB, 1000);
+        keyManager.listStatus(rootDirArgs, true, prefixKeyInDB, 1000, null);
     Assert.assertEquals(50, fileStatuses.size());
 
     // Get entries with startKey=prefixKeyInCache
     fileStatuses =
-        keyManager.listStatus(rootDirArgs, true, prefixKeyInCache, 1000);
+        keyManager.listStatus(rootDirArgs, true, prefixKeyInCache, 1000, null);
     Assert.assertEquals(100, fileStatuses.size());
 
     // Clean up cache by marking those keys in cache as deleted
@@ -875,12 +876,12 @@ public class TestKeyManagerImpl {
     OmKeyArgs rootDirArgs = createKeyArgs("");
     // Test listStatus with recursive=false, should only have dirs under root
     List<OzoneFileStatus> fileStatuses =
-        keyManager.listStatus(rootDirArgs, false, "", 1000);
+        keyManager.listStatus(rootDirArgs, false, "", 1000, null);
     Assert.assertEquals(2, fileStatuses.size());
 
     // Test listStatus with recursive=true, should have dirs under root and
     fileStatuses =
-        keyManager.listStatus(rootDirArgs, true, "", 1000);
+        keyManager.listStatus(rootDirArgs, true, "", 1000, null);
     Assert.assertEquals(3, fileStatuses.size());
 
     // Add a total of 10 key entries to DB and TableCache under dir1
@@ -904,12 +905,12 @@ public class TestKeyManagerImpl {
 
     // Test non-recursive, should return the dir under root
     fileStatuses =
-        keyManager.listStatus(rootDirArgs, false, "", 1000);
+        keyManager.listStatus(rootDirArgs, false, "", 1000, null);
     Assert.assertEquals(2, fileStatuses.size());
 
     // Test recursive, should return the dir and the keys in it
     fileStatuses =
-        keyManager.listStatus(rootDirArgs, true, "", 1000);
+        keyManager.listStatus(rootDirArgs, true, "", 1000, null);
     Assert.assertEquals(10 + 3, fileStatuses.size());
 
     // Clean up
@@ -954,12 +955,12 @@ public class TestKeyManagerImpl {
 
     OmKeyArgs rootDirArgs = createKeyArgs("");
     List<OzoneFileStatus> fileStatuses =
-        keyManager.listStatus(rootDirArgs, true, "", 1000);
+        keyManager.listStatus(rootDirArgs, true, "", 1000, null);
     // Should only get entries that are not marked as deleted.
     Assert.assertEquals(50, fileStatuses.size());
     // Test startKey
     fileStatuses =
-        keyManager.listStatus(rootDirArgs, true, prefixKey, 1000);
+        keyManager.listStatus(rootDirArgs, true, prefixKey, 1000, null);
     // Should only get entries that are not marked as deleted.
     Assert.assertEquals(50, fileStatuses.size());
     // Verify result
@@ -991,7 +992,7 @@ public class TestKeyManagerImpl {
     existKeySet.removeAll(deletedKeySet);
 
     fileStatuses = keyManager.listStatus(
-        rootDirArgs, true, "", 1000);
+        rootDirArgs, true, "", 1000, null);
     // Should only get entries that are not marked as deleted.
     Assert.assertEquals(50 / 2, fileStatuses.size());
 
@@ -1010,7 +1011,7 @@ public class TestKeyManagerImpl {
     expectedKeys.clear();
     do {
       fileStatuses = keyManager.listStatus(
-          rootDirArgs, true, startKey, batchSize);
+          rootDirArgs, true, startKey, batchSize, null);
       // Note fileStatuses will never be empty since we are using the last
       // keyName as the startKey of next batch,
       // the startKey itself will show up in the next batch of results.
@@ -1058,11 +1059,11 @@ public class TestKeyManagerImpl {
 
     OmKeyArgs rootDirArgs = createKeyArgs("");
     List<OzoneFileStatus> fileStatuses =
-        keyManager.listStatus(rootDirArgs, true, "", 100);
+        keyManager.listStatus(rootDirArgs, true, "", 100, null);
     // verify the number of status returned is same as number of entries
     Assert.assertEquals(numEntries, fileStatuses.size());
 
-    fileStatuses = keyManager.listStatus(rootDirArgs, false, "", 100);
+    fileStatuses = keyManager.listStatus(rootDirArgs, false, "", 100, null);
     // the number of immediate children of root is 1
     Assert.assertEquals(1, fileStatuses.size());
 
@@ -1070,19 +1071,19 @@ public class TestKeyManagerImpl {
     // return all the entries.
     String startKey = children.iterator().next();
     fileStatuses = keyManager.listStatus(rootDirArgs, true,
-        startKey.substring(0, startKey.length() - 1), 100);
+        startKey.substring(0, startKey.length() - 1), 100, null);
     Assert.assertEquals(numEntries, fileStatuses.size());
 
     for (String directory : directorySet) {
       // verify status list received for each directory with recursive flag set
       // to false
       OmKeyArgs dirArgs = createKeyArgs(directory);
-      fileStatuses = keyManager.listStatus(dirArgs, false, "", 100);
+      fileStatuses = keyManager.listStatus(dirArgs, false, "", 100, null);
       verifyFileStatus(directory, fileStatuses, directorySet, fileSet, false);
 
       // verify status list received for each directory with recursive flag set
       // to true
-      fileStatuses = keyManager.listStatus(dirArgs, true, "", 100);
+      fileStatuses = keyManager.listStatus(dirArgs, true, "", 100, null);
       verifyFileStatus(directory, fileStatuses, directorySet, fileSet, true);
 
       // verify list status call with using the startKey parameter and
@@ -1096,7 +1097,7 @@ public class TestKeyManagerImpl {
             tempFileStatus != null ?
                 tempFileStatus.get(tempFileStatus.size() - 1).getKeyInfo()
                     .getKeyName() : null,
-            2);
+            2, null);
         tmpStatusSet.addAll(tempFileStatus);
       } while (tempFileStatus.size() == 2);
       verifyFileStatus(directory, new ArrayList<>(tmpStatusSet), directorySet,
@@ -1114,7 +1115,7 @@ public class TestKeyManagerImpl {
                 tempFileStatus.get(tempFileStatus.size() - 1).getKeyInfo()
                     .getKeyName() :
                 null,
-            2);
+            2, null);
         tmpStatusSet.addAll(tempFileStatus);
       } while (tempFileStatus.size() == 2);
       verifyFileStatus(directory, new ArrayList<>(tmpStatusSet), directorySet,
