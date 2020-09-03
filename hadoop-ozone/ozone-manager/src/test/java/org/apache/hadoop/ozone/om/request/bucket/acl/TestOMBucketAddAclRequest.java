@@ -76,6 +76,7 @@ public class TestOMBucketAddAclRequest extends TestBucketRequest {
         createBucketAddAclRequest(volumeName, bucketName, acl);
     OMBucketAddAclRequest omBucketAddAclRequest =
         new OMBucketAddAclRequest(originalRequest);
+    omBucketAddAclRequest.preExecute(ozoneManager);
 
     OMClientResponse omClientResponse = omBucketAddAclRequest
         .validateAndUpdateCache(ozoneManager, 1,
