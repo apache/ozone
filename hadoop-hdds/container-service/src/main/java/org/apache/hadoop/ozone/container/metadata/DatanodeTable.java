@@ -21,9 +21,7 @@ package org.apache.hadoop.ozone.container.metadata;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import java.io.IOException;
 import java.util.List;
@@ -87,14 +85,6 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @Override
   public long getEstimatedKeyCount() throws IOException {
     return table.getEstimatedKeyCount();
-  }
-
-  @Override
-  public void addCacheEntry(CacheKey<KEY> cacheKey,
-                            CacheValue<VALUE> cacheValue) {
-    CacheKey<KEY> prefixedCacheKey =
-            new CacheKey<>(cacheKey.getCacheKey());
-    table.addCacheEntry(prefixedCacheKey, cacheValue);
   }
 
   @Override
