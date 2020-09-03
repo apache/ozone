@@ -96,7 +96,17 @@ public final class ReconServerConfigKeys {
   public static final String OZONE_RECON_HTTP_AUTH_TYPE =
       OZONE_RECON_HTTP_AUTH_CONFIG_PREFIX + "type";
 
+  public static final String RECON_PROMETHEUS_CONNECTION_TIMEOUT =
+      "ozone.recon.prometheus.connection.timeout";
 
+  public static final String RECON_PROMETHEUS_CONNECTION_TIMEOUT_DEFAULT =
+      "10s";
+
+  public static final String RECON_PROMETHEUS_CONNECTION_REQUEST_TIMEOUT =
+      "ozone.recon.prometheus.connection.timeout";
+
+  public static final String
+      RECON_PROMETHEUS_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "10s";
 
   /**
    * Private constructor for utility class.
