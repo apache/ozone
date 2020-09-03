@@ -70,7 +70,7 @@ public class DatanodeDispatcherInsight extends BaseInsightPoint
   }
 
   @Override
-  public List<MetricGroupDisplay> getMetrics() {
+  public List<MetricGroupDisplay> getMetrics(Map<String, String> filters) {
     return new ArrayList<>();
   }
 

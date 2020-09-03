@@ -42,7 +42,7 @@ public abstract class BaseInsightPoint implements InsightPoint {
    * List the related metrics.
    */
   @Override
-  public List<MetricGroupDisplay> getMetrics() {
+  public List<MetricGroupDisplay> getMetrics(Map<String, String> filters) {
     return new ArrayList<>();
   }
 

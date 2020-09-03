@@ -39,7 +39,7 @@ public interface InsightPoint {
   /**
    * List of the related metrics.
    */
-  List<MetricGroupDisplay> getMetrics();
+  List<MetricGroupDisplay> getMetrics(Map<String, String> filters);
 
   /**
    * List of the configuration classes.
