@@ -279,9 +279,8 @@ public final class ConfigurationReflectionUtil {
         return config;
       }
 
-      if (!theClass.getSuperclass().equals(Object.class)) {
-        theClass = theClass.getSuperclass();
-      } else {
+      theClass = theClass.getSuperclass();
+      if (Object.class.equals(theClass)) {
         theClass = null;
       }
     }
