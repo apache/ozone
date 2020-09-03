@@ -22,7 +22,7 @@ set -e
 
 : ${OZONE_TEST_S3_BUCKET1:?Please define test bucket}
 : ${OZONE_TEST_S3_BUCKET2:?Please define second test bucket}
-: ${OZONE_TEST_S3_REGION:?Please define the S3 region}
+: ${OZONE_TEST_S3_REGION:?Please define the S3 region for test buckets}
 
 test() {
    TEST_NAME=$1
