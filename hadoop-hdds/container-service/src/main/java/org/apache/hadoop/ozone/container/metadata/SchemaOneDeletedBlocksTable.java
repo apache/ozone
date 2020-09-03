@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -41,15 +42,9 @@ import java.util.List;
  * Since clients must operate independently of the underlying schema version,
  * This class is returned to clients using {@link DatanodeStoreSchemaOneImpl}
  * instances, allowing them to access keys as if no prefix is
- * required, while it adds the prefix when necessary.
+ * required, while it adds or removes the prefix when necessary.
  * This means the client should omit the deleted prefix when putting and
  * getting keys, regardless of the schema version.
- * <p>
- * Note that this class will only apply prefixes to keys as parameters,
- * never as return types. This means that keys returned through iterators
- * like {@link SchemaOneDeletedBlocksTable#getSequentialRangeKVs}, and
- * {@link SchemaOneDeletedBlocksTable#getRangeKVs} will return keys prefixed
- * with {@link SchemaOneDeletedBlocksTable#DELETED_KEY_PREFIX}.
  */
 public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
         ChunkInfoList> {
@@ -83,14 +78,6 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
   }
 
   @Override
-  public void addCacheEntry(CacheKey<String> cacheKey,
-                            CacheValue<ChunkInfoList> cacheValue) {
-    CacheKey<String> prefixedCacheKey =
-            new CacheKey<>(prefix(cacheKey.getCacheKey()));
-    super.addCacheEntry(prefixedCacheKey, cacheValue);
-  }
-
-  @Override
   public boolean isExist(String key) throws IOException {
     return super.isExist(prefix(key));
   }
@@ -110,10 +97,6 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
     return super.getReadCopy(prefix(key));
   }
 
-  /**
-   * Keys returned in the list by this method will begin with the
-   * {@link SchemaOneDeletedBlocksTable#DELETED_KEY_PREFIX}.
-   */
   @Override
   public List<? extends KeyValue<String, ChunkInfoList>> getRangeKVs(
           String startKey, int count,
@@ -122,14 +105,11 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
 
     // Deleted blocks will always have the #deleted# key prefix and nothing
     // else in this schema version. Ignore any user passed prefixes that could
-    // collide with this, returning results that are not deleted blocks.
-    return super.getRangeKVs(prefix(startKey), count, getDeletedFilter());
+    // collide with this and return results that are not deleted blocks.
+    return unprefix(super.getRangeKVs(prefix(startKey), count,
+            getDeletedFilter()));
   }
 
-  /**
-   * Keys returned in the list by this method will begin with the
-   * {@link SchemaOneDeletedBlocksTable#DELETED_KEY_PREFIX}.
-   */
   @Override
   public List<? extends KeyValue<String, ChunkInfoList>> getSequentialRangeKVs(
           String startKey, int count,
@@ -138,9 +118,9 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
 
     // Deleted blocks will always have the #deleted# key prefix and nothing
     // else in this schema version. Ignore any user passed prefixes that could
-    // collide with this, returning results that are not deleted blocks.
-    return super.getSequentialRangeKVs(prefix(startKey), count,
-            getDeletedFilter());
+    // collide with this and return results that are not deleted blocks.
+    return unprefix(super.getSequentialRangeKVs(prefix(startKey), count,
+            getDeletedFilter()));
   }
 
   private static String prefix(String key) {
@@ -152,8 +132,51 @@ public class SchemaOneDeletedBlocksTable extends DatanodeTable<String,
     return result;
   }
 
+  private static String unprefix(String key) {
+    String result = null;
+    if (key != null && key.startsWith(DELETED_KEY_PREFIX)) {
+      result = key.replaceFirst(DELETED_KEY_PREFIX, "");
+    }
+
+    return result;
+  }
+
+  private static List<KeyValue<String, ChunkInfoList>> unprefix(
+      List<? extends KeyValue<String, ChunkInfoList>> kvs) {
+
+    List<KeyValue<String, ChunkInfoList>> processedKVs = new ArrayList<>();
+    kvs.forEach(kv -> processedKVs.add(new UnprefixedKeyValue(kv)));
+
+    return processedKVs;
+  }
+
   private static MetadataKeyFilters.KeyPrefixFilter getDeletedFilter() {
     return (new MetadataKeyFilters.KeyPrefixFilter())
             .addFilter(DELETED_KEY_PREFIX);
+  }
+
+  /**
+   * {@link KeyValue} implementation that removes the deleted key prefix from
+   * an existing {@link KeyValue}.
+   */
+  private static class UnprefixedKeyValue implements KeyValue<String,
+        ChunkInfoList> {
+
+    private final KeyValue<String, ChunkInfoList> prefixedKeyValue;
+
+    UnprefixedKeyValue(
+            KeyValue<String, ChunkInfoList> prefixedKeyValue) {
+      this.prefixedKeyValue = prefixedKeyValue;
+    }
+
+    @Override
+    public String getKey() throws IOException {
+      return unprefix(prefixedKeyValue.getKey());
+    }
+
+    @Override
+    public ChunkInfoList getValue() throws IOException {
+      return prefixedKeyValue.getValue();
+    }
   }
 }
