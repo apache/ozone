@@ -25,13 +25,20 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.audit.AuditEventStatus.FAILURE;
 import static org.apache.hadoop.ozone.audit.AuditEventStatus.SUCCESS;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.core.StringContains.containsString;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import org.hamcrest.Matcher;
+import org.hamcrest.collection.IsIterableContainingInOrder;
+
 
 /**
  * Test Ozone Audit Logger.
@@ -143,7 +150,35 @@ public class TestOzoneAuditLogger {
     verifyNoLog();
   }
 
-  private void verifyLog(String expected) throws IOException {
+  /**
+   * Test to verify if multiline entries can be checked.
+   */
+
+  @Test
+  public void messageIncludesMultilineException() throws IOException {
+    String exceptionMessage = "Dummy exception message";
+    TestException testException = new TestException(exceptionMessage);
+    AuditMessage exceptionAuditMessage =
+        new AuditMessage.Builder()
+            .setUser(USER)
+            .atIp(IP_ADDRESS)
+            .forOperation(DummyAction.CREATE_VOLUME)
+            .withParams(PARAMS)
+            .withResult(FAILURE)
+            .withException(testException).build();
+    AUDIT.logWriteFailure(exceptionAuditMessage);
+    verifyLog(
+        "ERROR | OMAudit | user=john | "
+            + "ip=192.168.0.1 | op=CREATE_VOLUME "
+            + "{key1=value1, key2=value2} | ret=FAILURE",
+        "org.apache.hadoop.ozone.audit."
+            + "TestOzoneAuditLogger$TestException: Dummy exception message",
+        "at org.apache.hadoop.ozone.audit.TestOzoneAuditLogger"
+            + ".messageIncludesMultilineException"
+            + "(TestOzoneAuditLogger.java");
+  }
+
+  private void verifyLog(String... expectedStrings) throws IOException {
     File file = new File("audit.log");
     List<String> lines = FileUtils.readLines(file, (String)null);
     final int retry = 5;
@@ -158,11 +193,11 @@ public class TestOzoneAuditLogger {
       }
       i++;
     }
-
-    // When log entry is expected, the log file will contain one line and
-    // that must be equal to the expected string
-    assertTrue(lines.size() != 0);
-    assertTrue(expected.equalsIgnoreCase(lines.get(0)));
+    //check if every expected string can be found in the log entry
+    assertThat(
+        lines.subList(0, expectedStrings.length),
+        containsInOrder(expectedStrings)
+    );
     //empty the file
     lines.clear();
     FileUtils.writeLines(file, lines, false);
@@ -173,5 +208,20 @@ public class TestOzoneAuditLogger {
     List<String> lines = FileUtils.readLines(file, (String)null);
     // When no log entry is expected, the log file must be empty
     assertEquals(0, lines.size());
+  }
+
+  private class TestException extends Exception{
+    TestException(String message) {
+      super(message);
+    }
+  }
+
+  private Matcher<Iterable<? extends String>> containsInOrder(
+      String[] expectedStrings) {
+    return IsIterableContainingInOrder.contains(
+        Arrays.stream(expectedStrings)
+            .map(str -> containsString(str))
+            .collect(Collectors.toList())
+    );
   }
 }
