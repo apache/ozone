@@ -105,7 +105,7 @@ Raft can guarantee the replication of any request if the request is persisted to
 
 RocksDB instaces are updated by a background thread with batching transactions (so called "double buffer" as when one of the buffers is used to commit the data the other one collects all the new requests for the next commit.) To make all data available for the next request even if the background process is not yet wrote them the key data is cached in the memory.
 
-![Double buffer](HA-OM-doublebuffer.png
+![Double buffer](HA-OM-doublebuffer.png)
 
 The details of this approach discussed in a separated [design doc]({{< ref "design/omha.md" >}}) but it's integral part of the OM HA design.
 
