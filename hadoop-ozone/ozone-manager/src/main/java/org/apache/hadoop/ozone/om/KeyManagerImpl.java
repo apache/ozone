@@ -1732,17 +1732,36 @@ public class KeyManagerImpl implements KeyManager {
    * @param args Key args
    * @throws OMException if file does not exist
    *                     if bucket does not exist
+   *                     if volume does not exist
    * @throws IOException if there is error in the db
    *                     invalid arguments
    */
   public OzoneFileStatus getFileStatus(OmKeyArgs args) throws IOException {
+    Preconditions.checkNotNull(args, "Key args can not be null");
+    return getFileStatus(args, null);
+  }
+
+  /**
+   * OzoneFS api to get file status for an entry.
+   *
+   * @param args Key args
+   * @param clientAddress a hint to key manager, order the datanode in returned
+   *                      pipeline by distance between client and datanode.
+   * @throws OMException if file does not exist
+   *                     if bucket does not exist
+   *                     if volume does not exist
+   * @throws IOException if there is error in the db
+   *                     invalid arguments
+   */
+  public OzoneFileStatus getFileStatus(OmKeyArgs args, String clientAddress)
+          throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
 
     return getOzoneFileStatus(volumeName, bucketName, keyName,
-            args.getRefreshPipeline(), false, null);
+            args.getRefreshPipeline(), args.getSortDatanodes(), clientAddress);
   }
 
   private OzoneFileStatus getOzoneFileStatus(String volumeName,
@@ -1783,7 +1802,9 @@ public class KeyManagerImpl implements KeyManager {
 
       // if the key is a file then do refresh pipeline info in OM by asking SCM
       if (fileKeyInfo != null) {
-        refreshPipeline(fileKeyInfo);
+        if (refreshPipeline) {
+          refreshPipeline(fileKeyInfo);
+        }
         if (sortDatanodes) {
           sortDatanodeInPipeline(fileKeyInfo, clientAddress);
         }
@@ -2011,7 +2032,8 @@ public class KeyManagerImpl implements KeyManager {
    * @return list of file status
    */
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
-      String startKey, long numEntries) throws IOException {
+      String startKey, long numEntries, String clientAddress)
+          throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
 
     List<OzoneFileStatus> fileStatusList = new ArrayList<>();
@@ -2144,9 +2166,13 @@ public class KeyManagerImpl implements KeyManager {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
           bucketName);
     }
-    if (args.getRefreshPipeline()) {
-      for(OzoneFileStatus fileStatus : fileStatusList){
+
+    for (OzoneFileStatus fileStatus : fileStatusList) {
+      if (args.getRefreshPipeline()) {
         refreshPipeline(fileStatus.getKeyInfo());
+      }
+      if (args.getSortDatanodes()) {
+        sortDatanodeInPipeline(fileStatus.getKeyInfo(), clientAddress);
       }
     }
     return fileStatusList;
