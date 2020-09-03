@@ -36,8 +36,13 @@ public class OmKeyLocationInfoGroup {
   public OmKeyLocationInfoGroup(long version,
                                 List<OmKeyLocationInfo> locations) {
     this.version = version;
-    this.locationVersionMap = locations.stream()
-        .collect(Collectors.groupingBy(OmKeyLocationInfo::getCreateVersion));
+    locationVersionMap = new HashMap<>();
+    for (OmKeyLocationInfo info : locations) {
+      if (!locationVersionMap.containsKey(info.getCreateVersion())) {
+        locationVersionMap.put(info.getCreateVersion(), new ArrayList<>());
+      }
+      locationVersionMap.get(info.getCreateVersion()).add(info);
+    }
     //prevent NPE
     this.locationVersionMap.putIfAbsent(version, new ArrayList<>());
   }
