@@ -97,8 +97,6 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
     // Check modification time
     Assert.assertEquals(modifiedOmRequest.getAllocateBlockRequest()
         .getKeyArgs().getModificationTime(), omKeyInfo.getModificationTime());
-    Assert.assertNotEquals(omKeyInfo.getCreationTime(),
-        omKeyInfo.getModificationTime());
 
     // Check data of the block
     OzoneManagerProtocolProtos.KeyLocation keyLocation =
