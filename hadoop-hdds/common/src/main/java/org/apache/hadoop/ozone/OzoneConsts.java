@@ -205,7 +205,7 @@ public final class OzoneConsts {
   public static final long MAX_QUOTA_IN_BYTES = 1024L * 1024 * TB;
 
   /**
-   * Quota RESET default is -1, which means it does not take effect.
+   * Quota RESET default is -1, which means quota is not set.
    */
   public static final long QUOTA_RESET = -1;
 

@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.hdds.client;
 
-import org.apache.hadoop.ozone.OzoneConsts;
+import com.google.common.base.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -118,14 +118,6 @@ public final class OzoneQuota {
   }
 
   /**
-   * Constructs a default Quota object.
-   */
-  private OzoneQuota() {
-    this.quotaInCounts = OzoneConsts.QUOTA_RESET;
-    this.quotaInBytes = OzoneConsts.QUOTA_RESET;
-  }
-
-  /**
    * Constructor for Ozone Quota.
    *
    * @param quotaInCounts Volume quota in counts
@@ -144,7 +136,7 @@ public final class OzoneQuota {
    * @return string representation of quota
    */
   public static String formatQuota(OzoneQuota quota) {
-    return String.valueOf(quota.getRawSize())+ quota.getUnit();
+    return String.valueOf(quota.getRawSize()) + quota.getUnit();
   }
 
   /**
@@ -159,7 +151,7 @@ public final class OzoneQuota {
   public static OzoneQuota parseQuota(String quotaInBytes,
       long quotaInCounts) {
 
-    if ((quotaInBytes == null) || (quotaInBytes.isEmpty())) {
+    if (Strings.isNullOrEmpty(quotaInBytes)) {
       throw new IllegalArgumentException(
           "Quota string cannot be null or empty.");
     }
@@ -267,7 +259,7 @@ public final class OzoneQuota {
 
   @Override
   public String toString() {
-    return "Bytes Quota: " + rawQuotaInBytes.toString() + "\n" +
+    return "Space Bytes Quota: " + rawQuotaInBytes.toString() + "\n" +
         "Counts Quota: " + quotaInCounts;
   }
 }
