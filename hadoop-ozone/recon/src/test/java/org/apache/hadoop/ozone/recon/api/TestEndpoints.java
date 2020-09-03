@@ -69,6 +69,7 @@ import org.jooq.Configuration;
 import org.jooq.DSLContext;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -364,6 +365,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   }
 
   @Test
+  @Ignore("HDDS-4150")
   public void testGetDatanodes() throws Exception {
     Response response = nodeEndpoint.getDatanodes();
     DatanodesResponse datanodesResponse =
