@@ -97,7 +97,8 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
         .getKeyArgs().getModificationTime(), omKeyInfo.getModificationTime());
 
     // creationTime was assigned at TestOMRequestUtils.addKeyToTable
-    // modificationTime was assigned at doPreExecute(createAllocateBlockRequest())
+    // modificationTime was assigned at
+    // doPreExecute(createAllocateBlockRequest())
     Assert.assertTrue(
         omKeyInfo.getCreationTime() <= omKeyInfo.getModificationTime());
 
