@@ -50,7 +50,8 @@ public interface OzoneManagerFS extends IOzoneAcl {
    * @return file status.
    * @throws IOException if file or bucket or volume does not exist
    */
-  OzoneFileStatus getFileStatus(OmKeyArgs args, String clientAddress) throws IOException;
+  OzoneFileStatus getFileStatus(OmKeyArgs args, String clientAddress)
+          throws IOException;
 
   void createDirectory(OmKeyArgs args) throws IOException;
 
@@ -83,5 +84,6 @@ public interface OzoneManagerFS extends IOzoneAcl {
    * @throws IOException if file or bucket or volume does not exist
    */
   List<OzoneFileStatus> listStatus(OmKeyArgs keyArgs, boolean recursive,
-      String startKey, long numEntries, String clientAddress) throws IOException;
+      String startKey, long numEntries, String clientAddress)
+          throws IOException;
 }
