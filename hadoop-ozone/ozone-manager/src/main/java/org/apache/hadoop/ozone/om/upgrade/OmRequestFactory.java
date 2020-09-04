@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureCatalog.OMLayoutFeature.INITIAL_VERSION;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -68,22 +68,17 @@ public class OmRequestFactory {
           continue;
         }
         Method getRequestTypeMethod = requestClass.getMethod("getRequestType");
-        if (getRequestTypeMethod != null) {
-          String type = (String) getRequestTypeMethod.invoke(null);
-          LOG.debug("Registering {} with OmVersionFactory.",
-              requestClass.getSimpleName());
-          BelongsToLayoutVersion annotation =
-              requestClass.getAnnotation(BelongsToLayoutVersion.class);
-          if (annotation == null) {
-            registerRequestType(type, INITIAL_VERSION.layoutVersion(),
-                requestClass);
-          } else {
-            registerRequestType(type, annotation.value().layoutVersion(),
-                requestClass);
-          }
+        String type = (String) getRequestTypeMethod.invoke(null);
+        LOG.debug("Registering {} with OmVersionFactory.",
+            requestClass.getSimpleName());
+        BelongsToLayoutVersion annotation =
+            requestClass.getAnnotation(BelongsToLayoutVersion.class);
+        if (annotation == null) {
+          registerRequestType(type, INITIAL_VERSION.layoutVersion(),
+              requestClass);
         } else {
-          LOG.warn("Found request class {} without a configured requestType.",
-              requestClass.getSimpleName());
+          registerRequestType(type, annotation.value().layoutVersion(),
+              requestClass);
         }
       }
     } catch (Exception ex) {

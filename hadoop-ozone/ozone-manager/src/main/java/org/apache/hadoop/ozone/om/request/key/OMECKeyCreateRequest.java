@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureCatalog.OMLayoutFeature.CREATE_EC;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.CREATE_EC;
 
 import java.io.IOException;
 

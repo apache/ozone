@@ -19,8 +19,8 @@
 package org.apache.hadoop.ozone.om.upgrade;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureCatalog.OMLayoutFeature.CREATE_EC;
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureCatalog.OMLayoutFeature.INITIAL_VERSION;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.CREATE_EC;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -32,8 +32,7 @@ import java.io.IOException;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureCatalog.OMLayoutFeature;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -41,6 +40,11 @@ import org.junit.Test;
  * Test OM layout version management.
  */
 public class TestOMVersionManager {
+
+  @After
+  public void cleanup() {
+    OMLayoutVersionManager.resetLayoutVersionManager();
+  }
 
   @Test
   public void testOMLayoutVersionManager() throws IOException {
@@ -58,12 +62,11 @@ public class TestOMVersionManager {
   }
 
   @Test
-  public void testOMLayoutVersionManagerInitError() throws IOException {
+  public void testOMLayoutVersionManagerInitError() {
     OMStorage omStorage = mock(OMStorage.class);
     when(omStorage.getLayoutVersion()).thenReturn(
         OMLayoutFeature.values()[OMLayoutFeature.values().length - 1]
             .layoutVersion() + 1);
-
     try {
       OMLayoutVersionManager.initialize(omStorage);
       Assert.fail();
@@ -78,7 +81,10 @@ public class TestOMVersionManager {
     when(omStorage.getLayoutVersion()).thenReturn(0);
     OMLayoutVersionManager omVersionManager =
         OMLayoutVersionManager.initialize(omStorage);
-    assertEquals(2, omVersionManager.getSoftwareLayoutVersion());
+    int numLayoutVersions = OMLayoutFeature.values().length;
+    assertEquals(
+        OMLayoutFeature.values()[numLayoutVersions - 1].layoutVersion(),
+        omVersionManager.getSoftwareLayoutVersion());
     OMLayoutVersionManager.resetLayoutVersionManager();
     assertEquals(0, omVersionManager.getSoftwareLayoutVersion());
   }
@@ -87,7 +93,7 @@ public class TestOMVersionManager {
   public void testOMLayoutFeatureCatalog() {
     OMLayoutFeature[] values = OMLayoutFeature.values();
     int currVersion = Integer.MIN_VALUE;
-    for (LayoutFeature lf : values) {
+    for (OMLayoutFeature lf : values) {
       assertTrue(currVersion <= lf.layoutVersion());
       currVersion = lf.layoutVersion();
     }

@@ -92,7 +92,14 @@ public class LayoutVersionInstanceFactory<T> {
    * @return instance.
    */
   public T get(VersionFactoryKey key) {
-    checkArgument(lvm.getMetadataLayoutVersion() >= key.getVersion(),
+    Integer version = key.getVersion();
+    // If version is not passed in, go defensive and set the highest allowed
+    // version (MLV).
+    if (version == null) {
+      version = lvm.getMetadataLayoutVersion();
+    }
+
+    checkArgument(lvm.getMetadataLayoutVersion() >= version,
         String.format("Cannot get key %s since the version is greater " +
                 "than the Metadata layout version %d",
             key, lvm.getMetadataLayoutVersion()));
@@ -104,7 +111,6 @@ public class LayoutVersionInstanceFactory<T> {
           IllegalArgumentException("Unrecognized instance request : " + key);
     }
 
-    Integer version = key.getVersion();
     T value = versionedInstances.floorEntry(version).getValue();
     if (value == null) {
       throw new

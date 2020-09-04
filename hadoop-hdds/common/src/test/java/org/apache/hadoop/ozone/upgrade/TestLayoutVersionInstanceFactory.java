@@ -56,7 +56,7 @@ public class TestLayoutVersionInstanceFactory {
 
     // Should fail on re-registration.
     LambdaTestUtils.intercept(IllegalArgumentException.class,
-     "existing entry already",
+        "existing entry already",
         () -> factory.register(getKey("key", 1), new MockClassV1()));
     assertEquals(1, factory.getInstances().size());
 
@@ -78,6 +78,10 @@ public class TestLayoutVersionInstanceFactory {
     assertTrue(val instanceof MockClassV1);
 
     val = factory.get(getKey("key", 3));
+    assertTrue(val instanceof MockClassV2);
+
+    // Not passing in version --> Use MLV.
+    val = factory.get(getKey("key", null));
     assertTrue(val instanceof MockClassV2);
 
     // MLV check.
@@ -104,7 +108,7 @@ public class TestLayoutVersionInstanceFactory {
     Supplier<String> method = factory.get(getKey("method", 1));
     assertEquals("v1", method.get());
 
-    method = factory.get(getKey("method", 2));
+    method = factory.get(getKey("method", null));
     assertEquals("v2", method.get());
   }
 

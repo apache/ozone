@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureCatalog.OMLayoutFeature.CREATE_EC;
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureCatalog.OMLayoutFeature.INITIAL_VERSION;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.CREATE_EC;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -57,6 +57,8 @@ public class TestOmRequestFactory {
 
   @Test
   public void testKeyCreateRequest() {
+
+    // Try getting v1 of 'CreateKey'.
     Class<? extends OMClientRequest> requestType =
         omRequestFactory.getRequestType(OMRequest.newBuilder()
             .setCmdType(CreateKey)
@@ -68,6 +70,7 @@ public class TestOmRequestFactory {
             .build());
     Assert.assertEquals(requestType, OMKeyCreateRequest.class);
 
+    // Try getting 'CreateECKey' (V2). Should fail.
     try {
       omRequestFactory.getRequestType(OMRequest.newBuilder()
               .setCmdType(CreateKey)
@@ -81,7 +84,10 @@ public class TestOmRequestFactory {
     } catch (IllegalArgumentException ex) {
     }
 
+    // Finalize the version manager.
     omVersionManager.doFinalize(null);
+
+    // Try getting 'CreateECKey' again. Should succeed.
     requestType = omRequestFactory.getRequestType(OMRequest.newBuilder()
         .setCmdType(CreateKey)
         .setClientId("c1")

@@ -23,7 +23,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureCatalog.OMLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 
@@ -74,6 +73,7 @@ public final class OMLayoutVersionManager extends AbstractLayoutVersionManager {
    */
   private void init(Storage storage) throws OMException {
     init(storage.getLayoutVersion(), OMLayoutFeature.values());
+
     if (metadataLayoutVersion > softwareLayoutVersion) {
       throw new OMException(
           String.format("Cannot initialize VersionManager. Metadata " +
@@ -90,6 +90,11 @@ public final class OMLayoutVersionManager extends AbstractLayoutVersionManager {
       omVersionManager.reset();
       omVersionManager = null;
     }
+  }
+
+  public void reset() {
+    omRequestFactory = null;
+    super.reset();
   }
 
   public OmRequestFactory getVersionFactory() {

@@ -18,56 +18,12 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureCatalog.OMLayoutFeature.CREATE_EC;
-
-import java.util.Optional;
-
-import org.apache.hadoop.ozone.upgrade.LayoutFeature;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.CREATE_EC;
 
 /**
- * Catalog of Ozone Manager features.
+ * Test util class. To be removed.
  */
-public class OMLayoutFeatureCatalog {
-
-  /**
-   * List of OM Features.
-   */
-  public enum OMLayoutFeature implements LayoutFeature {
-    INITIAL_VERSION(0, "Initial Layout Version"),
-    CREATE_EC(1, ""),
-    NEW_FEATURE(2, "new feature", new NewOmFeatureUpgradeAction());
-
-    private int layoutVersion;
-    private String description;
-    private Optional<OmUpgradeAction> omUpgradeAction = Optional.empty();
-
-    OMLayoutFeature(final int layoutVersion, String description) {
-      this.layoutVersion = layoutVersion;
-      this.description = description;
-    }
-
-    OMLayoutFeature(final int layoutVersion, String description,
-                    OmUpgradeAction upgradeAction) {
-      this.layoutVersion = layoutVersion;
-      this.description = description;
-      omUpgradeAction = Optional.of(upgradeAction);
-    }
-
-    @Override
-    public int layoutVersion() {
-      return layoutVersion;
-    }
-
-    @Override
-    public String description() {
-      return description;
-    }
-
-    @Override
-    public Optional<OmUpgradeAction> onFinalizeAction() {
-      return omUpgradeAction;
-    }
-  }
+public class OMLayoutFeatureUtil {
 
   /**
    * This is an example of an "API" that uses a new Layout feature (EC) that is
