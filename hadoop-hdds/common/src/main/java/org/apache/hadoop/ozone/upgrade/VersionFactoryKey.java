@@ -18,12 +18,10 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
-import static org.apache.hadoop.ozone.upgrade.LayoutVersionManager.DEFAULT_LAYOUT_VERSION;
-
 /**
  * "Key" element to the Version specific instance factory. Currently it has 2
  * dimensions -> a 'key' string and a version. This is to support a factory
- * which returns an instance supplier for a given "key" and version.
+ * which returns an instance for a given "key" and "version".
  */
 public class VersionFactoryKey {
   private String key;
@@ -42,12 +40,18 @@ public class VersionFactoryKey {
     return version;
   }
 
+  @Override
+  public String toString() {
+    return getClass().getSimpleName() + " : [" + key + ", "
+        + version  + "]";
+  }
+
   /**
    * Builder for above key.
    */
   public static class Builder {
     private String key;
-    private Integer version = DEFAULT_LAYOUT_VERSION;
+    private Integer version;
 
     public Builder key(String k) {
       this.key = k;

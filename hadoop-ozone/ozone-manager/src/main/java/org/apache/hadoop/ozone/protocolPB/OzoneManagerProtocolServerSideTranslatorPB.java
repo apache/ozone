@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.ozone.protocolPB;
 
+import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.getRequest;
+
 import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
@@ -33,7 +35,7 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.upgrade.OmVersionFactory;
+import org.apache.hadoop.ozone.om.upgrade.OmRequestFactory;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -62,7 +64,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   private final AtomicLong transactionIndex = new AtomicLong(0L);
   private final OzoneProtocolMessageDispatcher<OMRequest, OMResponse>
       dispatcher;
-  private final OmVersionFactory omVersionFactory;
+  private final OmRequestFactory omVersionFactory;
 
   /**
    * Constructs an instance of the server handler.
@@ -127,8 +129,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       } else {
         if (omRatisServer.isLeader()) {
           try {
-            OMClientRequest omClientRequest =
-                omVersionFactory.getClientRequest(request);
+            OMClientRequest omClientRequest = getRequest(ozoneManager, request);
             request = omClientRequest.preExecute(ozoneManager);
           } catch (IOException ex) {
             // As some of the preExecute returns error. So handle here.
@@ -220,8 +221,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       if (OmUtils.isReadOnly(request)) {
         return handler.handleReadRequest(request);
       } else {
-        OMClientRequest omClientRequest =
-            omVersionFactory.getClientRequest(request);
+        OMClientRequest omClientRequest = getRequest(ozoneManager, request);
         request = omClientRequest.preExecute(ozoneManager);
         index = transactionIndex.incrementAndGet();
         omClientResponse = handler.handleWriteRequest(request, index);

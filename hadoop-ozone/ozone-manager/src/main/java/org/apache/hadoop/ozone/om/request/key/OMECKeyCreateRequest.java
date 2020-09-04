@@ -18,19 +18,23 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureCatalog.OMLayoutFeature.CREATE_EC;
+
 import java.io.IOException;
 
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.BelongsToLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+
 /**
- * Handles CreateKey V2 request.
+ * Handles Create EC Key  request. (To be removed later)
  */
+@BelongsToLayoutVersion(CREATE_EC)
+public class OMECKeyCreateRequest extends OMKeyCreateRequest {
 
-public class OMKeyCreateRequestV2 extends OMKeyRequest {
-
-  public OMKeyCreateRequestV2(OMRequest omRequest) {
+  public OMECKeyCreateRequest(OMRequest omRequest) {
     super(omRequest);
   }
 
@@ -39,7 +43,6 @@ public class OMKeyCreateRequestV2 extends OMKeyRequest {
     // V2 impl here.
     return null;
   }
-
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,

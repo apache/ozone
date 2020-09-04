@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureCatalog.OMLayoutFeature.CREATE_EC;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureCatalog.OMLayoutFeature.INITIAL_VERSION;
 import static org.junit.Assert.assertEquals;
@@ -30,8 +31,10 @@ import java.io.IOException;
 
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureCatalog.OMLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
+import org.junit.Assert;
 import org.junit.Test;
 
 /**
@@ -52,6 +55,32 @@ public class TestOMVersionManager {
     omVersionManager.doFinalize(mock(OzoneManager.class));
     assertFalse(omVersionManager.needsFinalization());
     assertEquals(2, omVersionManager.getMetadataLayoutVersion());
+  }
+
+  @Test
+  public void testOMLayoutVersionManagerInitError() throws IOException {
+    OMStorage omStorage = mock(OMStorage.class);
+    when(omStorage.getLayoutVersion()).thenReturn(
+        OMLayoutFeature.values()[OMLayoutFeature.values().length - 1]
+            .layoutVersion() + 1);
+
+    try {
+      OMLayoutVersionManager.initialize(omStorage);
+      Assert.fail();
+    } catch (OMException ex) {
+      assertEquals(NOT_SUPPORTED_OPERATION, ex.getResult());
+    }
+  }
+
+  @Test
+  public void testOMLayoutVersionManagerReset() throws IOException {
+    OMStorage omStorage = mock(OMStorage.class);
+    when(omStorage.getLayoutVersion()).thenReturn(0);
+    OMLayoutVersionManager omVersionManager =
+        OMLayoutVersionManager.initialize(omStorage);
+    assertEquals(2, omVersionManager.getSoftwareLayoutVersion());
+    OMLayoutVersionManager.resetLayoutVersionManager();
+    assertEquals(0, omVersionManager.getSoftwareLayoutVersion());
   }
 
   @Test

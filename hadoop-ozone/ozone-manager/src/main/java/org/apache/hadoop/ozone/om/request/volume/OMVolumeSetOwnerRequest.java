@@ -48,6 +48,7 @@ import java.io.IOException;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.SetVolumeProperty;
 
 /**
  * Handle set owner request for volume.
@@ -207,6 +208,10 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       omMetrics.incNumVolumeUpdateFails();
     }
     return omClientResponse;
+  }
+
+  public static String getRequestType() {
+    return SetVolumeProperty.name() + "-Owner";
   }
 }
 

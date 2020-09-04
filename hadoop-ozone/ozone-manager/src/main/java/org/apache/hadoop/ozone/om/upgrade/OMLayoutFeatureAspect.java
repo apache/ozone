@@ -28,6 +28,7 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
 import org.aspectj.lang.reflect.MethodSignature;
 
+
 /**
  * 'Aspect' for OM Layout Feature API. All methods annotated with the
  * specific annotation will have pre-processing done here to check layout
@@ -36,19 +37,22 @@ import org.aspectj.lang.reflect.MethodSignature;
 @Aspect
 public class OMLayoutFeatureAspect {
 
-  @Before("@annotation(OMLayoutFeatureAPI) && execution(* *(..))")
+  @Before("@annotation(DisallowedUntilLayoutVersion) && execution(* *(..))")
   public void checkLayoutFeature(JoinPoint joinPoint) throws Throwable {
     String featureName = ((MethodSignature) joinPoint.getSignature())
-        .getMethod().getAnnotation(OMLayoutFeatureAPI.class).value().name();
+        .getMethod().getAnnotation(DisallowedUntilLayoutVersion.class)
+        .value().name();
     LayoutVersionManager lvm = OMLayoutVersionManager.getInstance();
     if (!lvm.isAllowed(featureName)) {
       LayoutFeature layoutFeature = lvm.getFeature(featureName);
       throw new OMException(String.format("Operation %s cannot be invoked " +
-          "before finalization. Current layout version = %d, feature's layout" +
-              " version = %d",
-          featureName,
-          lvm.getMetadataLayoutVersion(),
-          layoutFeature.layoutVersion()), NOT_SUPPORTED_OPERATION);
+              "before finalization. It belongs to the layout feature %s, " +
+              "whose layout version is %d. Current Layout version is %d",
+          joinPoint.getSignature().toShortString(),
+          layoutFeature.name(),
+          layoutFeature.layoutVersion(),
+          lvm.getMetadataLayoutVersion()),
+          NOT_SUPPORTED_OPERATION);
     }
   }
 }

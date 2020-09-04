@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureCatalog.OMLayoutFeature.CREATE_EC;
+
 import java.util.Optional;
 
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
@@ -70,20 +72,19 @@ public class OMLayoutFeatureCatalog {
   /**
    * This is an example of an "API" that uses a new Layout feature (EC) that is
    * not yet supported by the current layout version. The following can be
-   * "guarded" by just adding the following annotation, thereby keeping the
+   * "disallowed" by just adding the following annotation, thereby keeping the
    * method logic and upgrade logic separate.
    */
-  @OMLayoutFeatureAPI(OMLayoutFeature.CREATE_EC)
+  @DisallowedUntilLayoutVersion(CREATE_EC)
   public String ecMethod() {
     // Blah Blah EC Blah....
     return "ec";
   }
 
   /**
-   * This is an example of an "API" that uses a Layout feature (EC) that is
+   * This is an example of an "API" that is
    * supported by the current layout version.
    */
-  @OMLayoutFeatureAPI(OMLayoutFeature.INITIAL_VERSION)
   public String basicMethod() {
     // Blah Blah Basic Blah....
     return "basic";

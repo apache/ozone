@@ -23,9 +23,6 @@ package org.apache.hadoop.ozone.upgrade;
  */
 public interface LayoutVersionManager {
 
-  // Default layout version
-  Integer DEFAULT_LAYOUT_VERSION = 0;
-
   /**
    * Get the Current Metadata Layout Version.
    * @return MLV

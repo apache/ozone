@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.ratis.utils;
 
 import com.google.common.base.Preconditions;
+
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -34,7 +35,6 @@ import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclRequest;
-import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixSetAclRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeSetOwnerRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeSetQuotaRequest;
 import org.apache.hadoop.ozone.om.request.volume.acl.OMVolumeAddAclRequest;
@@ -47,6 +47,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ratis.util.FileUtils;
 import org.rocksdb.RocksDBException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -59,10 +61,89 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_
  */
 public final class OzoneManagerRatisUtils {
 
+  private static final Logger LOG = LoggerFactory
+      .getLogger(OzoneManagerRatisUtils.class);
+
   private OzoneManagerRatisUtils() {
   }
 
-  public static OMClientRequest getVolumeSetOwnerRequest(OMRequest omRequest) {
+  public static OMClientRequest getRequest(OzoneManager om,
+                                           OMRequest omRequest) {
+    Type cmdType = omRequest.getCmdType();
+    switch (cmdType) {
+    case AddAcl:
+    case RemoveAcl:
+    case SetAcl:
+      return getOMAclRequest(om, omRequest);
+    case SetVolumeProperty:
+      return getVolumeSetPropertyRequest(om, omRequest);
+    default:
+      Class<? extends OMClientRequest> requestType =
+          om.getVersionManager().getVersionFactory().getRequestType(omRequest);
+      return getClientRequest(requestType, omRequest);
+    }
+  }
+
+  private static OMClientRequest getClientRequest(Class<?
+      extends OMClientRequest> requestClass, OMRequest omRequest) {
+    try {
+      return requestClass.getDeclaredConstructor(OMRequest.class)
+          .newInstance(omRequest);
+    } catch (Exception ex) {
+      LOG.error("Unable to get request handler for '{}', current layout " +
+              "version = {}", omRequest.getCmdType(),
+          omRequest.getLayoutVersion().getVersion());
+    }
+    throw new IllegalStateException("Unrecognized write command " +
+        "type request" + omRequest.getCmdType());
+  }
+
+  public static OMClientRequest getOMAclRequest(OzoneManager om,
+                                                OMRequest omRequest) {
+    Type cmdType = omRequest.getCmdType();
+    String requestType = null;
+    if (Type.AddAcl == cmdType) {
+      ObjectType type = omRequest.getAddAclRequest().getObj().getResType();
+      if (ObjectType.VOLUME == type) {
+        requestType = OMVolumeAddAclRequest.getRequestType();
+      } else if (ObjectType.BUCKET == type) {
+        requestType = OMBucketAddAclRequest.getRequestType();
+      } else if (ObjectType.KEY == type) {
+        requestType = OMKeyAddAclRequest.getRequestType();
+      } else {
+        requestType = OMPrefixAddAclRequest.getRequestType();
+      }
+    } else if (Type.RemoveAcl == cmdType) {
+      ObjectType type = omRequest.getRemoveAclRequest().getObj().getResType();
+      if (ObjectType.VOLUME == type) {
+        requestType = OMVolumeRemoveAclRequest.getRequestType();
+      } else if (ObjectType.BUCKET == type) {
+        requestType = OMBucketRemoveAclRequest.getRequestType();
+      } else if (ObjectType.KEY == type) {
+        requestType = OMKeyRemoveAclRequest.getRequestType();
+      } else {
+        requestType = OMPrefixRemoveAclRequest.getRequestType();
+      }
+    } else {
+      ObjectType type = omRequest.getSetAclRequest().getObj().getResType();
+      if (ObjectType.VOLUME == type) {
+        requestType = OMVolumeSetAclRequest.getRequestType();
+      } else if (ObjectType.BUCKET == type) {
+        requestType = OMBucketSetAclRequest.getRequestType();
+      } else if (ObjectType.KEY == type) {
+        requestType = OMKeySetAclRequest.getRequestType();
+      } else {
+        requestType = OMPrefixRemoveAclRequest.getRequestType();
+      }
+    }
+    Class<? extends OMClientRequest> requestClass =
+        om.getVersionManager().getVersionFactory().getRequestType(
+        requestType, om.getVersionManager().getMetadataLayoutVersion());
+    return getClientRequest(requestClass, omRequest);
+  }
+
+  public static OMClientRequest getVolumeSetPropertyRequest(
+      OzoneManager om, OMRequest omRequest) {
     boolean hasQuota = omRequest.getSetVolumePropertyRequest()
         .hasQuotaInBytes();
     boolean hasOwner = omRequest.getSetVolumePropertyRequest().hasOwnerName();
@@ -73,50 +154,15 @@ public final class OzoneManagerRatisUtils {
         "Either Quota or " +
             "owner should be set in the SetVolumeProperty request. Should not "
             + "set both");
-    if (hasQuota) {
-      return new OMVolumeSetQuotaRequest(omRequest);
-    } else {
-      return new OMVolumeSetOwnerRequest(omRequest);
-    }
+
+    String requestType = hasQuota ? OMVolumeSetQuotaRequest.getRequestType() :
+        OMVolumeSetOwnerRequest.getRequestType();
+    Class<? extends OMClientRequest> requestClass =
+        om.getVersionManager().getVersionFactory().getRequestType(
+            requestType, om.getVersionManager().getMetadataLayoutVersion());
+    return getClientRequest(requestClass, omRequest);
   }
 
-  public static OMClientRequest getOMAclRequest(OMRequest omRequest) {
-    Type cmdType = omRequest.getCmdType();
-    if (Type.AddAcl == cmdType) {
-      ObjectType type = omRequest.getAddAclRequest().getObj().getResType();
-      if (ObjectType.VOLUME == type) {
-        return new OMVolumeAddAclRequest(omRequest);
-      } else if (ObjectType.BUCKET == type) {
-        return new OMBucketAddAclRequest(omRequest);
-      } else if (ObjectType.KEY == type) {
-        return new OMKeyAddAclRequest(omRequest);
-      } else {
-        return new OMPrefixAddAclRequest(omRequest);
-      }
-    } else if (Type.RemoveAcl == cmdType) {
-      ObjectType type = omRequest.getRemoveAclRequest().getObj().getResType();
-      if (ObjectType.VOLUME == type) {
-        return new OMVolumeRemoveAclRequest(omRequest);
-      } else if (ObjectType.BUCKET == type) {
-        return new OMBucketRemoveAclRequest(omRequest);
-      } else if (ObjectType.KEY == type) {
-        return new OMKeyRemoveAclRequest(omRequest);
-      } else {
-        return new OMPrefixRemoveAclRequest(omRequest);
-      }
-    } else {
-      ObjectType type = omRequest.getSetAclRequest().getObj().getResType();
-      if (ObjectType.VOLUME == type) {
-        return new OMVolumeSetAclRequest(omRequest);
-      } else if (ObjectType.BUCKET == type) {
-        return new OMBucketSetAclRequest(omRequest);
-      } else if (ObjectType.KEY == type) {
-        return new OMKeySetAclRequest(omRequest);
-      } else {
-        return new OMPrefixSetAclRequest(omRequest);
-      }
-    }
-  }
 
   /**
    * Convert exception result to {@link OzoneManagerProtocolProtos.Status}.
