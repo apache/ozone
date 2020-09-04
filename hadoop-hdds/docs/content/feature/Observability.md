@@ -27,11 +27,11 @@ Ozone provides multiple tools to get more information about the current state of
 
 ## Prometheus
 
-Ozone has native Prometheus. Each internal metrics (collected by Hadoop metrics framework) published under the `/prom` HTTP context. (For example under http://localhost:9876/prom for SCM).
+Ozone has native support for Prometheus integration. All internal metrics (collected by Hadoop metrics framework) are published under the `/prom` HTTP endpoint. (For example under http://localhost:9876/prom for SCM).
 
 The Prometheus endpoint is turned on by default but can be turned off by the `hdds.prometheus.endpoint.enabled` configuration variable.
 
-In a secure environment the page is guarded with SPNEGO authentication which is not supported by Prometheus. To enable monitoring in a secure environment a specific authentication token cen be configured
+In a secure environment the page is guarded with SPNEGO authentication which is not supported by Prometheus. To enable monitoring in a secure environment, a specific authentication token can be configured
 
 Example `ozone-site.xml`:
 
