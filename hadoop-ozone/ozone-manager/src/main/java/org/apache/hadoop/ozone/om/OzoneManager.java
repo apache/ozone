@@ -84,6 +84,8 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBUpdatesWrapper;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.io.Text;
@@ -207,6 +209,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
+import static org.apache.hadoop.ozone.OzoneConsts.TB;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT;
@@ -441,6 +444,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // Create special volume s3v which is required for S3G.
     addS3GVolumeToDB();
+    //If old quota is 1EB，indicates that it is the previous default. We change
+    // it to -1 to mean that quota is not enabled.
+    initializeOldVolumeQuota();
 
     this.omRatisSnapshotInfo = new OMRatisSnapshotInfo();
     initializeRatisServer();
@@ -3532,6 +3538,43 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public boolean getEnableFileSystemPaths() {
     return configuration.getBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS,
         OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
+  }
+
+  /**
+   * Initialize volume's quota, which resolves the problem that the old quota
+   * initial value was not set correctly. This method will be removed in a
+   * later version.
+   * @throws IOException
+   */
+  private void initializeOldVolumeQuota() throws IOException {
+
+    TableIterator<String, ? extends Table.KeyValue<String,
+         OmVolumeArgs>> iterator = metadataManager.getVolumeTable().iterator();
+    while(iterator.hasNext()) {
+      OmVolumeArgs omVolumeArgs = iterator.next().getValue();
+      String omVolumeKey = metadataManager.getVolumeKey(
+          omVolumeArgs.getVolume());
+      // Previously, the volume quota was created to default to 1EB. To change
+      // to -1, default does not enable quota.
+      if (omVolumeArgs.getQuotaInBytes() == 1024 * 1024 * TB ||
+          omVolumeArgs.getQuotaInBytes() == OzoneConsts.MAX_QUOTA_IN_BYTES) {
+        omVolumeArgs.setQuotaInBytes(-1);
+        // Commit to DB.
+        BatchOperation batchOperation =
+            metadataManager.getStore().initBatchOperation();
+        metadataManager.getVolumeTable().putWithBatch(batchOperation,
+            omVolumeKey, omVolumeArgs);
+        metadataManager.getStore().commitBatchOperation(batchOperation);
+
+        // Add to cache.
+        long transactionID = (Long.MAX_VALUE - 1) >> 8;
+        metadataManager.getVolumeTable().addCacheEntry(
+            new CacheKey<>(omVolumeKey),
+            new CacheValue<>(Optional.of(omVolumeArgs), transactionID));
+        LOG.info("Update Volume {}'s quota to -1, , default does not enable" +
+            " quota.", omVolumeArgs.getVolume());
+      }
+    }
   }
 
   /**
