@@ -23,8 +23,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureCatalog.OMLayoutFeature;
-
 /**
  * Annotation used to "disallow" an API if current layout version does
  * not include the associated layout feature. Helps to keep the method logic

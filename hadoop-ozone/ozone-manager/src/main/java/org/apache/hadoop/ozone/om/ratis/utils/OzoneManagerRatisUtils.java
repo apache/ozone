@@ -35,6 +35,7 @@ import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclRequest;
+import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixSetAclRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeSetOwnerRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeSetQuotaRequest;
 import org.apache.hadoop.ozone.om.request.volume.acl.OMVolumeAddAclRequest;
@@ -91,11 +92,13 @@ public final class OzoneManagerRatisUtils {
           .newInstance(omRequest);
     } catch (Exception ex) {
       LOG.error("Unable to get request handler for '{}', current layout " +
-              "version = {}", omRequest.getCmdType(),
-          omRequest.getLayoutVersion().getVersion());
+              "version = {}, request factory returned '{}'",
+          omRequest.getCmdType(),
+          omRequest.getLayoutVersion().getVersion(),
+          requestClass.getSimpleName());
     }
     throw new IllegalStateException("Unrecognized write command " +
-        "type request" + omRequest.getCmdType());
+        "type request : " + omRequest.getCmdType());
   }
 
   public static OMClientRequest getOMAclRequest(OzoneManager om,
@@ -133,7 +136,7 @@ public final class OzoneManagerRatisUtils {
       } else if (ObjectType.KEY == type) {
         requestType = OMKeySetAclRequest.getRequestType();
       } else {
-        requestType = OMPrefixRemoveAclRequest.getRequestType();
+        requestType = OMPrefixSetAclRequest.getRequestType();
       }
     }
     Class<? extends OMClientRequest> requestClass =
