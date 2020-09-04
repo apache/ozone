@@ -45,7 +45,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
@@ -100,7 +99,6 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey("file1", 0);
     ozoneOutputStream.close();
-
 
   }
 
