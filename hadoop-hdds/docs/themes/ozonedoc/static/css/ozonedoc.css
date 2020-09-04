@@ -176,3 +176,10 @@ table.table {
   margin: 20px;
   margin-bottom: 40px;
 }
+
+.footer {
+  background-color: #f5f5f5;
+  padding-top: 15px;
+  padding-bottom: 15px;
+  text-align: center;
+}
