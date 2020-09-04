@@ -288,8 +288,8 @@ public class TestBlockDeletion {
     Thread.sleep(100);
     containerInfos = scm.getContainerManager().getContainers();
     containerInfos.stream().forEach(container ->
-      Assert.assertEquals(HddsProtos.LifeCycleState.DELETING,
-          container.getState()));
+        Assert.assertEquals(HddsProtos.LifeCycleState.DELETING,
+            container.getState()));
     LogCapturer logCapturer =
         LogCapturer.captureLogs(ReplicationManager.LOG);
     logCapturer.clearOutput();
@@ -298,7 +298,7 @@ public class TestBlockDeletion {
     Thread.sleep(100);
     // Wait for delete replica command resend
     GenericTestUtils.waitFor(() -> logCapturer.getOutput()
-            .contains("Resend delete Container"), 500, 5000);
+        .contains("Resend delete Container"), 500, 5000);
     cluster.restartHddsDatanode(0, true);
     Thread.sleep(100);
 
