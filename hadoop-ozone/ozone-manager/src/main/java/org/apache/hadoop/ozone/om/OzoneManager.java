@@ -138,6 +138,7 @@ import org.apache.hadoop.ozone.om.ratis.OMRatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.snapshot.OzoneManagerSnapshotProvider;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -3468,15 +3469,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     jvmPauseMonitor.start();
   }
 
-  public ResolvedBucket resolveBucketLink(KeyArgs args) throws IOException {
+  public ResolvedBucket resolveBucketLink(KeyArgs args,
+      OMClientRequest omClientRequest) throws IOException {
     return resolveBucketLink(
-        Pair.of(args.getVolumeName(), args.getBucketName()));
+        Pair.of(args.getVolumeName(), args.getBucketName()), omClientRequest);
   }
 
   public ResolvedBucket resolveBucketLink(OmKeyArgs args)
       throws IOException {
     return resolveBucketLink(
         Pair.of(args.getVolumeName(), args.getBucketName()));
+  }
+
+  public ResolvedBucket resolveBucketLink(Pair<String, String> requested,
+      OMClientRequest omClientRequest)
+      throws IOException {
+    Pair<String, String> resolved =
+        resolveBucketLink(requested, new HashSet<>(), omClientRequest);
+    return new ResolvedBucket(requested, resolved);
   }
 
   public ResolvedBucket resolveBucketLink(Pair<String, String> requested)
@@ -3521,6 +3531,47 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return resolveBucketLink(
         Pair.of(info.getSourceVolume(), info.getSourceBucket()),
         visited);
+  }
+
+  /**
+   * Resolves bucket symlinks. Read permission is required for following links.
+   *
+   * @param volumeAndBucket the bucket to be resolved (if it is a link)
+   * @param {@link OMClientRequest}  which has information required to check
+   * permission.
+   * @param visited collects link buckets visited during the resolution to
+   *   avoid infinite loops
+   * @return bucket location possibly updated with its actual volume and bucket
+   *   after following bucket links
+   * @throws IOException (most likely OMException) if ACL check fails, bucket is
+   *   not found, loop is detected in the links, etc.
+   */
+  private Pair<String, String> resolveBucketLink(
+      Pair<String, String> volumeAndBucket,
+      Set<Pair<String, String>> visited,
+      OMClientRequest omClientRequest) throws IOException {
+
+    String volumeName = volumeAndBucket.getLeft();
+    String bucketName = volumeAndBucket.getRight();
+    OmBucketInfo info = bucketManager.getBucketInfo(volumeName, bucketName);
+    if (!info.isLink()) {
+      return volumeAndBucket;
+    }
+
+    if (!visited.add(volumeAndBucket)) {
+      throw new OMException("Detected loop in bucket links",
+          DETECTED_LOOP_IN_BUCKET_LINKS);
+    }
+
+    if (isAclEnabled) {
+      checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.READ,
+          volumeName, bucketName, null, omClientRequest.createUGI(),
+          omClientRequest.getRemoteAddress(), omClientRequest.getHostName());
+    }
+
+    return resolveBucketLink(
+        Pair.of(info.getSourceVolume(), info.getSourceBucket()),
+        visited, omClientRequest);
   }
 
   @VisibleForTesting

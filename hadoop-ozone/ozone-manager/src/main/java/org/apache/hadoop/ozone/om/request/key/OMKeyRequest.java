@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
@@ -90,10 +91,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
     super(omRequest);
   }
 
-  protected static KeyArgs resolveBucketLink(
+  protected KeyArgs resolveBucketLink(
       OzoneManager ozoneManager, KeyArgs keyArgs,
       Map<String, String> auditMap) throws IOException {
-    ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs);
+    ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs, this);
     keyArgs = bucket.update(keyArgs);
     bucket.audit(auditMap);
     return keyArgs;

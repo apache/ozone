@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
@@ -44,6 +45,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
@@ -67,6 +69,39 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
   public void testAllOMNodesRunning() throws Exception {
     createVolumeTest(true);
     createKeyTest(true);
+  }
+
+  @Test
+  public void testBucketLinkOps() throws Exception {
+
+    String srcVolume = UUID.randomUUID().toString();
+    getObjectStore().createVolume(srcVolume);
+
+    OzoneVolume ozoneVolume = getObjectStore().getVolume(srcVolume);
+
+    String srcBucket = UUID.randomUUID().toString();
+    ozoneVolume.createBucket(srcBucket);
+
+    OzoneVolume s3Volume = getObjectStore().getVolume("s3v");
+
+    String linkBucket = UUID.randomUUID().toString();
+    s3Volume.createBucket(linkBucket,
+        BucketArgs.newBuilder().setSourceVolume(srcVolume)
+            .setSourceBucket(srcBucket).build());
+
+
+    String linkToLinkBucket = UUID.randomUUID().toString();
+
+    s3Volume.createBucket(linkToLinkBucket,
+        BucketArgs.newBuilder().setSourceVolume("s3v")
+        .setSourceBucket(linkBucket).build());
+
+    OzoneBucket ozoneBucket = s3Volume.getBucket(linkToLinkBucket);
+
+    OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey("file1", 0);
+    ozoneOutputStream.close();
+
+
   }
 
   /**

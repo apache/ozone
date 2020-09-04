@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.junit.After;
 import org.junit.Before;
@@ -160,9 +161,11 @@ public class TestOMKeyRequest {
     dataSize = 1000L;
 
     Pair<String, String> volumeAndBucket = Pair.of(volumeName, bucketName);
-    when(ozoneManager.resolveBucketLink(any(KeyArgs.class)))
+    when(ozoneManager.resolveBucketLink(any(KeyArgs.class),
+        any(OMClientRequest.class)))
         .thenReturn(new ResolvedBucket(volumeAndBucket, volumeAndBucket));
-    when(ozoneManager.resolveBucketLink(any(Pair.class)))
+    when(ozoneManager.resolveBucketLink(any(Pair.class),
+        any(OMClientRequest.class)))
         .thenReturn(new ResolvedBucket(volumeAndBucket, volumeAndBucket));
   }
 
