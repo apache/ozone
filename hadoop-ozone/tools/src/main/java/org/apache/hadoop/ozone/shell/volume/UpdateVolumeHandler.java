@@ -40,11 +40,11 @@ public class UpdateVolumeHandler extends VolumeHandler {
       description = "Owner of the volume to set")
   private String ownerName;
 
-  @Option(names = {"--spaceQuota", "-s"},
+  @Option(names = {"--spaceQuota", "-sq"},
       description = "Quota in bytes of the volume to set (eg. 1GB)")
   private String quotaInBytes;
 
-  @Option(names = {"--quota", "-q"},
+  @Option(names = {"--bucketQuota", "-bq"},
       description = "Bucket counts of the volume to set (eg. 5)")
   private long quotaInCounts = OzoneConsts.QUOTA_RESET;
 

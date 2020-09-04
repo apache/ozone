@@ -41,11 +41,11 @@ public class CreateVolumeHandler extends VolumeHandler {
       description = "Owner of the volume")
   private String ownerName;
 
-  @Option(names = {"--spaceQuota", "-s"},
+  @Option(names = {"--spaceQuota", "-sq"},
       description = "Quota in bytes of the newly created volume (eg. 1GB)")
   private String quotaInBytes;
 
-  @Option(names = {"--quota", "-q"},
+  @Option(names = {"--bucketQuota", "-bq"},
       description = "Bucket counts of the newly created volume (eg. 5)")
   private long quotaInCounts = OzoneConsts.QUOTA_RESET;
 
