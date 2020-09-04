@@ -60,7 +60,7 @@ find_tests(){
   echo $tests
 }
 
-## @description wait until safemode exit (or 180 seconds)
+## @description wait until safemode exit (or 240 seconds)
 wait_for_safemode_exit(){
   # version-dependent
   : ${OZONE_SAFEMODE_STATUS_COMMAND:=ozone admin safemode status --verbose}
@@ -68,8 +68,8 @@ wait_for_safemode_exit(){
   #Reset the timer
   SECONDS=0
 
-  #Don't give it up until 180 seconds
-  while [[ $SECONDS -lt 180 ]]; do
+  #Don't give it up until 240 seconds
+  while [[ $SECONDS -lt 240 ]]; do
 
      #This line checks the safemode status in scm
      local command="${OZONE_SAFEMODE_STATUS_COMMAND}"
@@ -78,6 +78,8 @@ wait_for_safemode_exit(){
      else
          status=$(docker-compose exec -T scm bash -c "$command")
      fi
+
+     echo "SECONDS: $SECONDS"
 
      echo $status
      if [[ "$status" ]]; then
