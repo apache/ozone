@@ -161,8 +161,8 @@ public abstract class TestOzoneRpcClientAbstract {
    */
   static void startCluster(OzoneConfiguration conf) throws Exception {
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
-        .setTotalPipelineNumLimit(10)
+        .setNumDatanodes(1)
+        .setTotalPipelineNumLimit(1)
         .setScmId(scmId)
         .build();
     cluster.waitForClusterToBeReady();
@@ -338,6 +338,8 @@ public abstract class TestOzoneRpcClientAbstract {
     Assert.assertEquals(bucketName, bucket.getName());
     Assert.assertFalse(bucket.getCreationTime().isBefore(testStartTime));
     Assert.assertFalse(volume.getCreationTime().isBefore(testStartTime));
+    OzoneBucket bucket1 = volume.getBucket(bucketName);
+    Assert.assertNotNull(bucket1);
   }
 
   @Test

@@ -35,8 +35,7 @@ import com.google.common.annotations.VisibleForTesting;
 public final class OMLayoutVersionManager extends AbstractLayoutVersionManager {
 
   private static OMLayoutVersionManager omVersionManager;
-
-  private OmVersionFactory omVersionFactory;
+  private OmRequestFactory omRequestFactory;
 
   private OMLayoutVersionManager() {
   }
@@ -82,7 +81,7 @@ public final class OMLayoutVersionManager extends AbstractLayoutVersionManager {
               metadataLayoutVersion, softwareLayoutVersion),
           NOT_SUPPORTED_OPERATION);
     }
-    omVersionFactory = new OmVersionFactory();
+    omRequestFactory = new OmRequestFactory(this);
   }
 
   @VisibleForTesting
@@ -93,8 +92,8 @@ public final class OMLayoutVersionManager extends AbstractLayoutVersionManager {
     }
   }
 
-  public OmVersionFactory getVersionFactory() {
-    return omVersionFactory;
+  public OmRequestFactory getVersionFactory() {
+    return omRequestFactory;
   }
 
 }

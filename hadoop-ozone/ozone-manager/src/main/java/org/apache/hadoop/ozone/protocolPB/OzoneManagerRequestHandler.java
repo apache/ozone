@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -77,6 +78,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import com.google.common.collect.Lists;
+
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclRequest;
@@ -221,8 +223,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   @Override
   public OMClientResponse handleWriteRequest(OMRequest omRequest,
       long transactionLogIndex) {
-    OMClientRequest omClientRequest = impl.getVersionManager()
-        .getVersionFactory().getClientRequest(omRequest);
+    OMClientRequest omClientRequest =
+        OzoneManagerRatisUtils.getRequest(getOzoneManager(), omRequest);
     OMClientResponse omClientResponse =
         omClientRequest.validateAndUpdateCache(getOzoneManager(),
             transactionLogIndex, ozoneManagerDoubleBuffer::add);

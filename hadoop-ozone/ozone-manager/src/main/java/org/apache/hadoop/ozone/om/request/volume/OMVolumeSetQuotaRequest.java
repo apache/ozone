@@ -53,6 +53,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.SetVolumeProperty;
 
 /**
  * Handles set Quota request for volume.
@@ -172,7 +173,9 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
     return omClientResponse;
   }
 
-
+  public static String getRequestType() {
+    return SetVolumeProperty.name() + "-Quota";
+  }
 }
 
 
