@@ -244,11 +244,15 @@ public class AbstractContainerReportHandler {
        */
       break;
     case DELETING:
-      throw new UnsupportedOperationException(
-          "Unsupported container state 'DELETING'.");
+      /*
+       * The container is under deleting. do nothing.
+       */
+      break;
     case DELETED:
-      throw new UnsupportedOperationException(
-          "Unsupported container state 'DELETED'.");
+      /*
+       * The container is deleted. do nothing.
+       */
+      break;
     default:
       break;
     }
