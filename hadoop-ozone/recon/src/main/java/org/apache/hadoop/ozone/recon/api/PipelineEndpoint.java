@@ -146,8 +146,10 @@ public class PipelineEndpoint {
         }
       }
     } catch (Exception ex) {
-      LOG.error("Unable to get metrics for " +
-          "ratis_leader_election_electionCount.", ex);
+      if (LOG.isErrorEnabled()) {
+        LOG.error(String.format("Unable to get metrics value for %s",
+            metricName), ex);
+      }
     }
     return Optional.empty();
   }
