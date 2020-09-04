@@ -22,6 +22,9 @@ import org.apache.ratis.protocol.StateMachineException;
 import org.junit.Before;
 import org.junit.Test;
 
+/**
+ * Tests on {@link org.apache.hadoop.hdds.scm.metadata.Replicate}.
+ */
 public class TestRelicationAnnotation {
   private SCMHAInvocationHandler scmhaInvocationHandler;
 

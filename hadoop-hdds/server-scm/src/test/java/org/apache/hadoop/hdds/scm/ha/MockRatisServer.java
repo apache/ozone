@@ -41,7 +41,8 @@ public class MockRatisServer implements SCMRatisServer{
   }
 
   @Override
-  public void registerStateMachineHandler(RequestType handlerType, Object handler) {
+  public void registerStateMachineHandler(
+      RequestType handlerType, Object handler) {
     // no op
   }
 
@@ -49,11 +50,13 @@ public class MockRatisServer implements SCMRatisServer{
   public SCMRatisResponse submitRequest(SCMRatisRequest request)
       throws IOException, ExecutionException, InterruptedException {
     RaftGroupMemberId groupMemberId =
-        RaftGroupMemberId.valueOf(RaftPeerId.valueOf("mock"), RaftGroupId.emptyGroupId());
+        RaftGroupMemberId.valueOf(
+            RaftPeerId.valueOf("mock"), RaftGroupId.emptyGroupId());
     // create a response with StateMachineException.
     return SCMRatisResponse.decode(new RaftClientReply(
         ClientId.randomId(), groupMemberId, 1L, false,
-        Message.EMPTY, new StateMachineException(groupMemberId, new Throwable()),
+        Message.EMPTY,
+        new StateMachineException(groupMemberId, new Throwable()),
         1L, null));
   }
 
