@@ -18,10 +18,13 @@
 
 package org.apache.hadoop.ozone.recon;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.ozone.recon.spi.MetricsServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.PrometheusServiceProviderImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -32,6 +35,9 @@ import javax.inject.Singleton;
  */
 @Singleton
 public class MetricsServiceProviderFactory {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(MetricsServiceProviderFactory.class);
 
   private OzoneConfiguration configuration;
   private ReconUtils reconUtils;
@@ -52,7 +58,12 @@ public class MetricsServiceProviderFactory {
    */
   public MetricsServiceProvider getMetricsServiceProvider() {
     String prometheusEndpoint = getPrometheusEndpoint();
-    if (prometheusEndpoint != null && !prometheusEndpoint.isEmpty()) {
+    if (StringUtils.isNotEmpty(prometheusEndpoint)) {
+      if (LOG.isInfoEnabled()) {
+        LOG.info(
+            String.format("Choosing Prometheus as Metrics service provider " +
+                "with configured endpoint: %s", prometheusEndpoint));
+      }
       return new PrometheusServiceProviderImpl(configuration, reconUtils);
     }
     return null;

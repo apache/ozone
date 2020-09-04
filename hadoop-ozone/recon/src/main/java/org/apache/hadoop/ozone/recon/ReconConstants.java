@@ -52,9 +52,6 @@ public final class ReconConstants {
   public static final String RECON_QUERY_BUCKET = "bucket";
   public static final String RECON_QUERY_FILE_SIZE = "fileSize";
 
-  public static final String PROMETHEUS_INSTANT_QUERY_API = "query";
-  public static final String PROMETHEUS_RANGED_QUERY_API = "query_range";
-
   public static final String RECON_SCM_CONTAINER_DB =
       "recon-" + CONTAINER_DB_SUFFIX;
   public static final String RECON_SCM_PIPELINE_DB = "recon-"

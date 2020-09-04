@@ -31,28 +31,21 @@ import java.util.TreeMap;
 @InterfaceAudience.Private
 public final class Metric {
 
-  private Map<String, String> metadata;
-  private TreeMap<Double, Double> values;
+  private final Map<String, String> metadata;
+  private final TreeMap<Double, Double> values;
 
   public Metric(Map<String, String> metadata,
                 SortedMap<Double, Double> values) {
     this.metadata = metadata;
-    this.values = (TreeMap<Double, Double>) values;
+    this.values = new TreeMap<>();
+    this.values.putAll(values);
   }
 
   public Map<String, String> getMetadata() {
     return metadata;
   }
 
-  public void setMetadata(Map<String, String> metadata) {
-    this.metadata = metadata;
-  }
-
   public SortedMap<Double, Double> getValues() {
     return values;
-  }
-
-  public void setValues(SortedMap<Double, Double> values) {
-    this.values = (TreeMap<Double, Double>) values;
   }
 }

@@ -38,8 +38,6 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.hadoop.ozone.recon.ReconConstants.PROMETHEUS_INSTANT_QUERY_API;
-import static org.apache.hadoop.ozone.recon.ReconConstants.PROMETHEUS_RANGED_QUERY_API;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_METRICS_HTTP_CONNECTION_TIMEOUT;
@@ -51,6 +49,9 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_METRICS_
 @Singleton
 public class PrometheusServiceProviderImpl
     implements MetricsServiceProvider {
+
+  public static final String PROMETHEUS_INSTANT_QUERY_API = "query";
+  public static final String PROMETHEUS_RANGED_QUERY_API = "query_range";
 
   private static final Logger LOG =
       LoggerFactory.getLogger(PrometheusServiceProviderImpl.class);

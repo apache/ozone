@@ -42,7 +42,8 @@ import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 
-import static org.apache.hadoop.ozone.recon.ReconConstants.PROMETHEUS_INSTANT_QUERY_API;
+import static org.apache.hadoop.ozone.recon.spi.impl.PrometheusServiceProviderImpl.PROMETHEUS_INSTANT_QUERY_API;
+
 
 /**
  * Endpoint to fetch metrics data from Prometheus HTTP endpoint.
