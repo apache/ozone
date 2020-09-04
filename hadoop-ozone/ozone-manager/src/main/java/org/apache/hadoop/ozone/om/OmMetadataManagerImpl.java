@@ -143,6 +143,20 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String TRANSACTION_INFO_TABLE =
       "transactionInfoTable";
 
+  public static final String[] ALL_TABLES = new String[] {
+      USER_TABLE,
+      VOLUME_TABLE,
+      BUCKET_TABLE,
+      KEY_TABLE,
+      DELETED_TABLE,
+      OPEN_KEY_TABLE,
+      MULTIPARTINFO_TABLE,
+      S3_SECRET_TABLE,
+      DELEGATION_TOKEN_TABLE,
+      PREFIX_TABLE,
+      TRANSACTION_INFO_TABLE
+  };
+
   private DBStore store;
 
   private final OzoneManagerLock lock;
