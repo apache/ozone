@@ -1741,29 +1741,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Changes the Quota on a volume.
    *
    * @param volume - Name of the volume.
-   * @param quota  - Quota in bytes.
+   * @param quotaInCounts - Volume quota in counts.
+   * @param quotaInBytes - Volume quota in bytes.
    * @throws IOException
    */
   @Override
-  public void setQuota(String volume, long quota) throws IOException {
-    if (isAclEnabled) {
-      checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.WRITE, volume,
-          null, null);
-    }
-
-    Map<String, String> auditMap = buildAuditMap(volume);
-    auditMap.put(OzoneConsts.QUOTA_IN_BYTES, String.valueOf(quota));
-    try {
-      metrics.incNumVolumeUpdates();
-      volumeManager.setQuota(volume, quota);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.SET_QUOTA,
-          auditMap));
-    } catch (Exception ex) {
-      metrics.incNumVolumeUpdateFails();
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.SET_QUOTA,
-          auditMap, ex));
-      throw ex;
-    }
+  public void setQuota(String volume, long quotaInCounts,
+                       long quotaInBytes) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As this requests use a new approach");
   }
 
   /**
@@ -3615,7 +3601,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setModificationTime(time)
         .setOwnerName(userName)
         .setAdminName(userName)
-        .setQuotaInBytes(OzoneConsts.MAX_QUOTA_IN_BYTES);
+        .setQuotaInBytes(OzoneConsts.QUOTA_RESET);
 
     // Provide ACLType of ALL which is default acl rights for user and group.
     List<OzoneAcl> listOfAcls = new ArrayList<>();
