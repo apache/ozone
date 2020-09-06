@@ -14,7 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-CORE-SITE.XML_fs.defaultFS=o3fs://bucket.volume.id1
+CORE-SITE.XML_fs.defaultFS=ofs://id1
+
 OZONE-SITE.XML_ozone.om.service.ids=id1
 OZONE-SITE.XML_ozone.om.internal.service.id=id1
 OZONE-SITE.XML_ozone.om.nodes.id1=om1,om2,om3
