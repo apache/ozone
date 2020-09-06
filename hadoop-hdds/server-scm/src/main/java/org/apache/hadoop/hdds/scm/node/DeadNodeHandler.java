@@ -74,7 +74,7 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
        * To be on a safer side, we double check here and take appropriate
        * action.
        */
-      LOG.warn("A dead datanode detected. {}", datanodeDetails);
+      LOG.warn("A dead datanode is detected. {}", datanodeDetails);
       destroyPipelines(datanodeDetails);
       closeContainers(datanodeDetails, publisher);
 
