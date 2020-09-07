@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.apache.ratis.protocol.StateMachineException;
 import org.apache.ratis.server.storage.FileInfo;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
@@ -379,9 +380,20 @@ public class TestContainerStateMachineFailures {
     } catch (IOException ioe) {
       Assert.assertTrue(ioe instanceof StateMachineException);
     }
-    // Make sure the latest snapshot is same as the previous one
-    FileInfo latestSnapshot = storage.findLatestSnapshot().getFile();
-    Assert.assertTrue(snapshot.getPath().equals(latestSnapshot.getPath()));
+
+    if (snapshot.getPath().toFile().exists()) {
+      // Make sure the latest snapshot is same as the previous one
+      try {
+        FileInfo latestSnapshot = storage.findLatestSnapshot().getFile();
+        Assert.assertTrue(snapshot.getPath().equals(latestSnapshot.getPath()));
+      } catch (Throwable e) {
+        Assert.assertFalse(snapshot.getPath().toFile().exists());
+      }
+    }
+    
+    // when remove pipeline, group dir including snapshot will be deleted
+    LambdaTestUtils.await(5000, 500,
+        () -> (!snapshot.getPath().toFile().exists()));
   }
 
   @Test
