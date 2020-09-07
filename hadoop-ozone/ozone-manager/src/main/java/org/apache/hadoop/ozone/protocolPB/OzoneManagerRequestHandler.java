@@ -293,6 +293,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
           OMException.ResultCodes.INVALID_REQUEST);
     }
 
+    // Layout version should have been set up the leader while serializing
+    // the request, and hence cannot be null. This version is used by each
+    // node to identify which request handler version to use.
     if (omRequest.getLayoutVersion() == null) {
       throw new OMException("LayoutVersion for request is null.",
           OMException.ResultCodes.INTERNAL_ERROR);

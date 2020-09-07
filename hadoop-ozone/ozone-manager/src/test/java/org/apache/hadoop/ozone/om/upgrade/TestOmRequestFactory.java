@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.om.request.key.OMECKeyCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -56,7 +57,7 @@ public class TestOmRequestFactory {
   }
 
   @Test
-  public void testKeyCreateRequest() {
+  public void testKeyCreateRequest() throws Exception {
 
     // Try getting v1 of 'CreateKey'.
     Class<? extends OMClientRequest> requestType =
@@ -71,18 +72,16 @@ public class TestOmRequestFactory {
     Assert.assertEquals(requestType, OMKeyCreateRequest.class);
 
     // Try getting 'CreateECKey' (V2). Should fail.
-    try {
-      omRequestFactory.getRequestType(OMRequest.newBuilder()
-              .setCmdType(CreateKey)
-              .setClientId("c1")
-              .setLayoutVersion(LayoutVersion
-                  .newBuilder()
-                  .setVersion(CREATE_EC.layoutVersion())
-                  .build())
-              .build());
-      Assert.fail();
-    } catch (IllegalArgumentException ex) {
-    }
+    LambdaTestUtils.intercept(IllegalArgumentException.class,
+        "version is greater than the Metadata layout version", () ->
+        omRequestFactory.getRequestType(OMRequest.newBuilder()
+        .setCmdType(CreateKey)
+        .setClientId("c1")
+        .setLayoutVersion(LayoutVersion
+            .newBuilder()
+            .setVersion(CREATE_EC.layoutVersion())
+            .build())
+        .build()));
 
     // Finalize the version manager.
     omVersionManager.doFinalize(null);
