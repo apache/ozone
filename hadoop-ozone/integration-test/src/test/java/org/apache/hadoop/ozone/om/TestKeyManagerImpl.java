@@ -65,7 +65,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -459,8 +458,8 @@ public class TestKeyManagerImpl {
     OzoneObj nonExistentKey = OzoneObjInfo.Builder.fromKeyArgs(keyArgs)
         .setStoreType(OzoneObj.StoreType.OZONE)
         .build();
-    OzoneTestUtils.expectOmException(OMException.ResultCodes.KEY_NOT_FOUND,
-        () -> keyManager.checkAccess(nonExistentKey, currentUserReads()));
+    Assert.assertTrue(keyManager.checkAccess(nonExistentKey,
+            currentUserReads()));
   }
 
   @Test
