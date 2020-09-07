@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketAddAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketSetAclRequest;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest;
+import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestV1;
 import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeysDeleteRequest;
 import org.apache.hadoop.ozone.om.request.key.OMAllocateBlockRequest;
@@ -82,6 +83,10 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_
  * Utility class used by OzoneManager HA.
  */
 public final class OzoneManagerRatisUtils {
+
+  // TODO: Temporary workaround for OM upgrade path and will be replaced once
+  //  upgrade HDDS-3698 story reaches consensus.
+  public static boolean LAYOUT_VERSION_V1 = true;
 
   private OzoneManagerRatisUtils() {
   }
@@ -133,6 +138,9 @@ public final class OzoneManagerRatisUtils {
     case RenameKeys:
       return new OMKeysRenameRequest(omRequest);
     case CreateDirectory:
+      if (LAYOUT_VERSION_V1) {
+        return new OMDirectoryCreateRequestV1(omRequest);
+      }
       return new OMDirectoryCreateRequest(omRequest);
     case CreateFile:
       return new OMFileCreateRequest(omRequest);

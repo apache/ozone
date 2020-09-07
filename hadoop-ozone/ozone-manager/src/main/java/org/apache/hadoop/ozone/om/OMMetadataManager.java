@@ -24,6 +24,7 @@ import java.util.Set;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
@@ -365,6 +366,12 @@ public interface OMMetadataManager {
       String bucketName, String prefix) throws IOException;
 
   /**
+   * Gets the DirectoryTable.
+   * @return Table.
+   */
+  Table<String, OmDirectoryInfo> getDirectoryTable();
+
+  /**
    * Return table mapped to the specified table name.
    * @param tableName
    * @return Table
@@ -382,4 +389,14 @@ public interface OMMetadataManager {
    * @return table names in OM DB.
    */
   Set<String> listTableNames();
+
+  /**
+   * Given a volume, bucket and a key, return the corresponding DB prefixKey
+   * key.
+   *
+   * @param parentObjectId - parent object Id
+   * @param leafNodeName   - leaf node name
+   * @return DB directory key as String.
+   */
+  String getOzoneLeafNodeKey(long parentObjectId, String leafNodeName);
 }

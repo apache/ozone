@@ -116,4 +116,14 @@ public final class OzoneFSUtils {
     }
     return true;
   }
+
+  /**
+   * The function returns leaf node name from the given absolute path. For
+   * example, the given key path '/a/b/c/d/e/file1' then it returns leaf node
+   * name 'file1'.
+   */
+  public static String getFileName(String keyName) {
+    java.nio.file.Path keyPath = Paths.get(keyName);
+    return keyPath.getFileName().toString();
+  }
 }

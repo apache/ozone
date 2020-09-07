@@ -246,4 +246,11 @@ public final class OMConfigKeys {
       "ozone.om.enable.filesystem.paths";
   public static final boolean OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT =
       false;
+
+  // TODO: Temporary workaround for OM upgrade path and will be replaced once
+  //  upgrade HDDS-3698 story reaches consensus.
+  public static final String OZONE_OM_LAYOUT_VERSION =
+          "ozone.om.layout.version";
+  public static final String OZONE_OM_LAYOUT_VERSION_DEFAULT =
+          "V1";
 }
