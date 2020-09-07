@@ -426,8 +426,6 @@ public class TestKeyManagerImpl {
   }
 
   @Test
-  // TODO this test relies on KeyManagerImpl.createFile which is dead code.
-  // Move the test case out of this file, update the implementation.
   public void testCheckAccessForFileKey() throws Exception {
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName("testdir/deep/NOTICE.txt")
