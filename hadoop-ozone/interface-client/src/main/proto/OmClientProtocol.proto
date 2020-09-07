@@ -1032,7 +1032,7 @@ message FinalizeUpgradeResponse {
 
 message FinalizeUpgradeProgressRequest {
     required string upgradeClientId = 1;
-    optional bool force = 2;
+    optional bool takeover = 2;
 }
 
 message FinalizeUpgradeProgressResponse {

@@ -1094,12 +1094,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   @Override
   public UpgradeFinalizationStatus queryUpgradeFinalizationProgress(
-      String upgradeClientID, boolean force
+      String upgradeClientID, boolean takeover
   ) throws IOException {
     FinalizeUpgradeProgressRequest req = FinalizeUpgradeProgressRequest
         .newBuilder()
         .setUpgradeClientId(upgradeClientID)
-        .setForce(force)
+        .setTakeover(takeover)
         .build();
 
     OMRequest omRequest = createOMRequest(Type.FinalizeUpgradeProgress)

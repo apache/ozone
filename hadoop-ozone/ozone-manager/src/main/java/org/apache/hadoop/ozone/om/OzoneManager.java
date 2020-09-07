@@ -2630,7 +2630,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     UpgradeFinalizationStatus status = UpgradeFinalizationStatus.newBuilder()
         .setStatus(finalizationStatus)
         .build();
-    LOG.info("finalizeUpgrade initiated by client: {}.", upgradeClientID);
+    LOG.info("FinalizeUpgrade initiated by client: {}.", upgradeClientID);
     if (isLeader()) {
       finalizationMsgs.add("Finalization started.");
       finalizationStatus =
@@ -2668,7 +2668,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public UpgradeFinalizationStatus queryUpgradeFinalizationProgress(
-      String upgradeClientID, boolean force
+      String upgradeClientID, boolean takeover
   ) throws IOException {
     UpgradeFinalizationStatus.Builder builder =
         UpgradeFinalizationStatus.newBuilder();

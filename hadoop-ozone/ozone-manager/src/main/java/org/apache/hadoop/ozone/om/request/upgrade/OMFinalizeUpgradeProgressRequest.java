@@ -63,10 +63,11 @@ public class OMFinalizeUpgradeProgressRequest extends OMClientRequest {
           getOmRequest().getFinalizeUpgradeProgressRequest();
       String upgradeClientID =
           finalizeUpgradeProgressRequest.getUpgradeClientId();
-      boolean force = finalizeUpgradeProgressRequest.getForce();
+      boolean takeover = finalizeUpgradeProgressRequest.getTakeover();
 
       UpgradeFinalizationStatus status =
-          ozoneManager.queryUpgradeFinalizationProgress(upgradeClientID, force);
+          ozoneManager
+              .queryUpgradeFinalizationProgress(upgradeClientID, takeover);
 
       FinalizeUpgradeProgressResponse omResponse =
           FinalizeUpgradeProgressResponse.newBuilder()

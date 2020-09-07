@@ -371,7 +371,7 @@ public interface OzoneManagerProtocol
    *            if finalization is needed but not yet started
    */
   UpgradeFinalizationStatus queryUpgradeFinalizationProgress(
-      String upgradeClientID, boolean force
+      String upgradeClientID, boolean takeover
   ) throws IOException;
 
   /*
