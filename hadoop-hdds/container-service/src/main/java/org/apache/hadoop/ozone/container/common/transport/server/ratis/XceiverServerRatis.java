@@ -733,7 +733,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     GroupManagementRequest request = GroupManagementRequest.newRemove(
         clientId, server.getId(), nextCallId(),
         RaftGroupId.valueOf(PipelineID.getFromProtobuf(pipelineId).getId()),
-        true);
+        true, false);
 
     RaftClientReply reply;
     try {
