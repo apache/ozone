@@ -273,7 +273,7 @@ public final class KeyValueContainerUtil {
         while (blockIter.hasNext()) {
           blockCount++;
           try {
-            usedBytes += blockIter.nextBlock().getSize();
+            usedBytes += getBlockLength(blockIter.nextBlock());
           } catch (IOException ex) {
             LOG.error(errorMessage);
           }
@@ -288,7 +288,7 @@ public final class KeyValueContainerUtil {
         while (blockIter.hasNext()) {
           blockCount++;
           try {
-            usedBytes += blockIter.nextBlock().getSize();
+            usedBytes += getBlockLength(blockIter.nextBlock());
           } catch (IOException ex) {
             LOG.error(errorMessage);
           }
@@ -298,6 +298,18 @@ public final class KeyValueContainerUtil {
 
     kvData.setBytesUsed(usedBytes);
     kvData.setKeyCount(blockCount);
+  }
+
+  private static long getBlockLength(BlockData block) {
+    long blockLen = 0;
+    List<ContainerProtos.ChunkInfo> chunkInfoList = block.getChunks();
+
+    for (ContainerProtos.ChunkInfo chunk : chunkInfoList) {
+      ChunkInfo info = ChunkInfo.getFromProtoBuf(chunk);
+      blockLen += info.getLen();
+    }
+
+    return blockLen;
   }
 
   /**
