@@ -16,8 +16,13 @@
  */
 package org.apache.hadoop.hdds.scm.ha;
 
+import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.ratis.protocol.ClientId;
@@ -34,49 +39,79 @@ import org.apache.ratis.server.RaftServer;
  * Mock RatisServer implementation for testing.
  */
 public class MockRatisServer implements SCMRatisServer{
+  private Map<RequestType, Object> handlers =
+      new EnumMap<>(RequestType.class);
 
   @Override
-  public void start() throws IOException {
-    // no op
+  public void start() {
   }
 
   @Override
-  public void registerStateMachineHandler(
-      RequestType handlerType, Object handler) {
-    // no op
+  public void registerStateMachineHandler(final RequestType handlerType,
+      final Object handler) {
+    handlers.put(handlerType, handler);
   }
 
   @Override
-  public SCMRatisResponse submitRequest(SCMRatisRequest request)
-      throws IOException, ExecutionException, InterruptedException {
-    RaftGroupMemberId groupMemberId =
-        RaftGroupMemberId.valueOf(
-            RaftPeerId.valueOf("mock"), RaftGroupId.emptyGroupId());
-    // create a response with StateMachineException.
-    return SCMRatisResponse.decode(new RaftClientReply(
-        ClientId.randomId(), groupMemberId, 1L, false,
-        Message.EMPTY,
-        new StateMachineException(groupMemberId, new Throwable()),
-        1L, null));
+  public SCMRatisResponse submitRequest(final SCMRatisRequest request)
+      throws IOException {
+    final RaftGroupMemberId raftId = RaftGroupMemberId.valueOf(
+        RaftPeerId.valueOf("peer"), RaftGroupId.randomId());
+    RaftClientReply reply;
+    try {
+      final Message result = process(request);
+      return SCMRatisResponse.decode(new RaftClientReply(ClientId.randomId(),
+          raftId, 1L, true, result, null, 1L, null));
+    } catch (Exception ex) {
+      return SCMRatisResponse.decode(new RaftClientReply(ClientId.randomId(),
+          raftId, 1L, false, null,
+          new StateMachineException(raftId, ex), 1L, null));
+    }
   }
 
-  @Override
-  public void stop() throws IOException {
-    // no op
+  private Message process(final SCMRatisRequest request)
+      throws Exception {
+    try {
+      final Object handler = handlers.get(request.getType());
+
+      if (handler == null) {
+        throw new IOException("No handler found for request type " +
+            request.getType());
+      }
+
+      final List<Class<?>> argumentTypes = new ArrayList<>();
+      for(Object args : request.getArguments()) {
+        argumentTypes.add(args.getClass());
+      }
+      final Object result = handler.getClass().getMethod(
+          request.getOperation(), argumentTypes.toArray(new Class<?>[0]))
+          .invoke(handler, request.getArguments());
+
+      return SCMRatisResponse.encode(result);
+    } catch (NoSuchMethodException | SecurityException ex) {
+      throw new InvalidProtocolBufferException(ex.getMessage());
+    } catch (InvocationTargetException e) {
+      final Exception targetEx = (Exception) e.getTargetException();
+      throw targetEx != null ? targetEx : e;
+    }
   }
 
   @Override
   public RaftServer getServer() {
-    throw new UnsupportedOperationException();
+    return null;
   }
 
   @Override
   public RaftGroupId getRaftGroupId() {
-    throw new UnsupportedOperationException();
+    return null;
   }
 
   @Override
   public List<RaftPeer> getRaftPeers() {
-    throw new UnsupportedOperationException();
+    return new ArrayList<>();
+  }
+
+  @Override
+  public void stop() {
   }
 }

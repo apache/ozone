@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.hdds.scm.ha;
 
+import java.io.IOException;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.ratis.protocol.StateMachineException;
@@ -36,10 +37,11 @@ public class TestRelicationAnnotation {
         new MockRatisServer());
   }
 
-  @Test(expected = StateMachineException.class)
+  @Test(expected = IOException.class)
   public void testReplicateAnnotationBasic() throws Throwable {
     // test whether replicatedOperation will hit the Ratis based replication
-    // code path in SCMHAInvocationHandler.
+    // code path in SCMHAInvocationHandler. Expect to see a IOException cause
+    // no handler is added yet.
     scmhaInvocationHandler.invoke(new Object(),
         this.getClass().getMethod("replicatedOperation"), new Object[0]);
   }
