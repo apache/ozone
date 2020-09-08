@@ -47,6 +47,11 @@ public class SimpleConfiguration extends SimpleConfigurationParent {
       + "test TIME config type)", tags = ConfigTag.MANAGEMENT)
   private long waitTime;
 
+  @Config(key = "class", type = ConfigType.CLASS,
+      defaultValue = "java.lang.Object", description = "",
+      tags = ConfigTag.OZONE)
+  private Class<?> myClass = Object.class;
+
   @PostConstruct
   public void validate() {
     if (port < 0) {
@@ -92,5 +97,13 @@ public class SimpleConfiguration extends SimpleConfigurationParent {
 
   public long getWaitTime() {
     return waitTime;
+  }
+
+  public Class<? extends Object> getMyClass() {
+    return myClass;
+  }
+
+  public void setMyClass(Class<?> aClass) {
+    this.myClass = aClass;
   }
 }
