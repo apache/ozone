@@ -14,21 +14,52 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       Smoketest ozone cluster startup
-Library             OperatingSystem
+Documentation       Test ozone admin pipeline command
 Library             BuiltIn
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
 
 *** Variables ***
-
+${PIPELINE}
 
 *** Test Cases ***
-Run list pipeline
-    ${output} =         Execute          ozone admin pipeline list
-                        Should contain   ${output}   Type:
-                        Should contain   ${output}   Factor:ONE, State:
-
-Run create pipeline
+Create pipeline
     ${output} =         Execute          ozone admin pipeline create
                         Should contain   ${output}   is created. Factor: ONE, Type: STAND_ALONE
+    ${pipeline} =       Execute          echo "${output}" | grep 'is created' | cut -f1 -d' ' | cut -f2 -d'='
+                        Set Suite Variable    ${PIPELINE}    ${pipeline}
+
+List pipelines
+    ${output} =         Execute          ozone admin pipeline list
+                        Should contain   ${output}   Factor:ONE
+
+List pipelines with explicit host
+    ${output} =         Execute          ozone admin pipeline list --scm scm
+                        Should contain   ${output}   Factor:ONE
+
+Deactivate pipeline
+                        Execute          ozone admin pipeline deactivate "${PIPELINE}"
+    ${output} =         Execute          ozone admin pipeline list | grep "${PIPELINE}"
+                        Should contain   ${output}   DORMANT
+
+Activate pipeline
+                        Execute          ozone admin pipeline activate "${PIPELINE}"
+    ${output} =         Execute          ozone admin pipeline list | grep "${PIPELINE}"
+                        Should contain   ${output}   OPEN
+
+Close pipeline
+                        Execute          ozone admin pipeline close "${PIPELINE}"
+    ${output} =         Execute          ozone admin pipeline list | grep "${PIPELINE}"
+                        Should contain   ${output}   CLOSED
+
+Incomplete command
+    ${output} =         Execute And Ignore Error     ozone admin pipeline
+                        Should contain   ${output}   Incomplete command
+                        Should contain   ${output}   close
+                        Should contain   ${output}   create
+                        Should contain   ${output}   deactivate
+                        Should contain   ${output}   list
+
+List pipelines on unknown host
+    ${output} =         Execute And Ignore Error     ozone admin --verbose pipeline list --scm unknown-host
+                        Should contain   ${output}   Invalid host name

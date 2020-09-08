@@ -130,6 +130,8 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
       omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
 
       omVolumeArgs.setQuotaInBytes(setVolumePropertyRequest.getQuotaInBytes());
+      omVolumeArgs.setQuotaInCounts(
+          setVolumePropertyRequest.getQuotaInCounts());
       omVolumeArgs.setUpdateID(transactionLogIndex,
           ozoneManager.isRatisEnabled());
       omVolumeArgs.setModificationTime(

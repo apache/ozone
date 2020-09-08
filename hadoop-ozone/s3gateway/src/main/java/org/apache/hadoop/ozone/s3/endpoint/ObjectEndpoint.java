@@ -38,6 +38,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.StreamingOutput;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
@@ -271,7 +272,8 @@ public class ObjectEndpoint extends EndpointBase {
           try (S3WrapperInputStream s3WrapperInputStream =
               new S3WrapperInputStream(
                   key.getInputStream())) {
-            IOUtils.copyLarge(s3WrapperInputStream, dest, startOffset,
+            s3WrapperInputStream.seek(startOffset);
+            IOUtils.copyLarge(s3WrapperInputStream, dest, 0,
                 copyLength, new byte[bufferSize]);
           }
         };
@@ -549,9 +551,16 @@ public class ObjectEndpoint extends EndpointBase {
             if (range != null) {
               RangeHeader rangeHeader =
                   RangeHeaderParserUtil.parseRangeHeader(range, 0);
-              IOUtils.copyLarge(sourceObject, ozoneOutputStream,
-                  rangeHeader.getStartOffset(),
-                  rangeHeader.getEndOffset() - rangeHeader.getStartOffset());
+              final long skipped =
+                  sourceObject.skip(rangeHeader.getStartOffset());
+              if (skipped != rangeHeader.getStartOffset()) {
+                throw new EOFException(
+                    "Bytes to skip: "
+                        + rangeHeader.getStartOffset() + " actual: " + skipped);
+              }
+              IOUtils.copyLarge(sourceObject, ozoneOutputStream, 0,
+                  rangeHeader.getEndOffset() - rangeHeader.getStartOffset()
+                      + 1);
             } else {
               IOUtils.copy(sourceObject, ozoneOutputStream);
             }

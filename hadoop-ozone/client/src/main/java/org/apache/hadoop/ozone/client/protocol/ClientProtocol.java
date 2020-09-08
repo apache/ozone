@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.crypto.key.KeyProvider;
-import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -99,10 +98,11 @@ public interface ClientProtocol {
   /**
    * Set Volume Quota.
    * @param volumeName Name of the Volume
-   * @param quota Quota to be set for the Volume
+   * @param quotaInBytes The maximum size this volume can be used.
+   * @param quotaInCounts The maximum number of buckets in this volume.
    * @throws IOException
    */
-  void setVolumeQuota(String volumeName, OzoneQuota quota)
+  void setVolumeQuota(String volumeName, long quotaInBytes, long quotaInCounts)
       throws IOException;
 
   /**
@@ -312,7 +312,17 @@ public interface ClientProtocol {
    * @throws IOException
    */
   void renameKey(String volumeName, String bucketName, String fromKeyName,
-      String toKeyName) throws IOException;
+                 String toKeyName) throws IOException;
+
+  /**
+   * Renames existing keys within a bucket.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyMap The key is original key name nad value is new key name.
+   * @throws IOException
+   */
+  void renameKeys(String volumeName, String bucketName,
+                  Map<String, String> keyMap) throws IOException;
 
   /**
    * Returns list of Keys in {Volume/Bucket} that matches the keyPrefix,

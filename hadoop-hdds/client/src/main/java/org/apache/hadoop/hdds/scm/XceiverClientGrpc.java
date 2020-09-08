@@ -248,6 +248,36 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   }
 
   @Override
+  public Map<DatanodeDetails, ContainerCommandResponseProto>
+      sendCommandOnAllNodes(
+      ContainerCommandRequestProto request) throws IOException {
+    HashMap<DatanodeDetails, ContainerCommandResponseProto>
+            responseProtoHashMap = new HashMap<>();
+    List<DatanodeDetails> datanodeList = pipeline.getNodes();
+    HashMap<DatanodeDetails, CompletableFuture<ContainerCommandResponseProto>>
+            futureHashMap = new HashMap<>();
+    for (DatanodeDetails dn : datanodeList) {
+      try {
+        futureHashMap.put(dn, sendCommandAsync(request, dn).getResponse());
+      } catch (InterruptedException e) {
+        LOG.error("Command execution was interrupted.");
+      }
+    }
+    try{
+      for (Map.Entry<DatanodeDetails,
+              CompletableFuture<ContainerCommandResponseProto> >
+              entry : futureHashMap.entrySet()){
+        responseProtoHashMap.put(entry.getKey(), entry.getValue().get());
+      }
+    } catch (InterruptedException e) {
+      LOG.error("Command execution was interrupted.");
+    } catch (ExecutionException e) {
+      LOG.error("Failed to execute command " + request, e);
+    }
+    return responseProtoHashMap;
+  }
+
+  @Override
   public ContainerCommandResponseProto sendCommand(
       ContainerCommandRequestProto request, List<CheckedBiFunction> validators)
       throws IOException {

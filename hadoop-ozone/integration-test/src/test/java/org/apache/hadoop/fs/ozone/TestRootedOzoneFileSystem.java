@@ -143,9 +143,7 @@ public class TestRootedOzoneFileSystem {
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
-    // Note: FileSystem#loadFileSystems won't load OFS class due to META-INF
-    //  hence this workaround.
-    conf.set("fs.ofs.impl", "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
+    // fs.ofs.impl would be loaded from META-INF, no need to manually set it
     fs = FileSystem.get(conf);
     trash = new Trash(conf);
     ofs = (RootedOzoneFileSystem) fs;
@@ -163,10 +161,7 @@ public class TestRootedOzoneFileSystem {
   @Test
   public void testOzoneFsServiceLoader() throws IOException {
     OzoneConfiguration confTestLoader = new OzoneConfiguration();
-    // Note: FileSystem#loadFileSystems won't load OFS class due to META-INF
-    //  hence this workaround.
-    confTestLoader.set("fs.ofs.impl",
-        "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
+    // fs.ofs.impl should be loaded from META-INF, no need to explicitly set it
     Assert.assertEquals(FileSystem.getFileSystemClass(
         OzoneConsts.OZONE_OFS_URI_SCHEME, confTestLoader),
         RootedOzoneFileSystem.class);
@@ -810,11 +805,14 @@ public class TestRootedOzoneFileSystem {
         userRights, ACCESS);
     // Construct VolumeArgs
     VolumeArgs volumeArgs = new VolumeArgs.Builder()
-        .setAcls(Collections.singletonList(aclWorldAccess)).build();
+        .setAcls(Collections.singletonList(aclWorldAccess))
+        .setQuotaInCounts(1000)
+        .setQuotaInBytes("1MB").build();
     // Sanity check
     Assert.assertNull(volumeArgs.getOwner());
     Assert.assertNull(volumeArgs.getAdmin());
-    Assert.assertNull(volumeArgs.getQuota());
+    Assert.assertEquals("1MB", volumeArgs.getQuotaInBytes());
+    Assert.assertEquals(1000, volumeArgs.getQuotaInCounts());
     Assert.assertEquals(0, volumeArgs.getMetadata().size());
     Assert.assertEquals(1, volumeArgs.getAcls().size());
     // Create volume "tmp" with world access. allow non-admin to create buckets
