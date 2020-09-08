@@ -35,7 +35,7 @@ public class PrintConfKeyCommandHandler implements Callable<Void> {
   private String confKey;
 
   @ParentCommand
-  OzoneGetConf tool;
+  private OzoneGetConf tool;
 
   @Override
   public Void call() throws Exception {

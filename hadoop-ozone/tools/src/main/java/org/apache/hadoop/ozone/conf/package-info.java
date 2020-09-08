@@ -19,4 +19,3 @@
  * Classes related to Ozone get conf tool.
  */
 package org.apache.hadoop.ozone.conf;
-
