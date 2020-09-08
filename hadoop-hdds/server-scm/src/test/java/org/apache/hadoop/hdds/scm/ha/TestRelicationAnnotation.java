@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.ha;
 import java.io.IOException;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
-import org.apache.ratis.protocol.StateMachineException;
 import org.junit.Before;
 import org.junit.Test;
 

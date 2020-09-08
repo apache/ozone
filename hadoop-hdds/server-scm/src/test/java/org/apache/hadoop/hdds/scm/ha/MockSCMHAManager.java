@@ -18,25 +18,15 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
 
-import com.google.protobuf.InvalidProtocolBufferException;
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
-import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.NotLeaderException;
-import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
-import org.apache.ratis.protocol.StateMachineException;
-import org.apache.ratis.server.RaftServer;
 
 /**
  * Mock SCMHAManager implementation for testing.
