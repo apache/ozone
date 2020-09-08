@@ -19,9 +19,7 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -33,10 +31,8 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.file.OMDirectoryCreateResponse;
 import org.apache.hadoop.ozone.om.response.file.OMDirectoryCreateResponseV1;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -53,7 +49,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
         .Status;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,44 +66,16 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.*;
 
 /**
- * Handle create directory request.
+ * Handle create directory request. It will add path components to the directory
+ * table and maintains file system semantics.
  */
-public class OMDirectoryCreateRequestV1 extends OMKeyRequest {
+public class OMDirectoryCreateRequestV1 extends OMDirectoryCreateRequest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDirectoryCreateRequestV1.class);
 
-  /**
-   * Stores the result of request execution in
-   * OMClientRequest#validateAndUpdateCache.
-   */
-  public enum Result {
-    SUCCESS, // The request was executed successfully
-
-    DIRECTORY_ALREADY_EXISTS, // Directory key already exists in DB
-
-    FAILURE // The request failed and exception was thrown
-  }
-
   public OMDirectoryCreateRequestV1(OMRequest omRequest) {
     super(omRequest);
-  }
-
-  @Override
-  public OMRequest preExecute(OzoneManager ozoneManager) {
-    CreateDirectoryRequest createDirectoryRequest =
-        getOmRequest().getCreateDirectoryRequest();
-    Preconditions.checkNotNull(createDirectoryRequest);
-
-    KeyArgs.Builder newKeyArgs = createDirectoryRequest.getKeyArgs()
-        .toBuilder().setModificationTime(Time.now());
-
-    CreateDirectoryRequest.Builder newCreateDirectoryRequest =
-        createDirectoryRequest.toBuilder().setKeyArgs(newKeyArgs);
-
-    return getOmRequest().toBuilder().setCreateDirectoryRequest(
-        newCreateDirectoryRequest).setUserInfo(getUserInfo()).build();
-
   }
 
   @Override
@@ -192,7 +159,7 @@ public class OMDirectoryCreateRequestV1 extends OMKeyRequest {
         OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
                 Optional.of(dirInfo), Optional.of(missingParentInfos),
                 trxnLogIndex);
-        result = OMDirectoryCreateRequestV1.Result.SUCCESS;
+        result = OMDirectoryCreateRequest.Result.SUCCESS;
         omClientResponse = new OMDirectoryCreateResponseV1(omResponse.build(),
                 dirInfo, missingParentInfos, result);
       } else {
@@ -217,14 +184,13 @@ public class OMDirectoryCreateRequestV1 extends OMKeyRequest {
     auditLog(auditLogger, buildAuditMessage(OMAction.CREATE_DIRECTORY,
         auditMap, exception, userInfo));
 
-    logResult(createDirectoryRequest, keyArgs, omMetrics, result, trxnLogIndex,
-        exception);
+    logResult(createDirectoryRequest, keyArgs, omMetrics, result, exception);
 
     return omClientResponse;
   }
 
   private void logResult(CreateDirectoryRequest createDirectoryRequest,
-                         KeyArgs keyArgs, OMMetrics omMetrics, Result result, long trxnLogIndex,
+                         KeyArgs keyArgs, OMMetrics omMetrics, Result result,
                          IOException exception) {
 
     String volumeName = keyArgs.getVolumeName();
@@ -255,44 +221,6 @@ public class OMDirectoryCreateRequestV1 extends OMKeyRequest {
           createDirectoryRequest);
     }
   }
-
-  /**
-   * fill in a KeyInfo for a new directory entry in OM database.
-   * without initializing ACLs from the KeyArgs - used for intermediate
-   * directories which get created internally/recursively during file
-   * and directory create.
-   * @param keyName
-   * @param keyArgs
-   * @param objectId
-   * @param transactionIndex
-   * @return the OmKeyInfo structure
-   */
-  public static OmKeyInfo createDirectoryKeyInfoWithACL(
-      String keyName, KeyArgs keyArgs, long objectId,
-      List<OzoneAcl> inheritAcls, long transactionIndex) {
-    return dirKeyInfoBuilderNoACL(keyName, keyArgs, objectId)
-        .setAcls(inheritAcls).setUpdateID(transactionIndex).build();
-  }
-
-  private static OmKeyInfo.Builder dirKeyInfoBuilderNoACL(String keyName,
-      KeyArgs keyArgs, long objectId) {
-    String dirName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
-
-    return new OmKeyInfo.Builder()
-        .setVolumeName(keyArgs.getVolumeName())
-        .setBucketName(keyArgs.getBucketName())
-        .setKeyName(dirName)
-        .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-        .setCreationTime(keyArgs.getModificationTime())
-        .setModificationTime(keyArgs.getModificationTime())
-        .setDataSize(0)
-        .setReplicationType(HddsProtos.ReplicationType.RATIS)
-        .setReplicationFactor(HddsProtos.ReplicationFactor.ONE)
-        .setObjectID(objectId)
-        .setUpdateID(objectId);
-  }
-
 
   /**
    * Construct OmDirectoryInfo for every parent directory in missing list.

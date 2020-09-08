@@ -33,12 +33,14 @@ public class OmDirectoryInfoCodec implements Codec<OmDirectoryInfo> {
   @Override
   public byte[] toPersistedFormat(OmDirectoryInfo object) throws IOException {
     Preconditions
-            .checkNotNull(object, "Null object can't be converted to byte array.");
+            .checkNotNull(object, "Null object can't be converted " +
+                    "to byte array.");
     return object.getProtobuf().toByteArray();
   }
 
   @Override
-  public OmDirectoryInfo fromPersistedFormat(byte[] rawData) throws IOException {
+  public OmDirectoryInfo fromPersistedFormat(byte[] rawData)
+          throws IOException {
     Preconditions
             .checkNotNull(rawData,
                     "Null byte array can't converted to real object.");

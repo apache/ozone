@@ -21,8 +21,7 @@ package org.apache.hadoop.ozone.om.response.file;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
-import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestV1.Result;
+import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest.Result;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -34,7 +33,6 @@ import java.io.IOException;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 
 /**
  * Response for create directory request.
@@ -51,11 +49,11 @@ public class OMDirectoryCreateResponseV1 extends OMClientResponse {
 
   public OMDirectoryCreateResponseV1(@Nonnull OMResponse omResponse,
                                      @Nonnull OmDirectoryInfo dirInfo,
-                                     @Nonnull List<OmDirectoryInfo> parentDirInfos,
+                                     @Nonnull List<OmDirectoryInfo> pDirInfos,
                                      @Nonnull Result result) {
     super(omResponse);
     this.dirInfo = dirInfo;
-    this.parentDirInfos = parentDirInfos;
+    this.parentDirInfos = pDirInfos;
     this.result = result;
   }
 
@@ -99,7 +97,7 @@ public class OMDirectoryCreateResponseV1 extends OMClientResponse {
       // When directory already exists, we don't add it to cache. And it is
       // not an error, in this case dirKeyInfo will be null.
       LOG.debug("Response Status is OK, dirKeyInfo is null in " +
-              "OMDirectoryCreateResponse");
+              "OMDirectoryCreateResponseV1");
     }
   }
 }

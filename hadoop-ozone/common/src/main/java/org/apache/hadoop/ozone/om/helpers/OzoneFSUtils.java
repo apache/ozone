@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.util.StringUtils;
 
+import javax.annotation.Nonnull;
 import java.nio.file.Paths;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -122,8 +123,12 @@ public final class OzoneFSUtils {
    * example, the given key path '/a/b/c/d/e/file1' then it returns leaf node
    * name 'file1'.
    */
-  public static String getFileName(String keyName) {
+  public static String getFileName(@Nonnull String keyName) {
     java.nio.file.Path keyPath = Paths.get(keyName);
-    return keyPath.getFileName().toString();
+    if (keyPath != null) {
+      return keyPath.getFileName().toString();
+    }
+    // failed to converts a path key
+    return keyName;
   }
 }

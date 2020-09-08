@@ -301,7 +301,9 @@ public final class OMFileRequest {
       this.acls = aclList;
     }
 
-    public String getLeafNodeName() { return leafNodeName; }
+    public String getLeafNodeName() {
+      return leafNodeName;
+    }
 
     public long getLeafNodeObjectId() {
       return leafNodeObjectId;
@@ -315,8 +317,9 @@ public final class OMFileRequest {
       this.lastKnownParentId = lastKnownParentId;
     }
 
-    public long getLastKnownParentId() { return lastKnownParentId; }
-
+    public long getLastKnownParentId() {
+      return lastKnownParentId;
+    }
 
     public List getMissingParents() {
       return missingParents;

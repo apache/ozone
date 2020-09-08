@@ -23,6 +23,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 import java.util.*;
 
+/**
+ * This class represents the directory information by keeping each component
+ * in the user given path and a pointer to its parent directory element in the
+ * path. Also, it stores directory node related metdata details.
+ */
 public class OmDirectoryInfo extends WithObjectID {
   private long parentObjectID; // pointer to parent directory
 
@@ -44,21 +49,6 @@ public class OmDirectoryInfo extends WithObjectID {
     this.modificationTime = builder.modificationTime;
   }
 
-  // TODO: its work around and need to remove the dependency with OMKeyInfo
-  public static OmDirectoryInfo createDirectoryInfo(OmKeyInfo omKeyInfo,
-                                                    long parentObjectID) {
-    String dirName = OzoneFSUtils.getFileName(omKeyInfo.getKeyName());
-    return new Builder().setName(dirName)
-            .setParentObjectID(parentObjectID)
-            .setObjectID(omKeyInfo.getObjectID())
-            .setUpdateID(omKeyInfo.getUpdateID())
-            .setCreationTime(omKeyInfo.getCreationTime())
-            .setModificationTime(omKeyInfo.getModificationTime())
-            .setAcls(omKeyInfo.getAcls())
-            .setMetadata(omKeyInfo.getMetadata())
-            .build();
-  }
-
   /**
    * Returns new builder class that builds a OmPrefixInfo.
    *
@@ -68,6 +58,9 @@ public class OmDirectoryInfo extends WithObjectID {
     return new OmDirectoryInfo.Builder();
   }
 
+  /**
+   * Builder for Directory Info.
+   */
   public static class Builder {
     private long parentObjectID; // pointer to parent directory
 
@@ -88,38 +81,38 @@ public class OmDirectoryInfo extends WithObjectID {
       this.metadata = new HashMap<>();
     }
 
-    public Builder setParentObjectID(long parentObjectID) {
-      this.parentObjectID = parentObjectID;
+    public Builder setParentObjectID(long parentObjectId) {
+      this.parentObjectID = parentObjectId;
       return this;
     }
 
-    public Builder setObjectID(long objectID) {
-      this.objectID = objectID;
+    public Builder setObjectID(long objectId) {
+      this.objectID = objectId;
       return this;
     }
 
-    public Builder setUpdateID(long updateID) {
-      this.updateID = updateID;
+    public Builder setUpdateID(long updateId) {
+      this.updateID = updateId;
       return this;
     }
 
-    public Builder setName(String name) {
-      this.name = name;
+    public Builder setName(String dirName) {
+      this.name = dirName;
       return this;
     }
 
-    public Builder setCreationTime(long creationTime) {
-      this.creationTime = creationTime;
+    public Builder setCreationTime(long newCreationTime) {
+      this.creationTime = newCreationTime;
       return this;
     }
 
-    public Builder setModificationTime(long modificationTime) {
-      this.modificationTime = modificationTime;
+    public Builder setModificationTime(long newModificationTime) {
+      this.modificationTime = newModificationTime;
       return this;
     }
 
-    public Builder setAcls(List<OzoneAcl> acls) {
-      this.acls = acls;
+    public Builder setAcls(List<OzoneAcl> newAcls) {
+      this.acls = newAcls;
       return this;
     }
 
@@ -130,8 +123,8 @@ public class OmDirectoryInfo extends WithObjectID {
       return this;
     }
 
-    public Builder setMetadata(Map<String, String> metadata) {
-      this.metadata = metadata;
+    public Builder setMetadata(Map<String, String> newMetadata) {
+      this.metadata = newMetadata;
       return this;
     }
 
@@ -165,7 +158,9 @@ public class OmDirectoryInfo extends WithObjectID {
     return getParentObjectID() + OzoneConsts.OM_KEY_PREFIX + getName();
   }
 
-  public String getName() { return name; }
+  public String getName() {
+    return name;
+  }
 
   public long getCreationTime() {
     return creationTime;
@@ -175,7 +170,9 @@ public class OmDirectoryInfo extends WithObjectID {
     return modificationTime;
   }
 
-  public List<OzoneAcl> getAcls() { return acls; }
+  public List<OzoneAcl> getAcls() {
+    return acls;
+  }
 
   /**
    * Creates DirectoryInfo protobuf from OmDirectoryInfo.

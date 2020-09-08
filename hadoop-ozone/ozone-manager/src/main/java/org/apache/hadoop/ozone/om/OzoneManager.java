@@ -1142,7 +1142,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // TODO: Temporary workaround for OM upgrade path and will be replaced once
     //  upgrade HDDS-3698 story reaches consensus.
-    setOMLayoutVersion();
+    getOMLayoutVersion();
 
     metadataManager.start(configuration);
     startSecretManagerIfNecessary();
@@ -3575,12 +3575,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
   }
 
-  private void setOMLayoutVersion() {
+  private void getOMLayoutVersion() {
     String version = configuration.getTrimmed(OZONE_OM_LAYOUT_VERSION,
             OZONE_OM_LAYOUT_VERSION_DEFAULT);
     OzoneManagerRatisUtils.LAYOUT_VERSION_V1 =
-            StringUtils.equalsIgnoreCase(version,
-            OZONE_OM_LAYOUT_VERSION_DEFAULT);
+            StringUtils.equalsIgnoreCase(version, "V1");
   }
 
   /**
