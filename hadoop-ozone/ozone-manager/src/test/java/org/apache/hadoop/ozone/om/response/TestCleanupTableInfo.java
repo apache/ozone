@@ -58,7 +58,7 @@ public class TestCleanupTableInfo {
   public void checkAllWriteResponseHasCleanupTableAnnotation() {
     getResponseClasses().forEach(aClass -> {
       Assert.assertTrue(
-          aClass + "does not have annotation of" + " CleanupTableInfo",
+          aClass + "does not have annotation of CleanupTableInfo",
           aClass.isAnnotationPresent(CleanupTableInfo.class));
     });
   }
