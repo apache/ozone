@@ -46,17 +46,17 @@ public enum OMLayoutFeature implements LayoutFeature {
     omUpgradeAction = Optional.of(upgradeAction);
   }
 
-  //    @Override
+  @Override
   public int layoutVersion() {
     return layoutVersion;
   }
 
-  //    @Override
+  @Override
   public String description() {
     return description;
   }
 
-  //    @Override
+  @Override
   public Optional<OmUpgradeAction> onFinalizeAction() {
     return omUpgradeAction;
   }
