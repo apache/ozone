@@ -269,12 +269,13 @@ public class TestSchemaOneBackwardsCompatibility {
               countUnprefixedBlocks(refCountedDB));
 
       // Test table metadata.
+      // Because the KeyValueHandler used for the block deleting service is
+      // mocked, the bytes used will not be updated by a ChunkManager in the
+      // KeyValueHandler. Therefore, this value is not checked.
       Table<String, Long> metadataTable =
               refCountedDB.getStore().getMetadataTable();
       assertEquals(expectedRegularBlocks + expectedDeletingBlocks,
               (long)metadataTable.get(OzoneConsts.BLOCK_COUNT));
-      assertEquals(TestDB.BYTES_USED,
-              (long)metadataTable.get(OzoneConsts.CONTAINER_BYTES_USED));
     }
   }
 
