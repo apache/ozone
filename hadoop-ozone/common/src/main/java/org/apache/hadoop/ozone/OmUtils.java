@@ -237,6 +237,7 @@ public final class OmUtils {
     case GetAcl:
     case DBUpdates:
     case ListMultipartUploads:
+    case FinalizeUpgradeProgress:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -266,7 +267,6 @@ public final class OmUtils {
     case AddAcl:
     case PurgeKeys:
     case RecoverTrash:
-    case FinalizeUpgradeProgress:
     case FinalizeUpgrade:
       return false;
     default:
