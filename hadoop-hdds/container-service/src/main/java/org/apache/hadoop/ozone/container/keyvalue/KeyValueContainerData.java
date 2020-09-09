@@ -46,6 +46,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.CHUNKS_PATH;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE;
 import static org.apache.hadoop.ozone.OzoneConsts.METADATA_PATH;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_VERSION;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_BYTES_USED;
 import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COUNT;
 import static org.apache.hadoop.ozone.OzoneConsts.PENDING_DELETE_BLOCK_COUNT;
@@ -116,10 +117,15 @@ public class KeyValueContainerData extends ContainerData {
 
   /**
    * @param version The schema version indicating the table layout of the
-   * container's database.
+   * container's database. If this value is {@code null},
+   * {@link org.apache.hadoop.ozone.OzoneConsts#SCHEMA_V1} will be used.
    */
   public void setSchemaVersion(String version) {
     schemaVersion = version;
+
+    if (schemaVersion == null) {
+      schemaVersion = SCHEMA_V1;
+    }
   }
 
   /**
