@@ -19,7 +19,9 @@
 package org.apache.hadoop.fs.ozone;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.hadoop.fs.*;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -58,7 +60,7 @@ public class TestOzoneDirectory {
   public Timeout timeout = new Timeout(300000);
 
   private static final Logger LOG =
-          LoggerFactory.getLogger(TestOzoneFileSystem.class);
+          LoggerFactory.getLogger(TestOzoneDirectory.class);
 
   private MiniOzoneCluster cluster;
   private FileSystem fs;

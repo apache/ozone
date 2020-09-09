@@ -3578,8 +3578,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private void getOMLayoutVersion() {
     String version = configuration.getTrimmed(OZONE_OM_LAYOUT_VERSION,
             OZONE_OM_LAYOUT_VERSION_DEFAULT);
-    OzoneManagerRatisUtils.LAYOUT_VERSION_V1 =
+    boolean omLayoutVersionV1 =
             StringUtils.equalsIgnoreCase(version, "V1");
+    OzoneManagerRatisUtils.setOmLayoutVersionV1(omLayoutVersionV1);
   }
 
   /**

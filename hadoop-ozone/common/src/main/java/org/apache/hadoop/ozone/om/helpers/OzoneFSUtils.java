@@ -124,9 +124,9 @@ public final class OzoneFSUtils {
    * name 'file1'.
    */
   public static String getFileName(@Nonnull String keyName) {
-    java.nio.file.Path keyPath = Paths.get(keyName);
-    if (keyPath != null) {
-      return keyPath.getFileName().toString();
+    java.nio.file.Path fileName = Paths.get(keyName).getFileName();
+    if (fileName != null) {
+      return fileName.toString();
     }
     // failed to converts a path key
     return keyName;
