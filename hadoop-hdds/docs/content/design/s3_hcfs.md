@@ -1,7 +1,7 @@
 ---
 title: S3/Ozone Filesystem inter-op 
 summary: How to support both S3 and HCFS and the same time
-date: 2019-06-09
+date: 2020-09-09
 jira: HDDS-4097
 status: draft
 author: Marton Elek, 
