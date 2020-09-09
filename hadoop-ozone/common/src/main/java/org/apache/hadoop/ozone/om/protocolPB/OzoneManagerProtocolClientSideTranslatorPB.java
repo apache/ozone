@@ -78,6 +78,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteVolumeRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetDelegationTokenResponseProto;
@@ -135,6 +139,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -1071,6 +1076,45 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .map(ServiceInfo::getFromProtobuf)
             .collect(Collectors.toList()),
         resp.getCaCertificate());
+  }
+
+  @Override
+  public UpgradeFinalizationStatus finalizeUpgrade(
+      String upgradeClientID
+  ) throws IOException {
+    FinalizeUpgradeRequest req = FinalizeUpgradeRequest.newBuilder()
+        .setUpgradeClientId(upgradeClientID)
+        .build();
+
+    OMRequest omRequest = createOMRequest(Type.FinalizeUpgrade)
+        .setFinalizeUpgradeRequest(req)
+        .build();
+
+    FinalizeUpgradeResponse response =
+        handleError(submitRequest(omRequest)).getFinalizeUpgradeResponse();
+
+    return response.getStatus();
+  }
+
+  @Override
+  public UpgradeFinalizationStatus queryUpgradeFinalizationProgress(
+      String upgradeClientID, boolean takeover
+  ) throws IOException {
+    FinalizeUpgradeProgressRequest req = FinalizeUpgradeProgressRequest
+        .newBuilder()
+        .setUpgradeClientId(upgradeClientID)
+        .setTakeover(takeover)
+        .build();
+
+    OMRequest omRequest = createOMRequest(Type.FinalizeUpgradeProgress)
+        .setFinalizeUpgradeProgressRequest(req)
+        .build();
+
+    FinalizeUpgradeProgressResponse response =
+        handleError(submitRequest(omRequest))
+            .getFinalizeUpgradeProgressResponse();
+
+    return response.getStatus();
   }
 
   /**

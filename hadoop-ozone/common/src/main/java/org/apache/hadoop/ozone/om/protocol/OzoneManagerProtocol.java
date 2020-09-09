@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSelector;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.KerberosInfo;
@@ -311,6 +312,69 @@ public interface OzoneManagerProtocol
   List<ServiceInfo> getServiceList() throws IOException;
 
   ServiceInfoEx getServiceInfo() throws IOException;
+
+  /**
+   * Initiate metadata upgrade finalization.
+   * This method when called, initiates finalization of Ozone Manager metadata
+   * during an upgrade. The status returned contains the status
+   * - ALREADY_FINALIZED with empty message list when the software layout
+   *    version and the metadata layout version are equal
+   * - STARTING_FINALIZATION with empty message list when the finalization
+   *    has been started successfully
+   * - If a finalization is already in progress, then the method throws an
+   *    {@link OMException} with a result code INVALID_REQUEST
+   *
+   *
+   * The leader Ozone Manager initiates finalization of the followers via
+   * the Raft protocol in other Ozone Managers, and reports progress to the
+   * client via the {@link #queryUpgradeFinalizationProgress(String, boolean)}
+   * call.
+   *
+   * The follower Ozone Managers reject this request and directs the client to
+   * the leader.
+   *
+   * @param upgradeClientID String identifier of the upgrade finalizer client
+   * @return the finalization status.
+   * @throws IOException
+   *            when finalization is failed, or this Ozone Manager is not the
+   *                leader.
+   * @throws OMException
+   *            when finalization is already in progress.
+   */
+  UpgradeFinalizationStatus finalizeUpgrade(
+      String upgradeClientID
+  ) throws IOException;
+
+  /**
+   * Queries the current status of finalization.
+   * This method when called, returns the status messages from the finalization
+   * progress, if any. The status returned is
+   * - FINALIZATION_IN_PROGRESS, and the messages since the last query if the
+   *    finalization is still running
+   * - FINALIZATION_DONE with a message list containing the messages since
+   *    the last query, if the finalization ended but the messages were not
+   *    yet emitted to the client.
+   * - ALREADY_FINALIZED with an empty message list otherwise
+   * - If finalization is not in progress, but software layout version and
+   *    metadata layout version are different, the method will throw an
+   *    {@link OMException} with a result code INVALID_REQUEST
+   * - If during finalization an other client with different ID than the one
+   *    initiated finalization is calling the method, then an
+   *    {@link OMException} with a result code INVALID_REQUEST is thrown,
+   *    unless the request is forced by a new client, in which case the new
+   *    client takes over the old client and the old client should exit.
+   *
+   * @param upgradeClientID String identifier of the upgrade finalizer client
+   * @param force set force takeover of output monitoring
+   * @return the finalization status and status messages.
+   * @throws IOException
+   *            if there was a problem during the query
+   * @throws OMException
+   *            if finalization is needed but not yet started
+   */
+  UpgradeFinalizationStatus queryUpgradeFinalizationProgress(
+      String upgradeClientID, boolean takeover
+  ) throws IOException;
 
   /*
    * S3 Specific functionality that is supported by Ozone Manager.

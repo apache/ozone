@@ -71,6 +71,8 @@ enum Type {
 
   ServiceList = 51;
   DBUpdates = 53;
+  FinalizeUpgrade = 54;
+  FinalizeUpgradeProgress = 55;
 
   GetDelegationToken = 61;
   RenewDelegationToken = 62;
@@ -138,6 +140,8 @@ message OMRequest {
 
   optional ServiceListRequest               serviceListRequest             = 51;
   optional DBUpdatesRequest                  dbUpdatesRequest              = 53;
+  optional FinalizeUpgradeRequest           finalizeUpgradeRequest         = 54;
+  optional FinalizeUpgradeProgressRequest   finalizeUpgradeProgressRequest = 55;
 
   optional hadoop.common.GetDelegationTokenRequestProto getDelegationTokenRequest = 61;
   optional hadoop.common.RenewDelegationTokenRequestProto renewDelegationTokenRequest= 62;
@@ -211,6 +215,8 @@ message OMResponse {
 
   optional ServiceListResponse               ServiceListResponse           = 51;
   optional DBUpdatesResponse                 dbUpdatesResponse             = 52;
+  optional FinalizeUpgradeResponse           finalizeUpgradeResponse       = 54;
+  optional FinalizeUpgradeProgressResponse finalizeUpgradeProgressResponse = 55;
 
   optional GetDelegationTokenResponseProto getDelegationTokenResponse = 61;
   optional RenewDelegationTokenResponseProto renewDelegationTokenResponse = 62;
@@ -1012,6 +1018,36 @@ message ServiceListResponse {
 message DBUpdatesResponse {
     required uint64 sequenceNumber = 1;
     repeated bytes data = 2;
+}
+
+
+message UpgradeFinalizationStatus {
+  enum Status {
+    ALREADY_FINALIZED = 1;
+    STARTING_FINALIZATION = 2;
+    FINALIZATION_IN_PROGRESS = 3;
+    FINALIZATION_DONE = 4;
+    FINALIZATION_REQUIRED = 5;
+  }
+  required Status status = 1;
+  repeated string messages = 2;
+}
+
+message FinalizeUpgradeRequest {
+  required string upgradeClientId = 1;
+}
+
+message FinalizeUpgradeResponse {
+    required UpgradeFinalizationStatus status = 1;
+}
+
+message FinalizeUpgradeProgressRequest {
+    required string upgradeClientId = 1;
+    optional bool takeover = 2;
+}
+
+message FinalizeUpgradeProgressResponse {
+    required UpgradeFinalizationStatus status = 1;
 }
 
 message ServicePort {
