@@ -44,6 +44,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
+import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.junit.Assert.assertThat;
 
 /**
  * Tests OzoneManager MetadataManager.
@@ -612,4 +614,12 @@ public class TestOmMetadataManager {
     }
   }
 
+  @Test
+  public void testAllTablesAreProperInOMMetadataManagerImpl() {
+    String[] tablesByDefinition = OmMetadataManagerImpl.ALL_TABLES;
+
+    Set<String> tablesInManager = omMetadataManager.listTableNames();
+
+    assertThat(tablesInManager, containsInAnyOrder(tablesByDefinition));
+  }
 }

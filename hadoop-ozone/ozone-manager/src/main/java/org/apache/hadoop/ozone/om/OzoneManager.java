@@ -41,6 +41,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Random;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -149,6 +150,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleI
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserVolumeInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
@@ -2598,6 +2600,73 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public ServiceInfoEx getServiceInfo() throws IOException {
     return new ServiceInfoEx(getServiceList(), caCertPem);
+  }
+
+  private final List<String> finalizationMsgs = new ArrayList<>();
+  private UpgradeFinalizationStatus.Status finalizationStatus =
+      UpgradeFinalizationStatus.Status.FINALIZATION_REQUIRED;
+
+  @Override
+  public UpgradeFinalizationStatus finalizeUpgrade(String upgradeClientID)
+      throws IOException {
+    if (!finalizationStatus
+        .equals(UpgradeFinalizationStatus.Status.FINALIZATION_REQUIRED)){
+      throw new OMException("Finalization is not needed.", INVALID_REQUEST);
+    }
+    finalizationStatus = UpgradeFinalizationStatus.Status.STARTING_FINALIZATION;
+    UpgradeFinalizationStatus status = UpgradeFinalizationStatus.newBuilder()
+        .setStatus(finalizationStatus)
+        .build();
+    LOG.info("FinalizeUpgrade initiated by client: {}.", upgradeClientID);
+    if (isLeader()) {
+      finalizationMsgs.add("Finalization started.");
+      finalizationStatus =
+          UpgradeFinalizationStatus.Status.FINALIZATION_IN_PROGRESS;
+
+      new Thread(() -> {
+        LOG.info("Finalization thread started.");
+        int i = 0;
+        Random random = new Random(0xafaf);
+        while (i < 50) {
+          int rand = random.nextInt(Math.min(10, 50 - i)) + 1;
+          synchronized (finalizationMsgs) {
+            LOG.info("Emitting {} messages", rand);
+            for (int j = 0; j < rand; j++) {
+              LOG.info("Upgrade MSG: {} - added.", "Message " + i + ".");
+              finalizationMsgs.add("Message " + i + ".");
+              i++;
+            }
+          }
+          try {
+            int sleep = random.nextInt(1200);
+            LOG.info("Sleeping {}ms before emit messages again.", sleep);
+            Thread.sleep(sleep);
+          } catch (InterruptedException e) {
+            LOG.info("Finalization thread interrupted.", e);
+            return;
+          }
+        }
+        LOG.info("Finalization done.");
+        finalizationStatus = UpgradeFinalizationStatus.Status.FINALIZATION_DONE;
+      }, "Finalization-Thread").start();
+    }
+    return status;
+  }
+
+  @Override
+  public UpgradeFinalizationStatus queryUpgradeFinalizationProgress(
+      String upgradeClientID, boolean takeover
+  ) throws IOException {
+    UpgradeFinalizationStatus.Builder builder =
+        UpgradeFinalizationStatus.newBuilder();
+    builder.setStatus(finalizationStatus);
+    List<String> msgs = new ArrayList<>();
+    synchronized (finalizationMsgs) {
+      msgs.addAll(finalizationMsgs);
+      finalizationMsgs.clear();
+    }
+    builder.addAllMessages(msgs);
+    return builder.build();
   }
 
   @Override
