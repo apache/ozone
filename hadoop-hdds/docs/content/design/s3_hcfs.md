@@ -153,7 +153,7 @@ Creating intermediate directories might not be possible if path contains illegal
 
 Creating intermediate directories can have some overhead (write amplification is increased if many keys are written with different prefixes as we need an entry for each prefixes). This write-amplification can be handled with the current implementation: based on the measurements RocksDB has no problems with billions of keys.
 
-If none of the mentioned configurations are enabled, the intermediate directories won't be created. But in this case, the consitent view of `ofs/o3fs` couldn't be guaranteed, so `ofs/o3fs` **should be disabled and throw an exception** (But Ozone can be used as a pure S3 replacement without using as a HCFS).
+If none of the mentioned configurations are enabled, the intermediate directories won't be created. But in this case, the consistent view of `ofs/o3fs` couldn't be guaranteed, so `ofs/o3fs` **should be disabled and throw an exception** (But Ozone can be used as a pure S3 replacement without using as a HCFS).
 
 # Problematic cases
 
@@ -254,7 +254,7 @@ Second command execution should modify the flag of `/e/f/` key to (explicit=true
 
 ## Create parent dir AND key with S3a
 
-This is the problem which is reporeted by [HDDS-4209](https://issues.apache.org/jira/browse/HDDS-4209)
+This is the problem which is reported by [HDDS-4209](https://issues.apache.org/jira/browse/HDDS-4209)
 
 ```
 hdfs dfs -mkdir -p s3a://b12345/d11/d12 # -> Success
@@ -264,7 +264,7 @@ hdfs dfs -put /tmp/file1 s3a://b12345/d11/d12/file1 # -> fails with below error
 
 Proposed behavior:
 
- * `ozone.om.enable.intermediate.dirs=true`: shold work without error
+ * `ozone.om.enable.intermediate.dirs=true`: should work without error
  * `ozone.om.enable.filesystem.paths=true`: should work without error.
 
 This is an `ofs`/`o3fs` question not an S3. The directory created in the first step shouldn't block the creation of the file. This can be a **mandatory** normalization for `mkdir` directory creation. As it's an HCFS operation, s3 is not affected. Entries created from S3 can be visible from s3 without any problem.
