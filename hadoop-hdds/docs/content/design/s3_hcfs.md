@@ -212,7 +212,7 @@ Behavior:
  
 Proposed behavior:
 
- * `permissive`: show both the file and the directory with the same name (similar to S3A)
+ * `ozone.om.enable.intermediate.dirs=true`: show both the file and the directory with the same name (similar to S3A)
  * `ozone.om.enable.filesystem.paths=true`: throwing exception when the second one is created  
 
 ## Directory entry created with file content
@@ -230,8 +230,8 @@ Behavior:
  
 Proposed behavior:
 
- * `permissive`: possible but `i/` is hidden from o3fs/ofs
- * `normalize`: key name is normalized to real key name
+ * `ozone.om.enable.intermediate.dirs=true`: possible but `i/` is hidden from o3fs/ofs
+ * `ozone.om.enable.filesystem.paths=true`: key name is normalized to real key name
 
 ## Create key and explicit create parent dir
 
