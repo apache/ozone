@@ -22,13 +22,17 @@ import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.reflections.Reflections;
 
 import java.io.File;
+import java.util.Arrays;
 import java.util.Set;
+
+import static org.junit.Assert.assertTrue;
 
 /**
  * This tests check whether {@link OMClientResponse} have defined
@@ -39,31 +43,53 @@ public class TestCleanupTableInfo {
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
 
-  @Test
-  public void checkAnnotationAndTableName() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
+  private OzoneConfiguration conf = new OzoneConfiguration();
+
+  @Before
+  public void setupMetaManager() throws Exception {
     File newFolder = folder.newFolder();
     if (!newFolder.exists()) {
       Assert.assertTrue(newFolder.mkdirs());
     }
     ServerUtils.setOzoneMetaDirPath(conf, newFolder.toString());
-    OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(conf);
+  }
 
-    Set<String> tables = omMetadataManager.listTableNames();
-    Reflections reflections = new Reflections(
-        "org.apache.hadoop.ozone.om.response");
-    Set<Class<? extends OMClientResponse>> subTypes =
-        reflections.getSubTypesOf(OMClientResponse.class);
-    subTypes.forEach(aClass -> {
-      Assert.assertTrue(aClass + "does not have annotation of" +
-              " CleanupTableInfo",
+  @Test
+  public void checkAllWriteResponseHasCleanupTableAnnotation() {
+    getResponseClasses().forEach(aClass -> {
+      Assert.assertTrue(
+          aClass + "does not have annotation of CleanupTableInfo",
           aClass.isAnnotationPresent(CleanupTableInfo.class));
-      String[] cleanupTables =
-          aClass.getAnnotation(CleanupTableInfo.class).cleanupTables();
-      Assert.assertTrue(cleanupTables.length >=1);
-      for (String tableName : cleanupTables) {
-        Assert.assertTrue(tables.contains(tableName));
-      }
     });
+  }
+
+  @Test
+  public void checkWriteResponseIsAnnotatedWithKnownTableNames()
+      throws Exception {
+    OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(conf);
+    Set<String> tables = omMetadataManager.listTableNames();
+
+    getResponseClasses().forEach(aClass -> {
+
+      CleanupTableInfo annotation =
+          aClass.getAnnotation(CleanupTableInfo.class);
+      String[] cleanupTables = annotation.cleanupTables();
+      boolean cleanupAll = annotation.cleanupAll();
+
+      if (cleanupTables.length >= 1) {
+        assertTrue(
+            Arrays.stream(cleanupTables).allMatch(tables::contains)
+        );
+      } else {
+        assertTrue(cleanupAll);
+      }
+
+    });
+  }
+
+  private Set<Class<? extends OMClientResponse>> getResponseClasses() {
+    Reflections reflections =
+        new Reflections("org.apache.hadoop.ozone.om.response");
+    return reflections.getSubTypesOf(OMClientResponse.class);
   }
 }

@@ -266,6 +266,8 @@ public final class OmUtils {
     case AddAcl:
     case PurgeKeys:
     case RecoverTrash:
+    case FinalizeUpgradeProgress:
+    case FinalizeUpgrade:
       return false;
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);
