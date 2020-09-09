@@ -28,7 +28,7 @@ import java.util.List;
 
 /**
  * Wrapper class to represent a table in a datanode RocksDB instance.
- * This class can wrap any {@link Table} instance, but will throw
+ * This class can wrap any existing {@link Table} instance, but will throw
  * {@link UnsupportedOperationException} for {@link Table#iterator}.
  * This is because differing schema versions used in datanode DB layouts may
  * have differing underlying table structures, so iterating a table instance

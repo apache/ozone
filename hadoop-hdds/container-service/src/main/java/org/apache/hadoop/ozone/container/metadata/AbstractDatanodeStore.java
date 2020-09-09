@@ -96,10 +96,17 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
               .setDBOption(options)
               .build();
 
+      // Use the DatanodeTable wrapper to disable the table iterator on
+      // existing Table implementations retrieved from the DBDefinition.
+      // See the DatanodeTable's Javadoc for an explanation of why this is
+      // necessary.
       metadataTable = new DatanodeTable<>(
               dbDef.getMetadataColumnFamily().getTable(this.store));
       checkTableStatus(metadataTable, metadataTable.getName());
 
+      // The block iterator this class returns will need to use the table
+      // iterator internally, so construct a block data table instance
+      // that does not have the iterator disabled by DatanodeTable.
       blockDataTableWithIterator =
               dbDef.getBlockDataColumnFamily().getTable(this.store);
 
