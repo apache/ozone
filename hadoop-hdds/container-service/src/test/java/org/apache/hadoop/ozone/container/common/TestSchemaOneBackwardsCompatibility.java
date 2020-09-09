@@ -348,17 +348,24 @@ public class TestSchemaOneBackwardsCompatibility {
   }
 
   /**
-   * @return A {@link KeyValueContainerData} object that has only its
-   * metadata path, db file, and checksum set to match the database under test.
+   * @return A {@link KeyValueContainerData} object that is read from
+   * {@link TestSchemaOneBackwardsCompatibility#containerFile} constructed to
+   * point to the instance of {@link TestDB} being used.
    * @throws IOException
    */
   private KeyValueContainerData newKvData() throws IOException {
     KeyValueContainerData kvData =
         (KeyValueContainerData) ContainerDataYaml.readContainerFile(containerFile);
 
+    // Because the test DB is set up in a temp folder, we cannot know any
+    // absolute paths to container components until run time.
+    // For this reason, any path fields are omitted from the container file,
+    // and added here.
     kvData.setMetadataPath(metadataDir.getAbsolutePath());
     kvData.setChunksPath(metadataDir.getAbsolutePath());
 
+    // Changing the paths above affects the checksum, so it was also removed
+    // from the container file and calculated at run time.
     Yaml yaml = ContainerDataYaml.getYamlForContainerType(
             kvData.getContainerType());
     kvData.computeAndSetChecksum(yaml);
@@ -426,8 +433,9 @@ public class TestSchemaOneBackwardsCompatibility {
     // Non configurable properties of database.
     public static final long CONTAINER_ID = 123;
     public static final String CONTAINER_FILE_NAME =
-            CONTAINER_ID + ".container";
-    public static final String DB_NAME = CONTAINER_ID + "-dn-container.db";
+        CONTAINER_ID + OzoneConsts.CONTAINER_EXTENSION;
+    public static final String DB_NAME =
+        CONTAINER_ID + OzoneConsts.DN_CONTAINER_DB;
 
     public static final String SCHEMA_VERSION = OzoneConsts.SCHEMA_V1;
     public static final long KEY_COUNT = 4;
