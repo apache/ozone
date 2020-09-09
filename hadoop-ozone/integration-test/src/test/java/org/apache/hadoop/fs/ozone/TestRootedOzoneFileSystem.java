@@ -623,6 +623,11 @@ public class TestRootedOzoneFileSystem {
    */
   @Test
   public void testListStatusRootAndVolumeNonRecursive() throws Exception {
+    // Get owner and group of the user running this test
+    final UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    final String ownerShort = ugi.getShortUserName();
+    final String group = ugi.getPrimaryGroupName();
+
     Path bucketPath1 = createRandomVolumeBucketWithDirs();
     Path bucketPath2 = createRandomVolumeBucketWithDirs();
     // listStatus("/volume/bucket")
@@ -633,11 +638,17 @@ public class TestRootedOzoneFileSystem {
         OZONE_URI_DELIMITER + new OFSPath(bucketPath1).getVolumeName());
     FileStatus[] fileStatusVolume = ofs.listStatus(volume);
     Assert.assertEquals(1, fileStatusVolume.length);
+    Assert.assertEquals(ownerShort, fileStatusVolume[0].getOwner());
+    Assert.assertEquals(group, fileStatusVolume[0].getGroup());
     // listStatus("/")
     Path root = new Path(OZONE_URI_DELIMITER);
     FileStatus[] fileStatusRoot = ofs.listStatus(root);
     // Default volume "s3v" is created by OM during start up.
     Assert.assertEquals(2 + 1, fileStatusRoot.length);
+    for (FileStatus fileStatus : fileStatusRoot) {
+      Assert.assertEquals(ownerShort, fileStatus.getOwner());
+      Assert.assertEquals(group, fileStatus.getGroup());
+    }
     // Cleanup
     teardownVolumeBucketWithDir(bucketPath2);
     teardownVolumeBucketWithDir(bucketPath1);
