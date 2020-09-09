@@ -159,14 +159,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
-      // Check by the time we commit this file, is there any directory
-      // created if then fail it. This is being done for correctness.
-
-      // For now we are taking this approach similar to local file creation.
-      // TODO: In future this can be revisited to come up with an advanced
-      // approach.
-
-
+      // Check for directory exists with same name, if it exists throw error. 
       if (ozoneManager.getEnableFileSystemPaths()) {
         if (checkDirectoryAlreadyExists(volumeName, bucketName, keyName,
             omMetadataManager)) {
