@@ -18,7 +18,9 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.junit.Assert;
 import org.junit.Test;
@@ -51,6 +53,25 @@ public class TestOmPrefixInfo {
         IAccessAuthorizer.ACLType.READ, ACCESS));
 
     Assert.assertNotEquals(omPrefixInfo, clonePrefixInfo);
+
+  }
+
+  @Test
+  public void testgetFromProtobufOneMetadataOneAcl(){
+    String prefixInfoName = "MyPrefixInfoName";
+    String aclString = "user:myuser:rw";
+    String metakey = "metakey";
+    String metaval = "metaval";
+    HddsProtos.KeyValue metadata = TestInstanceHelper.getDefaultTestMetadata(metakey,metaval);
+    OzoneManagerProtocolProtos.PrefixInfo prefixInfo = TestInstanceHelper.getDefaultTestPrefixInfo(prefixInfoName, aclString,metadata);
+
+    OmPrefixInfo ompri = OmPrefixInfo.getFromProtobuf(prefixInfo);
+
+    Assert.assertEquals(prefixInfoName, ompri.getName() );
+    Assert.assertEquals(1, ompri.getMetadata().size());
+    Assert.assertEquals(metaval, ompri.getMetadata().get(metakey));
+    Assert.assertEquals(1, ompri.getAcls().size());
+
 
   }
 }
