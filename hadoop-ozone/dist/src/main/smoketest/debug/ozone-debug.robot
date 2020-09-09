@@ -23,7 +23,7 @@ Suite Setup         Write key
 
 *** Keywords ***
 Write key
-    Execute             ozone sh volume create o3://om/vol1 --spaceQuota 100TB --bucketQuota 100
+    Execute             ozone sh volume create o3://om/vol1 --space-quota 100TB --bucket-quota 100
     Execute             ozone sh bucket create o3://om/vol1/bucket1
     Execute             ozone sh key put o3://om/vol1/bucket1/debugKey /opt/hadoop/NOTICE.txt
 

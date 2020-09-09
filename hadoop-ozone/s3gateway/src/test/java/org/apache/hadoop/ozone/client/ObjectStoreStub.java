@@ -55,7 +55,7 @@ public class ObjectStoreStub extends ObjectStore {
         VolumeArgs.newBuilder()
             .setAdmin("root")
             .setOwner("root")
-            .setQuotaInBytes("" + Integer.MAX_VALUE)
+            .setQuotaInBytes(Integer.MAX_VALUE)
             .setAcls(new ArrayList<>()).build());
   }
 
@@ -65,7 +65,7 @@ public class ObjectStoreStub extends ObjectStore {
         new OzoneVolumeStub(volumeName,
             volumeArgs.getAdmin(),
             volumeArgs.getOwner(),
-            Long.parseLong(volumeArgs.getQuotaInBytes()),
+            volumeArgs.getQuotaInBytes(),
             volumeArgs.getQuotaInCounts(),
             Time.now(),
             volumeArgs.getAcls());

@@ -18,25 +18,31 @@
 
 package org.apache.hadoop.ozone.shell.volume;
 
+import org.apache.hadoop.hdds.client.OzoneQuota;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
-
+import org.apache.hadoop.ozone.shell.SetSpaceQuotaOptions;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 import java.io.IOException;
 
 /**
- * Executes update volume calls.
+ * Executes set volume quota calls.
  */
-@Command(name = "update",
-    description = "Updates parameter of the volumes")
-public class UpdateVolumeHandler extends VolumeHandler {
+@Command(name = "setquota",
+    description = "Set quota of the volumes")
+public class SetQuotaHandler extends VolumeHandler {
 
-  @Option(names = {"--user"},
-      description = "Owner of the volume to set")
-  private String ownerName;
+  @CommandLine.Mixin
+  private SetSpaceQuotaOptions quotaOptions;
+
+  @Option(names = {"--bucket-quota"},
+      description = "Bucket counts of the volume to create (eg. 5)")
+  private long quotaInCounts = OzoneConsts.QUOTA_RESET;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
@@ -44,16 +50,18 @@ public class UpdateVolumeHandler extends VolumeHandler {
     String volumeName = address.getVolumeName();
     OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
 
-    if (ownerName != null && !ownerName.isEmpty()) {
-      boolean result = volume.setOwner(ownerName);
-      if (LOG.isDebugEnabled() && !result) {
-        out().format("Volume '%s' owner is already '%s'. Unchanged.%n",
-            volumeName, ownerName);
-      }
+    long spaceQuota = volume.getQuotaInBytes();
+    long countQuota = volume.getQuotaInCounts();
+
+    if (quotaOptions.getQuotaInBytes() != null
+        && !quotaOptions.getQuotaInBytes().isEmpty()) {
+      spaceQuota = OzoneQuota.parseQuota(quotaOptions.getQuotaInBytes(),
+          quotaInCounts).getQuotaInBytes();
+    }
+    if (quotaInCounts >= 0) {
+      countQuota = quotaInCounts;
     }
 
-    // For printing newer modificationTime.
-    OzoneVolume updatedVolume = client.getObjectStore().getVolume(volumeName);
-    printObjectAsJson(updatedVolume);
+    volume.setQuota(OzoneQuota.getOzoneQuota(spaceQuota, countQuota));
   }
 }
