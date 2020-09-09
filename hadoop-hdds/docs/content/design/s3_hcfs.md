@@ -20,7 +20,6 @@ author: Marton Elek,
   limitations under the License. See accompanying LICENSE file.
 -->
 
-
 # Ozone S3 vs file-system semantics
 
 Ozone is an object-store for Hadoop ecosystem which can be used from multiple interfaces: 
@@ -40,14 +39,14 @@ There are multiple challenges when file system hierarchy is simulated by a flat 
 
 See also the [Hadoop S3A documentation](https://hadoop.apache.org/docs/current/hadoop-aws/tools/hadoop-aws/index.html#Introducing_the_Hadoop_S3A_client) which describes some of these problem when AWS S3 is used. (*Warnings* section)
 
-## Current status
+# Current status
 
 As of today *Ozone Manager* has two different interfaces (both are defined in `OmClientProtocol.proto`): 
 
  1. object store related functions (like *CreateKey*, *LookupKey*, *DeleteKey*,...)  
  2. file system related functions (like *CreateFile*, *LookupFile*,...)
 
-File system related functions uses the same flat hierarchy under the hood but includes additional functionality. For example the `createFile` call creates all the intermediate directories for a specific key (create file `/a/b/c` will create `/a/b` and `/a` entries in the key space)
+File system related functions uses the same flat hierarchy under the hood but includes additional functionalities. For example the `createFile` call creates all the intermediate directories for a specific key (create file `/a/b/c` will create `/a/b` and `/a` entries in the key space)
 
 Today, if a key is created from the S3 interface can cause exceptions if the intermediate directories are checked from HCFS:
 
@@ -67,45 +66,100 @@ To solve the performance problems of the directory listing / rename, [HDDS-2939]
 
 [HDDS-4097](https://issues.apache.org/jira/browse/HDDS-4097) is created to normalize the key names based on file-system semantics if `ozone.om.enable.filesystem.paths` is enabled. But please note that `ozone.om.enable.filesystem.paths` should always be turned on if S3 and HCFS are both used which means that S3 and HCFS couldn't be used together with normalization.
 
-## Goals
+# Goals
 
- * Out of the box Ozone should support both S3 and HCFS interfaces without any settings. (It's possible only for the regular path)
- * As 100% compatibility couldn't be achieved on both side we need a configuration to set the expectations in case of incompatible key names
- * Default behavior of `o3fs` and `ofs` should be as close to `s3a` as possible
+ * Out of the box Ozone should support both S3 and HCFS interfaces without any settings. (It's possible only for the regular, fs compatible key names)
+ * As 100% compatibility couldn't be achieved on both side we need a configuration to set the expectations for incompatible key names
+ * Default behavior of `o3fs` and `ofs` should be as close to `s3a` as possible (when s3 compatibilty is prefered)
 
-## Proposed solution
+# Possible cases to support
 
-### S3/HCFS Interoperability
+There are two main aspects of supporting both `ofs/o3fs` and `s3` together:
+
+ 1. `ofs/o3fs` require to create intermediate directory entries (for exapmle `/a/b` for the key `/b/c/c`)
+ 2. Special file-system incompatible key names require special attention
+
+The second couldn't be done with compromise.
+
+ 1. We either support all key names (including non fs compatible key names), which means `ofs/o3fs` can provide only a partial view
+ 2. Or we can normalize the key names to be fs compatible (which makes it possible to create inconsistent S3 keys)
+
+HDDS-3955 introduced `ozone.om.enable.filesystem.paths`, with this setting we will have two possible usage pattern:
+
+| ozone.om.enable.filesystem.paths= | true | false
+|-|-|-|
+| create itermediate dirs | YES | NO |
+| normalize key names from `ofs/o3fs` | YES | NO
+| force to normalize key names of `s3` interface | YES (1) | NO 
+| `s3` key `/a/b/c` available from `ofs/o3fs` | YES | NO
+| `s3` key `/a/b//c` available from `ofs/o3fs` | YES | NO
+| `s3` key `/a/b//c` available from `s3` | AWS S3 incompatibility | YES
+
+(1): Under implementation
+
+This proposal suggest to use a 3rd option where 100% AWS compatiblity is guaranteed in exchange of a limited `ofs/o3fs` view:
+
+| ozone.om.intermediate.dir.generation= | true |
+|-|-|-|
+| create itermediate dirs | YES | 
+| normalize key names from `ofs/o3fs` | YES |
+| force to normalize key names of `s3` interface | **NO** |
+| `s3` key `/a/b/c` available from `ofs/o3fs` | YES | 
+| `s3` key `/a/b//c` available from `ofs/o3fs` | NO | 
+| `s3` key `/a/b//c` available from `s3` | *YES* (100% AWS compatibility) |
+
+
+# Proposed solution
+
+In short: 
+
+ **I propose to make it possible to configure **normalization** and **intermediate dir creation**, independent from each other**
+ 
+It can be done in multiple ways. For the sake of simplicity, let's imagine two configuration option
+
+| configuration | behavior | 
+|-|-|
+| `ozone.om.enable.filesystem.paths=true`  | Enable intermediate dir generation **AND** key name normalization 
+| `ozone.om.enable.intermediate.dirs=true` | Enable only the intermediate dir generation
+
+## S3/HCFS Interoperability
+
+**In case of intermediate directory generation is enabled (with either of the configuraiton keys)**:
 
 When somebody creates a new key like `/a/b/c/d`, the same key should be visible from HCFS (`o3fs//` or `o3://`). `/a`, `/a/b` and `/a/b/c` should be visible as directories from HCFS.
 
-S3 should list only the `/a/b/c/d` keys, (`/a`, `/a/b`, `/a/b/c` keys **won't be visible**!)
+S3 should list only the `/a/b/c/d` keys, (`/a`, `/a/b`, `/a/b/c` keys, created to help HCFS, **won't be visible** if the key is created from S3)
 
 This can be done with persisting an extra flag with the implicit directory entries. These entries can be modified if they are explicit created.
 
-(This flag should be added only for the keys which are created by S3. `ofs://` and `of3fs://` can create explicit directories all the time)
+This flag should be added only for the keys which are created by S3. `ofs://` and `of3fs://`  create explicit directories all the time.
 
-### Handling of the incompatible paths
+Advantages of this approach:
+
+ 1. HCFS and S3 can work together
+ 2. S3 behavior is closer to the original AWS s3 behavior (when `/a/b/c` key is created `/a/b` won't be visible)
+
+## Handling of the incompatible paths
+
+As it's defined above the intermediate directory generation and normalization are two independent settings. (It's possible to choose only to create the intermediate directories).
+
+**If normalization is choosen**: (`ozone.om.enable.filesystem.paths=true`), all the key names will be normalized to fs-compatible name. It may cause a conflict (error) if the normalized key is already exists (or exists as a file instead of directory)
+
+**Without normalization (`ozone.om.enable.intermediate.dirs=true`)**:
 
 Creating intermediate directories might not be possible if path contains illegal characters or can't be parsed as a file system path. **These keys will be invisible from HCFS** by default. They will be ignored during the normal file list.
 
-This behavior can be adjusted by a new configuration variable (eg. `ozone.keyspace.scheme`) based on the values:
-
- * `permissive` (default): any key name can be used from S3 interface but from HCFS only the valid key names (keys which can be transformed to a file system path) will be visible. The option provides the highest AWS s3 compatibility.
- * `strict`: This is the opposite: any non file-system compatible key name will be rejected by an exception. This is a safe choice to make everything visible from HCFS, but couldn't guarantee 100% AWS S3 compatibility as some key names couldn't be used. 
- * `normalize`: It's similar to the `strict` but -- instead of throwing an exception -- normalizes the key names to file-system compatible names. It breaks the AWS compatibility (some keys which are written will be readable from other path), but a safe choice when HCFS is heavliy used. 
-
-### Using Ozone in object-store only mode
+## Using Ozone in object-store only mode
 
 Creating intermediate directories can have some overhead (write amplification is increased if many keys are written with different prefixes as we need an entry for each prefixes). This write-amplification can be handled with the current implementation: based on the measurements RocksDB has no problems with billions of keys.
 
-But it's possible to use a specific configuration key (like `ozone.om.enable.filesystem.paths`) to **disable** the default behavior of creating directory entries. But in this case all the file system calls (any HCFS call) **should be disabled and throw an exception** as consistency couldn't be guaranteed from there. (But Ozone can be used as a pure S3 replacement without using as a HCFS).
+If none of the mentioned configurations are enabled, the intermediate directories won't be created. But in this case, the consitent view of `ofs/o3fs` couldn't be guaranteed, so `ofs/o3fs` **should be disabled and throw an exception** (But Ozone can be used as a pure S3 replacement without using as a HCFS).
 
-## Problematic cases
+# Problematic cases
 
 As described in the previous section there are some cases which couldn't be supported out-of-the-box due to the differences between the flat key-space and file-system hierarchy. These cases are collected here together with the information how existing tools (AWS console, AWS cli, AWS S3A Hadoop connector) behaves.
 
-### Empty directory path
+## Empty directory path
 
 With a pure object store keys with empty directory names can be created.
 
@@ -120,11 +174,10 @@ Behavior:
  
 Proposed behavior:
 
- * `permissive`: `/c` is not accessible, `/a/b` directory doesn't contain this entry
- * `strict`: throwing exception
- * `normalize`: key stored as `/a/b/c`  
+ * `ozone.om.enable.intermediate.dirs=true`: `/y` is not accessible, `/a/b` directory doesn't contain this entry
+ * `ozone.om.enable.filesystem.paths=true`: key stored as `/a/b/c`  
  
-### Path with invalid characters (`..`,`.`) 
+## Path with invalid characters (`..`,`.`) 
 
 Path segments might include parts which has file system semantics:
 
@@ -140,11 +193,10 @@ Behavior:
  
 Proposed behavior:
 
- * `permissive`: `e` and `f` are not visible
- * `strict`: throwing exception
- * `normalize`: key stored as `/a/e` and `a/b/f`  
+ * `ozone.om.enable.intermediate.dirs=true`: `e` and `f` are not visible
+ * `ozone.om.enable.filesystem.paths=true`: key stored as `/a/e` and `a/b/f`  
 
-### Key and directory with the same name
+## Key and directory with the same name
 
 It is possible to create directory and key with the same name in AWS:
 
@@ -161,10 +213,9 @@ Behavior:
 Proposed behavior:
 
  * `permissive`: show both the file and the directory with the same name (similar to S3A)
- * `strict`: throwing exception when the second is created
- * `normalize`: throwing exception when the second one is created  
+ * `ozone.om.enable.filesystem.paths=true`: throwing exception when the second one is created  
 
-### Directory entry created with file content
+## Directory entry created with file content
 
 In this case we create a directory (key which ends with `/`) but with real file content:
 
@@ -180,16 +231,14 @@ Behavior:
 Proposed behavior:
 
  * `permissive`: possible but `i/` is hidden from o3fs/ofs
- * `strict`: throwing exception when created
- * `normalize`: throwing exception when created  
+ * `normalize`: key name is normalized to real key name
 
-### Create key and explicit create parent dir
+## Create key and explicit create parent dir
 
 ```
 aws s3api put-object --bucket ozonetest --key e/f/g/
 aws s3api put-object --bucket ozonetest --key e/f/
 ```
-
 
 Behavior:
 
@@ -197,14 +246,37 @@ Behavior:
  
 Proposed behavior:
 
-After the first command `/e/f` and `/e` entries created in the key space (as they are required by `ofs`/`o3fs`) but **with a specific flag** (explicit=false). 
+After the first command `/e/f/` and `/e/` entries created in the key space (as they are required by `ofs`/`o3fs`) but **with a specific flag** (explicit=false). 
 
 AWS S3 list-objects API should exclude those entries from the result (!).
 
-Second command execution should modify the flag of `/e/f` key to (explicit=true).
+Second command execution should modify the flag of `/e/f/` key to (explicit=true).
 
-Note: using `o3fs://` or `ofs://` all the intermediate directories can be (explicit=true)
+## Create parent dir AND key with S3a
 
-### Create key and delete parent key
+This is the problem which is reporeted by [HDDS-4209](https://issues.apache.org/jira/browse/HDDS-4209)
 
-This is very similar to the previous one but the direction is opposite. If directory key entry is still required it should be modified to (explicit=false) and excluded from any listing from the object store interface.
+```
+hdfs dfs -mkdir -p s3a://b12345/d11/d12 # -> Success
+
+hdfs dfs -put /tmp/file1 s3a://b12345/d11/d12/file1 # -> fails with below error
+```
+
+Proposed behavior:
+
+ * `ozone.om.enable.intermediate.dirs=true`: shold work without error
+ * `ozone.om.enable.filesystem.paths=true`: should work without error.
+
+This is an `ofs`/`o3fs` question not an S3. The directory created in the first step shouldn't block the creation of the file. This can be a **mandatory** normalization for `mkdir` directory creation. As it's an HCFS operation, s3 is not affected. Entries created from S3 can be visible from s3 without any problem.
+
+## Create file and directory with S3
+
+This problem is reported in HDDS-4209, thanks to @Bharat
+
+```
+hdfs dfs -mkdir -p s3a://b12345/d11/d12 -> Success
+
+hdfs dfs -put /tmp/file1 s3a://b12345/d11/d12/file1 
+```
+
+In this case first a `d11/d12/` key is created. The intermediate key creation logic in the second step should use it as a directory instead of throwing an exception.
