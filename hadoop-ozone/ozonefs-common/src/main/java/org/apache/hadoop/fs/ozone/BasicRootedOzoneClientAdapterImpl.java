@@ -1010,7 +1010,6 @@ public class BasicRootedOzoneClientAdapterImpl
     return new FileStatusAdapter(0L, path, true, (short)0, 0L,
         ozoneBucket.getCreationTime().getEpochSecond() * 1000, 0L,
         FsPermission.getDirDefault().toShort(),
-        // TODO: maybe derive owner and group from ACLs later
         owner, group, path, new BlockLocation[0]);
   }
 
