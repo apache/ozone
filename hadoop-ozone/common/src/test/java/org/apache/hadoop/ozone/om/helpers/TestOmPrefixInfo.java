@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -27,6 +26,8 @@ import org.junit.Test;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 
@@ -35,13 +36,30 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
  */
 public class TestOmPrefixInfo {
 
+  String testPath = "/my/custom/path";
+  String username = "myuser";
+
+
+  public OmPrefixInfo getOmPrefixInfoForTest(String path,
+      IAccessAuthorizer.ACLIdentityType identityType,
+      String identityString,
+      IAccessAuthorizer.ACLType aclType,
+      OzoneAcl.AclScope scope){
+    return new OmPrefixInfo(path,
+        Collections.singletonList(new OzoneAcl(
+            identityType,identityString,
+            aclType, scope)), new HashMap<>(), 10, 100);
+  }
+
+
   @Test
   public void testCopyObject() {
-    OmPrefixInfo omPrefixInfo = new OmPrefixInfo("/path",
-        Collections.singletonList(new OzoneAcl(
-        IAccessAuthorizer.ACLIdentityType.USER, "user1",
-        IAccessAuthorizer.ACLType.WRITE, ACCESS)), new HashMap<>(), 10, 100);
 
+    OmPrefixInfo omPrefixInfo = getOmPrefixInfoForTest(testPath,
+        IAccessAuthorizer.ACLIdentityType.USER,
+        username,
+        IAccessAuthorizer.ACLType.WRITE,
+        ACCESS);
     OmPrefixInfo clonePrefixInfo = omPrefixInfo.copyObject();
 
     Assert.assertEquals(omPrefixInfo, clonePrefixInfo);
@@ -49,7 +67,7 @@ public class TestOmPrefixInfo {
 
     // Change acls and check.
     omPrefixInfo.addAcl(new OzoneAcl(
-        IAccessAuthorizer.ACLIdentityType.USER, "user1",
+        IAccessAuthorizer.ACLIdentityType.USER, username,
         IAccessAuthorizer.ACLType.READ, ACCESS));
 
     Assert.assertNotEquals(omPrefixInfo, clonePrefixInfo);
@@ -58,18 +76,29 @@ public class TestOmPrefixInfo {
 
   @Test
   public void testgetFromProtobufOneMetadataOneAcl(){
-    String prefixInfoName = "MyPrefixInfoName";
-    String aclString = "user:myuser:rw";
-    String metakey = "metakey";
-    String metaval = "metaval";
-    HddsProtos.KeyValue metadata = TestInstanceHelper.getDefaultTestMetadata(metakey,metaval);
-    OzoneManagerProtocolProtos.PrefixInfo prefixInfo = TestInstanceHelper.getDefaultTestPrefixInfo(prefixInfoName, aclString,metadata);
 
-    OmPrefixInfo ompri = OmPrefixInfo.getFromProtobuf(prefixInfo);
+    OmPrefixInfo ompri = getOmPrefixInfoForTest(testPath,
+        IAccessAuthorizer.ACLIdentityType.USER,
+        username,
+        IAccessAuthorizer.ACLType.READ,
+        ACCESS);
 
-    Assert.assertEquals(prefixInfoName, ompri.getName() );
-    Assert.assertEquals(1, ompri.getMetadata().size());
-    Assert.assertEquals(metaval, ompri.getMetadata().get(metakey));
+    Assert.assertEquals(testPath, ompri.getName() );
+    Assert.assertEquals(0, ompri.getMetadata().size());
     Assert.assertEquals(1, ompri.getAcls().size());
+  }
+
+  @Test
+  public void testGetProtobuf(){
+
+    OmPrefixInfo omPrefixInfo = getOmPrefixInfoForTest(testPath,
+        IAccessAuthorizer.ACLIdentityType.USER,
+        username, IAccessAuthorizer.ACLType.WRITE,
+        ACCESS);
+    omPrefixInfo.getMetadata().put("key","value");
+    OzoneManagerProtocolProtos.PrefixInfo pi = omPrefixInfo.getProtobuf();
+    Assert.assertEquals(testPath,pi.getName());
+    Assert.assertEquals(1,pi.getAclsCount());
+    Assert.assertEquals(1,pi.getMetadataCount());
   }
 }
