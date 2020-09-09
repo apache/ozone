@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.ozone;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -301,6 +302,12 @@ public class TestOzoneFSWithObjectStoreCreate {
       Assert.assertEquals(new String(b, 0, b.length, UTF_8), readData);
     }
 
+  }
+
+  @Test(expected = FileAlreadyExistsException.class)
+  public void testCreateDirectoryFirstThenFileWithSameName() throws Exception {
+    o3fs.mkdirs(new Path("/t1/t2"));
+    o3fs.create(new Path("/t1/t2"));
   }
 
   private void checkPath(Path path) {
