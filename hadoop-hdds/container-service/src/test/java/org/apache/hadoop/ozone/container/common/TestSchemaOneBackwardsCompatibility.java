@@ -146,7 +146,8 @@ public class TestSchemaOneBackwardsCompatibility {
       assertEquals(TestDB.KEY_COUNT - TestDB.NUM_PENDING_DELETION_BLOCKS,
               countUnprefixedBlocks(refCountedDB));
 
-      // Test that deleted block keys do not have a visible prefix when iterating.
+      // Test that deleted block keys do not have a visible prefix when
+      // iterating.
       final String prefix = SchemaOneDeletedBlocksTable.DELETED_KEY_PREFIX;
       Table<String, ChunkInfoList> deletedBlocksTable =
               refCountedDB.getStore().getDeletedBlocksTable();
@@ -354,8 +355,8 @@ public class TestSchemaOneBackwardsCompatibility {
    * @throws IOException
    */
   private KeyValueContainerData newKvData() throws IOException {
-    KeyValueContainerData kvData =
-        (KeyValueContainerData) ContainerDataYaml.readContainerFile(containerFile);
+    KeyValueContainerData kvData = (KeyValueContainerData)
+        ContainerDataYaml.readContainerFile(containerFile);
 
     // Because the test DB is set up in a temp folder, we cannot know any
     // absolute paths to container components until run time.
