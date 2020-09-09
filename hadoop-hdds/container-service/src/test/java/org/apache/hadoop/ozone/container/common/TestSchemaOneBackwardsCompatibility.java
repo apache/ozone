@@ -25,10 +25,7 @@ import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
-import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
@@ -80,7 +77,7 @@ public class TestSchemaOneBackwardsCompatibility {
   private OzoneConfiguration conf;
 
   private File metadataDir;
-  private File dbFile;
+  private File containerFile;
 
   @Rule
   public TemporaryFolder tempFolder = new TemporaryFolder();
@@ -100,15 +97,7 @@ public class TestSchemaOneBackwardsCompatibility {
     FileUtils.copyFileToDirectory(testDB.getContainerFile(), tempMetadataDir);
 
     metadataDir = tempMetadataDir;
-    File[] potentialDBFiles = metadataDir.listFiles((dir, name) ->
-            name.equals(TestDB.DB_NAME));
-
-    if (potentialDBFiles == null || potentialDBFiles.length != 1) {
-      throw new IOException("Failed load file named " + TestDB.DB_NAME + " " +
-              "from the metadata directory " + metadataDir.getAbsolutePath());
-    }
-
-    dbFile = potentialDBFiles[0];
+    containerFile = new File(metadataDir, TestDB.CONTAINER_FILE_NAME);
   }
 
   /**
@@ -120,10 +109,7 @@ public class TestSchemaOneBackwardsCompatibility {
    */
   @Test
   public void testDirectTableIterationDisabled() throws Exception {
-    KeyValueContainerData kvData = newKvData();
-    KeyValueContainerUtil.parseKVContainerData(kvData, conf);
-
-    try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(kvData, conf)) {
+    try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
       DatanodeStore store = refCountedDB.getStore();
 
       assertTableIteratorUnsupported(store.getMetadataTable());
@@ -151,10 +137,7 @@ public class TestSchemaOneBackwardsCompatibility {
    */
   @Test
   public void testBlockIteration() throws IOException {
-    KeyValueContainerData kvData = newKvData();
-    KeyValueContainerUtil.parseKVContainerData(kvData, conf);
-
-    try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(kvData, conf)) {
+    try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
       assertEquals(TestDB.NUM_DELETED_BLOCKS, countDeletedBlocks(refCountedDB));
 
       assertEquals(TestDB.NUM_PENDING_DELETION_BLOCKS,
@@ -195,9 +178,7 @@ public class TestSchemaOneBackwardsCompatibility {
    */
   @Test
   public void testReadWithMetadata() throws Exception {
-    KeyValueContainerData kvData = newKvData();
-    KeyValueContainerUtil.parseKVContainerData(kvData, conf);
-    checkContainerData(kvData);
+    checkContainerData(newKvData());
   }
 
   /**
@@ -210,14 +191,9 @@ public class TestSchemaOneBackwardsCompatibility {
    */
   @Test
   public void testReadWithoutMetadata() throws Exception {
-    // Init the kvData enough values so we can get the database to modify for
-    // testing and then read.
-    KeyValueContainerData kvData = newKvData();
-    KeyValueContainerUtil.parseKVContainerData(kvData, conf);
-
     // Delete metadata keys from our copy of the DB.
     // This simulates them not being there to start with.
-    try (ReferenceCountedDB db = BlockUtils.getDB(kvData, conf)) {
+    try (ReferenceCountedDB db = BlockUtils.getDB(newKvData(), conf)) {
       Table<String, Long> metadataTable = db.getStore().getMetadataTable();
 
       metadataTable.delete(OzoneConsts.BLOCK_COUNT);
@@ -233,9 +209,7 @@ public class TestSchemaOneBackwardsCompatibility {
     // Create a new container data object, and fill in its metadata by
     // counting blocks from the database, since the metadata keys in the
     // database are now gone.
-    kvData = newKvData();
-    KeyValueContainerUtil.parseKVContainerData(kvData, conf);
-    checkContainerData(kvData);
+    checkContainerData(newKvData());
   }
 
   /**
@@ -291,9 +265,6 @@ public class TestSchemaOneBackwardsCompatibility {
    */
   @Test
   public void testReadDeletedBlockChunkInfo() throws Exception {
-    KeyValueContainerData kvData = newKvData();
-    KeyValueContainerUtil.parseKVContainerData(kvData, conf);
-
     try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
       // Read blocks that were already deleted before the upgrade.
       List<? extends Table.KeyValue<String, ChunkInfoList>> deletedBlocks =
@@ -355,11 +326,8 @@ public class TestSchemaOneBackwardsCompatibility {
   }
 
   private ContainerSet makeContainerSet() throws Exception {
-    KeyValueContainerData kvData = newKvData();
-    KeyValueContainerUtil.parseKVContainerData(kvData, conf);
-
     ContainerSet containerSet = new ContainerSet();
-    KeyValueContainer container = new KeyValueContainer(kvData, conf);
+    KeyValueContainer container = new KeyValueContainer(newKvData(), conf);
     containerSet.addContainer(container);
 
     return containerSet;
@@ -385,25 +353,17 @@ public class TestSchemaOneBackwardsCompatibility {
    * @throws IOException
    */
   private KeyValueContainerData newKvData() throws IOException {
-    ChunkLayOutVersion clVersion =
-            ChunkLayOutVersion.getChunkLayOutVersion(1);
-    String pipelineID = UUID.randomUUID().toString();
-    String nodeID = UUID.randomUUID().toString();
+    KeyValueContainerData kvData =
+        (KeyValueContainerData) ContainerDataYaml.readContainerFile(containerFile);
 
-    KeyValueContainerData kvData = new KeyValueContainerData(
-            TestDB.CONTAINER_ID, clVersion,
-            ContainerTestHelper.CONTAINER_MAX_SIZE, pipelineID, nodeID);
     kvData.setMetadataPath(metadataDir.getAbsolutePath());
-    kvData.setDbFile(dbFile);
-
-    kvData.closeContainer();
-
-    // This must be set to some directory for the block deleting service to run.
     kvData.setChunksPath(metadataDir.getAbsolutePath());
 
     Yaml yaml = ContainerDataYaml.getYamlForContainerType(
             kvData.getContainerType());
     kvData.computeAndSetChecksum(yaml);
+
+    KeyValueContainerUtil.parseKVContainerData(kvData, conf);
 
     return kvData;
   }
@@ -413,6 +373,7 @@ public class TestSchemaOneBackwardsCompatibility {
    * metadata values matching those in the database under test.
    */
   private void checkContainerData(KeyValueContainerData kvData) {
+    assertTrue(kvData.isClosed());
     assertEquals(TestDB.SCHEMA_VERSION, kvData.getSchemaVersion());
     assertEquals(TestDB.KEY_COUNT, kvData.getKeyCount());
     assertEquals(TestDB.BYTES_USED, kvData.getBytesUsed());

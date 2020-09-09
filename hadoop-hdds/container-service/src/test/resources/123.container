@@ -1,13 +1,13 @@
 !<KeyValueContainerData>
-checksum: 9a45fbdbe40f6de3037fdd25c82f79c0ae69045f3c63997f60d516b9316ba9cf
-chunksPath: /home/work/Files/hadoop-ozone/hadoop-hdds/container-service/target/test-dir/TestBlockDeletingService/hdds/73eb89cf-ab05-42fc-af5c-995e1783263a/current/containerDir135/1596029079265/chunks
+checksum: 0faa897ee87aa3bb752d3983e22ccc6c966746e28178b553e6190662dc627740
+chunksPath: .
 containerDBType: RocksDB
-containerID: 1596029079265
+containerID: 123
 containerType: KeyValueContainer
 layOutVersion: 2
 maxSize: 1073741824
 metadata: {}
-metadataPath: /home/work/Files/hadoop-ozone/hadoop-hdds/container-service/target/test-dir/TestBlockDeletingService/hdds/73eb89cf-ab05-42fc-af5c-995e1783263a/current/containerDir135/1596029079265/metadata
+metadataPath: .
 originNodeId: fc916013-b295-4015-b775-b132a520dc7e
 originPipelineId: bf52d0e3-6418-4713-b0ff-3846243c3541
 state: CLOSED
