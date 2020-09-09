@@ -67,18 +67,24 @@ public class OmRequestFactory {
         if (Modifier.isAbstract(requestClass.getModifiers())) {
           continue;
         }
-        Method getRequestTypeMethod = requestClass.getMethod("getRequestType");
-        String type = (String) getRequestTypeMethod.invoke(null);
-        LOG.debug("Registering {} with OmVersionFactory.",
-            requestClass.getSimpleName());
-        BelongsToLayoutVersion annotation =
-            requestClass.getAnnotation(BelongsToLayoutVersion.class);
-        if (annotation == null) {
-          registerRequestType(type, INITIAL_VERSION.layoutVersion(),
-              requestClass);
-        } else {
-          registerRequestType(type, annotation.value().layoutVersion(),
-              requestClass);
+        try {
+          Method getRequestTypeMethod = requestClass.getMethod(
+              "getRequestType");
+          String type = (String) getRequestTypeMethod.invoke(null);
+          LOG.debug("Registering {} with OmVersionFactory.",
+              requestClass.getSimpleName());
+          BelongsToLayoutVersion annotation =
+              requestClass.getAnnotation(BelongsToLayoutVersion.class);
+          if (annotation == null) {
+            registerRequestType(type, INITIAL_VERSION.layoutVersion(),
+                requestClass);
+          } else {
+            registerRequestType(type, annotation.value().layoutVersion(),
+                requestClass);
+          }
+        } catch (NoSuchMethodException nsmEx) {
+          LOG.warn("Found a class {} with request type not defined. ",
+              requestClass.getSimpleName());
         }
       }
     } catch (Exception ex) {
