@@ -41,8 +41,6 @@ public class OpenKeyCleanupService extends BackgroundService {
   private static final Logger LOG =
       LoggerFactory.getLogger(OpenKeyCleanupService.class);
 
-  private final static int OPEN_KEY_DELETING_CORE_POOL_SIZE = 2;
-
   private final KeyManager keyManager;
   private final ScmBlockLocationProtocol scmClient;
 
@@ -50,7 +48,7 @@ public class OpenKeyCleanupService extends BackgroundService {
       KeyManager keyManager, int serviceInterval,
       long serviceTimeout) {
     super("OpenKeyCleanupService", serviceInterval, TimeUnit.SECONDS,
-        OPEN_KEY_DELETING_CORE_POOL_SIZE, serviceTimeout);
+        1, serviceTimeout);
     this.keyManager = keyManager;
     this.scmClient = scmClient;
   }
