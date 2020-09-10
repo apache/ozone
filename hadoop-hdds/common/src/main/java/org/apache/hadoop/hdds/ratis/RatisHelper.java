@@ -133,6 +133,8 @@ public final class RatisHelper {
 
   public static RaftGroup newRaftGroup(RaftGroupId groupId,
       List<DatanodeDetails> peers, List<Integer> priorityList) {
+    assert peers.size() == priorityList.size();
+
     final List<RaftPeer> newPeers = new ArrayList<>();
     for (int i = 0; i < peers.size(); i++) {
       RaftPeer peer = RatisHelper.toRaftPeer(peers.get(i), priorityList.get(i));

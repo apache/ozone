@@ -64,28 +64,6 @@ public class CreatePipelineCommandHandler implements CommandHandler {
     this.conf = conf;
   }
 
-  private void incSuggestedLeaderCount(
-      final List<Integer> priorityList,
-      final List<DatanodeDetails> peers,
-      final DatanodeDetails dn) {
-    if (peers == null || peers.isEmpty()) {
-      return;
-    }
-
-    DatanodeDetails maxPriorityPeer = null;
-    int maxPriority = Integer.MIN_VALUE;
-    for (int i = 0; i < priorityList.size(); i++) {
-      if (maxPriority < priorityList.get(i)) {
-        maxPriority = priorityList.get(i);
-        maxPriorityPeer = peers.get(i);
-      }
-    }
-
-    if (maxPriorityPeer.getUuid().equals(dn.getUuid())) {
-      dn.incSuggestedLeaderCount();
-    }
-  }
-
   /**
    * Handles a given SCM command.
    *
@@ -109,8 +87,6 @@ public class CreatePipelineCommandHandler implements CommandHandler {
             .map(DatanodeDetails::getFromProtoBuf)
             .collect(Collectors.toList());
     final List<Integer> priorityList = createCommand.getPriorityList();
-
-    incSuggestedLeaderCount(priorityList, peers, dn);
 
     try {
       XceiverServerSpi server = ozoneContainer.getWriteChannel();

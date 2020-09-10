@@ -20,7 +20,10 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -102,15 +105,41 @@ public class RatisPipelineProvider extends PipelineProvider {
     return false;
   }
 
+  private Map<DatanodeDetails, Integer> getSuggestedLeaderCount(
+      List<DatanodeDetails> dns) {
+    Map<DatanodeDetails, Integer> suggestedLeaderCount = new HashMap<>();
+    for (DatanodeDetails dn : dns) {
+      suggestedLeaderCount.put(dn, 0);
+
+      Set<PipelineID> pipelineIDSet = getNodeManager().getPipelines(dn);
+      for (PipelineID pipelineID : pipelineIDSet) {
+        try {
+          Pipeline pipeline = getPipelineStateManager().getPipeline(pipelineID);
+          if (!pipeline.isClosed()
+              && dn.getUuid().equals(pipeline.getSuggestedLeaderId())) {
+            suggestedLeaderCount.put(dn, suggestedLeaderCount.get(dn) + 1);
+          }
+        } catch (PipelineNotFoundException e) {
+          LOG.debug("Pipeline not found in pipeline state manager : {}",
+              pipelineID, e);
+        }
+      }
+    }
+
+    return suggestedLeaderCount;
+  }
+
   private DatanodeDetails getSuggestedLeader(List<DatanodeDetails> dns) {
+    Map<DatanodeDetails, Integer> suggestedLeaderCount =
+        getSuggestedLeaderCount(dns);
     int minLeaderCount = Integer.MAX_VALUE;
     DatanodeDetails suggestedLeader = null;
 
-    for (int i = 0; i < dns.size(); i++) {
-      DatanodeDetails dn = dns.get(i);
-      if (dn.getSuggestedLeaderCount() < minLeaderCount) {
-        minLeaderCount = dn.getSuggestedLeaderCount();
-        suggestedLeader = dn;
+    for (Map.Entry<DatanodeDetails, Integer> entry :
+        suggestedLeaderCount.entrySet()) {
+      if (entry.getValue() < minLeaderCount) {
+        minLeaderCount = entry.getValue();
+        suggestedLeader = entry.getKey();
       }
     }
 
@@ -121,9 +150,8 @@ public class RatisPipelineProvider extends PipelineProvider {
       List<DatanodeDetails> dns, DatanodeDetails suggestedLeader) {
     List<Integer> priorityList = new ArrayList<>();
 
-    for (int i = 0; i < dns.size(); i++) {
-      if (dns.get(i).getUuid().equals(suggestedLeader.getUuid())) {
-        dns.get(i).incSuggestedLeaderCount();
+    for (DatanodeDetails dn : dns) {
+      if (dn.getUuid().equals(suggestedLeader.getUuid())) {
         priorityList.add(HIGH_PRIORITY);
       } else {
         priorityList.add(LOW_PRIORITY);
@@ -165,7 +193,7 @@ public class RatisPipelineProvider extends PipelineProvider {
         .setType(ReplicationType.RATIS)
         .setFactor(factor)
         .setNodes(dns)
-        .setSuggestedLeader(suggestedLeader.getUuid())
+        .setSuggestedLeaderId(suggestedLeader.getUuid())
         .build();
 
     List<Integer> priorityList = getPriorityList(dns, suggestedLeader);

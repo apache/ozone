@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -50,10 +51,8 @@ public class CreatePipelineCommand
     this.factor = factor;
     this.type = type;
     this.nodelist = datanodeList;
-    this.priorityList = new ArrayList<>();
-    for (DatanodeDetails dn : datanodeList) {
-      priorityList.add(0);
-    }
+    this.priorityList =
+        new ArrayList<>(Collections.nCopies(datanodeList.size(), 0));
   }
 
   public CreatePipelineCommand(final PipelineID pipelineID,

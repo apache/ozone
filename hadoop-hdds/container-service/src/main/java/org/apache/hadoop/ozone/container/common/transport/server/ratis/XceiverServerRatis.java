@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -712,11 +713,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   @Override
   public void addGroup(HddsProtos.PipelineID pipelineId,
       List<DatanodeDetails> peers) throws IOException {
-    List<Integer> priorityList = new ArrayList<>();
-    for (DatanodeDetails dn : peers) {
-      priorityList.add(0);
-    }
-
+    List<Integer> priorityList =
+        new ArrayList<>(Collections.nCopies(peers.size(), 0));
     addGroup(pipelineId, peers, priorityList);
   }
 

@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -107,7 +106,7 @@ public class TestRatisPipelineCreateAndDestroy {
 
     for (Pipeline pipeline : pipelines) {
       LambdaTestUtils.await(30000, 500, () ->
-          pipeline.getLeaderId().equals(pipeline.getSuggestedLeader()));
+          pipeline.getLeaderId().equals(pipeline.getSuggestedLeaderId()));
     }
 
     Map<UUID, Integer> leaderCount = new HashMap<>();
@@ -127,7 +126,7 @@ public class TestRatisPipelineCreateAndDestroy {
   }
 
   @Test(timeout = 360000)
-  public void testRestoreSuggestedLeaderCount() throws Exception {
+  public void testRestoreSuggestedLeader() throws Exception {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
     int dnNum = 3;
     int dnPipelineLimit = 3;
@@ -145,18 +144,31 @@ public class TestRatisPipelineCreateAndDestroy {
     // pipelineNum pipelines in 3 datanodes,
     // each datanode has leaderNumOfEachDn leaders after balance
     checkLeaderBalance(dnNum, leaderNumOfEachDn);
+    List<Pipeline> pipelinesBeforeRestart =
+        cluster.getStorageContainerManager().getPipelineManager()
+            .getPipelines();
 
     cluster.restartStorageContainerManager(true);
 
     checkLeaderBalance(dnNum, leaderNumOfEachDn);
+    List<Pipeline> pipelinesAfterRestart =
+        cluster.getStorageContainerManager().getPipelineManager()
+            .getPipelines();
 
-    StorageContainerManager scm = cluster.getStorageContainerManager();
-    List<DatanodeDetails> dns = scm.getScmNodeManager().getAllNodes();
-    Assert.assertTrue(dns.size() == dnNum);
-    for (DatanodeDetails dn : dns) {
-      Assert.assertTrue(dn.getSuggestedLeaderCount() == leaderNumOfEachDn);
+    Assert.assertEquals(
+        pipelinesBeforeRestart.size(), pipelinesAfterRestart.size());
+
+    for (Pipeline p : pipelinesBeforeRestart) {
+      boolean equal = false;
+      for (Pipeline q : pipelinesAfterRestart) {
+        if (p.getId().equals(q.getId())
+            && p.getSuggestedLeaderId().equals(q.getSuggestedLeaderId())) {
+          equal = true;
+        }
+      }
+
+      Assert.assertTrue(equal);
     }
-
   }
 
   @Test(timeout = 360000)

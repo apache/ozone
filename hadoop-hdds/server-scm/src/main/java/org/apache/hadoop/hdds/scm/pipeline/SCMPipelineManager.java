@@ -619,22 +619,9 @@ public class SCMPipelineManager implements PipelineManager {
    * @throws IOException
    */
   protected void destroyPipeline(Pipeline pipeline) throws IOException {
-    // Make sure decrease leader count happen before BackgroundPipelineCreator
-    // create new pipeline, so decrease leader count must happen before close
-    // pipeline. Otherwise, maybe happen the order: close pipeline,
-    // BackgroundPipelineCreator create new pipeline, decrease leader count,
-    // and leader distribution will not balance.
-    if (pipeline != null && pipeline.getSuggestedLeader() != null) {
-      String suggestedLeader = pipeline.getSuggestedLeader().toString();
-      DatanodeDetails dn = nodeManager.getNodeByUuid(suggestedLeader);
-      if (dn != null) {
-        dn.decSuggestedLeaderCount();
-      }
-    }
-
-    pipelineFactory.close(pipeline.getType(), pipeline);
     // remove the pipeline from the pipeline manager
     removePipeline(pipeline.getId());
+    pipelineFactory.close(pipeline.getType(), pipeline);
     triggerPipelineCreation();
   }
 
