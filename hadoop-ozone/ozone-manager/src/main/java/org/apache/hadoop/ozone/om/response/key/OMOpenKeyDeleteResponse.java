@@ -17,5 +17,52 @@
  */
 package org.apache.hadoop.ozone.om.response.key;
 
-public class OMOpenKeyDeleteResponse {
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+
+import javax.annotation.Nonnull;
+import java.io.IOException;
+import java.util.List;
+
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
+
+@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, DELETED_TABLE})
+public class OMOpenKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
+
+  private List<OmKeyInfo> expiredOpenKeys;
+
+  public OMOpenKeyDeleteResponse(
+      @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse,
+      @Nonnull List<OmKeyInfo> expiredOpenKeys, boolean isRatisEnabled) {
+
+    super(omResponse, isRatisEnabled);
+    this.expiredOpenKeys = expiredOpenKeys;
+  }
+
+  /**
+   * For when the request is not successful.
+   * For a successful request, the other constructor should be used.
+   */
+  public OMOpenKeyDeleteResponse(
+      @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse) {
+
+    super(omResponse);
+    checkStatusNotOK();
+  }
+
+  @Override
+  public void addToDBBatch(OMMetadataManager omMetadataManager,
+      BatchOperation batchOperation) throws IOException {
+
+    Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable();
+
+    for (OmKeyInfo keyInfo: expiredOpenKeys) {
+      deleteFromTable(omMetadataManager, batchOperation, openKeyTable, keyInfo);
+    }
+  }
 }
