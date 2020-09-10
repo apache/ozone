@@ -76,7 +76,7 @@ To solve the performance problems of the directory listing / rename, [HDDS-2939]
 
 There are two main aspects of supporting both `ofs/o3fs` and `s3` together:
 
- 1. `ofs/o3fs` require to create intermediate directory entries (for exapmle `/a/b` for the key `/b/c/c`)
+ 1. `ofs/o3fs` require to create intermediate directory entries (for example `/a/b` for the key `/b/c/c`)
  2. Special file-system incompatible key names require special attention
 
 The second couldn't be done with compromise.
@@ -90,12 +90,10 @@ HDDS-3955 introduced `ozone.om.enable.filesystem.paths`, with this setting we wi
 |-|-|-|
 | create itermediate dirs | YES | NO |
 | normalize key names from `ofs/o3fs` | YES | NO
-| force to normalize key names of `s3` interface | YES (1) | NO 
+| force to normalize key names of `s3` interface | YES | NO 
 | `s3` key `/a/b/c` available from `ofs/o3fs` | YES | NO
 | `s3` key `/a/b//c` available from `ofs/o3fs` | YES | NO
 | `s3` key `/a/b//c` available from `s3` | AWS S3 incompatibility | YES
-
-(1): Under implementation
 
 This proposal suggest to use a 3rd option where 100% AWS compatiblity is guaranteed in exchange of a limited `ofs/o3fs` view:
 
