@@ -24,14 +24,14 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLConnection;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
 import java.util.zip.GZIPOutputStream;
 
+import com.google.inject.Singleton;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -59,6 +59,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Recon Utility class.
  */
+@Singleton
 public class ReconUtils {
 
   private final static int WRITE_BUFFER = 1048576; //1MB
@@ -222,20 +223,20 @@ public class ReconUtils {
   }
 
   /**
-   * Make HTTP GET call on the URL and return inputstream to the response.
+   * Make HTTP GET call on the URL and return HttpURLConnection instance.
    * @param connectionFactory URLConnectionFactory to use.
    * @param url url to call
    * @param isSpnego is SPNEGO enabled
-   * @return Inputstream to the response of the HTTP call.
+   * @return HttpURLConnection instance of the HTTP call.
    * @throws IOException, AuthenticationException While reading the response.
    */
-  public InputStream makeHttpCall(URLConnectionFactory connectionFactory,
+  public HttpURLConnection makeHttpCall(URLConnectionFactory connectionFactory,
                                   String url, boolean isSpnego)
       throws IOException, AuthenticationException {
-    URLConnection urlConnection =
+    HttpURLConnection urlConnection = (HttpURLConnection)
           connectionFactory.openConnection(new URL(url), isSpnego);
     urlConnection.connect();
-    return urlConnection.getInputStream();
+    return urlConnection;
   }
 
   /**

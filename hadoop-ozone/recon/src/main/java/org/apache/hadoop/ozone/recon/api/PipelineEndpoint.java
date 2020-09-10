@@ -20,9 +20,12 @@ package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory;
 import org.apache.hadoop.ozone.recon.api.types.PipelineMetadata;
 import org.apache.hadoop.ozone.recon.api.types.PipelinesResponse;
+import org.apache.hadoop.ozone.recon.metrics.Metric;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
+import org.apache.hadoop.ozone.recon.spi.MetricsServiceProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +39,8 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.TreeMap;
 import java.util.UUID;
 
 /**
@@ -49,10 +54,15 @@ public class PipelineEndpoint {
       LoggerFactory.getLogger(PipelineEndpoint.class);
 
   private ReconPipelineManager pipelineManager;
+  private MetricsServiceProvider metricsServiceProvider;
 
   @Inject
-  PipelineEndpoint(OzoneStorageContainerManager reconSCM) {
+  PipelineEndpoint(OzoneStorageContainerManager reconSCM,
+                   MetricsServiceProviderFactory
+                       metricsServiceProviderFactory) {
     this.pipelineManager = (ReconPipelineManager) reconSCM.getPipelineManager();
+    this.metricsServiceProvider =
+        metricsServiceProviderFactory.getMetricsServiceProvider();
   }
 
   /**
@@ -89,19 +99,58 @@ public class PipelineEndpoint {
         LOG.warn("Cannot get containers for pipeline {} ", pipelineId, ioEx);
       }
 
-      PipelineMetadata pipelineMetadata = builder.setPipelineId(pipelineId)
+      PipelineMetadata.Builder pipelineBuilder =
+          builder.setPipelineId(pipelineId)
           .setDatanodes(datanodes)
           .setDuration(duration)
           .setStatus(pipeline.getPipelineState())
           .setReplicationFactor(pipeline.getFactor().getNumber())
-          .setReplicationType(pipeline.getType().toString())
-          .build();
+          .setReplicationType(pipeline.getType().toString());
 
-      pipelinesList.add(pipelineMetadata);
+      // If any metrics service providers like Prometheus
+      // is configured, then query it for metrics and populate
+      // leader election count and last leader election time
+      if (metricsServiceProvider != null) {
+        // Extract last part of pipelineId to get its group Id.
+        // ex. group id of 48981bf7-8bea-4fbd-9857-79df51ee872d
+        // is group-79DF51EE872D
+        String[] splits = pipelineId.toString().split("-");
+        String groupId = "group-" + splits[splits.length-1].toUpperCase();
+        Optional<Long> leaderElectionCount = getMetricValue(
+            "ratis_leader_election_electionCount", groupId);
+        leaderElectionCount.ifPresent(pipelineBuilder::setLeaderElections);
+        Optional<Long> leaderElectionTime = getMetricValue(
+            "ratis_leader_election_lastLeaderElectionTime", groupId);
+        leaderElectionTime.ifPresent(pipelineBuilder::setLastLeaderElection);
+      }
+
+      pipelinesList.add(pipelineBuilder.build());
     });
 
     PipelinesResponse pipelinesResponse =
         new PipelinesResponse(pipelinesList.size(), pipelinesList);
     return Response.ok(pipelinesResponse).build();
+  }
+
+  private Optional<Long> getMetricValue(String metricName, String groupId) {
+    String metricsQuery = String.format(
+        "query=%s{group=\"%s\"}", metricName, groupId);
+    try {
+      List<Metric> metrics = metricsServiceProvider.getMetricsInstant(
+          metricsQuery);
+      if (!metrics.isEmpty()) {
+        TreeMap<Double, Double> values = (TreeMap<Double, Double>)
+            metrics.get(0).getValues();
+        if (!values.isEmpty()) {
+          return Optional.of(values.firstEntry().getValue().longValue());
+        }
+      }
+    } catch (Exception ex) {
+      if (LOG.isErrorEnabled()) {
+        LOG.error(String.format("Unable to get metrics value for %s",
+            metricName), ex);
+      }
+    }
+    return Optional.empty();
   }
 }
