@@ -55,11 +55,11 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
 
-    OzoneManagerProtocolProtos.DeleteOpenKeyRequest openKeyDeleteRequest =
-            getOmRequest().getDeleteOpenKeyRequest();
+    OzoneManagerProtocolProtos.DeleteOpenKeysRequest deleteOpenKeysRequest =
+            getOmRequest().getDeleteOpenKeysRequest();
 
     List<DeletedKeys> expiredOpenKeys =
-            openKeyDeleteRequest.getExpiredOpenKeys();
+            deleteOpenKeysRequest.getExpiredOpenKeys();
 
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
             OmResponseUtil.getOMResponseBuilder(getOmRequest());
@@ -71,19 +71,21 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
 
     try {
       for (DeletedKeys expiredOpenKeysPerBucket: expiredOpenKeys) {
+        // For each bucket where keys will be deleted from,
+        // get its bucket lock and update the cache accordingly.
         deletedKeys.addAll(updateCache(ozoneManager, trxnLogIndex,
                 expiredOpenKeysPerBucket));
       }
 
       omClientResponse = new OMOpenKeyDeleteResponse(omResponse.build(),
-             deletedKeys, ozoneManager.isRatisEnabled());
+          deletedKeys, ozoneManager.isRatisEnabled());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
       result = Result.FAILURE;
       exception = ex;
-      omClientResponse = new OMKeyDeleteResponse(
-              createErrorOMResponse(omResponse, exception));
+      omClientResponse =
+          new OMKeyDeleteResponse(createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
               omDoubleBufferHelper);
@@ -95,16 +97,18 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
-  private void writeMetrics(OMMetrics omMetrics, Result result) {
+  private void writeMetrics(OMMetrics omMetrics,
+      List<OmKeyInfo> deletedKeys, Result result) {
+
     switch (result) {
     case SUCCESS:
       // TODO: Add Metrics
-      omMetrics.decNumKeys();
+      omMetrics.incNumOpenKeyDeletes(deletedKeys.size());
       LOG.debug("Key deleted. Volume:{}, Bucket:{}, Key:{}", volumeName,
               bucketName, keyName);
       break;
     case FAILURE:
-      omMetrics.incNumKeyDeleteFails();
+      omMetrics.incNumOpenKeyCleanupFails();
       LOG.error("Key delete failed. Volume:{}, Bucket:{}, Key:{}.",
               volumeName, bucketName, keyName, exception);
       break;
@@ -114,7 +118,8 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
     }
   }
 
-  private void writeAuditLog(AuditLogger auditLogger) {
+  private void writeAuditLog(AuditLogger auditLogger,
+                             List<OmKeyInfo> deletedKeys, Exception exception) {
     // TODO: Audit logging to track operations.
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
 
@@ -143,6 +148,8 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
         String fullKeyName = omMetadataManager.getOzoneKey(volumeName,
                 bucketName, keyName);
 
+        // If an open key is no longer present in the table, it was committed
+        // and should not be deleted.
         OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(fullKeyName);
         if (omKeyInfo != null) {
           // Set the UpdateID to current transactionLogIndex
