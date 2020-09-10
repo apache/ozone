@@ -270,14 +270,51 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
-  public void testSetVolumeQuota()
+  public void testSetVolumeQuota() throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    store.createVolume(volumeName);
+    Assert.assertEquals(OzoneConsts.QUOTA_RESET,
+        store.getVolume(volumeName).getQuotaInBytes());
+    Assert.assertEquals(OzoneConsts.QUOTA_RESET,
+        store.getVolume(volumeName).getQuotaInCounts());
+    store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota("1GB", 1000L));
+    OzoneVolume volume = store.getVolume(volumeName);
+    Assert.assertEquals(1024 * 1024 * 1024,
+        volume.getQuotaInBytes());
+    Assert.assertEquals(1000L, volume.getQuotaInCounts());
+  }
+
+  @Test
+  public void testSetVolumeQuotaIllegal()
       throws IOException {
     String volumeName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
-    store.getVolume(volumeName).setQuota(
-        OzoneQuota.parseQuota("100000000 BYTES"));
-    OzoneVolume volume = store.getVolume(volumeName);
-    Assert.assertEquals(100000000L, volume.getQuota());
+    // The unit should be legal.
+    try {
+      store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
+          "1TEST", 1000L));
+    } catch (IllegalArgumentException ex) {
+      GenericTestUtils.assertExceptionContains(
+          "Invalid values for quota", ex);
+    }
+
+    // The setting value cannot be greater than LONG.MAX_VALUE BYTES.
+    try {
+      store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
+          "9999999999999GB", 1000L));
+    } catch (IllegalArgumentException ex) {
+      GenericTestUtils.assertExceptionContains(
+          "Invalid values for quota", ex);
+    }
+
+    // The value cannot be negative.
+    try {
+      store.getVolume(volumeName).setQuota(OzoneQuota.parseQuota(
+          "-10GB", 1000L));
+    } catch (IllegalArgumentException ex) {
+      GenericTestUtils.assertExceptionContains(
+          "Quota cannot be negative.", ex);
+    }
   }
 
   @Test

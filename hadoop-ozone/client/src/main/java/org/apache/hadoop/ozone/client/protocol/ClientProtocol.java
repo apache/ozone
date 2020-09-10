@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.crypto.key.KeyProvider;
-import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
@@ -101,10 +100,11 @@ public interface ClientProtocol {
   /**
    * Set Volume Quota.
    * @param volumeName Name of the Volume
-   * @param quota Quota to be set for the Volume
+   * @param quotaInBytes The maximum size this volume can be used.
+   * @param quotaInCounts The maximum number of buckets in this volume.
    * @throws IOException
    */
-  void setVolumeQuota(String volumeName, OzoneQuota quota)
+  void setVolumeQuota(String volumeName, long quotaInBytes, long quotaInCounts)
       throws IOException;
 
   /**

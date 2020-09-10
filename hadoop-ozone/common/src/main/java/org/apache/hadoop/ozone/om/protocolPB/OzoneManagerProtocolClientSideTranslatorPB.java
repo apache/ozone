@@ -263,14 +263,18 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * Changes the Quota on a volume.
    *
    * @param volume - Name of the volume.
-   * @param quota - Quota in bytes.
+   * @param quotaInCounts - Volume quota in counts.
+   * @param quotaInBytes - Volume quota in bytes.
    * @throws IOException
    */
   @Override
-  public void setQuota(String volume, long quota) throws IOException {
+  public void setQuota(String volume, long quotaInCounts,
+      long quotaInBytes) throws IOException {
     SetVolumePropertyRequest.Builder req =
         SetVolumePropertyRequest.newBuilder();
-    req.setVolumeName(volume).setQuotaInBytes(quota);
+    req.setVolumeName(volume)
+       .setQuotaInBytes(quotaInBytes)
+       .setQuotaInCounts(quotaInCounts);
 
     OMRequest omRequest = createOMRequest(Type.SetVolumeProperty)
         .setSetVolumePropertyRequest(req)

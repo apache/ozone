@@ -151,7 +151,7 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     // create request with quota set.
     OMRequest originalRequest =
         TestOMRequestUtils.createSetVolumePropertyRequest(volumeName,
-            100L);
+            100L, 100L);
 
     OMVolumeSetOwnerRequest omVolumeSetOwnerRequest =
         new OMVolumeSetOwnerRequest(originalRequest);

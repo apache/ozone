@@ -244,7 +244,6 @@ public class VolumeManagerImpl implements VolumeManager {
     }
   }
 
-
   private void setOwnerCommitToDB(UserVolumeInfo oldOwnerVolumeList,
       UserVolumeInfo newOwnerVolumeList, OmVolumeArgs newOwnerVolumeArgs,
       String oldOwner) throws IOException {
@@ -265,44 +264,6 @@ public class VolumeManagerImpl implements VolumeManager {
       metadataManager.getVolumeTable().putWithBatch(batch,
           dbVolumeKey, newOwnerVolumeArgs);
       metadataManager.getStore().commitBatchOperation(batch);
-    }
-  }
-
-
-  /**
-   * Changes the Quota on a volume.
-   *
-   * @param volume - Name of the volume.
-   * @param quota - Quota in bytes.
-   *
-   * @throws IOException
-   */
-  @Override
-  public void setQuota(String volume, long quota) throws IOException {
-    Preconditions.checkNotNull(volume);
-    metadataManager.getLock().acquireLock(VOLUME_LOCK, volume);
-    try {
-      String dbVolumeKey = metadataManager.getVolumeKey(volume);
-      OmVolumeArgs volumeArgs =
-          metadataManager.getVolumeTable().get(dbVolumeKey);
-      if (volumeArgs == null) {
-        LOG.debug("volume:{} does not exist", volume);
-        throw new OMException(ResultCodes.VOLUME_NOT_FOUND);
-      }
-
-      Preconditions.checkState(volume.equals(volumeArgs.getVolume()));
-
-      volumeArgs.setQuotaInBytes(quota);
-
-      metadataManager.getVolumeTable().put(dbVolumeKey, volumeArgs);
-    } catch (IOException ex) {
-      if (!(ex instanceof OMException)) {
-        LOG.error("Changing volume quota failed for volume:{} quota:{}", volume,
-            quota, ex);
-      }
-      throw ex;
-    } finally {
-      metadataManager.getLock().releaseLock(VOLUME_LOCK, volume);
     }
   }
 
