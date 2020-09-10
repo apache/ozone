@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
@@ -38,13 +37,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.security.Key;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 public class OMOpenKeyDeleteRequest extends OMKeyRequest {
@@ -65,17 +61,6 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
     List<DeletedKeys> expiredOpenKeys =
             openKeyDeleteRequest.getExpiredOpenKeys();
 
-    // TODO: Audit logging to track operations.
-    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
-
-    // TODO: Add metrics count for number of deleted open keys.
-    OMMetrics omMetrics = ozoneManager.getMetrics();
-    omMetrics.incNumKeyDeletes();
-
-    // TODO: Audit logging (used again after lock)
-    AuditLogger auditLogger = ozoneManager.getAuditLogger();
-    OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
-
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
             OmResponseUtil.getOMResponseBuilder(getOmRequest());
 
@@ -90,7 +75,7 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
                 expiredOpenKeysPerBucket));
       }
 
-     omClientResponse = new OMOpenKeyDeleteResponse(omResponse.build(),
+      omClientResponse = new OMOpenKeyDeleteResponse(omResponse.build(),
              deletedKeys, ozoneManager.isRatisEnabled());
 
       result = Result.SUCCESS;
@@ -104,11 +89,13 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
               omDoubleBufferHelper);
     }
 
-    // Performing audit logging outside of the lock.
-    auditLog(auditLogger, buildAuditMessage(OMAction.DELETE_OPEN_KEY, auditMap,
-            exception, userInfo));
+    writeMetrics(ozoneManager.getMetrics(), result);
+    writeAuditLog(ozoneManager.getAuditLogger());
 
+    return omClientResponse;
+  }
 
+  private void writeMetrics(OMMetrics omMetrics, Result result) {
     switch (result) {
     case SUCCESS:
       // TODO: Add Metrics
@@ -125,8 +112,16 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
       LOG.error("Unrecognized Result for OMOpenKeyDeleteRequest: {}",
               openKeyDeleteRequest);
     }
+  }
 
-    return omClientResponse;
+  private void writeAuditLog(AuditLogger auditLogger) {
+    // TODO: Audit logging to track operations.
+    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
+
+    OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
+
+    auditLog(auditLogger, buildAuditMessage(OMAction.DELETE_OPEN_KEY, auditMap,
+            exception, userInfo));
   }
 
   private List<OmKeyInfo> updateCache(OzoneManager ozoneManager,
