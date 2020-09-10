@@ -64,7 +64,7 @@ This configuration is turned off by default, which means that S3 and HCFS couldn
 
 To solve the performance problems of the directory listing / rename, [HDDS-2939](https://issues.apache.org/jira/browse/HDDS-2939) is created, which propose to use a new prefix table to store the "directory" entries (=prefixes).
 
-[HDDS-4097](https://issues.apache.org/jira/browse/HDDS-4097) is created to normalize the key names based on file-system semantics if `ozone.om.enable.filesystem.paths` is enabled. But please note that `ozone.om.enable.filesystem.paths` should always be turned on if S3 and HCFS are both used which means that S3 and HCFS couldn't be used together with normalization.
+[HDDS-4097](https://issues.apache.org/jira/browse/HDDS-4097) is created to normalize the key names based on file-system semantics if `ozone.om.enable.filesystem.paths` is enabled. But please note that `ozone.om.enable.filesystem.paths` should always be turned on if S3 and HCFS are both used. It means that if both S3 and HCFS are used, normalization is forced, and S3 interface is not fully AWS S3 compatible. There is no option to use HCFS and S3 but with full AWS compatibility (and reduced HCFS compatibility). 
 
 # Goals
 
