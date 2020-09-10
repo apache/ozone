@@ -40,8 +40,9 @@ public abstract class AbstractOMKeyDeleteResponse extends OMClientResponse {
 
   private boolean isRatisEnabled;
 
-  public AbstractOMKeyDeleteResponse(@Nonnull OMResponse omResponse,
-                                     boolean isRatisEnabled) {
+  public AbstractOMKeyDeleteResponse(
+      @Nonnull OMResponse omResponse, boolean isRatisEnabled) {
+
     super(omResponse);
     this.isRatisEnabled = isRatisEnabled;
   }
@@ -55,15 +56,11 @@ public abstract class AbstractOMKeyDeleteResponse extends OMClientResponse {
     checkStatusNotOK();
   }
 
-  @Override
-  public abstract void addToDBBatch(OMMetadataManager omMetadataManager,
-                           BatchOperation batchOperation) throws IOException;
-
-  @Override
-  public void addKeyDeleteToBatch(OMMetadataManager omMetadataManager,
-                           BatchOperation batchOperation,
-                                  Table<String, ?> fromTable,
-                                  OmKeyInfo omKeyInfo) throws IOException {
+  protected void deleteFromTable(
+      OMMetadataManager omMetadataManager,
+      BatchOperation batchOperation,
+      Table<String, ?> fromTable,
+      OmKeyInfo omKeyInfo) throws IOException {
 
     // For OmResponse with failure, this should do nothing. This method is
     // not called in failure scenario in OM code.
@@ -83,14 +80,18 @@ public abstract class AbstractOMKeyDeleteResponse extends OMClientResponse {
       // if it is not null, then we simply add to the list and store this
       // instance in deletedTable.
       RepeatedOmKeyInfo repeatedOmKeyInfo =
-              omMetadataManager.getDeletedTable().get(ozoneKey);
+          omMetadataManager.getDeletedTable().get(ozoneKey);
       repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-              omKeyInfo, repeatedOmKeyInfo, omKeyInfo.getUpdateID(),
-              isRatisEnabled);
-      omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-              ozoneKey, repeatedOmKeyInfo);
+          omKeyInfo, repeatedOmKeyInfo, omKeyInfo.getUpdateID(),
+          isRatisEnabled);
+      omMetadataManager.getDeletedTable().putWithBatch(
+          batchOperation, ozoneKey, repeatedOmKeyInfo);
     }
   }
+
+  @Override
+  public abstract void addToDBBatch(OMMetadataManager omMetadataManager,
+        BatchOperation batchOperation) throws IOException;
 
   /**
    * Check if the key is empty or not. Key will be empty if it does not have
