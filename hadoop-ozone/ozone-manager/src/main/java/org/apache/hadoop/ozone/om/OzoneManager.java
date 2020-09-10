@@ -3484,15 +3484,32 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public ResolvedBucket resolveBucketLink(Pair<String, String> requested,
       OMClientRequest omClientRequest)
       throws IOException {
-    Pair<String, String> resolved =
-        resolveBucketLink(requested, new HashSet<>(), omClientRequest);
+    Pair<String, String> resolved;
+    if (isAclEnabled) {
+      resolved = resolveBucketLink(requested, new HashSet<>(),
+              omClientRequest.createUGI(), omClientRequest.getRemoteAddress(),
+              omClientRequest.getHostName());
+    } else {
+      resolved = resolveBucketLink(requested, new HashSet<>(),
+          null, null, null);
+    }
     return new ResolvedBucket(requested, resolved);
   }
+
 
   public ResolvedBucket resolveBucketLink(Pair<String, String> requested)
       throws IOException {
-    Pair<String, String> resolved =
-        resolveBucketLink(requested, new HashSet<>());
+
+    Pair<String, String> resolved;
+    if (isAclEnabled) {
+      resolved = resolveBucketLink(requested, new HashSet<>(),
+              ProtobufRpcEngine.Server.getRemoteUser(),
+              ProtobufRpcEngine.Server.getRemoteIp(),
+              ProtobufRpcEngine.Server.getRemoteIp().getHostName());
+    } else {
+      resolved = resolveBucketLink(requested, new HashSet<>(),
+          null, null, null);
+    }
     return new ResolvedBucket(requested, resolved);
   }
 
@@ -3502,45 +3519,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @param volumeAndBucket the bucket to be resolved (if it is a link)
    * @param visited collects link buckets visited during the resolution to
    *   avoid infinite loops
-   * @return bucket location possibly updated with its actual volume and bucket
-   *   after following bucket links
-   * @throws IOException (most likely OMException) if ACL check fails, bucket is
-   *   not found, loop is detected in the links, etc.
-   */
-  private Pair<String, String> resolveBucketLink(
-      Pair<String, String> volumeAndBucket,
-      Set<Pair<String, String>> visited) throws IOException {
-
-    String volumeName = volumeAndBucket.getLeft();
-    String bucketName = volumeAndBucket.getRight();
-    OmBucketInfo info = bucketManager.getBucketInfo(volumeName, bucketName);
-    if (!info.isLink()) {
-      return volumeAndBucket;
-    }
-
-    if (!visited.add(volumeAndBucket)) {
-      throw new OMException("Detected loop in bucket links",
-          DETECTED_LOOP_IN_BUCKET_LINKS);
-    }
-
-    if (isAclEnabled) {
-      checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.READ,
-          volumeName, bucketName, null);
-    }
-
-    return resolveBucketLink(
-        Pair.of(info.getSourceVolume(), info.getSourceBucket()),
-        visited);
-  }
-
-  /**
-   * Resolves bucket symlinks. Read permission is required for following links.
-   *
-   * @param volumeAndBucket the bucket to be resolved (if it is a link)
-   * @param {@link OMClientRequest}  which has information required to check
-   * permission.
-   * @param visited collects link buckets visited during the resolution to
-   *   avoid infinite loops
+   * @param {@link UserGroupInformation}
+   * @param remoteAddress
+   * @param hostName
    * @return bucket location possibly updated with its actual volume and bucket
    *   after following bucket links
    * @throws IOException (most likely OMException) if ACL check fails, bucket is
@@ -3549,7 +3530,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private Pair<String, String> resolveBucketLink(
       Pair<String, String> volumeAndBucket,
       Set<Pair<String, String>> visited,
-      OMClientRequest omClientRequest) throws IOException {
+      UserGroupInformation userGroupInformation,
+      InetAddress remoteAddress,
+      String hostName) throws IOException {
 
     String volumeName = volumeAndBucket.getLeft();
     String bucketName = volumeAndBucket.getRight();
@@ -3565,13 +3548,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (isAclEnabled) {
       checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.READ,
-          volumeName, bucketName, null, omClientRequest.createUGI(),
-          omClientRequest.getRemoteAddress(), omClientRequest.getHostName());
+          volumeName, bucketName, null, userGroupInformation,
+          remoteAddress, hostName);
     }
 
     return resolveBucketLink(
         Pair.of(info.getSourceVolume(), info.getSourceBucket()),
-        visited, omClientRequest);
+        visited, userGroupInformation, remoteAddress, hostName);
   }
 
   @VisibleForTesting
