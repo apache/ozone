@@ -313,6 +313,6 @@ public class TestOzoneManagerListVolumes {
     OzoneClient client = cluster.getClient();
     ObjectStore objectStore = client.getObjectStore();
     OzoneVolume ozoneVolume = objectStore.getVolume("s3v");
-    Assert.assertEquals(ozoneVolume.getQuotaInBytes(), -1);
+    Assert.assertEquals(ozoneVolume.getQuota(), -1);
   }
 }

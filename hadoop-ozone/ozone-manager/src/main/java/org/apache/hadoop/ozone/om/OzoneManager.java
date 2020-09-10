@@ -3556,7 +3556,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           omVolumeArgs.getVolume());
       // Previously, the volume quota was created to default to 1EB. To change
       // to -1, default does not enable quota.
-      if (omVolumeArgs.getQuotaInBytes() == 1024 * 1024 * TB) {
+      if (omVolumeArgs.getQuotaInBytes() == 1024 * 1024 * TB ||
+          omVolumeArgs.getQuotaInBytes() == OzoneConsts.MAX_QUOTA_IN_BYTES) {
         omVolumeArgs.setQuotaInBytes(-1);
         // Commit to DB.
         BatchOperation batchOperation =
@@ -3570,7 +3571,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         metadataManager.getVolumeTable().addCacheEntry(
             new CacheKey<>(omVolumeKey),
             new CacheValue<>(Optional.of(omVolumeArgs), transactionID));
-        LOG.warn("Update Volume {}'s old quota to -1, default does not enable" +
+        LOG.info("Update Volume {}'s quota to -1, , default does not enable" +
             " quota.", omVolumeArgs.getVolume());
       }
     }
