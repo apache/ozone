@@ -303,16 +303,4 @@ public class TestOzoneManagerListVolumes {
         true);  // listall will succeed since acl is disabled
     stopCluster(cluster);
   }
-
-  @Test
-  public void testInitializeOldVolumeQuota() throws Exception {
-    // S3v is created by default when OM starts, and the initialization task is
-    // done after that. So, we can determine whether the initialization
-    // task takes effect by checking s3V's quota.
-    MiniOzoneCluster cluster = startCluster(false, false);
-    OzoneClient client = cluster.getClient();
-    ObjectStore objectStore = client.getObjectStore();
-    OzoneVolume ozoneVolume = objectStore.getVolume("s3v");
-    Assert.assertEquals(ozoneVolume.getQuota(), -1);
-  }
 }
