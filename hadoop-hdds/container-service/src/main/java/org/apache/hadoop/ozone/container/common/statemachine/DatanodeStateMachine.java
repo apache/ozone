@@ -230,7 +230,6 @@ public class DatanodeStateMachine implements Closeable {
         // Some one has sent interrupt signal, this could be because
         // 1. Trigger heartbeat immediately
         // 2. Shutdown has be initiated.
-        LOG.warn("Interrupt the execution.", e);
         Thread.currentThread().interrupt();
       } catch (Exception e) {
         LOG.error("Unable to finish the execution.", e);
@@ -242,7 +241,7 @@ public class DatanodeStateMachine implements Closeable {
           try {
             Thread.sleep(nextHB.get() - now);
           } catch (InterruptedException e) {
-            LOG.warn("Interrupt the execution.", e);
+            //triggerHeartbeat is called during the sleep
           }
         }
       }
