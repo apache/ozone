@@ -87,13 +87,13 @@ public class SCMBlockLocationFailoverProxyProvider implements
     this.scmNodeIDList = new ArrayList<>();
     loadConfigs();
 
+
     this.currentProxyIndex = 0;
     currentProxySCMNodeId = scmNodeIDList.get(currentProxyIndex);
 
-    this.maxRetryCount = conf.getObject(SCMBlockClientConfig.class)
-        .getRetryCount();
-    this.retryInterval = conf.getObject(SCMBlockClientConfig.class)
-        .getRetryInterval();
+    SCMClientConfig config = conf.getObject(SCMClientConfig.class);
+    this.maxRetryCount = config.getRetryCount();
+    this.retryInterval = config.getRetryInterval();
   }
 
   @VisibleForTesting
@@ -216,7 +216,7 @@ public class SCMBlockLocationFailoverProxyProvider implements
     return currentProxyIndex;
   }
 
-  synchronized boolean assignLeaderToNode(String newLeaderNodeId) {
+  private synchronized boolean assignLeaderToNode(String newLeaderNodeId) {
     if (!currentProxySCMNodeId.equals(newLeaderNodeId)) {
       if (scmProxies.containsKey(newLeaderNodeId)) {
         lastAttemptedLeader = currentProxySCMNodeId;
@@ -262,16 +262,15 @@ public class SCMBlockLocationFailoverProxyProvider implements
     return RPC.getProxy(ScmBlockLocationProtocolPB.class, scmVersion,
         scmAddress, UserGroupInformation.getCurrentUser(), hadoopConf,
         NetUtils.getDefaultSocketFactory(hadoopConf),
-        (int)conf.getObject(SCMBlockClientConfig.class).getRpcTimeOut());
+        (int)conf.getObject(SCMClientConfig.class).getRpcTimeOut());
   }
 
-  public RetryPolicy getSCMBlockLocationRetryPolicy(
-      String suggestedLeader) {
+  public RetryPolicy getSCMBlockLocationRetryPolicy(String newLeader) {
     RetryPolicy retryPolicy = new RetryPolicy() {
       @Override
       public RetryAction shouldRetry(Exception e, int retry,
                                      int failover, boolean b) {
-        performFailoverToAssignedLeader(suggestedLeader);
+        performFailoverToAssignedLeader(newLeader);
         return getRetryAction(failover);
       }
     };

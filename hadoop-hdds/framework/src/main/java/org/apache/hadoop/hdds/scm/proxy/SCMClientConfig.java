@@ -32,8 +32,8 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
 /**
  * Config for SCM Block Client.
  */
-@ConfigGroup(prefix = "ozone.scm.block.client")
-public class SCMBlockClientConfig {
+@ConfigGroup(prefix = "ozone.scmclient")
+public class SCMClientConfig {
   public static final String SCM_CLIENT_RPC_TIME_OUT = "rpc.timeout";
   public static final String SCM_CLIENT_FAILOVER_MAX_RETRY =
       "failover.max.retry";
