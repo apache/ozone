@@ -50,6 +50,7 @@ import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.junit.Assert.fail;
 
 /**
@@ -239,7 +240,7 @@ public class TestOzoneFSWithObjectStoreCreate {
       fail("testKeyCreationFailDuetoDirectoryCreationBeforeCommit");
     } catch (IOException ex) {
       Assert.assertTrue(ex instanceof OMException);
-      Assert.assertEquals(OMException.ResultCodes.NOT_A_FILE,
+      Assert.assertEquals(NOT_A_FILE,
           ((OMException) ex).getResult());
     }
 
@@ -283,8 +284,7 @@ public class TestOzoneFSWithObjectStoreCreate {
       fail("testMPUFailDuetoDirectoryCreationBeforeComplete failed");
     } catch (OMException ex) {
       Assert.assertTrue(ex instanceof OMException);
-      Assert.assertEquals(OMException.ResultCodes.NOT_A_FILE,
-          ((OMException) ex).getResult());
+      Assert.assertEquals(NOT_A_FILE, ex.getResult());
     }
 
     // Delete directory
@@ -304,10 +304,29 @@ public class TestOzoneFSWithObjectStoreCreate {
 
   }
 
-  @Test(expected = FileAlreadyExistsException.class)
-  public void testCreateDirectoryFirstThenFileWithSameName() throws Exception {
+  @Test
+  public void testCreateDirectoryFirstThenKeyAndFileWithSameName()
+      throws Exception {
     o3fs.mkdirs(new Path("/t1/t2"));
-    o3fs.create(new Path("/t1/t2"));
+
+    try {
+      o3fs.create(new Path("/t1/t2"));
+      fail("testCreateDirectoryFirstThenFileWithSameName failed");
+    } catch (FileAlreadyExistsException ex) {
+      Assert.assertTrue(ex.getMessage().contains(NOT_A_FILE.name()));
+    }
+
+    OzoneVolume ozoneVolume =
+        cluster.getRpcClient().getObjectStore().getVolume(volumeName);
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+    ozoneBucket.createDirectory("t1/t2");
+    try {
+      ozoneBucket.createKey("t1/t2", 0);
+      fail("testCreateDirectoryFirstThenFileWithSameName failed");
+    } catch (OMException ex) {
+      Assert.assertTrue(ex instanceof OMException);
+      Assert.assertEquals(NOT_A_FILE, ex.getResult());
+    }
   }
 
   private void checkPath(Path path) {
