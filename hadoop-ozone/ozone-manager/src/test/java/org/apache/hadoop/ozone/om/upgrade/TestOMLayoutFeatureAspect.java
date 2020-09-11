@@ -56,7 +56,7 @@ public class TestOMLayoutFeatureAspect {
    */
   @Test
   public void testCheckLayoutFeature() throws Exception {
-    OMLayoutVersionManager.initialize(new OMStorage(configuration));
+    OMLayoutVersionManagerImpl.initialize(new OMStorage(configuration));
     OMLayoutFeatureUtil testObj = new OMLayoutFeatureUtil();
     try {
       testObj.ecMethod();

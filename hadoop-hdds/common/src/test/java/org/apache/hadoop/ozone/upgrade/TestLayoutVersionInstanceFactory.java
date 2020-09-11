@@ -26,7 +26,6 @@ import static org.mockito.Mockito.when;
 import java.util.function.Supplier;
 
 import org.apache.hadoop.test.LambdaTestUtils;
-import org.junit.Before;
 import org.junit.Test;
 
 /**
@@ -36,80 +35,73 @@ public class TestLayoutVersionInstanceFactory {
 
   private MockInterface m1 = new MockClassV1();
   private MockInterface m2 = new MockClassV2();
-  private LayoutVersionManager lvm;
 
-  @Before
-  public void setUp() {
-    lvm = mock(LayoutVersionManager.class);
-    when(lvm.getMetadataLayoutVersion()).thenReturn(3);
-    when(lvm.getSoftwareLayoutVersion()).thenReturn(3);
-  }
 
   @Test
   public void testRegister() throws Exception {
+    LayoutVersionManager lvm = getMockLvm(1, 2);
     LayoutVersionInstanceFactory<MockInterface> factory =
-        new LayoutVersionInstanceFactory<>(lvm);
-    factory.register(getKey("key", 1), m1);
-    factory.register(getKey("key", 2), m1);
+        new LayoutVersionInstanceFactory<>();
+
+    assertTrue(factory.register(lvm, getKey("key", 0), m1));
+    assertTrue(factory.register(lvm, getKey("key", 1), m1));
+    assertTrue(factory.register(lvm, getKey("key", 2), m2));
 
     assertEquals(1, factory.getInstances().size());
+    assertEquals(2, factory.getInstances().get("key").size());
 
     // Should fail on re-registration.
     LambdaTestUtils.intercept(IllegalArgumentException.class,
         "existing entry already",
-        () -> factory.register(getKey("key", 1), new MockClassV1()));
+        () -> factory.register(lvm, getKey("key", 1), new MockClassV1()));
     assertEquals(1, factory.getInstances().size());
 
-    // Verify MLV check.
+    // Verify SLV check.
     LambdaTestUtils.intercept(IllegalArgumentException.class,
         "version is greater",
-        () -> factory.register(getKey("key2", 4), new MockClassV1()));
+        () -> factory.register(lvm, getKey("key2", 4), new MockClassV2()));
 
   }
 
   @Test
   public void testGet() throws Exception {
+    LayoutVersionManager lvm = getMockLvm(2, 3);
     LayoutVersionInstanceFactory<MockInterface> factory =
-        new LayoutVersionInstanceFactory<>(lvm);
-    factory.register(getKey("key", 1), m1);
-    factory.register(getKey("key", 2), m2);
+        new LayoutVersionInstanceFactory<>();
+    assertTrue(factory.register(lvm, getKey("key", 0), null));
+    assertTrue(factory.register(lvm, getKey("key", 1), m1));
+    assertTrue(factory.register(lvm, getKey("key", 3), m2));
 
-    MockInterface val = factory.get(getKey("key", 1));
+    MockInterface val = factory.get(lvm, getKey("key", 2));
     assertTrue(val instanceof MockClassV1);
 
-    val = factory.get(getKey("key", 3));
-    assertTrue(val instanceof MockClassV2);
-
     // Not passing in version --> Use MLV.
-    val = factory.get(getKey("key", null));
-    assertTrue(val instanceof MockClassV2);
+    val = factory.get(lvm, getKey("key", null));
+    assertTrue(val instanceof MockClassV1);
 
     // MLV check.
     LambdaTestUtils.intercept(IllegalArgumentException.class,
         "version is greater",
-        () -> factory.get(getKey("key", 4)));
-
+        () -> factory.get(lvm, getKey("key", 3)));
 
     // Verify failure on Unknown request.
     LambdaTestUtils.intercept(IllegalArgumentException.class,
-        "Unrecognized instance request",
-        () -> factory.get(getKey("key1", 1)));
+        "No suitable instance found",
+        () -> factory.get(lvm, getKey("key1", 1)));
   }
 
   @Test
   public void testMethodBasedVersionFactory() {
+    LayoutVersionManager lvm = getMockLvm(1, 2);
     LayoutVersionInstanceFactory<Supplier<String>> factory =
-        new LayoutVersionInstanceFactory<>(lvm);
+        new LayoutVersionInstanceFactory<>();
 
     MockClassWithVersionedAPIs m = new MockClassWithVersionedAPIs();
-    factory.register(getKey("method", 1), m::mockMethodV1);
-    factory.register(getKey("method", 2), m::mockMethodV2);
+    factory.register(lvm, getKey("method", 1), m::mockMethodV1);
+    factory.register(lvm, getKey("method", 2), m::mockMethodV2);
 
-    Supplier<String> method = factory.get(getKey("method", 1));
+    Supplier<String> method = factory.get(lvm, getKey("method", 1));
     assertEquals("v1", method.get());
-
-    method = factory.get(getKey("method", null));
-    assertEquals("v2", method.get());
   }
 
 
@@ -119,6 +111,14 @@ public class TestLayoutVersionInstanceFactory {
       vfKey.version(version);
     }
     return vfKey.build();
+  }
+
+
+  private LayoutVersionManager getMockLvm(int mlv, int slv) {
+    LayoutVersionManager lvm = mock(LayoutVersionManager.class);
+    when(lvm.getMetadataLayoutVersion()).thenReturn(mlv);
+    when(lvm.getSoftwareLayoutVersion()).thenReturn(slv);
+    return lvm;
   }
 
   /**

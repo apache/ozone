@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.upgrade.OmRequestFactory;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -64,7 +63,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   private final AtomicLong transactionIndex = new AtomicLong(0L);
   private final OzoneProtocolMessageDispatcher<OMRequest, OMResponse>
       dispatcher;
-  private final OmRequestFactory omVersionFactory;
 
   /**
    * Constructs an instance of the server handler.
@@ -102,8 +100,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     this.omRatisServer = ratisServer;
     dispatcher = new OzoneProtocolMessageDispatcher<>("OzoneProtocol",
         metrics, LOG);
-
-    omVersionFactory = ozoneManager.getVersionManager().getVersionFactory();
   }
 
   /**

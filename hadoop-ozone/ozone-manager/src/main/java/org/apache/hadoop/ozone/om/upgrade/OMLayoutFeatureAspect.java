@@ -42,7 +42,7 @@ public class OMLayoutFeatureAspect {
     String featureName = ((MethodSignature) joinPoint.getSignature())
         .getMethod().getAnnotation(DisallowedUntilLayoutVersion.class)
         .value().name();
-    LayoutVersionManager lvm = OMLayoutVersionManager.getInstance();
+    LayoutVersionManager lvm = OMLayoutVersionManagerImpl.getInstance();
     if (!lvm.isAllowed(featureName)) {
       LayoutFeature layoutFeature = lvm.getFeature(featureName);
       throw new OMException(String.format("Operation %s cannot be invoked " +

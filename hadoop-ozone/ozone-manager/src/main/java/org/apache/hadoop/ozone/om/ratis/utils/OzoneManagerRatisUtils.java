@@ -79,9 +79,10 @@ public final class OzoneManagerRatisUtils {
     case SetVolumeProperty:
       return getVolumeSetPropertyRequest(om, omRequest);
     default:
-      Class<? extends OMClientRequest> requestType =
-          om.getVersionManager().getVersionFactory().getRequestType(omRequest);
-      return getClientRequest(requestType, omRequest);
+      Class<? extends OMClientRequest> requestClass =
+          om.getVersionManager()
+              .getRequestHandler(omRequest.getCmdType().name());
+      return getClientRequest(requestClass, omRequest);
     }
   }
 
@@ -140,8 +141,7 @@ public final class OzoneManagerRatisUtils {
       }
     }
     Class<? extends OMClientRequest> requestClass =
-        om.getVersionManager().getVersionFactory().getRequestType(
-        requestType, om.getVersionManager().getMetadataLayoutVersion());
+        om.getVersionManager().getRequestHandler(requestType);
     return getClientRequest(requestClass, omRequest);
   }
 
@@ -161,8 +161,7 @@ public final class OzoneManagerRatisUtils {
     String requestType = hasQuota ? OMVolumeSetQuotaRequest.getRequestType() :
         OMVolumeSetOwnerRequest.getRequestType();
     Class<? extends OMClientRequest> requestClass =
-        om.getVersionManager().getVersionFactory().getRequestType(
-            requestType, om.getVersionManager().getMetadataLayoutVersion());
+        om.getVersionManager().getRequestHandler(requestType);
     return getClientRequest(requestClass, omRequest);
   }
 

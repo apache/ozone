@@ -19,12 +19,14 @@
 package org.apache.hadoop.ozone.upgrade;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.stream.Collectors.toList;
 
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
-
-import org.apache.commons.collections.MapUtils;
+import java.util.Optional;
+import java.util.PriorityQueue;
 
 import com.google.common.annotations.VisibleForTesting;
 
@@ -45,41 +47,86 @@ import com.google.common.annotations.VisibleForTesting;
  */
 public class LayoutVersionInstanceFactory<T> {
 
-  private final Map<String, TreeMap<Integer, T>> instances = new HashMap<>();
-  private LayoutVersionManager lvm;
-
-  public LayoutVersionInstanceFactory(LayoutVersionManager lvm) {
-    this.lvm = lvm;
-  }
+  /**
+   * The factory will maintain ALL instances > MLV and 1 instance <= MLV in a
+   * priority queue (ordered by version). By doing that it guarantees O(1)
+   * lookup at all times, since we always would lookup the first element (top
+   * of the PQ).
+   * Multiple entries will be there ONLY during pre-finalized state.
+   * On finalization, we will be removing the entry one by one until we reach
+   * a single entry. On a regular component instance (finalized), there will
+   * be a single request version associated with a request always.
+   */
+  private final Map<String, PriorityQueue<VersionedInstance<T>>> instances =
+      new HashMap<>();
 
   /**
-   * Register an instance with a given factory key (key + version). For
-   * safety reasons, we dont allow re-registering.
+   * Register an instance with a given factory key (key + version).
+   * For safety reasons we dont allow (1) re-registering, (2) registering an
+   * instance with version > SLV.
+   *
+   * @param lvm LayoutVersionManager
    * @param key VersionFactoryKey key to associate with instance.
    * @param instance instance to register.
    */
-  public void register(VersionFactoryKey key, T instance) {
+  public boolean register(LayoutVersionManager lvm, VersionFactoryKey key,
+                       T instance) {
+    // If version is not passed in, go defensive and set the highest possible
+    // version (SLV).
+    int version = key.getVersion() == null ?
+        lvm.getSoftwareLayoutVersion() : key.getVersion();
+
     checkArgument(lvm.getSoftwareLayoutVersion() >= key.getVersion(),
         String.format("Cannot register key %s since the version is greater " +
                 "than the Software layout version %d",
         key, lvm.getSoftwareLayoutVersion()));
 
+    // If we reach here, we know that the passed in version belongs to
+    // [0, SLV].
     String primaryKey = key.getKey();
-    if (!instances.containsKey(primaryKey)) {
-      instances.put(primaryKey, new TreeMap<>());
-    }
+    instances.computeIfAbsent(primaryKey, s ->
+        new PriorityQueue<>(Comparator.comparingInt(o -> o.version)));
 
-    TreeMap<Integer, T> versionedInstances = instances.get(primaryKey);
-    if (versionedInstances.containsKey(key.getVersion())) {
+    PriorityQueue<VersionedInstance<T>> versionedInstances =
+        instances.get(primaryKey);
+    Optional<VersionedInstance<T>> existingInstance =
+        versionedInstances.parallelStream()
+        .filter(v -> v.version == key.getVersion()).findAny();
+
+    if (existingInstance.isPresent()) {
       throw new IllegalArgumentException(String.format("Cannot register key " +
           "%s since there is an existing entry already.", key));
     }
 
-    // If version is not passed in, go defensive and set the highest possible
-    // version (SLV).
-    int version = key.getVersion() == null ?
-        lvm.getSoftwareLayoutVersion() : key.getVersion();
-    versionedInstances.put(version, instance);
+    if (!versionedInstances.isEmpty() && isValid(lvm, version)) {
+      VersionedInstance<T> currentPeek = versionedInstances.peek();
+      if (currentPeek.version < version) {
+        // Current peek < passed in version (and <= MLV). Hence, we can
+        // remove it, since the passed in a better candidate.
+        versionedInstances.poll();
+        // Add the passed in instance.
+        versionedInstances.offer(new VersionedInstance<>(version, instance));
+        return true;
+      } else if (currentPeek.version > lvm.getMetadataLayoutVersion()) {
+        // Current peak is > MLV, hence we don't need to remove that. Just
+        // add passed in instance.
+        versionedInstances.offer(new VersionedInstance<>(version, instance));
+        return true;
+      } else {
+        // Current peek <= MLV and > passed in version, and hence a better
+        // canidate. Retaining the peek, and ignoring the passed in instance.
+        return false;
+      }
+    } else {
+      // Passed in instance version > MLV (or the first version to be
+      // registered), hence can be registered.
+      versionedInstances.offer(new VersionedInstance<>(version, instance));
+      return true;
+    }
+  }
+
+  private boolean isValid(LayoutVersionManager lvm, int version) {
+    return version <= lvm.getMetadataLayoutVersion();
   }
 
   /**
@@ -88,10 +135,13 @@ public class LayoutVersionInstanceFactory<T> {
    * For example, if we have key = "CreateKey",  entry -> [(1, CreateKeyV1),
    * (3, CreateKeyV2), and if the passed in key = CreateKey & version = 2, we
    * return CreateKeyV1.
+   * Since this is a priority queue based implementation, we use a O(1) peek()
+   * lookup to get the current valid version.
+   * @param lvm LayoutVersionManager
    * @param key Key and Version.
    * @return instance.
    */
-  public T get(VersionFactoryKey key) {
+  public T get(LayoutVersionManager lvm, VersionFactoryKey key) {
     Integer version = key.getVersion();
     // If version is not passed in, go defensive and set the highest allowed
     // version (MLV).
@@ -105,23 +155,53 @@ public class LayoutVersionInstanceFactory<T> {
             key, lvm.getMetadataLayoutVersion()));
 
     String primaryKey = key.getKey();
-    TreeMap<Integer, T> versionedInstances = instances.get(primaryKey);
-    if (MapUtils.isEmpty(versionedInstances)) {
-      throw new
-          IllegalArgumentException("Unrecognized instance request : " + key);
+    PriorityQueue<VersionedInstance<T>> versionedInstances =
+        instances.get(primaryKey);
+    if (versionedInstances == null || versionedInstances.isEmpty()) {
+      throw new IllegalArgumentException(
+          "No suitable instance found for request : " + key);
     }
 
-    T value = versionedInstances.floorEntry(version).getValue();
-    if (value == null) {
-      throw new
-          IllegalArgumentException("Unrecognized instance request : " + key);
+    VersionedInstance<T> value = versionedInstances.peek();
+    if (value == null || value.version > version) {
+      throw new IllegalArgumentException(
+          "No suitable instance found for request : " + key);
     } else {
-      return value;
+      return value.instance;
     }
   }
 
   @VisibleForTesting
-  public Map<String, TreeMap<Integer, T>> getInstances() {
-    return instances;
+  protected Map<String, List<T>> getInstances()  {
+    Map<String, List<T>> instancesCopy = new HashMap<>();
+    instances.forEach((key, value) -> {
+      List<T> collect =
+          value.stream().map(v -> v.instance).collect(toList());
+      instancesCopy.put(key, collect);
+    });
+    return instancesCopy;
+  }
+
+  /**
+   * Class to encapsulate a instance with version. Not meant to be exposed
+   * outside this class.
+   * @param <T> instance
+   */
+  static class VersionedInstance<T> {
+    private int version;
+    private T instance;
+
+    VersionedInstance(int version, T instance) {
+      this.version = version;
+      this.instance = instance;
+    }
+
+    public long getVersion() {
+      return version;
+    }
+
+    public T getInstance() {
+      return instance;
+    }
   }
 }

@@ -18,23 +18,24 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.CREATE_EC;
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.ozone.om.OMStorage;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.key.OMECKeyCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -43,17 +44,15 @@ import org.reflections.Reflections;
 /**
  * Test OmVersionFactory.
  */
-public class TestOmRequestFactory {
+public class TestOmVersionManagerRequestFactory {
 
-  private static OmRequestFactory omRequestFactory;
-  private static OMLayoutVersionManager omVersionManager;
+  private static OMLayoutVersionManagerImpl omVersionManager;
 
   @BeforeClass
   public static void setup() throws OMException {
     OMStorage omStorage = mock(OMStorage.class);
     when(omStorage.getLayoutVersion()).thenReturn(0);
-    omVersionManager = OMLayoutVersionManager.initialize(omStorage);
-    omRequestFactory = omVersionManager.getVersionFactory();
+    omVersionManager = OMLayoutVersionManagerImpl.initialize(omStorage);
   }
 
   @Test
@@ -61,55 +60,54 @@ public class TestOmRequestFactory {
 
     // Try getting v1 of 'CreateKey'.
     Class<? extends OMClientRequest> requestType =
-        omRequestFactory.getRequestType(OMRequest.newBuilder()
-            .setCmdType(CreateKey)
-            .setClientId("c1")
-            .setLayoutVersion(LayoutVersion
-                .newBuilder()
-                .setVersion(INITIAL_VERSION.layoutVersion())
-                .build())
-            .build());
+        omVersionManager.getRequestHandler(CreateKey.name());
     Assert.assertEquals(requestType, OMKeyCreateRequest.class);
 
-    // Try getting 'CreateECKey' (V2). Should fail.
-    LambdaTestUtils.intercept(IllegalArgumentException.class,
-        "version is greater than the Metadata layout version", () ->
-        omRequestFactory.getRequestType(OMRequest.newBuilder()
-        .setCmdType(CreateKey)
-        .setClientId("c1")
-        .setLayoutVersion(LayoutVersion
-            .newBuilder()
-            .setVersion(CREATE_EC.layoutVersion())
-            .build())
-        .build()));
-
     // Finalize the version manager.
-    omVersionManager.doFinalize(null);
+    omVersionManager.doFinalize(mock(OzoneManager.class));
 
-    // Try getting 'CreateECKey' again. Should succeed.
-    requestType = omRequestFactory.getRequestType(OMRequest.newBuilder()
-        .setCmdType(CreateKey)
-        .setClientId("c1")
-        .setLayoutVersion(LayoutVersion
-            .newBuilder()
-            .setVersion(CREATE_EC.layoutVersion())
-            .build())
-        .build());
+    // Try getting 'CreateKey' again. Should return CreateECKey.
+    requestType = omVersionManager.getRequestHandler(CreateKey.name());
     Assert.assertEquals(requestType, OMECKeyCreateRequest.class);
   }
 
   @Test
-  public void testAllOMRequestClassesRegistered() {
+  public void testAllOMRequestClassesRegistered() throws Exception {
     Reflections reflections = new Reflections(
         "org.apache.hadoop.ozone.om.request");
     Set<Class<? extends OMClientRequest>> subTypes =
         reflections.getSubTypesOf(OMClientRequest.class);
-    long count = subTypes.stream().filter(
-        c -> !Modifier.isAbstract(c.getModifiers())).count();
+    List<Class<? extends OMClientRequest>> collect = subTypes.stream()
+            .filter(c -> !Modifier.isAbstract(c.getModifiers()))
+            .collect(Collectors.toList());
 
-    Integer countFromFactory = omRequestFactory.getRequestFactory()
-        .getInstances().values().stream()
-        .map(c -> c.size()).reduce(0, Integer::sum);
-    Assert.assertEquals(Math.toIntExact(count), (int) countFromFactory);
+    for (Class<? extends OMClientRequest> c : collect) {
+      Method getRequestTypeMethod = c.getMethod("getRequestType");
+      String type = (String) getRequestTypeMethod.invoke(null);
+      Assert.assertNotNull(String.format("Cannot get handler for %s", type),
+          omVersionManager.getRequestHandler(type));
+    }
+  }
+
+  @Test
+  public void testOmClientRequestHasExpectedConstructor()
+      throws NoSuchMethodException {
+    Reflections reflections = new Reflections(
+        "org.apache.hadoop.ozone.om.request");
+    Set<Class<? extends OMClientRequest>> subTypes =
+        reflections.getSubTypesOf(OMClientRequest.class);
+
+    for (Class<? extends OMClientRequest> requestClass : subTypes) {
+      if (Modifier.isAbstract(requestClass.getModifiers())) {
+        continue;
+      }
+      Method getRequestTypeMethod = requestClass.getMethod(
+          "getRequestType");
+      Assert.assertNotNull(getRequestTypeMethod);
+
+      Constructor<? extends OMClientRequest> constructorWithOmRequestArg =
+          requestClass.getDeclaredConstructor(OMRequest.class);
+      Assert.assertNotNull(constructorWithOmRequestArg);
+    }
   }
 }

@@ -43,15 +43,15 @@ public class TestOMVersionManager {
 
   @After
   public void cleanup() {
-    OMLayoutVersionManager.resetLayoutVersionManager();
+    OMLayoutVersionManagerImpl.resetLayoutVersionManager();
   }
 
   @Test
   public void testOMLayoutVersionManager() throws IOException {
     OMStorage omStorage = mock(OMStorage.class);
     when(omStorage.getLayoutVersion()).thenReturn(0);
-    OMLayoutVersionManager omVersionManager =
-        OMLayoutVersionManager.initialize(omStorage);
+    OMLayoutVersionManagerImpl omVersionManager =
+        OMLayoutVersionManagerImpl.initialize(omStorage);
     assertTrue(omVersionManager.isAllowed(INITIAL_VERSION));
     assertFalse(omVersionManager.isAllowed(CREATE_EC));
     assertEquals(0, omVersionManager.getMetadataLayoutVersion());
@@ -68,7 +68,7 @@ public class TestOMVersionManager {
         OMLayoutFeature.values()[OMLayoutFeature.values().length - 1]
             .layoutVersion() + 1);
     try {
-      OMLayoutVersionManager.initialize(omStorage);
+      OMLayoutVersionManagerImpl.initialize(omStorage);
       Assert.fail();
     } catch (OMException ex) {
       assertEquals(NOT_SUPPORTED_OPERATION, ex.getResult());
@@ -79,13 +79,13 @@ public class TestOMVersionManager {
   public void testOMLayoutVersionManagerReset() throws IOException {
     OMStorage omStorage = mock(OMStorage.class);
     when(omStorage.getLayoutVersion()).thenReturn(0);
-    OMLayoutVersionManager omVersionManager =
-        OMLayoutVersionManager.initialize(omStorage);
+    OMLayoutVersionManagerImpl omVersionManager =
+        OMLayoutVersionManagerImpl.initialize(omStorage);
     int numLayoutVersions = OMLayoutFeature.values().length;
     assertEquals(
         OMLayoutFeature.values()[numLayoutVersions - 1].layoutVersion(),
         omVersionManager.getSoftwareLayoutVersion());
-    OMLayoutVersionManager.resetLayoutVersionManager();
+    OMLayoutVersionManagerImpl.resetLayoutVersionManager();
     assertEquals(0, omVersionManager.getSoftwareLayoutVersion());
   }
 

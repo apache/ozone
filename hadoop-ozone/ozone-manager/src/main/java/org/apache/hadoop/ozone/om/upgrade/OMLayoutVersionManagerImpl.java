@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,17 +18,23 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Set;
 
+import org.apache.hadoop.ozone.common.Storage;
+import org.apache.hadoop.ozone.om.OMStorage;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager;
+import org.apache.hadoop.ozone.upgrade.LayoutVersionInstanceFactory;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.VersionFactoryKey;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionInstanceFactory;
 import org.reflections.Reflections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,27 +42,86 @@ import org.slf4j.LoggerFactory;
 import com.google.common.annotations.VisibleForTesting;
 
 /**
- * Wrapper class for OM around a generic Versioned Instance factory.
+ * Class to manage layout versions and features for Ozone Manager.
  */
-public class OmRequestFactory {
+public final class OMLayoutVersionManagerImpl
+    extends AbstractLayoutVersionManager implements OmLayoutVersionManager {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(OmRequestFactory.class);
-  private LayoutVersionManager layoutVersionManager;
+      LoggerFactory.getLogger(OMLayoutVersionManagerImpl.class);
 
+  private static OMLayoutVersionManagerImpl omVersionManager;
   private LayoutVersionInstanceFactory<Class<? extends OMClientRequest>>
       requestFactory;
 
-  public OmRequestFactory(LayoutVersionManager lvm) {
-    this.layoutVersionManager = lvm;
-    this.requestFactory = new LayoutVersionInstanceFactory<>(lvm);
-    registerOzoneManagerRequests();
+  private OMLayoutVersionManagerImpl() {
+    requestFactory = new LayoutVersionInstanceFactory<>();
   }
 
   /**
-   * Scan the packages in 'ozone.om.request' and register all classes of type
-   * 'OMClientRequest' to the factory.
+   * Read only instance to OM Version Manager.
+   * @return version manager instance.
    */
+  public static synchronized LayoutVersionManager getInstance() {
+    if (omVersionManager == null) {
+      throw new RuntimeException("OM Layout Version Manager not yet " +
+          "initialized.");
+    }
+    return omVersionManager;
+  }
+
+
+  /**
+   * Initialize OM version manager from storage.
+   * @return version manager instance.
+   */
+  public static synchronized OMLayoutVersionManagerImpl initialize(
+      OMStorage omStorage)
+      throws OMException {
+    if (omVersionManager == null) {
+      omVersionManager = new OMLayoutVersionManagerImpl();
+      omVersionManager.init(omStorage);
+    }
+    return omVersionManager;
+  }
+
+  /**
+   * Initialize the OM Layout Features and current Layout Version.
+   * @param storage to read the current layout version.
+   * @throws OMException on error.
+   */
+  private void init(Storage storage) throws OMException {
+    init(storage.getLayoutVersion(), OMLayoutFeature.values());
+
+    if (metadataLayoutVersion > softwareLayoutVersion) {
+      throw new OMException(
+          String.format("Cannot initialize VersionManager. Metadata " +
+                  "layout version (%d) > software layout version (%d)",
+              metadataLayoutVersion, softwareLayoutVersion),
+          NOT_SUPPORTED_OPERATION);
+    }
+    registerOzoneManagerRequests();
+  }
+
+  public void doFinalize(OzoneManager om) {
+    super.doFinalize(om);
+    requestFactory = new LayoutVersionInstanceFactory<>();
+    registerOzoneManagerRequests();
+  }
+
+  @VisibleForTesting
+  protected synchronized static void resetLayoutVersionManager() {
+    if (omVersionManager != null) {
+      omVersionManager.reset();
+      omVersionManager = null;
+    }
+  }
+
+  public void reset() {
+    requestFactory = null;
+    super.reset();
+  }
+
   private void registerOzoneManagerRequests() {
     Reflections reflections = new Reflections(
         "org.apache.hadoop.ozone.om.request");
@@ -93,20 +158,10 @@ public class OmRequestFactory {
   }
 
   private void registerRequestType(String type, int version,
-      Class<? extends OMClientRequest> requestClass) {
+                                   Class<? extends OMClientRequest> reqClass) {
     VersionFactoryKey key = new VersionFactoryKey.Builder()
         .key(type).version(version).build();
-    requestFactory.register(key, requestClass);
-  }
-
-  /**
-   * Given an OM Request, get the corresponding request class type.
-   * @param omRequest Om request
-   * @return class type.
-   */
-  public Class< ? extends OMClientRequest> getRequestType(OMRequest omRequest) {
-    VersionFactoryKey versionFactoryKey = getVersionFactoryKey(omRequest);
-    return requestFactory.get(versionFactoryKey);
+    requestFactory.register(this, key, reqClass);
   }
 
   /**
@@ -115,26 +170,20 @@ public class OmRequestFactory {
    * @param version version
    * @return class type.
    */
-  public Class< ? extends OMClientRequest> getRequestType(
-      String requestType, int version) {
+  @Override
+  public Class< ? extends OMClientRequest> getRequestHandler(String type) {
     VersionFactoryKey versionFactoryKey = new VersionFactoryKey.Builder()
-        .key(requestType).version(version).build();
-    return requestFactory.get(versionFactoryKey);
+        .key(type).build();
+    return requestFactory.get(this, versionFactoryKey);
   }
 
   private VersionFactoryKey getVersionFactoryKey(OMRequest omRequest) {
     int version = omRequest.hasLayoutVersion() ?
         Math.toIntExact(omRequest.getLayoutVersion().getVersion()) :
-        layoutVersionManager.getMetadataLayoutVersion();
+        metadataLayoutVersion;
     return new VersionFactoryKey.Builder()
         .version(version)
         .key(omRequest.getCmdType().name())
         .build();
-  }
-
-  @VisibleForTesting
-  protected LayoutVersionInstanceFactory<Class<? extends OMClientRequest>>
-      getRequestFactory() {
-    return requestFactory;
   }
 }
