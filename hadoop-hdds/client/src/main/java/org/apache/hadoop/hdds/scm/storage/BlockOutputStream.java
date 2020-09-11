@@ -17,45 +17,43 @@
  */
 
 package org.apache.hadoop.hdds.scm.storage;
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
+import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
+import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.writeChunkAsync;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
-import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
-import org.apache.hadoop.hdds.client.BlockID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
-
-import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls
-    .putBlockAsync;
-import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls
-    .writeChunkAsync;
 
 /**
  * An {@link OutputStream} used by the REST service in combination with the
@@ -120,6 +118,13 @@ public class BlockOutputStream extends OutputStream {
   private final List<DatanodeDetails> failedServers;
   private final Checksum checksum;
 
+  //number of buffers used before doing a flush/putBlock.
+  private int flushPeriod;
+  //bytes remaining to write in the current buffer.
+  private int currentBufferRemaining;
+  //current buffer allocated to write
+  private ChunkBuffer currentBuffer;
+
   /**
    * Creates a new BlockOutputStream.
    *
@@ -154,6 +159,14 @@ public class BlockOutputStream extends OutputStream {
     this.bufferPool = bufferPool;
     this.bytesPerChecksum = bytesPerChecksum;
 
+    //number of buffers used before doing a flush
+    refreshCurrentBuffer(bufferPool);
+    flushPeriod = (int) (streamBufferFlushSize / streamBufferSize);
+
+    Preconditions
+        .checkArgument(
+            (long) flushPeriod * streamBufferSize == streamBufferFlushSize);
+
     // A single thread executor handle the responses of async requests
     responseExecutor = Executors.newSingleThreadExecutor();
     commitWatcher = new CommitWatcher(bufferPool, xceiverClient);
@@ -165,6 +178,11 @@ public class BlockOutputStream extends OutputStream {
     checksum = new Checksum(checksumType, bytesPerChecksum);
   }
 
+  private void refreshCurrentBuffer(BufferPool pool) {
+    currentBuffer = pool.getCurrentBuffer();
+    currentBufferRemaining =
+        currentBuffer != null ? currentBuffer.remaining() : 0;
+  }
 
   public BlockID getBlockID() {
     return blockID.get();
@@ -209,9 +227,18 @@ public class BlockOutputStream extends OutputStream {
   @Override
   public void write(int b) throws IOException {
     checkOpen();
-    byte[] buf = new byte[1];
-    buf[0] = (byte) b;
-    write(buf, 0, 1);
+    allocateNewBufferIfNeeded();
+    currentBuffer.put((byte) b);
+    currentBufferRemaining--;
+    writeChunkIfNeeded();
+    writtenDataLength++;
+    doFlushOrWatchIfNeeded();
+  }
+
+  private void writeChunkIfNeeded() throws IOException {
+    if (currentBufferRemaining == 0) {
+      writeChunk(currentBuffer);
+    }
   }
 
   @Override
@@ -229,32 +256,36 @@ public class BlockOutputStream extends OutputStream {
     }
 
     while (len > 0) {
-      // Allocate a buffer if needed. The buffer will be allocated only
-      // once as needed and will be reused again for multiple blockOutputStream
-      // entries.
-      final ChunkBuffer currentBuffer = bufferPool.allocateBufferIfNeeded(
-          bytesPerChecksum);
-      final int writeLen = Math.min(currentBuffer.remaining(), len);
+      allocateNewBufferIfNeeded();
+      final int writeLen = Math.min(currentBufferRemaining, len);
       currentBuffer.put(b, off, writeLen);
-      if (!currentBuffer.hasRemaining()) {
-        writeChunk(currentBuffer);
-      }
+      currentBufferRemaining -= writeLen;
+      writeChunkIfNeeded();
       off += writeLen;
       len -= writeLen;
       writtenDataLength += writeLen;
-      if (shouldFlush()) {
+      doFlushOrWatchIfNeeded();
+    }
+  }
+
+  private void doFlushOrWatchIfNeeded() throws IOException {
+    if (currentBufferRemaining == 0) {
+      if (bufferPool.getNumberOfUsedBuffers() % flushPeriod == 0) {
         updateFlushLength();
         executePutBlock(false, false);
       }
       // Data in the bufferPool can not exceed streamBufferMaxSize
-      if (isBufferPoolFull()) {
+      if (bufferPool.getNumberOfUsedBuffers() == bufferPool.getCapacity()) {
         handleFullBuffer();
       }
     }
   }
 
-  private boolean shouldFlush() {
-    return bufferPool.computeBufferData() % streamBufferFlushSize == 0;
+  private void allocateNewBufferIfNeeded() {
+    if (currentBufferRemaining == 0) {
+      currentBuffer = bufferPool.allocateBuffer(bytesPerChecksum);
+      currentBufferRemaining = currentBuffer.remaining();
+    }
   }
 
   private void updateFlushLength() {
@@ -264,6 +295,7 @@ public class BlockOutputStream extends OutputStream {
   private boolean isBufferPoolFull() {
     return bufferPool.computeBufferData() == streamBufferMaxSize;
   }
+
   /**
    * Will be called on the retryPath in case closedContainerException/
    * TimeoutException.
@@ -334,6 +366,7 @@ public class BlockOutputStream extends OutputStream {
   // only contain data which have not been sufficiently replicated
   private void adjustBuffersOnException() {
     commitWatcher.releaseBuffersOnException();
+    refreshCurrentBuffer(bufferPool);
   }
 
   /**
@@ -363,6 +396,8 @@ public class BlockOutputStream extends OutputStream {
       setIoException(ioe);
       throw getIoException();
     }
+    refreshCurrentBuffer(bufferPool);
+
   }
 
   /**
@@ -481,7 +516,7 @@ public class BlockOutputStream extends OutputStream {
     checkOpen();
     // flush the last chunk data residing on the currentBuffer
     if (totalDataFlushedLength < writtenDataLength) {
-      final ChunkBuffer currentBuffer = bufferPool.getCurrentBuffer();
+      refreshCurrentBuffer(bufferPool);
       Preconditions.checkArgument(currentBuffer.position() > 0);
       if (currentBuffer.hasRemaining()) {
         writeChunk(currentBuffer);
