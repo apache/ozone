@@ -66,6 +66,11 @@ public class KeyDeletingService extends BackgroundService {
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyDeletingService.class);
 
+  // Use only a single thread for KeyDeletion. Multiple threads would read
+  // from the same table and can send deletion requests for same key multiple
+  // times.
+  private final static int KEY_DELETING_CORE_POOL_SIZE = 1;
+
   private final OzoneManager ozoneManager;
   private final ScmBlockLocationProtocol scmClient;
   private final KeyManager manager;
@@ -79,7 +84,7 @@ public class KeyDeletingService extends BackgroundService {
       KeyManager manager, long serviceInterval,
       long serviceTimeout, ConfigurationSource conf) {
     super("KeyDeletingService", serviceInterval, TimeUnit.MILLISECONDS,
-        1, serviceTimeout);
+        KEY_DELETING_CORE_POOL_SIZE, serviceTimeout);
     this.ozoneManager = ozoneManager;
     this.scmClient = scmClient;
     this.manager = manager;
