@@ -61,6 +61,7 @@ enum Type {
   AllocateBlock = 37;
   DeleteKeys = 38;
   RenameKeys = 39;
+  DeleteOpenKeys = 40;
 
   InitiateMultiPartUpload = 45;
   CommitMultiPartUpload = 46;
