@@ -184,6 +184,18 @@ public class ObjectEndpoint extends EndpointBase {
       // Normal put object
       OzoneBucket bucket = getBucket(bucketName);
 
+      // As S3A when create directory creates a put object with 0 bytes.
+      // So, we can safely call create directory.
+      // And also in S3 world, there is no such an API to create a directory.
+      // If some one is passing key with trailing "/" and length 0, Ozone S3
+      // can create directory.
+
+      if (length == 0 && keyPath.endsWith("/")) {
+        bucket.createDirectory(keyPath);
+        return Response.ok().status(HttpStatus.SC_OK)
+            .build();
+      }
+
       output = bucket.createKey(keyPath, length, replicationType,
           replicationFactor, new HashMap<>());
 
