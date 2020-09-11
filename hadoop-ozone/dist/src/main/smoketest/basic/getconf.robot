@@ -22,12 +22,12 @@ Test Timeout        5 minutes
 *** Test Cases ***
 Ozone getconf OM
     ${result} =        Execute              ozone getconf ozonemanagers
-                       Should contain   ${result}   Number of Keys added: 1
+                       Should contain   ${result}   om
 
 Ozone getconf SCM
     ${result} =        Execute              ozone getconf storagecontainermanagers
-                       Should contain   ${result}   Number of Keys added: 1
+                       Should contain   ${result}   scm
 
 Ozone getconf configration keys
     ${result} =        Execute              ozone getconf confKey endpoint.token
-                       Should contain   ${result}   Number of Keys added: 1
+                       Should contain   ${result}   Configuration endpoint.token is missing
