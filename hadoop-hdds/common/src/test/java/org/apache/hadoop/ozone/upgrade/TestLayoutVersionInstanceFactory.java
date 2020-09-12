@@ -114,6 +114,38 @@ public class TestLayoutVersionInstanceFactory {
   }
 
 
+
+  @Test
+  public void testOnFinalize() {
+    LayoutVersionManager lvm = getMockLvm(1, 3);
+    LayoutVersionInstanceFactory<MockInterface> factory =
+        new LayoutVersionInstanceFactory<>();
+    assertTrue(factory.register(lvm, getKey("key", 1), m1));
+    assertTrue(factory.register(lvm, getKey("key", 3), m2));
+    assertTrue(factory.register(lvm, getKey("key2", 1), m1));
+    assertTrue(factory.register(lvm, getKey("key2", 2), m2));
+
+    MockInterface val = factory.get(lvm, getKey("key", null));
+    assertTrue(val instanceof MockClassV1);
+    assertEquals(2, factory.getInstances().size());
+    assertEquals(2, factory.getInstances().get("key").size());
+
+    val = factory.get(lvm, getKey("key2", null));
+    assertTrue(val instanceof MockClassV1);
+
+    // Finalize the layout version.
+    lvm = getMockLvm(3, 3);
+    factory.onFinalize(lvm);
+
+    val = factory.get(lvm, getKey("key", null));
+    assertTrue(val instanceof MockClassV2);
+    assertEquals(2, factory.getInstances().size());
+    assertEquals(1, factory.getInstances().get("key").size());
+
+    val = factory.get(lvm, getKey("key2", null));
+    assertTrue(val instanceof MockClassV2);
+  }
+
   private LayoutVersionManager getMockLvm(int mlv, int slv) {
     LayoutVersionManager lvm = mock(LayoutVersionManager.class);
     when(lvm.getMetadataLayoutVersion()).thenReturn(mlv);

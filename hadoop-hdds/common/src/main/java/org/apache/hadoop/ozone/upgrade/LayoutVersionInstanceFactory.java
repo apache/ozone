@@ -23,10 +23,14 @@ import static java.util.stream.Collectors.toList;
 
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.PriorityQueue;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
 
@@ -46,6 +50,9 @@ import com.google.common.annotations.VisibleForTesting;
  * OMRequests sharded by Request Type & Layout Version Supported.
  */
 public class LayoutVersionInstanceFactory<T> {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(LayoutVersionInstanceFactory.class);
 
   /**
    * The factory will maintain ALL instances > MLV and 1 instance <= MLV in a
@@ -168,6 +175,38 @@ public class LayoutVersionInstanceFactory<T> {
           "No suitable instance found for request : " + key);
     } else {
       return value.instance;
+    }
+  }
+
+  /**
+   * To be called on finalization when there is an MLV update.
+   * @param lvm LayoutVersionManager instance.
+   */
+  public void onFinalize(LayoutVersionManager lvm) {
+    Iterator<Map.Entry<String, PriorityQueue<VersionedInstance<T>>>> iterator =
+        instances.entrySet().iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<String, PriorityQueue<VersionedInstance<T>>> next =
+          iterator.next();
+      PriorityQueue<VersionedInstance<T>> vInstances = next.getValue();
+      VersionedInstance<T> prevInstance = null;
+      while (!vInstances.isEmpty() &&
+          vInstances.peek().version < lvm.getMetadataLayoutVersion()) {
+        prevInstance = vInstances.poll();
+        LOG.info("Unregistering {} from factory. ", prevInstance.instance);
+      }
+
+      if ((vInstances.isEmpty() ||
+          vInstances.peek().version > lvm.getMetadataLayoutVersion())
+          && prevInstance != null) {
+        vInstances.offer(prevInstance);
+      }
+
+      if (vInstances.isEmpty()) {
+        LOG.info("Unregistering '{}' from factory since it has no entries." +
+            next.getKey());
+        iterator.remove();
+      }
     }
   }
 

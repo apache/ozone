@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionInstanceFactory;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
@@ -105,8 +104,7 @@ public final class OMLayoutVersionManagerImpl
 
   public void doFinalize(OzoneManager om) {
     super.doFinalize(om);
-    requestFactory = new LayoutVersionInstanceFactory<>();
-    registerOzoneManagerRequests();
+    requestFactory.onFinalize(this);
   }
 
   @VisibleForTesting
@@ -175,15 +173,5 @@ public final class OMLayoutVersionManagerImpl
     VersionFactoryKey versionFactoryKey = new VersionFactoryKey.Builder()
         .key(type).build();
     return requestFactory.get(this, versionFactoryKey);
-  }
-
-  private VersionFactoryKey getVersionFactoryKey(OMRequest omRequest) {
-    int version = omRequest.hasLayoutVersion() ?
-        Math.toIntExact(omRequest.getLayoutVersion().getVersion()) :
-        metadataLayoutVersion;
-    return new VersionFactoryKey.Builder()
-        .version(version)
-        .key(omRequest.getCmdType().name())
-        .build();
   }
 }
