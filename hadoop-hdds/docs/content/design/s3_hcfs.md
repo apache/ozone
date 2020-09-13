@@ -76,7 +76,7 @@ To solve the performance problems of the directory listing / rename, [HDDS-2939]
 
 There are two main aspects of supporting both `ofs/o3fs` and `s3` together:
 
- 1. `ofs/o3fs` require to create intermediate directory entries (for example `/a/b` for the key `/b/c/c`)
+ 1. `ofs/o3fs` require to create intermediate directory entries (for example `/a/b` for the key `/a/b/c`)
  2. Special file-system incompatible key names require special attention
 
 The second couldn't be done with compromise.
