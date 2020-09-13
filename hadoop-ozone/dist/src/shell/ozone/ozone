@@ -105,8 +105,8 @@ function ozonecmd_case
       # Corresponding Ratis issue https://issues.apache.org/jira/browse/RATIS-534.
       # TODO: Fix the problem related to netty resource leak detector throwing
       # exception as mentioned in HDDS-3812
-      HDDS_DN_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false -Dorg.apache.ratis.thirdparty.io.netty.leakDetection.level=disabled -Dlog4j.configurationFile=${HADOOP_CONF_DIR}/dn-audit-log4j2.properties ${HDDS_DN_OPTS}"
-      HADOOP_OPTS="${HADOOP_OPTS} ${HDDS_DN_OPTS}"
+      hadoop_deprecate_envvar HDDS_DN_OPTS OZONE_DATANODE_OPTS
+      OZONE_DATANODE_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false -Dorg.apache.ratis.thirdparty.io.netty.leakDetection.level=disabled -Dlog4j.configurationFile=${HADOOP_CONF_DIR}/dn-audit-log4j2.properties ${OZONE_DATANODE_OPTS}"
       HADOOP_CLASSNAME=org.apache.hadoop.ozone.HddsDatanodeService
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-datanode"
     ;;
@@ -154,8 +154,8 @@ function ozonecmd_case
     om)
       HADOOP_SUBCMD_SUPPORTDAEMONIZATION="true"
       HADOOP_CLASSNAME=org.apache.hadoop.ozone.om.OzoneManagerStarter
-      HDFS_OM_OPTS="${HDFS_OM_OPTS} -Dlog4j.configurationFile=${HADOOP_CONF_DIR}/om-audit-log4j2.properties"
-      HADOOP_OPTS="${HADOOP_OPTS} ${HDFS_OM_OPTS}"
+      hadoop_deprecate_envvar HDFS_OM_OPTS OZONE_OM_OPTS
+      OZONE_OM_OPTS="${OZONE_OM_OPTS} -Dlog4j.configurationFile=${HADOOP_CONF_DIR}/om-audit-log4j2.properties"
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-ozone-manager"
     ;;
     sh | shell)
@@ -172,9 +172,8 @@ function ozonecmd_case
     scm)
       HADOOP_SUBCMD_SUPPORTDAEMONIZATION="true"
       HADOOP_CLASSNAME='org.apache.hadoop.hdds.scm.server.StorageContainerManagerStarter'
-      hadoop_debug "Appending HDFS_STORAGECONTAINERMANAGER_OPTS onto HADOOP_OPTS"
-      HDFS_STORAGECONTAINERMANAGER_OPTS="${HDFS_STORAGECONTAINERMANAGER_OPTS} -Dlog4j.configurationFile=${HADOOP_CONF_DIR}/scm-audit-log4j2.properties"
-      HADOOP_OPTS="${HADOOP_OPTS} ${HDFS_STORAGECONTAINERMANAGER_OPTS}"
+      hadoop_deprecate_envvar HDFS_STORAGECONTAINERMANAGER_OPTS OZONE_SCM_OPTS
+      OZONE_SCM_OPTS="${OZONE_SCM_OPTS} -Dlog4j.configurationFile=${HADOOP_CONF_DIR}/scm-audit-log4j2.properties"
       OZONE_RUN_ARTIFACT_NAME="hadoop-hdds-server-scm"
     ;;
     s3g)
