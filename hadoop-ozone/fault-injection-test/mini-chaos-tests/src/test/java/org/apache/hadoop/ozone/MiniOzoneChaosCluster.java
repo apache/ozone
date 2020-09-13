@@ -94,7 +94,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
   public MiniOzoneChaosCluster(OzoneConfiguration conf,
       List<OzoneManager> ozoneManagers, StorageContainerManager scm,
       List<HddsDatanodeService> hddsDatanodes, String omServiceID,
-      List<Class<? extends Failures>> clazzes) {
+      Set<Class<? extends Failures>> clazzes) {
     super(conf, ozoneManagers, scm, hddsDatanodes, omServiceID);
     this.numDatanodes = getHddsDatanodes().size();
     this.numOzoneManagers = ozoneManagers.size();
@@ -150,7 +150,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
    */
   public static class Builder extends MiniOzoneHAClusterImpl.Builder {
 
-    private final List<Class<? extends Failures>> clazzes = new ArrayList<>();
+    private final Set<Class<? extends Failures>> clazzes = new HashSet<>();
 
     /**
      * Creates a new Builder.
