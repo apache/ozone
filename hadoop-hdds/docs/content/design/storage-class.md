@@ -3,7 +3,7 @@ title: Storage Class
 summary: New abstraction to configure replication methods.
 date: 2020-06-08
 jira: HDDS-3755
-status: draft
+status: implementing
 author: Marton Elek
 ---
 <!--
