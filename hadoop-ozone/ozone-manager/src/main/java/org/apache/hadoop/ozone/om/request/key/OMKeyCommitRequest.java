@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
@@ -157,6 +158,16 @@ public class OMKeyCommitRequest extends OMKeyRequest {
               volumeName, bucketName);
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+
+      // Check for directory exists with same name, if it exists throw error. 
+      if (ozoneManager.getEnableFileSystemPaths()) {
+        if (checkDirectoryAlreadyExists(volumeName, bucketName, keyName,
+            omMetadataManager)) {
+          throw new OMException("Can not create file: " + keyName +
+              " as there is already directory in the given path", NOT_A_FILE);
+        }
+      }
+
 
       omKeyInfo = omMetadataManager.getOpenKeyTable().get(dbOpenKey);
       if (omKeyInfo == null) {

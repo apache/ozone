@@ -530,4 +530,23 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
     return encryptionInfo;
   }
+
+  /**
+   * Check directory exists. If exists return true, else false.
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @param omMetadataManager
+   * @throws IOException
+   */
+  protected boolean checkDirectoryAlreadyExists(String volumeName,
+      String bucketName, String keyName, OMMetadataManager omMetadataManager)
+      throws IOException {
+    if (omMetadataManager.getKeyTable().isExist(
+        omMetadataManager.getOzoneDirKey(volumeName, bucketName,
+            keyName))) {
+      return true;
+    }
+    return false;
+  }
 }
