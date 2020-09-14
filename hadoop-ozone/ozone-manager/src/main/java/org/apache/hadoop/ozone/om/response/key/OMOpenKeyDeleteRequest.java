@@ -21,7 +21,6 @@ import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
-import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -31,7 +30,8 @@ import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeletedKeys;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeysPerBucket;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +39,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -58,8 +57,8 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
     OzoneManagerProtocolProtos.DeleteOpenKeysRequest deleteOpenKeysRequest =
             getOmRequest().getDeleteOpenKeysRequest();
 
-    List<DeletedKeys> expiredOpenKeys =
-            deleteOpenKeysRequest.getExpiredOpenKeys();
+    List<OpenKeysPerBucket> expiredOpenKeys =
+            deleteOpenKeysRequest.getOpenKeysToDeleteList();
 
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
             OmResponseUtil.getOMResponseBuilder(getOmRequest());
@@ -70,11 +69,11 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
     List<OmKeyInfo> deletedKeys = new ArrayList<>();
 
     try {
-      for (DeletedKeys expiredOpenKeysPerBucket: expiredOpenKeys) {
+      for (OpenKeysPerBucket openKeysPerBucket: expiredOpenKeys) {
         // For each bucket where keys will be deleted from,
         // get its bucket lock and update the cache accordingly.
         deletedKeys.addAll(updateCache(ozoneManager, trxnLogIndex,
-                expiredOpenKeysPerBucket));
+            openKeysPerBucket));
       }
 
       omClientResponse = new OMOpenKeyDeleteResponse(omResponse.build(),
@@ -119,7 +118,7 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
   }
 
   private void writeAuditLog(AuditLogger auditLogger,
-                             List<OmKeyInfo> deletedKeys, Exception exception) {
+      List<OmKeyInfo> deletedKeys, Exception exception) {
     // TODO: Audit logging to track operations.
 //    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
 //
@@ -130,8 +129,8 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
   }
 
   private List<OmKeyInfo> updateCache(OzoneManager ozoneManager,
-                                    long trxnLogIndex,
-                           DeletedKeys expiredKeysInBucket) throws IOException {
+      long trxnLogIndex, OpenKeysPerBucket expiredKeysInBucket)
+      throws IOException {
 
     List<OmKeyInfo> deletedKeys = new ArrayList<>();
 
@@ -144,9 +143,9 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
       acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
               volumeName, bucketName);
 
-      for (String keyName: expiredKeysInBucket.getKeysList()) {
-        String fullKeyName = omMetadataManager.getOzoneKey(volumeName,
-                bucketName, keyName);
+      for (OpenKey key: expiredKeysInBucket.getKeysList()) {
+        String fullKeyName = omMetadataManager.getOpenKey(volumeName,
+                bucketName, key.getName(), key.getId());
 
         // If an open key is no longer present in the table, it was committed
         // and should not be deleted.

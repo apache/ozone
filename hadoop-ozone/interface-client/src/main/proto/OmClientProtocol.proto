@@ -921,17 +921,17 @@ message PurgeKeysResponse {
 }
 
 message DeleteOpenKeysRequest {
-  repeated DeletedOpenKeys openKeysToDelete = 1;
+  repeated OpenKeysPerBucket openKeysToDelete = 1;
 }
 
-message DeletedOpenKeys {
+message OpenKeysPerBucket {
   required string volumeName = 1;
   required string bucketName = 2;
   repeated OpenKey keys = 3;
 }
 
 message OpenKey {
-  required string keys = 1;
+  required string name = 1;
   required uint64 id = 2;
 }
 
