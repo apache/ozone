@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -76,16 +77,21 @@ public class TestOmPrefixInfo {
 
   @Test
   public void testgetFromProtobufOneMetadataOneAcl(){
+    String prefixInfoPath = "/mypath/path";
+    String aclString = "user:myuser:rw";
+    String metakey = "metakey";
+    String metaval = "metaval";
+    HddsProtos.KeyValue metadata = TestInstanceHelper.getDefaultTestMetadata(metakey,metaval);
+    OzoneManagerProtocolProtos.PrefixInfo prefixInfo = TestInstanceHelper.getDefaultTestPrefixInfo(prefixInfoPath, aclString,metadata);
 
-    OmPrefixInfo ompri = getOmPrefixInfoForTest(testPath,
-        IAccessAuthorizer.ACLIdentityType.USER,
-        username,
-        IAccessAuthorizer.ACLType.READ,
-        ACCESS);
+    OmPrefixInfo ompri = OmPrefixInfo.getFromProtobuf(prefixInfo);
 
-    Assert.assertEquals(testPath, ompri.getName() );
-    Assert.assertEquals(0, ompri.getMetadata().size());
+    Assert.assertEquals(prefixInfoPath, ompri.getName() );
+    Assert.assertEquals(1, ompri.getMetadata().size());
+    Assert.assertEquals(metaval, ompri.getMetadata().get(metakey));
     Assert.assertEquals(1, ompri.getAcls().size());
+
+
   }
 
   @Test
