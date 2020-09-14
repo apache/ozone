@@ -26,6 +26,7 @@ import java.util.Random;
 import java.util.HashMap;
 
 import org.apache.commons.collections.ListUtils;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.response.key.OMOpenKeyDeleteRequest;
 import org.junit.Assert;
 import org.junit.Test;
@@ -48,7 +49,8 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
    * Tests adding multiple keys to the open key table, and updating the table
    * cache to only remove some of them.
    * Keys not removed should still be present in the open key table.
-   * Mixes keys to keep and delete among different volumes and buckets.
+   * Mixes which keys will be kept and deleted among different volumes and
+   * buckets.
    * @throws Exception
    */
   @Test
@@ -112,8 +114,16 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
   public void testDeleteOpenKeysNotInTable() throws Exception {
     List<OpenKey> openKeys = makeOpenKeys(volumeName, bucketName, 5);
     deleteOpenKeys(openKeys);
+    assertNotInOpenKeyTable(openKeys);
   }
 
+  /**
+   * Runs the validate and update cache step of
+   * {@link OMOpenKeyDeleteRequest} to mark the keys in {@code openKeys}
+   * as deleted in the open key table.
+   * Asserts that the call's response status is {@link Status#OK}.
+   * @throws Exception
+   */
   private void deleteOpenKeys(List<OpenKey> openKeys) throws Exception {
     List<DeletedKeys> openKeysPerBucket = gatherByBucket(openKeys);
 
@@ -128,9 +138,13 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
             100L, ozoneManagerDoubleBufferHelper);
 
     Assert.assertEquals(Status.OK, omClientResponse.getOMResponse().getStatus());
-    assertNotInOpenKeyTable(openKeys);
   }
 
+  /**
+   * Adds {@code openKeys} to the open key table, and asserts that they are
+   * present after the addition.
+   * @throws Exception
+   */
   private void addToOpenKeyTable(List<OpenKey> openKeys) throws Exception {
     for (OpenKey openKey: openKeys) {
       TestOMRequestUtils.addKeyToTable(false,
@@ -141,6 +155,18 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
     assertInOpenKeyTable(openKeys);
   }
 
+  /**
+   * Constructs a list of {@link OpenKey} objects of size {@code numKeys}.
+   * The keys created will all have the same volume and bucket, but
+   * randomized key names and client IDs. These keys are not added to the
+   * open key table.
+   *
+   * @param volume The volume all open keys created will have.
+   * @param bucket The bucket all open keys created will have.
+   * @param numKeys The number of keys with randomized key names and client
+   * IDs to create.
+   * @return A list of new open keys with size {@code numKeys}.
+   */
   private List<OpenKey> makeOpenKeys(String volume, String bucket,
       int numKeys) {
 
@@ -155,6 +181,19 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
     return openKeys;
   }
 
+  /**
+   * Constructs a list of {@link OpenKey} objects of size {@code numKeys}.
+   * The keys created will all have the same volume and bucket, and
+   * key names, but randomized client IDs. These keys are not added to the
+   * open key table.
+   *
+   * @param volume The volume all open keys created will have.
+   * @param bucket The bucket all open keys created will have.
+   * @param key The key name all open keys created will have.
+   * @param numKeys The number of keys with randomized key names and client
+   * IDs to create.
+   * @return A list of new open keys with size {@code numKeys}.
+   */
   private List<OpenKey> makeOpenKeys(String volume, String bucket,
       String key, int numKeys) {
 
@@ -184,17 +223,18 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
   }
 
   /**
-   * This method calls preExecute and verify the modified request.
-   * @param originalOmRequest
-   * @return OMRequest - modified request returned from preExecute.
+   * Constructs a new {@link OMOpenKeyDeleteRequest} objects, and calls its
+   * {@link OMOpenKeyDeleteRequest#preExecute} method with {@code
+   * originalOMRequest}. It verifies that {@code originalOMRequest} is modified
+   * after the call, and returns it.
    * @throws Exception
    */
   private OMRequest doPreExecute(OMRequest originalOmRequest) throws Exception {
+    OMOpenKeyDeleteRequest omOpenKeyDeleteRequest =
+        new OMOpenKeyDeleteRequest(originalOmRequest);
 
-    OMKeyDeleteRequest omKeyDeleteRequest =
-        new OMKeyDeleteRequest(originalOmRequest);
-
-    OMRequest modifiedOmRequest = omKeyDeleteRequest.preExecute(ozoneManager);
+    OMRequest modifiedOmRequest =
+        omOpenKeyDeleteRequest.preExecute(ozoneManager);
 
     // Will not be equal, as UserInfo will be set.
     Assert.assertNotEquals(originalOmRequest, modifiedOmRequest);
@@ -202,16 +242,38 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
     return modifiedOmRequest;
   }
 
+  /**
+   * Gathers a list of {@link OpenKey} objects into a list of
+   * {@link DeletedKeys} objects based on common volumes and buckets.
+   */
   private List<DeletedKeys> gatherByBucket(List<OpenKey> openKeys) {
-//    Map<String, Map<String, DeletedKeys>> deletedKeys = new HashMap<>();
-//
-//    for (OpenKey key: openKeys) {
-//      Map<String, DeletedKeys>
-//      if (deletedKeys.containsKey(key.volume)) {
-//
-//      }
-//    }
-    return null;
+    // Maps volume to bucket to DeletedKeys object for that bucket.
+    // Will be filled and used to construct the list of DeletedKeys.
+    Map<String, Map<String, DeletedKeys>> deletedKeys = new HashMap<>();
+    List<DeletedKeys> result = new ArrayList<>();
+
+    for (OpenKey key: openKeys) {
+      Map<String, DeletedKeys> volumeKeys = deletedKeys.get(key.volume);
+
+      if (volumeKeys == null) {
+        volumeKeys = new HashMap<>();
+        DeletedKeys gatheredKeys = DeletedKeys.newBuilder().build();
+
+        // Map the new DeletedKey object to its volume and bucket.
+        volumeKeys.put(key.bucket, gatheredKeys);
+        deletedKeys.put(key.volume, volumeKeys);
+
+        // Add the new DeletedKeys object to the return result.
+        // Any future updates made to it will persist to this reference as well.
+        result.add(gatheredKeys);
+      }
+
+      // TODO: Create new proto tracking client ID.
+      // Add this key to its existing DeletedKeys object.
+      volumeKeys.get(key.bucket).getKeysList().add(key.key);
+    }
+
+    return result;
   }
 
   /**
@@ -227,6 +289,10 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
         .setClientId(UUID.randomUUID().toString()).build();
   }
 
+  /**
+   * Class used to represent a single open key, not grouped with any others
+   * by volume or bucket.
+   */
   class OpenKey {
     public String volume;
     public String bucket;
@@ -242,8 +308,8 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
 
     @Override
     public String toString() {
-      return TestOMOpenKeyDeleteRequest.this.omMetadataManager.getOpenKey(volume,
-          bucket, key, clientID);
+      return TestOMOpenKeyDeleteRequest.this.omMetadataManager
+          .getOpenKey(volume, bucket, key, clientID);
     }
   }
 }
