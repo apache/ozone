@@ -77,7 +77,7 @@ enum Status {
  * DataNode will advertise its current layout version through
  * heartbeat as well as registration mechanism.
  */
-message HDDSLayoutVersionProto {
+message LayoutVersionProto {
    required uint32 metadataLayoutVersion = 1;
    required uint32 softwareLayoutVersion = 2;
 }
@@ -101,7 +101,7 @@ message SCMRegisterRequestProto {
   required NodeReportProto nodeReport = 2;
   required ContainerReportsProto containerReport = 3;
   required PipelineReportsProto pipelineReports = 4;
-  optional HDDSLayoutVersionProto dataNodeLayoutVersion = 5;
+  optional LayoutVersionProto dataNodeLayoutVersion = 5;
 }
 
 /**
@@ -136,7 +136,7 @@ message SCMHeartbeatRequestProto {
   optional ContainerActionsProto containerActions = 6;
   optional PipelineActionsProto pipelineActions = 7;
   optional PipelineReportsProto pipelineReports = 8;
-  optional HDDSLayoutVersionProto dataNodeLayoutVersion = 9;
+  optional LayoutVersionProto dataNodeLayoutVersion = 9;
 }
 
 /*
@@ -405,11 +405,11 @@ message ClosePipelineCommandProto {
 }
 
 /**
- * This command asks the DataNode to finalize a new HDDS layout version.
+ * This command asks the DataNode to finalize a new layout version.
  */
 message FinalizeNewLayoutVersionCommandProto {
-  required bool finalizeNewHDDSLayoutVersion = 1 [default = false];
-  required HDDSLayoutVersionProto dataNodeLayoutVersion = 2;
+  required bool finalizeNewLayoutVersion = 1 [default = false];
+  required LayoutVersionProto dataNodeLayoutVersion = 2;
 }
 
 /**
