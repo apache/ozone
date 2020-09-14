@@ -83,6 +83,7 @@ import org.apache.commons.io.IOUtils;
 
 import org.apache.commons.lang3.tuple.Pair;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ENTITY_TOO_SMALL;
@@ -198,6 +199,18 @@ public class ObjectEndpoint extends EndpointBase {
           .build();
     } catch (IOException ex) {
       LOG.error("Exception occurred in PutObject", ex);
+      if (ex instanceof  OMException) {
+        if (((OMException) ex).getResult() == ResultCodes.NOT_A_FILE) {
+          OS3Exception os3Exception = S3ErrorTable.newError(INVALID_REQUEST,
+              keyPath);
+          os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
+              "when calling the PutObject/MPU PartUpload operation: " +
+              OZONE_OM_ENABLE_FILESYSTEM_PATHS + " is enabled Keys are" +
+              " considered as Unix Paths. Path has Violated FS Semantics " +
+              "which caused put operation to fail.");
+          throw os3Exception;
+        }
+      }
       throw ex;
     } finally {
       if (output != null) {
@@ -521,6 +534,14 @@ public class ObjectEndpoint extends EndpointBase {
         os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
             "when calling the CompleteMultipartUpload operation: You must " +
             "specify at least one part");
+        throw os3Exception;
+      } else if(ex.getResult() == ResultCodes.NOT_A_FILE) {
+        OS3Exception os3Exception = S3ErrorTable.newError(INVALID_REQUEST, key);
+        os3Exception.setErrorMessage("An error occurred (InvalidRequest) " +
+            "when calling the CompleteMultipartUpload operation: " +
+            OZONE_OM_ENABLE_FILESYSTEM_PATHS + " is enabled Keys are " +
+            "considered as Unix Paths. A directory already exists with a " +
+            "given KeyName caused failure for MPU");
         throw os3Exception;
       }
       throw ex;
