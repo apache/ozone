@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -91,8 +91,8 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
               omDoubleBufferHelper);
     }
 
-    writeMetrics(ozoneManager.getMetrics(), result);
-    writeAuditLog(ozoneManager.getAuditLogger());
+    writeMetrics(ozoneManager.getMetrics(), deletedKeys, result);
+    writeAuditLog(ozoneManager.getAuditLogger(), deletedKeys, exception);
 
     return omClientResponse;
   }
@@ -100,33 +100,33 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
   private void writeMetrics(OMMetrics omMetrics,
       List<OmKeyInfo> deletedKeys, Result result) {
 
-    switch (result) {
-    case SUCCESS:
-      // TODO: Add Metrics
-      omMetrics.incNumOpenKeyDeletes(deletedKeys.size());
-      LOG.debug("Key deleted. Volume:{}, Bucket:{}, Key:{}", volumeName,
-              bucketName, keyName);
-      break;
-    case FAILURE:
-      omMetrics.incNumOpenKeyCleanupFails();
-      LOG.error("Key delete failed. Volume:{}, Bucket:{}, Key:{}.",
-              volumeName, bucketName, keyName, exception);
-      break;
-    default:
-      LOG.error("Unrecognized Result for OMOpenKeyDeleteRequest: {}",
-              openKeyDeleteRequest);
-    }
+    // TODO: Add Metrics
+//    switch (result) {
+//    case SUCCESS:
+//      omMetrics.incNumOpenKeyDeletes(deletedKeys.size());
+//      LOG.debug("Key deleted. Volume:{}, Bucket:{}, Key:{}", volumeName,
+//              bucketName, keyName);
+//      break;
+//    case FAILURE:
+//      omMetrics.incNumOpenKeyCleanupFails();
+//      LOG.error("Key delete failed. Volume:{}, Bucket:{}, Key:{}.",
+//              volumeName, bucketName, keyName, exception);
+//      break;
+//    default:
+//      LOG.error("Unrecognized Result for OMOpenKeyDeleteRequest: {}",
+//              openKeyDeleteRequest);
+//    }
   }
 
   private void writeAuditLog(AuditLogger auditLogger,
                              List<OmKeyInfo> deletedKeys, Exception exception) {
     // TODO: Audit logging to track operations.
-    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
-
-    OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
-
-    auditLog(auditLogger, buildAuditMessage(OMAction.DELETE_OPEN_KEY, auditMap,
-            exception, userInfo));
+//    Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
+//
+//    OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
+//
+//    auditLog(auditLogger, buildAuditMessage(OMAction.DELETE_OPEN_KEY, auditMap,
+//            exception, userInfo));
   }
 
   private List<OmKeyInfo> updateCache(OzoneManager ozoneManager,
