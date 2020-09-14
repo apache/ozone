@@ -26,8 +26,6 @@ Get and use Token in Secure Cluster
     Execute                      ozone sh token get > /tmp/ozone.token
     File Should Not Be Empty     /tmp/ozone.token
     Execute                      kdestroy
-    ${output} =                  klist
-    Should contain               ${output}           No credentials cache found
     Execute                      export HADOOP_TOKEN_FILE_LOCATION=/tmp/ozone.token
     ${output} =                  Execute             ozone sh volume list /
     Should not contain           ${output}           Client cannot authenticate
