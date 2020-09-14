@@ -23,7 +23,7 @@ Test Timeout        5 minutes
 
 *** Keywords ***
 Get and use Token in Secure Cluster
-    Execute                      ozone sh token get > /tmp/ozone.token
+    Execute                      ozone sh token get -t /tmp/ozone.token
     File Should Not Be Empty     /tmp/ozone.token
     Execute                      kdestroy
     Execute                      export HADOOP_TOKEN_FILE_LOCATION=/tmp/ozone.token
