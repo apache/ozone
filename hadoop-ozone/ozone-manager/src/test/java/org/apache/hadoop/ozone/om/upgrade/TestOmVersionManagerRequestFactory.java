@@ -72,7 +72,8 @@ public class TestOmVersionManagerRequestFactory {
   }
 
   @Test
-  public void testAllOMRequestClassesRegistered() throws Exception {
+  public void testAllOMRequestClassesHaveGetRequestTypeMethod()
+      throws Exception {
     Reflections reflections = new Reflections(
         "org.apache.hadoop.ozone.om.request");
     Set<Class<? extends OMClientRequest>> subTypes =
@@ -82,7 +83,15 @@ public class TestOmVersionManagerRequestFactory {
             .collect(Collectors.toList());
 
     for (Class<? extends OMClientRequest> c : collect) {
-      Method getRequestTypeMethod = c.getMethod("getRequestType");
+      Method getRequestTypeMethod = null;
+      try {
+        getRequestTypeMethod = c.getMethod("getRequestType");
+      } catch (NoSuchMethodException nsmEx) {
+        Assert.fail(String.format(
+            "%s does not have the 'getRequestType' method " +
+            "which should be defined or inherited for every OM request class.",
+            c));
+      }
       String type = (String) getRequestTypeMethod.invoke(null);
       Assert.assertNotNull(String.format("Cannot get handler for %s", type),
           omVersionManager.getRequestHandler(type));

@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.upgrade;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.stream.Collectors.toList;
 
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -203,7 +204,7 @@ public class LayoutVersionInstanceFactory<T> {
       }
 
       if (vInstances.isEmpty()) {
-        LOG.info("Unregistering '{}' from factory since it has no entries." +
+        LOG.info("Unregistering '{}' from factory since it has no entries.",
             next.getKey());
         iterator.remove();
       }
@@ -218,7 +219,7 @@ public class LayoutVersionInstanceFactory<T> {
           value.stream().map(v -> v.instance).collect(toList());
       instancesCopy.put(key, collect);
     });
-    return instancesCopy;
+    return Collections.unmodifiableMap(instancesCopy);
   }
 
   /**
