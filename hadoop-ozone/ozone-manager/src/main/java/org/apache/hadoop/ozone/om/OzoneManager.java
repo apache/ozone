@@ -3503,9 +3503,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     Pair<String, String> resolved;
     if (isAclEnabled) {
       resolved = resolveBucketLink(requested, new HashSet<>(),
-              ProtobufRpcEngine.Server.getRemoteUser(),
-              ProtobufRpcEngine.Server.getRemoteIp(),
-              ProtobufRpcEngine.Server.getRemoteIp().getHostName());
+              Server.getRemoteUser(),
+              Server.getRemoteIp(),
+              Server.getRemoteIp().getHostName());
     } else {
       resolved = resolveBucketLink(requested, new HashSet<>(),
           null, null, null);
