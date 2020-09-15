@@ -69,9 +69,9 @@ public class GetTokenHandler extends Handler {
       err().println("Error: Get delegation token operation failed. " +
           "Check OzoneManager logs for more details.");
     } else {
-      System.out.println("Successfully get token for service " +
+      out().println("Successfully get token for service " +
           token.getService());
-      System.out.println(token.toString());
+      out().println(token.toString());
       tokenFile.persistToken(token);
     }
   }

@@ -41,7 +41,7 @@ public class PrintTokenHandler implements Callable<Void> {
   public Void call() throws Exception {
     if (tokenFile.exists()) {
       Token<OzoneTokenIdentifier> token = tokenFile.decode();
-      System.out.print(token.toString());
+      System.out.println(token.toString());
     }
     return null;
   }
