@@ -58,7 +58,6 @@ import com.google.common.base.Preconditions;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
-import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
@@ -330,11 +329,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       }
     }
 
-    int index = -1;
     for (DatanodeDetails dn : datanodeList) {
-      index++;
       try {
-        long startTime = Time.monotonicNow();
         if (LOG.isDebugEnabled()) {
           LOG.debug("Executing command {} on datanode {}", request, dn);
         }
@@ -343,11 +339,6 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         // in case these don't exist for the specific datanode.
         reply.addDatanode(dn);
         responseProto = sendCommandAsync(request, dn).getResponse().get();
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Executed command {} on datanode {}, cost = {}, "
-                  + "retryCount = {}" + ", cmdType = {}", request, dn,
-              Time.monotonicNow() - startTime, index, request.getCmdType());
-        }
         if (validators != null && !validators.isEmpty()) {
           for (CheckedBiFunction validator : validators) {
             validator.apply(request, responseProto);
@@ -461,8 +452,14 @@ public class XceiverClientGrpc extends XceiverClientSpi {
               public void onNext(ContainerCommandResponseProto value) {
                 replyFuture.complete(value);
                 metrics.decrPendingContainerOpsMetrics(request.getCmdType());
+                long cost = System.nanoTime() - requestTime;
                 metrics.addContainerOpsLatency(request.getCmdType(),
-                    System.nanoTime() - requestTime);
+                    cost);
+                if (LOG.isDebugEnabled()) {
+                  LOG.debug("Executed command {} on datanode {}, cost = {}, "
+                          + "cmdType = {}", request, dn,
+                      cost, request.getCmdType());
+                }
                 semaphore.release();
               }
 
@@ -470,8 +467,14 @@ public class XceiverClientGrpc extends XceiverClientSpi {
               public void onError(Throwable t) {
                 replyFuture.completeExceptionally(t);
                 metrics.decrPendingContainerOpsMetrics(request.getCmdType());
+                long cost = System.nanoTime() - requestTime;
                 metrics.addContainerOpsLatency(request.getCmdType(),
                     System.nanoTime() - requestTime);
+                if (LOG.isDebugEnabled()) {
+                  LOG.debug("Executed command {} on datanode {}, cost = {}, "
+                          + "cmdType = {}", request, dn,
+                      cost, request.getCmdType());
+                }
                 semaphore.release();
               }
 
