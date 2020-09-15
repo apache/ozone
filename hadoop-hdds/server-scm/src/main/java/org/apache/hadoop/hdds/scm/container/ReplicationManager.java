@@ -660,8 +660,8 @@ public class ReplicationManager
       if (excess > 0) {
         eligibleReplicas.removeAll(unhealthyReplicas);
         Set<ContainerReplica> replicaSet = new HashSet<>(eligibleReplicas);
-        boolean misReplicated =
-            !getPlacementStatus(replicaSet, replicationFactor)
+        boolean satisfied =
+            getPlacementStatus(replicaSet, replicationFactor)
                 .isPolicySatisfied();
         for (ContainerReplica r : eligibleReplicas) {
           if (excess <= 0) {
@@ -670,11 +670,11 @@ public class ReplicationManager
           // First remove the replica we are working on from the set, and then
           // check if the set is now mis-replicated.
           replicaSet.remove(r);
-          boolean nowMisRep = getPlacementStatus(replicaSet, replicationFactor)
+          boolean nowSatisfied = getPlacementStatus(replicaSet, replicationFactor)
               .isPolicySatisfied();
-          if (misReplicated || !nowMisRep) {
-            // Remove the replica if the container was already mis-replicated
-            // OR if losing this replica does not make it become mis-replicated
+          if (!satisfied || nowSatisfied) {
+            // Remove the replica if the container was already unsatisfied
+            // OR if losing this replica still keep satisfied
             sendDeleteCommand(container, r.getDatanodeDetails(), true);
             excess -= 1;
             continue;
