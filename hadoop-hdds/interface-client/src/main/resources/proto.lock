@@ -1531,21 +1531,41 @@
                 "type": "string"
               },
               {
-                "id": 8,
-                "name": "version",
-                "type": "string"
-              },
-              {
-                "id": 9,
-                "name": "setupTime",
-                "type": "int64"
-              },
-              {
                 "id": 100,
                 "name": "uuid128",
                 "type": "UUID"
               }
             ]
+          },
+          {
+		"name": "ExtendedDatanodeDetailsProto",
+            "fields": [
+			  {
+			    "id": 1,
+				"name": "datanodeDetails",
+				"type": "DatanodeDetailsProto"
+			  },
+			  {
+			    "id": 2,
+				"name": "version",
+				"type": "string"
+			  },
+			  {
+			    "id": 3,
+				"name": "setupTime",
+				"type": "int64"
+			  },
+			  {
+			    "id": 4,
+				"name": "revision",
+				"type": "string"
+			  },
+			  {
+			    "id": 5,
+				"name": "buildDate",
+				"type": "string"
+			  }
+			]
           },
           {
             "name": "OzoneManagerDetailsProto",
