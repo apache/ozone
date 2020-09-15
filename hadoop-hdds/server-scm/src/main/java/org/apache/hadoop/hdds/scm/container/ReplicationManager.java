@@ -670,8 +670,9 @@ public class ReplicationManager
           // First remove the replica we are working on from the set, and then
           // check if the set is now mis-replicated.
           replicaSet.remove(r);
-          boolean nowSatisfied = getPlacementStatus(replicaSet, replicationFactor)
-              .isPolicySatisfied();
+          boolean nowSatisfied =
+              getPlacementStatus(replicaSet, replicationFactor)
+                  .isPolicySatisfied();
           if (!satisfied || nowSatisfied) {
             // Remove the replica if the container was already unsatisfied
             // OR if losing this replica still keep satisfied
