@@ -32,7 +32,7 @@ Get and use Token in Secure Cluster
     Execute                      unset HADOOP_TOKEN_FILE_LOCATION
     ${output} =                  Execute             ozone sh volume list /
     Should contain               ${output}           Client cannot authenticate
-    Execute                      Kinit test user     testuser     testuser.keytab
+    Run Keyword                  Kinit test user     testuser  testuser.keytab
 
 Get Token in Unsecure Cluster
     ${output} =                  Execute             ozone sh token get
