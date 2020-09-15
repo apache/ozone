@@ -1,8 +1,6 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.protobuf.ByteString;
-import javafx.application.Application;
-import javafx.stage.Stage;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
