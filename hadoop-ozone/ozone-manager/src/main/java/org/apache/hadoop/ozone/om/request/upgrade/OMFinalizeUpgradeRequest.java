@@ -17,13 +17,14 @@
 
 package org.apache.hadoop.ozone.om.request.upgrade;
 
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.FinalizeUpgrade;
+
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.upgrade.OMFinalizeUpgradeResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -53,7 +54,7 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
     LOG.trace("Request: {}", getOmRequest());
     OMResponse.Builder responseBuilder =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
-    responseBuilder.setCmdType(OzoneManagerProtocolProtos.Type.FinalizeUpgrade);
+    responseBuilder.setCmdType(FinalizeUpgrade);
     OMClientResponse response = null;
 
     try {
@@ -76,5 +77,9 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
     }
 
     return response;
+  }
+
+  public static String getRequestType() {
+    return FinalizeUpgrade.name();
   }
 }

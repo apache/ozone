@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.om.request.volume.acl;
 
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.AddAcl;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.hdds.scm.storage.CheckedBiFunction;
@@ -28,6 +30,7 @@ import org.apache.hadoop.ozone.om.response.volume.OMVolumeAclOpResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,5 +115,9 @@ public class OMVolumeAddAclRequest extends OMVolumeAclRequest {
       LOG.error("Unrecognized Result for OMVolumeAddAclRequest: {}",
           getOmRequest());
     }
+  }
+
+  public static String getRequestType() {
+    return AddAcl.name() + "-" + ObjectType.VOLUME;
   }
 }

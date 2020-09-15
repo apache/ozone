@@ -72,6 +72,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.DIRECTORY_EXISTS;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
 
 /**
  * Handles CreateKey request.
@@ -343,4 +344,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
+  public static String getRequestType() {
+    return CreateKey.name();
+  }
 }

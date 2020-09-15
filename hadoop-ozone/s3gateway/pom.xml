@@ -37,6 +37,11 @@
       <scope>compile</scope>
     </dependency>
     <dependency>
+      <groupId>org.javassist</groupId>
+      <artifactId>javassist</artifactId>
+      <version>3.26.0-GA</version>
+    </dependency>
+    <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdds-test-utils</artifactId>
       <scope>test</scope>

@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.RenameKey;
 
 /**
  * Handles rename key request.
@@ -235,5 +236,9 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     auditMap.put(OzoneConsts.SRC_KEY, keyArgs.getKeyName());
     auditMap.put(OzoneConsts.DST_KEY, renameKeyRequest.getToKeyName());
     return auditMap;
+  }
+
+  public static String getRequestType() {
+    return RenameKey.name();
   }
 }

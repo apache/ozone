@@ -18,10 +18,13 @@
 
 package org.apache.hadoop.ozone.om.request.bucket.acl;
 
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.RemoveAcl;
+
 import java.io.IOException;
 import java.util.List;
 
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,6 +114,10 @@ public class OMBucketRemoveAclRequest extends OMBucketAclRequest {
             exception);
       }
     }
+  }
+
+  public static String getRequestType() {
+    return RemoveAcl.name() + "-" + ObjectType.BUCKET.name();
   }
 }
 

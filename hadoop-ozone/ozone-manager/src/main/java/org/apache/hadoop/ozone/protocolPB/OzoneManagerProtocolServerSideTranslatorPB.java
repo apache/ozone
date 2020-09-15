@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.ozone.protocolPB;
 
+import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.getRequest;
+
 import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
@@ -98,7 +100,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     this.omRatisServer = ratisServer;
     dispatcher = new OzoneProtocolMessageDispatcher<>("OzoneProtocol",
         metrics, LOG);
-
   }
 
   /**
@@ -124,8 +125,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       } else {
         if (omRatisServer.isLeader()) {
           try {
-            OMClientRequest omClientRequest =
-                OzoneManagerRatisUtils.createClientRequest(request);
+            OMClientRequest omClientRequest = getRequest(ozoneManager, request);
             request = omClientRequest.preExecute(ozoneManager);
           } catch (IOException ex) {
             // As some of the preExecute returns error. So handle here.
@@ -217,8 +217,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       if (OmUtils.isReadOnly(request)) {
         return handler.handleReadRequest(request);
       } else {
-        OMClientRequest omClientRequest =
-            OzoneManagerRatisUtils.createClientRequest(request);
+        OMClientRequest omClientRequest = getRequest(ozoneManager, request);
         request = omClientRequest.preExecute(ozoneManager);
         index = transactionIndex.incrementAndGet();
         omClientResponse = handler.handleWriteRequest(request, index);

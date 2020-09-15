@@ -56,6 +56,8 @@ import com.google.common.base.Optional;
 import org.apache.commons.codec.digest.DigestUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_MULTIPART_MIN_SIZE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CompleteMultiPartUpload;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -366,6 +368,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     omMetadataManager.getMultipartInfoTable().addCacheEntry(
         new CacheKey<>(multipartKey),
         new CacheValue<>(Optional.absent(), transactionLogIndex));
+  }
+
+  public static String getRequestType() {
+    return CompleteMultiPartUpload.name();
   }
 }
 
