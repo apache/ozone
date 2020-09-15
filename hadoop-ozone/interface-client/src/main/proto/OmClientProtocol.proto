@@ -932,7 +932,7 @@ message OpenKeysPerBucket {
 
 message OpenKey {
   required string name = 1;
-  required uint64 id = 2;
+  required uint64 clientID = 2;
 }
 
 message OMTokenProto {

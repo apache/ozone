@@ -165,7 +165,7 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
 
       for (OpenKey openKey: openKeysPerBucket.getKeysList()) {
         TestOMRequestUtils.addKeyToTable(true,
-            volume, bucket, openKey.getName(), openKey.getId(),
+            volume, bucket, openKey.getName(), openKey.getClientID(),
             replicationType, replicationFactor, omMetadataManager);
       }
     }
@@ -199,7 +199,7 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
 
       OpenKey openKey = OpenKey.newBuilder()
           .setName(keyName)
-          .setId(clientID)
+          .setClientID(clientID)
           .build();
       keysPerBucketBuilder.addKeys(openKey);
     }
@@ -233,7 +233,7 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
 
       OpenKey openKey = OpenKey.newBuilder()
           .setName(key)
-          .setId(clientID)
+          .setClientID(clientID)
           .build();
       keysPerBucketBuilder.addKeys(openKey);
     }
@@ -270,7 +270,7 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
 
       for (OpenKey openKey: keysPerBucket.getKeysList()) {
         String fullName = omMetadataManager.getOpenKey(volume, bucket,
-            openKey.getName(), openKey.getId());
+            openKey.getName(), openKey.getClientID());
         fullKeyNames.add(fullName);
       }
     }

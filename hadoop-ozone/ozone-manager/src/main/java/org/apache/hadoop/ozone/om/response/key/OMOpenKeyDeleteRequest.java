@@ -146,7 +146,7 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
 
       for (OpenKey key: expiredKeysInBucket.getKeysList()) {
         String fullKeyName = omMetadataManager.getOpenKey(volumeName,
-                bucketName, key.getName(), key.getId());
+                bucketName, key.getName(), key.getClientID());
 
         // If an open key is no longer present in the table, it was committed
         // and should not be deleted.
