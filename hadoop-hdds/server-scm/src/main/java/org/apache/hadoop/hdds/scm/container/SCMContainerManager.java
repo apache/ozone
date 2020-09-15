@@ -463,7 +463,7 @@ public class SCMContainerManager implements ContainerManager {
         return containerInfo;
       }
     } catch (Exception e) {
-      LOG.warn("Container allocation failed for pipeline={} requiredSize={} {}",
+      LOG.warn("Container allocation failed for pipeline={} requiredSize={}.",
               pipeline, sizeRequired, e);
       return null;
     }
@@ -519,7 +519,7 @@ public class SCMContainerManager implements ContainerManager {
           containerIDIterator.remove();
         }
       } catch (ContainerNotFoundException e) {
-        LOG.error("Could not find container info for container id={} {}", cid,
+        LOG.error("Could not find container info for container id={}.", cid,
             e);
         containerIDIterator.remove();
       }

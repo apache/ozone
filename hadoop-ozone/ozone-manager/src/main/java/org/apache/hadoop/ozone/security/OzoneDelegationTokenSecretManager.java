@@ -600,7 +600,7 @@ public class OzoneDelegationTokenSecretManager
 
         }
       } catch (InterruptedException ie) {
-        LOG.error("ExpiredTokenRemover received {}", ie);
+        LOG.error("ExpiredTokenRemover received.", ie);
         Thread.currentThread().interrupt();
       } catch (Exception t) {
         LOG.error("ExpiredTokenRemover thread received unexpected exception",
