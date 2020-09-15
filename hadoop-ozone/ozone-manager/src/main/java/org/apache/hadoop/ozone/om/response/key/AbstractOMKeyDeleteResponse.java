@@ -60,13 +60,12 @@ public abstract class AbstractOMKeyDeleteResponse extends OMClientResponse {
       OMMetadataManager omMetadataManager,
       BatchOperation batchOperation,
       Table<String, ?> fromTable,
+      String keyName,
       OmKeyInfo omKeyInfo) throws IOException {
 
     // For OmResponse with failure, this should do nothing. This method is
     // not called in failure scenario in OM code.
-    String ozoneKey = omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
-            omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
-    fromTable.deleteWithBatch(batchOperation, ozoneKey);
+    fromTable.deleteWithBatch(batchOperation, keyName);
 
     // If Key is not empty add this to delete table.
     if (!isKeyEmpty(omKeyInfo)) {
@@ -80,12 +79,12 @@ public abstract class AbstractOMKeyDeleteResponse extends OMClientResponse {
       // if it is not null, then we simply add to the list and store this
       // instance in deletedTable.
       RepeatedOmKeyInfo repeatedOmKeyInfo =
-          omMetadataManager.getDeletedTable().get(ozoneKey);
+          omMetadataManager.getDeletedTable().get(keyName);
       repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
           omKeyInfo, repeatedOmKeyInfo, omKeyInfo.getUpdateID(),
           isRatisEnabled);
       omMetadataManager.getDeletedTable().putWithBatch(
-          batchOperation, ozoneKey, repeatedOmKeyInfo);
+          batchOperation, keyName, repeatedOmKeyInfo);
     }
   }
 

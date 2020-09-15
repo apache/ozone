@@ -37,8 +37,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -66,13 +67,13 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
     IOException exception = null;
     OMClientResponse omClientResponse = null;
     Result result = null;
-    List<OmKeyInfo> deletedKeys = new ArrayList<>();
+    Map<String, OmKeyInfo> deletedKeys = new HashMap<>();
 
     try {
       for (OpenKeysPerBucket openKeysPerBucket: expiredOpenKeys) {
         // For each bucket where keys will be deleted from,
         // get its bucket lock and update the cache accordingly.
-        deletedKeys.addAll(updateCache(ozoneManager, trxnLogIndex,
+        deletedKeys.putAll(updateCache(ozoneManager, trxnLogIndex,
             openKeysPerBucket));
       }
 
@@ -90,8 +91,8 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
               omDoubleBufferHelper);
     }
 
-    writeMetrics(ozoneManager.getMetrics(), deletedKeys, result);
-    writeAuditLog(ozoneManager.getAuditLogger(), deletedKeys, exception);
+//    writeMetrics(ozoneManager.getMetrics(), deletedKeys, result);
+//    writeAuditLog(ozoneManager.getAuditLogger(), deletedKeys, exception);
 
     return omClientResponse;
   }
@@ -128,11 +129,11 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
 //            exception, userInfo));
   }
 
-  private List<OmKeyInfo> updateCache(OzoneManager ozoneManager,
+  private Map<String, OmKeyInfo> updateCache(OzoneManager ozoneManager,
       long trxnLogIndex, OpenKeysPerBucket expiredKeysInBucket)
       throws IOException {
 
-    List<OmKeyInfo> deletedKeys = new ArrayList<>();
+    Map<String, OmKeyInfo> deletedKeys = new HashMap<>();
 
     boolean acquiredLock = false;
     String volumeName = expiredKeysInBucket.getVolumeName();
@@ -154,7 +155,7 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
         if (omKeyInfo != null) {
           // Set the UpdateID to current transactionLogIndex
           omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
-          deletedKeys.add(omKeyInfo);
+          deletedKeys.put(fullKeyName, omKeyInfo);
 
           // Update table cache.
           omMetadataManager.getOpenKeyTable().addCacheEntry(
