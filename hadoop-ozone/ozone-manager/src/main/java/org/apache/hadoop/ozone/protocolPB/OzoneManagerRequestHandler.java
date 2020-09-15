@@ -78,6 +78,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import com.google.common.collect.Lists;
+
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclRequest;
@@ -91,6 +92,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -222,7 +224,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   public OMClientResponse handleWriteRequest(OMRequest omRequest,
       long transactionLogIndex) {
     OMClientRequest omClientRequest =
-        OzoneManagerRatisUtils.createClientRequest(omRequest);
+        OzoneManagerRatisUtils.getRequest(getOzoneManager(), omRequest);
     OMClientResponse omClientResponse =
         omClientRequest.validateAndUpdateCache(getOzoneManager(),
             transactionLogIndex, ozoneManagerDoubleBuffer::add);
@@ -289,6 +291,14 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     if (omRequest.getClientId() == null) {
       throw new OMException("ClientId is null",
           OMException.ResultCodes.INVALID_REQUEST);
+    }
+
+    // Layout version should have been set up the leader while serializing
+    // the request, and hence cannot be null. This version is used by each
+    // node to identify which request handler version to use.
+    if (omRequest.getLayoutVersion() == null) {
+      throw new OMException("LayoutVersion for request is null.",
+          OMException.ResultCodes.INTERNAL_ERROR);
     }
   }
 

@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.ratis.utils;
 
 import com.google.common.base.Preconditions;
+
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -25,42 +26,16 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
-import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
-import org.apache.hadoop.ozone.om.request.bucket.OMBucketDeleteRequest;
-import org.apache.hadoop.ozone.om.request.bucket.OMBucketSetPropertyRequest;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketAddAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketSetAclRequest;
-import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest;
-import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
-import org.apache.hadoop.ozone.om.request.key.OMKeysDeleteRequest;
-import org.apache.hadoop.ozone.om.request.key.OMAllocateBlockRequest;
-import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
-import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
-import org.apache.hadoop.ozone.om.request.key.OMKeyDeleteRequest;
-import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
-import org.apache.hadoop.ozone.om.request.key.OMKeyRenameRequest;
-import org.apache.hadoop.ozone.om.request.key.OMKeysRenameRequest;
-import org.apache.hadoop.ozone.om.request.key.OMTrashRecoverRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixSetAclRequest;
-import org.apache.hadoop.ozone.om.request.s3.multipart.S3InitiateMultipartUploadRequest;
-import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortRequest;
-import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCommitPartRequest;
-import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCompleteRequest;
-import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
-import org.apache.hadoop.ozone.om.request.security.OMCancelDelegationTokenRequest;
-import org.apache.hadoop.ozone.om.request.security.OMGetDelegationTokenRequest;
-import org.apache.hadoop.ozone.om.request.security.OMRenewDelegationTokenRequest;
-import org.apache.hadoop.ozone.om.request.upgrade.OMFinalizeUpgradeProgressRequest;
-import org.apache.hadoop.ozone.om.request.upgrade.OMFinalizeUpgradeRequest;
-import org.apache.hadoop.ozone.om.request.volume.OMVolumeCreateRequest;
-import org.apache.hadoop.ozone.om.request.volume.OMVolumeDeleteRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeSetOwnerRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeSetQuotaRequest;
 import org.apache.hadoop.ozone.om.request.volume.acl.OMVolumeAddAclRequest;
@@ -73,6 +48,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ratis.util.FileUtils;
 import org.rocksdb.RocksDBException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -85,130 +62,109 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_
  */
 public final class OzoneManagerRatisUtils {
 
+  private static final Logger LOG = LoggerFactory
+      .getLogger(OzoneManagerRatisUtils.class);
+
   private OzoneManagerRatisUtils() {
   }
-  /**
-   * Create OMClientRequest which encapsulates the OMRequest.
-   * @param omRequest
-   * @return OMClientRequest
-   * @throws IOException
-   */
-  public static OMClientRequest createClientRequest(OMRequest omRequest) {
+
+  public static OMClientRequest getRequest(OzoneManager om,
+                                           OMRequest omRequest) {
     Type cmdType = omRequest.getCmdType();
     switch (cmdType) {
-    case CreateVolume:
-      return new OMVolumeCreateRequest(omRequest);
-    case SetVolumeProperty:
-      boolean hasQuota = omRequest.getSetVolumePropertyRequest()
-          .hasQuotaInBytes();
-      boolean hasOwner = omRequest.getSetVolumePropertyRequest().hasOwnerName();
-      Preconditions.checkState(hasOwner || hasQuota, "Either Quota or owner " +
-          "should be set in the SetVolumeProperty request");
-      Preconditions.checkState(!(hasOwner && hasQuota), "Either Quota or " +
-          "owner should be set in the SetVolumeProperty request. Should not " +
-          "set both");
-      if (hasQuota) {
-        return new OMVolumeSetQuotaRequest(omRequest);
-      } else {
-        return new OMVolumeSetOwnerRequest(omRequest);
-      }
-    case DeleteVolume:
-      return new OMVolumeDeleteRequest(omRequest);
-    case CreateBucket:
-      return new OMBucketCreateRequest(omRequest);
-    case DeleteBucket:
-      return new OMBucketDeleteRequest(omRequest);
-    case SetBucketProperty:
-      return new OMBucketSetPropertyRequest(omRequest);
-    case AllocateBlock:
-      return new OMAllocateBlockRequest(omRequest);
-    case CreateKey:
-      return new OMKeyCreateRequest(omRequest);
-    case CommitKey:
-      return new OMKeyCommitRequest(omRequest);
-    case DeleteKey:
-      return new OMKeyDeleteRequest(omRequest);
-    case DeleteKeys:
-      return new OMKeysDeleteRequest(omRequest);
-    case RenameKey:
-      return new OMKeyRenameRequest(omRequest);
-    case RenameKeys:
-      return new OMKeysRenameRequest(omRequest);
-    case CreateDirectory:
-      return new OMDirectoryCreateRequest(omRequest);
-    case CreateFile:
-      return new OMFileCreateRequest(omRequest);
-    case PurgeKeys:
-      return new OMKeyPurgeRequest(omRequest);
-    case InitiateMultiPartUpload:
-      return new S3InitiateMultipartUploadRequest(omRequest);
-    case CommitMultiPartUpload:
-      return new S3MultipartUploadCommitPartRequest(omRequest);
-    case AbortMultiPartUpload:
-      return new S3MultipartUploadAbortRequest(omRequest);
-    case CompleteMultiPartUpload:
-      return new S3MultipartUploadCompleteRequest(omRequest);
     case AddAcl:
     case RemoveAcl:
     case SetAcl:
-      return getOMAclRequest(omRequest);
-    case GetDelegationToken:
-      return new OMGetDelegationTokenRequest(omRequest);
-    case CancelDelegationToken:
-      return new OMCancelDelegationTokenRequest(omRequest);
-    case RenewDelegationToken:
-      return new OMRenewDelegationTokenRequest(omRequest);
-    case GetS3Secret:
-      return new S3GetSecretRequest(omRequest);
-    case RecoverTrash:
-      return new OMTrashRecoverRequest(omRequest);
-    case FinalizeUpgrade:
-      return new OMFinalizeUpgradeRequest(omRequest);
-    case FinalizeUpgradeProgress:
-      return new OMFinalizeUpgradeProgressRequest(omRequest);
+      return getOMAclRequest(om, omRequest);
+    case SetVolumeProperty:
+      return getVolumeSetPropertyRequest(om, omRequest);
     default:
-      throw new IllegalStateException("Unrecognized write command " +
-          "type request" + cmdType);
+      Class<? extends OMClientRequest> requestClass =
+          om.getVersionManager()
+              .getRequestHandler(omRequest.getCmdType().name());
+      return getClientRequest(requestClass, omRequest);
     }
   }
 
-  private static OMClientRequest getOMAclRequest(OMRequest omRequest) {
+  private static OMClientRequest getClientRequest(Class<?
+      extends OMClientRequest> requestClass, OMRequest omRequest) {
+    try {
+      return requestClass.getDeclaredConstructor(OMRequest.class)
+          .newInstance(omRequest);
+    } catch (Exception ex) {
+      LOG.error("Unable to get request handler for '{}', current layout " +
+              "version = {}, request factory returned '{}'",
+          omRequest.getCmdType(),
+          omRequest.getLayoutVersion().getVersion(),
+          requestClass.getSimpleName());
+    }
+    throw new IllegalStateException("Unrecognized write command " +
+        "type request : " + omRequest.getCmdType());
+  }
+
+  public static OMClientRequest getOMAclRequest(OzoneManager om,
+                                                OMRequest omRequest) {
     Type cmdType = omRequest.getCmdType();
+    String requestType = null;
     if (Type.AddAcl == cmdType) {
       ObjectType type = omRequest.getAddAclRequest().getObj().getResType();
       if (ObjectType.VOLUME == type) {
-        return new OMVolumeAddAclRequest(omRequest);
+        requestType = OMVolumeAddAclRequest.getRequestType();
       } else if (ObjectType.BUCKET == type) {
-        return new OMBucketAddAclRequest(omRequest);
+        requestType = OMBucketAddAclRequest.getRequestType();
       } else if (ObjectType.KEY == type) {
-        return new OMKeyAddAclRequest(omRequest);
+        requestType = OMKeyAddAclRequest.getRequestType();
       } else {
-        return new OMPrefixAddAclRequest(omRequest);
+        requestType = OMPrefixAddAclRequest.getRequestType();
       }
     } else if (Type.RemoveAcl == cmdType) {
       ObjectType type = omRequest.getRemoveAclRequest().getObj().getResType();
       if (ObjectType.VOLUME == type) {
-        return new OMVolumeRemoveAclRequest(omRequest);
+        requestType = OMVolumeRemoveAclRequest.getRequestType();
       } else if (ObjectType.BUCKET == type) {
-        return new OMBucketRemoveAclRequest(omRequest);
+        requestType = OMBucketRemoveAclRequest.getRequestType();
       } else if (ObjectType.KEY == type) {
-        return new OMKeyRemoveAclRequest(omRequest);
+        requestType = OMKeyRemoveAclRequest.getRequestType();
       } else {
-        return new OMPrefixRemoveAclRequest(omRequest);
+        requestType = OMPrefixRemoveAclRequest.getRequestType();
       }
     } else {
       ObjectType type = omRequest.getSetAclRequest().getObj().getResType();
       if (ObjectType.VOLUME == type) {
-        return new OMVolumeSetAclRequest(omRequest);
+        requestType = OMVolumeSetAclRequest.getRequestType();
       } else if (ObjectType.BUCKET == type) {
-        return new OMBucketSetAclRequest(omRequest);
+        requestType = OMBucketSetAclRequest.getRequestType();
       } else if (ObjectType.KEY == type) {
-        return new OMKeySetAclRequest(omRequest);
+        requestType = OMKeySetAclRequest.getRequestType();
       } else {
-        return new OMPrefixSetAclRequest(omRequest);
+        requestType = OMPrefixSetAclRequest.getRequestType();
       }
     }
+    Class<? extends OMClientRequest> requestClass =
+        om.getVersionManager().getRequestHandler(requestType);
+    return getClientRequest(requestClass, omRequest);
   }
+
+  public static OMClientRequest getVolumeSetPropertyRequest(
+      OzoneManager om, OMRequest omRequest) {
+    boolean hasQuota = omRequest.getSetVolumePropertyRequest()
+        .hasQuotaInBytes();
+    boolean hasOwner = omRequest.getSetVolumePropertyRequest().hasOwnerName();
+    Preconditions.checkState(hasOwner || hasQuota,
+        "Either Quota or owner " +
+            "should be set in the SetVolumeProperty request");
+    Preconditions.checkState(!(hasOwner && hasQuota),
+        "Either Quota or " +
+            "owner should be set in the SetVolumeProperty request. Should not "
+            + "set both");
+
+    String requestType = hasQuota ? OMVolumeSetQuotaRequest.getRequestType() :
+        OMVolumeSetOwnerRequest.getRequestType();
+    Class<? extends OMClientRequest> requestClass =
+        om.getVersionManager().getRequestHandler(requestType);
+    return getClientRequest(requestClass, omRequest);
+  }
+
 
   /**
    * Convert exception result to {@link OzoneManagerProtocolProtos.Status}.

@@ -59,6 +59,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CommitKey;
 
 /**
  * Handles CommitKey request.
@@ -252,5 +253,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     }
 
     return omClientResponse;
+  }
+
+  public static String getRequestType() {
+    return CommitKey.name();
   }
 }

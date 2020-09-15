@@ -18,18 +18,12 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeatureCatalog.OMLayoutFeature;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 
 /**
- * Annotation to specify if an API is backed up by a Layout Feature.
+ * Read only Interface for OM Layout Version Management.
  */
-@Target(ElementType.METHOD)
-@Retention(RetentionPolicy.RUNTIME)
-public @interface OMLayoutFeatureAPI {
-  OMLayoutFeature value();
+public interface OmLayoutVersionManager extends LayoutVersionManager {
+  Class<? extends OMClientRequest> getRequestHandler(String requestType);
 }

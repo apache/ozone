@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -92,7 +93,12 @@ public abstract class OMClientRequest implements RequestAuditor {
    */
   public OMRequest preExecute(OzoneManager ozoneManager)
       throws IOException {
-    omRequest = getOmRequest().toBuilder().setUserInfo(getUserInfo()).build();
+    LayoutVersion layoutVersion = LayoutVersion.newBuilder()
+        .setVersion(ozoneManager.getVersionManager().getMetadataLayoutVersion())
+        .build();
+    omRequest =
+        getOmRequest().toBuilder()
+            .setUserInfo(getUserInfo()).setLayoutVersion(layoutVersion).build();
     return omRequest;
   }
 

@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.request.upgrade;
 
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.FinalizeUpgradeProgress;
+
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -83,5 +85,9 @@ public class OMFinalizeUpgradeProgressRequest extends OMClientRequest {
     }
 
     return response;
+  }
+
+  public static String getRequestType() {
+    return FinalizeUpgradeProgress.name();
   }
 }

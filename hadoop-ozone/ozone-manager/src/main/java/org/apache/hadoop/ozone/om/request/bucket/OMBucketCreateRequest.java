@@ -76,6 +76,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_L
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .CryptoProtocolVersionProto.ENCRYPTION_ZONES;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateBucket;
 
 /**
  * Handles CreateBucket Request.
@@ -335,4 +336,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
   }
 
+  public static String getRequestType() {
+    return CreateBucket.name();
+  }
 }
