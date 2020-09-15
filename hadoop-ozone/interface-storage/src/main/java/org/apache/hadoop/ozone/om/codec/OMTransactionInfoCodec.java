@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.codec;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 
@@ -31,14 +32,14 @@ import static com.google.common.base.Preconditions.checkNotNull;
 public class OMTransactionInfoCodec implements Codec<OMTransactionInfo> {
   @Override
   public byte[] toPersistedFormat(OMTransactionInfo object) throws IOException {
-    checkNotNull(object, "Null object can't be converted to byte array.");
+    Preconditions.checkNotNull(object, "Null object can't be converted to byte array.");
     return object.convertToByteArray();
   }
 
   @Override
   public OMTransactionInfo fromPersistedFormat(byte[] rawData)
       throws IOException {
-    checkNotNull(rawData, "Null byte array can't be converted to " +
+    Preconditions.checkNotNull(rawData, "Null byte array can't be converted to " +
         "real object.");
     return OMTransactionInfo.getFromByteArray(rawData);
   }

@@ -20,10 +20,10 @@ package org.apache.hadoop.ozone.om.ratis;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.StringUtils;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 
 import java.io.IOException;
 import java.util.Objects;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.ratis.server.protocol.TermIndex;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;

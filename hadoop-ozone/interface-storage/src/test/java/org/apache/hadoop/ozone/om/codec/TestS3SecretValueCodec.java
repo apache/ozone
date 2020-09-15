@@ -66,7 +66,7 @@ public class TestS3SecretValueCodec {
   public void testCodecWithIncorrectValues() throws Exception {
     try {
       codec.fromPersistedFormat("random".getBytes(StandardCharsets.UTF_8));
-      fail("testCodecWithIncorrectValues failed");
+      Assert.fail("testCodecWithIncorrectValues failed");
     } catch (IllegalArgumentException ex) {
       GenericTestUtils.assertExceptionContains("Can't encode the the raw " +
           "data from the byte array", ex);

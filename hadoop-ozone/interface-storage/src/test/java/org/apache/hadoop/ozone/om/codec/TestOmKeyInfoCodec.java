@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.util.Time;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -91,10 +92,10 @@ public class TestOmKeyInfoCodec {
       OmKeyInfo key = codec.fromPersistedFormat(rawData);
       System.out.println("Chunk number = " + chunkNum +
           ", Serialized key size without pipeline = " + rawData.length);
-      assertNull(key.getLatestVersionLocations().getLocationList().get(0)
+      Assert.assertNull(key.getLatestVersionLocations().getLocationList().get(0)
           .getPipeline());
     } catch (IOException e) {
-      fail("Should success");
+      Assert.fail("Should success");
     }
   }
 
@@ -107,10 +108,10 @@ public class TestOmKeyInfoCodec {
       OmKeyInfo key = codecWithoutPipeline.fromPersistedFormat(rawData);
       System.out.println("Chunk number = " + chunkNum +
           ", Serialized key size with pipeline = " + rawData.length);
-      assertNotNull(key.getLatestVersionLocations().getLocationList().get(0)
+      Assert.assertNotNull(key.getLatestVersionLocations().getLocationList().get(0)
           .getPipeline());
     } catch (IOException e) {
-      fail("Should success");
+      Assert.fail("Should success");
     }
   }
 }
