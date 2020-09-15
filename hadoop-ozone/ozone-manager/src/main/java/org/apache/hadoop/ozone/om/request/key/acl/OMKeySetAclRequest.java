@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.om.request.key.acl;
 
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.SetAcl;
+
 import java.io.IOException;
 import java.util.List;
 
@@ -28,6 +30,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.key.acl.OMKeyAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,6 +100,10 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
   boolean apply(OmKeyInfo omKeyInfo, long trxnLogIndex) {
     // No need to check not null here, this will be never called with null.
     return omKeyInfo.setAcls(ozoneAcls);
+  }
+
+  public static String getRequestType() {
+    return SetAcl.name() + "-" + ObjectType.KEY;
   }
 }
 

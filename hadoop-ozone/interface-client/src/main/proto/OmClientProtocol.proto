@@ -107,6 +107,7 @@ message OMRequest {
 
   optional UserInfo userInfo = 4;
 
+  optional LayoutVersion layoutVersion = 5;
 
   optional CreateVolumeRequest              createVolumeRequest            = 11;
   optional SetVolumePropertyRequest         setVolumePropertyRequest       = 12;
@@ -1208,6 +1209,10 @@ message GetS3SecretRequest {
 
 message GetS3SecretResponse {
     required S3Secret s3Secret = 2;
+}
+
+message LayoutVersion {
+    required uint64 version = 1;
 }
 
 /**

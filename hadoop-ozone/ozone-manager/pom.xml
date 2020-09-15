@@ -131,7 +131,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <groupId>org.reflections</groupId>
       <artifactId>reflections</artifactId>
       <version>0.9.12</version>
-      <scope>test</scope>
     </dependency>
 
   </dependencies>

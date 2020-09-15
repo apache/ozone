@@ -54,6 +54,7 @@ import java.util.UUID;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.InitiateMultiPartUpload;
 
 /**
  * Handles initiate multipart upload request.
@@ -249,5 +250,9 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
     }
 
     return omClientResponse;
+  }
+
+  public static String getRequestType() {
+    return InitiateMultiPartUpload.name();
   }
 }

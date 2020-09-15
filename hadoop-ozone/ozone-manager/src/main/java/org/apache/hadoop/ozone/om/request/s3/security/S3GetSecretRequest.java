@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.GetS3Secret;
 
 /**
  * Handles GetS3Secret request.
@@ -185,5 +186,9 @@ public class S3GetSecretRequest extends OMClientRequest {
           exception);
     }
     return omClientResponse;
+  }
+
+  public static String getRequestType() {
+    return GetS3Secret.name();
   }
 }

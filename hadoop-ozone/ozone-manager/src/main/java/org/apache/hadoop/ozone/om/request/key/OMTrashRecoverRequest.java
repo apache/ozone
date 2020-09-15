@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.RecoverTrash;
 
 /**
  * Handles RecoverTrash request.
@@ -140,4 +141,7 @@ public class OMTrashRecoverRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
+  public static String getRequestType() {
+    return RecoverTrash.name();
+  }
 }
