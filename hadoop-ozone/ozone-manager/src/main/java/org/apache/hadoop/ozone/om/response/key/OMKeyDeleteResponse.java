@@ -59,7 +59,14 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
+    String key = omMetadataManager.getOzoneKey(
+        omKeyInfo.getVolumeName(),
+        omKeyInfo.getBucketName(),
+        omKeyInfo.getKeyName()
+    );
+
     Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable();
-    deleteFromTable(omMetadataManager, batchOperation, keyTable, omKeyInfo);
+    deleteFromTable(omMetadataManager, batchOperation, keyTable,
+        key, omKeyInfo);
   }
 }

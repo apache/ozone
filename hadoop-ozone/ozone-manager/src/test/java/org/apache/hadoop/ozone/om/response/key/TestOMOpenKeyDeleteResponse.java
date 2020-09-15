@@ -48,7 +48,7 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
   public void testAddToDBBatchWithEmptyBlocks() throws Exception {
     Map<String, OmKeyInfo> keysToDelete = createOpenKeys(3, false);
     Map<String, OmKeyInfo> keysToKeep = createOpenKeys(3, false);
-    createAndCommitResponse(keysToDelete.values(), Status.OK);
+    createAndCommitResponse(keysToDelete, Status.OK);
 
     for (String key: keysToDelete.keySet()) {
       Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(key));
@@ -68,7 +68,7 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
   public void testAddToDBBatchWithNonEmptyBlocks() throws Exception {
     Map<String, OmKeyInfo> keysToDelete = createOpenKeys(3, true);
     Map<String, OmKeyInfo> keysToKeep = createOpenKeys(3, true);
-    createAndCommitResponse(keysToDelete.values(), Status.OK);
+    createAndCommitResponse(keysToDelete, Status.OK);
 
     for (String key: keysToDelete.keySet()) {
       Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(key));
@@ -85,15 +85,15 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
   @Test
   public void testAddToDBBatchWithErrorResponse() throws Exception {
     Map<String, OmKeyInfo> keysToDelete = createOpenKeys(3, true);
-    createAndCommitResponse(keysToDelete.values(), Status.INTERNAL_ERROR);
+    createAndCommitResponse(keysToDelete, Status.INTERNAL_ERROR);
 
     for (String key: keysToDelete.keySet()) {
-      Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(key));
-      Assert.assertTrue(omMetadataManager.getDeletedTable().isExist(key));
+      Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(key));
+      Assert.assertFalse(omMetadataManager.getDeletedTable().isExist(key));
     }
   }
 
-  private void createAndCommitResponse(Collection<OmKeyInfo> keyInfosToDelete,
+  private void createAndCommitResponse(Map<String, OmKeyInfo> keysToDelete,
       Status status) throws Exception {
 
     OMResponse omResponse = OMResponse.newBuilder()
@@ -102,7 +102,7 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
         .build();
 
     OMOpenKeyDeleteResponse response = new OMOpenKeyDeleteResponse(omResponse,
-        keyInfosToDelete, true);
+        keysToDelete, true);
 
     // Operations are only added to the batch by this method when status is OK.
     response.checkAndUpdateDB(omMetadataManager, batchOperation);
