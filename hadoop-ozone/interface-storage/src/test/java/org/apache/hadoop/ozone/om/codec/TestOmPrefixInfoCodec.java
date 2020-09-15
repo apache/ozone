@@ -18,13 +18,11 @@
 package org.apache.hadoop.ozone.om.codec;
 
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.OzoneAcl.AclScope;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 
 import org.apache.hadoop.test.GenericTestUtils;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -59,7 +57,7 @@ public class TestOmPrefixInfoCodec {
   public void testCodecWithIncorrectValues() throws Exception {
     try {
       codec.fromPersistedFormat("random".getBytes(StandardCharsets.UTF_8));
-      Assert.fail("testCodecWithIncorrectValues failed");
+      fail("testCodecWithIncorrectValues failed");
     } catch (IllegalArgumentException ex) {
       GenericTestUtils.assertExceptionContains("Can't encode the the raw " +
           "data from the byte array", ex);
@@ -84,7 +82,7 @@ public class TestOmPrefixInfoCodec {
 
     List<OzoneAcl> acls = new LinkedList<>();
     OzoneAcl ozoneAcl = new OzoneAcl(ACLIdentityType.USER,
-        "hive", ACLType.ALL, AclScope.ACCESS);
+        "hive", ACLType.ALL, ACCESS);
     acls.add(ozoneAcl);
     OmPrefixInfo opiSave = OmPrefixInfo.newBuilder()
         .setName("/user/hive/warehouse")
@@ -95,7 +93,7 @@ public class TestOmPrefixInfoCodec {
     OmPrefixInfo opiLoad = codec.fromPersistedFormat(
         codec.toPersistedFormat(opiSave));
 
-    Assert.assertTrue("Load saved prefix info should match",
+    assertTrue("Load saved prefix info should match",
         opiLoad.equals(opiSave));
   }
 }

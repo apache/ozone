@@ -73,7 +73,7 @@ public class TestOMTransactionInfoCodec {
   public void testCodecWithIncorrectValues() throws Exception {
     try {
       codec.fromPersistedFormat("random".getBytes(StandardCharsets.UTF_8));
-      Assert.fail("testCodecWithIncorrectValues failed");
+      fail("testCodecWithIncorrectValues failed");
     } catch (IllegalStateException ex) {
       GenericTestUtils.assertExceptionContains("Incorrect TransactionInfo " +
           "value", ex);
