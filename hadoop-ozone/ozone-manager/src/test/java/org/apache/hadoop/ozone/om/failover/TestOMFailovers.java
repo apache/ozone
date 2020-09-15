@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.hadoop.ozone.om.failover;
 
 import com.google.protobuf.RpcController;
@@ -11,6 +29,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -26,8 +45,8 @@ import org.slf4j.event.Level;
  */
 public class TestOMFailovers {
 
-  ConfigurationSource conf = new OzoneConfiguration();
-  Exception testException;
+  private ConfigurationSource conf = new OzoneConfiguration();
+  private Exception testException;
 
   @Test
   public void test1() throws Exception {
@@ -69,11 +88,11 @@ public class TestOMFailovers {
         "Permission denied.";
   }
 
-  private class MockOzoneManagerProtocol implements OzoneManagerProtocolPB {
+  private final class MockOzoneManagerProtocol implements OzoneManagerProtocolPB {
 
-    final String omNodeId;
+    private final String omNodeId;
     // Exception to throw when submitMockRequest is called
-    final Exception exception;
+    private final Exception exception;
 
     private MockOzoneManagerProtocol(String nodeId, Exception ex) {
       omNodeId = nodeId;
@@ -88,7 +107,7 @@ public class TestOMFailovers {
     }
   }
 
-  private class MockFailoverProxyProvider extends OMFailoverProxyProvider {
+  private final class MockFailoverProxyProvider extends OMFailoverProxyProvider {
 
     private MockFailoverProxyProvider(ConfigurationSource configuration)
         throws IOException {
@@ -107,9 +126,10 @@ public class TestOMFailovers {
     @Override
     protected void loadOMClientConfigs(ConfigurationSource config,
         String omSvcId) {
-      this.omProxies = new HashMap<>();
-      this.omProxyInfos = new HashMap<>();
-      this.omNodeIDList = new ArrayList<>();
+      HashMap<String, ProxyInfo<OzoneManagerProtocolPB>> omProxies =
+          new HashMap<>();;
+      HashMap<String, OMProxyInfo> omProxyInfos = new HashMap<>();;
+      ArrayList<String> omNodeIDList = new ArrayList<>();
 
       for (int i = 1; i <= 3; i++) {
         String nodeId = "om" + i;
@@ -117,6 +137,7 @@ public class TestOMFailovers {
         omProxyInfos.put(nodeId, null);
         omNodeIDList.add(nodeId);
       }
+      setProxiesForTesting(omProxies, omProxyInfos, omNodeIDList);
     }
 
     @Override

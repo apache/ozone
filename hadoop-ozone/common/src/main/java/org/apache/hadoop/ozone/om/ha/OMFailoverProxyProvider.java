@@ -72,9 +72,9 @@ public class OMFailoverProxyProvider implements
       LoggerFactory.getLogger(OMFailoverProxyProvider.class);
 
   // Map of OMNodeID to its proxy
-  protected Map<String, ProxyInfo<OzoneManagerProtocolPB>> omProxies;
-  protected Map<String, OMProxyInfo> omProxyInfos;
-  protected List<String> omNodeIDList;
+  private Map<String, ProxyInfo<OzoneManagerProtocolPB>> omProxies;
+  private Map<String, OMProxyInfo> omProxyInfos;
+  private List<String> omNodeIDList;
 
   private String currentProxyOMNodeId;
   private int currentProxyIndex;
@@ -228,9 +228,6 @@ public class OMFailoverProxyProvider implements
 
   @VisibleForTesting
   public RetryPolicy getRetryPolicy(int maxFailovers) {
-    // Client attempts contacting each OM ipc.client.connect.max.retries
-    // (default = 10) times before failing over to the next OM, if
-    // available.
     // Client will attempt upto maxFailovers number of failovers between
     // available OMs before throwing exception.
     RetryPolicy retryPolicy = new RetryPolicy() {
@@ -552,6 +549,16 @@ public class OMFailoverProxyProvider implements
       }
     }
     return null;
+  }
+
+  @VisibleForTesting
+  protected void setProxiesForTesting(
+      Map<String, ProxyInfo<OzoneManagerProtocolPB>> testOMProxies,
+      Map<String, OMProxyInfo> testOMProxyInfos,
+      List<String> testOMNodeIDList) {
+    this.omProxies = testOMProxies;
+    this.omProxyInfos = testOMProxyInfos;
+    this.omNodeIDList = testOMNodeIDList;
   }
 }
 
