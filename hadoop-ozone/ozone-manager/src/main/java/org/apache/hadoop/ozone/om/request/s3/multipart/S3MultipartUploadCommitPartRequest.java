@@ -56,7 +56,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
  * Handle Multipart upload commit upload part file.
@@ -122,8 +122,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       bucketName = keyArgs.getBucketName();
 
       // TODO to support S3 ACL later.
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(
-          VOLUME_LOCK, volumeName);
+      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
+          volumeName, bucketName);
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
@@ -240,7 +240,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
+        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
+            volumeName, bucketName);
       }
     }
 
