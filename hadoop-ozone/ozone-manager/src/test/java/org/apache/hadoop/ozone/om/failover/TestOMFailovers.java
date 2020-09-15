@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryProxy;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
@@ -49,7 +50,7 @@ public class TestOMFailovers {
   private Exception testException;
 
   @Test
-  public void test1() throws Exception {
+  public void testAccessContorlExceptionFailovers() throws Exception {
 
     testException = new AccessControlException();
 
@@ -62,7 +63,8 @@ public class TestOMFailovers {
 
     OzoneManagerProtocolPB proxy = (OzoneManagerProtocolPB) RetryProxy
         .create(OzoneManagerProtocolPB.class, failoverProxyProvider,
-            failoverProxyProvider.getRetryPolicy(9));
+            failoverProxyProvider.getRetryPolicy(
+                OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT));
 
     try {
       proxy.submitRequest(null, null);
@@ -84,11 +86,12 @@ public class TestOMFailovers {
   }
 
   private String getRetryProxyDebugMsg(String omNodeId) {
-    return "RetryProxy: OM " + omNodeId +": AccessControlException: " +
+    return "RetryProxy: OM " + omNodeId + ": AccessControlException: " +
         "Permission denied.";
   }
 
-  private final class MockOzoneManagerProtocol implements OzoneManagerProtocolPB {
+  private final class MockOzoneManagerProtocol
+      implements OzoneManagerProtocolPB {
 
     private final String omNodeId;
     // Exception to throw when submitMockRequest is called
@@ -107,7 +110,8 @@ public class TestOMFailovers {
     }
   }
 
-  private final class MockFailoverProxyProvider extends OMFailoverProxyProvider {
+  private final class MockFailoverProxyProvider
+      extends OMFailoverProxyProvider {
 
     private MockFailoverProxyProvider(ConfigurationSource configuration)
         throws IOException {
@@ -127,8 +131,8 @@ public class TestOMFailovers {
     protected void loadOMClientConfigs(ConfigurationSource config,
         String omSvcId) {
       HashMap<String, ProxyInfo<OzoneManagerProtocolPB>> omProxies =
-          new HashMap<>();;
-      HashMap<String, OMProxyInfo> omProxyInfos = new HashMap<>();;
+          new HashMap<>();
+      HashMap<String, OMProxyInfo> omProxyInfos = new HashMap<>();
       ArrayList<String> omNodeIDList = new ArrayList<>();
 
       for (int i = 1; i <= 3; i++) {

@@ -539,7 +539,8 @@ public class OMFailoverProxyProvider implements
    *
    * @return OMNotLeaderException.
    */
-  public static OMNotLeaderException getNotLeaderException(Exception exception) {
+  public static OMNotLeaderException getNotLeaderException(
+      Exception exception) {
     Throwable cause = exception.getCause();
     if (cause instanceof RemoteException) {
       IOException ioException =
