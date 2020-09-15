@@ -661,7 +661,7 @@ public class ReplicationManager
         eligibleReplicas.removeAll(unhealthyReplicas);
         Set<ContainerReplica> replicaSet = new HashSet<>(eligibleReplicas);
         boolean misReplicated =
-            getPlacementStatus(replicaSet, replicationFactor)
+            !getPlacementStatus(replicaSet, replicationFactor)
                 .isPolicySatisfied();
         for (ContainerReplica r : eligibleReplicas) {
           if (excess <= 0) {
