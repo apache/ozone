@@ -90,7 +90,7 @@ public class DatanodeStateMachine implements Closeable {
 
   /**
    * Constructs a a datanode state machine.
-   *  @param datanodeDetails - DatanodeDetails used to identify a datanode
+   * @param datanodeDetails - DatanodeDetails used to identify a datanode
    * @param conf - Configuration.
    * @param certClient - Datanode Certificate client, required if security is
    *                     enabled
@@ -135,7 +135,7 @@ public class DatanodeStateMachine implements Closeable {
             dnConf.getReplicationMaxStreams());
 
     // When we add new handlers just adding a new handler here should do the
-     // trick.
+    // trick.
     commandDispatcher = CommandDispatcher.newBuilder()
         .addHandler(new CloseContainerCommandHandler())
         .addHandler(new DeleteBlocksCommandHandler(container.getContainerSet(),
