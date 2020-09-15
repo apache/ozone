@@ -47,7 +47,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
   private long quotaInBytes;
   private long quotaInCounts;
   private final OmOzoneAclMap aclMap;
-  private LongAdder usedBytes = new LongAdder();
+  private final LongAdder usedBytes = new LongAdder();
 
   /**
    * Private constructor, constructed via builder.
@@ -181,9 +181,6 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     return usedBytes;
   }
 
-  public void setUsedBytes(long usedBytes) {
-    this.usedBytes.add(usedBytes);
-  }
   /**
    * Returns new builder class that builds a OmVolumeArgs.
    *
@@ -392,7 +389,8 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
         ", admin='" + adminName + '\'' +
         ", owner='" + ownerName + '\'' +
         ", creationTime='" + creationTime + '\'' +
-        ", quota='" + quotaInBytes + '\'' +
+        ", quotaInBytes='" + quotaInBytes + '\'' +
+        ", usedBytes='" + usedBytes.sum() + '\'' +
         '}';
   }
 
