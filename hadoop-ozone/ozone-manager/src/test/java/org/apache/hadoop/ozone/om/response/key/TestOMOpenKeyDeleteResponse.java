@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,14 +50,14 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
     createAndCommitResponse(keysToDelete, Status.OK);
 
     for (String key: keysToDelete.keySet()) {
+      // open keys with no associated block data should have been removed
+      // from the open key table, but not added to the deleted table.
       Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(key));
-
-      // As default key entry does not have any blocks, it should not be in
-      // deletedKeyTable.
       Assert.assertFalse(omMetadataManager.getDeletedTable().isExist(key));
     }
 
     for (String key: keysToKeep.keySet()) {
+      // These keys should not have been removed from the open key table.
       Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(key));
       Assert.assertFalse(omMetadataManager.getDeletedTable().isExist(key));
     }
@@ -71,11 +70,14 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
     createAndCommitResponse(keysToDelete, Status.OK);
 
     for (String key: keysToDelete.keySet()) {
+      // These keys should have been moved from the open key table to the
+      // delete table.
       Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(key));
       Assert.assertTrue(omMetadataManager.getDeletedTable().isExist(key));
     }
 
     for (String key: keysToKeep.keySet()) {
+      // These keys should not have been moved out of the open key table.
       Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(key));
       Assert.assertFalse(omMetadataManager.getDeletedTable().isExist(key));
     }
@@ -88,11 +90,20 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
     createAndCommitResponse(keysToDelete, Status.INTERNAL_ERROR);
 
     for (String key: keysToDelete.keySet()) {
+      // If an error occurs in the response, the batch operation moving keys
+      // from the open key table to the delete table should not be committed.
       Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(key));
       Assert.assertFalse(omMetadataManager.getDeletedTable().isExist(key));
     }
   }
 
+  /**
+   * Constructs an {@link OMOpenKeyDeleteResponse} to delete the keys in
+   * {@code keysToDelete}, with the completion status set to {@code status}.
+   * If {@code status} is {@link Status#OK}, the keys to delete will be added
+   * to a batch operation and committed to the database.
+   * @throws Exception
+   */
   private void createAndCommitResponse(Map<String, OmKeyInfo> keysToDelete,
       Status status) throws Exception {
 
@@ -111,6 +122,13 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
   }
 
+  /**
+   * Creates {@code numKeys} open keys with random names, maps each one to a
+   * new {@link OmKeyInfo} object, and returns them.
+   * If {@code addBlocks} is true, each {@link OmKeyInfo} will have block
+   * data attached to it.
+   * @throws Exception
+   */
   private Map<String, OmKeyInfo> createOpenKeys(int numKeys, boolean addBlocks)
       throws Exception {
 
@@ -141,6 +159,10 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
     return newOpenKeys;
   }
 
+  /**
+   * Creates block data and attaches it to {@code keyInfo}.
+   * @throws Exception
+   */
   private void addBlocksTo(OmKeyInfo keyInfo) throws Exception {
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
 
