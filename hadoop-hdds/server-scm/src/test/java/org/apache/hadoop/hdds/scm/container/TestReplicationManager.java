@@ -912,7 +912,7 @@ public class TestReplicationManager {
 
   class FunctionMatcher extends ArgumentMatcher<List> {
 
-    Function<Object, Boolean> function;
+    private Function<Object, Boolean> function;
 
     FunctionMatcher(Function<Object, Boolean> function) {
       this.function = function;
