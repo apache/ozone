@@ -634,7 +634,8 @@ public class RpcClient implements ClientProtocol {
         bucketInfo.getEncryptionKeyInfo() != null ? bucketInfo
             .getEncryptionKeyInfo().getKeyName() : null,
         bucketInfo.getSourceVolume(),
-        bucketInfo.getSourceBucket()
+        bucketInfo.getSourceBucket(),
+        bucketInfo.getUsedBytes().sum()
     );
   }
 
@@ -658,7 +659,8 @@ public class RpcClient implements ClientProtocol {
         bucket.getEncryptionKeyInfo() != null ? bucket
             .getEncryptionKeyInfo().getKeyName() : null,
         bucket.getSourceVolume(),
-        bucket.getSourceBucket()))
+        bucket.getSourceBucket(),
+        bucket.getUsedBytes().sum()))
         .collect(Collectors.toList());
   }
 

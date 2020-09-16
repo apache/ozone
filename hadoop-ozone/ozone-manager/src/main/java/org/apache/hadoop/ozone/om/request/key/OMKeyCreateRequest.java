@@ -198,6 +198,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     OmKeyInfo omKeyInfo = null;
     OmVolumeArgs omVolumeArgs = null;
+    OmBucketInfo omBucketInfo = null;
     final List< OmKeyLocationInfo > locations = new ArrayList<>();
 
     boolean acquireLock = false;
@@ -294,6 +295,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
       long scmBlockSize = ozoneManager.getScmBlockSize();
       omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
+      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       // Here we refer to the implementation of HDFS:
       // If the key size is 600MB, when createKey, keyLocationInfo in
@@ -302,8 +304,11 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       // ize is 256MB * 3 * 3. We will allocate more 256MB * 3 * 3 - 600mb * 3
       // = 504MB in advance, and we  will subtract this part when we finally
       // commitKey.
-      omVolumeArgs.getUsedBytes().add(newLocationList.size() * scmBlockSize
-          * omKeyInfo.getFactor().getNumber());
+      long preAllocatedSpace = newLocationList.size() * scmBlockSize
+          * omKeyInfo.getFactor().getNumber();
+      omVolumeArgs.getUsedBytes().add(preAllocatedSpace);
+      omBucketInfo.getUsedBytes().add(preAllocatedSpace);
+
 
       // Prepare response
       omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
@@ -312,7 +317,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           .setOpenVersion(openVersion).build())
           .setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponse(omResponse.build(),
-          omKeyInfo, missingParentInfos, clientID, omVolumeArgs);
+          omKeyInfo, missingParentInfos, clientID, omVolumeArgs, omBucketInfo);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

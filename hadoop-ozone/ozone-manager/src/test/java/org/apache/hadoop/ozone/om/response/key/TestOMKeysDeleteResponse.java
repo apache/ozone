@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -79,10 +80,13 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
     OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
         .setOwnerName(keyName).setAdminName(keyName)
         .setVolume(volumeName).setCreationTime(Time.now()).build();
+    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName).setBucketName(bucketName)
+        .setCreationTime(Time.now()).build();
 
     OMClientResponse omKeysDeleteResponse = new OMKeysDeleteResponse(
         omResponse, omKeyInfoList, 10L, true,
-        omVolumeArgs);
+        omVolumeArgs, omBucketInfo);
 
     omKeysDeleteResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
@@ -114,10 +118,13 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
     OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
         .setOwnerName(keyName).setAdminName(keyName)
         .setVolume(volumeName).setCreationTime(Time.now()).build();
+    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName).setBucketName(bucketName)
+        .setCreationTime(Time.now()).build();
 
     OMClientResponse omKeysDeleteResponse = new OMKeysDeleteResponse(
         omResponse, omKeyInfoList, 10L, true,
-        omVolumeArgs);
+        omVolumeArgs, omBucketInfo);
 
     omKeysDeleteResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 

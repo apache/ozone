@@ -187,6 +187,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
     OmKeyInfo omKeyInfo = null;
     OmVolumeArgs omVolumeArgs = null;
+    OmBucketInfo omBucketInfo = null;
     final List<OmKeyLocationInfo> locations = new ArrayList<>();
     List<OmKeyInfo> missingParentInfos;
 
@@ -291,9 +292,13 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
       long scmBlockSize = ozoneManager.getScmBlockSize();
       omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
+      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+
       // update usedBytes atomically.
-      omVolumeArgs.getUsedBytes().add(newLocationList.size() * scmBlockSize
-          * omKeyInfo.getFactor().getNumber());
+      long preAllocatedSpace = newLocationList.size() * scmBlockSize
+          * omKeyInfo.getFactor().getNumber();
+      omVolumeArgs.getUsedBytes().add(preAllocatedSpace);
+      omBucketInfo.getUsedBytes().add(preAllocatedSpace);
 
       // Prepare response
       omResponse.setCreateFileResponse(CreateFileResponse.newBuilder()
@@ -302,7 +307,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
           .setOpenVersion(openVersion).build())
           .setCmdType(Type.CreateFile);
       omClientResponse = new OMFileCreateResponse(omResponse.build(),
-          omKeyInfo, missingParentInfos, clientID, omVolumeArgs);
+          omKeyInfo, missingParentInfos, clientID, omVolumeArgs, omBucketInfo);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
