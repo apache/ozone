@@ -138,6 +138,7 @@ import org.apache.hadoop.ozone.om.ratis.OMRatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.snapshot.OzoneManagerSnapshotProvider;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -3468,9 +3469,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     jvmPauseMonitor.start();
   }
 
-  public ResolvedBucket resolveBucketLink(KeyArgs args) throws IOException {
+  public ResolvedBucket resolveBucketLink(KeyArgs args,
+      OMClientRequest omClientRequest) throws IOException {
     return resolveBucketLink(
-        Pair.of(args.getVolumeName(), args.getBucketName()));
+        Pair.of(args.getVolumeName(), args.getBucketName()), omClientRequest);
   }
 
   public ResolvedBucket resolveBucketLink(OmKeyArgs args)
@@ -3479,10 +3481,35 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         Pair.of(args.getVolumeName(), args.getBucketName()));
   }
 
+  public ResolvedBucket resolveBucketLink(Pair<String, String> requested,
+      OMClientRequest omClientRequest)
+      throws IOException {
+    Pair<String, String> resolved;
+    if (isAclEnabled) {
+      resolved = resolveBucketLink(requested, new HashSet<>(),
+              omClientRequest.createUGI(), omClientRequest.getRemoteAddress(),
+              omClientRequest.getHostName());
+    } else {
+      resolved = resolveBucketLink(requested, new HashSet<>(),
+          null, null, null);
+    }
+    return new ResolvedBucket(requested, resolved);
+  }
+
+
   public ResolvedBucket resolveBucketLink(Pair<String, String> requested)
       throws IOException {
-    Pair<String, String> resolved =
-        resolveBucketLink(requested, new HashSet<>());
+
+    Pair<String, String> resolved;
+    if (isAclEnabled) {
+      resolved = resolveBucketLink(requested, new HashSet<>(),
+              Server.getRemoteUser(),
+              Server.getRemoteIp(),
+              Server.getRemoteIp().getHostName());
+    } else {
+      resolved = resolveBucketLink(requested, new HashSet<>(),
+          null, null, null);
+    }
     return new ResolvedBucket(requested, resolved);
   }
 
@@ -3492,6 +3519,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @param volumeAndBucket the bucket to be resolved (if it is a link)
    * @param visited collects link buckets visited during the resolution to
    *   avoid infinite loops
+   * @param {@link UserGroupInformation}
+   * @param remoteAddress
+   * @param hostName
    * @return bucket location possibly updated with its actual volume and bucket
    *   after following bucket links
    * @throws IOException (most likely OMException) if ACL check fails, bucket is
@@ -3499,7 +3529,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   private Pair<String, String> resolveBucketLink(
       Pair<String, String> volumeAndBucket,
-      Set<Pair<String, String>> visited) throws IOException {
+      Set<Pair<String, String>> visited,
+      UserGroupInformation userGroupInformation,
+      InetAddress remoteAddress,
+      String hostName) throws IOException {
 
     String volumeName = volumeAndBucket.getLeft();
     String bucketName = volumeAndBucket.getRight();
@@ -3515,12 +3548,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (isAclEnabled) {
       checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.READ,
-          volumeName, bucketName, null);
+          volumeName, bucketName, null, userGroupInformation,
+          remoteAddress, hostName);
     }
 
     return resolveBucketLink(
         Pair.of(info.getSourceVolume(), info.getSourceBucket()),
-        visited);
+        visited, userGroupInformation, remoteAddress, hostName);
   }
 
   @VisibleForTesting

@@ -90,10 +90,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
     super(omRequest);
   }
 
-  protected static KeyArgs resolveBucketLink(
+  protected KeyArgs resolveBucketLink(
       OzoneManager ozoneManager, KeyArgs keyArgs,
       Map<String, String> auditMap) throws IOException {
-    ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs);
+    ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs, this);
     keyArgs = bucket.update(keyArgs);
     bucket.audit(auditMap);
     return keyArgs;
