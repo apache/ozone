@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclR
  */
 public class OMBucketSetAclRequest extends OMBucketAclRequest {
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMBucketAddAclRequest.class);
+      LoggerFactory.getLogger(OMBucketSetAclRequest.class);
 
   private static BooleanBiFunction< List<OzoneAcl>,
         OmBucketInfo > bucketAddAclOp;
