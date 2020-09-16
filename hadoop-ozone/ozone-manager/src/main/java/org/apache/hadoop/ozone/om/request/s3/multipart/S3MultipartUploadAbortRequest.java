@@ -19,9 +19,11 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.Map;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
@@ -38,16 +40,12 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart
     .S3MultipartUploadAbortResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .KeyArgs;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .MultipartUploadAbortRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .MultipartUploadAbortResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadAbortRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadAbortResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -107,6 +105,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
         getOmRequest());
     OMClientResponse omClientResponse = null;
     Result result = null;
+    OmVolumeArgs omVolumeArgs = null;
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
       volumeName = keyArgs.getVolumeName();
@@ -124,6 +123,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
 
       OmKeyInfo omKeyInfo =
           omMetadataManager.getOpenKeyTable().get(multipartKey);
+      omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
 
       // If there is no entry in openKeyTable, then there is no multipart
       // upload initiated for this key.
@@ -136,6 +136,20 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       multipartKeyInfo = omMetadataManager.getMultipartInfoTable()
           .get(multipartKey);
       multipartKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+
+      // When abort uploaded key, we need to subtract the PartKey length from
+      // the volume usedBytes.
+      long quotaReleased = 0;
+      int keyFactor = omKeyInfo.getFactor().getNumber();
+      Iterator iter =
+          multipartKeyInfo.getPartKeyInfoMap().entrySet().iterator();
+      while(iter.hasNext()) {
+        Map.Entry entry = (Map.Entry)iter.next();
+        PartKeyInfo iterPartKeyInfo = (PartKeyInfo)entry.getValue();
+        quotaReleased +=
+            iterPartKeyInfo.getPartKeyInfo().getDataSize() * keyFactor;
+      }
+      omVolumeArgs.getUsedBytes().add(-quotaReleased);
 
       // Update cache of openKeyTable and multipartInfo table.
       // No need to add the cache entries to delete table, as the entries
@@ -150,7 +164,8 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       omClientResponse = new S3MultipartUploadAbortResponse(
           omResponse.setAbortMultiPartUploadResponse(
               MultipartUploadAbortResponse.newBuilder()).build(),
-          multipartKey, multipartKeyInfo, ozoneManager.isRatisEnabled());
+          multipartKey, multipartKeyInfo, ozoneManager.isRatisEnabled(),
+          omVolumeArgs);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

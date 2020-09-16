@@ -22,6 +22,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -56,6 +57,7 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
   private OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo;
   private OmKeyInfo openPartKeyInfoToBeDeleted;
   private boolean isRatisEnabled;
+  private OmVolumeArgs omVolumeArgs;
 
   /**
    * Regular response.
@@ -68,12 +70,13 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
    * @param omMultipartKeyInfo
    * @param oldPartKeyInfo
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public S3MultipartUploadCommitPartResponse(@Nonnull OMResponse omResponse,
       String multipartKey, String openKey,
       @Nullable OmMultipartKeyInfo omMultipartKeyInfo,
       @Nullable OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo,
       @Nullable OmKeyInfo openPartKeyInfoToBeDeleted,
-      boolean isRatisEnabled) {
+      boolean isRatisEnabled, OmVolumeArgs omVolumeArgs) {
     super(omResponse);
     this.multipartKey = multipartKey;
     this.openKey = openKey;
@@ -81,6 +84,7 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
     this.oldPartKeyInfo = oldPartKeyInfo;
     this.openPartKeyInfoToBeDeleted = openPartKeyInfoToBeDeleted;
     this.isRatisEnabled = isRatisEnabled;
+    this.omVolumeArgs = omVolumeArgs;
   }
 
   @Override
@@ -143,6 +147,10 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
     //  safely delete part key info from open key table.
     omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
         openKey);
+    // update volume usedBytes.
+    omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
+        omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
+        omVolumeArgs);
   }
 }
 

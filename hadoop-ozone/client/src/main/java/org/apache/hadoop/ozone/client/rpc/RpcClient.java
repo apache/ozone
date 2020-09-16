@@ -364,7 +364,8 @@ public class RpcClient implements ClientProtocol {
         volume.getModificationTime(),
         volume.getAclMap().ozoneAclGetProtobuf().stream().
             map(OzoneAcl::fromProtobuf).collect(Collectors.toList()),
-        volume.getMetadata());
+        volume.getMetadata(),
+        volume.getUsedBytes().sum());
   }
 
   @Override
@@ -420,7 +421,8 @@ public class RpcClient implements ClientProtocol {
         volume.getModificationTime(),
         volume.getAclMap().ozoneAclGetProtobuf().stream().
             map(OzoneAcl::fromProtobuf).collect(Collectors.toList()),
-        volume.getMetadata()))
+        volume.getMetadata(),
+        volume.getUsedBytes().sum()))
         .collect(Collectors.toList());
   }
 
