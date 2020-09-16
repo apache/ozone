@@ -1802,9 +1802,10 @@ public class KeyManagerImpl implements KeyManager {
 
       // if the key is a file then do refresh pipeline info in OM by asking SCM
       if (fileKeyInfo != null) {
-        if (refreshPipeline) {
-          refreshPipeline(fileKeyInfo);
-        }
+        // refreshPipeline flag check has been removed as part of
+        // https://issues.apache.org/jira/browse/HDDS-3658.
+        // Please refer this jira for more details.
+        refreshPipeline(fileKeyInfo);
         if (sortDatanodes) {
           sortDatanodeInPipeline(fileKeyInfo, clientAddress);
         }
@@ -2029,6 +2030,25 @@ public class KeyManagerImpl implements KeyManager {
    * @param startKey   Key from which listing needs to start. If startKey exists
    *                   its status is included in the final list.
    * @param numEntries Number of entries to list from the start key
+   * @return list of file status
+   */
+  public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
+                                          String startKey, long numEntries)
+          throws IOException {
+    return listStatus(args, recursive, startKey, numEntries, null);
+  }
+
+  /**
+   * List the status for a file or a directory and its contents.
+   *
+   * @param args       Key args
+   * @param recursive  For a directory if true all the descendants of a
+   *                   particular directory are listed
+   * @param startKey   Key from which listing needs to start. If startKey exists
+   *                   its status is included in the final list.
+   * @param numEntries Number of entries to list from the start key
+   * @param clientAddress a hint to key manager, order the datanode in returned
+   *                      pipeline by distance between client and datanode.
    * @return list of file status
    */
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,

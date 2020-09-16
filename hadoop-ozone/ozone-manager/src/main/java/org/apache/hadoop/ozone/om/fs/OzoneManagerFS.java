@@ -78,6 +78,22 @@ public interface OzoneManagerFS extends IOzoneAcl {
    * @param startKey      Key from which listing needs to start. If startKey
    *                      exists its status is included in the final list.
    * @param numEntries    Number of entries to list from the start key
+   * @return list of file status
+   * @throws IOException if file or bucket or volume does not exist
+   */
+  List<OzoneFileStatus> listStatus(OmKeyArgs keyArgs, boolean recursive,
+                                   String startKey, long numEntries)
+          throws IOException;
+
+  /**
+   * List the status for a file or a directory and its contents.
+   *
+   * @param keyArgs       the args of the key provided by client.
+   * @param recursive     For a directory if true all the descendants of a
+   *                      particular directory are listed
+   * @param startKey      Key from which listing needs to start. If startKey
+   *                      exists its status is included in the final list.
+   * @param numEntries    Number of entries to list from the start key
    * @param clientAddress a hint to key manager, order the datanode in returned
    *                      pipeline by distance between client and datanode.
    * @return list of file status
