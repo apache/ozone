@@ -26,11 +26,11 @@ Get and use Token in Secure Cluster
     Execute                      ozone sh token get -t /tmp/ozone.token
     File Should Not Be Empty     /tmp/ozone.token
     Execute                      kdestroy
-    Execute                      export HADOOP_TOKEN_FILE_LOCATION=/tmp/ozone.token
+    Set Environment Variable     HADOOP_TOKEN_FILE_LOCATION    /tmp/ozone.token
     ${output} =                  Execute             ozone sh volume list /
     Should not contain           ${output}           Client cannot authenticate
-    Execute                      unset HADOOP_TOKEN_FILE_LOCATION
-    ${output} =                  Execute             ozone sh volume list /
+    Remove Environment Variable  HADOOP_TOKEN_FILE_LOCATION
+    ${output} =                  Execute and Ignore Error  ozone sh volume list /
     Should contain               ${output}           Client cannot authenticate
     Run Keyword                  Kinit test user     testuser  testuser.keytab
 
