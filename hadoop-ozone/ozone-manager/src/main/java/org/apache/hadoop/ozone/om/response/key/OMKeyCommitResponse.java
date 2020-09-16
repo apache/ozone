@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -40,13 +41,16 @@ public class OMKeyCommitResponse extends OMClientResponse {
   private OmKeyInfo omKeyInfo;
   private String ozoneKeyName;
   private String openKeyName;
+  private OmVolumeArgs omVolumeArgs;
 
   public OMKeyCommitResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo, String ozoneKeyName, String openKeyName) {
+      @Nonnull OmKeyInfo omKeyInfo, String ozoneKeyName, String openKeyName,
+      OmVolumeArgs omVolumeArgs) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
     this.ozoneKeyName = ozoneKeyName;
     this.openKeyName = openKeyName;
+    this.omVolumeArgs = omVolumeArgs;
   }
 
   /**
@@ -68,6 +72,11 @@ public class OMKeyCommitResponse extends OMClientResponse {
 
     omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKeyName,
         omKeyInfo);
+
+    // update volume usedBytes.
+    omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
+        omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
+        omVolumeArgs);
   }
 
 }

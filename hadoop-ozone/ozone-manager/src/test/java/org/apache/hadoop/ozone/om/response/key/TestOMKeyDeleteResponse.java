@@ -22,6 +22,8 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -42,6 +44,9 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
 
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
         bucketName, keyName, replicationType, replicationFactor);
+    OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
+        .setOwnerName(keyName).setAdminName(keyName)
+        .setVolume(volumeName).setCreationTime(Time.now()).build();
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         OzoneManagerProtocolProtos.OMResponse.newBuilder().setDeleteKeyResponse(
@@ -51,7 +56,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
             .build();
 
     OMKeyDeleteResponse omKeyDeleteResponse = new OMKeyDeleteResponse(
-        omResponse, omKeyInfo, true);
+        omResponse, omKeyInfo, true, omVolumeArgs);
 
     String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
         keyName);
@@ -78,6 +83,9 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
 
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
         bucketName, keyName, replicationType, replicationFactor);
+    OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
+        .setOwnerName(keyName).setAdminName(keyName)
+        .setVolume(volumeName).setCreationTime(Time.now()).build();
 
     // Add block to key.
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
@@ -113,7 +121,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
             .build();
 
     OMKeyDeleteResponse omKeyDeleteResponse = new OMKeyDeleteResponse(
-        omResponse, omKeyInfo, true);
+        omResponse, omKeyInfo, true, omVolumeArgs);
 
     Assert.assertTrue(omMetadataManager.getKeyTable().isExist(ozoneKey));
     omKeyDeleteResponse.addToDBBatch(omMetadataManager, batchOperation);
@@ -133,6 +141,9 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
   public void testAddToDBBatchWithErrorResponse() throws Exception {
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
         bucketName, keyName, replicationType, replicationFactor);
+    OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
+        .setOwnerName(keyName).setAdminName(keyName)
+        .setVolume(volumeName).setCreationTime(Time.now()).build();
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         OzoneManagerProtocolProtos.OMResponse.newBuilder().setDeleteKeyResponse(
@@ -142,7 +153,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
             .build();
 
     OMKeyDeleteResponse omKeyDeleteResponse = new OMKeyDeleteResponse(
-        omResponse, omKeyInfo, true);
+        omResponse, omKeyInfo, true, omVolumeArgs);
 
     String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
         keyName);
