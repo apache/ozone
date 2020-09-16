@@ -54,6 +54,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -841,6 +842,47 @@ public class TestReplicationManager {
         .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
   }
 
+  @Test
+  public void testOverReplicatedAndPolicyUnSatisfiedAndDeleted() throws
+      SCMException, ContainerNotFoundException, InterruptedException {
+    final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
+    final ContainerID id = container.containerID();
+    final UUID originNodeId = UUID.randomUUID();
+    final ContainerReplica replicaOne = getReplicas(
+        id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+    final ContainerReplica replicaTwo = getReplicas(
+        id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+    final ContainerReplica replicaThree = getReplicas(
+        id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+    final ContainerReplica replicaFour = getReplicas(
+        id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+    final ContainerReplica replicaFive = getReplicas(
+        id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+
+    containerStateManager.loadContainer(container);
+    containerStateManager.updateContainerReplica(id, replicaOne);
+    containerStateManager.updateContainerReplica(id, replicaTwo);
+    containerStateManager.updateContainerReplica(id, replicaThree);
+    containerStateManager.updateContainerReplica(id, replicaFour);
+    containerStateManager.updateContainerReplica(id, replicaFive);
+
+    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+        Mockito.argThat(new FunctionMatcher(list ->
+            list != null && ((List) list).size() <= 4)),
+        Mockito.anyInt()
+    )).thenAnswer(
+        invocation -> new ContainerPlacementStatusDefault(1, 2, 3));
+
+    final int currentDeleteCommandCount = datanodeCommandHandler
+        .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand);
+
+    replicationManager.processContainersNow();
+    // Wait for EventQueue to call the event handler
+    Thread.sleep(100L);
+    Assert.assertEquals(currentDeleteCommandCount + 2, datanodeCommandHandler
+        .getInvocationCount(SCMCommandProto.Type.deleteContainerCommand));
+  }
+
   @After
   public void teardown() throws IOException {
     containerStateManager.close();
@@ -908,4 +950,17 @@ public class TestReplicationManager {
     }
   }
 
+  class FunctionMatcher extends ArgumentMatcher<List> {
+
+    Function<Object, Boolean> function;
+
+    FunctionMatcher(Function<Object, Boolean> function) {
+      this.function = function;
+    }
+
+    @Override
+    public boolean matches(Object argument) {
+      return function.apply(argument);
+    }
+  }
 }
