@@ -949,6 +949,10 @@ public abstract class TestOzoneRpcClientAbstract {
 
     Assert.assertEquals(valueLength, store.getVolume(volumeName)
         .getUsedBytes());
+
+    // Abort uploaded partKey and the usedBytes of volume should be 0.
+    bucket.abortMultipartUpload(keyName, uploadID);
+    Assert.assertEquals(0, store.getVolume(volumeName).getUsedBytes());
   }
 
   @Test
