@@ -46,7 +46,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveA
 public class OMPrefixRemoveAclRequest extends OMPrefixAclRequest {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMPrefixAddAclRequest.class);
+      LoggerFactory.getLogger(OMPrefixRemoveAclRequest.class);
 
   private OzoneObj ozoneObj;
   private List<OzoneAcl> ozoneAcls;

@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclR
 public class OMKeySetAclRequest extends OMKeyAclRequest {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMKeyAddAclRequest.class);
+      LoggerFactory.getLogger(OMKeySetAclRequest.class);
 
   private String path;
   private List<OzoneAcl> ozoneAcls;
