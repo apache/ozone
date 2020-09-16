@@ -698,4 +698,8 @@ public final class OzoneManagerRatisServer {
   public TermIndex getLastAppliedTermIndex() {
     return omStateMachine.getLastAppliedTermIndex();
   }
+
+  public RaftServer getServer() {
+    return server;
+  }
 }
