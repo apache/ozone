@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
@@ -48,6 +49,8 @@ public class TestHeartbeatEndpointTask {
 
   private static final InetSocketAddress TEST_SCM_ENDPOINT =
       new InetSocketAddress("test-scm-1", 9861);
+  private static final int TEST_SOFTWARE_LAYOUT_VERSION = 0;
+  private static final int TEST_METADATA_LAYOUT_VERSION = 0;
 
   @Test
   public void testheartbeatWithoutReports() throws Exception {
@@ -277,10 +280,17 @@ public class TestHeartbeatEndpointTask {
     Mockito.when(endpointStateMachine.getEndPoint()).thenReturn(proxy);
     Mockito.when(endpointStateMachine.getAddress())
         .thenReturn(TEST_SCM_ENDPOINT);
+    HDDSLayoutVersionManager layoutVersionManager =
+        Mockito.mock(HDDSLayoutVersionManager.class);
+    Mockito.when(layoutVersionManager.getSoftwareLayoutVersion())
+        .thenReturn(TEST_SOFTWARE_LAYOUT_VERSION);
+    Mockito.when(layoutVersionManager.getMetadataLayoutVersion())
+        .thenReturn(TEST_METADATA_LAYOUT_VERSION);
     return HeartbeatEndpointTask.newBuilder()
         .setConfig(conf)
         .setDatanodeDetails(datanodeDetails)
         .setContext(context)
+        .setLayoutVersionManager(layoutVersionManager)
         .setEndpointStateMachine(endpointStateMachine)
         .build();
   }

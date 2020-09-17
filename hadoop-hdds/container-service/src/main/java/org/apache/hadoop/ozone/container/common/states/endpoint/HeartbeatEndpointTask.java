@@ -95,7 +95,8 @@ public class HeartbeatEndpointTask
    * @param conf Config.
    */
   public HeartbeatEndpointTask(EndpointStateMachine rpcEndpoint,
-      ConfigurationSource conf, StateContext context) {
+                               ConfigurationSource conf, StateContext context,
+                               HDDSLayoutVersionManager versionManager) {
     this.rpcEndpoint = rpcEndpoint;
     this.conf = conf;
     this.context = context;
@@ -103,7 +104,11 @@ public class HeartbeatEndpointTask
         HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT);
     this.maxPipelineActionsPerHB = conf.getInt(HDDS_PIPELINE_ACTION_MAX_LIMIT,
         HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT);
-    layoutVersionManager = context.getParent().getDataNodeVersionManager();
+    if (versionManager == null) {
+      layoutVersionManager = context.getParent().getDataNodeVersionManager();
+    } else {
+      layoutVersionManager = versionManager;
+    }
   }
 
   /**
@@ -370,6 +375,7 @@ public class HeartbeatEndpointTask
     private ConfigurationSource conf;
     private DatanodeDetails datanodeDetails;
     private StateContext context;
+    private HDDSLayoutVersionManager versionManager;
 
     /**
      * Constructs the builder class.
@@ -385,6 +391,18 @@ public class HeartbeatEndpointTask
      */
     public Builder setEndpointStateMachine(EndpointStateMachine rpcEndPoint) {
       this.endPointStateMachine = rpcEndPoint;
+      return this;
+    }
+
+    /**
+     * Sets the LayoutVersionManager.
+     *
+     * @param versionMgr - config
+     * @return Builder
+     */
+    public Builder setLayoutVersionManager(
+        HDDSLayoutVersionManager versionMgr) {
+      this.versionManager = versionMgr;
       return this;
     }
 
@@ -440,7 +458,7 @@ public class HeartbeatEndpointTask
       }
 
       HeartbeatEndpointTask task = new HeartbeatEndpointTask(this
-          .endPointStateMachine, this.conf, this.context);
+          .endPointStateMachine, this.conf, this.context, this.versionManager);
       task.setDatanodeDetailsProto(datanodeDetails.getProtoBufMessage());
       return task;
     }

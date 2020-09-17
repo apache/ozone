@@ -57,6 +57,7 @@ public final class RegisterEndpointTask implements
   private DatanodeDetails datanodeDetails;
   private final OzoneContainer datanodeContainerManager;
   private StateContext stateContext;
+  private HDDSLayoutVersionManager layoutVersionManager;
 
   /**
    * Creates a register endpoint task.
@@ -68,12 +69,17 @@ public final class RegisterEndpointTask implements
   @VisibleForTesting
   public RegisterEndpointTask(EndpointStateMachine rpcEndPoint,
       ConfigurationSource conf, OzoneContainer ozoneContainer,
-      StateContext context) {
+      StateContext context, HDDSLayoutVersionManager layoutVersionManager) {
     this.rpcEndPoint = rpcEndPoint;
     this.conf = conf;
     this.datanodeContainerManager = ozoneContainer;
     this.stateContext = context;
-
+    if (layoutVersionManager == null) {
+      this.layoutVersionManager =
+          stateContext.getParent().getDataNodeVersionManager();
+    } else {
+      this.layoutVersionManager = layoutVersionManager;
+    }
   }
 
   /**
@@ -115,11 +121,11 @@ public final class RegisterEndpointTask implements
 
       if (rpcEndPoint.getState()
           .equals(EndpointStateMachine.EndPointStates.REGISTER)) {
-        HDDSLayoutVersionManager versionMgr =
-            stateContext.getParent().getDataNodeVersionManager();
         LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-            .setMetadataLayoutVersion(versionMgr.getMetadataLayoutVersion())
-            .setSoftwareLayoutVersion(versionMgr.getSoftwareLayoutVersion())
+            .setMetadataLayoutVersion(
+                layoutVersionManager.getMetadataLayoutVersion())
+            .setSoftwareLayoutVersion(
+                layoutVersionManager.getSoftwareLayoutVersion())
             .build();
         ContainerReportsProto containerReport =
             datanodeContainerManager.getController().getContainerReport();
@@ -176,6 +182,7 @@ public final class RegisterEndpointTask implements
     private DatanodeDetails datanodeDetails;
     private OzoneContainer container;
     private StateContext context;
+    private HDDSLayoutVersionManager versionManager;
 
     /**
      * Constructs the builder class.
@@ -202,6 +209,18 @@ public final class RegisterEndpointTask implements
      */
     public Builder setConfig(ConfigurationSource config) {
       this.conf = config;
+      return this;
+    }
+
+    /**
+     * Sets the LayoutVersionManager.
+     *
+     * @param versionMgr - config
+     * @return Builder.
+     */
+    public Builder setLayoutVersionManager(
+        HDDSLayoutVersionManager versionMgr) {
+      this.versionManager = versionMgr;
       return this;
     }
 
@@ -264,10 +283,10 @@ public final class RegisterEndpointTask implements
       }
 
       RegisterEndpointTask task = new RegisterEndpointTask(this
-          .endPointStateMachine, this.conf, this.container, this.context);
+          .endPointStateMachine, this.conf, this.container, this.context,
+          this.versionManager);
       task.setDatanodeDetails(datanodeDetails);
       return task;
     }
-
   }
 }

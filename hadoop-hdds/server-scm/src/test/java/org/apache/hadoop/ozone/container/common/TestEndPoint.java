@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -83,6 +84,8 @@ public class TestEndPoint {
   private static ScmTestMock scmServerImpl;
   private static File testDir;
   private static OzoneConfiguration config;
+  private static final int TEST_SOFTWARE_LAYOUT_VERSION = 0;
+  private static final int TEST_METADATA_LAYOUT_VERSION = 0;
 
   @AfterClass
   public static void tearDown() throws Exception {
@@ -305,9 +308,15 @@ public class TestEndPoint {
     when(ozoneContainer.getController()).thenReturn(controller);
     when(ozoneContainer.getPipelineReport()).thenReturn(
             TestUtils.getRandomPipelineReports());
+    HDDSLayoutVersionManager versionManager =
+        Mockito.mock(HDDSLayoutVersionManager.class);
+    when(versionManager.getMetadataLayoutVersion())
+        .thenReturn(TEST_METADATA_LAYOUT_VERSION);
+    when(versionManager.getSoftwareLayoutVersion())
+        .thenReturn(TEST_SOFTWARE_LAYOUT_VERSION);
     RegisterEndpointTask endpointTask =
         new RegisterEndpointTask(rpcEndPoint, conf, ozoneContainer,
-            mock(StateContext.class));
+            mock(StateContext.class), versionManager);
     if (!clearDatanodeDetails) {
       DatanodeDetails datanodeDetails = randomDatanodeDetails();
       endpointTask.setDatanodeDetails(datanodeDetails);
@@ -475,7 +484,8 @@ public class TestEndPoint {
               stateMachine);
 
       HeartbeatEndpointTask endpointTask =
-          new HeartbeatEndpointTask(rpcEndPoint, conf, stateContext);
+          new HeartbeatEndpointTask(rpcEndPoint, conf, stateContext,
+              stateMachine.getDataNodeVersionManager());
       endpointTask.setDatanodeDetailsProto(datanodeDetailsProto);
       endpointTask.call();
       Assert.assertNotNull(endpointTask.getDatanodeDetailsProto());
