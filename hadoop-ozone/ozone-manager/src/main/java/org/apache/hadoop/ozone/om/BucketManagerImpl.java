@@ -562,7 +562,7 @@ public class BucketManagerImpl implements BucketManager {
       return bucketInfo.getAcls();
     } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
-        LOG.error("Get acl operation failed for bucket:{}/{} acl:{}",
+        LOG.error("Get acl operation failed for bucket:{}/{}.",
             volume, bucket, ex);
       }
       throw ex;
@@ -607,7 +607,7 @@ public class BucketManagerImpl implements BucketManager {
       if(ex instanceof OMException) {
         throw (OMException) ex;
       }
-      LOG.error("CheckAccess operation failed for bucket:{}/{} acl:{}",
+      LOG.error("CheckAccess operation failed for bucket:{}/{}.",
           volume, bucket, ex);
       throw new OMException("Check access operation failed for " +
           "bucket:" + bucket, ex, INTERNAL_ERROR);

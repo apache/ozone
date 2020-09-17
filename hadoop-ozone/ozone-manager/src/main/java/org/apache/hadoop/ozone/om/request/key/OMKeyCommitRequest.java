@@ -237,7 +237,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           bucketName, keyName);
       break;
     case FAILURE:
-      LOG.error("Key commit failed. Volume:{}, Bucket:{}, Key:{}. Exception:{}",
+      LOG.error("Key commit failed. Volume:{}, Bucket:{}, Key:{}.",
           volumeName, bucketName, keyName, exception);
       omMetrics.incNumKeyCommitFails();
       break;
