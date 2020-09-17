@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.Random;
 
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.response.key.OMOpenKeyDeleteRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.junit.Assert;
@@ -128,6 +129,42 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
     OpenKeysPerBucket openKeys = makeOpenKeys(volumeName, bucketName, 5);
     deleteOpenKeys(openKeys);
     assertNotInOpenKeyTable(openKeys);
+  }
+
+  /**
+   * Tests metrics set by {@link OMOpenKeyDeleteRequest}.
+   * Submits a set of keys for deletion where only some of the keys actually
+   * exist in the open key table, and asserts that the metrics count keys
+   * that were submitted for deletion versus those that were actually deleted.
+   * @throws Exception
+   */
+  @Test
+  public void testMetrics() throws Exception {
+    final int numExistentKeys = 3;
+    final int numNonExistentKeys = 5;
+
+    OMMetrics metrics = ozoneManager.getMetrics();
+    Assert.assertEquals(metrics.getNumOpenKeyDeleteRequests(), 0);
+    Assert.assertEquals(metrics.getNumOpenKeyDeleteRequestFails(), 0);
+    Assert.assertEquals(metrics.getNumOpenKeysSubmittedForDeletion(), 0);
+    Assert.assertEquals(metrics.getNumOpenKeysDeleted(), 0);
+
+    OpenKeysPerBucket existentKeys =
+        makeOpenKeys(volumeName, bucketName, keyName, numExistentKeys);
+    OpenKeysPerBucket nonExistentKeys =
+        makeOpenKeys(volumeName, bucketName, keyName,numNonExistentKeys);
+
+    addToOpenKeyTable(existentKeys);
+    deleteOpenKeys(existentKeys, nonExistentKeys);
+
+    assertNotInOpenKeyTable(existentKeys);
+    assertNotInOpenKeyTable(nonExistentKeys);
+
+    Assert.assertEquals(1, metrics.getNumOpenKeyDeleteRequests() );
+    Assert.assertEquals(0, metrics.getNumOpenKeyDeleteRequestFails());
+    Assert.assertEquals(numExistentKeys + numNonExistentKeys,
+        metrics.getNumOpenKeysSubmittedForDeletion());
+    Assert.assertEquals(numExistentKeys, metrics.getNumOpenKeysDeleted());
   }
 
   /**
