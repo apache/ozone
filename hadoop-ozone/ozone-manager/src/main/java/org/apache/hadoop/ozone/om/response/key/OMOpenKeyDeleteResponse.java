@@ -34,14 +34,14 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 @CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, DELETED_TABLE})
 public class OMOpenKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
 
-  private Map<String, OmKeyInfo> expiredOpenKeys;
+  private Map<String, OmKeyInfo> keysToDelete;
 
   public OMOpenKeyDeleteResponse(
       @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse,
-      @Nonnull Map<String, OmKeyInfo> expiredOpenKeys, boolean isRatisEnabled) {
+      @Nonnull Map<String, OmKeyInfo> keysToDelete, boolean isRatisEnabled) {
 
     super(omResponse, isRatisEnabled);
-    this.expiredOpenKeys = expiredOpenKeys;
+    this.keysToDelete = keysToDelete;
   }
 
   /**
@@ -61,7 +61,7 @@ public class OMOpenKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
 
     Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable();
 
-    for (Map.Entry<String, OmKeyInfo> keyInfoPair: expiredOpenKeys.entrySet()) {
+    for (Map.Entry<String, OmKeyInfo> keyInfoPair: keysToDelete.entrySet()) {
       deleteFromTable(omMetadataManager, batchOperation, openKeyTable,
           keyInfoPair.getKey(), keyInfoPair.getValue());
     }

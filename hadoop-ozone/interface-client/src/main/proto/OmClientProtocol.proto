@@ -921,10 +921,10 @@ message PurgeKeysResponse {
 }
 
 message DeleteOpenKeysRequest {
-  repeated OpenKeysPerBucket openKeysToDelete = 1;
+  repeated OpenKeyBucket openKeysPerBucket = 1;
 }
 
-message OpenKeysPerBucket {
+message OpenKeyBucket {
   required string volumeName = 1;
   required string bucketName = 2;
   repeated OpenKey keys = 3;
