@@ -25,6 +25,8 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineActionsProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineAction;
@@ -38,6 +40,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.container.common.helpers
     .DeletedContainerBlocksSummary;
 import org.apache.hadoop.ozone.container.common.statemachine
@@ -50,6 +53,7 @@ import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 
 import org.slf4j.Logger;
@@ -83,6 +87,7 @@ public class HeartbeatEndpointTask
   private StateContext context;
   private int maxContainerActionsPerHB;
   private int maxPipelineActionsPerHB;
+  private HDDSLayoutVersionManager layoutVersionManager;
 
   /**
    * Constructs a SCM heart beat.
@@ -98,6 +103,7 @@ public class HeartbeatEndpointTask
         HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT);
     this.maxPipelineActionsPerHB = conf.getInt(HDDS_PIPELINE_ACTION_MAX_LIMIT,
         HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT);
+    layoutVersionManager = context.getParent().getDataNodeVersionManager();
   }
 
   /**
@@ -132,8 +138,16 @@ public class HeartbeatEndpointTask
     try {
       Preconditions.checkState(this.datanodeDetailsProto != null);
 
+      LayoutVersionProto layoutinfo = LayoutVersionProto.newBuilder()
+          .setSoftwareLayoutVersion(
+              layoutVersionManager.getSoftwareLayoutVersion())
+          .setMetadataLayoutVersion(
+              layoutVersionManager.getMetadataLayoutVersion())
+          .build();
+
       requestBuilder = SCMHeartbeatRequestProto.newBuilder()
-          .setDatanodeDetails(datanodeDetailsProto);
+          .setDatanodeDetails(datanodeDetailsProto)
+          .setDataNodeLayoutVersion(layoutinfo);
       addReports(requestBuilder);
       addContainerActions(requestBuilder);
       addPipelineActions(requestBuilder);
@@ -331,7 +345,17 @@ public class HeartbeatEndpointTask
         }
         this.context.addCommand(closePipelineCommand);
         break;
-      default:
+      case finalizeNewLayoutVersionCommand:
+        FinalizeNewLayoutVersionCommand finalizeNewLayoutVersionCommand =
+            FinalizeNewLayoutVersionCommand.getFromProtobuf(
+        commandResponseProto.getFinalizeNewLayoutVersionCommandProto());
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Received SCM finalize command {}",
+              finalizeNewLayoutVersionCommand.getId());
+        }
+        this.context.addCommand(finalizeNewLayoutVersionCommand);
+        break;
+        default:
         throw new IllegalArgumentException("Unknown response : "
             + commandResponseProto.getCommandType().name());
       }

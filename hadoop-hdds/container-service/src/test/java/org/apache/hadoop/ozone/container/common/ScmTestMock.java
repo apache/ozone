@@ -17,7 +17,10 @@
 package org.apache.hadoop.ozone.container.common;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -217,9 +220,28 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
   @Override
   public StorageContainerDatanodeProtocolProtos
       .SCMRegisteredResponseProto register(
-          DatanodeDetailsProto datanodeDetailsProto, NodeReportProto nodeReport,
-          ContainerReportsProto containerReportsRequestProto,
-          PipelineReportsProto pipelineReportsProto)
+      DatanodeDetailsProto datanodeDetailsProto, NodeReportProto nodeReport,
+      ContainerReportsProto containerReportsRequestProto,
+      PipelineReportsProto pipelineReportsProto)
+      throws IOException {
+    return register(datanodeDetailsProto, nodeReport,
+        containerReportsRequestProto,
+        pipelineReportsProto, null);
+  }
+
+  /**
+   * Register Datanode.
+   *
+   * @param datanodeDetailsProto DatanodDetailsProto.
+   * @return SCM Command.
+   */
+  @Override
+  public StorageContainerDatanodeProtocolProtos
+      .SCMRegisteredResponseProto register(
+      DatanodeDetailsProto datanodeDetailsProto, NodeReportProto nodeReport,
+      ContainerReportsProto containerReportsRequestProto,
+      PipelineReportsProto pipelineReportsProto,
+      LayoutVersionProto layoutInfo)
       throws IOException {
     rpcCount.incrementAndGet();
     updateNodeReport(datanodeDetailsProto, nodeReport);

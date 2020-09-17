@@ -27,14 +27,17 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
+import org.apache.hadoop.ozone.container.common.DataNodeStorageConfig;
 import org.apache.hadoop.ozone.container.common.report.ReportManager;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.CloseContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ClosePipelineCommandHandler;
@@ -42,6 +45,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Comm
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.CreatePipelineCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteContainerCommandHandler;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.FinalizeNewLayoutVersionCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReplicateContainerCommandHandler;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -82,6 +86,9 @@ public class DatanodeStateMachine implements Closeable {
   private JvmPauseMonitor jvmPauseMonitor;
   private CertificateClient dnCertClient;
   private final HddsDatanodeStopService hddsDatanodeStopService;
+
+  private HDDSLayoutVersionManager dataNodeVersionManager;
+
   /**
    * Used to synchronize to the OzoneContainer object created in the
    * constructor in a non-thread-safe way - see HDDS-3116.
@@ -96,14 +103,18 @@ public class DatanodeStateMachine implements Closeable {
    *                     enabled
    */
   public DatanodeStateMachine(DatanodeDetails datanodeDetails,
-      ConfigurationSource conf, CertificateClient certClient,
-      HddsDatanodeStopService hddsDatanodeStopService) throws IOException {
+                              OzoneConfiguration conf,
+                              CertificateClient certClient,
+                              HddsDatanodeStopService hddsDatanodeStopService)
+      throws IOException {
     DatanodeConfiguration dnConf =
         conf.getObject(DatanodeConfiguration.class);
 
     this.hddsDatanodeStopService = hddsDatanodeStopService;
     this.conf = conf;
     this.datanodeDetails = datanodeDetails;
+    dataNodeVersionManager =
+        HDDSLayoutVersionManager.initialize(new DataNodeStorageConfig(conf));
     executorService = Executors.newFixedThreadPool(
         getEndPointTaskThreadPoolSize(),
         new ThreadFactoryBuilder()
@@ -145,6 +156,7 @@ public class DatanodeStateMachine implements Closeable {
             dnConf.getContainerDeleteThreads()))
         .addHandler(new ClosePipelineCommandHandler())
         .addHandler(new CreatePipelineCommandHandler(conf))
+        .addHandler(new FinalizeNewLayoutVersionCommandHandler())
         .setConnectionManager(connectionManager)
         .setContainer(container)
         .setContext(context)
@@ -544,5 +556,10 @@ public class DatanodeStateMachine implements Closeable {
   @VisibleForTesting
   public ReplicationSupervisor getSupervisor() {
     return supervisor;
+  }
+
+  @VisibleForTesting
+  public HDDSLayoutVersionManager getDataNodeVersionManager() {
+    return dataNodeVersionManager;
   }
 }

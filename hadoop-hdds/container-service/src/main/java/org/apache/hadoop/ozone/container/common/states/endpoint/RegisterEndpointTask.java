@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.container.common.statemachine
     .EndpointStateMachine;
 import org.apache.hadoop.hdds.protocol.proto
@@ -31,6 +32,8 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.slf4j.Logger;
@@ -112,6 +115,12 @@ public final class RegisterEndpointTask implements
 
       if (rpcEndPoint.getState()
           .equals(EndpointStateMachine.EndPointStates.REGISTER)) {
+        HDDSLayoutVersionManager versionMgr =
+            stateContext.getParent().getDataNodeVersionManager();
+        LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+            .setMetadataLayoutVersion(versionMgr.getMetadataLayoutVersion())
+            .setSoftwareLayoutVersion(versionMgr.getSoftwareLayoutVersion())
+            .build();
         ContainerReportsProto containerReport =
             datanodeContainerManager.getController().getContainerReport();
         NodeReportProto nodeReport = datanodeContainerManager.getNodeReport();
@@ -120,7 +129,7 @@ public final class RegisterEndpointTask implements
         // TODO : Add responses to the command Queue.
         SCMRegisteredResponseProto response = rpcEndPoint.getEndPoint()
             .register(datanodeDetails.getProtoBufMessage(), nodeReport,
-                containerReport, pipelineReportsProto);
+                containerReport, pipelineReportsProto, layoutInfo);
         Preconditions.checkState(UUID.fromString(response.getDatanodeUUID())
                 .equals(datanodeDetails.getUuid()),
             "Unexpected datanode ID in the response.");
