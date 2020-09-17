@@ -164,7 +164,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
         getOmRequest());
     OMClientResponse omClientResponse = null;
 
-    OmKeyInfo openKeyInfo;
+    OmKeyInfo openKeyInfo = null;
     IOException exception = null;
     OmVolumeArgs omVolumeArgs = null;
     OmBucketInfo omBucketInfo = null;
@@ -192,9 +192,19 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
             KEY_NOT_FOUND);
       }
 
-      // Append new block
+
       List<OmKeyLocationInfo> newLocationList = Collections.singletonList(
           OmKeyLocationInfo.getFromProtobuf(blockLocation));
+      omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
+      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      // check volume quota
+      long preAllocatedSpace = newLocationList.size()
+          * ozoneManager.getScmBlockSize()
+          * openKeyInfo.getFactor().getNumber();
+      if (omVolumeArgs.getQuotaInBytes() > OzoneConsts.QUOTA_RESET) {
+        checkVolumeQuotaInBytes(omVolumeArgs, preAllocatedSpace);
+      }
+      // Append new block
       openKeyInfo.appendNewBlocks(newLocationList, false);
 
       // Set modification time.
@@ -208,12 +218,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
           new CacheKey<>(openKeyName),
           new CacheValue<>(Optional.of(openKeyInfo), trxnLogIndex));
 
-      long scmBlockSize = ozoneManager.getScmBlockSize();
-      omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       // update usedBytes atomically.
-      long preAllocatedSpace = newLocationList.size() * scmBlockSize
-          * openKeyInfo.getFactor().getNumber();
       omVolumeArgs.getUsedBytes().add(preAllocatedSpace);
       omBucketInfo.getUsedBytes().add(preAllocatedSpace);
 
@@ -227,6 +232,18 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     } catch (IOException ex) {
       omMetrics.incNumBlockAllocateCallFails();
       exception = ex;
+      if (exception.toString().contains(
+          OMException.ResultCodes.QUOTA_EXCEEDED.toString())) {
+        long keyAllocatedSpace = openKeyInfo.getLatestVersionLocations()
+            .getLocationListCount() * ozoneManager.getScmBlockSize()
+            * openKeyInfo.getFactor().getNumber();
+        // Update usedBytes atomically. ErrorOMResponse does not persist the DB,
+        // so we update the cache first. The next time another key is written,
+        // volume Args will be persisted to the DB.
+        // TODO: There is a delay in updating DB in this way, and if necessary
+        //  we can modify the ErrorOMResponse to avoid it.
+        omVolumeArgs.getUsedBytes().add(-keyAllocatedSpace);
+      }
       omClientResponse = new OMAllocateBlockResponse(createErrorOMResponse(
           omResponse, exception));
       LOG.error("Allocate Block failed. Volume:{}, Bucket:{}, OpenKey:{}. " +
@@ -239,8 +256,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     auditLog(auditLogger, buildAuditMessage(OMAction.ALLOCATE_BLOCK, auditMap,
         exception, getOmRequest().getUserInfo()));
 
-
-
     return omClientResponse;
   }
+
 }

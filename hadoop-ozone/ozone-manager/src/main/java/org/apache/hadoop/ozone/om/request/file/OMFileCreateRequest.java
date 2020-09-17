@@ -277,6 +277,16 @@ public class OMFileCreateRequest extends OMKeyRequest {
           .collect(Collectors.toList());
       omKeyInfo.appendNewBlocks(newLocationList, false);
 
+      omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
+      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      // check volume quota
+      long preAllocatedSpace = newLocationList.size()
+          * ozoneManager.getScmBlockSize()
+          * omKeyInfo.getFactor().getNumber();
+      if (omVolumeArgs.getQuotaInBytes() > OzoneConsts.QUOTA_RESET) {
+        checkVolumeQuotaInBytes(omVolumeArgs, preAllocatedSpace);
+      }
+
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
@@ -290,13 +300,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
           bucketName, Optional.absent(), Optional.of(missingParentInfos),
           trxnLogIndex);
 
-      long scmBlockSize = ozoneManager.getScmBlockSize();
-      omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
-
       // update usedBytes atomically.
-      long preAllocatedSpace = newLocationList.size() * scmBlockSize
-          * omKeyInfo.getFactor().getNumber();
       omVolumeArgs.getUsedBytes().add(preAllocatedSpace);
       omBucketInfo.getUsedBytes().add(preAllocatedSpace);
 

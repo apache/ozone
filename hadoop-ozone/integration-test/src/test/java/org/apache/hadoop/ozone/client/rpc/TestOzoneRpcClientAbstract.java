@@ -708,8 +708,70 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
+  public void testCheckUsedBytesQuota() throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OzoneVolume volume = null;
+
+    String value = "sample value";
+    int blockSize = (int) ozoneManager.getConfiguration().getStorageSize(
+        OZONE_SCM_BLOCK_SIZE, OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
+    int valueLength = value.getBytes().length;
+    int countException = 0;
+
+    store.createVolume(volumeName);
+    volume = store.getVolume(volumeName);
+    // Set quota In Bytes for a smaller value
+    store.getVolume(volumeName).setQuota(
+        OzoneQuota.parseQuota("1 Bytes", 100));
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    // Test write key.
+    // The remaining quota does not satisfy a block size, so the write fails.
+    try {
+      writeKey(bucket, UUID.randomUUID().toString(), ONE, value, valueLength);
+    } catch (IOException ex) {
+      countException++;
+      GenericTestUtils.assertExceptionContains("QUOTA_EXCEEDED", ex);
+    }
+    // Write failed, volume usedBytes should be 0
+    Assert.assertEquals(0L, store.getVolume(volumeName).getUsedBytes());
+
+    // Test write file.
+    // The remaining quota does not satisfy a block size, so the write fails.
+    try {
+      writeFile(bucket, UUID.randomUUID().toString(), ONE, value, 0);
+    } catch (IOException ex) {
+      countException++;
+      GenericTestUtils.assertExceptionContains("QUOTA_EXCEEDED", ex);
+    }
+    // Write failed, volume usedBytes should be 0
+    Assert.assertEquals(0L, store.getVolume(volumeName).getUsedBytes());
+
+    // Write large key, test allocateBlock fails.
+    store.getVolume(volumeName).setQuota(
+        OzoneQuota.parseQuota(blockSize + "Bytes", 100));
+    try {
+      OzoneOutputStream out = bucket.createKey(UUID.randomUUID().toString(),
+          valueLength, STAND_ALONE, ONE, new HashMap<>());
+      for(int i=0; i <= blockSize/value.length(); i++) {
+        out.write(value.getBytes());
+      }
+      out.close();
+    } catch (IOException ex) {
+      countException++;
+      GenericTestUtils.assertExceptionContains("QUOTA_EXCEEDED", ex);
+    }
+    // AllocateBlock failed, volume usedBytes should be 0
+    Assert.assertEquals(0L, store.getVolume(volumeName).getUsedBytes());
+
+    Assert.assertEquals(3, countException);
+  }
+
+  @Test
   @SuppressWarnings("methodlength")
-  public void testVolumeAndBucketUsedBytes() throws IOException {
+  public void testVolumeUsedBytes() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     OzoneVolume volume = null;

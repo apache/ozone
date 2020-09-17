@@ -534,6 +534,26 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
+   * Check volume quota in bytes.
+   * @param omVolumeArgs
+   * @param allocateSize
+   * @throws IOException
+   */
+  protected void checkVolumeQuotaInBytes(OmVolumeArgs omVolumeArgs,
+      long allocateSize) throws IOException {
+    long usedBytes = omVolumeArgs.getUsedBytes().sum();
+    long quotaInBytes = omVolumeArgs.getQuotaInBytes();
+    if (quotaInBytes - usedBytes < allocateSize) {
+      throw new OMException("The DiskSpace quota of volume:"
+          + omVolumeArgs.getVolume() + "exceeded: quotaInBytes: "
+          + quotaInBytes + " Bytes but diskspace consumed: " + (usedBytes
+          + allocateSize) + " Bytes.",
+          OMException.ResultCodes.QUOTA_EXCEEDED);
+    }
+
+  }
+
+  /**
    * Check directory exists. If exists return true, else false.
    * @param volumeName
    * @param bucketName
