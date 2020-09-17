@@ -708,7 +708,8 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
-  public void testUsedBytes() throws IOException {
+  @SuppressWarnings("methodlength")
+  public void testVolumeAndBucketUsedBytes() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     OzoneVolume volume = null;
@@ -947,7 +948,7 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
-  public void testVolumeQuotaWithUploadPart() throws IOException {
+  public void testUsedBytesWithUploadPart() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
