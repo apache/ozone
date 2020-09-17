@@ -89,8 +89,6 @@ public class TestOmPrefixInfo {
     Assert.assertEquals(1, ompri.getMetadata().size());
     Assert.assertEquals(metaval, ompri.getMetadata().get(metakey));
     Assert.assertEquals(1, ompri.getAcls().size());
-
-
   }
 
   @Test
