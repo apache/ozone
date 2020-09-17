@@ -60,11 +60,14 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
     OzoneManagerProtocolProtos.DeleteOpenKeysRequest deleteOpenKeysRequest =
             getOmRequest().getDeleteOpenKeysRequest();
 
-    List<OpenKeysPerBucket> submittedOpenKeys =
+    List<OpenKeysPerBucket> submittedOpenKeysPerBucket =
             deleteOpenKeysRequest.getOpenKeysToDeleteList();
 
-    LOG.debug("{} open keys submitted for deletion.", submittedOpenKeys.size());
-    omMetrics.incNumOpenKeysSubmittedForDeletion(submittedOpenKeys.size());
+    long numSubmittedOpenKeys = submittedOpenKeysPerBucket.stream()
+        .mapToLong(OpenKeysPerBucket::getKeysCount).sum();
+
+    LOG.debug("{} open keys submitted for deletion.", numSubmittedOpenKeys);
+    omMetrics.incNumOpenKeysSubmittedForDeletion(numSubmittedOpenKeys);
 
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
             OmResponseUtil.getOMResponseBuilder(getOmRequest());
@@ -75,7 +78,7 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
     Map<String, OmKeyInfo> deletedOpenKeys = new HashMap<>();
 
     try {
-      for (OpenKeysPerBucket openKeysPerBucket: submittedOpenKeys) {
+      for (OpenKeysPerBucket openKeysPerBucket: submittedOpenKeysPerBucket) {
         // For each bucket where keys will be deleted from,
         // get its bucket lock and update the cache accordingly.
         Map<String, OmKeyInfo> deleted = updateCache(ozoneManager, trxnLogIndex,
@@ -98,7 +101,7 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
               omDoubleBufferHelper);
     }
 
-    processResults(omMetrics, submittedOpenKeys.size(), deletedOpenKeys.size(),
+    processResults(omMetrics, numSubmittedOpenKeys, deletedOpenKeys.size(),
         deleteOpenKeysRequest, result);
 
     return omClientResponse;
