@@ -55,6 +55,7 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
       long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
+    omMetrics.incNumOpenKeyDeleteRequests();
 
     OzoneManagerProtocolProtos.DeleteOpenKeysRequest deleteOpenKeysRequest =
             getOmRequest().getDeleteOpenKeysRequest();
@@ -63,6 +64,7 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
             deleteOpenKeysRequest.getOpenKeysToDeleteList();
 
     LOG.debug("{} open keys submitted for deletion.", submittedOpenKeys.size());
+    omMetrics.incNumOpenKeysSubmittedForDeletion(submittedOpenKeys.size());
 
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse =
             OmResponseUtil.getOMResponseBuilder(getOmRequest());
@@ -76,8 +78,10 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
       for (OpenKeysPerBucket openKeysPerBucket: submittedOpenKeys) {
         // For each bucket where keys will be deleted from,
         // get its bucket lock and update the cache accordingly.
-        deletedOpenKeys.putAll(updateCache(ozoneManager, trxnLogIndex,
-            openKeysPerBucket));
+        Map<String, OmKeyInfo> deleted = updateCache(ozoneManager, trxnLogIndex,
+            openKeysPerBucket);
+
+        deletedOpenKeys.putAll(deleted);
       }
 
       omClientResponse = new OMOpenKeyDeleteResponse(omResponse.build(),
@@ -110,6 +114,7 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
           numDeletedOpenKeys, numSubmittedOpenKeys);
       break;
     case FAILURE:
+      omMetrics.incNumOpenKeyDeleteRequestFails();
       LOG.error("Failure occurred while trying to delete {} submitted open " +
               "keys.", numSubmittedOpenKeys);
       break;
@@ -152,6 +157,7 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
                   new CacheKey<>(fullKeyName),
                   new CacheValue<>(Optional.absent(), trxnLogIndex));
 
+          ozoneManager.getMetrics().incNumOpenKeysDeleted();
           LOG.debug("Open key {} deleted.", fullKeyName);
 
           // No need to add cache entries to delete table. As delete table will
