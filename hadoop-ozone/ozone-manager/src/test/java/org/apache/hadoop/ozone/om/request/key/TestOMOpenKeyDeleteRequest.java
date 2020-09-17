@@ -282,9 +282,7 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
       throws Exception {
 
     for (String keyName: getFullKeyNames(openKeys)) {
-      OmKeyInfo omKeyInfo =
-          omMetadataManager.getOpenKeyTable().get(keyName);
-      Assert.assertNotNull(omKeyInfo);
+      Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(keyName));
     }
   }
 
@@ -292,9 +290,7 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
       throws Exception {
 
     for (String keyName: getFullKeyNames(openKeys)) {
-      OmKeyInfo omKeyInfo =
-          omMetadataManager.getOpenKeyTable().get(keyName);
-      Assert.assertNull(omKeyInfo);
+      Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(keyName));
     }
   }
 
