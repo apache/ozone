@@ -167,7 +167,7 @@ public class StorageContainerDatanodeProtocolClientSideTranslatorPB
       PipelineReportsProto pipelineReportsProto)
       throws IOException {
     return this.register(datanodeDetailsProto, nodeReport,
-        containerReportsRequestProto,pipelineReportsProto, null);
+        containerReportsRequestProto, pipelineReportsProto, null);
   }
 
   /**

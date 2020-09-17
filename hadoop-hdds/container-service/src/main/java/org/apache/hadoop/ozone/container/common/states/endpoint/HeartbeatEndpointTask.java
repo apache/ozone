@@ -348,14 +348,14 @@ public class HeartbeatEndpointTask
       case finalizeNewLayoutVersionCommand:
         FinalizeNewLayoutVersionCommand finalizeNewLayoutVersionCommand =
             FinalizeNewLayoutVersionCommand.getFromProtobuf(
-        commandResponseProto.getFinalizeNewLayoutVersionCommandProto());
+                commandResponseProto.getFinalizeNewLayoutVersionCommandProto());
         if (LOG.isDebugEnabled()) {
           LOG.debug("Received SCM finalize command {}",
               finalizeNewLayoutVersionCommand.getId());
         }
         this.context.addCommand(finalizeNewLayoutVersionCommand);
         break;
-        default:
+      default:
         throw new IllegalArgumentException("Unknown response : "
             + commandResponseProto.getCommandType().name());
       }

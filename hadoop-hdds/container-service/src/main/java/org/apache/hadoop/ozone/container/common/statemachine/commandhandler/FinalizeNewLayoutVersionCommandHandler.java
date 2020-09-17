@@ -75,7 +75,7 @@ public class FinalizeNewLayoutVersionCommandHandler implements CommandHandler {
     try {
       // TODO : finalization logic
       if (LOG.isDebugEnabled()) {
-          LOG.debug("Finalize Upgrade called!");
+        LOG.debug("Finalize Upgrade called!");
       }
     } catch (Exception e) {
       LOG.debug("Unexpected Error: {} ", e);
