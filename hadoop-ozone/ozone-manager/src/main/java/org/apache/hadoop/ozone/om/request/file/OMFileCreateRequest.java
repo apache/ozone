@@ -332,7 +332,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
           bucketName, keyName);
       break;
     case FAILURE:
-      LOG.error("File create failed. Volume:{}, Bucket:{}, Key{}. Exception:{}",
+      LOG.error("File create failed. Volume:{}, Bucket:{}, Key{}.",
           volumeName, bucketName, keyName, exception);
       break;
     default:
