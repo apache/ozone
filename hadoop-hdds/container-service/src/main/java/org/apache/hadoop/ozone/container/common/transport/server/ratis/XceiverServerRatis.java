@@ -116,6 +116,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private static final Logger LOG = LoggerFactory
       .getLogger(XceiverServerRatis.class);
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
+  public static final List<Integer> DEFAULT_PRIORITY_LIST =
+      new ArrayList<>(
+          Collections.nCopies(HddsProtos.ReplicationFactor.THREE_VALUE, 0));
 
   private static long nextCallId() {
     return CALL_ID_COUNTER.getAndIncrement() & Long.MAX_VALUE;
@@ -713,9 +716,12 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   @Override
   public void addGroup(HddsProtos.PipelineID pipelineId,
       List<DatanodeDetails> peers) throws IOException {
-    List<Integer> priorityList =
-        new ArrayList<>(Collections.nCopies(peers.size(), 0));
-    addGroup(pipelineId, peers, priorityList);
+    if (peers.size() == DEFAULT_PRIORITY_LIST.size()) {
+      addGroup(pipelineId, peers, DEFAULT_PRIORITY_LIST);
+    } else {
+      addGroup(pipelineId, peers,
+          new ArrayList<>(Collections.nCopies(peers.size(), 0)));
+    }
   }
 
   @Override

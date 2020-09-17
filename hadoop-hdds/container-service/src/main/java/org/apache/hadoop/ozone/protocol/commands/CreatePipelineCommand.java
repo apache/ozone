@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -51,8 +52,13 @@ public class CreatePipelineCommand
     this.factor = factor;
     this.type = type;
     this.nodelist = datanodeList;
-    this.priorityList =
-        new ArrayList<>(Collections.nCopies(datanodeList.size(), 0));
+    if (datanodeList.size() ==
+        XceiverServerRatis.DEFAULT_PRIORITY_LIST.size()) {
+      this.priorityList = XceiverServerRatis.DEFAULT_PRIORITY_LIST;
+    } else {
+      this.priorityList =
+          new ArrayList<>(Collections.nCopies(datanodeList.size(), 0));
+    }
   }
 
   public CreatePipelineCommand(final PipelineID pipelineID,
