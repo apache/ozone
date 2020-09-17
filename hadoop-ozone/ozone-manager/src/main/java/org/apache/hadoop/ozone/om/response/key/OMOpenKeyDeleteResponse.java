@@ -31,6 +31,10 @@ import java.util.Map;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 
+/**
+ * Handles responses to move open keys from the open key table to the delete
+ * table. Modifies the open key table and delete table databases.
+ */
 @CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, DELETED_TABLE})
 public class OMOpenKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
 

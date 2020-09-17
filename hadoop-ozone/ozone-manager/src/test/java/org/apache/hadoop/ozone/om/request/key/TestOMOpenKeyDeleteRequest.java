@@ -128,7 +128,7 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
     OpenKeyBucket keysToKeep =
         makeOpenKeys(volumeName, bucketName, keyName, 3);
     OpenKeyBucket keysToDelete =
-        makeOpenKeys(volumeName, bucketName, keyName,3);
+        makeOpenKeys(volumeName, bucketName, keyName, 3);
 
     addToOpenKeyTable(keysToKeep, keysToDelete);
     deleteOpenKeys(keysToDelete);
@@ -158,7 +158,7 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
     OpenKeyBucket existentKeys =
         makeOpenKeys(volumeName, bucketName, keyName, numExistentKeys);
     OpenKeyBucket nonExistentKeys =
-        makeOpenKeys(volumeName, bucketName, keyName,numNonExistentKeys);
+        makeOpenKeys(volumeName, bucketName, keyName, numNonExistentKeys);
 
     addToOpenKeyTable(existentKeys);
     deleteOpenKeys(existentKeys, nonExistentKeys);
@@ -166,7 +166,7 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
     assertNotInOpenKeyTable(existentKeys);
     assertNotInOpenKeyTable(nonExistentKeys);
 
-    Assert.assertEquals(1, metrics.getNumOpenKeyDeleteRequests() );
+    Assert.assertEquals(1, metrics.getNumOpenKeyDeleteRequests());
     Assert.assertEquals(0, metrics.getNumOpenKeyDeleteRequestFails());
     Assert.assertEquals(numExistentKeys + numNonExistentKeys,
         metrics.getNumOpenKeysSubmittedForDeletion());
@@ -191,7 +191,8 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
         openKeyDeleteRequest.validateAndUpdateCache(ozoneManager,
             100L, ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(Status.OK, omClientResponse.getOMResponse().getStatus());
+    Assert.assertEquals(Status.OK,
+        omClientResponse.getOMResponse().getStatus());
   }
 
   /**
@@ -202,11 +203,11 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
   private void addToOpenKeyTable(OpenKeyBucket... openKeys)
       throws Exception {
 
-    for (OpenKeyBucket OpenKeyBucket: openKeys) {
-      String volume  = OpenKeyBucket.getVolumeName();
-      String bucket  = OpenKeyBucket.getBucketName();
+    for (OpenKeyBucket openKeyBucket: openKeys) {
+      String volume  = openKeyBucket.getVolumeName();
+      String bucket  = openKeyBucket.getBucketName();
 
-      for (OpenKey openKey: OpenKeyBucket.getKeysList()) {
+      for (OpenKey openKey: openKeyBucket.getKeysList()) {
         TestOMRequestUtils.addKeyToTable(true,
             volume, bucket, openKey.getName(), openKey.getClientID(),
             replicationType, replicationFactor, omMetadataManager);
@@ -300,10 +301,10 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
     }
   }
 
-  private List<String> getFullKeyNames(OpenKeyBucket... OpenKeyBuckets) {
+  private List<String> getFullKeyNames(OpenKeyBucket... openKeyBuckets) {
     List<String> fullKeyNames = new ArrayList<>();
 
-    for(OpenKeyBucket keysPerBucket: OpenKeyBuckets) {
+    for(OpenKeyBucket keysPerBucket: openKeyBuckets) {
       String volume = keysPerBucket.getVolumeName();
       String bucket = keysPerBucket.getBucketName();
 

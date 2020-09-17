@@ -42,6 +42,12 @@ import java.util.List;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
+/**
+ * Handles requests to move open keys from the open key table to the delete
+ * table. Modifies the open key table cache only, and no underlying databases.
+ * The delete table cache does not need to be modified since it is not used
+ * for client response validation.
+ */
 public class OMOpenKeyDeleteRequest extends OMKeyRequest {
 
   private static final Logger LOG =
