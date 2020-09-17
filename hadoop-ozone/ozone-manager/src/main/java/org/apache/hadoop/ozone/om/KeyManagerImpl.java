@@ -2069,18 +2069,18 @@ public class KeyManagerImpl implements KeyManager {
     // A set to keep track of keys deleted in cache but not flushed to DB.
     Set<String> deletedKeySet = new TreeSet<>();
 
+    if (Strings.isNullOrEmpty(startKey)) {
+      OzoneFileStatus fileStatus = getFileStatus(args, clientAddress);
+      if (fileStatus.isFile()) {
+        return Collections.singletonList(fileStatus);
+      }
+      // keyName is a directory
+      startKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
+    }
+
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
-      if (Strings.isNullOrEmpty(startKey)) {
-        OzoneFileStatus fileStatus = getFileStatus(args);
-        if (fileStatus.isFile()) {
-          return Collections.singletonList(fileStatus);
-        }
-        // keyName is a directory
-        startKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
-      }
-
       Table keyTable = metadataManager.getKeyTable();
       Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
           cacheIter = keyTable.cacheIterator();
