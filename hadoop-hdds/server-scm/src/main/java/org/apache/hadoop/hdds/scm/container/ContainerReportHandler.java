@@ -159,7 +159,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
       final EventPublisher publisher) {
     for (ContainerReplicaProto replicaProto : replicas) {
       try {
-        processContainerReplica(datanodeDetails, replicaProto);
+        processContainerReplica(datanodeDetails, replicaProto, publisher);
       } catch (ContainerNotFoundException e) {
         if(unknownContainerHandleAction.equals(
             UNKNOWN_CONTAINER_ACTION_WARN)) {

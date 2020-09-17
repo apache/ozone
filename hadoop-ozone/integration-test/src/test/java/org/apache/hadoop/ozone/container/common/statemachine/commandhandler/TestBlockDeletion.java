@@ -226,7 +226,7 @@ public class TestBlockDeletion {
   }
 
   @Test
-  public void testContainerStatistics() throws Exception {
+  public void testContainerStatisticsAfterDelete() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
@@ -309,6 +309,12 @@ public class TestBlockDeletion {
     containerInfos.stream().forEach(container -> {
       Assert.assertEquals(HddsProtos.LifeCycleState.DELETED,
           container.getState());
+      try {
+        Assert.assertNull(scm.getScmMetadataStore().getContainerTable()
+            .get(container.containerID()));
+      } catch (IOException e) {
+        Assert.fail("Getting container from SCM DB should not fail");
+      }
     });
   }
 

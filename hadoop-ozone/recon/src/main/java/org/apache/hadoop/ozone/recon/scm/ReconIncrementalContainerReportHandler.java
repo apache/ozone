@@ -80,7 +80,7 @@ public class ReconIncrementalContainerReportHandler
           return;
         }
         getNodeManager().addContainer(dd, id);
-        processContainerReplica(dd, replicaProto);
+        processContainerReplica(dd, replicaProto, publisher);
       } catch (ContainerNotFoundException e) {
         success = false;
         LOG.warn("Container {} not found!", replicaProto.getContainerID());

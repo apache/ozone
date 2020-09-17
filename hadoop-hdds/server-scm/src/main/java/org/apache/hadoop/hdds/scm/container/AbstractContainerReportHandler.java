@@ -26,6 +26,10 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -68,7 +72,7 @@ public class AbstractContainerReportHandler {
    * @throws IOException In case of any Exception while processing the report
    */
   protected void processContainerReplica(final DatanodeDetails datanodeDetails,
-                               final ContainerReplicaProto replicaProto)
+      final ContainerReplicaProto replicaProto, final EventPublisher publisher)
       throws IOException {
     final ContainerID containerId = ContainerID
         .valueof(replicaProto.getContainerID());
@@ -80,7 +84,8 @@ public class AbstractContainerReportHandler {
     // Synchronized block should be replaced by container lock,
     // once we have introduced lock inside ContainerInfo.
     synchronized (containerManager.getContainer(containerId)) {
-      updateContainerStats(datanodeDetails, containerId, replicaProto);
+      updateContainerStats(datanodeDetails, containerId, replicaProto,
+          publisher);
       updateContainerState(datanodeDetails, containerId, replicaProto);
       updateContainerReplica(datanodeDetails, containerId, replicaProto);
     }
@@ -96,13 +101,24 @@ public class AbstractContainerReportHandler {
    */
   private void updateContainerStats(final DatanodeDetails datanodeDetails,
                                     final ContainerID containerId,
-                                    final ContainerReplicaProto replicaProto)
+                                    final ContainerReplicaProto replicaProto,
+                                    final EventPublisher publisher)
       throws ContainerNotFoundException {
+    final ContainerInfo containerInfo = containerManager
+        .getContainer(containerId);
+
+    if (containerInfo.getState() == HddsProtos.LifeCycleState.DELETED) {
+      final DeleteContainerCommand deleteCommand =
+          new DeleteContainerCommand(containerId.getId(), true);
+      final CommandForDatanode datanodeCommand = new CommandForDatanode<>(
+          datanodeDetails.getUuid(), deleteCommand);
+      publisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
+      logger.info("Sending delete container command for deleted container {}"
+          + " to datanode {}", containerId.getId(), datanodeDetails);
+      return;
+    }
 
     if (isHealthy(replicaProto::getState)) {
-      final ContainerInfo containerInfo = containerManager
-          .getContainer(containerId);
-
       if (containerInfo.getSequenceId() <
           replicaProto.getBlockCommitSequenceId()) {
         containerInfo.updateSequenceId(
