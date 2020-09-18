@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.junit.Assert;
 import org.junit.Test;
@@ -46,7 +47,9 @@ public class TestS3MultipartUploadAbortResponse
     String multipartUploadID = UUID.randomUUID().toString();
     String multipartKey = omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyName, multipartUploadID);
-
+    OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
+        .setOwnerName(keyName).setAdminName(keyName)
+        .setVolume(volumeName).setCreationTime(Time.now()).build();
     S3InitiateMultipartUploadResponse s3InitiateMultipartUploadResponse =
         createS3InitiateMPUResponse(volumeName, bucketName, keyName,
             multipartUploadID);
@@ -56,7 +59,8 @@ public class TestS3MultipartUploadAbortResponse
 
     S3MultipartUploadAbortResponse s3MultipartUploadAbortResponse =
         createS3AbortMPUResponse(multipartKey, Time.now(),
-            s3InitiateMultipartUploadResponse.getOmMultipartKeyInfo());
+            s3InitiateMultipartUploadResponse.getOmMultipartKeyInfo(),
+            omVolumeArgs);
 
     s3MultipartUploadAbortResponse.addToDBBatch(omMetadataManager,
         batchOperation);
@@ -81,6 +85,9 @@ public class TestS3MultipartUploadAbortResponse
     String multipartUploadID = UUID.randomUUID().toString();
     String multipartKey = omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyName, multipartUploadID);
+    OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
+        .setOwnerName(keyName).setAdminName(keyName)
+        .setVolume(volumeName).setCreationTime(Time.now()).build();
 
     S3InitiateMultipartUploadResponse s3InitiateMultipartUploadResponse =
         createS3InitiateMPUResponse(volumeName, bucketName, keyName,
@@ -109,7 +116,8 @@ public class TestS3MultipartUploadAbortResponse
     long timeStamp = Time.now();
     S3MultipartUploadAbortResponse s3MultipartUploadAbortResponse =
         createS3AbortMPUResponse(multipartKey, timeStamp,
-            s3InitiateMultipartUploadResponse.getOmMultipartKeyInfo());
+            s3InitiateMultipartUploadResponse.getOmMultipartKeyInfo(),
+            omVolumeArgs);
 
     s3MultipartUploadAbortResponse.addToDBBatch(omMetadataManager,
         batchOperation);

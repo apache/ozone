@@ -88,7 +88,7 @@ message SCMVersionResponseProto {
 }
 
 message SCMRegisterRequestProto {
-  required DatanodeDetailsProto datanodeDetails = 1;
+  required ExtendedDatanodeDetailsProto extendedDatanodeDetails = 1;
   required NodeReportProto nodeReport = 2;
   required ContainerReportsProto containerReport = 3;
   required PipelineReportsProto pipelineReports = 4;

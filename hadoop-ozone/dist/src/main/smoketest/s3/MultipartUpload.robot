@@ -258,12 +258,12 @@ Test Multipart Upload Put With Copy and range
                         Should contain           ${result}    ${BUCKET}
                         Should contain           ${result}    UploadId
 
-    ${result} =         Execute AWSS3APICli      upload-part-copy --bucket ${BUCKET} --key copyrange/destination --upload-id ${uploadID} --part-number 1 --copy-source ${BUCKET}/copyrange/source --copy-source-range bytes=0-10485758
+    ${result} =         Execute AWSS3APICli      upload-part-copy --bucket ${BUCKET} --key copyrange/destination --upload-id ${uploadID} --part-number 1 --copy-source ${BUCKET}/copyrange/source --copy-source-range bytes=0-10485757
                         Should contain           ${result}    ETag
                         Should contain           ${result}    LastModified
     ${eTag1} =          Execute and checkrc      echo '${result}' | jq -r '.CopyPartResult.ETag'   0
 
-    ${result} =         Execute AWSS3APICli      upload-part-copy --bucket ${BUCKET} --key copyrange/destination --upload-id ${uploadID} --part-number 2 --copy-source ${BUCKET}/copyrange/source --copy-source-range bytes=10485758-10485760
+    ${result} =         Execute AWSS3APICli      upload-part-copy --bucket ${BUCKET} --key copyrange/destination --upload-id ${uploadID} --part-number 2 --copy-source ${BUCKET}/copyrange/source --copy-source-range bytes=10485758-10485759
                         Should contain           ${result}    ETag
                         Should contain           ${result}    LastModified
     ${eTag2} =          Execute and checkrc      echo '${result}' | jq -r '.CopyPartResult.ETag'   0

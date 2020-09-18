@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -86,6 +87,14 @@ public abstract class AbstractOMKeyDeleteResponse extends OMClientResponse {
       omMetadataManager.getDeletedTable().putWithBatch(
           batchOperation, keyName, repeatedOmKeyInfo);
     }
+  }
+
+  protected void updateVolumeBytesUsed(OMMetadataManager metadataManager,
+      BatchOperation batch, OmVolumeArgs volumeArgs)
+      throws IOException {
+
+    metadataManager.getVolumeTable().putWithBatch(batch,
+        metadataManager.getVolumeKey(volumeArgs.getVolume()), volumeArgs);
   }
 
   @Override

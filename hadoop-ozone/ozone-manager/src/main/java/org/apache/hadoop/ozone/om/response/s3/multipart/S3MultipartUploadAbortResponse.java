@@ -22,6 +22,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -50,14 +51,16 @@ public class S3MultipartUploadAbortResponse extends OMClientResponse {
   private String multipartKey;
   private OmMultipartKeyInfo omMultipartKeyInfo;
   private boolean isRatisEnabled;
+  private OmVolumeArgs omVolumeArgs;
 
   public S3MultipartUploadAbortResponse(@Nonnull OMResponse omResponse,
-      String multipartKey,
-      @Nonnull OmMultipartKeyInfo omMultipartKeyInfo, boolean isRatisEnabled) {
+      String multipartKey, @Nonnull OmMultipartKeyInfo omMultipartKeyInfo,
+      boolean isRatisEnabled, @Nonnull OmVolumeArgs omVolumeArgs) {
     super(omResponse);
     this.multipartKey = multipartKey;
     this.omMultipartKeyInfo = omMultipartKeyInfo;
     this.isRatisEnabled = isRatisEnabled;
+    this.omVolumeArgs = omVolumeArgs;
   }
 
   /**
@@ -96,6 +99,11 @@ public class S3MultipartUploadAbortResponse extends OMClientResponse {
 
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
           partKeyInfo.getPartName(), repeatedOmKeyInfo);
+
+      // update volume usedBytes.
+      omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
+          omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
+          omVolumeArgs);
     }
   }
 }

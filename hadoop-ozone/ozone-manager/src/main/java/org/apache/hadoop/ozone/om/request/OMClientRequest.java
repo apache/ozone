@@ -62,6 +62,9 @@ public abstract class OMClientRequest implements RequestAuditor {
       LoggerFactory.getLogger(OMClientRequest.class);
   private OMRequest omRequest;
 
+  private UserGroupInformation userGroupInformation;
+  private InetAddress inetAddress;
+
   /**
    * Stores the result of request execution in
    * OMClientRequest#validateAndUpdateCache.
@@ -160,10 +163,16 @@ public abstract class OMClientRequest implements RequestAuditor {
    */
   @VisibleForTesting
   public UserGroupInformation createUGI() {
+
+    if (userGroupInformation != null) {
+      return userGroupInformation;
+    }
+
     if (omRequest.hasUserInfo() &&
         !StringUtils.isBlank(omRequest.getUserInfo().getUserName())) {
-      return UserGroupInformation.createRemoteUser(
+      userGroupInformation = UserGroupInformation.createRemoteUser(
           omRequest.getUserInfo().getUserName());
+      return userGroupInformation;
     } else {
       // This will never happen, as for every OM request preExecute, we
       // should add userInfo.
@@ -179,9 +188,14 @@ public abstract class OMClientRequest implements RequestAuditor {
    */
   @VisibleForTesting
   public InetAddress getRemoteAddress() throws IOException {
+    if (inetAddress != null) {
+      return inetAddress;
+    }
+
     if (omRequest.hasUserInfo()) {
-      return InetAddress.getByName(omRequest.getUserInfo()
+      inetAddress = InetAddress.getByName(omRequest.getUserInfo()
           .getRemoteAddress());
+      return inetAddress;
     } else {
       return null;
     }

@@ -313,14 +313,6 @@ public class ReplicationManager
               .noneMatch(r -> r.getDatanodeDetails().equals(action.datanode)));
 
       /*
-       * If the container is in CLOSED state, check and update it's key count
-       * and bytes used statistics if needed.
-       */
-      if (state == LifeCycleState.CLOSED) {
-        checkAndUpdateContainerInfo(container, replicas);
-      }
-
-      /*
        * We don't have to take any action if the container is healthy.
        *
        * According to ReplicationMonitor container is considered healthy if
@@ -668,9 +660,8 @@ public class ReplicationManager
       if (excess > 0) {
         eligibleReplicas.removeAll(unhealthyReplicas);
         Set<ContainerReplica> replicaSet = new HashSet<>(eligibleReplicas);
-        boolean misReplicated =
-            getPlacementStatus(replicaSet, replicationFactor)
-                .isPolicySatisfied();
+        ContainerPlacementStatus ps =
+            getPlacementStatus(replicaSet, replicationFactor);
         for (ContainerReplica r : eligibleReplicas) {
           if (excess <= 0) {
             break;
@@ -678,11 +669,14 @@ public class ReplicationManager
           // First remove the replica we are working on from the set, and then
           // check if the set is now mis-replicated.
           replicaSet.remove(r);
-          boolean nowMisRep = getPlacementStatus(replicaSet, replicationFactor)
-              .isPolicySatisfied();
-          if (misReplicated || !nowMisRep) {
-            // Remove the replica if the container was already mis-replicated
-            // OR if losing this replica does not make it become mis-replicated
+          ContainerPlacementStatus nowPS =
+              getPlacementStatus(replicaSet, replicationFactor);
+          if ((!ps.isPolicySatisfied()
+                && nowPS.actualPlacementCount() == ps.actualPlacementCount())
+              || (ps.isPolicySatisfied() && nowPS.isPolicySatisfied())) {
+            // Remove the replica if the container was already unsatisfied
+            // and losing this replica keep actual placement count unchanged.
+            // OR if losing this replica still keep satisfied
             sendDeleteCommand(container, r.getDatanodeDetails(), true);
             excess -= 1;
             continue;
@@ -771,32 +765,6 @@ public class ReplicationManager
     unhealthyReplicas.stream().findFirst().ifPresent(replica ->
         sendDeleteCommand(container, replica.getDatanodeDetails(), false));
 
-  }
-
-  /**
-   * Check and update Container key count and used bytes based on it's replica's
-   * data.
-   */
-  private void checkAndUpdateContainerInfo(final ContainerInfo container,
-      final Set<ContainerReplica> replicas) {
-    // check container key count and bytes used
-    long maxUsedBytes = 0;
-    long maxKeyCount = 0;
-    ContainerReplica[] rps = replicas.toArray(new ContainerReplica[0]);
-    for (int i = 0; i < rps.length; i++) {
-      maxUsedBytes = Math.max(maxUsedBytes, rps[i].getBytesUsed());
-      maxKeyCount = Math.max(maxKeyCount, rps[i].getKeyCount());
-    }
-    if (maxKeyCount < container.getNumberOfKeys()) {
-      LOG.debug("Container {} key count changed from {} to {}",
-          container.containerID(), container.getNumberOfKeys(), maxKeyCount);
-      container.setNumberOfKeys(maxKeyCount);
-    }
-    if (maxUsedBytes < container.getUsedBytes()) {
-      LOG.debug("Container {} used bytes changed from {} to {}",
-          container.containerID(), container.getUsedBytes(), maxUsedBytes);
-      container.setUsedBytes(maxUsedBytes);
-    }
   }
 
   /**

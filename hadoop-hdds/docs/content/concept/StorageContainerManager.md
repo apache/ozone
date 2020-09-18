@@ -46,7 +46,7 @@ replicas. If there is a loss of data node or a disk, SCM
 detects it and instructs data nodes make copies of the
 missing blocks to ensure high availability.
 
- 3. **SCM's Ceritificate authority** is in
+ 3. **SCM's Certificate Authority** is in
 charge of issuing identity certificates for each and every
 service in the cluster. This certificate infrastructure makes
 it easy to enable mTLS at network layer and the block
@@ -88,13 +88,10 @@ The following data is persisted in Storage Container Manager side in a specific 
  * Valid cert, Revoked certs
   * Used by the internal Certificate Authority to authorize other Ozone services
 
-## Notable configuration
+## Notable configurations
 
-
-## Notable configuration
-
-key | default | description | 
-----|-------------|--------
+key | default | description 
+----|---------|------------
 ozone.scm.container.size | 5GB | Default container size used by Ozone
 ozone.scm.block.size | 256MB |  The default size of a data block.
 hdds.scm.safemode.min.datanode | 1 | Minimum number of datanodes to start the real work.

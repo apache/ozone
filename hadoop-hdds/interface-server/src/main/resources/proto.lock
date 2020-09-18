@@ -310,8 +310,8 @@
             "fields": [
               {
                 "id": 1,
-                "name": "datanodeDetails",
-                "type": "DatanodeDetailsProto"
+                "name": "extendedDatanodeDetails",
+                "type": "ExtendedDatanodeDetailsProto"
               },
               {
                 "id": 2,

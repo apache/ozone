@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
@@ -39,11 +40,14 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
 
   private OmKeyInfo omKeyInfo;
+  private OmVolumeArgs omVolumeArgs;
 
   public OMKeyDeleteResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo, boolean isRatisEnabled) {
+      @Nonnull OmKeyInfo omKeyInfo, boolean isRatisEnabled,
+      @Nonnull OmVolumeArgs omVolumeArgs) {
     super(omResponse, isRatisEnabled);
     this.omKeyInfo = omKeyInfo;
+    this.omVolumeArgs = omVolumeArgs;
   }
 
   /**
@@ -52,21 +56,21 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
    */
   public OMKeyDeleteResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
-    checkStatusNotOK();
   }
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
-    String key = omMetadataManager.getOzoneKey(
-        omKeyInfo.getVolumeName(),
-        omKeyInfo.getBucketName(),
-        omKeyInfo.getKeyName()
-    );
+    // For OmResponse with failure, this should do nothing. This method is
+    // not called in failure scenario in OM code.
+    String ozoneKey = omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
+        omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
 
     Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable();
-    deleteFromTable(omMetadataManager, batchOperation, keyTable,
-        key, omKeyInfo);
+    deleteFromTable(omMetadataManager, batchOperation, keyTable, ozoneKey,
+        omKeyInfo);
+
+    updateVolumeBytesUsed(omMetadataManager, batchOperation, omVolumeArgs);
   }
 }

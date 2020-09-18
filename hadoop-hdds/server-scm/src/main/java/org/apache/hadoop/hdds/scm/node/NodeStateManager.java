@@ -564,18 +564,18 @@ public class NodeStateManager implements Runnable, Closeable {
      *                      >>-->> time-line >>-->>
      *
      * Here is the logic of computing the health of a node.
-     *
-     * 1. We get the current time and look back that the time
-     *    when we got a heartbeat from a node.
-     * 
-     * 2. If the last heartbeat was within the window of healthy node we mark
-     *    it as healthy.
-     * 
-     * 3. If the last HB Time stamp is longer and falls within the window of
-     *    Stale Node time, we will mark it as Stale.
-     * 
-     * 4. If the last HB time is older than the Stale Window, then the node is
-     *    marked as dead.
+     *
+     * 1. We get the current time and look back that the time
+     *    when we got a heartbeat from a node.
+     *
+     * 2. If the last heartbeat was within the window of healthy node we mark
+     *    it as healthy.
+     *
+     * 3. If the last HB Time stamp is longer and falls within the window of
+     *    Stale Node time, we will mark it as Stale.
+     *
+     * 4. If the last HB time is older than the Stale Window, then the node is
+     *    marked as dead.
      *
      * The Processing starts from current time and looks backwards in time.
      */
@@ -602,7 +602,7 @@ public class NodeStateManager implements Runnable, Closeable {
             // Move the node to STALE if the last heartbeat time is less than
             // configured stale-node interval.
             updateNodeState(node, staleNodeCondition, state,
-                  NodeLifeCycleEvent.TIMEOUT);
+                NodeLifeCycleEvent.TIMEOUT);
             break;
           case STALE:
             // Move the node to DEAD if the last heartbeat time is less than
@@ -620,8 +620,8 @@ public class NodeStateManager implements Runnable, Closeable {
             updateNodeState(node, healthyNodeCondition, state,
                 NodeLifeCycleEvent.RESURRECT);
             break;
-            // We don't do anything for DECOMMISSIONING and DECOMMISSIONED in
-            // heartbeat processing.
+          // We don't do anything for DECOMMISSIONING and DECOMMISSIONED in
+          // heartbeat processing.
           case DECOMMISSIONING:
           case DECOMMISSIONED:
           default:
