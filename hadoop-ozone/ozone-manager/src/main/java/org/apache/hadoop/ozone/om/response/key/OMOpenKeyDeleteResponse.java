@@ -61,7 +61,6 @@ public class OMOpenKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
       @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse) {
 
     super(omResponse);
-    checkStatusNotOK();
   }
 
   @Override

@@ -58,7 +58,6 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
    */
   public OMKeysDeleteResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
-    checkStatusNotOK();
   }
 
   public void checkAndUpdateDB(OMMetadataManager omMetadataManager,
