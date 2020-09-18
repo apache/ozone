@@ -32,8 +32,8 @@ import com.google.common.annotations.VisibleForTesting;
  * Class to manage layout versions and features for Storage Container Manager
  * and DataNodes.
  */
-@SuppressWarnings("visibilitymodifier")
-public final class HDDSLayoutVersionManager extends
+@SuppressWarnings("FinalClass")
+public class HDDSLayoutVersionManager extends
     AbstractLayoutVersionManager {
 
   private static HDDSLayoutVersionManager hddsLayoutVersionManager;
