@@ -148,7 +148,7 @@ function ozonecmd_case
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
     ;;
     getconf)
-      HADOOP_CLASSNAME=org.apache.hadoop.ozone.freon.OzoneGetConf;
+      HADOOP_CLASSNAME=org.apache.hadoop.ozone.conf.OzoneGetConf;
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-tools"
     ;;
     om)
