@@ -21,11 +21,13 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
@@ -39,13 +41,16 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 public class OMOpenKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
 
   private Map<String, OmKeyInfo> keysToDelete;
+  private Collection<OmVolumeArgs> volumeArgsList;
 
   public OMOpenKeyDeleteResponse(
       @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse,
-      @Nonnull Map<String, OmKeyInfo> keysToDelete, boolean isRatisEnabled) {
+      @Nonnull Map<String, OmKeyInfo> keysToDelete, boolean isRatisEnabled,
+      @Nonnull Collection<OmVolumeArgs> volumeArgsList) {
 
     super(omResponse, isRatisEnabled);
     this.keysToDelete = keysToDelete;
+    this.volumeArgsList = volumeArgsList;
   }
 
   /**
@@ -68,6 +73,10 @@ public class OMOpenKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
     for (Map.Entry<String, OmKeyInfo> keyInfoPair: keysToDelete.entrySet()) {
       deleteFromTable(omMetadataManager, batchOperation, openKeyTable,
           keyInfoPair.getKey(), keyInfoPair.getValue());
+    }
+
+    for (OmVolumeArgs volumeArgs: volumeArgsList) {
+      updateVolumeBytesUsed(omMetadataManager, batchOperation, volumeArgs);
     }
   }
 }

@@ -71,36 +71,11 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
     // not called in failure scenario in OM code.
     String ozoneKey = omMetadataManager.getOzoneKey(omKeyInfo.getVolumeName(),
         omKeyInfo.getBucketName(), omKeyInfo.getKeyName());
-    omMetadataManager.getKeyTable().deleteWithBatch(batchOperation, ozoneKey);
-
-    // If Key is not empty add this to delete table.
-    if (!isKeyEmpty(omKeyInfo)) {
-      // If a deleted key is put in the table where a key with the same
-      // name already exists, then the old deleted key information would be
-      // lost. To avoid this, first check if a key with same name exists.
-      // deletedTable in OM Metadata stores <KeyName, RepeatedOMKeyInfo>.
-      // The RepeatedOmKeyInfo is the structure that allows us to store a
-      // list of OmKeyInfo that can be tied to same key name. For a keyName
-      // if RepeatedOMKeyInfo structure is null, we create a new instance,
-      // if it is not null, then we simply add to the list and store this
-      // instance in deletedTable.
-      RepeatedOmKeyInfo repeatedOmKeyInfo =
-          omMetadataManager.getDeletedTable().get(ozoneKey);
-      repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-          omKeyInfo, repeatedOmKeyInfo, omKeyInfo.getUpdateID(),
-          isRatisEnabled);
-      omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-            ozoneKey, repeatedOmKeyInfo);
-
-      // update volume usedBytes.
-      omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
-          omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
-          omVolumeArgs);
-    }
-  }
 
     Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable();
-    deleteFromTable(omMetadataManager, batchOperation, keyTable,
-        key, omKeyInfo);
+    deleteFromTable(omMetadataManager, batchOperation, keyTable, ozoneKey,
+        omKeyInfo);
+
+    updateVolumeBytesUsed(omMetadataManager, batchOperation, omVolumeArgs);
   }
 }
