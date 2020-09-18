@@ -85,7 +85,7 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
       Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable();
 
       deleteFromTable(omMetadataManager, batchOperation, keyTable, deleteKey,
-          omKeyInfo);
+          omKeyInfo, trxnLogIndex);
 
       updateVolumeBytesUsed(omMetadataManager, batchOperation, omVolumeArgs);
     }
