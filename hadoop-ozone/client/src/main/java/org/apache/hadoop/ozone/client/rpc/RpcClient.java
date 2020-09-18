@@ -1045,6 +1045,7 @@ public class RpcClient implements ClientProtocol {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setRefreshPipeline(true)
+        .setSortDatanodesInPipeline(topologyAwareReadEnabled)
         .build();
     return ozoneManagerClient.getFileStatus(keyArgs);
   }
@@ -1127,6 +1128,7 @@ public class RpcClient implements ClientProtocol {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setRefreshPipeline(true)
+        .setSortDatanodesInPipeline(topologyAwareReadEnabled)
         .build();
     return ozoneManagerClient
         .listStatus(keyArgs, recursive, startKey, numEntries);
