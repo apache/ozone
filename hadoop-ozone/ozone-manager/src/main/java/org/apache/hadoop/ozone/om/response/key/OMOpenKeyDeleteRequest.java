@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -36,6 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.List;
@@ -84,17 +86,29 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
     Map<String, OmKeyInfo> deletedOpenKeys = new HashMap<>();
 
     try {
+      // Open keys are grouped by bucket, but there may be multiple buckets
+      // per volume. This map aggregates volume changes across buckets.
+      Map<String, OmVolumeArgs> volumes = new HashMap<>();
       for (OpenKeyBucket openKeyBucket: submittedOpenKeyBucket) {
         // For each bucket where keys will be deleted from,
         // get its bucket lock and update the cache accordingly.
         Map<String, OmKeyInfo> deleted = updateCache(ozoneManager, trxnLogIndex,
             openKeyBucket);
 
+        // Update used bytes for this volume.
+        String volume = openKeyBucket.getVolumeName();
+        OmVolumeArgs volumeArgs = volumes.get(volume);
+        if (volumeArgs == null) {
+          volumeArgs = getVolumeInfo(ozoneManager.getMetadataManager(), volume);
+          volumes.put(volume, volumeArgs);
+        }
+        subtractUsedBytes(volumeArgs, deleted.values());
+
         deletedOpenKeys.putAll(deleted);
       }
 
       omClientResponse = new OMOpenKeyDeleteResponse(omResponse.build(),
-          deletedOpenKeys, ozoneManager.isRatisEnabled());
+          deletedOpenKeys, ozoneManager.isRatisEnabled(), volumes.values());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -128,7 +142,7 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
               "keys.", numSubmittedOpenKeys);
       break;
     default:
-      LOG.error("Unrecognized Result for OMOpenKeyDeleteRequest: {}",
+      LOG.error("Unrecognized result for OMOpenKeyDeleteRequest: {}",
           request);
     }
   }
@@ -185,5 +199,20 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
     }
 
     return deletedKeys;
+  }
+
+  /**
+   * Subtracts all bytes used by the blocks pointed to by {@code keyInfos}
+   * from {@code volumeArgs}.
+   */
+  private void subtractUsedBytes(OmVolumeArgs volumeArgs,
+      Collection<OmKeyInfo> keyInfos) {
+
+    long quotaReleased = keyInfos.stream()
+        .mapToLong(OMOpenKeyDeleteRequest::getUsedBytes)
+        .sum();
+
+    // update usedBytes atomically.
+    volumeArgs.getUsedBytes().add(-quotaReleased);
   }
 }

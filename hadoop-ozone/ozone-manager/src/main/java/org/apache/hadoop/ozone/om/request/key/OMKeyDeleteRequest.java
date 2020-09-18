@@ -22,8 +22,6 @@ import java.io.IOException;
 import java.util.Map;
 
 import com.google.common.base.Optional;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -143,15 +141,9 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
               keyName)),
           new CacheValue<>(Optional.absent(), trxnLogIndex));
 
-      long quotaReleased = 0;
-      int keyFactor = omKeyInfo.getFactor().getNumber();
-      omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
-      OmKeyLocationInfoGroup keyLocationGroup =
-          omKeyInfo.getLatestVersionLocations();
-      for(OmKeyLocationInfo locationInfo: keyLocationGroup.getLocationList()){
-        quotaReleased += locationInfo.getLength() * keyFactor;
-      }
       // update usedBytes atomically.
+      long quotaReleased = getUsedBytes(omKeyInfo);
+      omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
       omVolumeArgs.getUsedBytes().add(-quotaReleased);
 
       // No need to add cache entries to delete table. As delete table will

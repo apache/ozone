@@ -565,4 +565,20 @@ public abstract class OMKeyRequest extends OMClientRequest {
         new CacheKey<>(omMetadataManager.getVolumeKey(volume)))
         .getCacheValue();
   }
+
+  /**
+   * @return the number of bytes used by blocks pointed to by {@code omKeyInfo}.
+   */
+  protected static long getUsedBytes(OmKeyInfo omKeyInfo) {
+    long bytesUsed = 0;
+    int keyFactor = omKeyInfo.getFactor().getNumber();
+    OmKeyLocationInfoGroup keyLocationGroup =
+        omKeyInfo.getLatestVersionLocations();
+
+    for(OmKeyLocationInfo locationInfo: keyLocationGroup.getLocationList()){
+      bytesUsed += locationInfo.getLength() * keyFactor;
+    }
+
+    return bytesUsed;
+  }
 }
