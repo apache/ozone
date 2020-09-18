@@ -200,9 +200,19 @@ public final class OzoneConsts {
 
 
   /**
-   * Max OM Quota size of 1024 PB.
+   * Max OM Quota size of Long.MAX_VALUE.
    */
-  public static final long MAX_QUOTA_IN_BYTES = 1024L * 1024 * TB;
+  public static final long MAX_QUOTA_IN_BYTES = Long.MAX_VALUE;
+
+  /**
+   * Quota RESET default is -1, which means quota is not set.
+   */
+  public static final long QUOTA_RESET = -1;
+
+  /**
+   * Quota Units.
+   */
+  public enum Units {TB, GB, MB, KB, BYTES}
 
   /**
    * Max number of keys returned per list buckets operation.
@@ -259,7 +269,9 @@ public final class OzoneConsts {
   public static final String KEY = "key";
   public static final String SRC_KEY = "srcKey";
   public static final String DST_KEY = "dstKey";
+  public static final String USED_BYTES = "usedBytes";
   public static final String QUOTA_IN_BYTES = "quotaInBytes";
+  public static final String QUOTA_IN_COUNTS = "quotaInCounts";
   public static final String OBJECT_ID = "objectID";
   public static final String UPDATE_ID = "updateID";
   public static final String CLIENT_ID = "clientID";

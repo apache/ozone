@@ -41,7 +41,6 @@ import java.util.function.LongSupplier;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -823,22 +822,22 @@ public final class RandomKeyGenerator implements Callable<Void> {
 
     private String getInStorageUnits(Double value) {
       double size;
-      OzoneQuota.Units unit;
+      OzoneConsts.Units unit;
       if ((long) (value / OzoneConsts.TB) != 0) {
         size = value / OzoneConsts.TB;
-        unit = OzoneQuota.Units.TB;
+        unit = OzoneConsts.Units.TB;
       } else if ((long) (value / OzoneConsts.GB) != 0) {
         size = value / OzoneConsts.GB;
-        unit = OzoneQuota.Units.GB;
+        unit = OzoneConsts.Units.GB;
       } else if ((long) (value / OzoneConsts.MB) != 0) {
         size = value / OzoneConsts.MB;
-        unit = OzoneQuota.Units.MB;
+        unit = OzoneConsts.Units.MB;
       } else if ((long) (value / OzoneConsts.KB) != 0) {
         size = value / OzoneConsts.KB;
-        unit = OzoneQuota.Units.KB;
+        unit = OzoneConsts.Units.KB;
       } else {
         size = value;
-        unit = OzoneQuota.Units.BYTES;
+        unit = OzoneConsts.Units.BYTES;
       }
       return size + " " + unit;
     }

@@ -43,12 +43,21 @@ message DatanodeDetailsProto {
     // network name, can be Ip address or host name, depends
     optional string networkName = 6;
     optional string networkLocation = 7; // Network topology location
-    optional string version = 8;         // Datanode version
-    optional int64 setupTime = 9;
-    optional string revision = 10;
-    optional string buildDate = 11;
     // TODO(runzhiwang): when uuid is gone, specify 1 as the index of uuid128 and mark as required
     optional UUID uuid128 = 100; // UUID with 128 bits assigned to the Datanode.
+}
+
+/**
+ The DatanodeDetailsProto is a basic type that will be shared by many Proto,
+ to reduce the number of fields transfered by ProtoBuf, only need to extend
+ DatanodeDetailsProto for registering DataNode with SCM and Recon.
+*/
+message ExtendedDatanodeDetailsProto {
+    required DatanodeDetailsProto datanodeDetails = 1;
+    optional string version = 2;
+    optional int64 setupTime = 3;
+    optional string revision = 4;
+    optional string buildDate = 5;
 }
 
 /**

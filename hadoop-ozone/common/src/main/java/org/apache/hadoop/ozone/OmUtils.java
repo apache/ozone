@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone;
 
+import com.google.protobuf.ServiceException;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -36,12 +37,15 @@ import java.util.OptionalInt;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.token.SecretManager;
 
 import com.google.common.base.Joiner;
 import org.apache.commons.lang3.StringUtils;
@@ -59,6 +63,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_PORT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -574,5 +579,26 @@ public final class OmUtils {
       LOG.info("Using OzoneManager ServiceID '{}'.", serviceId);
       return serviceId;
     }
+  }
+
+  /**
+   * Unwrap exception to check if it is some kind of access control problem
+   * ({@link AccessControlException} or {@link SecretManager.InvalidToken}).
+   */
+  public static boolean isAccessControlException(Exception ex) {
+    if (ex instanceof ServiceException) {
+      Throwable t = ex.getCause();
+      if (t instanceof RemoteException) {
+        t = ((RemoteException) t).unwrapRemoteException();
+      }
+      while (t != null) {
+        if (t instanceof AccessControlException ||
+            t instanceof SecretManager.InvalidToken) {
+          return true;
+        }
+        t = t.getCause();
+      }
+    }
+    return false;
   }
 }

@@ -52,8 +52,7 @@ S3 使用了一种不一样的共享秘密的安全机制，Ozone 支持 AWS Sig
 S3 token 功能在启用安全机制的情况下也默认开启。
 
 
-Ozone 的每个服务进程都需要一个 Kerberos 服务主体名和对应的 [kerberos keytab](https://web.mit.edu/kerberos/krb5-latest/doc/basic
-/keytab_def.html) 文件。
+Ozone 的每个服务进程都需要一个 Kerberos 服务主体名和对应的 [kerberos keytab](https://web.mit.edu/kerberos/krb5-latest/doc/basic/keytab_def.html) 文件。
 
 ozone-site.xml 中应进行如下配置：
 

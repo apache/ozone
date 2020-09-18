@@ -663,12 +663,16 @@ public class BasicRootedOzoneClientAdapterImpl
     OFSPath ofsStartPath = new OFSPath(startPath);
     // list buckets in the volume
     OzoneVolume volume = objectStore.getVolume(volumeStr);
+    UserGroupInformation ugi =
+        UserGroupInformation.createRemoteUser(volume.getOwner());
+    String owner = ugi.getShortUserName();
+    String group = getGroupName(ugi);
     Iterator<? extends OzoneBucket> iter =
         volume.listBuckets(null, ofsStartPath.getBucketName());
     List<FileStatusAdapter> res = new ArrayList<>();
     while (iter.hasNext() && res.size() < numEntries) {
       OzoneBucket bucket = iter.next();
-      res.add(getFileStatusAdapterForBucket(bucket, uri, username));
+      res.add(getFileStatusAdapterForBucket(bucket, uri, owner, group));
       if (recursive) {
         String pathStrNext = volumeStr + OZONE_URI_DELIMITER + bucket.getName();
         res.addAll(listStatus(pathStrNext, recursive, startPath,
@@ -945,6 +949,19 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   /**
+   * Helper function to get the primary group name from a UGI.
+   * @param ugi UserGroupInformation
+   * @return String of the primary group name, empty String on exception.
+   */
+  private static String getGroupName(UserGroupInformation ugi) {
+    try {
+      return ugi.getPrimaryGroupName();
+    } catch (IOException ignored) {
+      return "";
+    }
+  }
+
+  /**
    * Generate a FileStatusAdapter for a volume.
    * @param ozoneVolume OzoneVolume object
    * @param uri Full URI to OFS root.
@@ -959,11 +976,14 @@ public class BasicRootedOzoneClientAdapterImpl
           ozoneVolume.getName(), pathStr);
     }
     Path path = new Path(pathStr);
+    UserGroupInformation ugi =
+        UserGroupInformation.createRemoteUser(ozoneVolume.getOwner());
+    String owner = ugi.getShortUserName();
+    String group = getGroupName(ugi);
     return new FileStatusAdapter(0L, path, true, (short)0, 0L,
         ozoneVolume.getCreationTime().getEpochSecond() * 1000, 0L,
         FsPermission.getDirDefault().toShort(),
-        // TODO: Revisit owner and admin
-        ozoneVolume.getOwner(), ozoneVolume.getAdmin(), path,
+        owner, group, path,
         new BlockLocation[0]
     );
   }
@@ -972,24 +992,25 @@ public class BasicRootedOzoneClientAdapterImpl
    * Generate a FileStatusAdapter for a bucket.
    * @param ozoneBucket OzoneBucket object.
    * @param uri Full URI to OFS root.
+   * @param owner Owner of the parent volume of the bucket.
+   * @param group Group of the parent volume of the bucket.
    * @return FileStatusAdapter for a bucket.
    */
   private static FileStatusAdapter getFileStatusAdapterForBucket(
-      OzoneBucket ozoneBucket, URI uri, String username) {
+      OzoneBucket ozoneBucket, URI uri, String owner, String group) {
     String pathStr = uri.toString() +
         OZONE_URI_DELIMITER + ozoneBucket.getVolumeName() +
         OZONE_URI_DELIMITER + ozoneBucket.getName();
     if (LOG.isDebugEnabled()) {
-      LOG.debug("getFileStatusAdapterForBucket: ozoneBucket={}, pathStr={}, "
-              + "username={}", ozoneBucket.getVolumeName() + OZONE_URI_DELIMITER
-              + ozoneBucket.getName(), pathStr, username);
+      LOG.debug("getFileStatusAdapterForBucket: ozoneBucket={}, pathStr={}",
+          ozoneBucket.getVolumeName() + OZONE_URI_DELIMITER +
+              ozoneBucket.getName(), pathStr);
     }
     Path path = new Path(pathStr);
     return new FileStatusAdapter(0L, path, true, (short)0, 0L,
         ozoneBucket.getCreationTime().getEpochSecond() * 1000, 0L,
-        FsPermission.getDirDefault().toShort(),  // TODO: derive from ACLs later
-        // TODO: revisit owner and group
-        username, username, path, new BlockLocation[0]);
+        FsPermission.getDirDefault().toShort(),
+        owner, group, path, new BlockLocation[0]);
   }
 
   /**

@@ -108,6 +108,7 @@ public class ReconControllerModule extends AbstractModule {
         .to(StorageContainerServiceProviderImpl.class).in(Singleton.class);
     bind(OzoneStorageContainerManager.class)
         .to(ReconStorageContainerManagerFacade.class).in(Singleton.class);
+    bind(MetricsServiceProviderFactory.class).in(Singleton.class);
   }
 
   static class ReconOmTaskBindingModule extends AbstractModule {

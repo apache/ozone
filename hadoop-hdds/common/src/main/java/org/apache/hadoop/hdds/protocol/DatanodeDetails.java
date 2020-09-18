@@ -35,12 +35,15 @@ import java.util.UUID;
  * - UUID of the DataNode.
  * - IP and Hostname details.
  * - Port details to which the DataNode will be listening.
+ * and may also include some extra info like:
+ * - version of the DataNode
+ * - setup time etc.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class DatanodeDetails extends NodeImpl implements
     Comparable<DatanodeDetails> {
-/**
+  /**
    * DataNode's unique identifier in the cluster.
    */
   private final UUID uuid;
@@ -225,17 +228,34 @@ public class DatanodeDetails extends NodeImpl implements
     if (datanodeDetailsProto.hasNetworkLocation()) {
       builder.setNetworkLocation(datanodeDetailsProto.getNetworkLocation());
     }
-    if (datanodeDetailsProto.hasVersion()) {
-      builder.setVersion(datanodeDetailsProto.getVersion());
+    return builder.build();
+  }
+
+  /**
+   * Returns a ExtendedDatanodeDetails from the protocol buffers.
+   *
+   * @param extendedDetailsProto - protoBuf Message
+   * @return DatanodeDetails
+   */
+  public static DatanodeDetails getFromProtoBuf(
+      HddsProtos.ExtendedDatanodeDetailsProto extendedDetailsProto) {
+    DatanodeDetails.Builder builder = newBuilder();
+    if (extendedDetailsProto.hasDatanodeDetails()) {
+      DatanodeDetails datanodeDetails = getFromProtoBuf(
+          extendedDetailsProto.getDatanodeDetails());
+      builder.setDatanodeDetails(datanodeDetails);
     }
-    if (datanodeDetailsProto.hasSetupTime()) {
-      builder.setSetupTime(datanodeDetailsProto.getSetupTime());
+    if (extendedDetailsProto.hasVersion()) {
+      builder.setVersion(extendedDetailsProto.getVersion());
     }
-    if (datanodeDetailsProto.hasRevision()) {
-      builder.setRevision(datanodeDetailsProto.getRevision());
+    if (extendedDetailsProto.hasSetupTime()) {
+      builder.setSetupTime(extendedDetailsProto.getSetupTime());
     }
-    if (datanodeDetailsProto.hasBuildDate()) {
-      builder.setBuildDate(datanodeDetailsProto.getBuildDate());
+    if (extendedDetailsProto.hasRevision()) {
+      builder.setRevision(extendedDetailsProto.getRevision());
+    }
+    if (extendedDetailsProto.hasBuildDate()) {
+      builder.setBuildDate(extendedDetailsProto.getBuildDate());
     }
     return builder.build();
   }
@@ -279,20 +299,34 @@ public class DatanodeDetails extends NodeImpl implements
           .build());
     }
 
+    return builder.build();
+  }
+
+  /**
+   * Returns a ExtendedDatanodeDetails protobuf message from a datanode ID.
+   * @return HddsProtos.ExtendedDatanodeDetailsProto
+   */
+  public HddsProtos.ExtendedDatanodeDetailsProto getExtendedProtoBufMessage() {
+    HddsProtos.DatanodeDetailsProto datanodeDetailsProto = getProtoBufMessage();
+
+    HddsProtos.ExtendedDatanodeDetailsProto.Builder extendedBuilder =
+        HddsProtos.ExtendedDatanodeDetailsProto.newBuilder()
+            .setDatanodeDetails(datanodeDetailsProto);
+
     if (!Strings.isNullOrEmpty(getVersion())) {
-      builder.setVersion(getVersion());
+      extendedBuilder.setVersion(getVersion());
     }
 
-    builder.setSetupTime(getSetupTime());
+    extendedBuilder.setSetupTime(getSetupTime());
 
     if (!Strings.isNullOrEmpty(getRevision())) {
-      builder.setRevision(getRevision());
+      extendedBuilder.setRevision(getRevision());
     }
     if (!Strings.isNullOrEmpty(getBuildDate())) {
-      builder.setBuildDate(getBuildDate());
+      extendedBuilder.setBuildDate(getBuildDate());
     }
 
-    return builder.build();
+    return extendedBuilder.build();
   }
 
   @Override
@@ -355,6 +389,27 @@ public class DatanodeDetails extends NodeImpl implements
      */
     private Builder() {
       ports = new ArrayList<>();
+    }
+
+    /**
+     * Initialize with DatanodeDetails.
+     *
+     * @param details DatanodeDetails
+     * @return DatanodeDetails.Builder
+     */
+    public Builder setDatanodeDetails(DatanodeDetails details) {
+      this.id = details.getUuid();
+      this.ipAddress = details.getIpAddress();
+      this.hostName = details.getHostName();
+      this.networkName = details.getNetworkName();
+      this.networkLocation = details.getNetworkLocation();
+      this.ports = details.getPorts();
+      this.certSerialId = details.getCertSerialId();
+      this.version = details.getVersion();
+      this.setupTime = details.getSetupTime();
+      this.revision = details.getRevision();
+      this.buildDate = details.getBuildDate();
+      return this;
     }
 
     /**

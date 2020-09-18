@@ -31,6 +31,7 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
@@ -41,6 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
@@ -90,10 +92,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
     super(omRequest);
   }
 
-  protected static KeyArgs resolveBucketLink(
+  protected KeyArgs resolveBucketLink(
       OzoneManager ozoneManager, KeyArgs keyArgs,
       Map<String, String> auditMap) throws IOException {
-    ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs);
+    ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs, this);
     keyArgs = bucket.update(keyArgs);
     bucket.audit(auditMap);
     return keyArgs;
@@ -529,5 +531,38 @@ public abstract class OMKeyRequest extends OMClientRequest {
       encryptionInfo = OMPBHelper.convert(keyArgs.getFileEncryptionInfo());
     }
     return encryptionInfo;
+  }
+
+  /**
+   * Check directory exists. If exists return true, else false.
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @param omMetadataManager
+   * @throws IOException
+   */
+  protected boolean checkDirectoryAlreadyExists(String volumeName,
+      String bucketName, String keyName, OMMetadataManager omMetadataManager)
+      throws IOException {
+    if (omMetadataManager.getKeyTable().isExist(
+        omMetadataManager.getOzoneDirKey(volumeName, bucketName,
+            keyName))) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Return volume info for the specified volume.
+   * @param omMetadataManager
+   * @param volume
+   * @return OmVolumeArgs
+   * @throws IOException
+   */
+  protected OmVolumeArgs getVolumeInfo(OMMetadataManager omMetadataManager,
+      String volume) {
+    return omMetadataManager.getVolumeTable().getCacheValue(
+        new CacheKey<>(omMetadataManager.getVolumeKey(volume)))
+        .getCacheValue();
   }
 }

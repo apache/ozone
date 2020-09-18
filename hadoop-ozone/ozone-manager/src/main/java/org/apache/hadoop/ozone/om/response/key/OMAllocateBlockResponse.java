@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -39,12 +40,14 @@ public class OMAllocateBlockResponse extends OMClientResponse {
 
   private OmKeyInfo omKeyInfo;
   private long clientID;
+  private OmVolumeArgs omVolumeArgs;
 
   public OMAllocateBlockResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo, long clientID) {
+      @Nonnull OmKeyInfo omKeyInfo, long clientID, OmVolumeArgs omVolumeArgs) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
     this.clientID = clientID;
+    this.omVolumeArgs = omVolumeArgs;
   }
 
   /**
@@ -64,5 +67,10 @@ public class OMAllocateBlockResponse extends OMClientResponse {
         omKeyInfo.getBucketName(), omKeyInfo.getKeyName(), clientID);
     omMetadataManager.getOpenKeyTable().putWithBatch(batchOperation, openKey,
         omKeyInfo);
+
+    // update volume usedBytes.
+    omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
+        omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
+        omVolumeArgs);
   }
 }

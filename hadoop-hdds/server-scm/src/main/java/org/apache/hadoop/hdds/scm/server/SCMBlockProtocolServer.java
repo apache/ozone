@@ -174,6 +174,7 @@ public class SCMBlockProtocolServer implements
       String owner, ExcludeList excludeList) throws IOException {
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("size", String.valueOf(size));
+    auditMap.put("num", String.valueOf(num));
     auditMap.put("type", type.name());
     auditMap.put("factor", factor.name());
     auditMap.put("owner", owner);

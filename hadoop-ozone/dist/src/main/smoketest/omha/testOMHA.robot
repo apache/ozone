@@ -92,7 +92,7 @@ Put Multiple Keys
     END
 
 Get OM Leader Node
-    ${result} =             Execute                 ozone admin om getserviceroles --service-id=omservice
+    ${result} =             Execute                 ozone admin om roles --service-id=omservice
                             LOG                     ${result}
                             Should Contain          ${result}               LEADER              1
                             Should Contain          ${result}               FOLLOWER            2

@@ -21,6 +21,7 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.*;
@@ -297,9 +298,11 @@ public class TestWatchForCommit {
             xceiverClient.getPipeline()));
     reply.getResponse().get();
     Assert.assertEquals(3, ratisClient.getCommitInfoMap().size());
+    List<DatanodeDetails> nodesInPipeline = pipeline.getNodes();
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       // shutdown the ratis follower
-      if (ContainerTestHelper.isRatisFollower(dn, pipeline)) {
+      if (nodesInPipeline.contains(dn.getDatanodeDetails())
+          && ContainerTestHelper.isRatisFollower(dn, pipeline)) {
         cluster.shutdownHddsDatanode(dn.getDatanodeDetails());
         break;
       }

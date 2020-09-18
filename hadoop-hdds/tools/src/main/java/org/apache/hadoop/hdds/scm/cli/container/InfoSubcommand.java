@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.cli.container;
 import java.io.IOException;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.cli.GenericParentCommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
@@ -31,7 +32,9 @@ import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Parameters;
+import picocli.CommandLine.Spec;
 
 /**
  * This is the handler that process container info command.
@@ -46,6 +49,9 @@ public class InfoSubcommand extends ScmSubcommand {
   private static final Logger LOG =
       LoggerFactory.getLogger(InfoSubcommand.class);
 
+  @Spec
+  private CommandSpec spec;
+
   @Parameters(description = "Decimal id of the container.")
   private long containerID;
 
@@ -57,7 +63,13 @@ public class InfoSubcommand extends ScmSubcommand {
 
     // Print container report info.
     LOG.info("Container id: {}", containerID);
-    LOG.info("Pipeline id: {}", container.getPipeline().getId().getId());
+    boolean verbose = spec.root().userObject() instanceof GenericParentCommand
+        && ((GenericParentCommand) spec.root().userObject()).isVerbose();
+    if (verbose) {
+      LOG.info("Pipeline Info: {}", container.getPipeline());
+    } else {
+      LOG.info("Pipeline id: {}", container.getPipeline().getId().getId());
+    }
     LOG.info("Container State: {}", container.getContainerInfo().getState());
 
     // Print pipeline of an existing container.
