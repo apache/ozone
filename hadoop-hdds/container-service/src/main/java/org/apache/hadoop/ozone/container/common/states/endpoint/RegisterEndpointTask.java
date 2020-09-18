@@ -65,6 +65,29 @@ public final class RegisterEndpointTask implements
    * @param rpcEndPoint - endpoint
    * @param conf - conf
    * @param ozoneContainer - container
+   * @param context - State context
+   */
+  @VisibleForTesting
+  public RegisterEndpointTask(EndpointStateMachine rpcEndPoint,
+                              ConfigurationSource conf,
+                              OzoneContainer ozoneContainer,
+                              StateContext context) {
+    this.rpcEndPoint = rpcEndPoint;
+    this.conf = conf;
+    this.datanodeContainerManager = ozoneContainer;
+    this.stateContext = context;
+    this.layoutVersionManager =
+          stateContext.getParent().getDataNodeVersionManager();
+  }
+
+  /**
+   * Creates a register endpoint task.
+   *
+   * @param rpcEndPoint - endpoint
+   * @param conf - conf
+   * @param ozoneContainer - container
+   * @param context - State context
+   * @param layoutVersionManager - layout version Manager
    */
   @VisibleForTesting
   public RegisterEndpointTask(EndpointStateMachine rpcEndPoint,

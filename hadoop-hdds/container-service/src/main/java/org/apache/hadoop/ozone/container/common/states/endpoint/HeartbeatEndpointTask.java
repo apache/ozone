@@ -92,7 +92,29 @@ public class HeartbeatEndpointTask
   /**
    * Constructs a SCM heart beat.
    *
+   * @param rpcEndpoint rpc Endpoint
    * @param conf Config.
+   * @param context State context
+   */
+  public HeartbeatEndpointTask(EndpointStateMachine rpcEndpoint,
+                               ConfigurationSource conf, StateContext context) {
+    this.rpcEndpoint = rpcEndpoint;
+    this.conf = conf;
+    this.context = context;
+    this.maxContainerActionsPerHB = conf.getInt(HDDS_CONTAINER_ACTION_MAX_LIMIT,
+        HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT);
+    this.maxPipelineActionsPerHB = conf.getInt(HDDS_PIPELINE_ACTION_MAX_LIMIT,
+        HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT);
+    layoutVersionManager = context.getParent().getDataNodeVersionManager();
+  }
+
+  /**
+   * Constructs a SCM heart beat.
+   *
+   * @param rpcEndpoint rpc Endpoint
+   * @param conf Config.
+   * @param context State context
+   * @param versionManager Layout version Manager
    */
   public HeartbeatEndpointTask(EndpointStateMachine rpcEndpoint,
                                ConfigurationSource conf, StateContext context,

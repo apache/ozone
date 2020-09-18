@@ -71,7 +71,8 @@ public class FinalizeNewLayoutVersionCommandHandler implements CommandHandler {
     final FinalizeNewLayoutVersionCommandProto finalizeCommand =
         ((FinalizeNewLayoutVersionCommand)command).getProto();
     final ContainerController controller = ozoneContainer.getController();
-    final boolean containerId = finalizeCommand.getFinalizeNewLayoutVersion();
+    final boolean finalizeUpgrade =
+        finalizeCommand.getFinalizeNewLayoutVersion();
     try {
       // TODO : finalization logic
       if (LOG.isDebugEnabled()) {
