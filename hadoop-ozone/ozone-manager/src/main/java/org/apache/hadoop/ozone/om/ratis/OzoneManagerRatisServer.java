@@ -38,6 +38,8 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
+import org.apache.hadoop.ipc.ProtobufRpcEngine.Server;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -76,6 +78,8 @@ import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
+import org.apache.ratis.server.impl.RaftServerProxy;
+import org.apache.ratis.server.protocol.RaftServerProtocol;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.LifeCycle;
@@ -143,8 +147,9 @@ public final class OzoneManagerRatisServer {
    * ratis server.
    */
   private RaftClientRequest createWriteRaftClientRequest(OMRequest omRequest) {
-    return new RaftClientRequest(clientId, server.getId(), raftGroupId,
-        nextCallId(),
+    return new RaftClientRequest(
+        ClientId.valueOf(UUID.nameUUIDFromBytes(Server.getClientId())),
+        server.getId(), raftGroupId, Server.getCallId(),
         Message.valueOf(OMRatisHelper.convertRequestToByteString(omRequest)),
         RaftClientRequest.writeRequestType(), null);
   }
@@ -337,6 +342,11 @@ public final class OzoneManagerRatisServer {
 
   public RaftGroup getRaftGroup() {
     return this.raftGroup;
+  }
+
+  @VisibleForTesting
+  public RaftServer getServer() {
+    return server;
   }
 
   /**
