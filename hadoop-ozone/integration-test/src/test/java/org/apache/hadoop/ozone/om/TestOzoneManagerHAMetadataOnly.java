@@ -418,7 +418,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     Assert.assertTrue(raftClientReply.isSuccess());
 
     // As second time with same client id and call id, this request should
-    // not be executedm ratis server should return from cache.
+    // not be executed ratis server should return from cache.
     Assert.assertFalse(logCapturer.getOutput().contains("created volume:"
         + volumeName));
 
