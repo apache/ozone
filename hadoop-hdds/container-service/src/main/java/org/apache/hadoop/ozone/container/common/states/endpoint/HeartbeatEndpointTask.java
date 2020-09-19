@@ -120,7 +120,12 @@ public class HeartbeatEndpointTask
         HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT);
     this.maxPipelineActionsPerHB = conf.getInt(HDDS_PIPELINE_ACTION_MAX_LIMIT,
         HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT);
-    layoutVersionManager = versionManager;
+    if (versionManager != null) {
+      this.layoutVersionManager = versionManager;
+    } else {
+      this.layoutVersionManager =
+         context.getParent().getDataNodeVersionManager();
+    }
   }
 
   /**

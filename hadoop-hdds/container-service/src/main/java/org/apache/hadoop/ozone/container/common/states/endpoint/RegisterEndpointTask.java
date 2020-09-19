@@ -83,17 +83,22 @@ public final class RegisterEndpointTask implements
    * @param conf - conf
    * @param ozoneContainer - container
    * @param context - State context
-   * @param layoutVersionManager - layout version Manager
+   * @param versionManager - layout version Manager
    */
   @VisibleForTesting
   public RegisterEndpointTask(EndpointStateMachine rpcEndPoint,
       ConfigurationSource conf, OzoneContainer ozoneContainer,
-      StateContext context, HDDSLayoutVersionManager layoutVersionManager) {
+      StateContext context, HDDSLayoutVersionManager versionManager) {
     this.rpcEndPoint = rpcEndPoint;
     this.conf = conf;
     this.datanodeContainerManager = ozoneContainer;
     this.stateContext = context;
-    this.layoutVersionManager = layoutVersionManager;
+    if (versionManager != null) {
+      this.layoutVersionManager = versionManager;
+    } else {
+      this.layoutVersionManager =
+          context.getParent().getDataNodeVersionManager();
+    }
   }
 
   /**
