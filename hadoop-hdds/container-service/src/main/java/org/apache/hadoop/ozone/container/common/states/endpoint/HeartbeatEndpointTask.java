@@ -98,14 +98,8 @@ public class HeartbeatEndpointTask
    */
   public HeartbeatEndpointTask(EndpointStateMachine rpcEndpoint,
                                ConfigurationSource conf, StateContext context) {
-    this.rpcEndpoint = rpcEndpoint;
-    this.conf = conf;
-    this.context = context;
-    this.maxContainerActionsPerHB = conf.getInt(HDDS_CONTAINER_ACTION_MAX_LIMIT,
-        HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT);
-    this.maxPipelineActionsPerHB = conf.getInt(HDDS_PIPELINE_ACTION_MAX_LIMIT,
-        HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT);
-    layoutVersionManager = context.getParent().getDataNodeVersionManager();
+    this(rpcEndpoint, conf, context,
+        context.getParent().getDataNodeVersionManager());
   }
 
   /**
@@ -126,11 +120,7 @@ public class HeartbeatEndpointTask
         HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT);
     this.maxPipelineActionsPerHB = conf.getInt(HDDS_PIPELINE_ACTION_MAX_LIMIT,
         HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT);
-    if (versionManager == null) {
-      layoutVersionManager = context.getParent().getDataNodeVersionManager();
-    } else {
-      layoutVersionManager = versionManager;
-    }
+    layoutVersionManager = versionManager;
   }
 
   /**
