@@ -132,7 +132,7 @@ public class DeletedBlockLogImpl
         if (block == null) {
           // Should we make this an error ? How can we not find the deleted
           // TXID?
-          LOG.warn("Deleted TXID not found.");
+          LOG.warn("Deleted TXID {} not found.", txID);
           continue;
         }
         DeletedBlocksTransaction.Builder builder = block.toBuilder();
@@ -196,8 +196,9 @@ public class DeletedBlockLogImpl
           final ContainerID containerId = ContainerID.valueof(
               transactionResult.getContainerID());
           if (dnsWithCommittedTxn == null) {
-            LOG.warn("Transaction txId={} commit by dnId={} for containerID={} "
-                    + "failed. Corresponding entry not found.", txID, dnID,
+            // Mostly likely it's a retried delete command response.
+            LOG.debug("Transaction txId={} commit by dnId={} for containerID={}"
+                    + " failed. Corresponding entry not found.", txID, dnID,
                 containerId);
             return;
           }

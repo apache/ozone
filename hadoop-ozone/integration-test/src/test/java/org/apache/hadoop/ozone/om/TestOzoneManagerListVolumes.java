@@ -42,7 +42,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
@@ -60,15 +59,18 @@ public class TestOzoneManagerListVolumes {
   @Rule
   public Timeout timeout = new Timeout(120_000);
 
-  private UserGroupInformation loginUser;
+  private UserGroupInformation adminUser =
+      UserGroupInformation.createUserForTesting("om", new String[]{"ozone"});
   private UserGroupInformation user1 =
-      UserGroupInformation.createRemoteUser("user1");  // Admin user
+      UserGroupInformation.createUserForTesting("user1", new String[]{"test"});
   private UserGroupInformation user2 =
-      UserGroupInformation.createRemoteUser("user2");  // Non-admin user
+      UserGroupInformation.createUserForTesting("user2", new String[]{"test"});
 
   @Before
   public void init() throws Exception {
-    loginUser = UserGroupInformation.getLoginUser();
+    // loginUser is the user running this test.
+    // Implication: loginUser is automatically added to the OM admin list.
+    UserGroupInformation.setLoginUser(adminUser);
   }
 
   /**
@@ -82,7 +84,6 @@ public class TestOzoneManagerListVolumes {
     String scmId = UUID.randomUUID().toString();
     String omId = UUID.randomUUID().toString();
     conf.setInt(OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS, 2);
-    conf.set(OZONE_ADMINISTRATORS, "user1");
     conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
 
     // Use native impl here, default impl doesn't do actual checks
@@ -95,9 +96,6 @@ public class TestOzoneManagerListVolumes {
         .setClusterId(clusterId).setScmId(scmId).setOmId(omId).build();
     cluster.waitForClusterToBeReady();
 
-    // loginUser is the user running this test.
-    // Implication: loginUser is automatically added to the OM admin list.
-    UserGroupInformation.setLoginUser(loginUser);
     // Create volumes with non-default owners and ACLs
     OzoneClient client = cluster.getClient();
     ObjectStore objectStore = client.getObjectStore();
@@ -148,13 +146,12 @@ public class TestOzoneManagerListVolumes {
   private void checkUser(MiniOzoneCluster cluster, UserGroupInformation user,
       List<String> expectVol, boolean expectListAllSuccess) throws IOException {
 
-    UserGroupInformation.setLoginUser(user);
     OzoneClient client = cluster.getClient();
     ObjectStore objectStore = client.getObjectStore();
 
     // `ozone sh volume list` shall return volumes with LIST permission of user.
     Iterator<? extends OzoneVolume> it = objectStore.listVolumesByUser(
-        null, "", "");
+        user.getUserName(), "", "");
     Set<String> accessibleVolumes = new HashSet<>();
     while (it.hasNext()) {
       OzoneVolume vol = it.next();
@@ -192,6 +189,62 @@ public class TestOzoneManagerListVolumes {
     }
   }
 
+  /**
+   * Check if listVolume of other users than the login user works as expected.
+   * ozone.om.volume.listall.allowed = true
+   * Everyone should be able to list other users' volumes with this config.
+   */
+  @Test
+  public void testListVolumeWithOtherUsersListAllAllowed() throws Exception {
+    // ozone.acl.enabled = true, ozone.om.volume.listall.allowed = true
+    MiniOzoneCluster cluster = startCluster(true, true);
+
+    // Login as user1, list other users' volumes
+    UserGroupInformation.setLoginUser(user1);
+    checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume5"),
+        true);
+
+    // Add "s3v" created default by OM.
+    checkUser(cluster, adminUser, Arrays.asList("volume1", "volume2", "volume3",
+        "volume4", "volume5", "s3v"), true);
+
+    UserGroupInformation.setLoginUser(user2);
+    checkUser(cluster, user1, Arrays.asList("volume1", "volume4", "volume5"),
+        true);
+    checkUser(cluster, adminUser, Arrays.asList("volume1", "volume2", "volume3",
+        "volume4", "volume5", "s3v"), true);
+
+    stopCluster(cluster);
+  }
+
+  /**
+   * Check if listVolume of other users than the login user works as expected.
+   * ozone.om.volume.listall.allowed = false
+   * Only admin should be able to list other users' volumes with this config.
+   */
+  @Test
+  public void testListVolumeWithOtherUsersListAllDisallowed() throws Exception {
+    // ozone.acl.enabled = true, ozone.om.volume.listall.allowed = false
+    MiniOzoneCluster cluster = startCluster(true, false);
+
+    // Login as user1, list other users' volumes, expect failure
+    UserGroupInformation.setLoginUser(user1);
+    checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume5"),
+        false);
+    // Add "s3v" created default by OM.
+    checkUser(cluster, adminUser, Arrays.asList("volume1", "volume2", "volume3",
+        "volume4", "volume5", "s3v"), false);
+
+    // While admin should be able to list volumes just fine.
+    UserGroupInformation.setLoginUser(adminUser);
+    checkUser(cluster, user1, Arrays.asList("volume1", "volume4", "volume5"),
+        true);
+    checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume5"),
+        true);
+
+    stopCluster(cluster);
+  }
+
   @Test
   public void testAclEnabledListAllAllowed() throws Exception {
     // ozone.acl.enabled = true, ozone.om.volume.listall.allowed = true
@@ -200,6 +253,10 @@ public class TestOzoneManagerListVolumes {
         true);
     checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume5"),
         true);
+
+    // Add "s3v" created default by OM.
+    checkUser(cluster, adminUser, Arrays.asList("volume1", "volume2", "volume3",
+        "volume4", "volume5", "s3v"), true);
     stopCluster(cluster);
   }
 
@@ -207,10 +264,18 @@ public class TestOzoneManagerListVolumes {
   public void testAclEnabledListAllDisallowed() throws Exception {
     // ozone.acl.enabled = true, ozone.om.volume.listall.allowed = false
     MiniOzoneCluster cluster = startCluster(true, false);
+    // The default user is adminUser as set in init(),
+    // listall always succeeds if we use that UGI, we should use non-admin here
+    UserGroupInformation.setLoginUser(user1);
     checkUser(cluster, user1, Arrays.asList("volume1", "volume4", "volume5"),
-        true);
+        false);
+    UserGroupInformation.setLoginUser(user2);
     checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume5"),
         false);
+    UserGroupInformation.setLoginUser(adminUser);
+    // Add "s3v" created default by OM.
+    checkUser(cluster, adminUser, Arrays.asList("volume1", "volume2",
+        "volume3", "volume4", "volume5", "s3v"), true);
     stopCluster(cluster);
   }
 
@@ -229,8 +294,11 @@ public class TestOzoneManagerListVolumes {
   public void testAclDisabledListAllDisallowed() throws Exception {
     // ozone.acl.enabled = false, ozone.om.volume.listall.allowed = false
     MiniOzoneCluster cluster = startCluster(false, false);
+    // If ACL is disabled, all permission checks are disabled in Ozone by design
+    UserGroupInformation.setLoginUser(user1);
     checkUser(cluster, user1, Arrays.asList("volume1", "volume3", "volume5"),
         true);
+    UserGroupInformation.setLoginUser(user2);
     checkUser(cluster, user2, Arrays.asList("volume2", "volume4"),
         true);  // listall will succeed since acl is disabled
     stopCluster(cluster);

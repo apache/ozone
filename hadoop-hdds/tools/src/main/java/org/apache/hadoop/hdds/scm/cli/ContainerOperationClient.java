@@ -21,7 +21,9 @@ import javax.net.SocketFactory;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.List;
+import java.util.Map;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -105,8 +107,8 @@ public class ContainerOperationClient implements ScmClient {
       String caCertificate =
           scmSecurityProtocolClient.getCACertificate();
       manager = new XceiverClientManager(conf,
-          OzoneConfiguration.of(conf).getObject(XceiverClientManager
-              .ScmClientConfig.class), caCertificate);
+          conf.getObject(XceiverClientManager.ScmClientConfig.class),
+          caCertificate);
     } else {
       manager = new XceiverClientManager(conf);
     }
@@ -383,7 +385,7 @@ public class ContainerOperationClient implements ScmClient {
       Pipeline pipeline) throws IOException {
     XceiverClientSpi client = null;
     try {
-      client = xceiverClientManager.acquireClient(pipeline);
+      client = xceiverClientManager.acquireClientForReadData(pipeline);
       ReadContainerResponseProto response =
           ContainerProtocolCalls.readContainer(client, containerID, null);
       if (LOG.isDebugEnabled()) {
@@ -474,6 +476,11 @@ public class ContainerOperationClient implements ScmClient {
    */
   public boolean inSafeMode() throws IOException {
     return storageContainerLocationClient.inSafeMode();
+  }
+
+  public Map<String, Pair<Boolean, String>> getSafeModeRuleStatuses()
+      throws IOException {
+    return storageContainerLocationClient.getSafeModeRuleStatuses();
   }
 
   /**

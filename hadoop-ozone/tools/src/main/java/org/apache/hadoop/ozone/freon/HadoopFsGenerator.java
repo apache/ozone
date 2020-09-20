@@ -57,9 +57,14 @@ public class HadoopFsGenerator extends BaseFreonGenerator
   private int fileSize;
 
   @Option(names = {"--buffer"},
-      description = "Size of buffer used to generated the key content.",
-      defaultValue = "4096")
+      description = "Size of buffer used store the generated key content",
+      defaultValue = "10240")
   private int bufferSize;
+
+  @Option(names = {"--copy-buffer"},
+      description = "Size of bytes written to the output in one operation",
+      defaultValue = "4096")
+  private int copyBufferSize;
 
   private ContentGenerator contentGenerator;
 
@@ -76,7 +81,8 @@ public class HadoopFsGenerator extends BaseFreonGenerator
 
     fileSystem = FileSystem.get(URI.create(rootPath), configuration);
 
-    contentGenerator = new ContentGenerator(fileSize, bufferSize);
+    contentGenerator =
+        new ContentGenerator(fileSize, bufferSize, copyBufferSize);
 
     timer = getMetrics().timer("file-create");
 

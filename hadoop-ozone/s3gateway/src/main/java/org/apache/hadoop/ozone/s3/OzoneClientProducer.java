@@ -51,7 +51,7 @@ public class OzoneClientProducer {
   private OzoneClient client;
 
   @Inject
-  private SignatureProcessor v4RequestParser;
+  private SignatureProcessor signatureParser;
 
   @Inject
   private OzoneConfiguration ozoneConfiguration;
@@ -76,16 +76,19 @@ public class OzoneClientProducer {
 
   private OzoneClient getClient(OzoneConfiguration config) throws IOException {
     try {
+      String awsAccessId = signatureParser.getAwsAccessId();
+      UserGroupInformation remoteUser =
+          UserGroupInformation.createRemoteUser(awsAccessId);
       if (OzoneSecurityUtil.isSecurityEnabled(config)) {
         LOG.debug("Creating s3 auth info for client.");
         try {
 
           OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
           identifier.setTokenType(S3AUTHINFO);
-          identifier.setStrToSign(v4RequestParser.getStringToSign());
-          identifier.setSignature(v4RequestParser.getSignature());
-          identifier.setAwsAccessId(v4RequestParser.getAwsAccessId());
-          identifier.setOwner(new Text(v4RequestParser.getAwsAccessId()));
+          identifier.setStrToSign(signatureParser.getStringToSign());
+          identifier.setSignature(signatureParser.getSignature());
+          identifier.setAwsAccessId(awsAccessId);
+          identifier.setOwner(new Text(awsAccessId));
           if (LOG.isTraceEnabled()) {
             LOG.trace("Adding token for service:{}", omService);
           }
@@ -93,17 +96,14 @@ public class OzoneClientProducer {
               identifier.getSignature().getBytes(UTF_8),
               identifier.getKind(),
               omService);
-          UserGroupInformation remoteUser =
-              UserGroupInformation.createRemoteUser(
-                  v4RequestParser.getAwsAccessId());
           remoteUser.addToken(token);
-          UserGroupInformation.setLoginUser(remoteUser);
         } catch (OS3Exception | URISyntaxException ex) {
           LOG.error("S3 auth info creation failed.");
           throw S3_AUTHINFO_CREATION_ERROR;
         }
 
       }
+      UserGroupInformation.setLoginUser(remoteUser);
     } catch (Exception e) {
       LOG.error("Error: ", e);
     }

@@ -34,6 +34,7 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -41,6 +42,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -67,7 +69,7 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
-import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreRDBImpl;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.DeadNodeHandler;
@@ -81,8 +83,8 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineActionHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineReportHandler;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.PipelineChoosePolicyFactory;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
-import org.apache.hadoop.hdds.scm.safemode.SafeModeHandler;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
@@ -94,7 +96,6 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.metrics2.MetricsSystem;
@@ -192,7 +193,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   private JvmPauseMonitor jvmPauseMonitor;
   private final OzoneConfiguration configuration;
-  private final SafeModeHandler safeModeHandler;
   private SCMContainerMetrics scmContainerMetrics;
   private SCMContainerPlacementMetrics placementMetrics;
   private MetricsSystem ms;
@@ -201,6 +201,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    *  Network topology Map.
    */
   private NetworkTopology clusterMap;
+  private PipelineChoosePolicy pipelineChoosePolicy;
 
   /**
    * Creates a new StorageContainerManager. Configuration will be
@@ -243,7 +244,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmStorageConfig = new SCMStorageConfig(conf);
     if (scmStorageConfig.getState() != StorageState.INITIALIZED) {
       LOG.error("Please make sure you have run \'ozone scm --init\' " +
-          "command to generate all the required metadata.");
+          "command to generate all the required metadata to " +
+          scmStorageConfig.getStorageDir() + ".");
       throw new SCMException("SCM not initialized due to storage config " +
           "failure.", ResultCodes.SCM_NOT_INITIALIZED);
     }
@@ -333,10 +335,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     clientProtocolServer = new SCMClientProtocolServer(conf, this);
     httpServer = new StorageContainerManagerHttpServer(conf);
 
-    safeModeHandler = new SafeModeHandler(configuration);
-    safeModeHandler.notifyImmediately(clientProtocolServer, scmBlockManager);
-    safeModeHandler.notifyAfterDelay(replicationManager, pipelineManager);
-
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.RETRIABLE_DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.NODE_REPORT, nodeReportHandler);
@@ -357,7 +355,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         (DeletedBlockLogImpl) scmBlockManager.getDeletedBlockLog());
     eventQueue.addHandler(SCMEvents.PIPELINE_ACTIONS, pipelineActionHandler);
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
-    eventQueue.addHandler(SCMEvents.SAFE_MODE_STATUS, safeModeHandler);
+    eventQueue.addHandler(SCMEvents.SAFE_MODE_STATUS, clientProtocolServer);
+    eventQueue.addHandler(SCMEvents.SAFE_MODE_STATUS, scmBlockManager);
+    eventQueue
+        .addHandler(SCMEvents.DELAYED_SAFE_MODE_STATUS, replicationManager);
+    eventQueue
+        .addHandler(SCMEvents.DELAYED_SAFE_MODE_STATUS, pipelineManager);
+
 
     // Emit initial safe mode status, as now handlers are registered.
     scmSafeModeManager.emitSafeModeStatus();
@@ -421,6 +425,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               pipelineManager);
     }
 
+    pipelineChoosePolicy = PipelineChoosePolicyFactory.getPolicy(conf);
     if (configurator.getScmBlockManager() != null) {
       scmBlockManager = configurator.getScmBlockManager();
     } else {
@@ -434,7 +439,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           containerManager,
           containerPlacementPolicy,
           eventQueue,
-          new LockManager<>(conf));
+          new LockManager<>(conf),
+          scmNodeManager);
     }
     if(configurator.getScmSafeModeManager() != null) {
       scmSafeModeManager = configurator.getScmSafeModeManager();
@@ -502,7 +508,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if(configurator.getMetadataStore() != null) {
       scmMetadataStore = configurator.getMetadataStore();
     } else {
-      scmMetadataStore = new SCMMetadataStoreRDBImpl(conf);
+      scmMetadataStore = new SCMMetadataStoreImpl(conf);
     }
   }
 
@@ -607,7 +613,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             .setSecretManager(null)
             .build();
 
-    DFSUtil.addPBProtocol(conf, protocol, instance, rpcServer);
+    HddsServerUtil.addPBProtocol(conf, protocol, instance, rpcServer);
     return rpcServer;
   }
 
@@ -641,8 +647,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         }
         scmStorageConfig.initialize();
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
-                + ";cid={}", scmStorageConfig.getStorageDir(),
-                scmStorageConfig.getClusterID());
+            + ";cid={};layoutVersion={}", scmStorageConfig.getStorageDir(),
+            scmStorageConfig.getClusterID(),
+            scmStorageConfig.getLayoutVersion());
         return true;
       } catch (IOException ioe) {
         LOG.error("Could not initialize SCM version file", ioe);
@@ -650,8 +657,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       }
     } else {
       LOG.info("SCM already initialized. Reusing existing cluster id for sd={}"
-              + ";cid={}", scmStorageConfig.getStorageDir(),
-              scmStorageConfig.getClusterID());
+          + ";cid={};layoutVersion={}", scmStorageConfig.getStorageDir(),
+          scmStorageConfig.getClusterID(),
+          scmStorageConfig.getLayoutVersion());
       return true;
     }
   }
@@ -979,11 +987,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   @VisibleForTesting
-  public SafeModeHandler getSafeModeHandler() {
-    return safeModeHandler;
-  }
-
-  @VisibleForTesting
   public SCMSafeModeManager getScmSafeModeManager() {
     return scmSafeModeManager;
   }
@@ -1114,5 +1117,36 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   public NetworkTopology getClusterMap() {
     return this.clusterMap;
+  }
+
+  /**
+   * Get the safe mode status of all rules.
+   *
+   * @return map of rule statuses.
+   */
+  public Map<String, Pair<Boolean, String>> getRuleStatus() {
+    return scmSafeModeManager.getRuleStatus();
+  }
+
+  @Override
+  public Map<String, String> getRuleStatusMetrics() {
+    Map<String, String> map = new HashMap<>();
+    for (Map.Entry<String, Pair<Boolean, String>> entry :
+        scmSafeModeManager.getRuleStatus().entrySet()) {
+      map.put(entry.getKey(), entry.getValue().getRight());
+    }
+    return map;
+  }
+
+  public PipelineChoosePolicy getPipelineChoosePolicy() {
+    return this.pipelineChoosePolicy;
+  }
+
+  public String getScmId() {
+    return getScmStorageConfig().getScmId();
+  }
+
+  public String getClusterId() {
+    return getScmStorageConfig().getClusterID();
   }
 }

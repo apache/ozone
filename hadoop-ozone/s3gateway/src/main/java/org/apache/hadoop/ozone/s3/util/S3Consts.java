@@ -52,4 +52,7 @@ public final class S3Consts {
   //Error code 416 is Range Not Satisfiable
   public static final int RANGE_NOT_SATISFIABLE = 416;
 
+  public static final String S3_XML_NAMESPACE = "http://s3.amazonaws" +
+      ".com/doc/2006-03-01/";
+
 }

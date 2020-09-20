@@ -21,10 +21,10 @@ package org.apache.hadoop.ozone.container.keyvalue;
 import com.google.common.primitives.Longs;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
@@ -58,10 +58,6 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL;
-
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_LEVELDB;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_ROCKSDB;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -76,7 +72,6 @@ import static org.junit.Assert.assertFalse;
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyValueContainerCheck.class);
 
-  private final String storeImpl;
   private final ChunkLayoutTestInfo chunkManagerTestInfo;
   private KeyValueContainer container;
   private KeyValueContainerData containerData;
@@ -85,31 +80,25 @@ import static org.junit.Assert.assertFalse;
   private File testRoot;
   private ChunkManager chunkManager;
 
-  public TestKeyValueContainerCheck(String metadataImpl,
-      ChunkLayoutTestInfo chunkManagerTestInfo) {
-    this.storeImpl = metadataImpl;
+  public TestKeyValueContainerCheck(ChunkLayoutTestInfo chunkManagerTestInfo) {
     this.chunkManagerTestInfo = chunkManagerTestInfo;
   }
 
   @Parameterized.Parameters public static Collection<Object[]> data() {
     return Arrays.asList(new Object[][] {
-        {OZONE_METADATA_STORE_IMPL_LEVELDB, ChunkLayoutTestInfo.FILE_PER_CHUNK},
-        {OZONE_METADATA_STORE_IMPL_LEVELDB, ChunkLayoutTestInfo.FILE_PER_BLOCK},
-        {OZONE_METADATA_STORE_IMPL_ROCKSDB, ChunkLayoutTestInfo.FILE_PER_CHUNK},
-        {OZONE_METADATA_STORE_IMPL_ROCKSDB, ChunkLayoutTestInfo.FILE_PER_BLOCK}
+        {ChunkLayoutTestInfo.FILE_PER_CHUNK},
+        {ChunkLayoutTestInfo.FILE_PER_BLOCK}
     });
   }
 
   @Before public void setUp() throws Exception {
-    LOG.info("Testing store:{} layout:{}",
-        storeImpl, chunkManagerTestInfo.getLayout());
+    LOG.info("Testing  layout:{}", chunkManagerTestInfo.getLayout());
     this.testRoot = GenericTestUtils.getRandomizedTestDir();
     conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
-    conf.set(OZONE_METADATA_STORE_IMPL, storeImpl);
     chunkManagerTestInfo.updateConfig(conf);
     volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf);
-    chunkManager = chunkManagerTestInfo.createChunkManager(true);
+    chunkManager = chunkManagerTestInfo.createChunkManager(true, null);
   }
 
   @After public void teardown() {
@@ -263,7 +252,7 @@ import static org.junit.Assert.assertFalse;
 
         if (i >= normalBlocks) {
           // deleted key
-          metadataStore.getStore().put(DFSUtil.string2Bytes(
+          metadataStore.getStore().put(StringUtils.string2Bytes(
               OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID()),
               blockData.getProtoBufMessage().toByteArray());
         } else {

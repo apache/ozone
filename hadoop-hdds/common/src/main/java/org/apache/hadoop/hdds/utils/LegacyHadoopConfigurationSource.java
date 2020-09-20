@@ -17,15 +17,18 @@
  */
 package org.apache.hadoop.hdds.utils;
 
+import java.io.IOException;
 import java.util.Collection;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 
 /**
  * Configuration source to wrap Hadoop Configuration object.
  */
-public class LegacyHadoopConfigurationSource implements ConfigurationSource {
+public class LegacyHadoopConfigurationSource
+    implements MutableConfigurationSource {
 
   private Configuration configuration;
 
@@ -37,6 +40,11 @@ public class LegacyHadoopConfigurationSource implements ConfigurationSource {
   @Override
   public String get(String key) {
     return configuration.getRaw(key);
+  }
+
+  @Override
+  public char[] getPassword(String key) throws IOException {
+    return configuration.getPassword(key);
   }
 
   @Override

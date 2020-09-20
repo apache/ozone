@@ -23,13 +23,14 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import javax.ws.rs.core.Response;
 
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 
 import org.apache.hadoop.ozone.s3.SignatureProcessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
-import static org.apache.hadoop.ozone.s3.AWSV4SignatureProcessor.DATE_FORMATTER;
+import static org.apache.hadoop.ozone.s3.AWSSignatureProcessor.DATE_FORMATTER;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -46,7 +47,7 @@ import java.time.LocalDate;
 public class TestBucketPut {
 
   private String bucketName = OzoneConsts.BUCKET;
-  private OzoneClientStub clientStub;
+  private OzoneClient clientStub;
   private BucketEndpoint bucketEndpoint;
 
   @Before

@@ -55,8 +55,12 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
+import org.apache.hadoop.http.FilterContainer;
+import org.apache.hadoop.http.FilterInitializer;
+import org.apache.hadoop.http.lib.StaticUserWebFilter;
 import org.apache.hadoop.jmx.JMXJsonServlet;
 import org.apache.hadoop.log.LogLevel;
 import org.apache.hadoop.security.AuthenticationFilterInitializer;
@@ -103,6 +107,8 @@ import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.eclipse.jetty.webapp.WebAppContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.security.AuthenticationFilterInitializer.getFilterConfigMap;
 
 /**
  * Create a Jetty embedded server to answer http requests. The primary goal is
@@ -194,7 +200,7 @@ public final class HttpServer2 implements FilterContainer {
   public static class Builder {
     private ArrayList<URI> endpoints = Lists.newArrayList();
     private String name;
-    private ConfigurationSource conf;
+    private MutableConfigurationSource conf;
     private ConfigurationSource sslConf;
     private String[] pathSpecs;
     private AccessControlList adminsAcl;
@@ -293,7 +299,7 @@ public final class HttpServer2 implements FilterContainer {
       return this;
     }
 
-    public Builder setConf(ConfigurationSource configuration) {
+    public Builder setConf(MutableConfigurationSource configuration) {
       this.conf = configuration;
       return this;
     }
@@ -435,6 +441,8 @@ public final class HttpServer2 implements FilterContainer {
       HttpServer2 server = new HttpServer2(this);
 
       if (this.securityEnabled) {
+        LOG.info("Initialize spnego with host: {} userKey: {} keytabKey: {}",
+            hostName, usernameConfKey, keytabConfKey);
         server.initSpnego(conf, hostName, usernameConfKey, keytabConfKey);
       }
 
@@ -564,12 +572,14 @@ public final class HttpServer2 implements FilterContainer {
 
     this.findPort = b.findPort;
     this.portRanges = b.portRanges;
-    initializeWebServer(b.name, b.hostName, b.conf, b.pathSpecs);
+    initializeWebServer(b.name, b.hostName, b.conf, b.pathSpecs,
+        b.authFilterConfigurationPrefix, b.securityEnabled);
   }
 
   private void initializeWebServer(String name, String hostName,
-      ConfigurationSource conf, String[] pathSpecs)
-      throws IOException {
+      MutableConfigurationSource conf, String[] pathSpecs,
+      String authFilterConfigPrefix,
+      boolean securityEnabled) throws IOException {
 
     Preconditions.checkNotNull(webAppContext);
 
@@ -606,8 +616,17 @@ public final class HttpServer2 implements FilterContainer {
     final FilterInitializer[] initializers = getFilterInitializers(conf);
     if (initializers != null) {
       conf.set(BIND_ADDRESS, hostName);
+      org.apache.hadoop.conf.Configuration hadoopConf =
+          LegacyHadoopConfigurationSource.asHadoopConfiguration(conf);
+      Map<String, String> filterConfig = getFilterConfigMap(hadoopConf,
+          authFilterConfigPrefix);
       for (FilterInitializer c : initializers) {
-        c.initFilter(this, conf);
+        if ((c instanceof AuthenticationFilterInitializer) && securityEnabled) {
+          addFilter("authentication",
+              AuthenticationFilter.class.getName(), filterConfig);
+        } else {
+          c.initFilter(this, hadoopConf);
+        }
       }
     }
 
@@ -873,6 +892,27 @@ public final class HttpServer2 implements FilterContainer {
       }
     }
     webAppContext.addServlet(holder, pathSpec);
+
+    // Remove any previous filter attached to the removed servlet path to avoid
+    // Kerberos replay error.
+    FilterMapping[] filterMappings = webAppContext.getServletHandler().
+        getFilterMappings();
+    for (int i = 0; i < filterMappings.length; i++) {
+      if (filterMappings[i].getPathSpecs() == null) {
+        LOG.debug("Skip checking {} filterMappings {} without a path spec.",
+            filterMappings[i].getFilterName(), filterMappings[i]);
+        continue;
+      }
+      int oldPathSpecsLen = filterMappings[i].getPathSpecs().length;
+      String[] newPathSpecs =
+          ArrayUtil.removeFromArray(filterMappings[i].getPathSpecs(), pathSpec);
+      if (newPathSpecs.length == 0) {
+        webAppContext.getServletHandler().setFilterMappings(
+            ArrayUtil.removeFromArray(filterMappings, filterMappings[i]));
+      } else if (newPathSpecs.length != oldPathSpecsLen) {
+        filterMappings[i].setPathSpecs(newPathSpecs);
+      }
+    }
 
     if (requireAuth && UserGroupInformation.isSecurityEnabled()) {
       LOG.info("Adding Kerberos (SPNEGO) filter to {}", name);

@@ -25,6 +25,7 @@ import com.google.common.collect.Lists;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.key.acl.OMKeyAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.slf4j.Logger;
@@ -41,7 +42,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclR
 public class OMKeySetAclRequest extends OMKeyAclRequest {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMKeyAddAclRequest.class);
+      LoggerFactory.getLogger(OMKeySetAclRequest.class);
 
   private String path;
   private List<OzoneAcl> ozoneAcls;
@@ -62,10 +63,7 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
 
   @Override
   OMResponse.Builder onInit() {
-    return OMResponse.newBuilder().setCmdType(
-        OzoneManagerProtocolProtos.Type.SetAcl).setStatus(
-        OzoneManagerProtocolProtos.Status.OK).setSuccess(true);
-
+    return OmResponseUtil.getOMResponseBuilder(getOmRequest());
   }
 
   @Override
@@ -84,12 +82,6 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
     case SUCCESS:
       if (LOG.isDebugEnabled()) {
         LOG.debug("Set acl: {} to path: {} success!", ozoneAcls, path);
-      }
-      break;
-    case REPLAY:
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-            getOmRequest());
       }
       break;
     case FAILURE:

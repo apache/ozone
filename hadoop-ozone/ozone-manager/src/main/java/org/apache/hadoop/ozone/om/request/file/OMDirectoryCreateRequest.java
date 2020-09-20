@@ -29,13 +29,13 @@ import java.util.Map;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.exceptions.OMReplayException;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
@@ -90,8 +90,6 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
   public enum Result {
     SUCCESS, // The request was executed successfully
 
-    REPLAY, // The request is a replay and was ignored
-
     DIRECTORY_ALREADY_EXISTS, // Directory key already exists in DB
 
     FAILURE // The request failed and exception was thrown
@@ -130,11 +128,9 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     String bucketName = keyArgs.getBucketName();
     String keyName = keyArgs.getKeyName();
 
-    OMResponse.Builder omResponse = OMResponse.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.CreateDirectory)
-        .setStatus(OzoneManagerProtocolProtos.Status.OK)
-        .setCreateDirectoryResponse(CreateDirectoryResponse.newBuilder());
-
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
+    omResponse.setCreateDirectoryResponse(CreateDirectoryResponse.newBuilder());
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumCreateDirectory();
 
@@ -150,6 +146,10 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     List<OmKeyInfo> missingParentInfos;
 
     try {
+      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+
       // check Acl
       checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
           IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
@@ -198,34 +198,20 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
             bucketName, Optional.of(dirKeyInfo),
             Optional.of(missingParentInfos), trxnLogIndex);
-
-        omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
-            dirKeyInfo, missingParentInfos);
         result = Result.SUCCESS;
+        omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
+            dirKeyInfo, missingParentInfos, result);
       } else {
         // omDirectoryResult == DIRECTORY_EXITS
-        // Check if this is a replay of ratis logs
-        String dirKey = omMetadataManager.getOzoneDirKey(volumeName,
-            bucketName, keyName);
-        OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable().get(dirKey);
-        if (isReplay(ozoneManager, dbKeyInfo, trxnLogIndex)) {
-          throw new OMReplayException();
-        } else {
-          result = Result.DIRECTORY_ALREADY_EXISTS;
-          omResponse.setStatus(Status.DIRECTORY_ALREADY_EXISTS);
-          omClientResponse = new OMDirectoryCreateResponse(omResponse.build());
-        }
+        result = Result.DIRECTORY_ALREADY_EXISTS;
+        omResponse.setStatus(Status.DIRECTORY_ALREADY_EXISTS);
+        omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
+            result);
       }
     } catch (IOException ex) {
-      if (ex instanceof OMReplayException) {
-        result = Result.REPLAY;
-        omClientResponse = new OMDirectoryCreateResponse(
-            createReplayOMResponse(omResponse));
-      } else {
-        exception = ex;
-        omClientResponse = new OMDirectoryCreateResponse(
-            createErrorOMResponse(omResponse, exception));
-      }
+      exception = ex;
+      omClientResponse = new OMDirectoryCreateResponse(
+          createErrorOMResponse(omResponse, exception), result);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
@@ -235,10 +221,8 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       }
     }
 
-    if (result != Result.REPLAY) {
-      auditLog(auditLogger, buildAuditMessage(OMAction.CREATE_DIRECTORY,
-          auditMap, exception, userInfo));
-    }
+    auditLog(auditLogger, buildAuditMessage(OMAction.CREATE_DIRECTORY,
+        auditMap, exception, userInfo));
 
     logResult(createDirectoryRequest, keyArgs, omMetrics, result, trxnLogIndex,
         exception);
@@ -313,12 +297,6 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Directory created. Volume:{}, Bucket:{}, Key:{}",
             volumeName, bucketName, keyName);
-      }
-      break;
-    case REPLAY:
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-            createDirectoryRequest);
       }
       break;
     case DIRECTORY_ALREADY_EXISTS:

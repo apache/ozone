@@ -103,7 +103,6 @@ a:hover {
   background-color: #73B148;
 }
 
-
 /*
  * Main content
  */
@@ -141,9 +140,6 @@ a:hover {
   border-radius: 50%;
 }
 
-
-
-
 h4 {
   font-weight: bold;
 }
@@ -166,4 +162,12 @@ h1 {
 
 .card {
   padding: 20px;
+}
+
+figure.ozone-usage {
+  padding: 40px;
+}
+
+table.table {
+  margin: 20px 20px 40px;
 }

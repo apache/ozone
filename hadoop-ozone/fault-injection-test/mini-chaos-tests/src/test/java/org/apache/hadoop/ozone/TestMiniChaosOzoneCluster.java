@@ -23,6 +23,14 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.MiniOzoneChaosCluster.FailureService;
+import org.apache.hadoop.ozone.failure.Failures;
+import org.apache.hadoop.ozone.loadgenerators.RandomLoadGenerator;
+import org.apache.hadoop.ozone.loadgenerators.ReadOnlyLoadGenerator;
+import org.apache.hadoop.ozone.loadgenerators.FilesystemLoadGenerator;
+import org.apache.hadoop.ozone.loadgenerators.AgedLoadGenerator;
+import org.apache.hadoop.ozone.loadgenerators.AgedDirLoadGenerator;
+import org.apache.hadoop.ozone.loadgenerators.RandomDirLoadGenerator;
+import org.apache.hadoop.ozone.loadgenerators.NestedDirLoadGenerator;
 import org.junit.BeforeClass;
 import org.junit.AfterClass;
 import org.junit.Ignore;
@@ -69,10 +77,6 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
       description = "total run time")
   private static int numMinutes = 1440; // 1 day by default
 
-  @Option(names = {"-n", "--numClients"},
-      description = "no of clients writing to OM")
-  private static int numClients = 3;
-
   @Option(names = {"-v", "--numDataVolume"},
       description = "number of datanode volumes to create")
   private static int numDataVolumes = 3;
@@ -89,17 +93,36 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
   @BeforeClass
   public static void init() throws Exception {
     OzoneConfiguration configuration = new OzoneConfiguration();
-    String omServiceID =
-        FailureService.of(failureService) == FailureService.OZONE_MANAGER ?
-            OM_SERVICE_ID : null;
+    FailureService service = FailureService.of(failureService);
+    String omServiceID;
 
-    cluster = new MiniOzoneChaosCluster.Builder(configuration)
+    MiniOzoneChaosCluster.Builder builder =
+        new MiniOzoneChaosCluster.Builder(configuration);
+
+    switch (service) {
+    case DATANODE:
+      omServiceID = null;
+      builder
+          .addFailures(Failures.DatanodeRestartFailure.class)
+          .addFailures(Failures.DatanodeStartStopFailure.class);
+      break;
+    case OZONE_MANAGER:
+      omServiceID = OM_SERVICE_ID;
+      builder
+          .addFailures(Failures.OzoneManagerStartStopFailure.class)
+          .addFailures(Failures.OzoneManagerRestartFailure.class);
+      break;
+    default:
+      throw new IllegalArgumentException();
+    }
+
+    builder
         .setNumDatanodes(numDatanodes)
         .setNumOzoneManagers(numOzoneManagers)
-        .setFailureService(failureService)
         .setOMServiceID(omServiceID)
-        .setNumDataVolumes(numDataVolumes)
-        .build();
+        .setNumDataVolumes(numDataVolumes);
+
+    cluster = builder.build();
     cluster.waitForClusterToBeReady();
 
     String volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
@@ -107,9 +130,20 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
 
-    loadGenerator =
-        new MiniOzoneLoadGenerator(volume, numClients, numThreads,
-            numBuffers, configuration, omServiceID);
+    loadGenerator = new MiniOzoneLoadGenerator.Builder()
+        .setVolume(volume)
+        .setConf(configuration)
+        .setNumBuffers(numBuffers)
+        .setNumThreads(numThreads)
+        .setOMServiceId(omServiceID)
+        .addLoadGenerator(RandomLoadGenerator.class)
+        .addLoadGenerator(AgedLoadGenerator.class)
+        .addLoadGenerator(FilesystemLoadGenerator.class)
+        .addLoadGenerator(ReadOnlyLoadGenerator.class)
+        .addLoadGenerator(RandomDirLoadGenerator.class)
+        .addLoadGenerator(AgedDirLoadGenerator.class)
+        .addLoadGenerator(NestedDirLoadGenerator.class)
+        .build();
   }
 
   /**
@@ -143,7 +177,7 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
   }
 
   @Test
-  public void testReadWriteWithChaosCluster() {
+  public void testReadWriteWithChaosCluster() throws Exception {
     cluster.startChaos(5, 10, TimeUnit.SECONDS);
     loadGenerator.startIO(120, TimeUnit.SECONDS);
   }

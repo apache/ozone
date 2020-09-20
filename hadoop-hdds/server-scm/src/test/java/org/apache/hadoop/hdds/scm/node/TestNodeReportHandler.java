@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.Event;
@@ -56,9 +57,9 @@ public class TestNodeReportHandler implements EventPublisher {
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMStorageConfig storageConfig = Mockito.mock(SCMStorageConfig.class);
     Mockito.when(storageConfig.getClusterID()).thenReturn("cluster1");
+    NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     nodeManager =
-        new SCMNodeManager(conf, storageConfig, new EventQueue(), Mockito.mock(
-            NetworkTopology.class));
+        new SCMNodeManager(conf, storageConfig, new EventQueue(), clusterMap);
     nodeReportHandler = new NodeReportHandler(nodeManager);
   }
 

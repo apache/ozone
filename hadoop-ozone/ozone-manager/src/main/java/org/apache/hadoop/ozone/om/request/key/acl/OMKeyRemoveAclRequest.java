@@ -24,6 +24,7 @@ import java.util.List;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.key.acl.OMKeyAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.slf4j.Logger;
@@ -40,7 +41,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveA
 public class OMKeyRemoveAclRequest extends OMKeyAclRequest {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMKeyAddAclRequest.class);
+      LoggerFactory.getLogger(OMKeyRemoveAclRequest.class);
 
   private String path;
   private List<OzoneAcl> ozoneAcls;
@@ -61,10 +62,7 @@ public class OMKeyRemoveAclRequest extends OMKeyAclRequest {
 
   @Override
   OMResponse.Builder onInit() {
-    return OMResponse.newBuilder().setCmdType(
-        OzoneManagerProtocolProtos.Type.RemoveAcl).setStatus(
-        OzoneManagerProtocolProtos.Status.OK).setSuccess(true);
-
+    return OmResponseUtil.getOMResponseBuilder(getOmRequest());
   }
 
   @Override
@@ -88,12 +86,6 @@ public class OMKeyRemoveAclRequest extends OMKeyAclRequest {
           LOG.debug("Acl {} not removed from path {} as it does not exist",
               ozoneAcls, path);
         }
-      }
-      break;
-    case REPLAY:
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-            getOmRequest());
       }
       break;
     case FAILURE:

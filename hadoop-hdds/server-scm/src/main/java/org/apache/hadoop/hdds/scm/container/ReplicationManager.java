@@ -19,8 +19,10 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -38,12 +40,14 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
-import org.apache.hadoop.hdds.scm.safemode.SafeModeNotification;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
+import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
@@ -72,7 +76,8 @@ import org.slf4j.LoggerFactory;
  * that the containers are properly replicated. Replication Manager deals only
  * with Quasi Closed / Closed container.
  */
-public class ReplicationManager implements MetricsSource, SafeModeNotification {
+public class ReplicationManager
+    implements MetricsSource, EventHandler<SafeModeStatus> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReplicationManager.class);
@@ -130,6 +135,11 @@ public class ReplicationManager implements MetricsSource, SafeModeNotification {
   private volatile boolean running;
 
   /**
+   * Used for check datanode state.
+   */
+  private final NodeManager nodeManager;
+
+  /**
    * Constructs ReplicationManager instance with the given configuration.
    *
    * @param conf OzoneConfiguration
@@ -141,7 +151,8 @@ public class ReplicationManager implements MetricsSource, SafeModeNotification {
                             final ContainerManager containerManager,
                             final PlacementPolicy containerPlacement,
                             final EventPublisher eventPublisher,
-                            final LockManager<ContainerID> lockManager) {
+                            final LockManager<ContainerID> lockManager,
+                            final NodeManager nodeManager) {
     this.containerManager = containerManager;
     this.containerPlacement = containerPlacement;
     this.eventPublisher = eventPublisher;
@@ -150,6 +161,7 @@ public class ReplicationManager implements MetricsSource, SafeModeNotification {
     this.running = false;
     this.inflightReplication = new ConcurrentHashMap<>();
     this.inflightDeletion = new ConcurrentHashMap<>();
+    this.nodeManager = nodeManager;
   }
 
   /**
@@ -207,6 +219,7 @@ public class ReplicationManager implements MetricsSource, SafeModeNotification {
       inflightReplication.clear();
       inflightDeletion.clear();
       running = false;
+      DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
       notifyAll();
     } else {
       LOG.info("Replication Monitor Thread is not running.");
@@ -252,9 +265,14 @@ public class ReplicationManager implements MetricsSource, SafeModeNotification {
       final LifeCycleState state = container.getState();
 
       /*
-       * We don't take any action if the container is in OPEN state.
+       * We don't take any action if the container is in OPEN state and
+       * the container is healthy. If the container is not healthy, i.e.
+       * the replicas are not in OPEN state, send CLOSE_CONTAINER command.
        */
       if (state == LifeCycleState.OPEN) {
+        if (!isContainerHealthy(container, replicas)) {
+          eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, id);
+        }
         return;
       }
 
@@ -293,7 +311,6 @@ public class ReplicationManager implements MetricsSource, SafeModeNotification {
       updateInflightAction(container, inflightDeletion,
           action -> replicas.stream()
               .noneMatch(r -> r.getDatanodeDetails().equals(action.datanode)));
-
 
       /*
        * We don't have to take any action if the container is healthy.
@@ -354,6 +371,9 @@ public class ReplicationManager implements MetricsSource, SafeModeNotification {
     final long deadline = Time.monotonicNow() - conf.getEventTimeout();
     if (inflightActions.containsKey(id)) {
       final List<InflightAction> actions = inflightActions.get(id);
+
+      actions.removeIf(action ->
+          nodeManager.getNodeState(action.datanode) != NodeState.HEALTHY);
       actions.removeIf(action -> action.time < deadline);
       actions.removeIf(filter);
       if (actions.isEmpty()) {
@@ -374,7 +394,8 @@ public class ReplicationManager implements MetricsSource, SafeModeNotification {
    */
   private boolean isContainerHealthy(final ContainerInfo container,
                                      final Set<ContainerReplica> replicas) {
-    return container.getReplicationFactor().getNumber() == replicas.size() &&
+    return !isContainerUnderReplicated(container, replicas) &&
+        !isContainerOverReplicated(container, replicas) &&
         replicas.stream().allMatch(
             r -> compareState(container.getState(), r.getState()));
   }
@@ -388,8 +409,11 @@ public class ReplicationManager implements MetricsSource, SafeModeNotification {
    */
   private boolean isContainerUnderReplicated(final ContainerInfo container,
       final Set<ContainerReplica> replicas) {
+    boolean misReplicated = !getPlacementStatus(
+        replicas, container.getReplicationFactor().getNumber())
+        .isPolicySatisfied();
     return container.getReplicationFactor().getNumber() >
-        getReplicaCount(container.containerID(), replicas);
+        getReplicaCount(container.containerID(), replicas) || misReplicated;
   }
 
   /**
@@ -487,11 +511,16 @@ public class ReplicationManager implements MetricsSource, SafeModeNotification {
    */
   private void handleUnderReplicatedContainer(final ContainerInfo container,
       final Set<ContainerReplica> replicas) {
-    LOG.debug("Handling underreplicated container: {}",
+    LOG.debug("Handling under-replicated container: {}",
         container.getContainerID());
     try {
       final ContainerID id = container.containerID();
       final List<DatanodeDetails> deletionInFlight = inflightDeletion
+          .getOrDefault(id, Collections.emptyList())
+          .stream()
+          .map(action -> action.datanode)
+          .collect(Collectors.toList());
+      final List<DatanodeDetails> replicationInFlight = inflightReplication
           .getOrDefault(id, Collections.emptyList())
           .stream()
           .map(action -> action.datanode)
@@ -507,25 +536,60 @@ public class ReplicationManager implements MetricsSource, SafeModeNotification {
       if (source.size() > 0) {
         final int replicationFactor = container
             .getReplicationFactor().getNumber();
-        final int delta = replicationFactor - getReplicaCount(id, replicas);
+        // Want to check if the container is mis-replicated after considering
+        // inflight add and delete.
+        // Create a new list from source (healthy replicas minus pending delete)
+        List<DatanodeDetails> targetReplicas = new ArrayList<>(source);
+        // Then add any pending additions
+        targetReplicas.addAll(replicationInFlight);
+        final ContainerPlacementStatus placementStatus =
+            containerPlacement.validateContainerPlacement(
+                targetReplicas, replicationFactor);
+        int delta = replicationFactor - getReplicaCount(id, replicas);
+        final int misRepDelta = placementStatus.misReplicationCount();
+        final int replicasNeeded
+            = delta < misRepDelta ? misRepDelta : delta;
+        if (replicasNeeded <= 0) {
+          LOG.debug("Container {} meets replication requirement with " +
+              "inflight replicas", id);
+          return;
+        }
+
         final List<DatanodeDetails> excludeList = replicas.stream()
             .map(ContainerReplica::getDatanodeDetails)
             .collect(Collectors.toList());
-        List<InflightAction> actionList = inflightReplication.get(id);
-        if (actionList != null) {
-          actionList.stream().map(r -> r.datanode)
-              .forEach(excludeList::add);
-        }
+        excludeList.addAll(replicationInFlight);
         final List<DatanodeDetails> selectedDatanodes = containerPlacement
-            .chooseDatanodes(excludeList, null, delta,
+            .chooseDatanodes(excludeList, null, replicasNeeded,
                 container.getUsedBytes());
-
-        LOG.info("Container {} is under replicated. Expected replica count" +
-                " is {}, but found {}.", id, replicationFactor,
-            replicationFactor - delta);
-
-        for (DatanodeDetails datanode : selectedDatanodes) {
-          sendReplicateCommand(container, datanode, source);
+        if (delta > 0) {
+          LOG.info("Container {} is under replicated. Expected replica count" +
+                  " is {}, but found {}.", id, replicationFactor,
+              replicationFactor - delta);
+        }
+        int newMisRepDelta = misRepDelta;
+        if (misRepDelta > 0) {
+          LOG.info("Container: {}. {}",
+              id, placementStatus.misReplicatedReason());
+          // Check if the new target nodes (original plus newly selected nodes)
+          // makes the placement policy valid.
+          targetReplicas.addAll(selectedDatanodes);
+          newMisRepDelta = containerPlacement.validateContainerPlacement(
+              targetReplicas, replicationFactor).misReplicationCount();
+        }
+        if (delta > 0 || newMisRepDelta < misRepDelta) {
+          // Only create new replicas if we are missing a replicas or
+          // the number of pending mis-replication has improved. No point in
+          // creating new replicas for mis-replicated containers unless it
+          // improves things.
+          for (DatanodeDetails datanode : selectedDatanodes) {
+            sendReplicateCommand(container, datanode, source);
+          }
+        } else {
+          LOG.warn("Container {} is mis-replicated, requiring {} additional " +
+              "replicas. After selecting new nodes, mis-replication has not " +
+              "improved. No additional replicas will be scheduled",
+              id, misRepDelta);
         }
       } else {
         LOG.warn("Cannot replicate container {}, no healthy replica found.",
@@ -550,8 +614,8 @@ public class ReplicationManager implements MetricsSource, SafeModeNotification {
 
     final ContainerID id = container.containerID();
     final int replicationFactor = container.getReplicationFactor().getNumber();
-    // Dont consider inflight replication while calculating excess here.
-    final int excess = replicas.size() - replicationFactor -
+    // Don't consider inflight replication while calculating excess here.
+    int excess = replicas.size() - replicationFactor -
         inflightDeletion.getOrDefault(id, Collections.emptyList()).size();
 
     if (excess > 0) {
@@ -577,15 +641,71 @@ public class ReplicationManager implements MetricsSource, SafeModeNotification {
           .filter(r -> !compareState(container.getState(), r.getState()))
           .collect(Collectors.toList());
 
-      //Move the unhealthy replicas to the front of eligible replicas to delete
-      eligibleReplicas.removeAll(unhealthyReplicas);
-      eligibleReplicas.addAll(0, unhealthyReplicas);
-
-      for (int i = 0; i < excess; i++) {
-        sendDeleteCommand(container,
-            eligibleReplicas.get(i).getDatanodeDetails(), true);
+      // If there are unhealthy replicas, then we should remove them even if it
+      // makes the container violate the placement policy, as excess unhealthy
+      // containers are not really useful. It will be corrected later as a
+      // mis-replicated container will be seen as under-replicated.
+      for (ContainerReplica r : unhealthyReplicas) {
+        if (excess > 0) {
+          sendDeleteCommand(container, r.getDatanodeDetails(), true);
+          excess -= 1;
+        }
+        break;
+      }
+      // After removing all unhealthy replicas, if the container is still over
+      // replicated then we need to check if it is already mis-replicated.
+      // If it is, we do no harm by removing excess replicas. However, if it is
+      // not mis-replicated, then we can only remove replicas if they don't
+      // make the container become mis-replicated.
+      if (excess > 0) {
+        eligibleReplicas.removeAll(unhealthyReplicas);
+        Set<ContainerReplica> replicaSet = new HashSet<>(eligibleReplicas);
+        ContainerPlacementStatus ps =
+            getPlacementStatus(replicaSet, replicationFactor);
+        for (ContainerReplica r : eligibleReplicas) {
+          if (excess <= 0) {
+            break;
+          }
+          // First remove the replica we are working on from the set, and then
+          // check if the set is now mis-replicated.
+          replicaSet.remove(r);
+          ContainerPlacementStatus nowPS =
+              getPlacementStatus(replicaSet, replicationFactor);
+          if ((!ps.isPolicySatisfied()
+                && nowPS.actualPlacementCount() == ps.actualPlacementCount())
+              || (ps.isPolicySatisfied() && nowPS.isPolicySatisfied())) {
+            // Remove the replica if the container was already unsatisfied
+            // and losing this replica keep actual placement count unchanged.
+            // OR if losing this replica still keep satisfied
+            sendDeleteCommand(container, r.getDatanodeDetails(), true);
+            excess -= 1;
+            continue;
+          }
+          // If we decided not to remove this replica, put it back into the set
+          replicaSet.add(r);
+        }
+        if (excess > 0) {
+          LOG.info("The container {} is over replicated with {} excess " +
+              "replica. The excess replicas cannot be removed without " +
+              "violating the placement policy", container, excess);
+        }
       }
     }
+  }
+
+  /**
+   * Given a set of ContainerReplica, transform it to a list of DatanodeDetails
+   * and then check if the list meets the container placement policy.
+   * @param replicas List of containerReplica
+   * @param replicationFactor Expected Replication Factor of the containe
+   * @return ContainerPlacementStatus indicating if the policy is met or not
+   */
+  private ContainerPlacementStatus getPlacementStatus(
+      Set<ContainerReplica> replicas, int replicationFactor) {
+    List<DatanodeDetails> replicaDns = replicas.stream()
+        .map(c -> c.getDatanodeDetails()).collect(Collectors.toList());
+    return containerPlacement.validateContainerPlacement(
+        replicaDns, replicationFactor);
   }
 
   /**
@@ -776,8 +896,8 @@ public class ReplicationManager implements MetricsSource, SafeModeNotification {
   }
 
   @Override
-  public void handleSafeModeTransition(
-      SCMSafeModeManager.SafeModeStatus status) {
+  public void onMessage(SafeModeStatus status,
+      EventPublisher publisher) {
     if (!status.isInSafeMode() && !this.isRunning()) {
       this.start();
     }
@@ -815,7 +935,7 @@ public class ReplicationManager implements MetricsSource, SafeModeNotification {
             "cluster. This property is used to configure the interval in " +
             "which that thread runs."
     )
-    private long interval = 5 * 60 * 1000;
+    private long interval = Duration.ofSeconds(300).toMillis();
 
     /**
      * Timeout for container replication & deletion command issued by
@@ -823,21 +943,19 @@ public class ReplicationManager implements MetricsSource, SafeModeNotification {
      */
     @Config(key = "event.timeout",
         type = ConfigType.TIME,
-        defaultValue = "10m",
+        defaultValue = "30m",
         tags = {SCM, OZONE},
         description = "Timeout for the container replication/deletion commands "
             + "sent  to datanodes. After this timeout the command will be "
             + "retried.")
-    private long eventTimeout = 10 * 60 * 1000;
+    private long eventTimeout = Duration.ofMinutes(30).toMillis();
 
-
-    public void setInterval(long interval) {
-      this.interval = interval;
+    public void setInterval(Duration interval) {
+      this.interval = interval.toMillis();
     }
 
-
-    public void setEventTimeout(long eventTimeout) {
-      this.eventTimeout = eventTimeout;
+    public void setEventTimeout(Duration timeout) {
+      this.eventTimeout = timeout.toMillis();
     }
 
     public long getInterval() {

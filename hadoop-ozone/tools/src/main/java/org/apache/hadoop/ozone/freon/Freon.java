@@ -43,10 +43,12 @@ import picocli.CommandLine.Option;
         OmBucketGenerator.class,
         HadoopFsGenerator.class,
         HadoopNestedDirGenerator.class,
+        HadoopDirTreeGenerator.class,
         HadoopFsValidator.class,
         SameKeyReader.class,
         S3KeyGenerator.class,
         DatanodeChunkGenerator.class,
+        DatanodeChunkValidator.class,
         DatanodeBlockPutter.class,
         FollowerAppendLogEntryGenerator.class,
         ChunkManagerDiskWrite.class,
@@ -56,6 +58,10 @@ import picocli.CommandLine.Option;
 public class Freon extends GenericCli {
 
   public static final Logger LOG = LoggerFactory.getLogger(Freon.class);
+
+  public Freon() {
+    super(Freon.class);
+  }
 
   @Option(names = "--server",
       description = "Enable internal http server to provide metric "

@@ -19,10 +19,9 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.OPEN;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -32,10 +31,11 @@ import java.util.List;
 import java.util.NavigableSet;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.junit.Test;
 
 /**
@@ -45,39 +45,57 @@ public class TestReconContainerManager
     extends AbstractReconContainerManagerTest {
 
   @Test
-  public void testAddNewContainer() throws IOException {
-    ContainerID containerID = new ContainerID(100L);
-    Pipeline pipeline = getRandomPipeline();
-    ReconPipelineManager pipelineManager = getPipelineManager();
-    pipelineManager.addPipeline(pipeline);
-    ContainerInfo containerInfo =
-        new ContainerInfo.Builder()
-            .setContainerID(containerID.getId())
-            .setNumberOfKeys(10)
-            .setPipelineID(pipeline.getId())
-            .setReplicationFactor(ONE)
-            .setOwner("test")
-            .setState(OPEN)
-            .setReplicationType(STAND_ALONE)
-            .build();
+  public void testAddNewOpenContainer() throws IOException {
     ContainerWithPipeline containerWithPipeline =
-        new ContainerWithPipeline(containerInfo, pipeline);
+        getTestContainer(LifeCycleState.OPEN);
+    ContainerID containerID =
+        containerWithPipeline.getContainerInfo().containerID();
+    ContainerInfo containerInfo = containerWithPipeline.getContainerInfo();
 
     ReconContainerManager containerManager = getContainerManager();
     assertFalse(containerManager.exists(containerID));
+    assertFalse(getContainerTable().isExist(containerID));
 
     containerManager.addNewContainer(
         containerID.getId(), containerWithPipeline);
 
     assertTrue(containerManager.exists(containerID));
 
-    List<ContainerInfo> containers = containerManager.getContainers(OPEN);
+    List<ContainerInfo> containers =
+        containerManager.getContainers(LifeCycleState.OPEN);
     assertEquals(1, containers.size());
     assertEquals(containerInfo, containers.get(0));
     NavigableSet<ContainerID> containersInPipeline =
-        pipelineManager.getContainersInPipeline(pipeline.getId());
+        getPipelineManager().getContainersInPipeline(
+            containerWithPipeline.getPipeline().getId());
     assertEquals(1, containersInPipeline.size());
     assertEquals(containerID, containersInPipeline.first());
+
+    // Verify container DB.
+    assertTrue(getContainerTable().isExist(containerID));
+  }
+
+  @Test
+  public void testAddNewClosedContainer() throws IOException {
+    ContainerWithPipeline containerWithPipeline = getTestContainer(CLOSED);
+    ContainerID containerID =
+        containerWithPipeline.getContainerInfo().containerID();
+    ContainerInfo containerInfo = containerWithPipeline.getContainerInfo();
+
+    ReconContainerManager containerManager = getContainerManager();
+    assertFalse(containerManager.exists(containerID));
+    assertFalse(getContainerTable().isExist(containerID));
+
+    containerManager.addNewContainer(
+        containerID.getId(), containerWithPipeline);
+
+    assertTrue(containerManager.exists(containerID));
+
+    List<ContainerInfo> containers = containerManager.getContainers(CLOSED);
+    assertEquals(1, containers.size());
+    assertEquals(containerInfo, containers.get(0));
+    // Verify container DB.
+    assertTrue(getContainerTable().isExist(containerID));
   }
 
   @Test
@@ -86,12 +104,39 @@ public class TestReconContainerManager
     ReconContainerManager containerManager = getContainerManager();
     assertFalse(containerManager.exists(containerID));
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
-    containerManager.checkAndAddNewContainer(containerID, datanodeDetails);
+    containerManager.checkAndAddNewContainer(containerID,
+        OPEN, datanodeDetails);
     assertTrue(containerManager.exists(containerID));
 
     // Doing it one more time should not change any state.
-    containerManager.checkAndAddNewContainer(containerID, datanodeDetails);
+    containerManager.checkAndAddNewContainer(containerID, OPEN,
+        datanodeDetails);
     assertTrue(containerManager.exists(containerID));
+    assertEquals(LifeCycleState.OPEN,
+        getContainerManager().getContainer(containerID).getState());
   }
 
+  @Test
+  public void testUpdateContainerStateFromOpen() throws IOException {
+    ContainerWithPipeline containerWithPipeline =
+        getTestContainer(LifeCycleState.OPEN);
+
+    long id = containerWithPipeline.getContainerInfo().getContainerID();
+    ContainerID containerID =
+        containerWithPipeline.getContainerInfo().containerID();
+
+    // Adding container #100.
+    getContainerManager().addNewContainer(id, containerWithPipeline);
+    assertEquals(LifeCycleState.OPEN,
+        getContainerManager().getContainer(containerID).getState());
+
+    DatanodeDetails datanodeDetails = randomDatanodeDetails();
+
+    // First report with "CLOSED" replica state moves container state to
+    // "CLOSING".
+    getContainerManager().checkAndAddNewContainer(containerID, State.CLOSED,
+        datanodeDetails);
+    assertEquals(CLOSING,
+        getContainerManager().getContainer(containerID).getState());
+  }
 }

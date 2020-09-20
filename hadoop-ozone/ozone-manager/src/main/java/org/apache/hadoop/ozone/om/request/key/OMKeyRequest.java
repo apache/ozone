@@ -27,11 +27,14 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.PrefixManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -39,6 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
@@ -86,6 +90,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   public OMKeyRequest(OMRequest omRequest) {
     super(omRequest);
+  }
+
+  protected KeyArgs resolveBucketLink(
+      OzoneManager ozoneManager, KeyArgs keyArgs,
+      Map<String, String> auditMap) throws IOException {
+    ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs, this);
+    keyArgs = bucket.update(keyArgs);
+    bucket.audit(auditMap);
+    return keyArgs;
   }
 
   /**
@@ -470,36 +483,38 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     // If KMS is not enabled, follow the normal approach of execution of not
     // reading DB in pre-execute.
+
+    OmBucketInfo bucketInfo = null;
     if (ozoneManager.getKmsProvider() != null) {
       try {
         acquireLock = omMetadataManager.getLock().acquireReadLock(
             BUCKET_LOCK, volumeName, bucketName);
 
-
-        OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
+        bucketInfo = omMetadataManager.getBucketTable().get(
             omMetadataManager.getBucketKey(volumeName, bucketName));
 
-
-        // Don't throw exception of bucket not found when bucketinfo is not
-        // null. If bucketinfo is null, later when request
-        // is submitted and if bucket does not really exist it will fail in
-        // applyTransaction step. Why we are doing this is if OM thinks it is
-        // the leader, but it is not, we don't want to fail request in this
-        // case. As anyway when it submits request to ratis it will fail with
-        // not leader exception, and client will retry on correct leader and
-        // request will be executed.
-        if (bucketInfo != null) {
-          Optional< FileEncryptionInfo > encryptionInfo =
-              getFileEncryptionInfo(ozoneManager, bucketInfo);
-          if (encryptionInfo.isPresent()) {
-            newKeyArgs.setFileEncryptionInfo(
-                OMPBHelper.convert(encryptionInfo.get()));
-          }
-        }
       } finally {
         if (acquireLock) {
           omMetadataManager.getLock().releaseReadLock(
               BUCKET_LOCK, volumeName, bucketName);
+        }
+      }
+
+      // Don't throw exception of bucket not found when bucketinfo is
+      // null. If bucketinfo is null, later when request
+      // is submitted and if bucket does not really exist it will fail in
+      // applyTransaction step. Why we are doing this is if OM thinks it is
+      // the leader, but it is not, we don't want to fail request in this
+      // case. As anyway when it submits request to ratis it will fail with
+      // not leader exception, and client will retry on correct leader and
+      // request will be executed.
+
+      if (bucketInfo != null) {
+        Optional<FileEncryptionInfo> encryptionInfo =
+            getFileEncryptionInfo(ozoneManager, bucketInfo);
+        if (encryptionInfo.isPresent()) {
+          newKeyArgs.setFileEncryptionInfo(
+              OMPBHelper.convert(encryptionInfo.get()));
         }
       }
     }
@@ -516,5 +531,38 @@ public abstract class OMKeyRequest extends OMClientRequest {
       encryptionInfo = OMPBHelper.convert(keyArgs.getFileEncryptionInfo());
     }
     return encryptionInfo;
+  }
+
+  /**
+   * Check directory exists. If exists return true, else false.
+   * @param volumeName
+   * @param bucketName
+   * @param keyName
+   * @param omMetadataManager
+   * @throws IOException
+   */
+  protected boolean checkDirectoryAlreadyExists(String volumeName,
+      String bucketName, String keyName, OMMetadataManager omMetadataManager)
+      throws IOException {
+    if (omMetadataManager.getKeyTable().isExist(
+        omMetadataManager.getOzoneDirKey(volumeName, bucketName,
+            keyName))) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Return volume info for the specified volume.
+   * @param omMetadataManager
+   * @param volume
+   * @return OmVolumeArgs
+   * @throws IOException
+   */
+  protected OmVolumeArgs getVolumeInfo(OMMetadataManager omMetadataManager,
+      String volume) {
+    return omMetadataManager.getVolumeTable().getCacheValue(
+        new CacheKey<>(omMetadataManager.getVolumeKey(volume)))
+        .getCacheValue();
   }
 }

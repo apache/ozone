@@ -56,6 +56,8 @@ public final class SCMContainerPlacementRackAware
   private static final int RACK_LEVEL = 1;
   private static final int MAX_RETRY= 3;
   private final SCMContainerPlacementMetrics metrics;
+  // Used to check the placement policy is validated in the parent class
+  private static final int REQUIRED_RACKS = 2;
 
   /**
    * Constructs a Container Placement with rack awareness.
@@ -344,5 +346,10 @@ public final class SCMContainerPlacementRackAware
         return Arrays.asList(chosenNodes.toArray(new DatanodeDetails[0]));
       }
     }
+  }
+
+  @Override
+  protected int getRequiredRackCount() {
+    return REQUIRED_RACKS;
   }
 }

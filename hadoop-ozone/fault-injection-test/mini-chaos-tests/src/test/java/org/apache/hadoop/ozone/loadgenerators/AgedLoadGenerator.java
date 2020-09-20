@@ -34,7 +34,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  * The default writes to read ratio is 10:90.
  */
 public class AgedLoadGenerator extends LoadGenerator {
-  private static String agedSuffix = "aged";
 
   private final AtomicInteger agedFileWrittenIndex;
   private final AtomicInteger agedFileAllocationIndex;

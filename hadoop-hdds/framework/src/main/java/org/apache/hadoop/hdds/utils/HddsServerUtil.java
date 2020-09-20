@@ -20,10 +20,14 @@ package org.apache.hadoop.hdds.utils;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.TimeUnit;
 
+import com.google.protobuf.BlockingService;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -49,7 +53,6 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.security.UserGroupInformation;
 
-import com.google.common.base.Strings;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
@@ -62,6 +65,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_LOG_W
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.sanitizeUserArgs;
@@ -78,6 +83,19 @@ public final class HddsServerUtil {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       HddsServerUtil.class);
+
+  /**
+   * Add protobuf-based protocol to the {@link RPC.Server}.
+   * @param conf configuration
+   * @param protocol Protocol interface
+   * @param service service that implements the protocol
+   * @param server RPC server to which the protocol & implementation is added to
+   */
+  public static void addPBProtocol(Configuration conf, Class<?> protocol,
+      BlockingService service, RPC.Server server) throws IOException {
+    RPC.setProtocolEngine(conf, protocol, ProtobufRpcEngine.class);
+    server.addProtocol(RPC.RpcKind.RPC_PROTOCOL_BUFFER, protocol, service);
+  }
 
   /**
    * Retrieve the socket address that should be used by DataNodes to connect
@@ -309,6 +327,17 @@ public final class HddsServerUtil {
   }
 
   /**
+   * Max retry count of rpcProxy for EndpointStateMachine of SCM.
+   *
+   * @param conf - Ozone Config
+   * @return - Max retry count.
+   */
+  public static int getScmRpcRetryCount(ConfigurationSource conf) {
+    return conf.getInt(OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT,
+        OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT_DEFAULT);
+  }
+
+  /**
    * Log Warn interval.
    *
    * @param conf - Ozone Config
@@ -329,15 +358,16 @@ public final class HddsServerUtil {
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
   }
 
-  public static String getOzoneDatanodeRatisDirectory(
+  public static Collection<String> getOzoneDatanodeRatisDirectory(
       ConfigurationSource conf) {
-    String storageDir = conf.get(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR);
+    Collection<String> rawLocations = conf.getTrimmedStringCollection(
+            OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR);
 
-    if (Strings.isNullOrEmpty(storageDir)) {
-      storageDir = ServerUtils.getDefaultRatisDirectory(conf);
+    if (rawLocations.isEmpty()) {
+      rawLocations = new ArrayList<>(1);
+      rawLocations.add(ServerUtils.getDefaultRatisDirectory(conf));
     }
-    return storageDir;
+    return rawLocations;
   }
 
   /**

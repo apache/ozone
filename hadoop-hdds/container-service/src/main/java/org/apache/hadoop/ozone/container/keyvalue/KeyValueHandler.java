@@ -119,7 +119,7 @@ public class KeyValueHandler extends Handler {
     super(config, datanodeId, contSet, volSet, metrics, icrSender);
     containerType = ContainerType.KeyValueContainer;
     blockManager = new BlockManagerImpl(config);
-    chunkManager = ChunkManagerFactory.createChunkManager(config);
+    chunkManager = ChunkManagerFactory.createChunkManager(config, blockManager);
     try {
       volumeChoosingPolicy = conf.getClass(
           HDDS_DATANODE_VOLUME_CHOOSING_POLICY, RoundRobinVolumeChoosingPolicy
@@ -420,17 +420,16 @@ public class KeyValueHandler extends Handler {
       BlockData blockData = BlockData.getFromProtoBuf(data);
       Preconditions.checkNotNull(blockData);
 
+      boolean incrKeyCount = false;
       if (!request.getPutBlock().hasEof() || request.getPutBlock().getEof()) {
-        for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
-          chunkManager.finishWriteChunk(kvContainer, blockData.getBlockID(),
-              ChunkInfo.getFromProtoBuf(chunkInfo));
-        }
+        chunkManager.finishWriteChunks(kvContainer, blockData);
+        incrKeyCount = true;
       }
 
       long bcsId =
           dispatcherContext == null ? 0 : dispatcherContext.getLogIndex();
       blockData.setBlockCommitSequenceId(bcsId);
-      blockManager.putBlock(kvContainer, blockData);
+      blockManager.putBlock(kvContainer, blockData, incrKeyCount);
 
       blockDataProto = blockData.getProtoBufMessage();
 
@@ -773,7 +772,7 @@ public class KeyValueHandler extends Handler {
       // here. There is no need to maintain this info in openContainerBlockMap.
       chunkManager
           .writeChunk(kvContainer, blockID, chunkInfo, data, dispatcherContext);
-      chunkManager.finishWriteChunk(kvContainer, blockID, chunkInfo);
+      chunkManager.finishWriteChunks(kvContainer, blockData);
 
       List<ContainerProtos.ChunkInfo> chunks = new LinkedList<>();
       chunks.add(chunkInfoProto);
@@ -1069,5 +1068,7 @@ public class KeyValueHandler extends Handler {
     }
     // Avoid holding write locks for disk operations
     container.delete();
+    container.getContainerData().setState(State.DELETED);
+    sendICR(container);
   }
 }

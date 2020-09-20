@@ -24,12 +24,11 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.time.format.DateTimeFormatter;
 
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -51,12 +50,9 @@ public class TestObjectGet {
   @Test
   public void get() throws IOException, OS3Exception {
     //GIVEN
-    OzoneClientStub client = new OzoneClientStub();
-    client.getObjectStore().createS3Bucket("bilbo", "b1");
-    String volumeName = client.getObjectStore().getOzoneVolumeName("b1");
-    OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
-    OzoneBucket bucket =
-        volume.getBucket("b1");
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket("b1");
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket("b1");
     OzoneOutputStream keyStream =
         bucket.createKey("key1", CONTENT.getBytes(UTF_8).length);
     keyStream.write(CONTENT.getBytes(UTF_8));
@@ -74,10 +70,10 @@ public class TestObjectGet {
 
     //THEN
     OzoneInputStream ozoneInputStream =
-        volume.getBucket("b1")
+        client.getObjectStore().getS3Bucket("b1")
             .readKey("key1");
     String keyContent =
-        IOUtils.toString(ozoneInputStream, Charset.forName("UTF-8"));
+        IOUtils.toString(ozoneInputStream, UTF_8);
 
     Assert.assertEquals(CONTENT, keyContent);
     Assert.assertEquals("" + keyContent.length(),

@@ -44,7 +44,7 @@ public final class MockDatanodeDetails {
    * @return DatanodeDetails
    */
   public static DatanodeDetails createDatanodeDetails(String hostname,
-       String loc) {
+      String loc) {
     Random random = ThreadLocalRandom.current();
     String ipAddress = random.nextInt(256)
         + "." + random.nextInt(256)
@@ -94,7 +94,7 @@ public final class MockDatanodeDetails {
     DatanodeDetails.Port restPort = DatanodeDetails.newPort(
         DatanodeDetails.Port.Name.REST, port);
     return DatanodeDetails.newBuilder()
-        .setUuid(uuid)
+        .setUuid(UUID.fromString(uuid))
         .setHostName(hostname)
         .setIpAddress(ipAddress)
         .addPort(containerPort)

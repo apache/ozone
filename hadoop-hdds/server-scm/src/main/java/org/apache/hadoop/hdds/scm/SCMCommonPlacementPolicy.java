@@ -25,8 +25,10 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -45,6 +47,17 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
   private final NodeManager nodeManager;
   private final Random rand;
   private final ConfigurationSource conf;
+
+  /**
+   * Return for replication factor 1 containers where the placement policy
+   * is always met, or not met (zero replicas available) rather than creating a
+   * new object each time. There are only used when there is no network topology
+   * or the replication factor is 1 or the required racks is 1.
+   */
+  private ContainerPlacementStatus validPlacement
+      = new ContainerPlacementStatusDefault(1, 1, 1);
+  private ContainerPlacementStatus invalidPlacement
+      = new ContainerPlacementStatusDefault(0, 1, 1);
 
   /**
    * Constructor.
@@ -198,4 +211,59 @@ public abstract class SCMCommonPlacementPolicy implements PlacementPolicy {
    */
   public abstract DatanodeDetails chooseNode(
       List<DatanodeDetails> healthyNodes);
+
+  /**
+   * Default implementation to return the number of racks containers should span
+   * to meet the placement policy. For simple policies that are not rack aware
+   * we return 1, from this default implementation.
+   * should have
+   * @return The number of racks containers should span to meet the policy
+   */
+  protected int getRequiredRackCount() {
+    return 1;
+  }
+
+  /**
+   * This default implementation handles rack aware policies and non rack
+   * aware policies. If a future placement policy needs to check more than racks
+   * to validate the policy (eg node groups, HDFS like upgrade domain) this
+   * method should be overridden in the sub class.
+   * This method requires that subclasses which implement rack aware policies
+   * override the default method getRequiredRackCount and getNetworkTopology.
+   * @param dns List of datanodes holding a replica of the container
+   * @param replicas The expected number of replicas
+   * @return ContainerPlacementStatus indicating if the placement policy is
+   *         met or not. Not this only considers the rack count and not the
+   *         number of replicas.
+   */
+  @Override
+  public ContainerPlacementStatus validateContainerPlacement(
+      List<DatanodeDetails> dns, int replicas) {
+    NetworkTopology topology = nodeManager.getClusterNetworkTopologyMap();
+    int requiredRacks = getRequiredRackCount();
+    if (topology == null || replicas == 1 || requiredRacks == 1) {
+      if (dns.size() > 0) {
+        // placement is always satisfied if there is at least one DN.
+        return validPlacement;
+      } else {
+        return invalidPlacement;
+      }
+    }
+    // We have a network topology so calculate if it is satisfied or not.
+    int numRacks = 1;
+    final int maxLevel = topology.getMaxLevel();
+    // The leaf nodes are all at max level, so the number of nodes at
+    // leafLevel - 1 is the rack count
+    numRacks = topology.getNumOfNodes(maxLevel - 1);
+    final long currentRackCount = dns.stream()
+        .map(d -> topology.getAncestor(d, 1))
+        .distinct()
+        .count();
+
+    if (replicas < requiredRacks) {
+      requiredRacks = replicas;
+    }
+    return new ContainerPlacementStatusDefault(
+        (int)currentRackCount, requiredRacks, numRacks);
+  }
 }

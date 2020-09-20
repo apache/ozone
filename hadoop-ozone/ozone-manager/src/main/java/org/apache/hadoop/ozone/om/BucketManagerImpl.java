@@ -17,7 +17,6 @@
 package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -25,7 +24,7 @@ import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.CryptoProtocolVersion;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -34,6 +33,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.util.StringUtils;
@@ -41,6 +41,7 @@ import org.apache.hadoop.util.Time;
 
 import com.google.common.base.Preconditions;
 import org.iq80.leveldb.DBException;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -136,46 +137,34 @@ public class BucketManagerImpl implements BucketManager {
         throw new OMException("Bucket already exist",
             OMException.ResultCodes.BUCKET_ALREADY_EXISTS);
       }
-      BucketEncryptionKeyInfo bek = bucketInfo.getEncryptionKeyInfo();
-      BucketEncryptionKeyInfo.Builder bekb = null;
-      if (bek != null) {
-        if (kmsProvider == null) {
-          throw new OMException("Invalid KMS provider, check configuration " +
-              CommonConfigurationKeys.HADOOP_SECURITY_KEY_PROVIDER_PATH,
-              OMException.ResultCodes.INVALID_KMS_PROVIDER);
-        }
-        if (bek.getKeyName() == null) {
-          throw new OMException("Bucket encryption key needed.", OMException
-              .ResultCodes.BUCKET_ENCRYPTION_KEY_NOT_FOUND);
-        }
-        // Talk to KMS to retrieve the bucket encryption key info.
-        KeyProvider.Metadata metadata = getKMSProvider().getMetadata(
-            bek.getKeyName());
-        if (metadata == null) {
-          throw new OMException("Bucket encryption key " + bek.getKeyName()
-              + " doesn't exist.",
-              OMException.ResultCodes.BUCKET_ENCRYPTION_KEY_NOT_FOUND);
-        }
-        // If the provider supports pool for EDEKs, this will fill in the pool
-        kmsProvider.warmUpEncryptedKeys(bek.getKeyName());
-        bekb = new BucketEncryptionKeyInfo.Builder()
-            .setKeyName(bek.getKeyName())
-            .setVersion(CryptoProtocolVersion.ENCRYPTION_ZONES)
-            .setSuite(CipherSuite.convert(metadata.getCipher()));
-      }
-      List<OzoneAcl> acls = new ArrayList<>();
-      acls.addAll(bucketInfo.getAcls());
-      volumeArgs.getAclMap().getDefaultAclList().forEach(
-          a -> acls.add(OzoneAcl.fromProtobufWithAccessType(a)));
 
-      OmBucketInfo.Builder omBucketInfoBuilder = OmBucketInfo.newBuilder()
-          .setVolumeName(bucketInfo.getVolumeName())
-          .setBucketName(bucketInfo.getBucketName())
-          .setAcls(acls)
-          .setStorageType(bucketInfo.getStorageType())
-          .setIsVersionEnabled(bucketInfo.getIsVersionEnabled())
-          .setCreationTime(Time.now())
-          .addAllMetadata(bucketInfo.getMetadata());
+      BucketEncryptionKeyInfo bek = bucketInfo.getEncryptionKeyInfo();
+
+      boolean hasSourceVolume = bucketInfo.getSourceVolume() != null;
+      boolean hasSourceBucket = bucketInfo.getSourceBucket() != null;
+
+      if (hasSourceBucket != hasSourceVolume) {
+        throw new OMException("Both source volume and source bucket are " +
+            "required for bucket links",
+            OMException.ResultCodes.INVALID_REQUEST);
+      }
+
+      if (bek != null && hasSourceBucket) {
+        throw new OMException("Encryption cannot be set for bucket links",
+            OMException.ResultCodes.INVALID_REQUEST);
+      }
+
+      BucketEncryptionKeyInfo.Builder bekb =
+          createBucketEncryptionKeyInfoBuilder(bek);
+
+      OmBucketInfo.Builder omBucketInfoBuilder = bucketInfo.toBuilder()
+          .setCreationTime(Time.now());
+
+      List<OzoneManagerProtocolProtos.OzoneAclInfo> defaultAclList =
+          volumeArgs.getAclMap().getDefaultAclList();
+      for (OzoneManagerProtocolProtos.OzoneAclInfo a : defaultAclList) {
+        omBucketInfoBuilder.addAcl(OzoneAcl.fromProtobufWithAccessType(a));
+      }
 
       if (bekb != null) {
         omBucketInfoBuilder.setBucketEncryptionKey(bekb.build());
@@ -183,7 +172,14 @@ public class BucketManagerImpl implements BucketManager {
 
       OmBucketInfo omBucketInfo = omBucketInfoBuilder.build();
       commitBucketInfoToDB(omBucketInfo);
-      LOG.debug("created bucket: {} in volume: {}", bucketName, volumeName);
+      if (hasSourceBucket) {
+        LOG.debug("created link {}/{} to bucket: {}/{}",
+            volumeName, bucketName,
+            omBucketInfo.getSourceVolume(), omBucketInfo.getSourceBucket());
+      } else {
+        LOG.debug("created bucket: {} in volume: {}", bucketName,
+            volumeName);
+      }
     } catch (IOException | DBException ex) {
       if (!(ex instanceof OMException)) {
         LOG.error("Bucket creation failed for bucket:{} in volume:{}",
@@ -197,6 +193,38 @@ public class BucketManagerImpl implements BucketManager {
       }
       metadataManager.getLock().releaseLock(VOLUME_LOCK, volumeName);
     }
+  }
+
+  @Nullable
+  public BucketEncryptionKeyInfo.Builder createBucketEncryptionKeyInfoBuilder(
+      BucketEncryptionKeyInfo bek) throws IOException {
+    BucketEncryptionKeyInfo.Builder bekb = null;
+    if (bek != null) {
+      if (kmsProvider == null) {
+        throw new OMException("Invalid KMS provider, check configuration " +
+            CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH,
+            OMException.ResultCodes.INVALID_KMS_PROVIDER);
+      }
+      if (bek.getKeyName() == null) {
+        throw new OMException("Bucket encryption key needed.", OMException
+            .ResultCodes.BUCKET_ENCRYPTION_KEY_NOT_FOUND);
+      }
+      // Talk to KMS to retrieve the bucket encryption key info.
+      KeyProvider.Metadata metadata = getKMSProvider().getMetadata(
+          bek.getKeyName());
+      if (metadata == null) {
+        throw new OMException("Bucket encryption key " + bek.getKeyName()
+            + " doesn't exist.",
+            OMException.ResultCodes.BUCKET_ENCRYPTION_KEY_NOT_FOUND);
+      }
+      // If the provider supports pool for EDEKs, this will fill in the pool
+      kmsProvider.warmUpEncryptedKeys(bek.getKeyName());
+      bekb = new BucketEncryptionKeyInfo.Builder()
+          .setKeyName(bek.getKeyName())
+          .setVersion(CryptoProtocolVersion.ENCRYPTION_ZONES)
+          .setSuite(CipherSuite.convert(metadata.getCipher()));
+    }
+    return bekb;
   }
 
   private void commitBucketInfoToDB(OmBucketInfo omBucketInfo)
@@ -534,7 +562,7 @@ public class BucketManagerImpl implements BucketManager {
       return bucketInfo.getAcls();
     } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
-        LOG.error("Get acl operation failed for bucket:{}/{} acl:{}",
+        LOG.error("Get acl operation failed for bucket:{}/{}.",
             volume, bucket, ex);
       }
       throw ex;
@@ -579,7 +607,7 @@ public class BucketManagerImpl implements BucketManager {
       if(ex instanceof OMException) {
         throw (OMException) ex;
       }
-      LOG.error("CheckAccess operation failed for bucket:{}/{} acl:{}",
+      LOG.error("CheckAccess operation failed for bucket:{}/{}.",
           volume, bucket, ex);
       throw new OMException("Check access operation failed for " +
           "bucket:" + bucket, ex, INTERNAL_ERROR);

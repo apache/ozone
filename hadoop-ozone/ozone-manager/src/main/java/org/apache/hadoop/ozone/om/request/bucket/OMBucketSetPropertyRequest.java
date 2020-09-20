@@ -25,6 +25,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,9 +90,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     String volumeName = bucketArgs.getVolumeName();
     String bucketName = bucketArgs.getBucketName();
 
-    OMResponse.Builder omResponse = OMResponse.newBuilder().setCmdType(
-        OzoneManagerProtocolProtos.Type.CreateBucket).setStatus(
-        OzoneManagerProtocolProtos.Status.OK);
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
     OmBucketInfo omBucketInfo = null;
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
@@ -119,16 +119,6 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
         LOG.debug("bucket: {} not found ", bucketName);
         throw new OMException("Bucket doesn't exist",
             OMException.ResultCodes.BUCKET_NOT_FOUND);
-      }
-
-      // Check if this transaction is a replay of ratis logs.
-      // If a replay, then the response has already been returned to the
-      // client. So take no further action and return a dummy OMClientResponse.
-      if (isReplay(ozoneManager, dbBucketInfo, transactionLogIndex)) {
-        LOG.debug("Replayed Transaction {} ignored. Request: {}",
-            transactionLogIndex, setBucketPropertyRequest);
-        return new OMBucketSetPropertyResponse(
-            createReplayOMResponse(omResponse));
       }
 
       OmBucketInfo.Builder bucketInfoBuilder = OmBucketInfo.newBuilder();
@@ -190,7 +180,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       success = false;
       exception = ex;
       omClientResponse = new OMBucketSetPropertyResponse(
-          createErrorOMResponse(omResponse, exception), omBucketInfo);
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

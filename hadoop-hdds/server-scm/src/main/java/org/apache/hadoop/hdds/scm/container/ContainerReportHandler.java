@@ -102,8 +102,15 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
   public void onMessage(final ContainerReportFromDatanode reportFromDatanode,
                         final EventPublisher publisher) {
 
-    final DatanodeDetails datanodeDetails =
+    final DatanodeDetails dnFromReport =
         reportFromDatanode.getDatanodeDetails();
+    DatanodeDetails datanodeDetails =
+        nodeManager.getNodeByUuid(dnFromReport.getUuidString());
+    if (datanodeDetails == null) {
+      LOG.warn("Received container report from unknown datanode {}",
+          dnFromReport);
+      return;
+    }
     final ContainerReportsProto containerReport =
         reportFromDatanode.getReport();
 
@@ -133,7 +140,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
       containerManager.notifyContainerReportProcessing(true, true);
     } catch (NodeNotFoundException ex) {
       containerManager.notifyContainerReportProcessing(true, false);
-      LOG.error("Received container report from unknown datanode {} {}",
+      LOG.error("Received container report from unknown datanode {}.",
           datanodeDetails, ex);
     }
 

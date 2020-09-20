@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +42,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclR
  */
 public class OMBucketSetAclRequest extends OMBucketAclRequest {
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMBucketAddAclRequest.class);
+      LoggerFactory.getLogger(OMBucketSetAclRequest.class);
 
   private static BooleanBiFunction< List<OzoneAcl>,
         OmBucketInfo > bucketAddAclOp;
@@ -76,10 +77,7 @@ public class OMBucketSetAclRequest extends OMBucketAclRequest {
 
   @Override
   OMResponse.Builder onInit() {
-    return OMResponse.newBuilder().setCmdType(
-        OzoneManagerProtocolProtos.Type.SetAcl).setStatus(
-        OzoneManagerProtocolProtos.Status.OK).setSuccess(true);
-
+    return OmResponseUtil.getOMResponseBuilder(getOmRequest());
   }
 
   @Override

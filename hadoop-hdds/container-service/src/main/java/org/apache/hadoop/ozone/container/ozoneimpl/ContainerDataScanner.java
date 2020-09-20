@@ -49,6 +49,7 @@ public class ContainerDataScanner extends Thread {
   private final Canceler canceler;
   private final ContainerDataScrubberMetrics metrics;
   private final long dataScanInterval;
+  private static final String NAME_FORMAT = "ContainerDataScanner(%s)";
 
   /**
    * True if the thread is stopping.<p/>
@@ -66,7 +67,7 @@ public class ContainerDataScanner extends Thread {
     throttler = new HddsDataTransferThrottler(conf.getBandwidthPerVolume());
     canceler = new Canceler();
     metrics = ContainerDataScrubberMetrics.create(volume.toString());
-    setName("ContainerDataScanner(" + volume + ")");
+    setName(String.format(NAME_FORMAT, volume));
     setDaemon(true);
   }
 
@@ -82,7 +83,7 @@ public class ContainerDataScanner extends Thread {
         metrics.resetNumUnhealthyContainers();
       }
       LOG.info("{} exiting.", this);
-    } catch (Throwable e) {
+    } catch (Exception e) {
       LOG.error("{} exiting because of exception ", this, e);
     } finally {
       if (metrics != null) {
@@ -138,6 +139,8 @@ public class ContainerDataScanner extends Thread {
         try {
           Thread.sleep(remainingSleep);
         } catch (InterruptedException ignored) {
+          LOG.warn("Operation was interrupted.");
+          Thread.currentThread().interrupt();
         }
       }
     }
@@ -162,13 +165,15 @@ public class ContainerDataScanner extends Thread {
 
   public synchronized void shutdown() {
     this.stopping = true;
-    this.canceler.cancel("ContainerDataScanner("+volume+") is shutting down");
+    this.canceler.cancel(
+        String.format(NAME_FORMAT, volume) + " is shutting down");
     this.interrupt();
     try {
       this.join();
     } catch (InterruptedException ex) {
       LOG.warn("Unexpected exception while stopping data scanner for volume "
           + volume, ex);
+      Thread.currentThread().interrupt();
     }
   }
 
@@ -179,8 +184,7 @@ public class ContainerDataScanner extends Thread {
 
   @Override
   public String toString() {
-    return "ContainerDataScanner(" + volume +
-        ", " + volume.getStorageID() + ")";
+    return String.format(NAME_FORMAT, volume + ", " + volume.getStorageID());
   }
 
   private class HddsDataTransferThrottler extends DataTransferThrottler {

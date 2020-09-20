@@ -31,6 +31,8 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Strings;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import picocli.CommandLine;
 import picocli.CommandLine.ExecutionException;
 import picocli.CommandLine.IExceptionHandler2;
@@ -42,6 +44,12 @@ import picocli.CommandLine.RunLast;
  * This test class specified for testing Ozone datanode shell command.
  */
 public class TestOzoneDatanodeShell {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneDatanodeShell.class);
@@ -122,7 +130,7 @@ public class TestOzoneDatanodeShell {
   @Test
   public void testDatanodeInvalidParamCommand() {
     LOG.info("Running testDatanodeIncompleteCommand");
-    String expectedError = "Unknown option: -invalidParam";
+    String expectedError = "Unknown option: '-invalidParam'";
     //executing 'ozone datanode -invalidParam'
     String[] args = new String[]{"-invalidParam"};
 

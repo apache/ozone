@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,10 +20,13 @@ package org.apache.hadoop.hdds.scm.cli.pipeline;
 
 import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import picocli.CommandLine;
 
-import java.util.concurrent.Callable;
+import java.io.IOException;
+import java.util.stream.Stream;
 
 /**
  * Handler of list pipelines command.
@@ -33,39 +36,29 @@ import java.util.concurrent.Callable;
     description = "List all active pipelines",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class ListPipelinesSubcommand implements Callable<Void> {
-
-  @CommandLine.ParentCommand
-  private PipelineCommands parent;
+public class ListPipelinesSubcommand extends ScmSubcommand {
 
   @CommandLine.Option(names = {"-ffc", "--filterByFactor"},
       description = "Filter listed pipelines by Factor(ONE/one)",
-      defaultValue = "",
-      required = false)
+      defaultValue = "")
   private String factor;
 
   @CommandLine.Option(names = {"-fst", "--filterByState"},
       description = "Filter listed pipelines by State(OPEN/CLOSE)",
-      defaultValue = "",
-      required = false)
+      defaultValue = "")
   private String state;
 
-
   @Override
-  public Void call() throws Exception {
-    try (ScmClient scmClient = parent.getParent().createScmClient()) {
-      if (Strings.isNullOrEmpty(factor) && Strings.isNullOrEmpty(state)) {
-        scmClient.listPipelines().forEach(System.out::println);
-      } else {
-        scmClient.listPipelines().stream()
-            .filter(p -> ((Strings.isNullOrEmpty(factor) ||
-                (p.getFactor().toString().compareToIgnoreCase(factor) == 0))
-                && (Strings.isNullOrEmpty(state) ||
-                (p.getPipelineState().toString().compareToIgnoreCase(state)
-                    == 0))))
-            .forEach(System.out::println);
-      }
-      return null;
+  public void execute(ScmClient scmClient) throws IOException {
+    Stream<Pipeline> stream = scmClient.listPipelines().stream();
+    if (!Strings.isNullOrEmpty(factor)) {
+      stream = stream.filter(
+          p -> p.getFactor().toString().compareToIgnoreCase(factor) == 0);
     }
+    if (!Strings.isNullOrEmpty(state)) {
+      stream = stream.filter(p -> p.getPipelineState().toString()
+          .compareToIgnoreCase(state) == 0);
+    }
+    stream.forEach(System.out::println);
   }
 }

@@ -32,9 +32,9 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-import org.apache.hadoop.hdfs.DFSUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.security.Credentials;
@@ -124,7 +124,7 @@ public final class OzoneKMSUtil {
     // put back into UGI
     if (keyProviderUri != null && credsKey != null) {
       credentials.addSecretKey(
-          credsKey, DFSUtil.string2Bytes(keyProviderUri.toString()));
+          credsKey, StringUtils.string2Bytes(keyProviderUri.toString()));
     }
 
     return keyProviderUri;

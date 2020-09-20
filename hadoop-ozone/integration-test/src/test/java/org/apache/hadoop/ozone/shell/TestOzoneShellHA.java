@@ -17,8 +17,20 @@
  */
 package org.apache.hadoop.ozone.shell;
 
-import com.google.common.base.Strings;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.PrintStream;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
+
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.ozone.OFSPath;
+import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -26,14 +38,20 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.shell.s3.S3Shell;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.util.ToolRunner;
+
+import com.google.common.base.Strings;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
+import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
+import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
@@ -45,15 +63,6 @@ import picocli.CommandLine.IExceptionHandler2;
 import picocli.CommandLine.ParameterException;
 import picocli.CommandLine.ParseResult;
 import picocli.CommandLine.RunLast;
-
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.PrintStream;
-import java.util.Arrays;
-import java.util.List;
-import java.util.UUID;
-
-import static org.junit.Assert.fail;
 
 /**
  * This class tests Ozone sh shell command.
@@ -337,11 +346,7 @@ public class TestOzoneShellHA {
    */
   @Test
   public void testOzoneShCmdURIs() {
-    // Test case 1: ozone sh volume create /volume
-    // Expectation: Failure.
-    String[] args = new String[] {"volume", "create", "/volume"};
-    executeWithError(ozoneShell, args,
-        "Service ID or host name must not be omitted");
+
 
     // Get leader OM node RPC address from ozone.om.address.omServiceId.omNode
     String omLeaderNodeId = getLeaderOMNodeId();
@@ -358,7 +363,7 @@ public class TestOzoneShellHA {
     // TODO: Fix this behavior, then uncomment the execute() below.
     String setOmAddress = "--set=" + OMConfigKeys.OZONE_OM_ADDRESS_KEY + "="
         + omLeaderNodeAddr;
-    args = new String[] {setOmAddress,
+    String[] args = new String[] {setOmAddress,
         "volume", "create", "o3://" + omLeaderNodeAddrWithoutPort + "/volume2"};
     //execute(ozoneShell, args);
 
@@ -380,15 +385,14 @@ public class TestOzoneShellHA {
     executeWithError(ozoneShell, args, "does not use port information");
 
     // Test case 6: ozone sh bucket create /volume/bucket
-    // Expectation: Failure.
-    args = new String[] {"bucket", "create", "/volume/bucket"};
-    executeWithError(ozoneShell, args,
-        "Service ID or host name must not be omitted");
+    // Expectation: Success.
+    args = new String[] {"bucket", "create", "/volume/bucket-one"};
+    execute(ozoneShell, args);
 
     // Test case 7: ozone sh bucket create o3://om1/volume/bucket
     // Expectation: Success.
     args = new String[] {
-        "bucket", "create", "o3://" + omServiceId + "/volume/bucket"};
+        "bucket", "create", "o3://" + omServiceId + "/volume/bucket-two"};
     execute(ozoneShell, args);
   }
 
@@ -442,31 +446,83 @@ public class TestOzoneShellHA {
     Assert.assertEquals(0, getNumOfBuckets("bucket"));
   }
 
+  /**
+   * Helper function to retrieve Ozone client configuration for trash testing.
+   * @param hostPrefix Scheme + Authority. e.g. ofs://om-service-test1
+   * @param configuration Server config to generate client config from.
+   * @return Config added with fs.ofs.impl, fs.defaultFS and fs.trash.interval.
+   */
+  private OzoneConfiguration getClientConfForOFS(
+      String hostPrefix, OzoneConfiguration configuration) {
+
+    OzoneConfiguration clientConf = new OzoneConfiguration(configuration);
+    // fs.ofs.impl should be loaded from META-INF, no need to explicitly set it
+    clientConf.set(FS_DEFAULT_NAME_KEY, hostPrefix);
+    clientConf.setInt(FS_TRASH_INTERVAL_KEY, 60);
+    return clientConf;
+  }
 
   @Test
-  public void testS3PathCommand() throws Exception {
+  @Ignore("HDDS-3982. Disable moveToTrash in o3fs and ofs temporarily")
+  public void testDeleteToTrashOrSkipTrash() throws Exception {
+    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
+    OzoneConfiguration clientConf = getClientConfForOFS(hostPrefix, conf);
+    OzoneFsShell shell = new OzoneFsShell(clientConf);
+    FileSystem fs = FileSystem.get(clientConf);
+    final String strDir1 = hostPrefix + "/volumed2t/bucket1/dir1";
+    // Note: CURRENT is also privately defined in TrashPolicyDefault
+    final Path trashCurrent = new Path("Current");
 
-    String s3Bucket = "b12345";
-    cluster.getRpcClient().getObjectStore().createS3Bucket(
-        UserGroupInformation.getCurrentUser().getUserName(), s3Bucket);
+    final String strKey1 = strDir1 + "/key1";
+    final Path pathKey1 = new Path(strKey1);
+    final Path trashPathKey1 = Path.mergePaths(new Path(
+        new OFSPath(strKey1).getTrashRoot(), trashCurrent), pathKey1);
 
-    String[] args = new String[] {"path", s3Bucket,
-        "--om-service-id="+omServiceId};
+    final String strKey2 = strDir1 + "/key2";
+    final Path pathKey2 = new Path(strKey2);
+    final Path trashPathKey2 = Path.mergePaths(new Path(
+        new OFSPath(strKey2).getTrashRoot(), trashCurrent), pathKey2);
 
-    S3Shell s3Shell = new S3Shell();
-    execute(s3Shell, args);
+    int res;
+    try {
+      res = ToolRunner.run(shell, new String[]{"-mkdir", "-p", strDir1});
+      Assert.assertEquals(0, res);
 
+      // Check delete to trash behavior
+      res = ToolRunner.run(shell, new String[]{"-touch", strKey1});
+      Assert.assertEquals(0, res);
+      // Verify key1 creation
+      FileStatus statusPathKey1 = fs.getFileStatus(pathKey1);
+      Assert.assertEquals(strKey1, statusPathKey1.getPath().toString());
+      // rm without -skipTrash. since trash interval > 0, should moved to trash
+      res = ToolRunner.run(shell, new String[]{"-rm", strKey1});
+      Assert.assertEquals(0, res);
+      // Verify that the file is moved to the correct trash location
+      FileStatus statusTrashPathKey1 = fs.getFileStatus(trashPathKey1);
+      // It'd be more meaningful if we actually write some content to the file
+      Assert.assertEquals(
+          statusPathKey1.getLen(), statusTrashPathKey1.getLen());
+      Assert.assertEquals(
+          fs.getFileChecksum(pathKey1), fs.getFileChecksum(trashPathKey1));
 
-    String volumeName =
-        cluster.getRpcClient().getObjectStore().getOzoneVolumeName(s3Bucket);
-
-    String ozoneFsUri = String.format("%s://%s.%s", OzoneConsts
-        .OZONE_URI_SCHEME, s3Bucket, volumeName);
-
-    Assert.assertTrue(out.toString().contains(volumeName));
-    Assert.assertTrue(out.toString().contains(ozoneFsUri));
-
-    out.reset();
+      // Check delete skip trash behavior
+      res = ToolRunner.run(shell, new String[]{"-touch", strKey2});
+      Assert.assertEquals(0, res);
+      // Verify key2 creation
+      FileStatus statusPathKey2 = fs.getFileStatus(pathKey2);
+      Assert.assertEquals(strKey2, statusPathKey2.getPath().toString());
+      // rm with -skipTrash
+      res = ToolRunner.run(shell, new String[]{"-rm", "-skipTrash", strKey2});
+      Assert.assertEquals(0, res);
+      // Verify that the file is NOT moved to the trash location
+      try {
+        fs.getFileStatus(trashPathKey2);
+        Assert.fail("getFileStatus on non-existent should throw.");
+      } catch (FileNotFoundException ignored) {
+      }
+    } finally {
+      shell.close();
+    }
   }
 
 }

@@ -130,7 +130,7 @@ public final class TracingUtil {
         new TraceAllMethod<>(delegate, itf.getSimpleName())));
   }
 
-  private static boolean isTracingEnabled(
+  public static boolean isTracingEnabled(
       ConfigurationSource conf) {
     return conf.getBoolean(
         ScmConfigKeys.HDDS_TRACING_ENABLED,
@@ -145,14 +145,7 @@ public final class TracingUtil {
       throws IOException {
     Span span = GlobalTracer.get()
         .buildSpan(spanName).start();
-    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
-      return supplier.get();
-    } catch (Exception ex) {
-      span.setTag("failed", true);
-      throw ex;
-    } finally {
-      span.finish();
-    }
+    return executeInSpan(span, supplier);
   }
 
   /**
@@ -171,6 +164,31 @@ public final class TracingUtil {
       span.finish();
     }
   }
+
+  /**
+   * Execute a new function a given span.
+   */
+  private static <R> R executeInSpan(Span span,
+      SupplierWithIOException<R> supplier) throws IOException {
+    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+      return supplier.get();
+    } catch (Exception ex) {
+      span.setTag("failed", true);
+      throw ex;
+    } finally {
+      span.finish();
+    }
+  }
+
+  /**
+   * Execute a new function as a child span of the parent.
+   */
+  public static <R> R executeAsChildSpan(String spanName, String parentName,
+      SupplierWithIOException<R> supplier) throws IOException {
+    Span span = TracingUtil.importAndCreateSpan(spanName, parentName);
+    return executeInSpan(span, supplier);
+  }
+
 
   /**
    * Create an active span with auto-close at finish.

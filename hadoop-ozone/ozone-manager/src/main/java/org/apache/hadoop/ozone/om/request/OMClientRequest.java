@@ -18,14 +18,9 @@
 
 package org.apache.hadoop.ozone.om.request;
 
-import java.io.IOException;
-import java.net.InetAddress;
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -35,22 +30,27 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.nio.file.Paths;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.REPLAY;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 
 /**
  * OMClientRequest provides methods which every write OM request should
@@ -58,7 +58,12 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
  */
 public abstract class OMClientRequest implements RequestAuditor {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMClientRequest.class);
   private OMRequest omRequest;
+
+  private UserGroupInformation userGroupInformation;
+  private InetAddress inetAddress;
 
   /**
    * Stores the result of request execution in
@@ -66,8 +71,6 @@ public abstract class OMClientRequest implements RequestAuditor {
    */
   public enum Result {
     SUCCESS, // The request was executed successfully
-
-    REPLAY, // The request is a replay and was ignored
 
     FAILURE // The request failed and exception was thrown
   }
@@ -160,10 +163,16 @@ public abstract class OMClientRequest implements RequestAuditor {
    */
   @VisibleForTesting
   public UserGroupInformation createUGI() {
+
+    if (userGroupInformation != null) {
+      return userGroupInformation;
+    }
+
     if (omRequest.hasUserInfo() &&
         !StringUtils.isBlank(omRequest.getUserInfo().getUserName())) {
-      return UserGroupInformation.createRemoteUser(
+      userGroupInformation = UserGroupInformation.createRemoteUser(
           omRequest.getUserInfo().getUserName());
+      return userGroupInformation;
     } else {
       // This will never happen, as for every OM request preExecute, we
       // should add userInfo.
@@ -179,9 +188,14 @@ public abstract class OMClientRequest implements RequestAuditor {
    */
   @VisibleForTesting
   public InetAddress getRemoteAddress() throws IOException {
+    if (inetAddress != null) {
+      return inetAddress;
+    }
+
     if (omRequest.hasUserInfo()) {
-      return InetAddress.getByName(omRequest.getUserInfo()
+      inetAddress = InetAddress.getByName(omRequest.getUserInfo()
           .getRemoteAddress());
+      return inetAddress;
     } else {
       return null;
     }
@@ -222,7 +236,6 @@ public abstract class OMClientRequest implements RequestAuditor {
 
   /**
    * Add the client response to double buffer and set the flush future.
-   * For responses which has status set to REPLAY it is a no-op.
    * @param trxIndex
    * @param omClientResponse
    * @param omDoubleBufferHelper
@@ -231,13 +244,8 @@ public abstract class OMClientRequest implements RequestAuditor {
       OMClientResponse omClientResponse,
       OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
     if (omClientResponse != null) {
-      // For replay transaction we do not need to add to double buffer, as
-      // for these transactions there is nothing needs to be done for
-      // addDBToBatch.
-      if (omClientResponse.getOMResponse().getStatus() != REPLAY) {
-        omClientResponse.setFlushFuture(
-            omDoubleBufferHelper.add(omClientResponse, trxIndex));
-      }
+      omClientResponse.setFlushFuture(
+          omDoubleBufferHelper.add(omClientResponse, trxIndex));
     }
   }
 
@@ -280,28 +288,71 @@ public abstract class OMClientRequest implements RequestAuditor {
     return auditMap;
   }
 
-  /**
-   * Check if the transaction is a replay.
-   * @param ozoneObj OMVolumeArgs or OMBucketInfo or OMKeyInfo object whose 
-   *                 updateID needs to be compared with
-   * @param transactionID the current transaction ID
-   * @return true if transactionID is less than or equal to updateID, false
-   * otherwise.
-   */
-  protected boolean isReplay(OzoneManager om, WithObjectID ozoneObj,
-      long transactionID) {
-    return om.isRatisEnabled() && ozoneObj.isUpdateIDset() &&
-        transactionID <= ozoneObj.getUpdateID();
+
+  public static String validateAndNormalizeKey(boolean enableFileSystemPaths,
+      String keyName) throws OMException {
+    if (enableFileSystemPaths) {
+      return validateAndNormalizeKey(keyName);
+    } else {
+      return keyName;
+    }
+  }
+
+  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
+  public static String validateAndNormalizeKey(String keyName)
+      throws OMException {
+    String normalizedKeyName;
+    if (keyName.startsWith(OM_KEY_PREFIX)) {
+      normalizedKeyName = Paths.get(keyName).toUri().normalize().getPath();
+    } else {
+      normalizedKeyName = Paths.get(OM_KEY_PREFIX, keyName).toUri()
+          .normalize().getPath();
+    }
+    if (!keyName.equals(normalizedKeyName)) {
+      LOG.debug("Normalized key {} to {} ", keyName,
+          normalizedKeyName.substring(1));
+    }
+    return isValidKeyPath(normalizedKeyName.substring(1));
   }
 
   /**
-   * Return a dummy OMClientResponse for when the transactions are replayed.
+   * Whether the pathname is valid.  Check key names which contain a
+   * ":", ".", "..", "//", "". If it has any of these characters throws
+   * OMException, else return the path.
    */
-  protected OMResponse createReplayOMResponse(
-      @Nonnull OMResponse.Builder omResponse) {
+  private static String isValidKeyPath(String path) throws OMException {
+    boolean isValid = true;
 
-    omResponse.setSuccess(false);
-    omResponse.setStatus(REPLAY);
-    return omResponse.build();
+    // If keyName is empty string throw error.
+    if (path.length() == 0) {
+      throw new OMException("Invalid KeyPath, empty keyName" + path,
+          INVALID_KEY_NAME);
+    } else if(path.startsWith("/")) {
+      isValid = false;
+    } else {
+      // Check for ".." "." ":" "/"
+      String[] components = StringUtils.split(path, '/');
+      for (int i = 0; i < components.length; i++) {
+        String element = components[i];
+        if (element.equals(".") ||
+            (element.contains(":")) ||
+            (element.contains("/") || element.equals(".."))) {
+          isValid = false;
+          break;
+        }
+
+        // The string may end with a /, but not have
+        // "//" in the middle.
+        if (element.isEmpty() && i != components.length - 1) {
+          isValid = false;
+        }
+      }
+    }
+
+    if (isValid) {
+      return path;
+    } else {
+      throw new OMException("Invalid KeyPath " + path, INVALID_KEY_NAME);
+    }
   }
 }

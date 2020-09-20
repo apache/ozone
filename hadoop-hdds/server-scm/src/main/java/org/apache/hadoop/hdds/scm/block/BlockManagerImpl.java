@@ -32,6 +32,8 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmOps;
+import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
+import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -42,9 +44,10 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.safemode.SafeModePrecheck;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.util.StringUtils;
@@ -76,6 +79,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
 
   private ObjectName mxBean;
   private SafeModePrecheck safeModePrecheck;
+  private PipelineChoosePolicy pipelineChoosePolicy;
 
   /**
    * Constructor.
@@ -89,7 +93,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     Objects.requireNonNull(scm, "SCM cannot be null");
     this.pipelineManager = scm.getPipelineManager();
     this.containerManager = scm.getContainerManager();
-
+    this.pipelineChoosePolicy = scm.getPipelineChoosePolicy();
     this.containerSize = (long)conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
@@ -151,7 +155,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
       ReplicationFactor factor, String owner, ExcludeList excludeList)
       throws IOException {
     if (LOG.isTraceEnabled()) {
-      LOG.trace("Size;{} , type : {}, factor : {} ", size, type, factor);
+      LOG.trace("Size : {} , type : {}, factor : {} ", size, type, factor);
     }
     ScmUtils.preCheck(ScmOps.allocateBlock, safeModePrecheck);
     if (size < 0 || size > containerSize) {
@@ -221,9 +225,12 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
       }
 
       if (null == pipeline) {
-        // TODO: #CLUTIL Make the selection policy driven.
-        pipeline = availablePipelines
-            .get((int) (Math.random() * availablePipelines.size()));
+        PipelineRequestInformation pri =
+            PipelineRequestInformation.Builder.getBuilder()
+                .setSize(size)
+                .build();
+        pipeline = pipelineChoosePolicy.choosePipeline(
+            availablePipelines, pri);
       }
 
       // look for OPEN containers that match the criteria.
@@ -353,11 +360,6 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     return this.blockDeletingService;
   }
 
-  @Override
-  public void handleSafeModeTransition(
-      SCMSafeModeManager.SafeModeStatus status) {
-    this.safeModePrecheck.setInSafeMode(status.isInSafeMode());
-  }
   /**
    * Returns status of scm safe mode determined by SAFE_MODE_STATUS event.
    * */
@@ -370,6 +372,12 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
    * */
   public static Logger getLogger() {
     return LOG;
+  }
+
+  @Override
+  public void onMessage(SafeModeStatus status,
+      EventPublisher publisher) {
+    this.safeModePrecheck.setInSafeMode(status.isInSafeMode());
   }
 
   /**

@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerActionsHandler;
@@ -33,6 +34,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
@@ -50,10 +53,10 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.ozone.recon.fsck.MissingContainerTask;
+import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
 import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
-
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import com.google.inject.Inject;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREFIX;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpcServerStartMessage;
@@ -82,6 +85,8 @@ public class ReconStorageContainerManagerFacade
   private NetworkTopology clusterMap;
   private StorageContainerServiceProvider scmServiceProvider;
   private Set<ReconScmTask> reconScmTasks = new HashSet<>();
+  private SCMContainerPlacementMetrics placementMetrics;
+  private PlacementPolicy containerPlacementPolicy;
 
   @Inject
   public ReconStorageContainerManagerFacade(OzoneConfiguration conf,
@@ -95,20 +100,25 @@ public class ReconStorageContainerManagerFacade
     this.scmStorageConfig = new ReconStorageConfig(conf);
     this.clusterMap = new NetworkTopologyImpl(conf);
     dbStore = DBStoreBuilder
-        .createDBStore(ozoneConfiguration, new ReconDBDefinition());
+        .createDBStore(ozoneConfiguration, new ReconSCMDBDefinition());
 
     this.nodeManager =
-        new ReconNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
+        new ReconNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
+            ReconSCMDBDefinition.NODES.getTable(dbStore));
+    placementMetrics = SCMContainerPlacementMetrics.create();
+    this.containerPlacementPolicy =
+        ContainerPlacementPolicyFactory.getPolicy(conf, nodeManager,
+        clusterMap, true, placementMetrics);
     this.datanodeProtocolServer = new ReconDatanodeProtocolServer(
         conf, this, eventQueue);
     this.pipelineManager =
 
         new ReconPipelineManager(conf,
             nodeManager,
-            ReconDBDefinition.PIPELINES.getTable(dbStore),
+            ReconSCMDBDefinition.PIPELINES.getTable(dbStore),
             eventQueue);
     this.containerManager = new ReconContainerManager(conf,
-        ReconDBDefinition.CONTAINERS.getTable(dbStore),
+        ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
         dbStore,
         pipelineManager,
         scmServiceProvider,
@@ -154,15 +164,18 @@ public class ReconStorageContainerManagerFacade
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
     eventQueue.addHandler(SCMEvents.NEW_NODE, newNodeHandler);
 
+    ReconTaskConfig reconTaskConfig = conf.getObject(ReconTaskConfig.class);
     reconScmTasks.add(new PipelineSyncTask(
-        this,
+        pipelineManager,
         scmServiceProvider,
-        reconTaskStatusDao));
-    reconScmTasks.add(new MissingContainerTask(
-        this,
         reconTaskStatusDao,
-        containerSchemaManager));
-    reconScmTasks.forEach(ReconScmTask::register);
+        reconTaskConfig));
+    reconScmTasks.add(new ContainerHealthTask(
+        containerManager,
+        reconTaskStatusDao,
+        containerSchemaManager,
+        containerPlacementPolicy,
+        reconTaskConfig));
   }
 
   /**

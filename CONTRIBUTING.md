@@ -44,7 +44,6 @@ Requirements to compile the code:
 * Unix System
 * JDK 1.8 or higher
 * Maven 3.5 or later
-* Protocol Buffers 2.5 (see the next session for installation)
 * Internet connection for first build (to fetch all Maven and Hadoop dependencies)
 
 Additional requirements to run your first pseudo cluster:
@@ -63,28 +62,11 @@ Optional dependencies:
 
 * [hugo](https://gohugo.io/) to include the documentation in the web ui.
 
-#### Installing protobuf 2.5
-
-Protobuf 2.5 can be installed from the source:
-
-```
-mkdir -p /usr/local/src/
-cd /usr/local/src/
-wget https://github.com/google/protobuf/releases/download/v2.5.0/protobuf-2.5.0.tar.gz
-tar xvf protobuf-2.5.0.tar.gz
-cd protobuf-2.5.0
-./autogen.sh
-./configure --prefix=/usr
-make
-make install
-protoc --version
-```
-
 (Standard development tools such as make, gcc, etc. are required.)
 
 ### Build the project
 
-After installing the requirements (especially maven and protobuf) the build is as simple as:
+After installing the requirements (especially maven) the build is as simple as:
 
 ```
 mvn clean install -DskipTests

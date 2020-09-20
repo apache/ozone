@@ -22,6 +22,7 @@ import com.google.common.collect.Lists;
 import org.apache.hadoop.hdds.scm.storage.CheckedBiFunction;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeAclOpResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -76,9 +77,7 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
 
   @Override
   OMResponse.Builder onInit() {
-    return OMResponse.newBuilder().setCmdType(
-        OzoneManagerProtocolProtos.Type.RemoveAcl)
-        .setStatus(OzoneManagerProtocolProtos.Status.OK).setSuccess(true);
+    return OmResponseUtil.getOMResponseBuilder(getOmRequest());
   }
 
   @Override
@@ -102,12 +101,6 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Remove acl: {} from volume: {} success!", getAcl(),
             getVolumeName());
-      }
-      break;
-    case REPLAY:
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-            getOmRequest());
       }
       break;
     case FAILURE:

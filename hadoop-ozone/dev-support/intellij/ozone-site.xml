@@ -24,6 +24,14 @@
     <value>localhost</value>
   </property>
   <property>
+    <name>ozone.csi.owner</name>
+    <value>hadoop</value>
+  </property>
+  <property>
+    <name>ozone.csi.socket</name>
+    <value>/tmp/csi.sock</value>
+  </property>
+  <property>
     <name>ozone.scm.client.address</name>
     <value>localhost</value>
   </property>

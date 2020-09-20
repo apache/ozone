@@ -20,11 +20,9 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import java.util.List;
 
-import javax.inject.Inject;
-
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.util.Time;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.slf4j.Logger;
@@ -41,17 +39,16 @@ public class PipelineSyncTask extends ReconScmTask {
 
   private StorageContainerServiceProvider scmClient;
   private ReconPipelineManager reconPipelineManager;
-  private static final long INTERVAL = 10 * 60 * 1000L;
+  private final long interval;
 
-  @Inject
-  public PipelineSyncTask(
-      OzoneStorageContainerManager storageContainerManager,
+  public PipelineSyncTask(ReconPipelineManager pipelineManager,
       StorageContainerServiceProvider scmClient,
-      ReconTaskStatusDao reconTaskStatusDao) {
+      ReconTaskStatusDao reconTaskStatusDao,
+      ReconTaskConfig reconTaskConfig) {
     super(reconTaskStatusDao);
     this.scmClient = scmClient;
-    this.reconPipelineManager = (ReconPipelineManager)
-        storageContainerManager.getPipelineManager();
+    this.reconPipelineManager = pipelineManager;
+    this.interval = reconTaskConfig.getPipelineSyncTaskInterval().toMillis();
   }
 
   @Override
@@ -64,7 +61,7 @@ public class PipelineSyncTask extends ReconScmTask {
         LOG.info("Pipeline sync Thread took {} milliseconds.",
             Time.monotonicNow() - start);
         recordSingleRunCompletion();
-        wait(INTERVAL);
+        wait(interval);
       }
     } catch (Throwable t) {
       LOG.error("Exception in Pipeline sync Thread.", t);

@@ -47,7 +47,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.ANCESTOR_GENERATION_DE
  */
 public class NetworkTopologyImpl implements NetworkTopology{
   public static final Logger LOG =
-      LoggerFactory.getLogger(NetworkTopology.class);
+      LoggerFactory.getLogger(NetworkTopologyImpl.class);
 
   /** The Inner node crate factory. */
   private final InnerNode.Factory factory;

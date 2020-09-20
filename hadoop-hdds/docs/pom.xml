@@ -20,10 +20,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-hdds</artifactId>
-    <version>0.6.0-SNAPSHOT</version>
+    <version>1.1.0-SNAPSHOT</version>
   </parent>
   <artifactId>hadoop-hdds-docs</artifactId>
-  <version>0.6.0-SNAPSHOT</version>
+  <version>1.1.0-SNAPSHOT</version>
   <description>Apache Hadoop HDDS/Ozone Documentation</description>
   <name>Apache Hadoop HDDS/Ozone Documentation</name>
   <packaging>jar</packaging>
@@ -36,7 +36,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
-        <version>1.6.0</version>
         <executions>
           <execution>
             <goals>
@@ -53,9 +52,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <groupId>org.apache.rat</groupId>
         <artifactId>apache-rat-plugin</artifactId>
         <configuration>
-          <excludes>
+            <excludes>
+            <exclude>static/slides/*</exclude>
             <exclude>themes/ozonedoc/static/js/bootstrap.min.js</exclude>
-            <exclude>themes/ozonedoc/static/js/jquery-3.4.1.min.js</exclude>
+            <exclude>themes/ozonedoc/static/js/jquery-3.5.1.min.js</exclude>
             <exclude>themes/ozonedoc/static/css/bootstrap-theme.min.css
             </exclude>
             <exclude>themes/ozonedoc/static/css/bootstrap.min.css.map</exclude>

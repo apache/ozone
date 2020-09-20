@@ -34,7 +34,6 @@ public class TestNetUtils {
     assertEquals("/", NetUtils.normalize("/"));
     assertThrows(IllegalArgumentException.class, () -> NetUtils.normalize("x"));
     assertEquals("/a/b/c", NetUtils.normalize("/a/b/c"));
-    assertEquals("/a/b/c", NetUtils.normalize("/a/b/c////"));
     assertEquals("/a/b/c/$", NetUtils.normalize("/a/b/c/$"));
   }
 }

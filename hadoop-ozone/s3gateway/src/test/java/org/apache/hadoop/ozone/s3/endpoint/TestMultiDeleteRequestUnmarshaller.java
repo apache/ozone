@@ -25,7 +25,6 @@ import java.io.IOException;
 import org.junit.Assert;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.*;
 import org.junit.Test;
 
 /**

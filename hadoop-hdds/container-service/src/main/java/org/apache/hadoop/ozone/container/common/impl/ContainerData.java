@@ -24,6 +24,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.
     ContainerType;
@@ -501,6 +502,15 @@ public abstract class ContainerData {
    */
   public void decrKeyCount() {
     this.keyCount.decrementAndGet();
+  }
+
+  /**
+   * Decrease the count of keys in the container.
+   *
+   * @param deletedKeyCount
+   */
+  public void decrKeyCount(long deletedKeyCount) {
+    this.keyCount.addAndGet(-1 * deletedKeyCount);
   }
 
   /**

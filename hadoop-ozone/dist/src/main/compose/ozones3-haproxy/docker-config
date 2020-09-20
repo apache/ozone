@@ -14,8 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+CORE-SITE.XML_fs.defaultFS=ofs://om
+
 OZONE-SITE.XML_ozone.om.address=om
 OZONE-SITE.XML_ozone.scm.container.size=1GB
+OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
 OZONE-SITE.XML_ozone.scm.names=scm
 OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
@@ -31,4 +34,4 @@ HDFS-SITE.XML_rpc.metrics.percentiles.intervals=60,300
 #Enable this variable to print out all hadoop rpc traffic to the stdout. See http://byteman.jboss.org/ to define your own instrumentation.
 #BYTEMAN_SCRIPT_URL=https://raw.githubusercontent.com/apache/hadoop/trunk/dev-support/byteman/hadooprpc.btm
 
-no_proxy=om,scm,s3g,kdc,localhost,127.0.0.1
+no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1

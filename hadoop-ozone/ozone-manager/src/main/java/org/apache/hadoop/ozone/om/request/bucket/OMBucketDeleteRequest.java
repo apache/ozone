@@ -23,6 +23,7 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,7 +36,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.response.bucket.OMBucketDeleteResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
@@ -80,10 +81,8 @@ public class OMBucketDeleteRequest extends OMClientRequest {
     String bucketName = deleteBucketRequest.getBucketName();
 
     // Generate end user response
-    OMResponse.Builder omResponse = OMResponse.newBuilder()
-        .setStatus(OzoneManagerProtocolProtos.Status.OK)
-        .setCmdType(omRequest.getCmdType());
-
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     Map<String, String> auditMap = buildVolumeAuditMap(volumeName);
@@ -103,7 +102,6 @@ public class OMBucketDeleteRequest extends OMClientRequest {
             volumeName, bucketName, null);
       }
 
-
       // acquire lock
       acquiredVolumeLock =
           omMetadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName);
@@ -112,25 +110,12 @@ public class OMBucketDeleteRequest extends OMClientRequest {
           volumeName, bucketName);
 
       // No need to check volume exists here, as bucket cannot be created
-      // with out volume creation.
-      //Check if bucket exists
+      // with out volume creation. Check if bucket exists
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-      OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable()
-          .get(bucketKey);
-      if (omBucketInfo == null) {
-        LOG.debug("bucket: {} not found ", bucketName);
-        throw new OMException("Bucket doesn't exist",
-            OMException.ResultCodes.BUCKET_NOT_FOUND);
-      }
 
-      // Check if this transaction is a replay of ratis logs.
-      // If this is a replay, then the response has already been returned to
-      // the client. So take no further action and return a dummy
-      // OMClientResponse.
-      if (isReplay(ozoneManager, omBucketInfo, transactionLogIndex)) {
-        LOG.debug("Replayed Transaction {} ignored. Request: {}",
-            transactionLogIndex, deleteBucketRequest);
-        return new OMBucketDeleteResponse(createReplayOMResponse(omResponse));
+      if (!omMetadataManager.getBucketTable().isExist(bucketKey)) {
+        LOG.debug("bucket: {} not found ", bucketName);
+        throw new OMException("Bucket already exist", BUCKET_NOT_FOUND);
       }
 
       //Check if bucket is empty
@@ -156,7 +141,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       success = false;
       exception = ex;
       omClientResponse = new OMBucketDeleteResponse(
-          createErrorOMResponse(omResponse, exception), volumeName, bucketName);
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

@@ -88,6 +88,7 @@ public class TestOzoneManagerHttpServer {
   }
 
   @AfterClass public static void tearDown() throws Exception {
+    connectionFactory.destroy();
     FileUtil.fullyDelete(new File(BASEDIR));
     KeyStoreTestUtil.cleanupSSLConfig(keystoresDir, sslConfDir);
   }

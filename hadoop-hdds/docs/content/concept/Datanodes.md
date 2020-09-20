@@ -1,7 +1,10 @@
 ---
 title: "Datanodes"
 date: "2017-09-14"
-weight: 4
+weight: 7
+menu: 
+  main:
+     parent: Architecture
 summary: Ozone supports Amazon's Simple Storage Service (S3) protocol. In fact, You can use S3 clients and S3 SDK based applications without any modifications with Ozone.
 ---
 <!---
@@ -55,7 +58,7 @@ Storage Container Manager (SCM). In most cases, the container location will be
 cached by Ozone Manager and will be returned along with the Ozone blocks.
 
 
-Once the client is able to locate the contianer, that is, understand which
+Once the client is able to locate the container, that is, understand which
 data nodes contain this container, the client will connect to the datanode
 and read the data stream specified by _Container ID:Local ID_. In other
 words, the local ID serves as index into the container which describes what

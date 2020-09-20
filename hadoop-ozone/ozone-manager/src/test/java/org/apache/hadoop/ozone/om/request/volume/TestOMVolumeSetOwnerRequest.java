@@ -92,6 +92,13 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
         .getVolumeTable().get(volumeKey).getOwnerName();
     Assert.assertEquals(newOwner, fromDBOwner);
 
+    // modificationTime should be greater than creationTime.
+    long creationTime = omMetadataManager.getVolumeTable()
+        .get(volumeKey).getCreationTime();
+    long modificationTime = omMetadataManager.getVolumeTable()
+        .get(volumeKey).getModificationTime();
+    Assert.assertTrue(modificationTime > creationTime);
+
 
     OzoneManagerProtocolProtos.UserVolumeInfo newOwnerVolumeList =
         omMetadataManager.getUserTable().get(newOwnerKey);
@@ -144,7 +151,7 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     // create request with quota set.
     OMRequest originalRequest =
         TestOMRequestUtils.createSetVolumePropertyRequest(volumeName,
-            100L);
+            100L, 100L);
 
     OMVolumeSetOwnerRequest omVolumeSetOwnerRequest =
         new OMVolumeSetOwnerRequest(originalRequest);
@@ -160,37 +167,6 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     Assert.assertNotNull(omResponse.getCreateVolumeResponse());
     Assert.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST,
         omResponse.getStatus());
-  }
-
-  @Test
-  public void testReplayRequest() throws Exception {
-    // create volume
-    String volumeName = UUID.randomUUID().toString();
-    String ownerName = "user1";
-    TestOMRequestUtils.addUserToDB(volumeName, ownerName, omMetadataManager);
-    TestOMRequestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
-
-    // create request to set new owner
-    String newOwnerName = "user2";
-    OMRequest originalRequest =
-        TestOMRequestUtils.createSetVolumePropertyRequest(volumeName,
-            newOwnerName);
-    OMVolumeSetOwnerRequest omVolumeSetOwnerRequest =
-        new OMVolumeSetOwnerRequest(originalRequest);
-
-    // Execute the original request
-    omVolumeSetOwnerRequest.preExecute(ozoneManager);
-    omVolumeSetOwnerRequest.validateAndUpdateCache(ozoneManager, 1,
-        ozoneManagerDoubleBufferHelper);
-
-    // Replay the transaction - Execute the same request again
-    OMClientResponse omClientResponse =
-        omVolumeSetOwnerRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
-
-    // Replay should result in Replay response
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
-        omClientResponse.getOMResponse().getStatus());
   }
 
 

@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -30,6 +31,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
+import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .UserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -203,6 +205,18 @@ public interface OMMetadataManager {
       String startKeyName, String keyPrefix, int maxKeys) throws IOException;
 
   /**
+   * Recover trash allows the user to recover the keys
+   * that were marked as deleted, but not actually deleted by Ozone Manager.
+   * @param volumeName - The volume name.
+   * @param bucketName - The bucket name.
+   * @param keyName - The key user want to recover.
+   * @param destinationBucket - The bucket user want to recover to.
+   * @return The result of recovering operation is success or not.
+   */
+  boolean recoverTrash(String volumeName, String bucketName,
+      String keyName, String destinationBucket) throws IOException;
+
+  /**
    * Returns a list of volumes owned by a given user; if user is null, returns
    * all volumes.
    *
@@ -230,14 +244,14 @@ public interface OMMetadataManager {
   List<BlockGroup> getPendingDeletionKeys(int count) throws IOException;
 
   /**
-   * Returns a list of all still open key info. Which contains the info about
-   * the key name and all its associated block IDs. A pending open key has
-   * prefix #open# in OM DB.
+   * Returns the names of up to {@code count} open keys that are older than
+   * the configured expiration age.
    *
-   * @return a list of {@link BlockGroup} representing keys and blocks.
+   * @param count The maximum number of open keys to return.
+   * @return a list of {@link String} representing names of open expired keys.
    * @throws IOException
    */
-  List<BlockGroup> getExpiredOpenKeys() throws IOException;
+  List<String> getExpiredOpenKeys(int count) throws IOException;
 
   /**
    * Returns the user Table.
@@ -289,14 +303,6 @@ public interface OMMetadataManager {
   Table<OzoneTokenIdentifier, Long> getDelegationTokenTable();
 
   /**
-   * Gets the S3Bucket to Ozone Volume/bucket mapping table.
-   *
-   * @return Table.
-   */
-
-  Table<String, String> getS3Table();
-
-  /**
    * Gets the Ozone prefix path to its acl mapping table.
    * @return Table.
    */
@@ -328,6 +334,8 @@ public interface OMMetadataManager {
    */
   Table<String, S3SecretValue> getS3SecretTable();
 
+  Table<String, OMTransactionInfo> getTransactionInfoTable();
+
   /**
    * Returns number of rows in a table.  This should not be used for very
    * large tables.
@@ -355,4 +363,23 @@ public interface OMMetadataManager {
    */
   Set<String> getMultipartUploadKeys(String volumeName,
       String bucketName, String prefix) throws IOException;
+
+  /**
+   * Return table mapped to the specified table name.
+   * @param tableName
+   * @return Table
+   */
+  Table getTable(String tableName);
+
+  /**
+   * Return a map of tableName and table in OM DB.
+   * @return map of table and table name.
+   */
+  Map<String, Table> listTables();
+
+  /**
+   * Return Set of table names created in OM DB.
+   * @return table names in OM DB.
+   */
+  Set<String> listTableNames();
 }

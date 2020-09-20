@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@babel/core": "^7.0.0",
+    "@types/classnames": "^2.2.10",
     "@types/jest": "24.0.12",
     "@types/node": "11.13.9",
     "@types/react": "16.8.15",
@@ -11,21 +12,24 @@
     "@types/react-router-dom": "^4.3.3",
     "antd": "^3.26.9",
     "axios": "^0.19.0",
-    "babel-jest": "24.7.1",
+    "babel-jest": "^24.9.0",
     "babel-plugin-import": "^1.11.0",
     "classnames": "^2.2.6",
     "customize-cra": "^0.2.12",
-    "filesize": "^6.0.1",
+    "filesize": "^6.1.0",
     "less": "^3.9.0",
     "less-loader": "^5.0.0",
     "moment": "^2.24.0",
-    "pretty-bytes": "^5.3.0",
+    "plotly.js": "^1.54.1",
     "pretty-ms": "^5.1.0",
     "react": "^16.8.6",
     "react-app-rewired": "^2.1.3",
     "react-dom": "^16.8.6",
+    "react-plotly.js": "^2.4.0",
+    "react-router": "^5.1.2",
     "react-router-dom": "^5.0.0",
-    "react-scripts": "3.0.0",
+    "react-scripts": "^3.1.2",
+    "react-select": "^3.0.3",
     "typescript": "3.4.5"
   },
   "scripts": {
@@ -35,7 +39,8 @@
     "eject": "react-scripts eject",
     "mock:api": "json-server --watch api/db.json --routes api/routes.json --port 9888",
     "dev": "npm-run-all --parallel mock:api start",
-    "lint": "eslint '**/*.tsx'"
+    "lint": "xo src/*",
+    "lint:fix": "xo --fix src/*"
   },
   "eslintConfig": {
     "extends": "react-app"
@@ -53,8 +58,109 @@
     ]
   },
   "devDependencies": {
+    "@types/react-plotly.js": "^2.2.4",
+    "@types/react-select": "^3.0.13",
+    "@typescript-eslint/eslint-plugin": "^2.31.0",
+    "@typescript-eslint/parser": "^2.31.0",
+    "eslint": "^6.6.0",
+    "eslint-config-xo": "^0.29.1",
+    "eslint-config-xo-react": "^0.23.0",
+    "eslint-config-xo-typescript": "^0.28.0",
+    "eslint-plugin-import": "^2.20.2",
+    "eslint-plugin-react": "^7.19.0",
+    "eslint-plugin-unicorn": "^19.0.1",
     "json-server": "^0.15.1",
-    "npm-run-all": "^4.1.5"
+    "npm-run-all": "^4.1.5",
+    "xo": "^0.30.0"
+  },
+  "xo": {
+    "space": true,
+    "parser": "@typescript-eslint/parser",
+    "settings": {
+      "react": {
+        "pragma": "React",
+        "version": "16.8.6"
+      }
+    },
+    "rules": {
+      "jsx-quotes": [
+        2,
+        "prefer-single"
+      ],
+      "import/no-unassigned-import": 0,
+      "@typescript-eslint/explicit-function-return-type": "off",
+      "@typescript-eslint/prefer-readonly-parameter-types": "off",
+      "@typescript-eslint/interface-name-prefix": [
+        2,
+        "always"
+      ],
+      "import/no-extraneous-dependencies": [
+        "error",
+        {
+          "devDependencies": true,
+          "optionalDependencies": true,
+          "peerDependencies": true
+        }
+      ],
+      "camelcase": 0,
+      "react/state-in-constructor": 0,
+      "react/boolean-prop-naming": 0,
+      "promise/prefer-await-to-then": 0,
+      "react/require-default-props": 0,
+      "react/default-props-match-prop-types": 0,
+      "unicorn/prevent-abbreviations": 0,
+      "react/no-array-index-key": 0,
+      "no-return-assign": 0,
+      "indent": [
+        2,
+        2,
+        {
+          "SwitchCase": 1
+        }
+      ],
+      "unicorn/filename-case": [
+        "error",
+        {
+          "case": "camelCase",
+          "ignore": [
+            "^react-app-env"
+          ]
+        }
+      ],
+      "import/extensions": [
+        "error",
+        "ignorePackages",
+        {
+          "js": "never",
+          "ts": "never",
+          "tsx": "never"
+        }
+      ],
+      "no-unused-vars": [
+        2,
+        {
+          "argsIgnorePattern": "^_\\w*",
+          "varsIgnorePattern": "^_\\w*"
+        }
+      ],
+      "eslint-comments/disable-enable-pair": [
+        2,
+        {
+          "allowWholeFile": true
+        }
+      ]
+    },
+    "env": [
+      "node",
+      "es6",
+      "mocha",
+      "jest",
+      "browser"
+    ],
+    "extends": [
+      "xo-react/space",
+      "plugin:@typescript-eslint/recommended"
+    ]
   },
   "proxy": "http://localhost:9888"
 }

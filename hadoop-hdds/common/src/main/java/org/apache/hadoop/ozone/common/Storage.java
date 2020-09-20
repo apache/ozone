@@ -48,6 +48,7 @@ public abstract class Storage {
   public static final String STORAGE_DIR_CURRENT = "current";
   protected static final String STORAGE_FILE_VERSION = "VERSION";
   public static final String CONTAINER_DIR = "containerDir";
+  private static final int LAYOUT_VERSION = 0;
 
   private final NodeType nodeType;
   private final File root;
@@ -74,7 +75,7 @@ public abstract class Storage {
       this.storageInfo = new StorageInfo(type, getVersionFile());
     } else {
       this.storageInfo = new StorageInfo(
-          nodeType, StorageInfo.newClusterID(), Time.now());
+          nodeType, StorageInfo.newClusterID(), Time.now(), LAYOUT_VERSION);
       setNodeProperties();
     }
   }
@@ -114,6 +115,10 @@ public abstract class Storage {
     } else {
       storageInfo.setClusterId(clusterId);
     }
+  }
+
+  public int getLayoutVersion() {
+    return storageInfo.getLayoutVersion();
   }
 
   /**
@@ -163,7 +168,7 @@ public abstract class Storage {
    *
    * @return the version file path
    */
-  private File getVersionFile() {
+  public File getVersionFile() {
     return new File(getCurrentDir(), STORAGE_FILE_VERSION);
   }
 

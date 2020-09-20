@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,7 +17,7 @@
  */
 
 import * as React from 'react';
-import {Tooltip} from "antd";
+import {Tooltip} from 'antd';
 
 export class FilledIcon extends React.Component {
   render() {
@@ -26,64 +26,75 @@ export class FilledIcon extends React.Component {
         '704c0 53 43 96 96 96h704c53 0 96-43 96-96V16' +
         '0c0-53-43-96-96-96z';
     return (
-        <svg {...(this.props as any)} viewBox="0 0 1024 1024">
-          <path d={path} />
-        </svg>
+      <svg {...(this.props as Record<string, object>)} viewBox='0 0 1024 1024'>
+        <path d={path}/>
+      </svg>
     );
   }
 }
 
-interface RatisIconProps {
+interface IRatisIconProps {
   replicationFactor: number;
+  isLeader: boolean;
 }
 
-interface ReplicationIconProps {
+interface IReplicationIconProps {
   replicationFactor: number;
   replicationType: string;
+  leaderNode: string;
+  isLeader: boolean;
 }
 
-export class RatisIcon extends React.PureComponent<RatisIconProps> {
+export class RatisIcon extends React.PureComponent<IRatisIconProps> {
   render() {
-    const {replicationFactor} = this.props;
-    const textClass = replicationFactor >= 3 ? 'icon-text-three-dots' : 'icon-text-one-dot';
+    const {replicationFactor, isLeader} = this.props;
+    const threeFactorClass = isLeader ? 'icon-text-three-dots-leader' : 'icon-text-three-dots';
+    const textClass = replicationFactor >= 3 ? threeFactorClass : 'icon-text-one-dot';
     return (
-        <div className="ratis-icon">
-          <div className={textClass}>R</div>
-        </div>
-    )
+      <div className='ratis-icon'>
+        <div className={textClass}>R</div>
+      </div>
+    );
   }
 }
 
 export class StandaloneIcon extends React.PureComponent {
   render() {
     return (
-        <div className="standalone-icon">
-          <div className="icon-text-one-dot">S</div>
-        </div>
-    )
+      <div className='standalone-icon'>
+        <div className='icon-text-one-dot'>S</div>
+      </div>
+    );
   }
 }
 
-export class ReplicationIcon extends React.PureComponent<ReplicationIconProps> {
+export class ReplicationIcon extends React.PureComponent<IReplicationIconProps> {
   render() {
-    const {replicationType, replicationFactor} = this.props;
+    const {replicationType, replicationFactor, isLeader, leaderNode} = this.props;
     // Assign icons only for RATIS and STAND_ALONE types
     let icon = null;
     if (replicationType === 'RATIS') {
-      icon = <RatisIcon replicationFactor={replicationFactor}/>
+      icon = <RatisIcon replicationFactor={replicationFactor} isLeader={isLeader}/>;
     } else if (replicationType === 'STAND_ALONE') {
-      icon = <StandaloneIcon/>
+      icon = <StandaloneIcon/>;
     }
+
     // Wrap the icon in a tooltip
     if (icon) {
-      const tooltip = <div>
-        <div>Replication Type: {replicationType}</div>
-        <div>Replication Factor: {replicationFactor}</div>
-      </div>;
-      icon = <Tooltip title={tooltip} placement="right">
-        <div className="replication-icon">{icon}</div>
-      </Tooltip>;
+      const tooltip = (
+        <div>
+          <div>Replication Type: {replicationType}</div>
+          <div>Replication Factor: {replicationFactor}</div>
+          <div>Leader Node: {leaderNode}</div>
+        </div>
+      );
+      icon = (
+        <Tooltip title={tooltip} placement='right' className='pointer'>
+          <div className='replication-icon'>{icon}</div>
+        </Tooltip>
+      );
     }
+
     return icon;
   }
 }

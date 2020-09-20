@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Lightweight interface to defined the contract of the Configuration objects.
+ * Defines read-only contract of Configuration objects.
  */
 public interface ConfigurationSource {
 
@@ -35,10 +35,7 @@ public interface ConfigurationSource {
 
   Collection<String> getConfigKeys();
 
-  @Deprecated
-    //TODO: user read only configs and don't use it to store actual port
-    // numbers.
-  void set(String key, String value);
+  char[] getPassword(String key) throws IOException;
 
   default String get(String key, String defaultValue) {
     String value = get(key);
@@ -106,10 +103,6 @@ public interface ConfigurationSource {
     }
 
     return valueString.trim().split("\\s*[,\n]\\s*");
-  }
-
-  default char[] getPassword(String key) throws IOException {
-    return get(key).toCharArray();
   }
 
   default Map<String, String> getPropsWithPrefix(String confPrefix) {

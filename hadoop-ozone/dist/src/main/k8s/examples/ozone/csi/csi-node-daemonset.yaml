@@ -15,7 +15,7 @@
 # limitations under the License.
 
 kind: DaemonSet
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 metadata:
   name: csi-node
 spec:
@@ -60,7 +60,7 @@ spec:
         envFrom:
         - configMapRef:
             name: config
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         volumeMounts:
         - name: plugin-dir
           mountPath: /var/lib/csi

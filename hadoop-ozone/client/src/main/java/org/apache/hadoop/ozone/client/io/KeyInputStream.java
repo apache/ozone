@@ -322,4 +322,15 @@ public class KeyInputStream extends InputStream implements Seekable {
   public long getRemainingOfIndex(int index) throws IOException {
     return blockStreams.get(index).getRemaining();
   }
+
+  @Override
+  public long skip(long n) throws IOException {
+    if (n <= 0) {
+      return 0;
+    }
+
+    long toSkip = Math.min(n, length - getPos());
+    seek(getPos() + toSkip);
+    return toSkip;
+  }
 }

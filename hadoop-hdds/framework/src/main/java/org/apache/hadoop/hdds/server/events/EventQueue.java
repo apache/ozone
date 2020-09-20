@@ -17,17 +17,6 @@
  */
 package org.apache.hadoop.hdds.server.events;
 
-import com.google.common.annotations.VisibleForTesting;
-
-import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.util.Time;
-
-import com.google.common.base.Preconditions;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -36,6 +25,16 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.Time;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Simple async event processing utility.
@@ -204,7 +203,7 @@ public class EventQueue implements EventPublisher, AutoCloseable {
    * all the dependent messages (messages which are sent by current handlers)
    * are processed.
    *
-   * @param timeout Timeout in seconds to wait for the processing.
+   * @param timeout Timeout in milliseconds to wait for the processing.
    */
   @VisibleForTesting
   public void processAll(long timeout) {

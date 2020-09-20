@@ -31,7 +31,6 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import javax.ws.rs.core.Response.Status;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
@@ -53,7 +52,6 @@ import org.apache.hadoop.ozone.s3.util.S3StorageType;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.StringUtils;
-import static org.apache.hadoop.ozone.s3.util.OzoneS3Util.getS3Username;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
 import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
@@ -202,10 +200,8 @@ public class BucketEndpoint extends EndpointBase {
   public Response put(@PathParam("bucket") String bucketName, @Context
       HttpHeaders httpHeaders) throws IOException, OS3Exception {
 
-    String volumeName = getS3Username(getSignatureProcessor().getAwsAccessId());
-
     try {
-      String location = createS3Bucket(volumeName, bucketName);
+      String location = createS3Bucket(bucketName);
       LOG.info("Location is {}", location);
       return Response.status(HttpStatus.SC_OK).header("Location", location)
           .build();
@@ -256,12 +252,7 @@ public class BucketEndpoint extends EndpointBase {
       getBucket(bucketName);
     } catch (OS3Exception ex) {
       LOG.error("Exception occurred in headBucket", ex);
-      //TODO: use a subclass fo OS3Exception and catch it here.
-      if (ex.getCode().contains("NoSuchBucket")) {
-        return Response.status(Status.BAD_REQUEST).build();
-      } else {
-        throw ex;
-      }
+      throw ex;
     }
     return Response.ok().build();
   }

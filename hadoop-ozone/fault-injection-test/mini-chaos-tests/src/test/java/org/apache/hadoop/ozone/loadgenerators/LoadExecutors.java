@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.loadgenerators;
 
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -38,30 +39,32 @@ public class LoadExecutors {
   private static final Logger LOG =
       LoggerFactory.getLogger(LoadExecutors.class);
 
-  private final LoadGenerator generator;
+  private final List<LoadGenerator> generators;
   private final int numThreads;
   private final ExecutorService executor;
+  private final int numGenerators;
   private final List<CompletableFuture<Void>> futures = new ArrayList<>();
 
-  public LoadExecutors(int numThreads, LoadGenerator generator) {
+  public LoadExecutors(int numThreads,  List<LoadGenerator> generators) {
     this.numThreads = numThreads;
-    this.generator = generator;
+    this.generators = generators;
+    this.numGenerators = generators.size();
     this.executor = Executors.newFixedThreadPool(numThreads);
   }
 
   private void load(long runTimeMillis) {
     long threadID = Thread.currentThread().getId();
-    LOG.info("{} LOADGEN: Started {} IO Thread:{}.",
-        generator, threadID);
+    LOG.info("LOADGEN: Started IO Thread:{}.", threadID);
     long startTime = Time.monotonicNow();
 
     while (Time.monotonicNow() - startTime < runTimeMillis) {
+      LoadGenerator gen =
+          generators.get(RandomUtils.nextInt(0, numGenerators));
 
       try {
-        generator.generateLoad();
+        gen.generateLoad();
       } catch (Throwable t) {
-        LOG.error("{} LOADGEN: Exiting due to exception",
-            generator, t);
+        LOG.error("{} LOADGEN: Exiting due to exception", gen, t);
         ExitUtil.terminate(new ExitUtil.ExitException(1, t));
         break;
       }
@@ -69,16 +72,21 @@ public class LoadExecutors {
   }
 
 
-  public void startLoad(long time) {
-    LOG.info("Starting {} threads for {}", numThreads, generator);
-    try {
-      generator.initialize();
-      for (int i = 0; i < numThreads; i++) {
-        futures.add(CompletableFuture.runAsync(
-            () -> load(time), executor));
+  public void startLoad(long time) throws Exception {
+    LOG.info("Starting {} threads for {} genrators", numThreads,
+        generators.size());
+    for (LoadGenerator gen : generators) {
+      try {
+        LOG.info("Initializing {} generator", gen);
+        gen.initialize();
+      } catch (Throwable t) {
+        LOG.error("Failed to initialize loadgen:{}", gen, t);
+        throw t;
       }
-    } catch (Throwable t) {
-      LOG.error("Failed to initialize loadgen:{}", generator, t);
+    }
+
+    for (int i = 0; i < numThreads; i++) {
+      futures.add(CompletableFuture.runAsync(() -> load(time), executor));
     }
   }
 

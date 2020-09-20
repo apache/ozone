@@ -65,6 +65,7 @@ import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.malformedRequest;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
+
 import org.apache.ratis.thirdparty.com.google.protobuf.ProtocolMessageEnum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,7 +114,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     this.tokenVerifier = tokenVerifier;
 
     protocolMetrics =
-        new ProtocolMessageMetrics<ProtocolMessageEnum>(
+        new ProtocolMessageMetrics<>(
             "HddsDispatcher",
             "HDDS dispatcher metrics",
             ContainerProtos.Type.values());
@@ -175,7 +176,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       ContainerCommandRequestProto msg, DispatcherContext dispatcherContext) {
     Preconditions.checkNotNull(msg);
     if (LOG.isTraceEnabled()) {
-      LOG.trace("Command {}, trace ID: {} ", msg.getCmdType().toString(),
+      LOG.trace("Command {}, trace ID: {} ", msg.getCmdType(),
           msg.getTraceID());
     }
 
@@ -490,10 +491,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     try {
       validateBlockToken(msg);
     } catch (IOException ioe) {
-      StorageContainerException sce = new StorageContainerException(
+      throw new StorageContainerException(
           "Block token verification failed. " + ioe.getMessage(), ioe,
           ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED);
-      throw sce;
     }
   }
 
@@ -583,14 +583,16 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     AuditMessage amsg;
     switch (result) {
     case SUCCESS:
-      if(eventType == EventType.READ &&
-          AUDIT.getLogger().isInfoEnabled(AuditMarker.READ.getMarker())) {
-        amsg = buildAuditMessageForSuccess(action, params);
-        AUDIT.logReadSuccess(amsg);
-      } else if(eventType == EventType.WRITE &&
-          AUDIT.getLogger().isInfoEnabled(AuditMarker.WRITE.getMarker())) {
-        amsg = buildAuditMessageForSuccess(action, params);
-        AUDIT.logWriteSuccess(amsg);
+      if(isAllowed(action.getAction())) {
+        if(eventType == EventType.READ &&
+            AUDIT.getLogger().isInfoEnabled(AuditMarker.READ.getMarker())) {
+          amsg = buildAuditMessageForSuccess(action, params);
+          AUDIT.logReadSuccess(amsg);
+        } else if(eventType == EventType.WRITE &&
+            AUDIT.getLogger().isInfoEnabled(AuditMarker.WRITE.getMarker())) {
+          amsg = buildAuditMessageForSuccess(action, params);
+          AUDIT.logWriteSuccess(amsg);
+        }
       }
       break;
 
@@ -627,7 +629,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         .build();
   }
 
-  //TODO: use GRPC to fetch user and ip details
   @Override
   public AuditMessage buildAuditMessageForFailure(AuditAction op,
       Map<String, String> auditMap, Throwable throwable) {
@@ -645,5 +646,24 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   enum EventType {
     READ,
     WRITE
+  }
+
+  /**
+   * Checks if the action is allowed for audit.
+   * @param action
+   * @return true or false accordingly.
+   */
+  private boolean isAllowed(String action) {
+    switch(action) {
+    case "CLOSE_CONTAINER":
+    case "CREATE_CONTAINER":
+    case "LIST_CONTAINER":
+    case "DELETE_CONTAINER":
+    case "READ_CONTAINER":
+    case "UPDATE_CONTAINER":
+    case "DELETE_BLOCK":
+      return true;
+    default: return false;
+    }
   }
 }

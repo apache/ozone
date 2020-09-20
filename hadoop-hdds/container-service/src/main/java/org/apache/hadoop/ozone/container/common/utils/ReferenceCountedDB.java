@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.container.common.utils;
 
 import com.google.common.base.Preconditions;
 
-import org.apache.commons.lang.exception.ExceptionUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.hadoop.hdds.utils.MetadataStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone;
 
+import com.google.protobuf.ServiceException;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -33,16 +34,18 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.token.SecretManager;
 
 import com.google.common.base.Joiner;
 import org.apache.commons.lang3.StringUtils;
@@ -56,9 +59,11 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTPS_BIND_PORT_D
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_BIND_HOST_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_BIND_PORT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_PORT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -229,9 +234,6 @@ public final class OmUtils {
     case LookupKey:
     case ListKeys:
     case ListTrash:
-    case RecoverTrash:
-    case InfoS3Bucket:
-    case ListS3Buckets:
     case ServiceList:
     case ListMultiPartUploadParts:
     case GetFileStatus:
@@ -249,11 +251,11 @@ public final class OmUtils {
     case DeleteBucket:
     case CreateKey:
     case RenameKey:
+    case RenameKeys:
     case DeleteKey:
+    case DeleteKeys:
     case CommitKey:
     case AllocateBlock:
-    case CreateS3Bucket:
-    case DeleteS3Bucket:
     case InitiateMultiPartUpload:
     case CommitMultiPartUpload:
     case CompleteMultiPartUpload:
@@ -268,6 +270,7 @@ public final class OmUtils {
     case SetAcl:
     case AddAcl:
     case PurgeKeys:
+    case RecoverTrash:
       return false;
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);
@@ -502,8 +505,100 @@ public final class OmUtils {
   /**
    * Return OM Client Rpc Time out.
    */
-  public static long getOMClientRpcTimeOut(Configuration configuration) {
-    return OzoneConfiguration.of(configuration)
-        .getObject(OMClientConfig.class).getRpcTimeOut();
+  public static long getOMClientRpcTimeOut(ConfigurationSource configuration) {
+    return configuration.getObject(OMClientConfig.class).getRpcTimeOut();
+  }
+
+  /**
+   * Return OmKeyInfo that would be recovered.
+   */
+  public static OmKeyInfo prepareKeyForRecover(OmKeyInfo keyInfo,
+      RepeatedOmKeyInfo repeatedOmKeyInfo) {
+
+    /* TODO: HDDS-2425. HDDS-2426.*/
+    if (repeatedOmKeyInfo.getOmKeyInfoList().contains(keyInfo)) {
+      return keyInfo;
+    } else {
+      return null;
+    }
+  }
+
+  /**
+   * Verify key name is a valid name.
+   */
+  public static void validateKeyName(String keyName)
+          throws OMException {
+    try {
+      HddsClientUtils.verifyKeyName(keyName);
+    } catch (IllegalArgumentException e) {
+      throw new OMException(e.getMessage(),
+              OMException.ResultCodes.INVALID_KEY_NAME);
+    }
+  }
+
+  /**
+   * Return configured OzoneManager service id based on the following logic.
+   * Look at 'ozone.om.internal.service.id' first. If configured, return that.
+   * If the above is not configured, look at 'ozone.om.service.ids'.
+   * If count(ozone.om.service.ids) == 1, return that id.
+   * If count(ozone.om.service.ids) > 1 throw exception
+   * If 'ozone.om.service.ids' is not configured, return null. (Non HA)
+   * @param conf configuration
+   * @return OM service ID.
+   * @throws IOException on error.
+   */
+  public static String getOzoneManagerServiceId(OzoneConfiguration conf)
+      throws IOException {
+    String localOMServiceId = conf.get(OZONE_OM_INTERNAL_SERVICE_ID);
+    Collection<String> omServiceIds = conf.getTrimmedStringCollection(
+        OZONE_OM_SERVICE_IDS_KEY);
+    if (localOMServiceId == null) {
+      LOG.info("{} is not defined, falling back to {} to find serviceID for "
+              + "OzoneManager if it is HA enabled cluster",
+          OZONE_OM_INTERNAL_SERVICE_ID, OZONE_OM_SERVICE_IDS_KEY);
+      if (omServiceIds.size() > 1) {
+        throw new IOException(String.format(
+            "More than 1 OzoneManager ServiceID (%s) " +
+                "configured : %s, but %s is not " +
+                "configured.", OZONE_OM_SERVICE_IDS_KEY,
+            omServiceIds.toString(), OZONE_OM_INTERNAL_SERVICE_ID));
+      }
+    } else if (!omServiceIds.contains(localOMServiceId)) {
+      throw new IOException(String.format(
+          "Cannot find the internal service id %s in %s",
+          localOMServiceId, omServiceIds.toString()));
+    } else {
+      omServiceIds = Collections.singletonList(localOMServiceId);
+    }
+
+    if (omServiceIds.isEmpty()) {
+      LOG.info("No OzoneManager ServiceID configured.");
+      return null;
+    } else {
+      String serviceId = omServiceIds.iterator().next();
+      LOG.info("Using OzoneManager ServiceID '{}'.", serviceId);
+      return serviceId;
+    }
+  }
+
+  /**
+   * Unwrap exception to check if it is some kind of access control problem
+   * ({@link AccessControlException} or {@link SecretManager.InvalidToken}).
+   */
+  public static boolean isAccessControlException(Exception ex) {
+    if (ex instanceof ServiceException) {
+      Throwable t = ex.getCause();
+      if (t instanceof RemoteException) {
+        t = ((RemoteException) t).unwrapRemoteException();
+      }
+      while (t != null) {
+        if (t instanceof AccessControlException ||
+            t instanceof SecretManager.InvalidToken) {
+          return true;
+        }
+        t = t.getCause();
+      }
+    }
+    return false;
   }
 }

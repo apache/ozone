@@ -41,11 +41,18 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.junit.rules.Timeout;
 
 /**
  * This class tests the versioning of blocks from OM side.
  */
 public class TestOmBlockVersioning {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
   private static OzoneManager ozoneManager;

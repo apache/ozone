@@ -31,6 +31,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
@@ -45,6 +46,7 @@ import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.nio.file.Paths;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -112,8 +114,10 @@ public class TestOzoneManagerServiceProviderImpl {
     File tarFile = createTarFile(checkpoint.getCheckpointLocation());
     InputStream inputStream = new FileInputStream(tarFile);
     ReconUtils reconUtilsMock = getMockReconUtils();
-    when(reconUtilsMock.makeHttpCall(any(), anyString()))
-        .thenReturn(inputStream);
+    HttpURLConnection httpURLConnectionMock = mock(HttpURLConnection.class);
+    when(httpURLConnectionMock.getInputStream()).thenReturn(inputStream);
+    when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
+        .thenReturn(httpURLConnectionMock);
 
     ReconTaskController reconTaskController = getMockTaskController();
 
@@ -163,8 +167,10 @@ public class TestOzoneManagerServiceProviderImpl {
     File tarFile = createTarFile(checkpointDir.toPath());
     InputStream fileInputStream = new FileInputStream(tarFile);
     ReconUtils reconUtilsMock = getMockReconUtils();
-    when(reconUtilsMock.makeHttpCall(any(), anyString()))
-        .thenReturn(fileInputStream);
+    HttpURLConnection httpURLConnectionMock = mock(HttpURLConnection.class);
+    when(httpURLConnectionMock.getInputStream()).thenReturn(fileInputStream);
+    when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
+        .thenReturn(httpURLConnectionMock);
 
     ReconOMMetadataManager reconOMMetadataManager =
         mock(ReconOMMetadataManager.class);

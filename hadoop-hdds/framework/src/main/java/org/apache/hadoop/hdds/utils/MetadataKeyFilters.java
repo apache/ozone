@@ -44,7 +44,10 @@ public final class MetadataKeyFilters {
           .addFilter(OzoneConsts.DELETING_KEY_PREFIX, true)
           .addFilter(OzoneConsts.DELETED_KEY_PREFIX, true)
           .addFilter(OzoneConsts.DELETE_TRANSACTION_KEY_PREFIX, true)
-          .addFilter(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX, true);
+          .addFilter(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX, true)
+          .addFilter(OzoneConsts.BLOCK_COUNT, true)
+          .addFilter(OzoneConsts.CONTAINER_BYTES_USED, true)
+          .addFilter(OzoneConsts.PENDING_DELETE_BLOCK_COUNT, true);
 
   private MetadataKeyFilters() {
   }

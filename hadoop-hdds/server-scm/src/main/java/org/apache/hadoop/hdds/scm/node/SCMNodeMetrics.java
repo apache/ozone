@@ -18,12 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DECOMMISSIONED;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DECOMMISSIONING;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
-
 import java.util.Map;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -39,6 +33,12 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConsts;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DECOMMISSIONED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
+
 /**
  * This class maintains Node related metrics.
  */
@@ -46,7 +46,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 @Metrics(about = "SCM NodeManager Metrics", context = OzoneConsts.OZONE)
 public final class SCMNodeMetrics implements MetricsSource {
 
-  private static final String SOURCE_NAME =
+  public static final String SOURCE_NAME =
       SCMNodeMetrics.class.getSimpleName();
 
   private @Metric MutableCounterLong numHBProcessed;
@@ -113,14 +113,13 @@ public final class SCMNodeMetrics implements MetricsSource {
   }
 
   /**
-   * Get aggregated counter and gauage metrics.
+   * Get aggregated counter and gauge metrics.
    */
   @Override
   @SuppressWarnings("SuspiciousMethodCalls")
   public void getMetrics(MetricsCollector collector, boolean all) {
     Map<String, Integer> nodeCount = managerMXBean.getNodeCount();
     Map<String, Long> nodeInfo = managerMXBean.getNodeInfo();
-
     registry.snapshot(
         collector.addRecord(registry.info()) // Add annotated ones first
             .addGauge(Interns.info(

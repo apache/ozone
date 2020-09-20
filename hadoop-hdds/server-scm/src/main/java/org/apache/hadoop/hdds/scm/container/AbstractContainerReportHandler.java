@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -28,6 +29,9 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -68,13 +72,6 @@ public class AbstractContainerReportHandler {
       throws IOException {
     final ContainerID containerId = ContainerID
         .valueof(replicaProto.getContainerID());
-    final ContainerReplica replica = ContainerReplica.newBuilder()
-        .setContainerID(containerId)
-        .setContainerState(replicaProto.getState())
-        .setDatanodeDetails(datanodeDetails)
-        .setOriginNodeId(UUID.fromString(replicaProto.getOriginNodeId()))
-        .setSequenceId(replicaProto.getBlockCommitSequenceId())
-        .build();
 
     if (logger.isDebugEnabled()) {
       logger.debug("Processing replica of container {} from datanode {}",
@@ -83,9 +80,9 @@ public class AbstractContainerReportHandler {
     // Synchronized block should be replaced by container lock,
     // once we have introduced lock inside ContainerInfo.
     synchronized (containerManager.getContainer(containerId)) {
-      updateContainerStats(containerId, replicaProto);
-      updateContainerState(datanodeDetails, containerId, replica);
-      containerManager.updateContainerReplica(containerId, replica);
+      updateContainerStats(datanodeDetails, containerId, replicaProto);
+      updateContainerState(datanodeDetails, containerId, replicaProto);
+      updateContainerReplica(datanodeDetails, containerId, replicaProto);
     }
   }
 
@@ -97,11 +94,12 @@ public class AbstractContainerReportHandler {
    * @param replicaProto Container Replica information
    * @throws ContainerNotFoundException If the container is not present
    */
-  private void updateContainerStats(final ContainerID containerId,
+  private void updateContainerStats(final DatanodeDetails datanodeDetails,
+                                    final ContainerID containerId,
                                     final ContainerReplicaProto replicaProto)
       throws ContainerNotFoundException {
 
-    if (!isUnhealthy(replicaProto::getState)) {
+    if (isHealthy(replicaProto::getState)) {
       final ContainerInfo containerInfo = containerManager
           .getContainer(containerId);
 
@@ -110,13 +108,44 @@ public class AbstractContainerReportHandler {
         containerInfo.updateSequenceId(
             replicaProto.getBlockCommitSequenceId());
       }
-      if (containerInfo.getUsedBytes() < replicaProto.getUsed()) {
-        containerInfo.setUsedBytes(replicaProto.getUsed());
+      List<ContainerReplica> otherReplicas =
+          getOtherReplicas(containerId, datanodeDetails);
+      long usedBytes = replicaProto.getUsed();
+      long keyCount = replicaProto.getKeyCount();
+      for (ContainerReplica r : otherReplicas) {
+        // Open containers are generally growing in key count and size, the
+        // overall size should be the min of all reported replicas.
+        if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)) {
+          usedBytes = Math.min(usedBytes, r.getBytesUsed());
+          keyCount = Math.min(keyCount, r.getKeyCount());
+        } else {
+          // Containers which are not open can only shrink in size, so use the
+          // largest values reported.
+          usedBytes = Math.max(usedBytes, r.getBytesUsed());
+          keyCount = Math.max(keyCount, r.getKeyCount());
+        }
       }
-      if (containerInfo.getNumberOfKeys() < replicaProto.getKeyCount()) {
-        containerInfo.setNumberOfKeys(replicaProto.getKeyCount());
+
+      if (containerInfo.getUsedBytes() != usedBytes) {
+        containerInfo.setUsedBytes(usedBytes);
+      }
+      if (containerInfo.getNumberOfKeys() != keyCount) {
+        containerInfo.setNumberOfKeys(keyCount);
       }
     }
+  }
+
+  private List<ContainerReplica> getOtherReplicas(ContainerID containerId,
+      DatanodeDetails exclude) throws ContainerNotFoundException {
+    List<ContainerReplica> filteredReplicas = new ArrayList<>();
+    Set<ContainerReplica> replicas
+        = containerManager.getContainerReplicas(containerId);
+    for (ContainerReplica r : replicas) {
+      if (!r.getDatanodeDetails().equals(exclude)) {
+        filteredReplicas.add(r);
+      }
+    }
+    return filteredReplicas;
   }
 
   /**
@@ -129,7 +158,7 @@ public class AbstractContainerReportHandler {
    */
   private void updateContainerState(final DatanodeDetails datanode,
                                     final ContainerID containerId,
-                                    final ContainerReplica replica)
+                                    final ContainerReplicaProto replica)
       throws IOException {
 
     final ContainerInfo container = containerManager
@@ -177,7 +206,7 @@ public class AbstractContainerReportHandler {
       if (replica.getState() == State.CLOSED) {
         logger.info("Moving container {} to CLOSED state, datanode {} " +
             "reported CLOSED replica.", containerId, datanode);
-        Preconditions.checkArgument(replica.getSequenceId()
+        Preconditions.checkArgument(replica.getBlockCommitSequenceId()
             == container.getSequenceId());
         containerManager.updateContainerState(containerId,
             LifeCycleEvent.CLOSE);
@@ -203,7 +232,7 @@ public class AbstractContainerReportHandler {
       if (replica.getState() == State.CLOSED) {
         logger.info("Moving container {} to CLOSED state, datanode {} " +
             "reported CLOSED replica.", containerId, datanode);
-        Preconditions.checkArgument(replica.getSequenceId()
+        Preconditions.checkArgument(replica.getBlockCommitSequenceId()
             == container.getSequenceId());
         containerManager.updateContainerState(containerId,
             LifeCycleEvent.FORCE_CLOSE);
@@ -225,14 +254,39 @@ public class AbstractContainerReportHandler {
     }
   }
 
+  private void updateContainerReplica(final DatanodeDetails datanodeDetails,
+                                      final ContainerID containerId,
+                                      final ContainerReplicaProto replicaProto)
+      throws ContainerNotFoundException, ContainerReplicaNotFoundException {
+    final ContainerReplica replica = ContainerReplica.newBuilder()
+        .setContainerID(containerId)
+        .setContainerState(replicaProto.getState())
+        .setDatanodeDetails(datanodeDetails)
+        .setOriginNodeId(UUID.fromString(replicaProto.getOriginNodeId()))
+        .setSequenceId(replicaProto.getBlockCommitSequenceId())
+        .setKeyCount(replicaProto.getKeyCount())
+        .setBytesUsed(replicaProto.getUsed())
+        .build();
+
+    if (replica.getState().equals(State.DELETED)) {
+      containerManager.removeContainerReplica(containerId, replica);
+    } else {
+      containerManager.updateContainerReplica(containerId, replica);
+    }
+  }
+
   /**
-   * Returns true if the container replica is not marked as UNHEALTHY.
+   * Returns true if the container replica is HEALTHY. <br>
+   * A replica is considered healthy if it's not in UNHEALTHY,
+   * INVALID or DELETED state.
    *
    * @param replicaState State of the container replica.
-   * @return true if unhealthy, false otherwise
+   * @return true if healthy, false otherwise
    */
-  private boolean isUnhealthy(final Supplier<State> replicaState) {
-    return replicaState.get() == ContainerReplicaProto.State.UNHEALTHY;
+  private boolean isHealthy(final Supplier<State> replicaState) {
+    return replicaState.get() != State.UNHEALTHY
+        && replicaState.get() != State.INVALID
+        && replicaState.get() != State.DELETED;
   }
 
   /**

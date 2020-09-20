@@ -17,22 +17,24 @@
 
 package org.apache.hadoop.hdds.scm.block;
 
-import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.hdds.scm.safemode.SafeModeNotification;
-
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
+import org.apache.hadoop.hdds.server.events.EventHandler;
 
 /**
  *
  *  Block APIs.
  *  Container is transparent to these APIs.
  */
-public interface BlockManager extends Closeable, SafeModeNotification {
+public interface BlockManager extends Closeable,
+    EventHandler<SafeModeStatus> {
   /**
    * Allocates a new block for a given size.
    * @param size - Block Size

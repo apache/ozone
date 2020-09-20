@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.scm.server;
 
 import java.io.IOException;
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 
@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.server.http.BaseHttpServer;
  */
 public class StorageContainerManagerHttpServer extends BaseHttpServer {
 
-  public StorageContainerManagerHttpServer(ConfigurationSource conf)
+  public StorageContainerManagerHttpServer(MutableConfigurationSource conf)
       throws IOException {
     super(conf, "scm");
   }
@@ -73,6 +73,16 @@ public class StorageContainerManagerHttpServer extends BaseHttpServer {
 
   @Override protected String getEnabledKey() {
     return ScmConfigKeys.OZONE_SCM_HTTP_ENABLED_KEY;
+  }
+
+  @Override
+  protected String getHttpAuthType() {
+    return SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_AUTH_TYPE;
+  }
+
+  @Override
+  protected String getHttpAuthConfigPrefix() {
+    return SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_AUTH_CONFIG_PREFIX;
   }
 
 }

@@ -50,9 +50,9 @@ public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
     List<Pair<String, Integer>> expectedPairs = new ArrayList<>();
 
     expectedPairs.add(new ImmutablePair<>("key", Types.VARCHAR));
-    expectedPairs.add(new ImmutablePair<>("value", Types.INTEGER));
+    expectedPairs.add(new ImmutablePair<>("value", Types.BIGINT));
     expectedPairs.add(new ImmutablePair<>("last_updated_timestamp",
-        Types.VARCHAR));
+        Types.TIMESTAMP));
 
     List<Pair<String, Integer>> actualPairs = new ArrayList<>();
 

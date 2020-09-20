@@ -153,7 +153,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
    *
    * Caller's of this method should use synchronization mechanism, when
    * accessing. First it will check from cache, if it has entry return the
-   * value, otherwise get from the RocksDB table.
+   * cloned cache value, otherwise get from the RocksDB table.
    *
    * @param key metadata key
    * @return VALUE
@@ -170,6 +170,56 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     if (cacheResult.getCacheStatus() == EXISTS) {
       return codecRegistry.copyObject(cacheResult.getValue().getCacheValue(),
           valueType);
+    } else if (cacheResult.getCacheStatus() == NOT_EXIST) {
+      return null;
+    } else {
+      return getFromTable(key);
+    }
+  }
+
+  /**
+   * Skip checking cache and get the value mapped to the given key in byte
+   * array or returns null if the key is not found.
+   *
+   * @param key metadata key
+   * @return value in byte array or null if the key is not found.
+   * @throws IOException on Failure
+   */
+  @Override
+  public VALUE getSkipCache(KEY key) throws IOException {
+    return getFromTable(key);
+  }
+
+  /**
+   * This method returns the value if it exists in cache, if it 
+   * does not, get the value from the underlying rockdb table. If it 
+   * exists in cache, it returns the same reference of the cached value.
+   * 
+   *
+   * Caller's of this method should use synchronization mechanism, when
+   * accessing. First it will check from cache, if it has entry return the
+   * cached value, otherwise get from the RocksDB table. It is caller
+   * responsibility to not to use the returned object outside the lock.
+   *
+   * One example use case of this method is, when validating volume exists in
+   * bucket requests and also where we need actual value of volume info. Once 
+   * bucket response is added to the double buffer, only bucket info is 
+   * required to flush to DB. So, there is no case of concurrent threads 
+   * modifying the same cached object.
+   * @param key metadata key
+   * @return VALUE
+   * @throws IOException
+   */
+  @Override
+  public VALUE getReadCopy(KEY key) throws IOException {
+    // Here the metadata lock will guarantee that cache is not updated for same
+    // key during get key.
+
+    CacheResult<CacheValue<VALUE>> cacheResult =
+        cache.lookup(new CacheKey<>(key));
+
+    if (cacheResult.getCacheStatus() == EXISTS) {
+      return cacheResult.getValue().getCacheValue();
     } else if (cacheResult.getCacheStatus() == NOT_EXIST) {
       return null;
     } else {
@@ -382,6 +432,11 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     public TypedKeyValue next() {
       return new TypedKeyValue(rawIterator.next(), keyType,
           valueType);
+    }
+
+    @Override
+    public void removeFromDB() throws IOException {
+      rawIterator.removeFromDB();
     }
   }
 }

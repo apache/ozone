@@ -180,7 +180,7 @@ public final class HddsVolumeUtil {
     try {
       hddsVolume.format(clusterId);
     } catch (IOException ex) {
-      logger.error("Error during formatting volume {}, exception is {}",
+      logger.error("Error during formatting volume {}.",
           volumeRoot, ex);
       return false;
     }

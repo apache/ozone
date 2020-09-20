@@ -63,11 +63,19 @@ import org.mockito.Mockito;
 import java.io.File;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 
 /**
  * Test for metrics published by storage containers.
  */
 public class TestContainerMetrics {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private GrpcReplicationService createReplicationService(
       ContainerController controller) {
