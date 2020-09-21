@@ -22,6 +22,8 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -32,6 +34,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -83,7 +86,6 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
     }
   }
 
-
   @Test
   public void testAddToDBBatchWithErrorResponse() throws Exception {
     Map<String, OmKeyInfo> keysToDelete = createOpenKeys(3, true);
@@ -112,8 +114,14 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
         .setCmdType(OzoneManagerProtocolProtos.Type.DeleteOpenKeys)
         .build();
 
+    // For now, construct dummy volume args to pass in while unit tests
+    // for volume quota updates are WIP.
+    OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
+        .setOwnerName(keyName).setAdminName(keyName)
+        .setVolume(volumeName).setCreationTime(Time.now()).build();
+
     OMOpenKeyDeleteResponse response = new OMOpenKeyDeleteResponse(omResponse,
-        keysToDelete, true);
+        keysToDelete, true, Arrays.asList(omVolumeArgs));
 
     // Operations are only added to the batch by this method when status is OK.
     response.checkAndUpdateDB(omMetadataManager, batchOperation);
