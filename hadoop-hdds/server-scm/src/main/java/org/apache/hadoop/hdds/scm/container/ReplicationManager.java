@@ -629,7 +629,7 @@ public class ReplicationManager
       final Map<UUID, ContainerReplica> uniqueReplicas =
           new LinkedHashMap<>();
 
-      if (container.getState() == LifeCycleState.CLOSED) {
+      if (container.getState() != LifeCycleState.CLOSED) {
         replicas.stream()
             .filter(r -> compareState(container.getState(), r.getState()))
             .forEach(r -> uniqueReplicas
