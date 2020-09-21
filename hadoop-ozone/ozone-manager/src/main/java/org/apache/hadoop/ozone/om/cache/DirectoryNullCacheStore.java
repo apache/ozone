@@ -19,6 +19,9 @@ package org.apache.hadoop.ozone.om.cache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Not caching directories and used to disable caching.
+ */
 public class DirectoryNullCacheStore implements CacheStore {
 
   private static final Logger LOG =

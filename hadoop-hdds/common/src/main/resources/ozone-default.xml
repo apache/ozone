@@ -2521,4 +2521,32 @@
       filesystem semantics.
     </description>
   </property>
+
+  <property>
+    <name>ozone.om.metadata.cache.directory</name>
+    <tag>OZONE, OM</tag>
+    <value>DIR_LRU</value>
+    <description>Configure the cache policy to provide caching of the
+      directories for faster traversal of path components. Available values
+      are DIR_LRU and DIR_NOCACHE. As name says, DIR_LRU uses least recently
+      used eviction mechanism and DIR_NOCACHE has no caching.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.metadata.cache.directory.init.capacity</name>
+    <tag>OZONE, OM</tag>
+    <value>DIR_LRU</value>
+    <description>Configure the minimum total size for directory cache.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.metadata.cache.directory.max.capacity</name>
+    <tag>OZONE, OM</tag>
+    <value>DIR_LRU</value>
+    <description>Specifies the maximum number of entries the cache may
+      contain in the directory cache.
+    </description>
+  </property>
 </configuration>

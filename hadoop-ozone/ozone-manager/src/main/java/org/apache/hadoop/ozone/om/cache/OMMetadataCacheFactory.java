@@ -55,15 +55,15 @@ public final class OMMetadataCacheFactory {
     CacheEntity entity = getCacheEntity(configuredCachePolicy);
 
     switch (entity) {
-      case DIR:
-        OMMetadataCacheProvider provider = new OMDirectoryCacheProvider(config,
-                cachePolicy);
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("CacheStore initialized with {}:" + provider.getEntity());
-        }
-        return provider.getCache();
-      default:
-        return null;
+    case DIR:
+      OMMetadataCacheProvider provider = new OMDirectoryCacheProvider(config,
+              cachePolicy);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("CacheStore initialized with {}:" + provider.getEntity());
+      }
+      return provider.getCache();
+    default:
+      return null;
     }
   }
 
@@ -104,11 +104,11 @@ public final class OMMetadataCacheFactory {
     private CacheStore getCacheStore(String cachePolicy) {
       CachePolicy policy = CachePolicy.getPolicy(cachePolicy);
       switch (policy) {
-        case DIR_LRU:
-          return new DirectoryLRUCacheStore(config);
-        case DIR_NOCACHE: // testing purpose
-        default:
-          return new DirectoryNullCacheStore();
+      case DIR_LRU:
+        return new DirectoryLRUCacheStore(config);
+      case DIR_NOCACHE: // disable cache
+      default:
+        return new DirectoryNullCacheStore();
       }
     }
 

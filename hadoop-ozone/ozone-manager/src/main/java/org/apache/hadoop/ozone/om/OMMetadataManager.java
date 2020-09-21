@@ -389,5 +389,5 @@ public interface OMMetadataManager {
    *
    * @return OMCacheManager.
    */
-  public OMCacheManager getOMCacheManager();
+  OMCacheManager getOMCacheManager();
 }

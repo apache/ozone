@@ -15,7 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.hadoop.ozone.om.cache;
 
 import java.util.Objects;
@@ -27,8 +26,8 @@ import java.util.Objects;
 public class OMCacheKey<KEY> implements Comparable<KEY> {
 
   // Format <parentID/keyName>.
-  // For example, user defined path "/vol1/buck1/a" the key will be "512/a", where
-  // 512 is bucketID.
+  // For example, user defined path "/vol1/buck1/a" the key will be "512/a",
+  // where 512 is bucketID.
   private final KEY key;
 
   public OMCacheKey(KEY key) {
