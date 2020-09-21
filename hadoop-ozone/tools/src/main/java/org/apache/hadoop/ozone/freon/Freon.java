@@ -36,7 +36,6 @@ import picocli.CommandLine.Option;
     name = "ozone freon",
     description = "Load generator and tester tool for ozone",
     subcommands = {
-        RandomKeyGenerator.class,
         OzoneClientKeyGenerator.class,
         OzoneClientKeyValidator.class,
         OmKeyGenerator.class,
