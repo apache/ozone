@@ -2536,7 +2536,7 @@
   <property>
     <name>ozone.om.metadata.cache.directory.init.capacity</name>
     <tag>OZONE, OM</tag>
-    <value>DIR_LRU</value>
+    <value>100000</value>
     <description>Configure the minimum total size for directory cache.
     </description>
   </property>
@@ -2544,7 +2544,7 @@
   <property>
     <name>ozone.om.metadata.cache.directory.max.capacity</name>
     <tag>OZONE, OM</tag>
-    <value>DIR_LRU</value>
+    <value>5000000</value>
     <description>Specifies the maximum number of entries the cache may
       contain in the directory cache.
     </description>

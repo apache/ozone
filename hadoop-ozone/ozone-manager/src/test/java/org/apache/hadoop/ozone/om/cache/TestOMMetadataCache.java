@@ -192,6 +192,7 @@ public class TestOMMetadataCache {
             testDir.toString());
 
     //1. Verify default dir cache policy. Defaulting to DIR_LRU
+    conf.unset(OMConfigKeys.OZONE_OM_CACHE_DIR_POLICY);
     Assert.assertNull("Unexpected CachePolicy, it should be null!",
             conf.get(OMConfigKeys.OZONE_OM_CACHE_DIR_POLICY));
 
