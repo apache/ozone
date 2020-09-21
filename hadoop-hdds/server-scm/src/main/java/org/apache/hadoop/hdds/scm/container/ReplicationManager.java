@@ -24,10 +24,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -622,8 +624,20 @@ public class ReplicationManager
               " is {}, but found {}.", id, replicationFactor,
           replicationFactor + excess);
 
-      // Retain one healthy replica per origin node Id.
       final List<ContainerReplica> eligibleReplicas = new ArrayList<>(replicas);
+
+      final Map<UUID, ContainerReplica> uniqueReplicas =
+          new LinkedHashMap<>();
+
+      if (container.getState() == LifeCycleState.CLOSED) {
+        replicas.stream()
+            .filter(r -> compareState(container.getState(), r.getState()))
+            .forEach(r -> uniqueReplicas
+                .putIfAbsent(r.getOriginDatanodeId(), r));
+
+        // Retain one healthy replica per origin node Id.
+        eligibleReplicas.removeAll(uniqueReplicas.values());
+      }
 
       final List<ContainerReplica> unhealthyReplicas = eligibleReplicas
           .stream()
