@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.util.Time;
@@ -45,11 +46,12 @@ import java.util.UUID;
  * Tests OMOpenKeyDeleteResponse.
  */
 public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
+  private static final long KEY_LENGTH = 100;
 
   @Test
   public void testAddToDBBatchWithEmptyBlocks() throws Exception {
-    Map<String, OmKeyInfo> keysToDelete = createOpenKeys(3, false);
-    Map<String, OmKeyInfo> keysToKeep = createOpenKeys(3, false);
+    Map<String, OmKeyInfo> keysToDelete = createOpenKeys(volumeName, 3);
+    Map<String, OmKeyInfo> keysToKeep = createOpenKeys(volumeName, 3);
     createAndCommitResponse(keysToDelete, Status.OK);
 
     for (String key: keysToDelete.keySet()) {
@@ -68,8 +70,12 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
 
   @Test
   public void testAddToDBBatchWithNonEmptyBlocks() throws Exception {
-    Map<String, OmKeyInfo> keysToDelete = createOpenKeys(3, true);
-    Map<String, OmKeyInfo> keysToKeep = createOpenKeys(3, true);
+    // TODO: Adds volume info to table, and sets its bytes used.
+    // TODO: Use different volumes.
+    Map<String, OmKeyInfo> keysToDelete = createOpenKeys(volumeName, 3, KEY_LENGTH);
+    Map<String, OmKeyInfo> keysToKeep = createOpenKeys(volumeName, 3, KEY_LENGTH);
+    // TODO: assert that volume args gotten from table matches key length.
+    // TODO: Pass volume args list to this method.
     createAndCommitResponse(keysToDelete, Status.OK);
 
     for (String key: keysToDelete.keySet()) {
@@ -84,11 +90,16 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
       Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(key));
       Assert.assertFalse(omMetadataManager.getDeletedTable().isExist(key));
     }
+
+    // TODO: Check that volume args retrieved from table are now using zero
+    //  bytes.
+    OmVolumeArgs volumeArgs =
+        omMetadataManager.getVolumeTable().get(volumeName);
   }
 
   @Test
   public void testAddToDBBatchWithErrorResponse() throws Exception {
-    Map<String, OmKeyInfo> keysToDelete = createOpenKeys(3, true);
+    Map<String, OmKeyInfo> keysToDelete = createOpenKeys(volumeName, 3);
     createAndCommitResponse(keysToDelete, Status.INTERNAL_ERROR);
 
     for (String key: keysToDelete.keySet()) {
@@ -129,6 +140,14 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
     // If status is not OK, this will do nothing.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
   }
+
+private Map<String, OmKeyInfo> createOpenKeys(String volume, int numKeys,
+                                              long blockS
+                                              )
+      throws Exception {
+
+
+}
 
   /**
    * Creates {@code numKeys} open keys with random names, maps each one to a

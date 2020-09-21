@@ -173,6 +173,11 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
     Assert.assertEquals(numExistentKeys, metrics.getNumOpenKeysDeleted());
   }
 
+  // TODO: Add test for volume table cache update.
+  //  Add ability to utils to create keyinfo with specified size.
+  //  Create volume args and add it to table, with size equal to keyinfo.
+  //  Call delete, and check that the volume args in the table have zero size.
+
   /**
    * Runs the validate and update cache step of
    * {@link OMOpenKeyDeleteRequest} to mark the keys in {@code openKeys}
