@@ -23,6 +23,7 @@ import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.om.cache.OMCacheManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -382,4 +383,11 @@ public interface OMMetadataManager {
    * @return table names in OM DB.
    */
   Set<String> listTableNames();
+
+  /**
+   * Returns the CacheManager used to keep cache entities.
+   *
+   * @return OMCacheManager.
+   */
+  public OMCacheManager getOMCacheManager();
 }

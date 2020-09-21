@@ -246,4 +246,15 @@ public final class OMConfigKeys {
       "ozone.om.enable.filesystem.paths";
   public static final boolean OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT =
       false;
+
+  public static final String OZONE_OM_CACHE_DIR_POLICY =
+          "ozone.om.metadata.cache.directory";
+  public static final String OZONE_OM_CACHE_DIR_DEFAULT = "DIR_LRU";
+  public static final String OZONE_OM_CACHE_DIR_INIT_CAPACITY =
+          "ozone.om.metadata.cache.directory.init.capacity";
+  public static final int OZONE_OM_CACHE_DIR_INIT_CAPACITY_DEFAULT = 100000;
+  public static final String OZONE_OM_CACHE_DIR_MAX_CAPACITY =
+          "ozone.om.metadata.cache.directory.max.capacity";
+  public static final long OZONE_OM_CACHE_DIR_MAX_CAPACITY_DEFAULT = 5000000;
+
 }

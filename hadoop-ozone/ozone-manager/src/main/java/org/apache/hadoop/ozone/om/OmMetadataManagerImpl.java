@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.om.cache.OMCacheManager;
 import org.apache.hadoop.ozone.om.codec.OMTransactionInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmBucketInfoCodec;
 import org.apache.hadoop.ozone.om.codec.OmKeyInfoCodec;
@@ -163,6 +164,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private boolean ignorePipelineinKey;
 
   private Map<String, Table> tableMap = new HashMap<>();
+
+  private OMCacheManager omCacheManager;
 
   public OmMetadataManagerImpl(OzoneConfiguration conf) throws IOException {
 
@@ -291,6 +294,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       this.store = loadDB(configuration, metaDir);
 
       initializeOmTables();
+
+      omCacheManager = new OMCacheManager(configuration);
     }
   }
 
@@ -1132,6 +1137,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public Set<String> listTableNames() {
     return tableMap.keySet();
+  }
+
+  @Override
+  public OMCacheManager getOMCacheManager() {
+    return omCacheManager;
   }
 
 }
