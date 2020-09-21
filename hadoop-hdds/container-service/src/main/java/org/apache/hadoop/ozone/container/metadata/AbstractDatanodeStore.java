@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.metadata;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -34,7 +35,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
@@ -45,6 +48,12 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKS
  * functionality common to all more derived datanode store implementations.
  */
 public abstract class AbstractDatanodeStore implements DatanodeStore {
+
+  // Used to save expensive JNI calls to create new RocksDB options when the
+  // same config is used.
+  @VisibleForTesting
+  public static final Map<ConfigurationSource, DBOptions>
+      CACHED_OPTS = new ConcurrentHashMap<>();
 
   private Table<String, Long> metadataTable;
 
@@ -77,19 +86,27 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   @Override
   public void start(ConfigurationSource config)
           throws IOException {
+
     if (this.store == null) {
-      DBOptions options = new DBOptions();
-      options.setCreateIfMissing(true);
-      options.setCreateMissingColumnFamilies(true);
+      DBOptions options;
+      if (CACHED_OPTS.containsKey(config)) {
+        options = CACHED_OPTS.get(config);
+      } else {
+        options = new DBOptions();
+        options.setCreateIfMissing(true);
+        options.setCreateMissingColumnFamilies(true);
 
-      String rocksDbStat = config.getTrimmed(
-              OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
-              OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
+        String rocksDbStat = config.getTrimmed(
+            OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
+            OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
 
-      if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
-        Statistics statistics = new Statistics();
-        statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
-        options.setStatistics(statistics);
+        if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
+          Statistics statistics = new Statistics();
+          statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
+          options.setStatistics(statistics);
+        }
+
+        CACHED_OPTS.put(config, options);
       }
 
       this.store = DBStoreBuilder.newBuilder(config, dbDef)
