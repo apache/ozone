@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.container.common.volume
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
@@ -50,6 +51,7 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
+import org.rocksdb.DBOptions;
 
 import java.io.File;
 
@@ -382,5 +384,28 @@ public class TestKeyValueContainer {
       assertEquals(ContainerProtos.Result.UNSUPPORTED_REQUEST, ex
           .getResult());
     }
+  }
+
+  @Test
+  public void testRocksDBCreateUsesCachedOptions() throws Exception {
+    // Create Container 1
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    Assert.assertTrue("Rocks DB options should be cached.",
+        AbstractDatanodeStore.CACHED_OPTS.containsKey(conf));
+
+    DBOptions opts = AbstractDatanodeStore.CACHED_OPTS.get(conf);
+
+    // Create Container 2
+    keyValueContainerData = new KeyValueContainerData(2L,
+        ChunkLayOutVersion.FILE_PER_CHUNK, (long) StorageUnit.GB.toBytes(5),
+        UUID.randomUUID().toString(), datanodeId.toString());
+
+    keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+
+    Assert.assertEquals(1, AbstractDatanodeStore.CACHED_OPTS.size());
+    DBOptions cachedOpts = AbstractDatanodeStore.CACHED_OPTS.get(conf);
+    Assert.assertEquals("Cache object should not be updated.",
+        opts, cachedOpts);
   }
 }
