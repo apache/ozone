@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -87,7 +88,8 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
 
     try {
       // Open keys are grouped by bucket, but there may be multiple buckets
-      // per volume. This map aggregates volume changes across buckets.
+      // per volume. This maps volume name to volume args to track
+      // all volume updates for this request.
       Map<String, OmVolumeArgs> volumes = new HashMap<>();
       OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
 
@@ -97,16 +99,30 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
         Map<String, OmKeyInfo> deleted = updateCache(ozoneManager, trxnLogIndex,
             openKeyBucket);
 
-        // Update used bytes for this volume.
-        String volume = openKeyBucket.getVolumeName();
-        OmVolumeArgs volumeArgs = volumes.get(volume);
-        if (volumeArgs == null) {
-          volumeArgs = getVolumeInfo(metadataManager, volume);
-          volumes.put(volume, volumeArgs);
-        }
-        subtractUsedBytes(volumeArgs, deleted.values());
-
         deletedOpenKeys.putAll(deleted);
+
+        // If open keys were deleted from this bucket and its volume still
+        // exists, update the volume's byte usage.
+        if (!deleted.isEmpty()) {
+          String volumeKey =
+              metadataManager.getVolumeKey(openKeyBucket.getVolumeName());
+          boolean volumeExists =
+              metadataManager.getVolumeTable().isExist(volumeKey);
+
+          if (volumeExists) {
+            OmVolumeArgs volumeArgs = volumes.get(volumeKey);
+
+            // If we have not encountered this volume yet, add it to the
+            // collection of modified volumes.
+            if (volumeArgs == null) {
+              volumeArgs = getVolumeInfo(metadataManager, volumeKey);
+              volumes.put(volumeKey, volumeArgs);
+            }
+            // Modify byte usage for this volume, but do not write the result
+            // to the cache yet.
+            subtractUsedBytes(volumeArgs, deleted.values());
+          }
+        }
       }
 
       updateVolumeTableCache(metadataManager, volumes.values(), trxnLogIndex);
