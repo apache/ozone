@@ -57,3 +57,4 @@ public class OmDirectoryInfoCodec implements Codec<OmDirectoryInfo> {
     return object.copyObject();
   }
 }
+

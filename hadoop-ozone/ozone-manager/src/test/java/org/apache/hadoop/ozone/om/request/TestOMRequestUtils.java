@@ -214,6 +214,25 @@ public final class TestOMRequestUtils {
   }
 
   /**
+   * Add dir key entry to DirectoryTable.
+   *
+   * @throws Exception
+   */
+  public static void addDirKeyToDirTable(boolean addToCache,
+                                         OmDirectoryInfo omDirInfo,
+                                         long trxnLogIndex,
+                                         OMMetadataManager omMetadataManager)
+          throws Exception {
+    String ozoneKey = omDirInfo.getPath();
+    if (addToCache) {
+      omMetadataManager.getDirectoryTable().addCacheEntry(
+              new CacheKey<>(ozoneKey),
+              new CacheValue<>(Optional.of(omDirInfo), trxnLogIndex));
+    }
+    omMetadataManager.getDirectoryTable().put(ozoneKey, omDirInfo);
+  }
+
+  /**
    * Create OmKeyInfo.
    */
   public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,

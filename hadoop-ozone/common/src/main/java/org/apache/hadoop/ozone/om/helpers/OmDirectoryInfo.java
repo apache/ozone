@@ -111,8 +111,10 @@ public class OmDirectoryInfo extends WithObjectID {
       return this;
     }
 
-    public Builder setAcls(List<OzoneAcl> newAcls) {
-      this.acls = newAcls;
+    public Builder setAcls(List<OzoneAcl> listOfAcls) {
+      if (listOfAcls != null) {
+        this.acls.addAll(listOfAcls);
+      }
       return this;
     }
 
@@ -120,11 +122,6 @@ public class OmDirectoryInfo extends WithObjectID {
       if (ozoneAcl != null) {
         this.acls.add(ozoneAcl);
       }
-      return this;
-    }
-
-    public Builder setMetadata(Map<String, String> newMetadata) {
-      this.metadata = newMetadata;
       return this;
     }
 
@@ -147,7 +144,7 @@ public class OmDirectoryInfo extends WithObjectID {
 
   @Override
   public String toString() {
-    return getObjectID() + "";
+    return getObjectID() + ":" + getName();
   }
 
   public long getParentObjectID() {

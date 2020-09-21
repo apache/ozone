@@ -88,6 +88,7 @@ public class OMDirectoryCreateRequestV1 extends OMDirectoryCreateRequest {
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
     String keyName = keyArgs.getKeyName();
+    int numKeysCreated = 0;
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -140,8 +141,9 @@ public class OMDirectoryCreateRequestV1 extends OMDirectoryCreateRequest {
 
       if (omDirectoryResult == FILE_EXISTS ||
           omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
-        throw new OMException("Unable to create directory: " +keyName
-            + " in volume/bucket: " + volumeName + "/" + bucketName,
+        throw new OMException("Unable to create directory: " + keyName
+            + " in volume/bucket: " + volumeName + "/" + bucketName + " as " +
+                "file:" + omPathInfo.getExisitingKeyPath() + " already exists",
             FILE_ALREADY_EXISTS);
       } else if (omDirectoryResult == DIRECTORY_EXISTS_IN_GIVENPATH ||
           omDirectoryResult == NONE) {
@@ -158,6 +160,10 @@ public class OMDirectoryCreateRequestV1 extends OMDirectoryCreateRequest {
         OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
                 Optional.of(dirInfo), Optional.of(missingParentInfos),
                 trxnLogIndex);
+
+        // total number of keys created.
+        numKeysCreated = missingParentInfos.size() + 1;
+
         result = OMDirectoryCreateRequest.Result.SUCCESS;
         omClientResponse = new OMDirectoryCreateResponseV1(omResponse.build(),
                 dirInfo, missingParentInfos, result);
@@ -183,13 +189,15 @@ public class OMDirectoryCreateRequestV1 extends OMDirectoryCreateRequest {
     auditLog(auditLogger, buildAuditMessage(OMAction.CREATE_DIRECTORY,
         auditMap, exception, userInfo));
 
-    logResult(createDirectoryRequest, keyArgs, omMetrics, result, exception);
+    logResult(createDirectoryRequest, keyArgs, omMetrics, numKeysCreated,
+            result, exception);
 
     return omClientResponse;
   }
 
   private void logResult(CreateDirectoryRequest createDirectoryRequest,
-                         KeyArgs keyArgs, OMMetrics omMetrics, Result result,
+                         KeyArgs keyArgs, OMMetrics omMetrics, int numKeys,
+                         Result result,
                          IOException exception) {
 
     String volumeName = keyArgs.getVolumeName();
@@ -198,7 +206,9 @@ public class OMDirectoryCreateRequestV1 extends OMDirectoryCreateRequest {
 
     switch (result) {
     case SUCCESS:
-      omMetrics.incNumKeys();
+      for (int indx = 0; indx < numKeys; indx++) {
+        omMetrics.incNumKeys();
+      }
       if (LOG.isDebugEnabled()) {
         LOG.debug("Directory created. Volume:{}, Bucket:{}, Key:{}",
             volumeName, bucketName, keyName);
@@ -260,7 +270,8 @@ public class OMDirectoryCreateRequestV1 extends OMDirectoryCreateRequest {
                 INVALID_KEY_NAME);
       }
 
-      LOG.debug("missing parent {} getting added to KeyTable", missingKey);
+      LOG.debug("missing parent {} getting added to DirectoryTable",
+              missingKey);
       // what about keyArgs for parent directories? TODO
       OmDirectoryInfo dirInfo = createDirectoryInfoWithACL(missingKey,
               keyArgs, nextObjId, lastKnownParentId, trxnLogIndex, inheritAcls);
