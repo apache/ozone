@@ -89,6 +89,8 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
       // Open keys are grouped by bucket, but there may be multiple buckets
       // per volume. This map aggregates volume changes across buckets.
       Map<String, OmVolumeArgs> volumes = new HashMap<>();
+      OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+
       for (OpenKeyBucket openKeyBucket: submittedOpenKeyBucket) {
         // For each bucket where keys will be deleted from,
         // get its bucket lock and update the cache accordingly.
@@ -99,13 +101,15 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
         String volume = openKeyBucket.getVolumeName();
         OmVolumeArgs volumeArgs = volumes.get(volume);
         if (volumeArgs == null) {
-          volumeArgs = getVolumeInfo(ozoneManager.getMetadataManager(), volume);
+          volumeArgs = getVolumeInfo(metadataManager, volume);
           volumes.put(volume, volumeArgs);
         }
         subtractUsedBytes(volumeArgs, deleted.values());
 
         deletedOpenKeys.putAll(deleted);
       }
+
+      updateVolumeTableCache(metadataManager, volumes.values(), trxnLogIndex);
 
       omClientResponse = new OMOpenKeyDeleteResponse(omResponse.build(),
           deletedOpenKeys, ozoneManager.isRatisEnabled(), volumes.values());
@@ -214,5 +218,17 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
 
     // update usedBytes atomically.
     volumeArgs.getUsedBytes().add(-quotaReleased);
+  }
+
+  private void updateVolumeTableCache(OMMetadataManager metadataManager,
+      Collection<OmVolumeArgs> volumeArgList, long trxnLogIndex) {
+
+    for (OmVolumeArgs volumeArgs: volumeArgList) {
+      String volumeKey = volumeArgs.getVolume();
+
+      metadataManager.getVolumeTable().addCacheEntry(
+          new CacheKey<>(volumeKey),
+          new CacheValue<>(Optional.of(volumeArgs), trxnLogIndex));
+    }
   }
 }
