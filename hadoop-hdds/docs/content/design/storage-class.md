@@ -64,7 +64,7 @@ ozone sh bucket create --storage-class=INFREQUENT_ACCESS
 ```
 
 
-Bucket-level default storage-class can be overridden for ay key, but will be used as default.
+Bucket-level default storage-class can be overridden for any key, but will be used as default.
 
 
 ## [USER] Fine grained replication control when using S3 API
@@ -330,7 +330,7 @@ With this storage class the containers can be converted to a specific EC contain
 
 NFS / Fuse file system might require to support Random read/write which can be tricky as the closed containers are immutable. In case of changing any one byte in a block, the whole block should be re-created with the new data. It can have a lot of overhead especially in case of many small writes.
 
-But write is cheap with Ratis/THREE containers. Similar to any `ChunkWrite` and `PutBlock` we can implementa `UpdateChunk` call which modifies the current content of the chunk AND replicates the change with the help of Ratis.
+But write is cheap with Ratis/THREE containers. Similar to any `ChunkWrite` and `PutBlock` we can implement an `UpdateChunk` call which modifies the current content of the chunk AND replicates the change with the help of Ratis.
 
 Let's imagine that we solved the resiliency of Ratis pipelines: In case of any Ratis error we can ask other Datanode to join to the Ratis ring *instead of* closing it. I know that it can be hard to implement, but if it is solved, we have an easy solution for random read/write.
 
