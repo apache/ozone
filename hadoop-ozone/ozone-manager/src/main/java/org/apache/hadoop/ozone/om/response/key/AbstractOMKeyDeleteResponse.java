@@ -36,7 +36,6 @@ import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 
 /**
  * Response for DeleteKey request.
