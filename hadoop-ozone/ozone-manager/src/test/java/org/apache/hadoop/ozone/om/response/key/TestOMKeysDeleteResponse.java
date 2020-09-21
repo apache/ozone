@@ -92,13 +92,10 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
 
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           omMetadataManager.getDeletedTable().get(ozKey);
-      Assert.assertNotNull(repeatedOmKeyInfo);
-
-      Assert.assertEquals(1, repeatedOmKeyInfo.getOmKeyInfoList().size());
-      Assert.assertEquals(10L,
-          repeatedOmKeyInfo.getOmKeyInfoList().get(0).getUpdateID());
+      // Because the key info has no associated blocks, it should not be
+      // added to the delete table.
+      Assert.assertNull(repeatedOmKeyInfo);
     }
-
   }
 
   @Test
