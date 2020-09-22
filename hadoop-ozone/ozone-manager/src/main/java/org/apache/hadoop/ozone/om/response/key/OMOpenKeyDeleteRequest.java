@@ -89,45 +89,40 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
       // Open keys are grouped by bucket, but there may be multiple buckets
       // per volume. This maps volume name to volume args to track
       // all volume updates for this request.
-      Map<String, OmVolumeArgs> volumes = new HashMap<>();
+      Map<String, OmVolumeArgs> modifiedVolumes = new HashMap<>();
       OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
 
       for (OpenKeyBucket openKeyBucket: submittedOpenKeyBucket) {
         // For each bucket where keys will be deleted from,
         // get its bucket lock and update the cache accordingly.
-        Map<String, OmKeyInfo> deleted = updateCache(ozoneManager, trxnLogIndex,
+        Map<String, OmKeyInfo> deleted = updateOpenKeyTableCache(ozoneManager, trxnLogIndex,
             openKeyBucket);
 
         deletedOpenKeys.putAll(deleted);
 
         // If open keys were deleted from this bucket and its volume still
-        // exists, update the volume's byte usage.
+        // exists, update the volume's byte usage in the cache.
         if (!deleted.isEmpty()) {
-          String volumeKey =
-              metadataManager.getVolumeKey(openKeyBucket.getVolumeName());
-          boolean volumeExists =
-              metadataManager.getVolumeTable().isExist(volumeKey);
+          String volumeName = openKeyBucket.getVolumeName();
+          // Returns volume args from the cache if the volume is present,
+          // null otherwise.
+          OmVolumeArgs volumeArgs = getVolumeInfo(metadataManager, volumeName);
 
-          if (volumeExists) {
-            OmVolumeArgs volumeArgs = volumes.get(volumeKey);
-
-            // If we have not encountered this volume yet, add it to the
-            // collection of modified volumes.
-            if (volumeArgs == null) {
-              volumeArgs = getVolumeInfo(metadataManager, volumeKey);
-              volumes.put(volumeKey, volumeArgs);
-            }
-            // Modify byte usage for this volume, but do not write the result
-            // to the cache yet.
+          // If this volume still exists, decrement bytes used based on open
+          // keys deleted.
+          // The volume args object being updated is a reference from the
+          // cache, so this serves as a cache update.
+          if (volumeArgs != null) {
+            // If we already encountered the volume, it was a reference to
+            // the same object from the cache, so this will update it.
+            modifiedVolumes.put(volumeName, volumeArgs);
             subtractUsedBytes(volumeArgs, deleted.values());
           }
         }
       }
 
-      updateVolumeTableCache(metadataManager, volumes.values(), trxnLogIndex);
-
       omClientResponse = new OMOpenKeyDeleteResponse(omResponse.build(),
-          deletedOpenKeys, ozoneManager.isRatisEnabled(), volumes.values());
+          deletedOpenKeys, ozoneManager.isRatisEnabled(), modifiedVolumes.values());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -166,8 +161,8 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
     }
   }
 
-  private Map<String, OmKeyInfo> updateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OpenKeyBucket keysPerBucket)
+  private Map<String, OmKeyInfo> updateOpenKeyTableCache(
+      OzoneManager ozoneManager, long trxnLogIndex, OpenKeyBucket keysPerBucket)
       throws IOException {
 
     Map<String, OmKeyInfo> deletedKeys = new HashMap<>();
@@ -233,17 +228,5 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
 
     // update usedBytes atomically.
     volumeArgs.getUsedBytes().add(-quotaReleased);
-  }
-
-  private void updateVolumeTableCache(OMMetadataManager metadataManager,
-      Collection<OmVolumeArgs> volumeArgList, long trxnLogIndex) {
-
-    for (OmVolumeArgs volumeArgs: volumeArgList) {
-      String volumeKey = volumeArgs.getVolume();
-
-      metadataManager.getVolumeTable().addCacheEntry(
-          new CacheKey<>(volumeKey),
-          new CacheValue<>(Optional.of(volumeArgs), trxnLogIndex));
-    }
   }
 }
