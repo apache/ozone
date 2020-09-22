@@ -77,6 +77,10 @@ public abstract class AbstractLayoutVersionManager implements
     return metadataLayoutVersion < softwareLayoutVersion;
   }
 
+  public boolean softwareIsBehindMetaData() {
+    return metadataLayoutVersion > softwareLayoutVersion;
+  }
+
   public boolean isAllowed(LayoutFeature layoutFeature) {
     return layoutFeature.layoutVersion() <= metadataLayoutVersion;
   }

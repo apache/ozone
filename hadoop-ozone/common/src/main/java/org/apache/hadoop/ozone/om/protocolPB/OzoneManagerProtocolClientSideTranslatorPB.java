@@ -139,7 +139,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -147,6 +146,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.CancelDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -156,6 +156,7 @@ import com.google.protobuf.ByteString;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.*;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.DIRECTORY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
@@ -258,7 +259,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .build();
 
     OMResponse omResponse = submitRequest(omRequest);
-    OzoneManagerProtocolProtos.SetVolumePropertyResponse response =
+    SetVolumePropertyResponse response =
         handleError(omResponse).getSetVolumePropertyResponse();
 
     return response.getResponse();
@@ -1075,7 +1076,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public UpgradeFinalizationStatus finalizeUpgrade(
+  public UpgradeFinalizer.StatusAndMessages finalizeUpgrade(
       String upgradeClientID
   ) throws IOException {
     FinalizeUpgradeRequest req = FinalizeUpgradeRequest.newBuilder()
@@ -1089,11 +1090,15 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     FinalizeUpgradeResponse response =
         handleError(submitRequest(omRequest)).getFinalizeUpgradeResponse();
 
-    return response.getStatus();
+    UpgradeFinalizationStatus status = response.getStatus();
+    return new UpgradeFinalizer.StatusAndMessages(
+        UpgradeFinalizer.Status.valueOf(status.getStatus().name()),
+        status.getMessagesList()
+    );
   }
 
   @Override
-  public UpgradeFinalizationStatus queryUpgradeFinalizationProgress(
+  public UpgradeFinalizer.StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean takeover
   ) throws IOException {
     FinalizeUpgradeProgressRequest req = FinalizeUpgradeProgressRequest
@@ -1110,7 +1115,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         handleError(submitRequest(omRequest))
             .getFinalizeUpgradeProgressResponse();
 
-    return response.getStatus();
+    UpgradeFinalizationStatus status = response.getStatus();
+
+    return new UpgradeFinalizer.StatusAndMessages(
+        UpgradeFinalizer.Status.valueOf(status.getStatus().name()),
+        status.getMessagesList()
+    );
   }
 
   /**

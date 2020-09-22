@@ -96,6 +96,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
 
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -605,11 +606,20 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     String upgradeClientId = request.getUpgradeClientId();
     boolean takeover = request.getTakeover();
 
-    UpgradeFinalizationStatus status =
+    StatusAndMessages progress =
         impl.queryUpgradeFinalizationProgress(upgradeClientId, takeover);
 
+    UpgradeFinalizationStatus.Status protoStatus =
+        UpgradeFinalizationStatus.Status.valueOf(progress.status().name());
+
+    UpgradeFinalizationStatus response =
+        UpgradeFinalizationStatus.newBuilder()
+            .setStatus(protoStatus)
+            .addAllMessages(progress.msgs())
+            .build();
+
     return FinalizeUpgradeProgressResponse.newBuilder()
-        .setStatus(status)
+        .setStatus(response)
         .build();
   }
 

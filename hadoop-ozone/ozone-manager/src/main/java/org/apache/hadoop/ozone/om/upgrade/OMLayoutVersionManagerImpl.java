@@ -97,6 +97,15 @@ public final class OMLayoutVersionManagerImpl
       throw new OMException(String.format(e.getMessage()),
           NOT_SUPPORTED_OPERATION);
     }
+
+    if (softwareIsBehindMetaData()) {
+      throw new OMException(
+          String.format("Cannot initialize VersionManager. Metadata " +
+                  "layout version (%d) > software layout version (%d)",
+              metadataLayoutVersion, softwareLayoutVersion),
+          NOT_SUPPORTED_OPERATION);
+    }
+
     registerOzoneManagerRequests();
   }
 
@@ -162,8 +171,7 @@ public final class OMLayoutVersionManagerImpl
 
   /**
    * Given a type and version, get the corresponding request class type.
-   * @param requestType type string
-   * @param version version
+   * @param type type string
    * @return class type.
    */
   @Override
