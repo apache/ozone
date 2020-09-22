@@ -54,10 +54,10 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import org.apache.ratis.protocol.AlreadyClosedException;
-import org.apache.ratis.protocol.NotReplicatedException;
-import org.apache.ratis.protocol.RaftRetryFailureException;
-import org.apache.ratis.protocol.TimeoutIOException;
+import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
+import org.apache.ratis.protocol.exceptions.NotReplicatedException;
+import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
+import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
