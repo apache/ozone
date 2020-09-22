@@ -51,9 +51,11 @@ public final class RatisUpgradeUtils {
       StateMachine stateMachine,
       RaftGroup raftGroup,
       RaftServerProxy server,
-      long maxTimeToWaitSeconds)
+      long maxTimeToWaitSeconds,
+      long timeBetweenRetryInSeconds)
       throws InterruptedException, IOException {
 
+    long intervalTime = TimeUnit.SECONDS.toMillis(timeBetweenRetryInSeconds);
     long endTime = System.currentTimeMillis() +
         TimeUnit.SECONDS.toMillis(maxTimeToWaitSeconds);
     boolean success = false;
@@ -62,12 +64,13 @@ public final class RatisUpgradeUtils {
       if (success) {
         break;
       }
-      Thread.sleep(5000L);
+      Thread.sleep(intervalTime);
     }
 
     if (!success) {
-      throw new IOException(String.format("After waiting for %d seconds, OM " +
-          "has not applied  all the transactions.", maxTimeToWaitSeconds));
+      throw new IOException(String.format("After waiting for %d seconds, " +
+          "State Machine has not applied  all the transactions.",
+          maxTimeToWaitSeconds));
     }
 
     long snapshotIndex = stateMachine.takeSnapshot();

@@ -215,10 +215,12 @@ import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FLUSH_TXNS_RETRY_INTERVAL_SECONDS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MAX_TIME_TO_WAIT_FLUSH_TXNS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
@@ -231,7 +233,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService.newReflectiveBlockingService;
-import static org.apache.ratis.server.RaftServerConfigKeys.Log.PURGE_UPTO_SNAPSHOT_INDEX_KEY;
 
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
@@ -1013,17 +1014,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return true;
     }
 
-    String purgeConfig = omRatisServer.getServer()
-        .getProperties().get(PURGE_UPTO_SNAPSHOT_INDEX_KEY);
-    if (!Boolean.parseBoolean(purgeConfig)) {
-      throw new IllegalStateException("Cannot prepare OM for Upgrade since  " +
-          "raft.server.log.purge.upto.snapshot.index is not true");
-    }
-
     waitForAllTxnsApplied(omRatisServer.getOmStateMachine(),
         omRatisServer.getRaftGroup(),
         (RaftServerProxy) omRatisServer.getServer(),
-        TimeUnit.MINUTES.toSeconds(5));
+        OZONE_OM_MAX_TIME_TO_WAIT_FLUSH_TXNS,
+        OZONE_OM_FLUSH_TXNS_RETRY_INTERVAL_SECONDS);
 
     long appliedIndexFromRatis =
         omRatisServer.getOmStateMachine().getLastAppliedTermIndex().getIndex();
