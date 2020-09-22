@@ -37,7 +37,13 @@ public class OMCacheManager {
             OMConfigKeys.OZONE_OM_CACHE_DIR_DEFAULT, config);
   }
 
+  /**
+   * Returns directory cache store instance.
+   *
+   * @return
+   */
   public CacheStore getDirCache() {
     return dirCache;
   }
 }
+

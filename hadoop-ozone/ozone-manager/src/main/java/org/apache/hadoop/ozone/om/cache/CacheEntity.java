@@ -38,7 +38,7 @@ public enum CacheEntity {
 
   public static CacheEntity getEntity(String entityStr) {
     for (CacheEntity entity : CacheEntity.values()) {
-      if (entityStr.equalsIgnoreCase(entity.getName())) {
+      if (entity.getName().equalsIgnoreCase(entityStr)) {
         return entity;
       }
     }

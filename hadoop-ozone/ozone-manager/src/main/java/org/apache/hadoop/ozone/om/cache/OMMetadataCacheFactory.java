@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om.cache;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,32 +51,43 @@ public final class OMMetadataCacheFactory {
   public static CacheStore getCache(String configuredCachePolicy,
                                     String defaultValue,
                                     OzoneConfiguration config) {
+    CacheEntity entity = getCacheEntity(configuredCachePolicy);
+    if (entity == null) {
+      LOG.error("Invalid property configured: {}", configuredCachePolicy);
+      throw new IllegalArgumentException("Invalid property configured: "
+              + configuredCachePolicy);
+    }
+
     String cachePolicy = config.get(configuredCachePolicy, defaultValue);
     LOG.info("Configured {} with {}", configuredCachePolicy, cachePolicy);
-    CacheEntity entity = getCacheEntity(configuredCachePolicy);
-
     switch (entity) {
     case DIR:
+    default:
       OMMetadataCacheProvider provider = new OMDirectoryCacheProvider(config,
               cachePolicy);
       if (LOG.isDebugEnabled()) {
         LOG.debug("CacheStore initialized with {}:" + provider.getEntity());
       }
       return provider.getCache();
-    default:
-      return null;
     }
   }
 
+  /**
+   * Entityname present at the second last position of configuration name.
+   * Here, this function filters out the second last part separated by '.'
+   * character and returns corresponding entity to be cached.
+   * <p>
+   * For example, "ozone.om.metadata.cache.directory.policy", in this
+   * property name the 'directory' part represents entity name.
+   * In future, one can add new entity by providing new configuration like,
+   * "ozone.om.metadata.cache.file.policy" to represents the FILE cache entity.
+   *
+   * @param configuredCachePolicy property name for the cache policy
+   * @return entity to be cached
+   */
   private static CacheEntity getCacheEntity(String configuredCachePolicy) {
-    // entityname present at the end of configuration name. Here, the
-    // logic is to get the last part separated by '.' character.
-    // For example, in configuration "ozone.om.metadata.cache.directory", the
-    // last part is 'directory' and this represents the entity name.
-    // In future, one can add new entity by providing new configuration like,
-    // "ozone.om.metadata.cache.file" and this represents the FILE cache entity.
-    String entity = configuredCachePolicy
-            .substring(configuredCachePolicy.lastIndexOf('.') + 1);
+    String[] parts = StringUtils.split(configuredCachePolicy, '.');
+    String entity = parts[parts.length - 2];
     return CacheEntity.getEntity(entity);
   }
 

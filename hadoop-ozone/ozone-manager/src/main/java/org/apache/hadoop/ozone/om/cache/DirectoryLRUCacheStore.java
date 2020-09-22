@@ -52,8 +52,10 @@ public class DirectoryLRUCacheStore implements CacheStore {
     long maxSize = configuration.getLong(
             OMConfigKeys.OZONE_OM_CACHE_DIR_MAX_CAPACITY,
             OMConfigKeys.OZONE_OM_CACHE_DIR_MAX_CAPACITY_DEFAULT);
-    LOG.info("Configured {} with {}",
+    LOG.info("Configured {} = {} and {} = {}",
+            OMConfigKeys.OZONE_OM_CACHE_DIR_INIT_CAPACITY, initSize,
             OMConfigKeys.OZONE_OM_CACHE_DIR_MAX_CAPACITY, maxSize);
+
     mCache = CacheBuilder.newBuilder()
             .initialCapacity(initSize)
             .maximumSize(maxSize)
@@ -62,17 +64,24 @@ public class DirectoryLRUCacheStore implements CacheStore {
 
   @Override
   public void put(OMCacheKey key, OMCacheValue value) {
-    mCache.put(key, value);
+    if (key != null && value != null) {
+      mCache.put(key, value);
+    }
   }
 
   @Override
   public OMCacheValue get(OMCacheKey key) {
-    return mCache.getIfPresent(key);
+    if (key != null) {
+      return mCache.getIfPresent(key);
+    }
+    return null;
   }
 
   @Override
   public void remove(OMCacheKey key) {
-    mCache.invalidate(key);
+    if (key != null) {
+      mCache.invalidate(key);
+    }
   }
 
   @Override

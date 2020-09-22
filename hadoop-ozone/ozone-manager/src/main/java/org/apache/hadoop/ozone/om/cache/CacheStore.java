@@ -26,6 +26,8 @@ package org.apache.hadoop.ozone.om.cache;
  *       define cache loading strategies. It can be NullLoader, LazyLoader,
  *       LevelLoader etc.
  *
+ * TODO: Add cache metrics interface - occupancy, hit, miss, evictions etc
+ *
  * @param <CACHEKEY>
  * @param <CACHEVALUE>
  */

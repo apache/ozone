@@ -32,6 +32,9 @@ import org.junit.rules.Timeout;
 import java.io.File;
 import java.io.IOException;
 
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 /**
  * Testing OMMetadata cache policy class.
  */
@@ -164,7 +167,37 @@ public class TestOMMetadataCache {
   }
 
   @Test
-  public void testNullCacheDirectoryPolicy() throws IOException {
+  public void testNullKeysAndValuesToLRUCacheDirectoryPolicy() throws IOException {
+    conf.set(OMConfigKeys.OZONE_OM_CACHE_DIR_POLICY,
+            CachePolicy.DIR_LRU.getPolicy());
+    conf.setInt(OMConfigKeys.OZONE_OM_CACHE_DIR_INIT_CAPACITY, 1);
+    conf.setLong(OMConfigKeys.OZONE_OM_CACHE_DIR_MAX_CAPACITY, 2);
+
+    File testDir = GenericTestUtils.getRandomizedTestDir();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
+            testDir.toString());
+
+    omMetadataManager = new OmMetadataManagerImpl(conf);
+    CacheStore dirCacheStore =
+            omMetadataManager.getOMCacheManager().getDirCache();
+    Assert.assertEquals("CachePolicy Mismatches!", CachePolicy.DIR_LRU,
+            dirCacheStore.getCachePolicy());
+
+    OMCacheKey<String> dirA = new OMCacheKey<>("512/a");
+    OMCacheValue<Long> dirAObjID = new OMCacheValue<>(1026L);
+    // shouldn't throw NPE, just skip null key
+    dirCacheStore.put(null, dirAObjID);
+    dirCacheStore.put(dirA, null);
+
+    // shouldn't throw NPE, just skip null key
+    Assert.assertNull("Unexpected value!", dirCacheStore.get(null));
+
+    // shouldn't throw NPE, just skip null key
+    dirCacheStore.remove(null);
+  }
+
+  @Test
+  public void testNoCacheDirectoryPolicy() throws IOException {
     conf.set(OMConfigKeys.OZONE_OM_CACHE_DIR_POLICY,
             CachePolicy.DIR_NOCACHE.getPolicy());
 
@@ -201,5 +234,43 @@ public class TestOMMetadataCache {
             omMetadataManager.getOMCacheManager().getDirCache();
     Assert.assertEquals("CachePolicy Mismatches!", CachePolicy.DIR_LRU,
             dirCacheStore.getCachePolicy());
+  }
+
+  @Test
+  public void testInvalidCacheDirectoryPolicyValue() throws IOException {
+    File testDir = GenericTestUtils.getRandomizedTestDir();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
+            testDir.toString());
+
+    //1. Verify default dir cache policy. Defaulting to DIR_NOCACHE
+    conf.set(OMConfigKeys.OZONE_OM_CACHE_DIR_POLICY, "INVALID");
+    Assert.assertEquals("Unexpected CachePolicy!", "INVALID",
+            conf.get(OMConfigKeys.OZONE_OM_CACHE_DIR_POLICY));
+
+    omMetadataManager = new OmMetadataManagerImpl(conf);
+    CacheStore dirCacheStore =
+            omMetadataManager.getOMCacheManager().getDirCache();
+    Assert.assertEquals("CachePolicy Mismatches!", CachePolicy.DIR_NOCACHE,
+            dirCacheStore.getCachePolicy());
+  }
+
+  @Test
+  public void testInvalidCacheDirectoryPolicyConfigurationName() throws IOException {
+    File testDir = GenericTestUtils.getRandomizedTestDir();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
+            testDir.toString());
+
+    String propertyName = "ozone.om.metadata.cache.directoryINVALID.policy";
+
+    //1. Verify invalid dir cache policy name.
+    conf.set(propertyName, CachePolicy.DIR_NOCACHE.getPolicy());
+
+    try {
+      OMMetadataCacheFactory.getCache(propertyName,
+              OMConfigKeys.OZONE_OM_CACHE_DIR_DEFAULT, conf);
+      fail("An invalid property name should cause an IllegalArgumentException");
+    } catch (Exception e) {
+      assertTrue(e instanceof IllegalArgumentException);
+    }
   }
 }
