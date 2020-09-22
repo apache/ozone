@@ -249,7 +249,7 @@ public final class OMConfigKeys {
 
   public static final String OZONE_OM_CACHE_DIR_POLICY =
           "ozone.om.metadata.cache.directory.policy";
-  public static final String OZONE_OM_CACHE_DIR_DEFAULT = "DIR_LRU";
+  public static final String OZONE_OM_CACHE_DIR_POLICY_DEFAULT = "DIR_LRU";
   public static final String OZONE_OM_CACHE_DIR_INIT_CAPACITY =
           "ozone.om.metadata.cache.directory.init.capacity";
   public static final int OZONE_OM_CACHE_DIR_INIT_CAPACITY_DEFAULT = 100000;

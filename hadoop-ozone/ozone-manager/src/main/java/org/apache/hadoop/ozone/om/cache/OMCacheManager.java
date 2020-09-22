@@ -34,7 +34,7 @@ public class OMCacheManager {
     // Defaulting to DIR_LRU cache policy.
     dirCache = OMMetadataCacheFactory.getCache(
             OMConfigKeys.OZONE_OM_CACHE_DIR_POLICY,
-            OMConfigKeys.OZONE_OM_CACHE_DIR_DEFAULT, config);
+            OMConfigKeys.OZONE_OM_CACHE_DIR_POLICY_DEFAULT, config);
   }
 
   /**

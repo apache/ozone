@@ -62,7 +62,7 @@ public class TestOMMetadataCache {
             CachePolicy.DIR_NOCACHE.getPolicy());
     CacheStore dirCacheStore = OMMetadataCacheFactory.getCache(
             OMConfigKeys.OZONE_OM_CACHE_DIR_POLICY,
-            OMConfigKeys.OZONE_OM_CACHE_DIR_DEFAULT, conf);
+            OMConfigKeys.OZONE_OM_CACHE_DIR_POLICY_DEFAULT, conf);
     Assert.assertEquals("Cache Policy mismatches!", CachePolicy.DIR_NOCACHE,
             dirCacheStore.getCachePolicy());
 
@@ -70,16 +70,16 @@ public class TestOMMetadataCache {
     conf.set(OMConfigKeys.OZONE_OM_CACHE_DIR_POLICY, "InvalidCachePolicy");
     dirCacheStore = OMMetadataCacheFactory.getCache(
             OMConfigKeys.OZONE_OM_CACHE_DIR_POLICY,
-            OMConfigKeys.OZONE_OM_CACHE_DIR_DEFAULT, conf);
+            OMConfigKeys.OZONE_OM_CACHE_DIR_POLICY_DEFAULT, conf);
     Assert.assertEquals("Expected NullCache for an invalid CachePolicy",
             CachePolicy.DIR_NOCACHE, dirCacheStore.getCachePolicy());
 
     //3. Directory LRU cache policy
     conf.set(OMConfigKeys.OZONE_OM_CACHE_DIR_POLICY,
-            OMConfigKeys.OZONE_OM_CACHE_DIR_DEFAULT);
+            OMConfigKeys.OZONE_OM_CACHE_DIR_POLICY_DEFAULT);
     dirCacheStore = OMMetadataCacheFactory.getCache(
             OMConfigKeys.OZONE_OM_CACHE_DIR_POLICY,
-            OMConfigKeys.OZONE_OM_CACHE_DIR_DEFAULT, conf);
+            OMConfigKeys.OZONE_OM_CACHE_DIR_POLICY_DEFAULT, conf);
     Assert.assertEquals("Cache Type mismatches!", CachePolicy.DIR_LRU,
             dirCacheStore.getCachePolicy());
   }
@@ -167,7 +167,8 @@ public class TestOMMetadataCache {
   }
 
   @Test
-  public void testNullKeysAndValuesToLRUCacheDirectoryPolicy() throws IOException {
+  public void testNullKeysAndValuesToLRUCacheDirectoryPolicy()
+          throws IOException {
     conf.set(OMConfigKeys.OZONE_OM_CACHE_DIR_POLICY,
             CachePolicy.DIR_LRU.getPolicy());
     conf.setInt(OMConfigKeys.OZONE_OM_CACHE_DIR_INIT_CAPACITY, 1);
@@ -255,7 +256,7 @@ public class TestOMMetadataCache {
   }
 
   @Test
-  public void testInvalidCacheDirectoryPolicyConfigurationName() throws IOException {
+  public void testInvalidCacheDirectoryPolicyConfigurationName() {
     File testDir = GenericTestUtils.getRandomizedTestDir();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
             testDir.toString());
@@ -267,7 +268,7 @@ public class TestOMMetadataCache {
 
     try {
       OMMetadataCacheFactory.getCache(propertyName,
-              OMConfigKeys.OZONE_OM_CACHE_DIR_DEFAULT, conf);
+              OMConfigKeys.OZONE_OM_CACHE_DIR_POLICY_DEFAULT, conf);
       fail("An invalid property name should cause an IllegalArgumentException");
     } catch (Exception e) {
       assertTrue(e instanceof IllegalArgumentException);
