@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
         .OMResponse;
@@ -34,9 +35,12 @@ import java.io.IOException;
 import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
+
 /**
  * Response for DeleteKey request.
  */
+@CleanupTableInfo(cleanupTables = {DELETED_TABLE})
 public abstract class AbstractOMKeyDeleteResponse extends OMClientResponse {
 
   private boolean isRatisEnabled;
