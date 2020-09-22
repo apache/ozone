@@ -224,14 +224,16 @@ public class TestOMDirectoryCreateRequest1 {
     OmBucketInfo omBucketInfo =
             omMetadataManager.getBucketTable().get(bucketKey);
     long bucketID = omBucketInfo.getObjectID();
+    int objID = 100;
 
     //1. Create root
     OmDirectoryInfo omDirInfo =
-            TestOMRequestUtils.createOmDirectoryInfo(dirs.get(0), 100, bucketID);
+            TestOMRequestUtils.createOmDirectoryInfo(dirs.get(0), objID++,
+                    bucketID);
     TestOMRequestUtils.addDirKeyToDirTable(true, omDirInfo, 5000,
             omMetadataManager);
     //2. Create sub-directory under root
-    omDirInfo = TestOMRequestUtils.createOmDirectoryInfo(dirs.get(1), 101,
+    omDirInfo = TestOMRequestUtils.createOmDirectoryInfo(dirs.get(1), objID++,
             omDirInfo.getObjectID());
     TestOMRequestUtils.addDirKeyToDirTable(true, omDirInfo, 5000,
             omMetadataManager);
@@ -330,16 +332,15 @@ public class TestOMDirectoryCreateRequest1 {
     long txnID = 5000;
     // for index=0, parentID is bucketID
     OmDirectoryInfo omDirInfo = TestOMRequestUtils.createOmDirectoryInfo(
-            dirs.get(0), objID, parentID);
+            dirs.get(0), objID++, parentID);
     TestOMRequestUtils.addDirKeyToDirTable(true, omDirInfo,
             txnID, omMetadataManager);
     parentID = omDirInfo.getObjectID();
 
     // Add a key in second level.
     OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
-            bucketName, keyName,
-            HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE,
-            101);
+            bucketName, keyName, HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.THREE, objID++);
     String ozoneKey = parentID + "/" + dirs.get(1);
     omMetadataManager.getKeyTable().addCacheEntry(new CacheKey<>(ozoneKey),
             new CacheValue<>(Optional.of(omKeyInfo), ++txnID));
