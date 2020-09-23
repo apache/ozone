@@ -565,4 +565,19 @@ public abstract class OMKeyRequest extends OMClientRequest {
         new CacheKey<>(omMetadataManager.getVolumeKey(volume)))
         .getCacheValue();
   }
+
+  /**
+   * Return bucket info for the specified bucket.
+   * @param omMetadataManager
+   * @param volume
+   * @param bucket
+   * @return OmVolumeArgs
+   * @throws IOException
+   */
+  protected OmBucketInfo getBucketInfo(OMMetadataManager omMetadataManager,
+      String volume, String bucket) {
+    return omMetadataManager.getBucketTable().getCacheValue(
+        new CacheKey<>(omMetadataManager.getBucketKey(volume, bucket)))
+        .getCacheValue();
+  }
 }

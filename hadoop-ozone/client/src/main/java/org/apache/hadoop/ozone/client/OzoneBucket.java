@@ -93,6 +93,11 @@ public class OzoneBucket extends WithMetadata {
   private int listCacheSize;
 
   /**
+   * Used bytes of the bucket.
+   */
+  private long usedBytes;
+
+  /**
    * Creation time of the bucket.
    */
   private Instant creationTime;
@@ -171,6 +176,18 @@ public class OzoneBucket extends WithMetadata {
       String sourceVolume, String sourceBucket) {
     this(conf, proxy, volumeName, bucketName, storageType, versioning,
         creationTime, metadata, encryptionKeyName, sourceVolume, sourceBucket);
+    this.modificationTime = Instant.ofEpochMilli(modificationTime);
+  }
+
+  @SuppressWarnings("parameternumber")
+  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
+      String volumeName, String bucketName, StorageType storageType,
+      Boolean versioning, long creationTime, long modificationTime,
+      Map<String, String> metadata, String encryptionKeyName,
+      String sourceVolume, String sourceBucket, long usedBytes) {
+    this(conf, proxy, volumeName, bucketName, storageType, versioning,
+        creationTime, metadata, encryptionKeyName, sourceVolume, sourceBucket);
+    this.usedBytes = usedBytes;
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
   }
 
@@ -414,6 +431,10 @@ public class OzoneBucket extends WithMetadata {
    */
   public OzoneKeyDetails getKey(String key) throws IOException {
     return proxy.getKeyDetails(volumeName, name, key);
+  }
+
+  public long getUsedBytes() {
+    return usedBytes;
   }
 
   /**

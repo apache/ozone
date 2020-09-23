@@ -25,6 +25,7 @@ import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -166,6 +167,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     OmKeyInfo openKeyInfo;
     IOException exception = null;
     OmVolumeArgs omVolumeArgs = null;
+    OmBucketInfo omBucketInfo = null;
 
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
@@ -208,14 +210,17 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
 
       long scmBlockSize = ozoneManager.getScmBlockSize();
       omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
+      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       // update usedBytes atomically.
-      omVolumeArgs.getUsedBytes().add(newLocationList.size() * scmBlockSize
-          * openKeyInfo.getFactor().getNumber());
+      long preAllocatedSpace = newLocationList.size() * scmBlockSize
+          * openKeyInfo.getFactor().getNumber();
+      omVolumeArgs.getUsedBytes().add(preAllocatedSpace);
+      omBucketInfo.getUsedBytes().add(preAllocatedSpace);
 
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
           .setKeyLocation(blockLocation).build());
       omClientResponse = new OMAllocateBlockResponse(omResponse.build(),
-          openKeyInfo, clientID, omVolumeArgs);
+          openKeyInfo, clientID, omVolumeArgs, omBucketInfo);
 
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
           volumeName, bucketName, openKeyName);
