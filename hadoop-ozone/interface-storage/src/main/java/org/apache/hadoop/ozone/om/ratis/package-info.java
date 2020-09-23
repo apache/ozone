@@ -19,9 +19,6 @@
  */
 
 /**
- * Utility classes to encode/decode DTO objects to/from byte array.
+ * OMTransactionInfo.
  */
-/**
- * OM DB definitions.
- */
-package org.apache.hadoop.ozone.om.codec;
+package org.apache.hadoop.ozone.om.ratis;

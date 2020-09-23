@@ -31,6 +31,7 @@
   </properties>
   <modules>
     <module>interface-client</module>
+    <module>interface-storage</module>
     <module>common</module>
     <module>client</module>
     <module>ozone-manager</module>
@@ -69,6 +70,11 @@
       <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-ozone-interface-client</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-ozone-interface-storage</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
