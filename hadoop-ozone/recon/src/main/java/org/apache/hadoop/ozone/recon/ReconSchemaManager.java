@@ -49,7 +49,7 @@ public class ReconSchemaManager {
       try {
         reconSchemaDefinition.initializeSchema();
       } catch (SQLException e) {
-        LOG.error("Error creating Recon schema {} : {}",
+        LOG.error("Error creating Recon schema {}.",
             reconSchemaDefinition.getClass().getSimpleName(), e);
       }
     });

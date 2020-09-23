@@ -203,13 +203,13 @@ public class SCMDatanodeProtocolServer implements
 
   @Override
   public SCMRegisteredResponseProto register(
-      HddsProtos.DatanodeDetailsProto datanodeDetailsProto,
+      HddsProtos.ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto,
       NodeReportProto nodeReport,
       ContainerReportsProto containerReportsProto,
           PipelineReportsProto pipelineReportsProto)
       throws IOException {
     DatanodeDetails datanodeDetails = DatanodeDetails
-        .getFromProtoBuf(datanodeDetailsProto);
+        .getFromProtoBuf(extendedDatanodeDetailsProto);
     boolean auditSuccess = true;
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("datanodeDetails", datanodeDetails.toString());

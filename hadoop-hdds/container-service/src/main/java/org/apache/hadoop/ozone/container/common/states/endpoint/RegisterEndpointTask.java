@@ -22,7 +22,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
-        .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+    .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.ozone.container.common.statemachine
     .EndpointStateMachine;
 import org.apache.hadoop.hdds.protocol.proto
@@ -119,8 +119,8 @@ public final class RegisterEndpointTask implements
             datanodeContainerManager.getPipelineReport();
         // TODO : Add responses to the command Queue.
         SCMRegisteredResponseProto response = rpcEndPoint.getEndPoint()
-            .register(datanodeDetails.getProtoBufMessage(), nodeReport,
-                containerReport, pipelineReportsProto);
+            .register(datanodeDetails.getExtendedProtoBufMessage(),
+                nodeReport, containerReport, pipelineReportsProto);
         Preconditions.checkState(UUID.fromString(response.getDatanodeUUID())
                 .equals(datanodeDetails.getUuid()),
             "Unexpected datanode ID in the response.");

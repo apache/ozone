@@ -29,6 +29,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -45,21 +46,17 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .CommitKeyRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .KeyArgs;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .KeyLocation;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
@@ -125,6 +122,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
     IOException exception = null;
     OmKeyInfo omKeyInfo = null;
+    OmVolumeArgs omVolumeArgs = null;
     OMClientResponse omClientResponse = null;
     boolean bucketLockAcquired = false;
     Result result;
@@ -158,6 +156,16 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
+      // Check for directory exists with same name, if it exists throw error. 
+      if (ozoneManager.getEnableFileSystemPaths()) {
+        if (checkDirectoryAlreadyExists(volumeName, bucketName, keyName,
+            omMetadataManager)) {
+          throw new OMException("Can not create file: " + keyName +
+              " as there is already directory in the given path", NOT_A_FILE);
+        }
+      }
+
+
       omKeyInfo = omMetadataManager.getOpenKeyTable().get(dbOpenKey);
       if (omKeyInfo == null) {
         throw new OMException("Failed to commit key, as " + dbOpenKey +
@@ -182,8 +190,19 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           new CacheKey<>(dbOzoneKey),
           new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
 
+      long scmBlockSize = ozoneManager.getScmBlockSize();
+      int factor = omKeyInfo.getFactor().getNumber();
+      omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
+      // update usedBytes atomically.
+      // Block was pre-requested and UsedBytes updated when createKey and
+      // AllocatedBlock. The space occupied by the Key shall be based on
+      // the actual Key size, and the total Block size applied before should
+      // be subtracted.
+      omVolumeArgs.getUsedBytes().add(omKeyInfo.getDataSize() * factor -
+          locationInfoList.size() * scmBlockSize * factor);
+
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
-          omKeyInfo, dbOzoneKey, dbOpenKey);
+          omKeyInfo, dbOzoneKey, dbOpenKey, omVolumeArgs);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -218,7 +237,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           bucketName, keyName);
       break;
     case FAILURE:
-      LOG.error("Key commit failed. Volume:{}, Bucket:{}, Key:{}. Exception:{}",
+      LOG.error("Key commit failed. Volume:{}, Bucket:{}, Key:{}.",
           volumeName, bucketName, keyName, exception);
       omMetrics.incNumKeyCommitFails();
       break;

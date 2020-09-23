@@ -74,7 +74,8 @@ import org.slf4j.LoggerFactory;
  */
 public class KeyValueContainer implements Container<KeyValueContainerData> {
 
-  private static final Logger LOG = LoggerFactory.getLogger(Container.class);
+  private static final Logger LOG =
+          LoggerFactory.getLogger(KeyValueContainer.class);
 
   // Use a non-fair RW lock for better throughput, we may revisit this decision
   // if this causes fairness issues.

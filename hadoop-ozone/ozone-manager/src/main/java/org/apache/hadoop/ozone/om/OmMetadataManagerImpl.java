@@ -263,7 +263,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
       // the OM process should be terminated.
       File markerFile = new File(metaDir, DB_TRANSIENT_MARKER);
       if (markerFile.exists()) {
-        LOG.error("File {} marks that OM DB is in an inconsistent state.");
+        LOG.error("File {} marks that OM DB is in an inconsistent state.",
+                markerFile);
         // Note - The marker file should be deleted only after fixing the DB.
         // In an HA setup, this can be done by replacing this DB with a
         // checkpoint from another OM.

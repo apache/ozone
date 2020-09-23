@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.shell.volume;
 
 import org.apache.hadoop.hdds.client.OzoneQuota;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
@@ -39,21 +40,32 @@ public class UpdateVolumeHandler extends VolumeHandler {
       description = "Owner of the volume to set")
   private String ownerName;
 
-  @Option(names = {"--quota"},
-      description = "Quota of the volume to set"
-          + "(eg. 1G)")
-  private String quota;
+  @Option(names = {"--spaceQuota", "-sq"},
+      description = "Quota in bytes of the volume to set (eg. 1GB)")
+  private String quotaInBytes;
+
+  @Option(names = {"--bucketQuota", "-bq"},
+      description = "Bucket counts of the volume to set (eg. 5)")
+  private long quotaInCounts = OzoneConsts.QUOTA_RESET;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
-
     String volumeName = address.getVolumeName();
-
     OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
-    if (quota != null && !quota.isEmpty()) {
-      volume.setQuota(OzoneQuota.parseQuota(quota));
+
+    long spaceQuota = volume.getQuotaInBytes();
+    long countQuota = volume.getQuotaInCounts();
+
+    if (quotaInBytes != null && !quotaInBytes.isEmpty()) {
+      spaceQuota = OzoneQuota.parseQuota(quotaInBytes,
+          quotaInCounts).getQuotaInBytes();
     }
+    if (quotaInCounts >= 0) {
+      countQuota = quotaInCounts;
+    }
+
+    volume.setQuota(OzoneQuota.getOzoneQuota(spaceQuota, countQuota));
 
     if (ownerName != null && !ownerName.isEmpty()) {
       boolean result = volume.setOwner(ownerName);

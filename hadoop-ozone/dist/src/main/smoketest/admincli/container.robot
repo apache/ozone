@@ -46,7 +46,12 @@ List containers with explicit host
 Container info
     ${output} =         Execute          ozone admin container info "${CONTAINER}"
                         Should contain   ${output}   Container id: ${CONTAINER}
+                        Should contain   ${output}   Pipeline id
                         Should contain   ${output}   Datanodes
+
+Verbose container info
+    ${output} =         Execute          ozone admin --verbose container info "${CONTAINER}"
+                        Should contain   ${output}   Pipeline Info
 
 Close container
                         Execute          ozone admin container close "${CONTAINER}"

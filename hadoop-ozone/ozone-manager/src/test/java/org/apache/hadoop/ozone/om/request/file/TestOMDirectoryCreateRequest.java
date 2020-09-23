@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.junit.After;
@@ -88,7 +89,8 @@ public class TestOMDirectoryCreateRequest {
     auditLogger = Mockito.mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
-    when(ozoneManager.resolveBucketLink(any(KeyArgs.class)))
+    when(ozoneManager.resolveBucketLink(any(KeyArgs.class),
+        any(OMClientRequest.class)))
         .thenReturn(new ResolvedBucket(Pair.of("", ""), Pair.of("", "")));
   }
 

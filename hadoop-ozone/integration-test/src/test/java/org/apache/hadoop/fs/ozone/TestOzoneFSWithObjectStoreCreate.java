@@ -19,6 +19,8 @@
 package org.apache.hadoop.fs.ozone;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -29,6 +31,8 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -40,9 +44,13 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.junit.Assert.fail;
 
 /**
@@ -207,6 +215,118 @@ public class TestOzoneFSWithObjectStoreCreate {
       checkAncestors(p);
     }
 
+  }
+
+
+  @Test
+  public void testKeyCreationFailDuetoDirectoryCreationBeforeCommit()
+      throws Exception {
+    OzoneVolume ozoneVolume =
+        cluster.getRpcClient().getObjectStore().getVolume(volumeName);
+
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+
+    OzoneOutputStream ozoneOutputStream =
+        ozoneBucket.createKey("/a/b/c", 10);
+    byte[] b = new byte[10];
+    Arrays.fill(b, (byte)96);
+    ozoneOutputStream.write(b);
+
+    // Before close create directory with same name.
+    o3fs.mkdirs(new Path("/a/b/c"));
+
+    try {
+      ozoneOutputStream.close();
+      fail("testKeyCreationFailDuetoDirectoryCreationBeforeCommit");
+    } catch (IOException ex) {
+      Assert.assertTrue(ex instanceof OMException);
+      Assert.assertEquals(NOT_A_FILE,
+          ((OMException) ex).getResult());
+    }
+
+  }
+
+
+  @Test
+  public void testMPUFailDuetoDirectoryCreationBeforeComplete()
+      throws Exception {
+    OzoneVolume ozoneVolume =
+        cluster.getRpcClient().getObjectStore().getVolume(volumeName);
+
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+
+    String keyName = "/dir1/dir2/mpukey";
+    OmMultipartInfo omMultipartInfo =
+        ozoneBucket.initiateMultipartUpload(keyName);
+    Assert.assertNotNull(omMultipartInfo);
+
+    OzoneOutputStream ozoneOutputStream =
+        ozoneBucket.createMultipartKey(keyName, 10, 1,
+            omMultipartInfo.getUploadID());
+    byte[] b = new byte[10];
+    Arrays.fill(b, (byte)96);
+    ozoneOutputStream.write(b);
+
+    // Before close, create directory with same name.
+    o3fs.mkdirs(new Path(keyName));
+
+    // This should succeed, as we check during creation of part or during
+    // complete MPU.
+    ozoneOutputStream.close();
+
+    Map<Integer, String> partsMap = new HashMap<>();
+    partsMap.put(1, ozoneOutputStream.getCommitUploadPartInfo().getPartName());
+
+    // Should fail, as we have directory with same name.
+    try {
+      ozoneBucket.completeMultipartUpload(keyName,
+          omMultipartInfo.getUploadID(), partsMap);
+      fail("testMPUFailDuetoDirectoryCreationBeforeComplete failed");
+    } catch (OMException ex) {
+      Assert.assertTrue(ex instanceof OMException);
+      Assert.assertEquals(NOT_A_FILE, ex.getResult());
+    }
+
+    // Delete directory
+    o3fs.delete(new Path(keyName), true);
+
+    // And try again for complete MPU. This should succeed.
+    ozoneBucket.completeMultipartUpload(keyName,
+        omMultipartInfo.getUploadID(), partsMap);
+
+    try (FSDataInputStream ozoneInputStream = o3fs.open(new Path(keyName))) {
+      byte[] buffer = new byte[10];
+      // This read will not change the offset inside the file
+      int readBytes = ozoneInputStream.read(0, buffer, 0, 10);
+      String readData = new String(buffer, 0, readBytes, UTF_8);
+      Assert.assertEquals(new String(b, 0, b.length, UTF_8), readData);
+    }
+
+  }
+
+  @Test
+  public void testCreateDirectoryFirstThenKeyAndFileWithSameName()
+      throws Exception {
+    o3fs.mkdirs(new Path("/t1/t2"));
+
+    try {
+      o3fs.create(new Path("/t1/t2"));
+      fail("testCreateDirectoryFirstThenFileWithSameName failed");
+    } catch (FileAlreadyExistsException ex) {
+      Assert.assertTrue(ex.getMessage().contains(NOT_A_FILE.name()));
+    }
+
+    OzoneVolume ozoneVolume =
+        cluster.getRpcClient().getObjectStore().getVolume(volumeName);
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+    ozoneBucket.createDirectory("t1/t2");
+    try {
+      ozoneBucket.createKey("t1/t2", 0);
+      fail("testCreateDirectoryFirstThenFileWithSameName failed");
+    } catch (OMException ex) {
+      Assert.assertTrue(ex instanceof OMException);
+      Assert.assertEquals(NOT_A_FILE, ex.getResult());
+    }
   }
 
   private void checkPath(Path path) {
