@@ -79,7 +79,6 @@ public class OMAllocateBlockResponse extends OMClientResponse {
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
         omMetadataManager.getBucketKey(omVolumeArgs.getVolume(),
-            omBucketInfo.getBucketName()),
-        omBucketInfo);
+            omBucketInfo.getBucketName()), omBucketInfo);
   }
 }
