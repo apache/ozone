@@ -24,7 +24,7 @@ set -e
 : ${OZONE_TEST_S3_BUCKET2:?Please define second test bucket}
 : ${OZONE_TEST_S3_REGION:?Please define the S3 region for test buckets}
 
-test() {
+run_robot_test() {
    TEST_NAME=$1
    robot \
        --nostatusrc \
@@ -38,10 +38,10 @@ test() {
 
 mkdir -p results
 
-test objectputget
-test objectdelete
-test objectcopy
-test objectmultidelete
-test MultipartUpload
+run_robot_test objectputget
+run_robot_test objectdelete
+run_robot_test objectcopy
+run_robot_test objectmultidelete
+run_robot_test MultipartUpload
 
 rebot --outputdir results/ results/*.xml
