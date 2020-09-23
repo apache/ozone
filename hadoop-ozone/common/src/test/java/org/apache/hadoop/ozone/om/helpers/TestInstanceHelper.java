@@ -31,7 +31,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
  */
 public final class TestInstanceHelper {
 
-  private  TestInstanceHelper(){
+  private TestInstanceHelper(){
     super();
   }
 
@@ -49,7 +49,7 @@ public final class TestInstanceHelper {
   }
 
   public static HddsProtos.KeyValue getDefaultTestMetadata(
-      String key, String value){
+      String key, String value) {
     return HddsProtos.KeyValue.newBuilder()
         .setKey(key)
         .setValue(value)

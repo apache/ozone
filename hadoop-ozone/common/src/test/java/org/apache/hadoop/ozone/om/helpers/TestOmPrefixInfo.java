@@ -40,7 +40,7 @@ public class TestOmPrefixInfo {
       IAccessAuthorizer.ACLIdentityType identityType,
       String identityString,
       IAccessAuthorizer.ACLType aclType,
-      OzoneAcl.AclScope scope){
+      OzoneAcl.AclScope scope) {
     return new OmPrefixInfo(path,
         Collections.singletonList(new OzoneAcl(
             identityType, identityString,
@@ -72,7 +72,7 @@ public class TestOmPrefixInfo {
   }
 
   @Test
-  public void testgetFromProtobufOneMetadataOneAcl(){
+  public void testgetFromProtobufOneMetadataOneAcl() {
     String prefixInfoPath = "/mypath/path";
     String aclString = "user:myuser:rw";
     String metakey = "metakey";
@@ -92,7 +92,7 @@ public class TestOmPrefixInfo {
   }
 
   @Test
-  public void testGetProtobuf(){
+  public void testGetProtobuf() {
     String testPath = "/my/custom/path";
     String username = "myuser";
     OmPrefixInfo omPrefixInfo = getOmPrefixInfoForTest(testPath,
