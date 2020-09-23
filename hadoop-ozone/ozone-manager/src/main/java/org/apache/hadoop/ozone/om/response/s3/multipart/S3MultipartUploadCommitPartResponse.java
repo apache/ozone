@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -58,6 +59,7 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
   private OmKeyInfo openPartKeyInfoToBeDeleted;
   private boolean isRatisEnabled;
   private OmVolumeArgs omVolumeArgs;
+  private OmBucketInfo omBucketInfo;
 
   /**
    * Regular response.
@@ -76,7 +78,8 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
       @Nullable OmMultipartKeyInfo omMultipartKeyInfo,
       @Nullable OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo,
       @Nullable OmKeyInfo openPartKeyInfoToBeDeleted,
-      boolean isRatisEnabled, OmVolumeArgs omVolumeArgs) {
+      boolean isRatisEnabled, @Nonnull OmVolumeArgs omVolumeArgs,
+      @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse);
     this.multipartKey = multipartKey;
     this.openKey = openKey;
@@ -85,6 +88,7 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
     this.openPartKeyInfoToBeDeleted = openPartKeyInfoToBeDeleted;
     this.isRatisEnabled = isRatisEnabled;
     this.omVolumeArgs = omVolumeArgs;
+    this.omBucketInfo = omBucketInfo;
   }
 
   @Override
@@ -151,6 +155,10 @@ public class S3MultipartUploadCommitPartResponse extends OMClientResponse {
     omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
         omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
         omVolumeArgs);
+    // update bucket usedBytes.
+    omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+        omMetadataManager.getBucketKey(omVolumeArgs.getVolume(),
+            omBucketInfo.getBucketName()), omBucketInfo);
   }
 }
 

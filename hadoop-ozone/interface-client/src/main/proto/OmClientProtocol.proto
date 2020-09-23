@@ -499,6 +499,7 @@ message BucketInfo {
     optional uint64 modificationTime = 11;
     optional string sourceVolume = 12;
     optional string sourceBucket = 13;
+    optional uint64 usedBytes = 14;
 }
 
 enum StorageTypeProto {

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -46,14 +47,16 @@ public class OMKeyDeleteResponse extends OMClientResponse {
   private OmKeyInfo omKeyInfo;
   private boolean isRatisEnabled;
   private OmVolumeArgs omVolumeArgs;
+  private OmBucketInfo omBucketInfo;
 
   public OMKeyDeleteResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, boolean isRatisEnabled,
-      @Nonnull OmVolumeArgs omVolumeArgs) {
+      @Nonnull OmVolumeArgs omVolumeArgs, @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
     this.isRatisEnabled = isRatisEnabled;
     this.omVolumeArgs = omVolumeArgs;
+    this.omBucketInfo = omBucketInfo;
   }
 
   /**
@@ -98,6 +101,10 @@ public class OMKeyDeleteResponse extends OMClientResponse {
       omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
           omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
           omVolumeArgs);
+      // update bucket usedBytes.
+      omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+          omMetadataManager.getBucketKey(omVolumeArgs.getVolume(),
+              omBucketInfo.getBucketName()), omBucketInfo);
     }
   }
 

@@ -29,6 +29,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -123,6 +124,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     IOException exception = null;
     OmKeyInfo omKeyInfo = null;
     OmVolumeArgs omVolumeArgs = null;
+    OmBucketInfo omBucketInfo = null;
     OMClientResponse omClientResponse = null;
     boolean bucketLockAcquired = false;
     Result result;
@@ -193,16 +195,19 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       long scmBlockSize = ozoneManager.getScmBlockSize();
       int factor = omKeyInfo.getFactor().getNumber();
       omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
+      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       // update usedBytes atomically.
       // Block was pre-requested and UsedBytes updated when createKey and
       // AllocatedBlock. The space occupied by the Key shall be based on
       // the actual Key size, and the total Block size applied before should
       // be subtracted.
-      omVolumeArgs.getUsedBytes().add(omKeyInfo.getDataSize() * factor -
-          locationInfoList.size() * scmBlockSize * factor);
+      long correctedSpace = omKeyInfo.getDataSize() * factor -
+          locationInfoList.size() * scmBlockSize * factor;
+      omVolumeArgs.getUsedBytes().add(correctedSpace);
+      omBucketInfo.getUsedBytes().add(correctedSpace);
 
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
-          omKeyInfo, dbOzoneKey, dbOpenKey, omVolumeArgs);
+          omKeyInfo, dbOzoneKey, dbOpenKey, omVolumeArgs, omBucketInfo);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
