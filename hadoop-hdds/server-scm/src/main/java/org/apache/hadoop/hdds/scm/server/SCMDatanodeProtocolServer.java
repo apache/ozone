@@ -206,18 +206,6 @@ public class SCMDatanodeProtocolServer implements
       HddsProtos.DatanodeDetailsProto datanodeDetailsProto,
       NodeReportProto nodeReport,
       ContainerReportsProto containerReportsProto,
-      PipelineReportsProto pipelineReportsProto)
-      throws IOException {
-    return register(datanodeDetailsProto, nodeReport, containerReportsProto,
-        pipelineReportsProto, null);
-
-  }
-
-  @Override
-  public SCMRegisteredResponseProto register(
-      HddsProtos.DatanodeDetailsProto datanodeDetailsProto,
-      NodeReportProto nodeReport,
-      ContainerReportsProto containerReportsProto,
       PipelineReportsProto pipelineReportsProto,
       StorageContainerDatanodeProtocolProtos.LayoutVersionProto layoutInfo)
       throws IOException {

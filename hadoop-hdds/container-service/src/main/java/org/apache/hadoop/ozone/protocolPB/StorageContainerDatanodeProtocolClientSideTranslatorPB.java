@@ -158,24 +158,6 @@ public class StorageContainerDatanodeProtocolClientSideTranslatorPB
    * @param datanodeDetailsProto - Datanode Details
    * @param nodeReport - Node Report.
    * @param containerReportsRequestProto - Container Reports.
-   * @return SCM Command.
-   */
-  @Override
-  public SCMRegisteredResponseProto register(
-      DatanodeDetailsProto datanodeDetailsProto, NodeReportProto nodeReport,
-      ContainerReportsProto containerReportsRequestProto,
-      PipelineReportsProto pipelineReportsProto)
-      throws IOException {
-    return this.register(datanodeDetailsProto, nodeReport,
-        containerReportsRequestProto, pipelineReportsProto, null);
-  }
-
-  /**
-   * Register Datanode.
-   *
-   * @param datanodeDetailsProto - Datanode Details
-   * @param nodeReport - Node Report.
-   * @param containerReportsRequestProto - Container Reports.
    * @param layoutInfo - Layout Version Information.
    * @return SCM Command.
    */

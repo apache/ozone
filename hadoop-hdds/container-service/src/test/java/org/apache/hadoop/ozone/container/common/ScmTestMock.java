@@ -222,24 +222,6 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
       .SCMRegisteredResponseProto register(
       DatanodeDetailsProto datanodeDetailsProto, NodeReportProto nodeReport,
       ContainerReportsProto containerReportsRequestProto,
-      PipelineReportsProto pipelineReportsProto)
-      throws IOException {
-    return register(datanodeDetailsProto, nodeReport,
-        containerReportsRequestProto,
-        pipelineReportsProto, null);
-  }
-
-  /**
-   * Register Datanode.
-   *
-   * @param datanodeDetailsProto DatanodDetailsProto.
-   * @return SCM Command.
-   */
-  @Override
-  public StorageContainerDatanodeProtocolProtos
-      .SCMRegisteredResponseProto register(
-      DatanodeDetailsProto datanodeDetailsProto, NodeReportProto nodeReport,
-      ContainerReportsProto containerReportsRequestProto,
       PipelineReportsProto pipelineReportsProto,
       LayoutVersionProto layoutInfo)
       throws IOException {

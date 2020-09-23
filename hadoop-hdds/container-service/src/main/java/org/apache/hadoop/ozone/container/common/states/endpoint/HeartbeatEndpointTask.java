@@ -40,7 +40,6 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.container.common.helpers
     .DeletedContainerBlocksSummary;
 import org.apache.hadoop.ozone.container.common.statemachine
@@ -48,6 +47,7 @@ import org.apache.hadoop.ozone.container.common.statemachine
 import org.apache.hadoop.ozone.container.common.statemachine
     .EndpointStateMachine.EndPointStates;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.upgrade.DataNodeLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
@@ -87,7 +87,7 @@ public class HeartbeatEndpointTask
   private StateContext context;
   private int maxContainerActionsPerHB;
   private int maxPipelineActionsPerHB;
-  private HDDSLayoutVersionManager layoutVersionManager;
+  private DataNodeLayoutVersionManager layoutVersionManager;
 
   /**
    * Constructs a SCM heart beat.
@@ -112,7 +112,7 @@ public class HeartbeatEndpointTask
    */
   public HeartbeatEndpointTask(EndpointStateMachine rpcEndpoint,
                                ConfigurationSource conf, StateContext context,
-                               HDDSLayoutVersionManager versionManager) {
+                               DataNodeLayoutVersionManager versionManager) {
     this.rpcEndpoint = rpcEndpoint;
     this.conf = conf;
     this.context = context;
@@ -392,7 +392,7 @@ public class HeartbeatEndpointTask
     private ConfigurationSource conf;
     private DatanodeDetails datanodeDetails;
     private StateContext context;
-    private HDDSLayoutVersionManager versionManager;
+    private DataNodeLayoutVersionManager versionManager;
 
     /**
      * Constructs the builder class.
@@ -418,7 +418,7 @@ public class HeartbeatEndpointTask
      * @return Builder
      */
     public Builder setLayoutVersionManager(
-        HDDSLayoutVersionManager versionMgr) {
+        DataNodeLayoutVersionManager versionMgr) {
       this.versionManager = versionMgr;
       return this;
     }

@@ -22,6 +22,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.io.IOException;
+
 import org.junit.Before;
 import org.junit.Test;
 
@@ -40,19 +42,29 @@ public class TestAbstractLayoutVersionManager {
 
   @Test
   public void testInit() {
-    versionManager.init(1,
-        getTestLayoutFeatures(2));
-    assertEquals(2, versionManager.features.size());
-    assertEquals(2, versionManager.featureMap.size());
-    assertEquals(1, versionManager.getMetadataLayoutVersion());
-    assertEquals(2, versionManager.getSoftwareLayoutVersion());
-    assertTrue(versionManager.needsFinalization());
+    try {
+      versionManager.init(1,
+          getTestLayoutFeatures(2));
+      assertEquals(2, versionManager.features.size());
+      assertEquals(2, versionManager.featureMap.size());
+      assertEquals(1, versionManager.getMetadataLayoutVersion());
+      assertEquals(2, versionManager.getSoftwareLayoutVersion());
+      assertTrue(versionManager.needsFinalization());
+    } catch (IOException e) {
+      // We don't expect it to throw IOException.
+      assertTrue(false);
+    }
   }
 
   @Test
   public void testNeedsFinalization() {
-    versionManager.init(2, getTestLayoutFeatures(2));
-    assertFalse(versionManager.needsFinalization());
+    try {
+      versionManager.init(2, getTestLayoutFeatures(2));
+      assertFalse(versionManager.needsFinalization());
+    } catch (IOException e) {
+      // We don't expect it to throw IOException.
+      assertTrue(false);
+    }
   }
 
   private LayoutFeature[] getTestLayoutFeatures(int num) {

@@ -78,19 +78,6 @@ public interface StorageContainerDatanodeProtocol {
    * @param datanodeDetails - Datanode Details.
    * @param nodeReport - Node Report.
    * @param containerReportsRequestProto - Container Reports.
-   * @return SCM Command.
-   */
-  SCMRegisteredResponseProto register(
-          DatanodeDetailsProto datanodeDetails,
-          NodeReportProto nodeReport,
-          ContainerReportsProto containerReportsRequestProto,
-          PipelineReportsProto pipelineReports) throws IOException;
-
-  /**
-   * Register Datanode.
-   * @param datanodeDetails - Datanode Details.
-   * @param nodeReport - Node Report.
-   * @param containerReportsRequestProto - Container Reports.
    * @param layoutInfo - Layout Version Information.
    * @return SCM Command.
    */
