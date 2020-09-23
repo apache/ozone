@@ -75,7 +75,7 @@ public class OMOpenKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
     }
 
     for (OmVolumeArgs volumeArgs: volumeArgsList) {
-      updateVolumeBytesUsed(omMetadataManager, batchOperation, volumeArgs);
+      addVolumeArgsToBatch(omMetadataManager, batchOperation, volumeArgs);
     }
   }
 }

@@ -71,6 +71,6 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
     deleteFromTable(omMetadataManager, batchOperation, keyTable, ozoneKey,
         omKeyInfo);
 
-    updateVolumeBytesUsed(omMetadataManager, batchOperation, omVolumeArgs);
+    addVolumeArgsToBatch(omMetadataManager, batchOperation, omVolumeArgs);
   }
 }

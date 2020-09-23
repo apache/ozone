@@ -116,18 +116,12 @@ public abstract class AbstractOMKeyDeleteResponse extends OMClientResponse {
     }
   }
 
-  protected void updateVolumeBytesUsed(OMMetadataManager metadataManager,
-      BatchOperation batch, OmVolumeArgs volumeArgs)
-      throws IOException {
+  protected void addVolumeArgsToBatch(OMMetadataManager metadataManager,
+      BatchOperation batch, OmVolumeArgs volumeArgs) throws IOException {
 
     Table<String, OmVolumeArgs> volumeTable = metadataManager.getVolumeTable();
     String volumeKey = metadataManager.getVolumeKey(volumeArgs.getVolume());
-
-    // For background services calling this method (like open key cleanup
-    // service), only update volume information if the volume still exists.
-    if (volumeTable.isExist(volumeKey)) {
-      volumeTable.putWithBatch(batch, volumeKey, volumeArgs);
-    }
+    volumeTable.putWithBatch(batch, volumeKey, volumeArgs);
   }
 
   @Override
