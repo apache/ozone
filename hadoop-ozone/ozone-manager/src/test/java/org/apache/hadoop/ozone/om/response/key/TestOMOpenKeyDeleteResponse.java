@@ -241,7 +241,7 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
     return omMetadataManager.getVolumeTable().getSkipCache(volumeKey);
   }
 
-  private OmVolumeArgs getCacheVolume(String volume) throws Exception {
+  private OmVolumeArgs getCacheVolume(String volume) {
     String volumeKey = omMetadataManager.getVolumeKey(volume);
     return omMetadataManager.getVolumeTable()
             .getCacheValue(new CacheKey<>(volumeKey))
