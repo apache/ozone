@@ -26,7 +26,7 @@ DO
 
 ENDRULE
 
-RULE BlockOutputStream.watchForCommit.Entry
+RULE watchforcommit_all-BlockOutputStream.watchForCommit.Entry
 CLASS org.apache.hadoop.hdds.scm.storage.BlockOutputStream
 METHOD watchForCommit
 AT ENTRY
@@ -35,7 +35,7 @@ DO resetTimer(Thread.currentThread());
    incrementCounter("watchForCommit.call")
 ENDRULE
 
-RULE BlockOutputStream.watchForCommit.Exit
+RULE watchforcommit_all-BlockOutputStream.watchForCommit.Exit
 CLASS org.apache.hadoop.hdds.scm.storage.BlockOutputStream
 METHOD watchForCommit
 AT EXIT
