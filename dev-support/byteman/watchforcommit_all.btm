@@ -15,7 +15,7 @@
 
 # Measure overall time spent in Watch for commit calls
 
-RULE FileSystem.close
+RULE watchforcommit_all-FileSystem.close
 CLASS org.apache.hadoop.fs.FileSystem
 METHOD close
 IF TRUE

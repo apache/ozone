@@ -15,7 +15,7 @@
 
 # Measure time spent in HCFS read implementations
 
-RULE FileSystem.close
+RULE hcfs-read-FileSystem.close
 CLASS org.apache.hadoop.fs.FileSystem
 METHOD close
 IF TRUE
