@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
@@ -32,7 +33,6 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.FileUtils;
@@ -180,6 +180,13 @@ public final class KeyValueContainerUtil {
       return;
     }
     kvContainerData.setDbFile(dbFile);
+
+    if (kvContainerData.getSchemaVersion() == null) {
+      // If this container has not specified a schema version, it is in the old
+      // format with one default column family.
+      kvContainerData.setSchemaVersion(OzoneConsts.SCHEMA_V1);
+    }
+
 
     boolean isBlockMetadataSet = false;
 
