@@ -135,7 +135,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       omResponse.setDeleteBucketResponse(
           DeleteBucketResponse.newBuilder().build());
 
-      // update used namespace for volumn
+      // update used namespace for volume
       String volumeKey = omMetadataManager.getVolumeKey(volumeName);
       OmVolumeArgs omVolumeArgs =
               omMetadataManager.getVolumeTable().getReadCopy(volumeKey);

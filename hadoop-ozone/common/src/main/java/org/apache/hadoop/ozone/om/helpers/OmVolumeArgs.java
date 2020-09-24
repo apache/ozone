@@ -58,7 +58,8 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
    * @param quotaInBytes - Volume Quota in bytes.
    * @param quotaInCounts - Volume Quota in counts.
    * @param metadata - metadata map for custom key/value data.
-   * @param usedBytes - Volume Quota Usage in bytes.
+   * @param usedBytes - Volume Storage Quota Usage in bytes.
+   * @param usedNamespace - Volume Namespace Quota Usage in counts.
    * @param aclMap - User to access rights map.
    * @param creationTime - Volume creation time.
    * @param  objectID - ID of this object.

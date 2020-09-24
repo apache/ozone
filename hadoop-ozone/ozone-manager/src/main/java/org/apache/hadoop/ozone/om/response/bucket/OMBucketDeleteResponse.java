@@ -79,8 +79,8 @@ public final class OMBucketDeleteResponse extends OMClientResponse {
     // update volume usedNamespace
     if (omVolumeArgs != null) {
       omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
-              omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
-              omVolumeArgs);
+          omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
+          omVolumeArgs);
     }
   }
 

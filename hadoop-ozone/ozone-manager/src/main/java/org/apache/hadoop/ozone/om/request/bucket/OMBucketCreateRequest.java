@@ -201,7 +201,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
       // Add default acls from volume.
       addDefaultAcls(omBucketInfo, omVolumeArgs);
 
-      // quotaAdd used namespace
+      // update used namespace for volume
       omVolumeArgs.getUsedNamespace().add(1L);
 
       // Update table cache.
@@ -211,7 +211,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
       omResponse.setCreateBucketResponse(
           CreateBucketResponse.newBuilder().build());
       omClientResponse = new OMBucketCreateResponse(omResponse.build(),
-              omBucketInfo, omVolumeArgs);
+          omBucketInfo, omVolumeArgs);
     } catch (IOException ex) {
       exception = ex;
       omClientResponse = new OMBucketCreateResponse(
