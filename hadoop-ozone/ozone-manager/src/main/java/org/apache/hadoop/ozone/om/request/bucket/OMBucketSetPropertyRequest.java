@@ -59,6 +59,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.SetBucketProperty;
 
 /**
  * Handle SetBucketProperty Request.
@@ -205,5 +206,9 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       omMetrics.incNumBucketUpdateFails();
       return omClientResponse;
     }
+  }
+
+  public static String getRequestType() {
+    return SetBucketProperty.name();
   }
 }

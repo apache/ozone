@@ -54,6 +54,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteBucket;
 
 /**
  * Handles DeleteBucket Request.
@@ -168,5 +169,9 @@ public class OMBucketDeleteRequest extends OMClientRequest {
           volumeName, exception);
       return omClientResponse;
     }
+  }
+
+  public static String getRequestType() {
+    return DeleteBucket.name();
   }
 }

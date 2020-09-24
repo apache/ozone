@@ -53,6 +53,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.AbortMultiPartUpload;
 
 /**
  * Handles Abort of multipart upload request.
@@ -191,5 +192,9 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     }
 
     return omClientResponse;
+  }
+
+  public static String getRequestType() {
+    return AbortMultiPartUpload.name();
   }
 }

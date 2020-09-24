@@ -18,12 +18,15 @@
 
 package org.apache.hadoop.ozone.om.request.bucket.acl;
 
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.AddAcl;
+
 import java.io.IOException;
 import java.util.List;
 
 import com.google.common.collect.Lists;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
 import org.apache.hadoop.ozone.util.BooleanBiFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -115,5 +118,8 @@ public class OMBucketAddAclRequest extends OMBucketAclRequest {
     }
   }
 
+  public static String getRequestType() {
+    return AddAcl.name() + "-" + ObjectType.BUCKET.name();
+  }
 }
 

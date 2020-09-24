@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.om.request.security;
 
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.GetDelegationToken;
+
 import com.google.common.base.Optional;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -63,7 +65,6 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
     // Call OM to create token
     Token<OzoneTokenIdentifier> token = ozoneManager
         .getDelegationToken(new Text(getDelegationTokenRequest.getRenewer()));
-
 
     // Client issues GetDelegationToken request, when received by OM leader
     // it will generate a token. Original GetDelegationToken request is
@@ -180,5 +181,9 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
     }
 
     return omClientResponse;
+  }
+
+  public static String getRequestType() {
+    return GetDelegationToken.name();
   }
 }
