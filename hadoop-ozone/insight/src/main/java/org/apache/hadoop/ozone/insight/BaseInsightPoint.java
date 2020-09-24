@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.insight;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -28,10 +29,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.apache.hadoop.hdds.server.http.PrometheusMetricsSink;
 import org.apache.hadoop.ozone.insight.LoggerSource.Level;
-
-import com.google.protobuf.ProtocolMessageEnum;
 
 /**
  * Default implementation of Insight point logic.
@@ -42,7 +40,7 @@ public abstract class BaseInsightPoint implements InsightPoint {
    * List the related metrics.
    */
   @Override
-  public List<MetricGroupDisplay> getMetrics() {
+  public List<MetricGroupDisplay> getMetrics(Map<String, String> filters) {
     return new ArrayList<>();
   }
 
@@ -91,21 +89,35 @@ public abstract class BaseInsightPoint implements InsightPoint {
     return verbose ? Level.TRACE : Level.DEBUG;
   }
 
+  public void addProtocolMessageMetrics(
+      List<MetricGroupDisplay> metrics,
+      String prefix,
+      Component.Type type,
+      Object[] types
+  ) {
+    addProtocolMessageMetrics(metrics, prefix, new Component(type), types);
+  }
+
   /**
    * Default metrics for any message type based RPC ServerSide translators.
    */
-  public void addProtocolMessageMetrics(List<MetricGroupDisplay> metrics,
+  public void addProtocolMessageMetrics(
+      List<MetricGroupDisplay> metrics,
       String prefix,
-      Component.Type component,
-      ProtocolMessageEnum[] types) {
+      Component component,
+      Object[] types
+  ) {
 
     MetricGroupDisplay messageTypeCounters =
         new MetricGroupDisplay(component, "Message type counters");
-    for (ProtocolMessageEnum type : types) {
+    for (Object type : types) {
       String typeName = type.toString();
-      MetricDisplay metricDisplay = new MetricDisplay("Number of " + typeName,
-          prefix + "_" + PrometheusMetricsSink
-              .normalizeName(typeName));
+
+      Map<String, String> typeFilter = new HashMap<>();
+      typeFilter.put("type", typeName);
+      MetricDisplay metricDisplay =
+          new MetricDisplay("Number of " + typeName + " calls",
+              prefix + "_counter", typeFilter);
       messageTypeCounters.addMetrics(metricDisplay);
     }
     metrics.add(messageTypeCounters);
