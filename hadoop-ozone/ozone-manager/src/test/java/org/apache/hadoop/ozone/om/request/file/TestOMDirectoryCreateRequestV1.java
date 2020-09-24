@@ -56,7 +56,7 @@ import static org.mockito.Mockito.when;
 /**
  * Test OM directory create request V1 layout version.
  */
-public class TestOMDirectoryCreateRequest1 {
+public class TestOMDirectoryCreateRequestV1 {
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -429,7 +429,7 @@ public class TestOMDirectoryCreateRequest1 {
       String dirName = dirs.get(indx);
       String dbKey = "";
       // for index=0, parentID is bucketID
-      dbKey = omMetadataManager.getOzoneLeafNodeKey(parentID, dirName);
+      dbKey = omMetadataManager.getOzonePathKey(parentID, dirName);
       OmDirectoryInfo omDirInfo =
               omMetadataManager.getDirectoryTable().get(dbKey);
       Assert.assertNotNull("Invalid directory!", omDirInfo);
@@ -448,7 +448,7 @@ public class TestOMDirectoryCreateRequest1 {
       String dirName = dirs.get(indx);
       String dbKey = "";
       // for index=0, parentID is bucketID
-      dbKey = omMetadataManager.getOzoneLeafNodeKey(parentID, dirName);
+      dbKey = omMetadataManager.getOzonePathKey(parentID, dirName);
       CacheValue<OmDirectoryInfo> omDirInfoCacheValue =
               omMetadataManager.getDirectoryTable()
                       .getCacheValue(new CacheKey<>(dbKey));

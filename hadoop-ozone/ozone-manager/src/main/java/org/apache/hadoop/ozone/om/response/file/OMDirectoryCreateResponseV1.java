@@ -80,7 +80,7 @@ public class OMDirectoryCreateResponseV1 extends OMClientResponse {
       if (parentDirInfos != null) {
         for (OmDirectoryInfo parentDirInfo : parentDirInfos) {
           String parentKey = omMetadataManager
-                  .getOzoneLeafNodeKey(parentDirInfo.getParentObjectID(),
+                  .getOzonePathKey(parentDirInfo.getParentObjectID(),
                           parentDirInfo.getName());
           LOG.debug("putWithBatch parent : dir {} info : {}", parentKey,
                   parentDirInfo);
@@ -89,7 +89,7 @@ public class OMDirectoryCreateResponseV1 extends OMClientResponse {
         }
       }
 
-      String dirKey = omMetadataManager.getOzoneLeafNodeKey(
+      String dirKey = omMetadataManager.getOzonePathKey(
               dirInfo.getParentObjectID(), dirInfo.getName());
       omMetadataManager.getDirectoryTable().putWithBatch(batchOperation, dirKey,
               dirInfo);

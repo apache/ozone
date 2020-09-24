@@ -83,6 +83,6 @@ public class TestOMDirectoryCreateResponseV1 {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     Assert.assertNotNull(omMetadataManager.getDirectoryTable().get(
-            omMetadataManager.getOzoneLeafNodeKey(parentID, keyName)));
+            omMetadataManager.getOzonePathKey(parentID, keyName)));
   }
 }

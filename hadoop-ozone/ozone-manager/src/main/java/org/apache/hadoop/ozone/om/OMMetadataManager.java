@@ -395,8 +395,8 @@ public interface OMMetadataManager {
    * key.
    *
    * @param parentObjectId - parent object Id
-   * @param leafNodeName   - leaf node name
+   * @param pathComponentName   - path component name
    * @return DB directory key as String.
    */
-  String getOzoneLeafNodeKey(long parentObjectId, String leafNodeName);
+  String getOzonePathKey(long parentObjectId, String pathComponentName);
 }

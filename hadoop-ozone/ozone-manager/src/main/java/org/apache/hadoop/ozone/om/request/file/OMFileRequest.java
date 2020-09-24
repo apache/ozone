@@ -187,7 +187,7 @@ public final class OMFileRequest {
       // 1. Do lookup on directoryTable. If not exists goto next step.
       // 2. Do look on keyTable. If not exists goto next step.
       // 3. Add 'sub-dir' to missing parents list
-      String dbNodeName = omMetadataManager.getOzoneLeafNodeKey(
+      String dbNodeName = omMetadataManager.getOzonePathKey(
               lastKnownParentId, fileName);
       OmDirectoryInfo omDirInfo = omMetadataManager.getDirectoryTable().
               get(dbNodeName);
@@ -292,24 +292,19 @@ public final class OMFileRequest {
    * Includes the list of missing intermediate directories and
    * the directory search result code.
    */
-  public static class OMPathInfoV1 {
-    private OMDirectoryResult directoryResult;
+  public static class OMPathInfoV1 extends OMPathInfo{
     private String leafNodeName;
     private long lastKnownParentId;
     private long leafNodeObjectId;
-    private List<String> missingParents;
-    private List<OzoneAcl> acls;
-    private String exisitingKeyPath;
+    private String existingKeyPath;
 
     public OMPathInfoV1(String leafNodeName, long lastKnownParentId,
                         List missingParents, OMDirectoryResult result,
                         List<OzoneAcl> aclList, String exisitingPathName) {
+      super(missingParents, result, aclList);
       this.leafNodeName = leafNodeName;
       this.lastKnownParentId = lastKnownParentId;
-      this.missingParents = missingParents;
-      this.directoryResult = result;
-      this.acls = aclList;
-      this.exisitingKeyPath = exisitingPathName;
+      this.existingKeyPath = exisitingPathName;
     }
 
     public String getLeafNodeName() {
@@ -332,20 +327,8 @@ public final class OMFileRequest {
       return lastKnownParentId;
     }
 
-    public List getMissingParents() {
-      return missingParents;
-    }
-
-    public OMDirectoryResult getDirectoryResult() {
-      return directoryResult;
-    }
-
-    public List<OzoneAcl> getAcls() {
-      return acls;
-    }
-
-    public String getExisitingKeyPath() {
-      return exisitingKeyPath;
+    public String getExistingKeyPath() {
+      return existingKeyPath;
     }
   }
 
@@ -463,14 +446,14 @@ public final class OMFileRequest {
           long trxnLogIndex) {
     for (OmDirectoryInfo subDirInfo : missingParentInfos.get()) {
       omMetadataManager.getDirectoryTable().addCacheEntry(
-              new CacheKey<>(omMetadataManager.getOzoneLeafNodeKey(
+              new CacheKey<>(omMetadataManager.getOzonePathKey(
                       subDirInfo.getParentObjectID(), subDirInfo.getName())),
               new CacheValue<>(Optional.of(subDirInfo), trxnLogIndex));
     }
 
     if (dirInfo.isPresent()) {
       omMetadataManager.getDirectoryTable().addCacheEntry(
-              new CacheKey<>(omMetadataManager.getOzoneLeafNodeKey(
+              new CacheKey<>(omMetadataManager.getOzonePathKey(
                       dirInfo.get().getParentObjectID(),
                       dirInfo.get().getName())),
               new CacheValue<>(dirInfo, trxnLogIndex));

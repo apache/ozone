@@ -1152,10 +1152,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public String getOzoneLeafNodeKey(long parentObjectId, String leafNodeName) {
+  public String getOzonePathKey(long parentObjectId, String pathComponentName) {
     StringBuilder builder = new StringBuilder();
     builder.append(parentObjectId);
-    builder.append(OM_KEY_PREFIX).append(leafNodeName);
+    builder.append(OM_KEY_PREFIX).append(pathComponentName);
     return builder.toString();
   }
 
