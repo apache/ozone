@@ -48,6 +48,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
   private long quotaInCounts;
   private final OmOzoneAclMap aclMap;
   private final LongAdder usedBytes = new LongAdder();
+  private final LongAdder usedNamespace = new LongAdder();
 
   /**
    * Private constructor, constructed via builder.
@@ -68,8 +69,8 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
       "builder."})
   private OmVolumeArgs(String adminName, String ownerName, String volume,
       long quotaInBytes, long quotaInCounts, Map<String, String> metadata,
-      long usedBytes, OmOzoneAclMap aclMap, long creationTime,
-      long modificationTime, long objectID, long updateID) {
+      long usedBytes, long usedNamespace, OmOzoneAclMap aclMap,
+      long creationTime, long modificationTime, long objectID, long updateID) {
     this.adminName = adminName;
     this.ownerName = ownerName;
     this.volume = volume;
@@ -77,6 +78,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     this.quotaInCounts = quotaInCounts;
     this.metadata = metadata;
     this.usedBytes.add(usedBytes);
+    this.usedNamespace.add(usedNamespace);
     this.aclMap = aclMap;
     this.creationTime = creationTime;
     this.modificationTime = modificationTime;
@@ -181,6 +183,10 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     return usedBytes;
   }
 
+  public LongAdder getUsedNamespace() {
+    return usedNamespace;
+  }
+
   /**
    * Returns new builder class that builds a OmVolumeArgs.
    *
@@ -242,6 +248,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     private long objectID;
     private long updateID;
     private long usedBytes;
+    private long usedNamespace;
 
     /**
      * Sets the Object ID for this Object.
@@ -324,6 +331,11 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
       return this;
     }
 
+    public Builder setUsedNamespace(long namespaceUsage) {
+      this.usedNamespace = namespaceUsage;
+      return this;
+    }
+
     public Builder addOzoneAcls(OzoneAclInfo acl) throws IOException {
       aclMap.addAcl(acl);
       return this;
@@ -338,8 +350,8 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
       Preconditions.checkNotNull(ownerName);
       Preconditions.checkNotNull(volume);
       return new OmVolumeArgs(adminName, ownerName, volume, quotaInBytes,
-          quotaInCounts, metadata, usedBytes, aclMap, creationTime,
-          modificationTime, objectID, updateID);
+          quotaInCounts, metadata, usedBytes, usedNamespace, aclMap,
+          creationTime, modificationTime, objectID, updateID);
     }
 
   }
@@ -360,6 +372,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
         .setObjectID(objectID)
         .setUpdateID(updateID)
         .setUsedBytes(usedBytes.sum())
+        .setUsedNamespace(usedNamespace.sum())
         .build();
   }
 
@@ -375,6 +388,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
         volInfo.getQuotaInCounts(),
         KeyValueUtil.getFromProtobuf(volInfo.getMetadataList()),
         volInfo.getUsedBytes(),
+        volInfo.getUsedNamespace(),
         aclMap,
         volInfo.getCreationTime(),
         volInfo.getModificationTime(),
@@ -391,6 +405,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
         ", creationTime='" + creationTime + '\'' +
         ", quotaInBytes='" + quotaInBytes + '\'' +
         ", usedBytes='" + usedBytes.sum() + '\'' +
+        ", usedNamespace='" + usedNamespace.sum() + '\'' +
         '}';
   }
 
@@ -406,7 +421,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     OmOzoneAclMap cloneAclMap = aclMap.copyObject();
 
     return new OmVolumeArgs(adminName, ownerName, volume, quotaInBytes,
-        quotaInCounts, cloneMetadata, usedBytes.sum(), cloneAclMap,
-        creationTime, modificationTime, objectID, updateID);
+        quotaInCounts, cloneMetadata, usedBytes.sum(), usedNamespace.sum(),
+        cloneAclMap, creationTime, modificationTime, objectID, updateID);
   }
 }

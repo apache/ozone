@@ -871,6 +871,27 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
+  public void testVolumnUsedNamespace() throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OzoneVolume volume = null;
+    OzoneBucket bucket = null;
+
+    store.createVolume(volumeName);
+    volume = store.getVolume(volumeName);
+    // The initial value should be 0
+    Assert.assertEquals(0L, volume.getUsedNamespace());
+    volume.createBucket(bucketName);
+    // Used namespace should be 1
+    volume = store.getVolume(volumeName);
+    Assert.assertEquals(1L, volume.getUsedNamespace());
+    volume.deleteBucket(bucketName);
+    // Used namespace should be 0
+    volume = store.getVolume(volumeName);
+    Assert.assertEquals(0L, volume.getUsedNamespace());
+  }
+
+  @Test
   public void testVolumeQuotaWithMultiThread() throws IOException,
       InterruptedException{
     String volumeName = UUID.randomUUID().toString();

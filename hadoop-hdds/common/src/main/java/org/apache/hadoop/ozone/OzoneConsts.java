@@ -270,6 +270,7 @@ public final class OzoneConsts {
   public static final String SRC_KEY = "srcKey";
   public static final String DST_KEY = "dstKey";
   public static final String USED_BYTES = "usedBytes";
+  public static final String USED_NAMESPACE = "usedNamespace";
   public static final String QUOTA_IN_BYTES = "quotaInBytes";
   public static final String QUOTA_IN_COUNTS = "quotaInCounts";
   public static final String OBJECT_ID = "objectID";

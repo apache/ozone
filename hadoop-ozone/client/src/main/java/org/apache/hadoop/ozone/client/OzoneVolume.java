@@ -85,6 +85,8 @@ public class OzoneVolume extends WithMetadata {
 
   private long usedBytes;
 
+  private long usedNamespace;
+
   /**
    * Constructs OzoneVolume instance.
    * @param conf Configuration object.
@@ -138,10 +140,12 @@ public class OzoneVolume extends WithMetadata {
       String name, String admin, String owner, long quotaInBytes,
       long quotaInCounts, long creationTime, long modificationTime,
       List<OzoneAcl> acls, Map<String, String> metadata,
-      long usedBytes) {
+      long usedBytes, long usedNamespace) {
     this(conf, proxy, name, admin, owner, quotaInBytes, quotaInCounts,
         creationTime, acls, metadata);
     this.usedBytes = usedBytes;
+    this.usedNamespace = usedNamespace;
+    this.modificationTime = Instant.ofEpochMilli(modificationTime);
   }
 
   @SuppressWarnings("parameternumber")
@@ -269,6 +273,10 @@ public class OzoneVolume extends WithMetadata {
 
   public long getUsedBytes() {
     return usedBytes;
+  }
+
+  public long getUsedNamespace() {
+    return usedNamespace;
   }
 
   /**

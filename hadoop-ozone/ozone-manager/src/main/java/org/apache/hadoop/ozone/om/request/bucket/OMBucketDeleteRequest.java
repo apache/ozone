@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.Map;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
@@ -133,6 +134,12 @@ public class OMBucketDeleteRequest extends OMClientRequest {
 
       omResponse.setDeleteBucketResponse(
           DeleteBucketResponse.newBuilder().build());
+
+      // update used namespace for volumn
+      String volumeKey = omMetadataManager.getVolumeKey(volumeName);
+      OmVolumeArgs omVolumeArgs =
+              omMetadataManager.getVolumeTable().getReadCopy(volumeKey);
+      omVolumeArgs.getUsedNamespace().add(-1L);
 
       // Add to double buffer.
       omClientResponse = new OMBucketDeleteResponse(omResponse.build(),
