@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Turn of flush for Raits log
-
+# Print out time spent in Ratis log flush
 
 RULE SegmentedRaftLogOutputStream.flush.Entry
 CLASS org.apache.ratis.server.raftlog.segmented.SegmentedRaftLogOutputStream
@@ -30,6 +29,6 @@ CLASS org.apache.ratis.server.raftlog.segmented.SegmentedRaftLogOutputStream
 METHOD flush
 AT EXIT
 BIND elapsedTime = java.lang.Math.toIntExact(getElapsedTimeFromTimer("flush" + Thread.currentThread().getId()))
-DO 
+DO
    System.out.println("flush: " + elapsedTime);
 ENDRULE

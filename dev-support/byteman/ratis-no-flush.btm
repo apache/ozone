@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This btm script turns off the flush when ratis Log is written
+# This btm script turns off the flush when Ratis Log is written
 
 RULE Ratis.noFlush
 CLASS org.apache.ratis.server.raftlog.segmented.SegmentedRaftLogOutputStream
