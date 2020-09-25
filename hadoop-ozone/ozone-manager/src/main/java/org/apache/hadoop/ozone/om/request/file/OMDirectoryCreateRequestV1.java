@@ -143,7 +143,7 @@ public class OMDirectoryCreateRequestV1 extends OMDirectoryCreateRequest {
           omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
         throw new OMException("Unable to create directory: " + keyName
             + " in volume/bucket: " + volumeName + "/" + bucketName + " as " +
-                "file:" + omPathInfo.getExistingKeyPath() + " already exists",
+                "file:" + omPathInfo.getFullKeyPathName() + " already exists",
             FILE_ALREADY_EXISTS);
       } else if (omDirectoryResult == DIRECTORY_EXISTS_IN_GIVENPATH ||
           omDirectoryResult == NONE) {

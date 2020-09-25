@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -84,9 +85,9 @@ public class TestOMDirectoryCreateRequestV1 {
     auditLogger = Mockito.mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
-    when(ozoneManager.resolveBucketLink(any(KeyArgs.class)))
-            .thenReturn(new ResolvedBucket(Pair.of("", ""),
-                    Pair.of("", "")));
+    when(ozoneManager.resolveBucketLink(any(KeyArgs.class),
+            any(OMClientRequest.class)))
+            .thenReturn(new ResolvedBucket(Pair.of("", ""), Pair.of("", "")));
   }
 
   @After

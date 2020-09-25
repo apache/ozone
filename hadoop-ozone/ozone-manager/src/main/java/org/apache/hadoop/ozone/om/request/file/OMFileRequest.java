@@ -167,11 +167,11 @@ public final class OMFileRequest {
     OmDirectoryInfo parentDirInfo = null;
     String dbDirName = ""; // absolute path for trace logs
     // for better logging
-    StringBuilder exisitingKeyPath = new StringBuilder(bucketKey);
+    StringBuilder fullKeyPath = new StringBuilder(bucketKey);
     while (elements.hasNext()) {
       String fileName = elements.next().toString();
-      exisitingKeyPath.append(OzoneConsts.OM_KEY_PREFIX);
-      exisitingKeyPath.append(fileName);
+      fullKeyPath.append(OzoneConsts.OM_KEY_PREFIX);
+      fullKeyPath.append(fileName);
       if (missing.size() > 0) {
         // Add all the sub-dirs to the missing list except the leaf element.
         // For example, /vol1/buck1/a/b/c/d/e/f/file1.txt.
@@ -242,7 +242,7 @@ public final class OMFileRequest {
       LOG.trace("verifyFiles in Path : " + "/" + volumeName
               + "/" + bucketName + "/" + keyName + ":" + result);
       return new OMPathInfoV1(leafNodeName, lastKnownParentId, missing, result,
-              inheritAcls, exisitingKeyPath.toString());
+              inheritAcls, fullKeyPath.toString());
     }
 
     if (inheritAcls.isEmpty()) {
@@ -256,7 +256,7 @@ public final class OMFileRequest {
             + keyName + ":" + result);
     // Found no files/ directories in the given path.
     return new OMPathInfoV1(leafNodeName, lastKnownParentId, missing,
-            OMDirectoryResult.NONE, inheritAcls, exisitingKeyPath.toString());
+            OMDirectoryResult.NONE, inheritAcls, fullKeyPath.toString());
   }
 
   /**
@@ -296,15 +296,15 @@ public final class OMFileRequest {
     private String leafNodeName;
     private long lastKnownParentId;
     private long leafNodeObjectId;
-    private String existingKeyPath;
+    private String fullKeyPathName;
 
     public OMPathInfoV1(String leafNodeName, long lastKnownParentId,
                         List missingParents, OMDirectoryResult result,
-                        List<OzoneAcl> aclList, String exisitingPathName) {
+                        List<OzoneAcl> aclList, String fullKeyPath) {
       super(missingParents, result, aclList);
       this.leafNodeName = leafNodeName;
       this.lastKnownParentId = lastKnownParentId;
-      this.existingKeyPath = exisitingPathName;
+      this.fullKeyPathName = fullKeyPath;
     }
 
     public String getLeafNodeName() {
@@ -327,8 +327,8 @@ public final class OMFileRequest {
       return lastKnownParentId;
     }
 
-    public String getExistingKeyPath() {
-      return existingKeyPath;
+    public String getFullKeyPathName() {
+      return fullKeyPathName;
     }
   }
 
