@@ -52,36 +52,36 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
   static final Logger LOG =
       LoggerFactory.getLogger(TestMiniChaosOzoneCluster.class);
 
-  @Option(names = {"-d", "--numDatanodes"},
+  @Option(names = {"-d", "--num-datanodes"},
       description = "num of datanodes")
   private static int numDatanodes = 20;
 
-  @Option(names = {"-o", "--numOzoneManager"},
+  @Option(names = {"-o", "--num-ozone-manager"},
       description = "num of ozoneManagers")
   private static int numOzoneManagers = 1;
 
-  @Option(names = {"-s", "--failureService"},
+  @Option(names = {"-s", "--failure-service"},
       description = "service (datanode or ozoneManager) to test chaos on",
       defaultValue = "datanode")
   private static String failureService = "datanode";
 
-  @Option(names = {"-t", "--numThreads"},
+  @Option(names = {"-t", "--num-threads"},
       description = "num of IO threads")
   private static int numThreads = 5;
 
-  @Option(names = {"-b", "--numBuffers"},
+  @Option(names = {"-b", "--num-buffers"},
       description = "num of IO buffers")
   private static int numBuffers = 16;
 
-  @Option(names = {"-m", "--numMinutes"},
+  @Option(names = {"-m", "--num-minutes"},
       description = "total run time")
   private static int numMinutes = 1440; // 1 day by default
 
-  @Option(names = {"-v", "--numDataVolume"},
+  @Option(names = {"-v", "--num-data-volume"},
       description = "number of datanode volumes to create")
   private static int numDataVolumes = 3;
 
-  @Option(names = {"-i", "--failureInterval"},
+  @Option(names = {"-i", "--failure-interval"},
       description = "time between failure events in seconds")
   private static int failureInterval = 300; // 5 minute period between failures.
 

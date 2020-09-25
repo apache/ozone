@@ -113,43 +113,43 @@ public final class RandomKeyGenerator implements Callable<Void> {
   private volatile boolean completed = false;
   private volatile Throwable exception;
 
-  @Option(names = "--numOfThreads",
+  @Option(names = "--num-of-threads",
       description = "number of threads to be launched for the run",
       defaultValue = "10")
   private int numOfThreads = 10;
 
-  @Option(names = "--numOfVolumes",
+  @Option(names = "--num-of-volumes",
       description = "specifies number of Volumes to be created in offline mode",
       defaultValue = "10")
   private int numOfVolumes = 10;
 
-  @Option(names = "--numOfBuckets",
+  @Option(names = "--num-of-buckets",
       description = "specifies number of Buckets to be created per Volume",
       defaultValue = "1000")
   private int numOfBuckets = 1000;
 
   @Option(
-      names = "--numOfKeys",
+      names = "--num-of-keys",
       description = "specifies number of Keys to be created per Bucket",
       defaultValue = "500000"
   )
   private int numOfKeys = 500000;
 
   @Option(
-      names = "--keySize",
+      names = "--key-size",
       description = "Specifies the size of Key in bytes to be created",
       defaultValue = "10240"
   )
   private long keySize = 10240;
 
   @Option(
-      names = "--validateWrites",
+      names = "--validate-writes",
       description = "Specifies whether to validate keys after writing"
   )
   private boolean validateWrites = false;
 
   @Option(
-      names = "--bufferSize",
+      names = "--buffer-size",
       description = "Specifies the buffer size while writing",
       defaultValue = "4096"
   )
@@ -162,7 +162,7 @@ public final class RandomKeyGenerator implements Callable<Void> {
   private String jsonDir;
 
   @Option(
-      names = "--replicationType",
+      names = "--replication-type",
       description = "Replication type (STAND_ALONE, RATIS)",
       defaultValue = "STAND_ALONE"
   )

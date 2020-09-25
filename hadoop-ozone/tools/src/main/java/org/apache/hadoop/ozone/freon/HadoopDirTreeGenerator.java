@@ -59,12 +59,12 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
       defaultValue = "5")
   private int depth;
 
-  @Option(names = {"-c", "--fileCount"},
+  @Option(names = {"-c", "--file-count"},
       description = "Number of files to be written in each directory",
       defaultValue = "2")
   private int fileCount;
 
-  @Option(names = {"-g", "--fileSize"},
+  @Option(names = {"-g", "--file-size"},
       description = "Generated data size(in bytes) of each file to be " +
               "written in each directory",
       defaultValue = "4096")
@@ -81,7 +81,7 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
       defaultValue = "10")
   private int span;
 
-  @Option(names = {"-l", "--nameLen"},
+  @Option(names = {"-l", "--name-len"},
       description =
           "Length of the random name of directory you want to create.",
       defaultValue = "10")

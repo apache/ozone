@@ -38,7 +38,7 @@ import java.io.IOException;
 public class CreatePipelineSubcommand extends ScmSubcommand {
 
   @CommandLine.Option(
-      names = {"-t", "--replicationType"},
+      names = {"-t", "--replication-type"},
       description = "Replication type (STAND_ALONE, RATIS)",
       defaultValue = "STAND_ALONE"
   )
