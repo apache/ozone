@@ -218,7 +218,7 @@ public class SCMBlockProtocolServer implements
   @Override
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
       List<BlockGroup> keyBlocksInfoList) throws IOException {
-    LOG.info("SCM is informed by OM to delete {} blocks", keyBlocksInfoList
+    LOG.debug("SCM is informed by OM to delete {} blocks", keyBlocksInfoList
         .size());
     List<DeleteBlockGroupResult> results = new ArrayList<>();
     Map<String, String> auditMap = Maps.newHashMap();
