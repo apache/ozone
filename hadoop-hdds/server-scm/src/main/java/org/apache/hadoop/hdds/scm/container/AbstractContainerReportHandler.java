@@ -84,10 +84,11 @@ public class AbstractContainerReportHandler {
     // Synchronized block should be replaced by container lock,
     // once we have introduced lock inside ContainerInfo.
     synchronized (containerManager.getContainer(containerId)) {
-      updateContainerStats(datanodeDetails, containerId, replicaProto,
-          publisher);
-      updateContainerState(datanodeDetails, containerId, replicaProto);
-      updateContainerReplica(datanodeDetails, containerId, replicaProto);
+      updateContainerStats(datanodeDetails, containerId, replicaProto);
+      if (!updateContainerState(datanodeDetails, containerId, replicaProto,
+          publisher)) {
+        updateContainerReplica(datanodeDetails, containerId, replicaProto);
+      }
     }
   }
 
@@ -101,22 +102,10 @@ public class AbstractContainerReportHandler {
    */
   private void updateContainerStats(final DatanodeDetails datanodeDetails,
                                     final ContainerID containerId,
-                                    final ContainerReplicaProto replicaProto,
-                                    final EventPublisher publisher)
+                                    final ContainerReplicaProto replicaProto)
       throws ContainerNotFoundException {
     final ContainerInfo containerInfo = containerManager
         .getContainer(containerId);
-
-    if (containerInfo.getState() == HddsProtos.LifeCycleState.DELETED) {
-      final DeleteContainerCommand deleteCommand =
-          new DeleteContainerCommand(containerId.getId(), true);
-      final CommandForDatanode datanodeCommand = new CommandForDatanode<>(
-          datanodeDetails.getUuid(), deleteCommand);
-      publisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
-      logger.info("Sending delete container command for deleted container {}"
-          + " to datanode {}", containerId.getId(), datanodeDetails);
-      return;
-    }
 
     if (isHealthy(replicaProto::getState)) {
       if (containerInfo.getSequenceId() <
@@ -170,15 +159,18 @@ public class AbstractContainerReportHandler {
    * @param datanode Datanode from which the report is received
    * @param containerId ID of the container
    * @param replica ContainerReplica
+   * @boolean true - replica should be ignored in the next process
    * @throws IOException In case of Exception
    */
-  private void updateContainerState(final DatanodeDetails datanode,
+  private boolean updateContainerState(final DatanodeDetails datanode,
                                     final ContainerID containerId,
-                                    final ContainerReplicaProto replica)
+                                    final ContainerReplicaProto replica,
+                                    final EventPublisher publisher)
       throws IOException {
 
     final ContainerInfo container = containerManager
         .getContainer(containerId);
+    boolean ignored = false;
 
     switch (container.getState()) {
     case OPEN:
@@ -266,18 +258,23 @@ public class AbstractContainerReportHandler {
       break;
     case DELETED:
       /*
-       * The container is deleted. do nothing.
+       * The container is deleted. delete the replica.
        */
+      deleteReplica(containerId, datanode, publisher, "DELETED");
+      ignored = true;
       break;
     default:
       break;
     }
+
+    return ignored;
   }
 
   private void updateContainerReplica(final DatanodeDetails datanodeDetails,
                                       final ContainerID containerId,
                                       final ContainerReplicaProto replicaProto)
       throws ContainerNotFoundException, ContainerReplicaNotFoundException {
+
     final ContainerReplica replica = ContainerReplica.newBuilder()
         .setContainerID(containerId)
         .setContainerState(replicaProto.getState())
@@ -317,4 +314,14 @@ public class AbstractContainerReportHandler {
     return containerManager;
   }
 
+  protected void deleteReplica(ContainerID containerID, DatanodeDetails dn,
+      EventPublisher publisher, String reason) {
+    final DeleteContainerCommand deleteCommand =
+        new DeleteContainerCommand(containerID.getId(), true);
+    final CommandForDatanode datanodeCommand = new CommandForDatanode<>(
+        dn.getUuid(), deleteCommand);
+    publisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
+    logger.info("Sending delete container command for " + reason +
+        " container {} to datanode {}", containerID.getId(), dn);
+  }
 }

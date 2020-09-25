@@ -170,13 +170,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
             UNKNOWN_CONTAINER_ACTION_DELETE)) {
           final ContainerID containerId = ContainerID
               .valueof(replicaProto.getContainerID());
-          final DeleteContainerCommand deleteCommand =
-              new DeleteContainerCommand(containerId.getId(), true);
-          final CommandForDatanode datanodeCommand = new CommandForDatanode<>(
-              datanodeDetails.getUuid(), deleteCommand);
-          publisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
-          LOG.info("Sending delete container command for unknown container {}"
-              + " to datanode {}", containerId.getId(), datanodeDetails);
+          deleteReplica(containerId, datanodeDetails, publisher, "unknown");
         }
       } catch (IOException e) {
         LOG.error("Exception while processing container report for container" +
