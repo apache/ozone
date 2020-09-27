@@ -28,10 +28,10 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
     name = "roles",
-    description = "List all SCMs and their respective Ratis server status",
+    description = "List all SCMs and their respective Ratis server roles",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class GetScmRatisStatusSubcommand implements Callable<Void> {
+public class GetScmRatisRolesSubcommand implements Callable<Void> {
 
   @CommandLine.ParentCommand
   private ScmAdmin parent;
@@ -39,8 +39,8 @@ public class GetScmRatisStatusSubcommand implements Callable<Void> {
   @Override
   public Void call() throws Exception {
     ScmClient scmClient = parent.createScmClient();
-    List<String> status = scmClient.getScmRatisStatus();
-    System.out.println(status);
+    List<String> roles = scmClient.getScmRatisRoles();
+    System.out.println(roles);
     return null;
   }
 }

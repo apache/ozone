@@ -69,11 +69,11 @@ public class TestScmAdminHA {
   }
 
   @Test
-  public void testGetRatisStatus() {
+  public void testGetRatisRoles() {
     InetSocketAddress address =
         cluster.getStorageContainerManager().getClientRpcAddress();
     String hostPort = address.getHostName() + ":" + address.getPort();
-    String[] args = {"--scm", hostPort, "scm", "status"};
+    String[] args = {"--scm", hostPort, "scm", "roles"};
     ozoneAdmin.execute(args);
   }
 }

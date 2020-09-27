@@ -109,11 +109,11 @@ public final class MockSCMHAManager implements SCMHAManager {
   }
 
   @Override
-  public List<String> getRatisStatus() {
+  public List<String> getRatisRoles() {
     return Arrays.asList(
-        "180.3.14.5:2333",
-        "180.3.14.21:2333",
-        "180.3.14.145:2333");
+        "180.3.14.5:9865",
+        "180.3.14.21:9865",
+        "180.3.14.145:9865");
   }
 
   /**

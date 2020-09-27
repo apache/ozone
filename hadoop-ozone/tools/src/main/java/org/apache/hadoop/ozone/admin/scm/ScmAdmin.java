@@ -34,7 +34,7 @@ import picocli.CommandLine.Spec;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,
     subcommands = {
-        GetScmRatisStatusSubcommand.class
+        GetScmRatisRolesSubcommand.class
     })
 public class ScmAdmin extends GenericCli {
 

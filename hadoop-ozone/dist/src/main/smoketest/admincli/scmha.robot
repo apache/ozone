@@ -23,6 +23,6 @@ Test Timeout        5 minutes
 *** Variables ***
 
 *** Test Cases ***
-Run scm status
+Run scm roles
     ${output} =         Execute          ozone admin scm roles
                         Should contain   ${output}  []

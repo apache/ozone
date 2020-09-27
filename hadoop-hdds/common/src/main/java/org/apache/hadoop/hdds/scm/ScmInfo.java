@@ -28,7 +28,7 @@ import java.util.List;
 public final class ScmInfo {
   private String clusterId;
   private String scmId;
-  private List<String> peerStatus;
+  private List<String> peerRoles;
 
   /**
    * Builder for ScmInfo.
@@ -36,10 +36,10 @@ public final class ScmInfo {
   public static class Builder {
     private String clusterId;
     private String scmId;
-    private List<String> peerStatus;
+    private List<String> peerRoles;
 
     public Builder() {
-      peerStatus = new ArrayList<>();
+      peerRoles = new ArrayList<>();
     }
 
     /**
@@ -64,23 +64,23 @@ public final class ScmInfo {
 
     /**
      * Set peer address in Scm HA.
-     * @param status ratis peer address in the format of [ip|hostname]:port
+     * @param roles ratis peer address in the format of [ip|hostname]:port
      * @return  Builder for scmInfo
      */
-    public Builder setRatisPeerStatus(List<String> status) {
-      peerStatus.addAll(status);
+    public Builder setRatisPeerRoles(List<String> roles) {
+      peerRoles.addAll(roles);
       return this;
     }
 
     public ScmInfo build() {
-      return new ScmInfo(clusterId, scmId, peerStatus);
+      return new ScmInfo(clusterId, scmId, peerRoles);
     }
   }
 
-  private ScmInfo(String clusterId, String scmId, List<String> peerStatus) {
+  private ScmInfo(String clusterId, String scmId, List<String> peerRoles) {
     this.clusterId = clusterId;
     this.scmId = scmId;
-    this.peerStatus = peerStatus;
+    this.peerRoles = peerRoles;
   }
 
   /**
@@ -100,10 +100,10 @@ public final class ScmInfo {
   }
 
   /**
-   * Gets the list of peer status (currently address) in Scm HA.
+   * Gets the list of peer roles (currently address) in Scm HA.
    * @return List of peer address
    */
-  public List<String> getRatisPeerStatus() {
-    return peerStatus;
+  public List<String> getRatisPeerRoles() {
+    return peerRoles;
   }
 }

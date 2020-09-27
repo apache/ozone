@@ -54,9 +54,9 @@ public interface SCMHAManager {
   void shutdown() throws IOException;
 
   /**
-   * Returns status of ratis peers.
+   * Returns roles of ratis peers.
    */
-  List<String> getRatisStatus();
+  List<String> getRatisRoles();
 
   /**
    * Returns NotLeaderException with useful info.

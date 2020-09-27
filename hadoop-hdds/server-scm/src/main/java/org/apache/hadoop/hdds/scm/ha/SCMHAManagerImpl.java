@@ -148,7 +148,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
   }
 
   @Override
-  public List<String> getRatisStatus() {
+  public List<String> getRatisRoles() {
     return getRatisServer()
             .getRaftPeers()
             .stream()
