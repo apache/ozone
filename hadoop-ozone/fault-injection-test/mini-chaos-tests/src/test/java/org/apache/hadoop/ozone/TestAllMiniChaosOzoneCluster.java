@@ -32,7 +32,8 @@ import java.util.concurrent.Callable;
     description = "run chaos cluster across all daemons",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class TestAllMiniChaosOzoneCluster extends TestMiniChaosOzoneCluster implements Callable<Void> {
+public class TestAllMiniChaosOzoneCluster extends TestMiniChaosOzoneCluster
+    implements Callable<Void> {
 
   @CommandLine.ParentCommand
   private OzoneChaosCluster chaosCluster;

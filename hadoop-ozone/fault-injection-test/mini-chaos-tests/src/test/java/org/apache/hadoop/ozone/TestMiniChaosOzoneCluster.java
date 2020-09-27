@@ -44,13 +44,11 @@ import java.util.concurrent.TimeUnit;
     name = "chaos", mixinStandardHelpOptions = true)
 public class TestMiniChaosOzoneCluster extends GenericCli {
 
-  @CommandLine.Option(names = "-f", description = { "Specify multiple -f options to increase verbosity.",
-      "For example, `-f -f -f` or `-fff`"})
-  protected static List<Class<? extends Failures>> failureClasses = new ArrayList<>();
+  protected static List<Class<? extends Failures>> failureClasses
+      = new ArrayList<>();
 
-  @CommandLine.Option(names = "-l", description = { "Specify multiple -l options to increase verbosity.",
-      "For example, `-l -l -l` or `-lll`"})
-  protected static List<Class<? extends LoadGenerator>> loadClasses = new ArrayList<>();
+  protected static List<Class<? extends LoadGenerator>> loadClasses
+      = new ArrayList<>();
 
   @Option(names = {"-d", "--num-datanodes", "--numDatanodes"},
       description = "num of datanodes. Full name --numDatanodes will be" +

@@ -27,6 +27,9 @@ import picocli.CommandLine;
 
 import java.util.concurrent.Callable;
 
+/**
+ * Chaos cluster for Ozone Manager.
+ */
 @CommandLine.Command(
     name = "ozonemanager",
     description = "run chaos cluster across all daemons",
