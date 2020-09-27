@@ -28,7 +28,6 @@ import org.junit.BeforeClass;
 import org.junit.AfterClass;
 import org.junit.Ignore;
 import org.junit.Test;
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -44,10 +43,10 @@ import java.util.concurrent.TimeUnit;
     name = "chaos", mixinStandardHelpOptions = true)
 public class TestMiniChaosOzoneCluster extends GenericCli {
 
-  protected static List<Class<? extends Failures>> failureClasses
+  private static List<Class<? extends Failures>> failureClasses
       = new ArrayList<>();
 
-  protected static List<Class<? extends LoadGenerator>> loadClasses
+  private static List<Class<? extends LoadGenerator>> loadClasses
       = new ArrayList<>();
 
   @Option(names = {"-d", "--num-datanodes", "--numDatanodes"},
@@ -92,10 +91,6 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
 
   private static final String OM_SERVICE_ID = "ozoneChaosTest";
 
-  public static void setOmHaMode() {
-    omServiceId = OM_SERVICE_ID;
-  }
-
   @BeforeClass
   public static void init() throws Exception {
     OzoneConfiguration configuration = new OzoneConfiguration();
@@ -127,6 +122,26 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
         .setOMServiceId(omServiceId);
     loadClasses.forEach(loadBuilder::addLoadGenerator);
     loadGenerator = loadBuilder.build();
+  }
+
+  static void addFailureClasses(Class<? extends Failures> clz) {
+    failureClasses.add(clz);
+  }
+
+  static void addLoadClasses(Class<? extends LoadGenerator> clz) {
+    loadClasses.add(clz);
+  }
+
+  static void setNumDatanodes(int nDns) {
+    numDatanodes = nDns;
+  }
+
+  static void setNumOzoneManagers(int nOms, boolean enableHA) {
+
+    if (nOms > 1 || enableHA) {
+      omServiceId = OM_SERVICE_ID;
+    }
+    numOzoneManagers = nOms;
   }
 
   /**

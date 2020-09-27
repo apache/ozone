@@ -40,18 +40,16 @@ public class TestOzoneManagerMiniChaosOzoneCluster extends
 
   @Override
   public Void call() throws Exception {
-    setOmHaMode();
+    setNumOzoneManagers(3, true);
+    setNumDatanodes(3);
 
-    numOzoneManagers = 3;
-    numDatanodes = 3;
+    addLoadClasses(AgedDirLoadGenerator.class);
+    addLoadClasses(RandomDirLoadGenerator.class);
+    addLoadClasses(NestedDirLoadGenerator.class);
 
+    addFailureClasses(Failures.OzoneManagerRestartFailure.class);
+    addFailureClasses(Failures.OzoneManagerStartStopFailure.class);
 
-    loadClasses.add(AgedDirLoadGenerator.class);
-    loadClasses.add(RandomDirLoadGenerator.class);
-    loadClasses.add(NestedDirLoadGenerator.class);
-
-    failureClasses.add(Failures.OzoneManagerRestartFailure.class);
-    failureClasses.add(Failures.OzoneManagerStartStopFailure.class);
     startChaosCluster();
     return null;
   }

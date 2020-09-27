@@ -40,10 +40,12 @@ public class TestAllMiniChaosOzoneCluster extends TestMiniChaosOzoneCluster
 
   @Override
   public Void call() throws Exception {
-    setOmHaMode();
+    setNumOzoneManagers(3, true);
 
-    loadClasses.addAll(LoadGenerator.getClassList());
-    failureClasses.addAll(Failures.getClassList());
+    LoadGenerator.getClassList().forEach(
+        TestMiniChaosOzoneCluster::addLoadClasses);
+    Failures.getClassList().forEach(
+        TestMiniChaosOzoneCluster::addFailureClasses);
 
     startChaosCluster();
 

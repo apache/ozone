@@ -39,11 +39,11 @@ public class TestDatanodeMiniChaosOzoneCluster extends
 
   @Override
   public Void call() throws Exception {
-    loadClasses.add(RandomLoadGenerator.class);
-    loadClasses.add(AgedLoadGenerator.class);
+    addLoadClasses(RandomLoadGenerator.class);
+    addLoadClasses(AgedLoadGenerator.class);
 
-    failureClasses.add(Failures.DatanodeStartStopFailure.class);
-    failureClasses.add(Failures.DatanodeRestartFailure.class);
+    addFailureClasses(Failures.DatanodeStartStopFailure.class);
+    addFailureClasses(Failures.DatanodeRestartFailure.class);
 
     startChaosCluster();
 
