@@ -62,4 +62,12 @@ public class SCMProxyInfo {
   public InetSocketAddress getAddress() {
     return rpcAddr;
   }
+
+  public String getServiceId() {
+    return serviceId;
+  }
+
+  public String getNodeId() {
+    return nodeId;
+  }
 }

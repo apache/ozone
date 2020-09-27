@@ -32,7 +32,7 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
 /**
  * Config for SCM Block Client.
  */
-@ConfigGroup(prefix = "ozone.scmclient")
+@ConfigGroup(prefix = "hdds.scmclient")
 public class SCMClientConfig {
   public static final String SCM_CLIENT_RPC_TIME_OUT = "rpc.timeout";
   public static final String SCM_CLIENT_FAILOVER_MAX_RETRY =
@@ -46,7 +46,7 @@ public class SCMClientConfig {
       tags = {OZONE, SCM, CLIENT},
       timeUnit = TimeUnit.MILLISECONDS,
       description = "RpcClient timeout on waiting for the response from " +
-          "OzoneManager. The default value is set to 15 minutes. " +
+          "SCM. The default value is set to 15 minutes. " +
           "If ipc.client.ping is set to true and this rpc-timeout " +
           "is greater than the value of ipc.ping.interval, the effective " +
           "value of the rpc-timeout is rounded up to multiple of " +
@@ -67,12 +67,8 @@ public class SCMClientConfig {
       type = ConfigType.TIME,
       tags = {OZONE, SCM, CLIENT},
       timeUnit = TimeUnit.MILLISECONDS,
-      description = "RpcClient timeout on waiting for the response from " +
-          "OzoneManager. The default value is set to 15 minutes. " +
-          "If ipc.client.ping is set to true and this rpc-timeout " +
-          "is greater than the value of ipc.ping.interval, the effective " +
-          "value of the rpc-timeout is rounded up to multiple of " +
-          "ipc.ping.interval."
+      description = "SCM Client timeout on waiting for the next connection " +
+          "retry to other SCM IP. The default value is set to 2 minutes. "
   )
   private long retryInterval = 2 * 1000;
 
