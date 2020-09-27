@@ -749,7 +749,7 @@ public abstract class TestOzoneRpcClientAbstract {
     // Write failed, volume usedBytes should be 0
     Assert.assertEquals(0L, store.getVolume(volumeName).getUsedBytes());
 
-    // Write large key, test allocateBlock fails.
+    // Write a key(with two blocks), test allocateBlock fails.
     store.getVolume(volumeName).setQuota(
         OzoneQuota.parseQuota(blockSize + "Bytes", 100));
     try {
@@ -763,10 +763,30 @@ public abstract class TestOzoneRpcClientAbstract {
       countException++;
       GenericTestUtils.assertExceptionContains("QUOTA_EXCEEDED", ex);
     }
-    // AllocateBlock failed, volume usedBytes should be 0
-    Assert.assertEquals(0L, store.getVolume(volumeName).getUsedBytes());
+    // AllocateBlock failed, volume usedBytes should be 1 * blockSize.
+    Assert.assertEquals(blockSize, store.getVolume(volumeName).getUsedBytes());
 
-    Assert.assertEquals(3, countException);
+    // Write large key(with five blocks), the first four blocks will succeed，
+    // while the later block will fail.
+    store.getVolume(volumeName).setQuota(
+        OzoneQuota.parseQuota(5 * blockSize + "Bytes", 100));
+    try {
+      OzoneOutputStream out = bucket.createKey(UUID.randomUUID().toString(),
+          valueLength, STAND_ALONE, ONE, new HashMap<>());
+      for(int i=0; i <= (4 * blockSize)/value.length(); i++) {
+        out.write(value.getBytes());
+      }
+      out.close();
+    } catch (IOException ex) {
+      countException++;
+      GenericTestUtils.assertExceptionContains("QUOTA_EXCEEDED", ex);
+    }
+    // AllocateBlock failed, volume usedBytes should be 4 * blockSize + 1 *
+    // blockSize = 5 * blockSize.
+    Assert.assertEquals(5 * blockSize,
+        store.getVolume(volumeName).getUsedBytes());
+
+    Assert.assertEquals(4, countException);
   }
 
   @Test

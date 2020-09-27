@@ -29,7 +29,6 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -300,9 +299,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           * ozoneManager.getScmBlockSize()
           * omKeyInfo.getFactor().getNumber();
       // check volume quota
-      if (omVolumeArgs.getQuotaInBytes() > OzoneConsts.QUOTA_RESET) {
-        checkVolumeQuotaInBytes(omVolumeArgs, preAllocatedSpace);
-      }
+      checkVolumeQuotaInBytes(omVolumeArgs, preAllocatedSpace);
 
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
