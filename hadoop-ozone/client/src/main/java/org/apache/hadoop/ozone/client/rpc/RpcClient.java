@@ -634,7 +634,8 @@ public class RpcClient implements ClientProtocol {
         bucketInfo.getEncryptionKeyInfo() != null ? bucketInfo
             .getEncryptionKeyInfo().getKeyName() : null,
         bucketInfo.getSourceVolume(),
-        bucketInfo.getSourceBucket()
+        bucketInfo.getSourceBucket(),
+        bucketInfo.getUsedBytes().sum()
     );
   }
 
@@ -658,7 +659,8 @@ public class RpcClient implements ClientProtocol {
         bucket.getEncryptionKeyInfo() != null ? bucket
             .getEncryptionKeyInfo().getKeyName() : null,
         bucket.getSourceVolume(),
-        bucket.getSourceBucket()))
+        bucket.getSourceBucket(),
+        bucket.getUsedBytes().sum()))
         .collect(Collectors.toList());
   }
 
@@ -1045,6 +1047,7 @@ public class RpcClient implements ClientProtocol {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setRefreshPipeline(true)
+        .setSortDatanodesInPipeline(topologyAwareReadEnabled)
         .build();
     return ozoneManagerClient.getFileStatus(keyArgs);
   }
@@ -1127,6 +1130,7 @@ public class RpcClient implements ClientProtocol {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setRefreshPipeline(true)
+        .setSortDatanodesInPipeline(topologyAwareReadEnabled)
         .build();
     return ozoneManagerClient
         .listStatus(keyArgs, recursive, startKey, numEntries);

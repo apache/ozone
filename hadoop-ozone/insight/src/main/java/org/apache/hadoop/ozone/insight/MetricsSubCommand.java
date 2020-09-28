@@ -17,6 +17,19 @@
  */
 package org.apache.hadoop.ozone.insight;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
+
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
@@ -25,16 +38,6 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.HttpClientBuilder;
 import picocli.CommandLine;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.*;
-import java.util.Map.Entry;
-import java.util.concurrent.Callable;
-import java.util.stream.Collectors;
 
 /**
  * Command line interface to show metrics for a specific component.
@@ -48,6 +51,10 @@ import java.util.stream.Collectors;
 public class MetricsSubCommand extends BaseInsightSubCommand
     implements Callable<Void> {
 
+  @CommandLine.Option(names = "-f", description = "Define filters to scope "
+      + "the output (eg. -f datanode=_1234_datanode_id)")
+  private Map<String, String> filters;
+
   @CommandLine.Parameters(description = "Name of the insight point (use list "
       + "to check the available options)")
   private String insightName;
@@ -59,13 +66,15 @@ public class MetricsSubCommand extends BaseInsightSubCommand
     InsightPoint insight =
         getInsight(conf, insightName);
     Set<Component> sources =
-        insight.getMetrics().stream().map(MetricGroupDisplay::getComponent)
+        insight.getMetrics(filters)
+            .stream()
+            .map(MetricGroupDisplay::getComponent)
             .collect(Collectors.toSet());
     Map<Component, List<String>> metrics = getMetrics(conf, sources);
     System.out.println(
         "Metrics for `" + insightName + "` (" + insight.getDescription() + ")");
     System.out.println();
-    for (MetricGroupDisplay group : insight.getMetrics()) {
+    for (MetricGroupDisplay group : insight.getMetrics(filters)) {
       System.out.println(group.getDescription());
       System.out.println();
       for (MetricDisplay display : group.getMetrics()) {

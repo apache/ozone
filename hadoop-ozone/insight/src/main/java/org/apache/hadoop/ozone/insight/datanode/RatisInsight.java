@@ -22,24 +22,21 @@ import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.insight.BaseInsightPoint;
-import org.apache.hadoop.ozone.insight.Component;
-import org.apache.hadoop.ozone.insight.Component.Type;
 import org.apache.hadoop.ozone.insight.InsightPoint;
 import org.apache.hadoop.ozone.insight.LoggerSource;
 
+import static org.apache.hadoop.ozone.insight.datanode.PipelineComponentUtil.getPipelineIdFromFilters;
+import static org.apache.hadoop.ozone.insight.datanode.PipelineComponentUtil.withDatanodesFromPipeline;
+
 /**
- * Insight definition for datanode/pipline metrics.
+ * Insight definition for datanode/pipeline metrics.
  */
 public class RatisInsight extends BaseInsightPoint implements InsightPoint {
 
-  public static final String PIPELINE_FILTER = "pipeline";
   private OzoneConfiguration conf;
 
   public RatisInsight(OzoneConfiguration conf) {
@@ -49,38 +46,22 @@ public class RatisInsight extends BaseInsightPoint implements InsightPoint {
   @Override
   public List<LoggerSource> getRelatedLoggers(boolean verbose,
       Map<String, String> filters) {
-    if (filters == null || !filters.containsKey(PIPELINE_FILTER)) {
-      throw new IllegalArgumentException(PIPELINE_FILTER
-          + " filter should be specified (-f " + PIPELINE_FILTER
-          + "=<pipelineid)");
-    }
 
-    String pipelineId = filters.get(PIPELINE_FILTER);
     List<LoggerSource> result = new ArrayList<>();
 
     try (ScmClient scmClient = createScmClient(conf)) {
-      Optional<Pipeline> pipelineSelection = scmClient.listPipelines()
-          .stream()
-          .filter(
-              pipline -> pipline.getId().getId().toString().equals(pipelineId))
-          .findFirst();
-
-      if (!pipelineSelection.isPresent()) {
-        throw new IllegalArgumentException("No such multi-node pipeline.");
-      }
-      Pipeline pipeline = pipelineSelection.get();
-      for (DatanodeDetails datanode : pipeline.getNodes()) {
-        Component dn =
-            new Component(Type.DATANODE, datanode.getUuid().toString(),
-                datanode.getHostName(), 9882);
-        result
-            .add(new LoggerSource(dn, "org.apache.ratis.server.impl",
-                defaultLevel(verbose)));
-      }
+      withDatanodesFromPipeline(scmClient,
+          getPipelineIdFromFilters(filters),
+          dn -> {
+            result
+                .add(new LoggerSource(dn,
+                    "org.apache.ratis.server.impl",
+                    defaultLevel(verbose)));
+            return null;
+          });
     } catch (IOException e) {
       throw new UncheckedIOException("Can't enumerate required logs", e);
     }
-
     return result;
   }
 

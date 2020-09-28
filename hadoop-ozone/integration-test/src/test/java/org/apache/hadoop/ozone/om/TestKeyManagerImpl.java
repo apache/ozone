@@ -1090,8 +1090,7 @@ public class TestKeyManagerImpl {
         tempFileStatus = keyManager.listStatus(dirArgs, false,
             tempFileStatus != null ?
                 tempFileStatus.get(tempFileStatus.size() - 1).getKeyInfo()
-                    .getKeyName() : null,
-            2);
+                    .getKeyName() : null, 2);
         tmpStatusSet.addAll(tempFileStatus);
       } while (tempFileStatus.size() == 2);
       verifyFileStatus(directory, new ArrayList<>(tmpStatusSet), directorySet,
@@ -1107,9 +1106,7 @@ public class TestKeyManagerImpl {
         tempFileStatus = keyManager.listStatus(dirArgs, true,
             tempFileStatus != null ?
                 tempFileStatus.get(tempFileStatus.size() - 1).getKeyInfo()
-                    .getKeyName() :
-                null,
-            2);
+                    .getKeyName() : null, 2);
         tmpStatusSet.addAll(tempFileStatus);
       } while (tempFileStatus.size() == 2);
       verifyFileStatus(directory, new ArrayList<>(tmpStatusSet), directorySet,

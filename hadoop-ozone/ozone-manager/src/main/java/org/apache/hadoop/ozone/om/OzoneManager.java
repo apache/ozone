@@ -2784,7 +2784,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     try {
       metrics.incNumGetFileStatus();
-      return keyManager.getFileStatus(args);
+      return keyManager.getFileStatus(args, getClientAddress());
     } catch (IOException ex) {
       metrics.incNumGetFileStatusFails();
       auditSuccess = false;
@@ -2908,7 +2908,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     try {
       metrics.incNumListStatus();
-      return keyManager.listStatus(args, recursive, startKey, numEntries);
+      return keyManager.listStatus(args, recursive, startKey, numEntries,
+              getClientAddress());
     } catch (Exception ex) {
       metrics.incNumListStatusFails();
       auditSuccess = false;
@@ -3125,7 +3126,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       termIndex = installCheckpoint(leaderId, omDBCheckpoint);
     } catch (Exception ex) {
-      LOG.error("Failed to install snapshot from Leader OM: {}", ex);
+      LOG.error("Failed to install snapshot from Leader OM.", ex);
     }
     return termIndex;
   }

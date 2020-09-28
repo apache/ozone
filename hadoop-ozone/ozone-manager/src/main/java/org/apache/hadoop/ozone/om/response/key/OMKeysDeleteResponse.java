@@ -49,9 +49,9 @@ public class OMKeysDeleteResponse extends OMClientResponse {
   private OmBucketInfo omBucketInfo;
 
   public OMKeysDeleteResponse(@Nonnull OMResponse omResponse,
-                              @Nonnull List<OmKeyInfo> keyDeleteList, long trxnLogIndex,
-                              boolean isRatisEnabled, @Nonnull OmVolumeArgs omVolumeArgs,
-                              @Nonnull OmBucketInfo omBucketInfo) {
+      @Nonnull List<OmKeyInfo> keyDeleteList, long trxnLogIndex,
+      boolean isRatisEnabled, @Nonnull OmVolumeArgs omVolumeArgs,
+      @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse);
     this.omKeyInfoList = keyDeleteList;
     this.isRatisEnabled = isRatisEnabled;

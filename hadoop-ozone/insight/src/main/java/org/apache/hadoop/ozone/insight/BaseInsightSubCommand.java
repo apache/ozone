@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.insight.Component.Type;
+import org.apache.hadoop.ozone.insight.datanode.DatanodeDispatcherInsight;
 import org.apache.hadoop.ozone.insight.datanode.RatisInsight;
 import org.apache.hadoop.ozone.insight.om.KeyManagerInsight;
 import org.apache.hadoop.ozone.insight.om.OmProtocolInsight;
@@ -98,6 +99,8 @@ public class BaseInsightSubCommand {
     insights.put("om.key-manager", new KeyManagerInsight());
     insights.put("om.protocol.client", new OmProtocolInsight());
     insights.put("datanode.pipeline", new RatisInsight(configuration));
+    insights.put("datanode.dispatcher",
+        new DatanodeDispatcherInsight(configuration));
 
     return insights;
   }

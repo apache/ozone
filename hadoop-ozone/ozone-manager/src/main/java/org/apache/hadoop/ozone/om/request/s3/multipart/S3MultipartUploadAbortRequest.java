@@ -23,6 +23,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -106,6 +107,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     OMClientResponse omClientResponse = null;
     Result result = null;
     OmVolumeArgs omVolumeArgs = null;
+    OmBucketInfo omBucketInfo = null;
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
       volumeName = keyArgs.getVolumeName();
@@ -124,6 +126,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       OmKeyInfo omKeyInfo =
           omMetadataManager.getOpenKeyTable().get(multipartKey);
       omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
+      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       // If there is no entry in openKeyTable, then there is no multipart
       // upload initiated for this key.
@@ -150,6 +153,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
             iterPartKeyInfo.getPartKeyInfo().getDataSize() * keyFactor;
       }
       omVolumeArgs.getUsedBytes().add(-quotaReleased);
+      omBucketInfo.getUsedBytes().add(-quotaReleased);
 
       // Update cache of openKeyTable and multipartInfo table.
       // No need to add the cache entries to delete table, as the entries
@@ -165,7 +169,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
           omResponse.setAbortMultiPartUploadResponse(
               MultipartUploadAbortResponse.newBuilder()).build(),
           multipartKey, multipartKeyInfo, ozoneManager.isRatisEnabled(),
-          omVolumeArgs);
+          omVolumeArgs, omBucketInfo);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
