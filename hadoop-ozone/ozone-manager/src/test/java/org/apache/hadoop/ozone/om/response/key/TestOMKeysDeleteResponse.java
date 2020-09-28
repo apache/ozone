@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -79,10 +80,13 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
     OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
         .setOwnerName(keyName).setAdminName(keyName)
         .setVolume(volumeName).setCreationTime(Time.now()).build();
+    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName).setBucketName(bucketName)
+        .setCreationTime(Time.now()).build();
 
     OMClientResponse omKeysDeleteResponse = new OMKeysDeleteResponse(
         omResponse, omKeyInfoList, 10L, true,
-        omVolumeArgs);
+        omVolumeArgs, omBucketInfo);
 
     omKeysDeleteResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
@@ -92,10 +96,13 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
 
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           omMetadataManager.getDeletedTable().get(ozKey);
-      // Because the key info has no associated blocks, it should not be
-      // added to the delete table.
-      Assert.assertNull(repeatedOmKeyInfo);
+      Assert.assertNotNull(repeatedOmKeyInfo);
+
+      Assert.assertEquals(1, repeatedOmKeyInfo.getOmKeyInfoList().size());
+      Assert.assertEquals(10L,
+          repeatedOmKeyInfo.getOmKeyInfoList().get(0).getUpdateID());
     }
+
   }
 
   @Test
@@ -111,10 +118,13 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
     OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
         .setOwnerName(keyName).setAdminName(keyName)
         .setVolume(volumeName).setCreationTime(Time.now()).build();
+    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName).setBucketName(bucketName)
+        .setCreationTime(Time.now()).build();
 
     OMClientResponse omKeysDeleteResponse = new OMKeysDeleteResponse(
         omResponse, omKeyInfoList, 10L, true,
-        omVolumeArgs);
+        omVolumeArgs, omBucketInfo);
 
     omKeysDeleteResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
