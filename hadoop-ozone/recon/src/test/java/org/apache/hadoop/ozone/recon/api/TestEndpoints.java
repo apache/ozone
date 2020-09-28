@@ -28,6 +28,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
@@ -140,6 +142,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private final String prometheusTestResponseFile =
       "prometheus-test-response.txt";
   private ReconUtils reconUtilsMock;
+  private static final int TEST_SOFTWARE_LAYOUT_VERSION = 0;
+  private static final int TEST_METADATA_LAYOUT_VERSION = 0;
 
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
@@ -326,15 +330,19 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         NodeReportProto.newBuilder()
             .addStorageReport(storageReportProto3)
             .addStorageReport(storageReportProto4).build();
+    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+        .setMetadataLayoutVersion(TEST_METADATA_LAYOUT_VERSION)
+        .setSoftwareLayoutVersion(TEST_SOFTWARE_LAYOUT_VERSION)
+        .build();
 
     try {
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto, nodeReportProto,
-              containerReportsProto, pipelineReportsProto);
+              containerReportsProto, pipelineReportsProto, layoutInfo);
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto2, nodeReportProto2,
               ContainerReportsProto.newBuilder().build(),
-              PipelineReportsProto.newBuilder().build());
+              PipelineReportsProto.newBuilder().build(), layoutInfo);
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
     } catch (Exception ex) {

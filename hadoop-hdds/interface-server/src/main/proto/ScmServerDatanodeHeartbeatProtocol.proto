@@ -410,6 +410,7 @@ message ClosePipelineCommandProto {
 message FinalizeNewLayoutVersionCommandProto {
   required bool finalizeNewLayoutVersion = 1 [default = false];
   required LayoutVersionProto dataNodeLayoutVersion = 2;
+  required int64 cmdId = 3;
 }
 
 /**

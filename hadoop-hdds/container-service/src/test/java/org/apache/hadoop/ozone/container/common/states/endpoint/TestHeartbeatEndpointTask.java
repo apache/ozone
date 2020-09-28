@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.upgrade.DataNodeLayoutVersionManager;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 
 import org.junit.Assert;
@@ -48,6 +49,8 @@ public class TestHeartbeatEndpointTask {
 
   private static final InetSocketAddress TEST_SCM_ENDPOINT =
       new InetSocketAddress("test-scm-1", 9861);
+  private static final int TEST_SOFTWARE_LAYOUT_VERSION = 0;
+  private static final int TEST_METADATA_LAYOUT_VERSION = 0;
 
   @Test
   public void testheartbeatWithoutReports() throws Exception {
@@ -277,10 +280,17 @@ public class TestHeartbeatEndpointTask {
     Mockito.when(endpointStateMachine.getEndPoint()).thenReturn(proxy);
     Mockito.when(endpointStateMachine.getAddress())
         .thenReturn(TEST_SCM_ENDPOINT);
+    DataNodeLayoutVersionManager layoutVersionManager =
+        Mockito.mock(DataNodeLayoutVersionManager.class);
+    Mockito.when(layoutVersionManager.getSoftwareLayoutVersion())
+        .thenReturn(TEST_SOFTWARE_LAYOUT_VERSION);
+    Mockito.when(layoutVersionManager.getMetadataLayoutVersion())
+        .thenReturn(TEST_METADATA_LAYOUT_VERSION);
     return HeartbeatEndpointTask.newBuilder()
         .setConfig(conf)
         .setDatanodeDetails(datanodeDetails)
         .setContext(context)
+        .setLayoutVersionManager(layoutVersionManager)
         .setEndpointStateMachine(endpointStateMachine)
         .build();
   }
