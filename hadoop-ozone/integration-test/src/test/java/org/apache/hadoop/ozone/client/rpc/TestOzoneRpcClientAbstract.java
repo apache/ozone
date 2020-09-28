@@ -755,7 +755,7 @@ public abstract class TestOzoneRpcClientAbstract {
     try {
       OzoneOutputStream out = bucket.createKey(UUID.randomUUID().toString(),
           valueLength, STAND_ALONE, ONE, new HashMap<>());
-      for(int i=0; i <= blockSize/value.length(); i++) {
+      for (int i = 0; i <= blockSize / value.length(); i++) {
         out.write(value.getBytes());
       }
       out.close();
@@ -773,7 +773,7 @@ public abstract class TestOzoneRpcClientAbstract {
     try {
       OzoneOutputStream out = bucket.createKey(UUID.randomUUID().toString(),
           valueLength, STAND_ALONE, ONE, new HashMap<>());
-      for(int i=0; i <= (4 * blockSize)/value.length(); i++) {
+      for (int i = 0; i <= (4 * blockSize) / value.length(); i++) {
         out.write(value.getBytes());
       }
       out.close();
@@ -781,8 +781,7 @@ public abstract class TestOzoneRpcClientAbstract {
       countException++;
       GenericTestUtils.assertExceptionContains("QUOTA_EXCEEDED", ex);
     }
-    // AllocateBlock failed, volume usedBytes should be 4 * blockSize + 1 *
-    // blockSize = 5 * blockSize.
+    // AllocateBlock failed, volume usedBytes should be (4 + 1) * blockSize
     Assert.assertEquals(5 * blockSize,
         store.getVolume(volumeName).getUsedBytes());
 
