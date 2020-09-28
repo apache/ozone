@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,6 +62,7 @@ import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 
+import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 /**
@@ -84,7 +86,8 @@ public final class ContainerProtocolCalls  {
    * @throws IOException if there is an I/O error while performing the call
    */
   public static GetBlockResponseProto getBlock(XceiverClientSpi xceiverClient,
-      DatanodeBlockID datanodeBlockID) throws IOException {
+      DatanodeBlockID datanodeBlockID,
+      Collection<Token<? extends TokenIdentifier>> tokens) throws IOException {
     GetBlockRequestProto.Builder readBlockRequest = GetBlockRequestProto
         .newBuilder()
         .setBlockID(datanodeBlockID);
@@ -96,7 +99,8 @@ public final class ContainerProtocolCalls  {
         .setContainerID(datanodeBlockID.getContainerID())
         .setDatanodeUuid(id)
         .setGetBlock(readBlockRequest);
-    String encodedToken = getEncodedBlockToken(getService(datanodeBlockID));
+    String encodedToken = getEncodedBlockToken(getService(datanodeBlockID),
+        tokens);
     if (encodedToken != null) {
       builder.setEncodedToken(encodedToken);
     }
@@ -187,7 +191,8 @@ public final class ContainerProtocolCalls  {
    * @throws ExecutionException
    */
   public static XceiverClientReply putBlockAsync(
-      XceiverClientSpi xceiverClient, BlockData containerBlockData, boolean eof)
+      XceiverClientSpi xceiverClient, BlockData containerBlockData, boolean eof,
+      Collection<Token<? extends TokenIdentifier>> tokens)
       throws IOException, InterruptedException, ExecutionException {
     PutBlockRequestProto.Builder createBlockRequest =
         PutBlockRequestProto.newBuilder()
@@ -200,7 +205,8 @@ public final class ContainerProtocolCalls  {
             .setDatanodeUuid(id)
             .setPutBlock(createBlockRequest);
     String encodedToken =
-        getEncodedBlockToken(getService(containerBlockData.getBlockID()));
+        getEncodedBlockToken(getService(containerBlockData.getBlockID()),
+            tokens);
     if (encodedToken != null) {
       builder.setEncodedToken(encodedToken);
     }
@@ -220,7 +226,8 @@ public final class ContainerProtocolCalls  {
    */
   public static ContainerProtos.ReadChunkResponseProto readChunk(
       XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
-      List<CheckedBiFunction> validators) throws IOException {
+      List<CheckedBiFunction> validators,
+      Collection<Token<? extends TokenIdentifier>> tokens) throws IOException {
     ReadChunkRequestProto.Builder readChunkRequest =
         ReadChunkRequestProto.newBuilder()
             .setBlockID(blockID.getDatanodeBlockIDProtobuf())
@@ -231,7 +238,7 @@ public final class ContainerProtocolCalls  {
             .setContainerID(blockID.getContainerID())
             .setDatanodeUuid(id).setReadChunk(readChunkRequest);
     String encodedToken = getEncodedBlockToken(new Text(blockID.
-        getContainerBlockID().toString()));
+        getContainerBlockID().toString()), tokens);
     if (encodedToken != null) {
       builder.setEncodedToken(encodedToken);
     }
@@ -285,7 +292,7 @@ public final class ContainerProtocolCalls  {
    */
   public static XceiverClientReply writeChunkAsync(
       XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
-      ByteString data)
+      ByteString data, Collection<Token<? extends TokenIdentifier>> tokens)
       throws IOException, ExecutionException, InterruptedException {
     WriteChunkRequestProto.Builder writeChunkRequest =
         WriteChunkRequestProto.newBuilder()
@@ -297,7 +304,7 @@ public final class ContainerProtocolCalls  {
             .setContainerID(blockID.getContainerID())
             .setDatanodeUuid(id).setWriteChunk(writeChunkRequest);
     String encodedToken = getEncodedBlockToken(new Text(blockID.
-        getContainerBlockID().toString()));
+        getContainerBlockID().toString()), tokens);
     if (encodedToken != null) {
       builder.setEncodedToken(encodedToken);
     }
@@ -540,8 +547,13 @@ public final class ContainerProtocolCalls  {
   private static String getEncodedBlockToken(Text service)
       throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+    return getEncodedBlockToken(service, ugi.getTokens());
+  }
+
+  private static String getEncodedBlockToken(Text service,
+      Collection<Token<? extends TokenIdentifier>> tokens) throws IOException {
     Token<OzoneBlockTokenIdentifier> token =
-        OzoneBlockTokenSelector.selectBlockToken(service, ugi.getTokens());
+        OzoneBlockTokenSelector.selectBlockToken(service, tokens);
     if (token != null) {
       return token.encodeToUrlString();
     }

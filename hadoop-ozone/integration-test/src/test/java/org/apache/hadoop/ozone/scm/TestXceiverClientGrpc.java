@@ -41,6 +41,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
+import static java.util.Collections.emptyList;
+
 /**
  * Tests for TestXceiverClientGrpc, to ensure topology aware reads work
  * select the closest node, and connections are re-used after a getBlock call.
@@ -156,7 +158,7 @@ public class TestXceiverClientGrpc {
             .setContainerID(1)
             .setLocalID(1)
             .setBlockCommitSequenceId(1)
-            .build());
+            .build(), emptyList());
   }
 
   private void invokeXceiverClientReadChunk(XceiverClientSpi client)
@@ -174,7 +176,7 @@ public class TestXceiverClientGrpc {
             .setOffset(100)
             .build(),
         bid,
-        null);
+        null, emptyList());
   }
 
   private void invokeXceiverClientReadSmallFile(XceiverClientSpi client)

@@ -31,12 +31,15 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
+import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -72,15 +75,19 @@ public class ChunkInputStream extends InputStream implements Seekable {
   // position. Once the chunk is read, this variable is reset.
   private long chunkPosition = -1;
 
+  private final Collection<Token<? extends TokenIdentifier>> tokens;
+
   private static final int EOF = -1;
 
   ChunkInputStream(ChunkInfo chunkInfo, BlockID blockId,
-          XceiverClientSpi xceiverClient, boolean verifyChecksum) {
+      XceiverClientSpi xceiverClient, boolean verifyChecksum,
+      Collection<Token<? extends TokenIdentifier>> tokens) {
     this.chunkInfo = chunkInfo;
     this.length = chunkInfo.getLen();
     this.blockID = blockId;
     this.xceiverClient = xceiverClient;
     this.verifyChecksum = verifyChecksum;
+    this.tokens = tokens;
   }
 
   public synchronized long getRemaining() throws IOException {
@@ -332,7 +339,7 @@ public class ChunkInputStream extends InputStream implements Seekable {
       validators.add(validator);
 
       readChunkResponse = ContainerProtocolCalls.readChunk(xceiverClient,
-          readChunkInfo, blockID, validators);
+          readChunkInfo, blockID, validators, tokens);
 
     } catch (IOException e) {
       if (e instanceof StorageContainerException) {
