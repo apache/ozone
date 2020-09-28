@@ -224,7 +224,7 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
       Collection<OmKeyInfo> keyInfos) {
 
     long quotaReleased = keyInfos.stream()
-        .mapToLong(OMOpenKeysDeleteRequest::getUsedBytes)
+        .mapToLong(OMOpenKeysDeleteRequest::sumBlockLengths)
         .sum();
 
     // update usedBytes atomically.
