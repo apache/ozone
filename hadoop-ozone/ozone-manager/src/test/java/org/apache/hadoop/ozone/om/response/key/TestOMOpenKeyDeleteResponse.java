@@ -191,49 +191,25 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
 
       OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volume,
           bucket, key, replicationType, replicationFactor);
+
+      if (keyLength > 0) {
+        TestOMRequestUtils.addKeyLocationInfo(omKeyInfo, 0, keyLength);
+      }
+
       String openKey = omMetadataManager.getOpenKey(volume, bucket,
           key, clientID);
 
-      if (keyLength > 0) {
-        addBlocksTo(omKeyInfo, keyLength);
-      }
-
-      // Add to the open key table.
-      TestOMRequestUtils.addKeyToTable(true, volume, bucket, key,
-          clientID, replicationType, replicationFactor, omMetadataManager);
+      // Add to the open key table DB, not cache.
+      // In a real execution, the open key would have been removed from the
+      // cache already, and it would only remain in the DB.
+      TestOMRequestUtils.addKeyToTable(true, false, omKeyInfo,
+          clientID, 0L, omMetadataManager);
       Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(openKey));
 
       newOpenKeys.put(openKey, omKeyInfo);
     }
 
     return newOpenKeys;
-  }
-
-  /**
-   * Creates block data and attaches it to {@code keyInfo}.
-   * @throws Exception
-   */
-  private void addBlocksTo(OmKeyInfo keyInfo, long keyLength) throws Exception {
-    List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
-
-    Pipeline pipeline = Pipeline.newBuilder()
-        .setState(Pipeline.PipelineState.OPEN)
-        .setId(PipelineID.randomId())
-        .setType(replicationType)
-        .setFactor(replicationFactor)
-        .setNodes(new ArrayList<>())
-        .build();
-
-    OmKeyLocationInfo omKeyLocationInfo = new OmKeyLocationInfo.Builder()
-        .setBlockID(new BlockID(100L, 1000L))
-        .setOffset(0)
-        .setLength(keyLength)
-        .setPipeline(pipeline)
-        .build();
-
-    omKeyLocationInfoList.add(omKeyLocationInfo);
-
-    keyInfo.appendNewBlocks(omKeyLocationInfoList, false);
   }
 
   private OmVolumeArgs getDBVolume(String volume) throws Exception {
