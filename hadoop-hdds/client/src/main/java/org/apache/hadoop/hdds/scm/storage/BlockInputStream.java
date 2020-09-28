@@ -131,8 +131,6 @@ public class BlockInputStream extends InputStream implements Seekable {
       return;
     }
 
-    tokens = UserGroupInformation.getCurrentUser().getTokens();
-
     List<ChunkInfo> chunks = null;
     try {
       chunks = getChunkInfos();
@@ -198,6 +196,7 @@ public class BlockInputStream extends InputStream implements Seekable {
       if (token != null) {
         UserGroupInformation.getCurrentUser().addToken(token);
       }
+      tokens = UserGroupInformation.getCurrentUser().getTokens();
       DatanodeBlockID datanodeBlockID = blockID
           .getDatanodeBlockIDProtobuf();
       GetBlockResponseProto response = ContainerProtocolCalls
