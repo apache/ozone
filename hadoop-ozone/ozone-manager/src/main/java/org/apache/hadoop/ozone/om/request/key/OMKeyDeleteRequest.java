@@ -87,7 +87,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-                                                 long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
     DeleteKeyRequest deleteKeyRequest = getOmRequest().getDeleteKeyRequest();
 
     OzoneManagerProtocolProtos.KeyArgs keyArgs =
@@ -175,7 +175,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
           createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
+            omDoubleBufferHelper);
       if (acquiredLock) {
         omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
             bucketName);
@@ -188,19 +188,19 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
 
     switch (result) {
-      case SUCCESS:
-        omMetrics.decNumKeys();
-        LOG.debug("Key deleted. Volume:{}, Bucket:{}, Key:{}", volumeName,
-            bucketName, keyName);
-        break;
-      case FAILURE:
-        omMetrics.incNumKeyDeleteFails();
-        LOG.error("Key delete failed. Volume:{}, Bucket:{}, Key:{}.",
-            volumeName, bucketName, keyName, exception);
-        break;
-      default:
-        LOG.error("Unrecognized Result for OMKeyDeleteRequest: {}",
-            deleteKeyRequest);
+    case SUCCESS:
+      omMetrics.decNumKeys();
+      LOG.debug("Key deleted. Volume:{}, Bucket:{}, Key:{}", volumeName,
+          bucketName, keyName);
+      break;
+    case FAILURE:
+      omMetrics.incNumKeyDeleteFails();
+      LOG.error("Key delete failed. Volume:{}, Bucket:{}, Key:{}.",
+          volumeName, bucketName, keyName, exception);
+      break;
+    default:
+      LOG.error("Unrecognized Result for OMKeyDeleteRequest: {}",
+          deleteKeyRequest);
     }
 
     return omClientResponse;

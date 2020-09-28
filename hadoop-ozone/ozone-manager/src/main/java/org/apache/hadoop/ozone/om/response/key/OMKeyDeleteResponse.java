@@ -70,7 +70,7 @@ public class OMKeyDeleteResponse extends OMClientResponse {
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
-                           BatchOperation batchOperation) throws IOException {
+      BatchOperation batchOperation) throws IOException {
 
     // For OmResponse with failure, this should do nothing. This method is
     // not called in failure scenario in OM code.
@@ -95,7 +95,7 @@ public class OMKeyDeleteResponse extends OMClientResponse {
           omKeyInfo, repeatedOmKeyInfo, omKeyInfo.getUpdateID(),
           isRatisEnabled);
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-          ozoneKey, repeatedOmKeyInfo);
+            ozoneKey, repeatedOmKeyInfo);
 
       // update volume usedBytes.
       omMetadataManager.getVolumeTable().putWithBatch(batchOperation,

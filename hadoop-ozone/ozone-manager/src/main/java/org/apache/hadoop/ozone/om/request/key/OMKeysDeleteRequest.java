@@ -76,7 +76,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-                                                 long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
     DeleteKeysRequest deleteKeyRequest =
         getOmRequest().getDeleteKeysRequest();
 
@@ -219,26 +219,26 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
 
     switch (result) {
-      case SUCCESS:
-        omMetrics.decNumKeys(deleteKeys.size());
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Keys delete success. Volume:{}, Bucket:{}, Keys:{}",
-              volumeName, bucketName, auditMap.get(DELETED_KEYS_LIST));
-        }
-        break;
-      case FAILURE:
-        omMetrics.decNumKeys(deleteKeys.size());
-        omMetrics.incNumKeyDeleteFails();
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Keys delete failed. Volume:{}, Bucket:{}, DeletedKeys:{}, " +
-                  "UnDeletedKeys:{}", volumeName, bucketName,
-              auditMap.get(DELETED_KEYS_LIST), auditMap.get(UNDELETED_KEYS_LIST),
-              exception);
-        }
-        break;
-      default:
-        LOG.error("Unrecognized Result for OMKeysDeleteRequest: {}",
-            deleteKeyRequest);
+    case SUCCESS:
+      omMetrics.decNumKeys(deleteKeys.size());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Keys delete success. Volume:{}, Bucket:{}, Keys:{}",
+            volumeName, bucketName, auditMap.get(DELETED_KEYS_LIST));
+      }
+      break;
+    case FAILURE:
+      omMetrics.decNumKeys(deleteKeys.size());
+      omMetrics.incNumKeyDeleteFails();
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Keys delete failed. Volume:{}, Bucket:{}, DeletedKeys:{}, " +
+                "UnDeletedKeys:{}", volumeName, bucketName,
+            auditMap.get(DELETED_KEYS_LIST), auditMap.get(UNDELETED_KEYS_LIST),
+            exception);
+      }
+      break;
+    default:
+      LOG.error("Unrecognized Result for OMKeysDeleteRequest: {}",
+          deleteKeyRequest);
     }
 
     return omClientResponse;
