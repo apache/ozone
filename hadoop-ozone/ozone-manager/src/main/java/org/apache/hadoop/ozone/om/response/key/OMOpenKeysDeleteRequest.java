@@ -50,12 +50,12 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  * The delete table cache does not need to be modified since it is not used
  * for client response validation.
  */
-public class OMOpenKeyDeleteRequest extends OMKeyRequest {
+public class OMOpenKeysDeleteRequest extends OMKeyRequest {
 
   private static final Logger LOG =
-          LoggerFactory.getLogger(OMOpenKeyDeleteRequest.class);
+          LoggerFactory.getLogger(OMOpenKeysDeleteRequest.class);
 
-  public OMOpenKeyDeleteRequest(OMRequest omRequest) {
+  public OMOpenKeysDeleteRequest(OMRequest omRequest) {
     super(omRequest);
   }
 
@@ -121,7 +121,7 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
         }
       }
 
-      omClientResponse = new OMOpenKeyDeleteResponse(omResponse.build(),
+      omClientResponse = new OMOpenKeysDeleteResponse(omResponse.build(),
           deletedOpenKeys, ozoneManager.isRatisEnabled(),
           modifiedVolumes.values());
 
@@ -157,7 +157,7 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
               "keys.", numSubmittedOpenKeys);
       break;
     default:
-      LOG.error("Unrecognized result for OMOpenKeyDeleteRequest: {}",
+      LOG.error("Unrecognized result for OMOpenKeysDeleteRequest: {}",
           request);
     }
   }
@@ -224,7 +224,7 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
       Collection<OmKeyInfo> keyInfos) {
 
     long quotaReleased = keyInfos.stream()
-        .mapToLong(OMOpenKeyDeleteRequest::getUsedBytes)
+        .mapToLong(OMOpenKeysDeleteRequest::getUsedBytes)
         .sum();
 
     // update usedBytes atomically.

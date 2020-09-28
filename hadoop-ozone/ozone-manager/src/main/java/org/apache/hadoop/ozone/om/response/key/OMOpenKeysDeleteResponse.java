@@ -38,12 +38,12 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
  * table. Modifies the open key table and delete table databases.
  */
 @CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, DELETED_TABLE})
-public class OMOpenKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
+public class OMOpenKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
 
   private Map<String, OmKeyInfo> keysToDelete;
   private Collection<OmVolumeArgs> volumeArgsList;
 
-  public OMOpenKeyDeleteResponse(
+  public OMOpenKeysDeleteResponse(
       @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse,
       @Nonnull Map<String, OmKeyInfo> keysToDelete, boolean isRatisEnabled,
       @Nonnull Collection<OmVolumeArgs> volumeArgsList) {
@@ -57,7 +57,7 @@ public class OMOpenKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMOpenKeyDeleteResponse(
+  public OMOpenKeysDeleteResponse(
       @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse) {
 
     super(omResponse);

@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.response.key.OMOpenKeyDeleteRequest;
+import org.apache.hadoop.ozone.om.response.key.OMOpenKeysDeleteRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
 import org.junit.Assert;
@@ -50,9 +50,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 
 /**
- * Tests OMOpenKeyDeleteRequest.
+ * Tests OMOpenKeysDeleteRequest.
  */
-public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
+public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
   /**
    * Tests removing keys from the open key table cache that never existed there.
    * The operation should complete without errors.
@@ -142,7 +142,7 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
   }
 
   /**
-   * Tests metrics set by {@link OMOpenKeyDeleteRequest}.
+   * Tests metrics set by {@link OMOpenKeysDeleteRequest}.
    * Submits a set of keys for deletion where only some of the keys actually
    * exist in the open key table, and asserts that the metrics count keys
    * that were submitted for deletion versus those that were actually deleted.
@@ -237,7 +237,7 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
 
   /**
    * Runs the validate and update cache step of
-   * {@link OMOpenKeyDeleteRequest} to mark the keys in {@code openKeys}
+   * {@link OMOpenKeysDeleteRequest} to mark the keys in {@code openKeys}
    * as deleted in the open key table cache.
    * Asserts that the call's response status is {@link Status#OK}.
    * @throws Exception
@@ -248,8 +248,8 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
     OMRequest omRequest =
         doPreExecute(createDeleteOpenKeyRequest(openKeys));
 
-    OMOpenKeyDeleteRequest openKeyDeleteRequest =
-        new OMOpenKeyDeleteRequest(omRequest);
+    OMOpenKeysDeleteRequest openKeyDeleteRequest =
+        new OMOpenKeysDeleteRequest(omRequest);
 
     OMClientResponse omClientResponse =
         openKeyDeleteRequest.validateAndUpdateCache(ozoneManager,
@@ -411,18 +411,18 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
   }
 
   /**
-   * Constructs a new {@link OMOpenKeyDeleteRequest} objects, and calls its
-   * {@link OMOpenKeyDeleteRequest#preExecute} method with {@code
+   * Constructs a new {@link OMOpenKeysDeleteRequest} objects, and calls its
+   * {@link OMOpenKeysDeleteRequest#preExecute} method with {@code
    * originalOMRequest}. It verifies that {@code originalOMRequest} is modified
    * after the call, and returns it.
    * @throws Exception
    */
   private OMRequest doPreExecute(OMRequest originalOmRequest) throws Exception {
-    OMOpenKeyDeleteRequest omOpenKeyDeleteRequest =
-        new OMOpenKeyDeleteRequest(originalOmRequest);
+    OMOpenKeysDeleteRequest omOpenKeysDeleteRequest =
+        new OMOpenKeysDeleteRequest(originalOmRequest);
 
     OMRequest modifiedOmRequest =
-        omOpenKeyDeleteRequest.preExecute(ozoneManager);
+        omOpenKeysDeleteRequest.preExecute(ozoneManager);
 
     // Will not be equal, as UserInfo will be set.
     Assert.assertNotEquals(originalOmRequest, modifiedOmRequest);

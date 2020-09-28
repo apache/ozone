@@ -38,9 +38,9 @@ import java.util.Random;
 import java.util.UUID;
 
 /**
- * Tests OMOpenKeyDeleteResponse.
+ * Tests OMOpenKeysDeleteResponse.
  */
-public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
+public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
   private static final long KEY_LENGTH = 100;
 
   @Test
@@ -147,7 +147,7 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
   }
 
   /**
-   * Constructs an {@link OMOpenKeyDeleteResponse} to delete the keys in
+   * Constructs an {@link OMOpenKeysDeleteResponse} to delete the keys in
    * {@code keysToDelete}, with the completion status set to {@code status}.
    * If {@code status} is {@link Status#OK}, the keys to delete will be added
    * to a batch operation and committed to the database.
@@ -160,7 +160,7 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
   }
 
   /**
-   * Constructs an {@link OMOpenKeyDeleteResponse} to delete the keys in
+   * Constructs an {@link OMOpenKeysDeleteResponse} to delete the keys in
    * {@code keysToDelete}, with the completion status set to {@code status}
    * and list of modified volume information set to {@code modifiedVolumes}.
    * If {@code status} is {@link Status#OK}, the keys to delete will be added
@@ -176,7 +176,7 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
         .setCmdType(OzoneManagerProtocolProtos.Type.DeleteOpenKeys)
         .build();
 
-    OMOpenKeyDeleteResponse response = new OMOpenKeyDeleteResponse(omResponse,
+    OMOpenKeysDeleteResponse response = new OMOpenKeysDeleteResponse(omResponse,
         keysToDelete, true, modifiedVolumes);
 
     // Operations are only added to the batch by this method when status is OK.
