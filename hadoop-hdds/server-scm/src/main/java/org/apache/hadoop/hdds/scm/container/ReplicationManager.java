@@ -624,17 +624,20 @@ public class ReplicationManager
               " is {}, but found {}.", id, replicationFactor,
           replicationFactor + excess);
 
+      final List<ContainerReplica> eligibleReplicas = new ArrayList<>(replicas);
+
       final Map<UUID, ContainerReplica> uniqueReplicas =
           new LinkedHashMap<>();
 
-      replicas.stream()
-          .filter(r -> compareState(container.getState(), r.getState()))
-          .forEach(r -> uniqueReplicas
-              .putIfAbsent(r.getOriginDatanodeId(), r));
+      if (container.getState() != LifeCycleState.CLOSED) {
+        replicas.stream()
+            .filter(r -> compareState(container.getState(), r.getState()))
+            .forEach(r -> uniqueReplicas
+                .putIfAbsent(r.getOriginDatanodeId(), r));
 
-      // Retain one healthy replica per origin node Id.
-      final List<ContainerReplica> eligibleReplicas = new ArrayList<>(replicas);
-      eligibleReplicas.removeAll(uniqueReplicas.values());
+        // Retain one healthy replica per origin node Id.
+        eligibleReplicas.removeAll(uniqueReplicas.values());
+      }
 
       final List<ContainerReplica> unhealthyReplicas = eligibleReplicas
           .stream()

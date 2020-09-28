@@ -817,7 +817,7 @@ public class TestReplicationManager {
     final ContainerReplica replicaFour = getReplicas(
         id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
     final ContainerReplica replicaFive = getReplicas(
-        id, State.CLOSED, 1000L, originNodeId, randomDatanodeDetails());
+        id, State.QUASI_CLOSED, 1000L, originNodeId, randomDatanodeDetails());
 
     containerStateManager.loadContainer(container);
     containerStateManager.updateContainerReplica(id, replicaOne);
