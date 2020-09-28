@@ -21,6 +21,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
@@ -76,12 +78,14 @@ public interface StorageContainerDatanodeProtocol {
    * @param datanodeDetails - Datanode Details.
    * @param nodeReport - Node Report.
    * @param containerReportsRequestProto - Container Reports.
+   * @param layoutInfo - Layout Version Information.
    * @return SCM Command.
    */
   SCMRegisteredResponseProto register(
-          DatanodeDetailsProto datanodeDetails,
-          NodeReportProto nodeReport,
-          ContainerReportsProto containerReportsRequestProto,
-          PipelineReportsProto pipelineReports) throws IOException;
+      DatanodeDetailsProto datanodeDetails,
+      NodeReportProto nodeReport,
+      ContainerReportsProto containerReportsRequestProto,
+      PipelineReportsProto pipelineReports,
+      LayoutVersionProto layoutInfo) throws IOException;
 
 }

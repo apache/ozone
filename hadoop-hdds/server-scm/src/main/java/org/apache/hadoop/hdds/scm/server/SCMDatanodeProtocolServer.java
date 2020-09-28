@@ -206,8 +206,10 @@ public class SCMDatanodeProtocolServer implements
       HddsProtos.DatanodeDetailsProto datanodeDetailsProto,
       NodeReportProto nodeReport,
       ContainerReportsProto containerReportsProto,
-          PipelineReportsProto pipelineReportsProto)
+      PipelineReportsProto pipelineReportsProto,
+      StorageContainerDatanodeProtocolProtos.LayoutVersionProto layoutInfo)
       throws IOException {
+    //TODO : DataNode-Upgrade: layoutinfo related processing.
     DatanodeDetails datanodeDetails = DatanodeDetails
         .getFromProtoBuf(datanodeDetailsProto);
     boolean auditSuccess = true;

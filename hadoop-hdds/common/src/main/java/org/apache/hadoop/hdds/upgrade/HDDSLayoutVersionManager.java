@@ -32,7 +32,8 @@ import com.google.common.annotations.VisibleForTesting;
  * Class to manage layout versions and features for Storage Container Manager
  * and DataNodes.
  */
-public final class HDDSLayoutVersionManager extends
+@SuppressWarnings("FinalClass")
+public class HDDSLayoutVersionManager extends
     AbstractLayoutVersionManager {
 
   private static HDDSLayoutVersionManager hddsLayoutVersionManager;
@@ -62,24 +63,10 @@ public final class HDDSLayoutVersionManager extends
       throws IOException {
     if (hddsLayoutVersionManager == null) {
       hddsLayoutVersionManager = new HDDSLayoutVersionManager();
-      hddsLayoutVersionManager.init(hddsStorage);
+      hddsLayoutVersionManager.init(hddsStorage.getLayoutVersion(),
+          HDDSLayoutFeature.values());
     }
     return hddsLayoutVersionManager;
-  }
-
-  /**
-   * Initialize the HDDS Layout Features and current Layout Version.
-   * @param storage to read the current layout version.
-   * @throws IOException on error.
-   */
-  private void init(Storage storage) throws IOException {
-    init(storage.getLayoutVersion(), HDDSLayoutFeature.values());
-    if (metadataLayoutVersion > softwareLayoutVersion) {
-      throw new IOException(
-          String.format("Cannot initialize VersionManager. Metadata " +
-                  "layout version (%d) > software layout version (%d)",
-              metadataLayoutVersion, softwareLayoutVersion));
-    }
   }
 
   @VisibleForTesting

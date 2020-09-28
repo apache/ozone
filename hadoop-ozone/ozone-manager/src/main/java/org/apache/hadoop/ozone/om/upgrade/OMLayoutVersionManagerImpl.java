@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.upgrade;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 
+import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Set;
@@ -90,13 +91,10 @@ public final class OMLayoutVersionManagerImpl
    * @throws OMException on error.
    */
   private void init(Storage storage) throws OMException {
-    init(storage.getLayoutVersion(), OMLayoutFeature.values());
-
-    if (metadataLayoutVersion > softwareLayoutVersion) {
-      throw new OMException(
-          String.format("Cannot initialize VersionManager. Metadata " +
-                  "layout version (%d) > software layout version (%d)",
-              metadataLayoutVersion, softwareLayoutVersion),
+    try {
+      init(storage.getLayoutVersion(), OMLayoutFeature.values());
+    } catch (IOException e) {
+      throw new OMException(String.format(e.getMessage()),
           NOT_SUPPORTED_OPERATION);
     }
     registerOzoneManagerRequests();

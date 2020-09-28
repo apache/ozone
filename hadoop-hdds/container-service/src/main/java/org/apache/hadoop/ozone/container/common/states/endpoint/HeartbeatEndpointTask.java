@@ -25,6 +25,8 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineActionsProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineAction;
@@ -45,11 +47,13 @@ import org.apache.hadoop.ozone.container.common.statemachine
 import org.apache.hadoop.ozone.container.common.statemachine
     .EndpointStateMachine.EndPointStates;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.upgrade.DataNodeLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 
 import org.slf4j.Logger;
@@ -83,14 +87,32 @@ public class HeartbeatEndpointTask
   private StateContext context;
   private int maxContainerActionsPerHB;
   private int maxPipelineActionsPerHB;
+  private DataNodeLayoutVersionManager layoutVersionManager;
 
   /**
    * Constructs a SCM heart beat.
    *
+   * @param rpcEndpoint rpc Endpoint
    * @param conf Config.
+   * @param context State context
    */
   public HeartbeatEndpointTask(EndpointStateMachine rpcEndpoint,
-      ConfigurationSource conf, StateContext context) {
+                               ConfigurationSource conf, StateContext context) {
+    this(rpcEndpoint, conf, context,
+        context.getParent().getDataNodeVersionManager());
+  }
+
+  /**
+   * Constructs a SCM heart beat.
+   *
+   * @param rpcEndpoint rpc Endpoint
+   * @param conf Config.
+   * @param context State context
+   * @param versionManager Layout version Manager
+   */
+  public HeartbeatEndpointTask(EndpointStateMachine rpcEndpoint,
+                               ConfigurationSource conf, StateContext context,
+                               DataNodeLayoutVersionManager versionManager) {
     this.rpcEndpoint = rpcEndpoint;
     this.conf = conf;
     this.context = context;
@@ -98,6 +120,12 @@ public class HeartbeatEndpointTask
         HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT);
     this.maxPipelineActionsPerHB = conf.getInt(HDDS_PIPELINE_ACTION_MAX_LIMIT,
         HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT);
+    if (versionManager != null) {
+      this.layoutVersionManager = versionManager;
+    } else {
+      this.layoutVersionManager =
+         context.getParent().getDataNodeVersionManager();
+    }
   }
 
   /**
@@ -132,8 +160,16 @@ public class HeartbeatEndpointTask
     try {
       Preconditions.checkState(this.datanodeDetailsProto != null);
 
+      LayoutVersionProto layoutinfo = LayoutVersionProto.newBuilder()
+          .setSoftwareLayoutVersion(
+              layoutVersionManager.getSoftwareLayoutVersion())
+          .setMetadataLayoutVersion(
+              layoutVersionManager.getMetadataLayoutVersion())
+          .build();
+
       requestBuilder = SCMHeartbeatRequestProto.newBuilder()
-          .setDatanodeDetails(datanodeDetailsProto);
+          .setDatanodeDetails(datanodeDetailsProto)
+          .setDataNodeLayoutVersion(layoutinfo);
       addReports(requestBuilder);
       addContainerActions(requestBuilder);
       addPipelineActions(requestBuilder);
@@ -331,6 +367,16 @@ public class HeartbeatEndpointTask
         }
         this.context.addCommand(closePipelineCommand);
         break;
+      case finalizeNewLayoutVersionCommand:
+        FinalizeNewLayoutVersionCommand finalizeNewLayoutVersionCommand =
+            FinalizeNewLayoutVersionCommand.getFromProtobuf(
+                commandResponseProto.getFinalizeNewLayoutVersionCommandProto());
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Received SCM finalize command {}",
+              finalizeNewLayoutVersionCommand.getId());
+        }
+        this.context.addCommand(finalizeNewLayoutVersionCommand);
+        break;
       default:
         throw new IllegalArgumentException("Unknown response : "
             + commandResponseProto.getCommandType().name());
@@ -346,6 +392,7 @@ public class HeartbeatEndpointTask
     private ConfigurationSource conf;
     private DatanodeDetails datanodeDetails;
     private StateContext context;
+    private DataNodeLayoutVersionManager versionManager;
 
     /**
      * Constructs the builder class.
@@ -361,6 +408,18 @@ public class HeartbeatEndpointTask
      */
     public Builder setEndpointStateMachine(EndpointStateMachine rpcEndPoint) {
       this.endPointStateMachine = rpcEndPoint;
+      return this;
+    }
+
+    /**
+     * Sets the LayoutVersionManager.
+     *
+     * @param versionMgr - config
+     * @return Builder
+     */
+    public Builder setLayoutVersionManager(
+        DataNodeLayoutVersionManager versionMgr) {
+      this.versionManager = versionMgr;
       return this;
     }
 
@@ -416,7 +475,7 @@ public class HeartbeatEndpointTask
       }
 
       HeartbeatEndpointTask task = new HeartbeatEndpointTask(this
-          .endPointStateMachine, this.conf, this.context);
+          .endPointStateMachine, this.conf, this.context, this.versionManager);
       task.setDatanodeDetailsProto(datanodeDetails.getProtoBufMessage());
       return task;
     }
