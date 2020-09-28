@@ -95,8 +95,8 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
       for (OpenKeyBucket openKeyBucket: submittedOpenKeyBucket) {
         // For each bucket where keys will be deleted from,
         // get its bucket lock and update the cache accordingly.
-        Map<String, OmKeyInfo> deleted = updateOpenKeyTableCache(ozoneManager, trxnLogIndex,
-            openKeyBucket);
+        Map<String, OmKeyInfo> deleted = updateOpenKeyTableCache(ozoneManager,
+            trxnLogIndex, openKeyBucket);
 
         deletedOpenKeys.putAll(deleted);
 
@@ -122,7 +122,8 @@ public class OMOpenKeyDeleteRequest extends OMKeyRequest {
       }
 
       omClientResponse = new OMOpenKeyDeleteResponse(omResponse.build(),
-          deletedOpenKeys, ozoneManager.isRatisEnabled(), modifiedVolumes.values());
+          deletedOpenKeys, ozoneManager.isRatisEnabled(),
+          modifiedVolumes.values());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

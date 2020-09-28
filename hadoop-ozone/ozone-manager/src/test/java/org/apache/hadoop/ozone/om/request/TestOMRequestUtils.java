@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.request;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -220,14 +219,14 @@ public final class TestOMRequestUtils {
         .setNodes(new ArrayList<>())
         .build();
 
-      OmKeyLocationInfo locationInfo = new OmKeyLocationInfo.Builder()
-        .setBlockID(new BlockID(100L, 1000L))
-        .setOffset(offset)
-        .setLength(keyLength)
-        .setPipeline(pipeline)
-        .build();
+    OmKeyLocationInfo locationInfo = new OmKeyLocationInfo.Builder()
+          .setBlockID(new BlockID(100L, 1000L))
+          .setOffset(offset)
+          .setLength(keyLength)
+          .setPipeline(pipeline)
+          .build();
 
-      keyInfo.appendNewBlocks(Collections.singletonList(locationInfo), false);
+    keyInfo.appendNewBlocks(Collections.singletonList(locationInfo), false);
   }
 
   /**

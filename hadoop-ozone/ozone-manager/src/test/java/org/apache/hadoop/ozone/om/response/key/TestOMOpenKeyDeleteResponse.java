@@ -142,7 +142,8 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
     }
 
     // Check that response persisted volume changes to DB.
-    Assert.assertEquals(KEY_LENGTH, getVolumeFromDB(volumeName).getUsedBytes().sum());
+    Assert.assertEquals(KEY_LENGTH,
+        getVolumeFromDB(volumeName).getUsedBytes().sum());
   }
 
   /**
@@ -167,7 +168,8 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
    * @throws Exception
    */
   private void createAndCommitResponse(Map<String, OmKeyInfo> keysToDelete,
-      Collection<OmVolumeArgs> modifiedVolumes, Status status) throws Exception {
+      Collection<OmVolumeArgs> modifiedVolumes, Status status)
+      throws Exception {
 
     OMResponse omResponse = OMResponse.newBuilder()
         .setStatus(status)
@@ -192,7 +194,7 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
   private Map<String, OmKeyInfo> addOpenKeysToDB(String volume, int numKeys)
       throws Exception {
     return addOpenKeysToDB(volume, numKeys, 0);
-}
+  }
 
   /**
    * Creates {@code numKeys} open keys with random names, maps each one to a

@@ -224,7 +224,8 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
     // Check that byte usage in the present volume was decremented in the cache
     // only.
     // New value after open key delete:
-    Assert.assertEquals(0, getVolumeFromCache(presentVolume).getUsedBytes().sum());
+    Assert.assertEquals(0,
+        getVolumeFromCache(presentVolume).getUsedBytes().sum());
     // Old value:
     Assert.assertEquals(volumeSize,
         getVolumeFromDB(presentVolume).getUsedBytes().sum());
@@ -241,7 +242,9 @@ public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
    * Asserts that the call's response status is {@link Status#OK}.
    * @throws Exception
    */
-  private void deleteOpenKeysFromCache(OpenKeyBucket... openKeys) throws Exception {
+  private void deleteOpenKeysFromCache(OpenKeyBucket... openKeys)
+      throws Exception {
+
     OMRequest omRequest =
         doPreExecute(createDeleteOpenKeyRequest(openKeys));
 

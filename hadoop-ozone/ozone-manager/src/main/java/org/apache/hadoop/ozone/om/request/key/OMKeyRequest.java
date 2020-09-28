@@ -566,15 +566,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     OmVolumeArgs volumeArgs = null;
 
-     CacheValue<OmVolumeArgs> value =
-         omMetadataManager.getVolumeTable().getCacheValue(
+    CacheValue<OmVolumeArgs> value =
+        omMetadataManager.getVolumeTable().getCacheValue(
         new CacheKey<>(omMetadataManager.getVolumeKey(volume)));
 
-     if (value != null) {
-       volumeArgs = value.getCacheValue();
-     }
+    if (value != null) {
+      volumeArgs = value.getCacheValue();
+    }
 
-     return volumeArgs;
+    return volumeArgs;
   }
 
   /**
