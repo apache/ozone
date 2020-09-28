@@ -59,8 +59,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   private final OzoneManager ozoneManager;
   private final OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
   private final AtomicLong transactionIndex = new AtomicLong(0L);
-  private final OzoneProtocolMessageDispatcher<OMRequest, OMResponse>
-      dispatcher;
+  private final OzoneProtocolMessageDispatcher<OMRequest, OMResponse,
+      ProtocolMessageEnum> dispatcher;
 
   /**
    * Constructs an instance of the server handler.

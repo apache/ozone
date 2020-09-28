@@ -21,4 +21,7 @@
 /**
  * Utility classes to encode/decode DTO objects to/from byte array.
  */
+/**
+ * OM DB definitions.
+ */
 package org.apache.hadoop.ozone.om.codec;

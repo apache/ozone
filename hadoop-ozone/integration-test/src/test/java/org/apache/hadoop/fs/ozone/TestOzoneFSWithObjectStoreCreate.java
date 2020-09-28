@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -327,6 +328,45 @@ public class TestOzoneFSWithObjectStoreCreate {
       Assert.assertTrue(ex instanceof OMException);
       Assert.assertEquals(NOT_A_FILE, ex.getResult());
     }
+  }
+
+
+  @Test
+  public void testReadWithNotNormalizedPath() throws Exception {
+    OzoneVolume ozoneVolume =
+        cluster.getRpcClient().getObjectStore().getVolume(volumeName);
+
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+
+    String key = "/dir1///dir2/file1/";
+
+    int length = 10;
+    byte[] input = new byte[length];
+    Arrays.fill(input, (byte)96);
+    String inputString = new String(input);
+
+    OzoneOutputStream ozoneOutputStream =
+        ozoneBucket.createKey(key, length);
+
+    ozoneOutputStream.write(input);
+    ozoneOutputStream.write(input, 0, 10);
+    ozoneOutputStream.close();
+
+    // Read the key with given key name.
+    OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);
+    byte[] read = new byte[length];
+    ozoneInputStream.read(read, 0, length);
+    ozoneInputStream.close();
+
+    Assert.assertEquals(inputString, new String(read));
+
+    // Read using filesystem.
+    FSDataInputStream fsDataInputStream = o3fs.open(new Path(key));
+    read = new byte[length];
+    fsDataInputStream.read(read, 0, length);
+    ozoneInputStream.close();
+
+    Assert.assertEquals(inputString, new String(read));
   }
 
   private void checkPath(Path path) {

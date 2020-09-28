@@ -86,7 +86,7 @@ public class ReconIncrementalContainerReportHandler
         LOG.warn("Container {} not found!", replicaProto.getContainerID());
       } catch (NodeNotFoundException ex) {
         success = false;
-        LOG.error("Received ICR from unknown datanode {} {}",
+        LOG.error("Received ICR from unknown datanode {}.",
             report.getDatanodeDetails(), ex);
       } catch (IOException e) {
         success = false;

@@ -27,41 +27,38 @@ ${ENDPOINT_URL}       http://s3g:9878
 ${BUCKET}             generated
 ${DESTBUCKET}         generated1
 
-
 *** Keywords ***
 Create Dest Bucket
-
     ${postfix} =         Generate Random String  5  [NUMBERS]
     Set Suite Variable   ${DESTBUCKET}             destbucket-${postfix}
     Execute AWSS3APICli  create-bucket --bucket ${DESTBUCKET}
-
 
 *** Test Cases ***
 Copy Object Happy Scenario
     Run Keyword if    '${DESTBUCKET}' == 'generated1'    Create Dest Bucket
                         Execute                    date > /tmp/copyfile
-    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key copyobject/f1 --body /tmp/copyfile
-    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix copyobject/
+    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/copyobject/f1 --body /tmp/copyfile
+    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/copyobject/
                         Should contain             ${result}         f1
 
-    ${result} =         Execute AWSS3ApiCli        copy-object --bucket ${DESTBUCKET} --key copyobject/f1 --copy-source ${BUCKET}/copyobject/f1
-    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${DESTBUCKET} --prefix copyobject/
+    ${result} =         Execute AWSS3ApiCli        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/f1
+    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${DESTBUCKET} --prefix ${PREFIX}/copyobject/
                         Should contain             ${result}         f1
     #copying again will not throw error
-    ${result} =         Execute AWSS3ApiCli        copy-object --bucket ${DESTBUCKET} --key copyobject/f1 --copy-source ${BUCKET}/copyobject/f1
-    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${DESTBUCKET} --prefix copyobject/
+    ${result} =         Execute AWSS3ApiCli        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/f1
+    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${DESTBUCKET} --prefix ${PREFIX}/copyobject/
                         Should contain             ${result}         f1
 
 Copy Object Where Bucket is not available
-    ${result} =         Execute AWSS3APICli and checkrc        copy-object --bucket dfdfdfdfdfnonexistent --key copyobject/f1 --copy-source ${BUCKET}/copyobject/f1      255
+    ${result} =         Execute AWSS3APICli and checkrc        copy-object --bucket dfdfdfdfdfnonexistent --key ${PREFIX}/copyobject/f1 --copy-source ${BUCKET}/${PREFIX}/copyobject/f1      255
                         Should contain             ${result}        NoSuchBucket
-    ${result} =         Execute AWSS3APICli and checkrc        copy-object --bucket ${DESTBUCKET} --key copyobject/f1 --copy-source dfdfdfdfdfnonexistent/copyobject/f1  255
+    ${result} =         Execute AWSS3APICli and checkrc        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/f1 --copy-source dfdfdfdfdfnonexistent/${PREFIX}/copyobject/f1  255
                         Should contain             ${result}        NoSuchBucket
 
 Copy Object Where both source and dest are same with change to storageclass
-     ${result} =         Execute AWSS3APICli        copy-object --storage-class REDUCED_REDUNDANCY --bucket ${DESTBUCKET} --key copyobject/f1 --copy-source ${DESTBUCKET}/copyobject/f1
+     ${result} =         Execute AWSS3APICli        copy-object --storage-class REDUCED_REDUNDANCY --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/f1 --copy-source ${DESTBUCKET}/${PREFIX}/copyobject/f1
                          Should contain             ${result}        ETag
 
 Copy Object Where Key not available
-    ${result} =         Execute AWSS3APICli and checkrc        copy-object --bucket ${DESTBUCKET} --key copyobject/f1 --copy-source ${BUCKET}/nonnonexistentkey       255
+    ${result} =         Execute AWSS3APICli and checkrc        copy-object --bucket ${DESTBUCKET} --key ${PREFIX}/copyobject/f1 --copy-source ${BUCKET}/nonnonexistentkey       255
                         Should contain             ${result}        NoSuchKey
