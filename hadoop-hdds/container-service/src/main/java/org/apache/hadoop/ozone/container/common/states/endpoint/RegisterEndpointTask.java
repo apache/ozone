@@ -31,8 +31,11 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.upgrade.DataNodeLayoutVersionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,6 +57,7 @@ public final class RegisterEndpointTask implements
   private DatanodeDetails datanodeDetails;
   private final OzoneContainer datanodeContainerManager;
   private StateContext stateContext;
+  private DataNodeLayoutVersionManager layoutVersionManager;
 
   /**
    * Creates a register endpoint task.
@@ -61,16 +65,40 @@ public final class RegisterEndpointTask implements
    * @param rpcEndPoint - endpoint
    * @param conf - conf
    * @param ozoneContainer - container
+   * @param context - State context
+   */
+  @VisibleForTesting
+  public RegisterEndpointTask(EndpointStateMachine rpcEndPoint,
+                              ConfigurationSource conf,
+                              OzoneContainer ozoneContainer,
+                              StateContext context) {
+    this(rpcEndPoint, conf, ozoneContainer, context,
+        context.getParent().getDataNodeVersionManager());
+  }
+
+  /**
+   * Creates a register endpoint task.
+   *
+   * @param rpcEndPoint - endpoint
+   * @param conf - conf
+   * @param ozoneContainer - container
+   * @param context - State context
+   * @param versionManager - layout version Manager
    */
   @VisibleForTesting
   public RegisterEndpointTask(EndpointStateMachine rpcEndPoint,
       ConfigurationSource conf, OzoneContainer ozoneContainer,
-      StateContext context) {
+      StateContext context, DataNodeLayoutVersionManager versionManager) {
     this.rpcEndPoint = rpcEndPoint;
     this.conf = conf;
     this.datanodeContainerManager = ozoneContainer;
     this.stateContext = context;
-
+    if (versionManager != null) {
+      this.layoutVersionManager = versionManager;
+    } else {
+      this.layoutVersionManager =
+          context.getParent().getDataNodeVersionManager();
+    }
   }
 
   /**
@@ -112,6 +140,12 @@ public final class RegisterEndpointTask implements
 
       if (rpcEndPoint.getState()
           .equals(EndpointStateMachine.EndPointStates.REGISTER)) {
+        LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+            .setMetadataLayoutVersion(
+                layoutVersionManager.getMetadataLayoutVersion())
+            .setSoftwareLayoutVersion(
+                layoutVersionManager.getSoftwareLayoutVersion())
+            .build();
         ContainerReportsProto containerReport =
             datanodeContainerManager.getController().getContainerReport();
         NodeReportProto nodeReport = datanodeContainerManager.getNodeReport();
@@ -120,7 +154,7 @@ public final class RegisterEndpointTask implements
         // TODO : Add responses to the command Queue.
         SCMRegisteredResponseProto response = rpcEndPoint.getEndPoint()
             .register(datanodeDetails.getExtendedProtoBufMessage(),
-                nodeReport, containerReport, pipelineReportsProto);
+            nodeReport, containerReport, pipelineReportsProto, layoutInfo);
         Preconditions.checkState(UUID.fromString(response.getDatanodeUUID())
                 .equals(datanodeDetails.getUuid()),
             "Unexpected datanode ID in the response.");
@@ -167,6 +201,7 @@ public final class RegisterEndpointTask implements
     private DatanodeDetails datanodeDetails;
     private OzoneContainer container;
     private StateContext context;
+    private DataNodeLayoutVersionManager versionManager;
 
     /**
      * Constructs the builder class.
@@ -193,6 +228,18 @@ public final class RegisterEndpointTask implements
      */
     public Builder setConfig(ConfigurationSource config) {
       this.conf = config;
+      return this;
+    }
+
+    /**
+     * Sets the LayoutVersionManager.
+     *
+     * @param versionMgr - config
+     * @return Builder.
+     */
+    public Builder setLayoutVersionManager(
+        DataNodeLayoutVersionManager versionMgr) {
+      this.versionManager = versionMgr;
       return this;
     }
 
@@ -255,10 +302,10 @@ public final class RegisterEndpointTask implements
       }
 
       RegisterEndpointTask task = new RegisterEndpointTask(this
-          .endPointStateMachine, this.conf, this.container, this.context);
+          .endPointStateMachine, this.conf, this.container, this.context,
+          this.versionManager);
       task.setDatanodeDetails(datanodeDetails);
       return task;
     }
-
   }
 }
