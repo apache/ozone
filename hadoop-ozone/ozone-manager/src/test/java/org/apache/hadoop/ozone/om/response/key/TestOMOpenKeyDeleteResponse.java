@@ -18,14 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.junit.Assert;
 import org.junit.Test;
@@ -40,9 +33,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
 
@@ -53,9 +44,13 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
   private static final long KEY_LENGTH = 100;
 
   @Test
+  /**
+   * Tests deleting a subset of keys from the open key table DB when the keys
+   * have no associated block data.
+   */
   public void testAddToDBBatchWithEmptyBlocks() throws Exception {
-    Map<String, OmKeyInfo> keysToDelete = createOpenKeys(volumeName, 3);
-    Map<String, OmKeyInfo> keysToKeep = createOpenKeys(volumeName, 3);
+    Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3);
+    Map<String, OmKeyInfo> keysToKeep = addOpenKeysToDB(volumeName, 3);
     createAndCommitResponse(keysToDelete, Status.OK);
 
     for (String key: keysToDelete.keySet()) {
@@ -72,11 +67,15 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
     }
   }
 
+  /**
+   * Tests deleting a subset of keys from the open key table DB when the keys
+   * have associated block data.
+   */
   @Test
   public void testAddToDBBatchWithNonEmptyBlocks() throws Exception {
-    Map<String, OmKeyInfo> keysToDelete = createOpenKeys(volumeName, 3,
+    Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3,
         KEY_LENGTH);
-    Map<String, OmKeyInfo> keysToKeep = createOpenKeys(volumeName, 3,
+    Map<String, OmKeyInfo> keysToKeep = addOpenKeysToDB(volumeName, 3,
         KEY_LENGTH);
 
     createAndCommitResponse(keysToDelete, Status.OK);
@@ -95,9 +94,14 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
     }
   }
 
+  /**
+   * Tests attempting deleting keys from the open key table DB when the
+   * submitted response has an error status. In this case, no changes to the
+   * DB should be made.
+   */
   @Test
   public void testAddToDBBatchWithErrorResponse() throws Exception {
-    Map<String, OmKeyInfo> keysToDelete = createOpenKeys(volumeName, 3);
+    Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3);
     createAndCommitResponse(keysToDelete, Status.INTERNAL_ERROR);
 
     for (String key: keysToDelete.keySet()) {
@@ -108,19 +112,24 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
     }
   }
 
+  /**
+   * Tests that the byte usage information for a volume is updated in the
+   * DB when open keys with block data are submitted for deletion from the DB.
+   */
   @Test
   public void testAddToDBBatchWithVolumeModifications() throws Exception {
     // Put the volume in the cache and DB, and return a reference to the
     // cached value.
-    OmVolumeArgs volumeArgs = makeVolume(volumeName);
+    OmVolumeArgs volumeArgs = createVolume(volumeName);
     // Updates the volume args in the cache only.
     volumeArgs.getUsedBytes().add(KEY_LENGTH);
-    // Make sure updates were not persisted to DB.
-    Assert.assertEquals(0, getDBVolume(volumeName).getUsedBytes().sum());
+    // Make sure updates were not persisted to DB to simulate the request
+    // already running and doing the cache update only.
+    Assert.assertEquals(0, getVolumeFromDB(volumeName).getUsedBytes().sum());
     Assert.assertEquals(KEY_LENGTH,
-        getCacheVolume(volumeName).getUsedBytes().sum());
+        getVolumeFromCache(volumeName).getUsedBytes().sum());
 
-    Map<String, OmKeyInfo> keysToDelete = createOpenKeys(volumeName, 3,
+    Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3,
         KEY_LENGTH);
 
     createAndCommitResponse(keysToDelete, Arrays.asList(volumeArgs), Status.OK);
@@ -133,9 +142,16 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
     }
 
     // Check that response persisted volume changes to DB.
-    Assert.assertEquals(KEY_LENGTH, getDBVolume(volumeName).getUsedBytes().sum());
+    Assert.assertEquals(KEY_LENGTH, getVolumeFromDB(volumeName).getUsedBytes().sum());
   }
 
+  /**
+   * Constructs an {@link OMOpenKeyDeleteResponse} to delete the keys in
+   * {@code keysToDelete}, with the completion status set to {@code status}.
+   * If {@code status} is {@link Status#OK}, the keys to delete will be added
+   * to a batch operation and committed to the database.
+   * @throws Exception
+   */
   private void createAndCommitResponse(Map<String, OmKeyInfo> keysToDelete,
       Status status) throws Exception {
 
@@ -144,7 +160,8 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
 
   /**
    * Constructs an {@link OMOpenKeyDeleteResponse} to delete the keys in
-   * {@code keysToDelete}, with the completion status set to {@code status}.
+   * {@code keysToDelete}, with the completion status set to {@code status}
+   * and list of modified volume information set to {@code modifiedVolumes}.
    * If {@code status} is {@link Status#OK}, the keys to delete will be added
    * to a batch operation and committed to the database.
    * @throws Exception
@@ -167,20 +184,26 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
   }
 
-  private Map<String, OmKeyInfo> createOpenKeys(String volume, int numKeys)
+  /**
+   * Creates {@code numKeys} open keys with random names, maps each one to a
+   * new {@link OmKeyInfo} object, adds them to the open key table cache, and
+   * returns them. These keys will have no associated block data.
+   */
+  private Map<String, OmKeyInfo> addOpenKeysToDB(String volume, int numKeys)
       throws Exception {
-    return createOpenKeys(volume, numKeys, 0);
+    return addOpenKeysToDB(volume, numKeys, 0);
 }
 
   /**
    * Creates {@code numKeys} open keys with random names, maps each one to a
-   * new {@link OmKeyInfo} object, and returns them.
-   * If {@code keyLength} is greater than 0, allocates that many bytes of
-   * data for each key.
+   * new {@link OmKeyInfo} object, adds them to the open key table cache, and
+   * returns them.
+   * If {@code keyLength} is greater than 0, adds one block with that many
+   * bytes of data for each key.
    * @throws Exception
    */
-  private Map<String, OmKeyInfo> createOpenKeys(String volume,
-      int numKeys, long keyLength) throws Exception {
+  private Map<String, OmKeyInfo> addOpenKeysToDB(String volume, int numKeys,
+      long keyLength) throws Exception {
 
     Map<String, OmKeyInfo> newOpenKeys = new HashMap<>();
 
@@ -201,7 +224,7 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
 
       // Add to the open key table DB, not cache.
       // In a real execution, the open key would have been removed from the
-      // cache already, and it would only remain in the DB.
+      // cache by the request, and it would only remain in the DB.
       TestOMRequestUtils.addKeyToTable(true, false, omKeyInfo,
           clientID, 0L, omMetadataManager);
       Assert.assertTrue(omMetadataManager.getOpenKeyTable().isExist(openKey));
@@ -212,19 +235,23 @@ public class TestOMOpenKeyDeleteResponse extends TestOMKeyResponse {
     return newOpenKeys;
   }
 
-  private OmVolumeArgs getDBVolume(String volume) throws Exception {
+  private OmVolumeArgs getVolumeFromDB(String volume) throws Exception {
     String volumeKey = omMetadataManager.getVolumeKey(volume);
     return omMetadataManager.getVolumeTable().getSkipCache(volumeKey);
   }
 
-  private OmVolumeArgs getCacheVolume(String volume) {
+  private OmVolumeArgs getVolumeFromCache(String volume) {
     String volumeKey = omMetadataManager.getVolumeKey(volume);
     return omMetadataManager.getVolumeTable()
             .getCacheValue(new CacheKey<>(volumeKey))
             .getCacheValue();
   }
 
-  private OmVolumeArgs makeVolume(String volume) throws Exception {
+  /**
+   * Creates a volume with name {@code volume}, adds it to the volume table
+   * cache and DB, and returns a reference to the cached version.
+   */
+  private OmVolumeArgs createVolume(String volume) throws Exception {
     // Adds the volume to the cache only.
     TestOMRequestUtils.addVolumeToDB(volume, omMetadataManager);
 

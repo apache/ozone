@@ -206,6 +206,9 @@ public final class TestOMRequestUtils {
             keyName)), new CacheValue<>(Optional.of(omKeyInfo), 1L));
   }
 
+  /**
+   * Adds one block to {@code keyInfo} with the provided size and offset.
+   */
   public static void addKeyLocationInfo(
       OmKeyInfo keyInfo, long offset, long keyLength) throws IOException {
 

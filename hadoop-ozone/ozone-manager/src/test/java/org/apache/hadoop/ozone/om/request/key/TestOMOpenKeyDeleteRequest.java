@@ -51,8 +51,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 
 /**
  * Tests OMOpenKeyDeleteRequest.
- * This class updates the open key table cache only. It does not write to any
- * underlying database, and it does not update the delete table cache.
  */
 public class TestOMOpenKeyDeleteRequest extends TestOMKeyRequest {
   /**
