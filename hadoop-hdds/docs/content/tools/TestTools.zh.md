@@ -75,6 +75,16 @@ python -m pytest -s .
 
 Freon 是 Ozone 发行包中包含的命令行应用，它是一个负载生成器，用于压力测试。
 
+随机生成Key:
+
+在randomkeys模式下，写入Ozone的数据是随机生成的。每个键的大小为10 KB。
+
+volume/bucket/key的数量是可以配置的。副本type和factor(例如: 3个节点使用ratis控制副本)也可以配置。
+
+更多信息，可使用如下命令查看:
+
+bin/ozone freon --help
+
 例如：
 
 ```
@@ -98,8 +108,6 @@ Total bytes written: 10240000
 Total Execution time: 00:00:16,898
 ***********************
 ```
-
-更多细节请查看 [freon 文档页面](https://hadoop.apache.org/ozone/docs/0.4.0-alpha/freon.html)
 
 ## Genesis
 
