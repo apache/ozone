@@ -245,6 +245,7 @@ public class TestBlockManager {
   public void testBlockDistribution() throws Exception {
     int threadCount = numContainerPerOwnerInPipeline *
             numContainerPerOwnerInPipeline;
+    nodeManager.setNumPipelinePerDatanode(1);
     List<ExecutorService> executors = new ArrayList<>(threadCount);
     for (int i = 0; i < threadCount; i++) {
       executors.add(Executors.newSingleThreadExecutor());
@@ -304,6 +305,7 @@ public class TestBlockManager {
     int threadCount = numContainerPerOwnerInPipeline *
             numContainerPerOwnerInPipeline;
     nodeManager.setNumHealthyVolumes(numContainerPerOwnerInPipeline);
+    nodeManager.setNumPipelinePerDatanode(1);
     List<ExecutorService> executors = new ArrayList<>(threadCount);
     for (int i = 0; i < threadCount; i++) {
       executors.add(Executors.newSingleThreadExecutor());
@@ -499,6 +501,8 @@ public class TestBlockManager {
   @Test(timeout = 10000)
   public void testMultipleBlockAllocationWithClosedContainer()
       throws IOException, TimeoutException, InterruptedException {
+    nodeManager.setNumPipelinePerDatanode(1);
+    nodeManager.setNumHealthyVolumes(1);
     // create pipelines
     for (int i = 0;
          i < nodeManager.getNodes(HddsProtos.NodeState.HEALTHY).size() / factor

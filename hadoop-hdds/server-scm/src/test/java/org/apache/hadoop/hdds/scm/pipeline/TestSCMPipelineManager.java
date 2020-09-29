@@ -343,6 +343,7 @@ public class TestSCMPipelineManager {
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     config.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
         false);
+    config.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 0);
     MockNodeManager nodeManagerMock = new MockNodeManager(true,
         3);
     nodeManagerMock.setNumRaftLogVolumes(numRaftLogVolumes);
@@ -364,7 +365,7 @@ public class TestSCMPipelineManager {
 
     // max limit on no of pipelines is 4
     for (int i = 0; i < numRaftLogVolumes *
-        MockNodeManager.NUM_PIPELINE_PER_RAFT_LOG_DISK; i++) {
+        MockNodeManager.NUM_PIPELINE_PER_METADATA_DISK; i++) {
       Pipeline pipeline = pipelineManager
           .createPipeline(HddsProtos.ReplicationType.RATIS,
               HddsProtos.ReplicationFactor.THREE);
@@ -374,7 +375,7 @@ public class TestSCMPipelineManager {
     metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
     numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
-    Assert.assertEquals(5, numPipelineAllocated);
+    Assert.assertEquals(4, numPipelineAllocated);
 
     long numPipelineCreateFailed = getLongCounter(
         "NumPipelineCreationFailed", metrics);
@@ -393,7 +394,7 @@ public class TestSCMPipelineManager {
     metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
     numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
-    Assert.assertEquals(5, numPipelineAllocated);
+    Assert.assertEquals(4, numPipelineAllocated);
 
     numPipelineCreateFailed = getLongCounter(
         "NumPipelineCreationFailed", metrics);

@@ -68,7 +68,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
  * Test Helper for testing container Mapping.
  */
 public class MockNodeManager implements NodeManager {
-  public final static int NUM_PIPELINE_PER_RAFT_LOG_DISK = 2;
+  public final static int NUM_PIPELINE_PER_METADATA_DISK = 2;
   private final static NodeData[] NODES = {
       new NodeData(10L * OzoneConsts.TB, OzoneConsts.GB),
       new NodeData(64L * OzoneConsts.TB, 100 * OzoneConsts.GB),
@@ -95,6 +95,7 @@ public class MockNodeManager implements NodeManager {
   private ConcurrentMap<String, Set<String>> dnsToUuidMap;
   private int numHealthyDisksPerDatanode;
   private int numRaftLogDisksPerDatanode;
+  private int numPipelinePerDatanode;
 
   public MockNodeManager(NetworkTopologyImpl clusterMap,
                          List<DatanodeDetails> nodes,
@@ -126,6 +127,8 @@ public class MockNodeManager implements NodeManager {
     this.commandMap = new HashMap<>();
     numHealthyDisksPerDatanode = 1;
     numRaftLogDisksPerDatanode = 1;
+    numPipelinePerDatanode = numRaftLogDisksPerDatanode *
+        NUM_PIPELINE_PER_METADATA_DISK;
   }
 
   public MockNodeManager(boolean initializeFakeNodes, int nodeCount) {
@@ -595,15 +598,18 @@ public class MockNodeManager implements NodeManager {
   @Override
   public int minPipelineLimit(DatanodeDetails dn) {
     // by default 1 single node pipeline and 1 three node pipeline
-    return numRaftLogDisksPerDatanode * NUM_PIPELINE_PER_RAFT_LOG_DISK;
+    return numPipelinePerDatanode;
   }
 
   @Override
   public int minPipelineLimit(List<DatanodeDetails> dn) {
     // by default 1 single node pipeline and 1 three node pipeline
-    return numRaftLogDisksPerDatanode * NUM_PIPELINE_PER_RAFT_LOG_DISK;
+    return numPipelinePerDatanode;
   }
 
+  public void setNumPipelinePerDatanode(int value) {
+    numPipelinePerDatanode = value;
+  }
 
   public void setNumHealthyVolumes(int value) {
     numHealthyDisksPerDatanode = value;

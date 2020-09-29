@@ -68,8 +68,6 @@ public class SCMContainerManager implements ContainerManager {
 
   private final int numContainerPerVolume;
 
-  private final int numPipelinesPerRaftLogDisk;
-
   private final SCMContainerManagerMetrics scmContainerManagerMetrics;
 
   private Table<ContainerID, ContainerInfo> containerStore;
@@ -102,10 +100,7 @@ public class SCMContainerManager implements ContainerManager {
     this.containerStateManager = new ContainerStateManager(conf);
     this.numContainerPerVolume = conf
         .getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
-            ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
-    this.numPipelinesPerRaftLogDisk = conf
-        .getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_DISK,
-            ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_DISK_DEFAULT);
+            ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);;
 
     loadExistingContainers();
 
@@ -115,9 +110,9 @@ public class SCMContainerManager implements ContainerManager {
   private int getOpenContainerCountPerPipeline(Pipeline pipeline) {
     int totalContainerCountPerDn = numContainerPerVolume *
         pipelineManager.getNumHealthyVolumes(pipeline);
-    int maxPipelineCountPerDn = pipelineManager.minPipelineLimit(pipeline);
+    int minPipelineCountPerDn = pipelineManager.minPipelineLimit(pipeline);
     return (int) Math.ceil(
-        ((double) totalContainerCountPerDn / maxPipelineCountPerDn));
+        ((double) totalContainerCountPerDn / minPipelineCountPerDn));
   }
 
   private void loadExistingContainers() throws IOException {
