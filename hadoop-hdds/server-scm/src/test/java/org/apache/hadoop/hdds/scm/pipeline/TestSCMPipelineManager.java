@@ -352,7 +352,7 @@ public class TestSCMPipelineManager {
     nodeManagerMock.setNumMetaDataVolumes(numMetaDataVolumes);
     int pipelinePerDn = numMetaDataVolumes *
         MockNodeManager.NUM_PIPELINE_PER_METADATA_DISK;
-    nodeManagerMock.setNumPipelinePerDatanode(pipelinePerDn );
+    nodeManagerMock.setNumPipelinePerDatanode(pipelinePerDn);
     SCMPipelineManager pipelineManager =
         new SCMPipelineManager(config, nodeManagerMock,
             scmMetadataStore.getPipelineTable(), new EventQueue());
