@@ -422,6 +422,7 @@ public class TestOzoneFSWithObjectStoreCreate {
     ozoneInputStream.read(read, 0, length);
     ozoneInputStream.close();
 
+    String inputString = new String(input);
     Assert.assertEquals(inputString, new String(read));
 
     // Read using filesystem.
