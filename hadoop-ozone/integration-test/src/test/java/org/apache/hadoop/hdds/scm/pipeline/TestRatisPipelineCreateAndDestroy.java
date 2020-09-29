@@ -191,10 +191,6 @@ public class TestRatisPipelineCreateAndDestroy {
     // each datanode has leaderNumOfEachDn leaders after balance
     checkLeaderBalance(dnNum, leaderNumOfEachDn);
 
-    //cluster.restartStorageContainerManager(true);
-
-    //checkLeaderBalance();
-
     Random r = new Random(0);
     for (int i = 0; i < 10; i++) {
       // destroy some pipelines, wait new pipelines created,

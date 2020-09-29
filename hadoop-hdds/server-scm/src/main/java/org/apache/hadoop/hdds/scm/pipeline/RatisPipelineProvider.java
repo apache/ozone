@@ -20,10 +20,7 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -35,11 +32,14 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
+import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.LeaderChoosePolicy;
+import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.MinLeaderCountChoosePolicy;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 
+import org.apache.ratis.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,11 +56,13 @@ public class RatisPipelineProvider extends PipelineProvider {
   private final PipelinePlacementPolicy placementPolicy;
   private int pipelineNumberLimit;
   private int maxPipelinePerDatanode;
+  private final LeaderChoosePolicy leaderChoosePolicy;
 
   private static final Integer HIGH_PRIORITY = 1;
   private static final Integer LOW_PRIORITY = 0;
 
-  RatisPipelineProvider(NodeManager nodeManager,
+  @VisibleForTesting
+  public RatisPipelineProvider(NodeManager nodeManager,
       PipelineStateManager stateManager, ConfigurationSource conf,
       EventPublisher eventPublisher) {
     super(nodeManager, stateManager);
@@ -74,6 +76,14 @@ public class RatisPipelineProvider extends PipelineProvider {
     String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
     this.maxPipelinePerDatanode = dnLimit == null ? 0 :
         Integer.parseInt(dnLimit);
+    try {
+      leaderChoosePolicy = conf.getClass(
+          ScmConfigKeys.OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY,
+          MinLeaderCountChoosePolicy.class,
+          LeaderChoosePolicy.class).newInstance();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private boolean exceedPipelineNumberLimit(ReplicationFactor factor) {
@@ -105,47 +115,10 @@ public class RatisPipelineProvider extends PipelineProvider {
     return false;
   }
 
-  private Map<DatanodeDetails, Integer> getSuggestedLeaderCount(
-      List<DatanodeDetails> dns) {
-    Map<DatanodeDetails, Integer> suggestedLeaderCount = new HashMap<>();
-    for (DatanodeDetails dn : dns) {
-      suggestedLeaderCount.put(dn, 0);
-
-      Set<PipelineID> pipelineIDSet = getNodeManager().getPipelines(dn);
-      for (PipelineID pipelineID : pipelineIDSet) {
-        try {
-          Pipeline pipeline = getPipelineStateManager().getPipeline(pipelineID);
-          if (!pipeline.isClosed()
-              && dn.getUuid().equals(pipeline.getSuggestedLeaderId())) {
-            suggestedLeaderCount.put(dn, suggestedLeaderCount.get(dn) + 1);
-          }
-        } catch (PipelineNotFoundException e) {
-          LOG.debug("Pipeline not found in pipeline state manager : {}",
-              pipelineID, e);
-        }
-      }
-    }
-
-    return suggestedLeaderCount;
+  @VisibleForTesting
+  public LeaderChoosePolicy getLeaderChoosePolicy() {
+    return leaderChoosePolicy;
   }
-
-  private DatanodeDetails getSuggestedLeader(List<DatanodeDetails> dns) {
-    Map<DatanodeDetails, Integer> suggestedLeaderCount =
-        getSuggestedLeaderCount(dns);
-    int minLeaderCount = Integer.MAX_VALUE;
-    DatanodeDetails suggestedLeader = null;
-
-    for (Map.Entry<DatanodeDetails, Integer> entry :
-        suggestedLeaderCount.entrySet()) {
-      if (entry.getValue() < minLeaderCount) {
-        minLeaderCount = entry.getValue();
-        suggestedLeader = entry.getKey();
-      }
-    }
-
-    return suggestedLeader;
-  }
-
   private List<Integer> getPriorityList(
       List<DatanodeDetails> dns, DatanodeDetails suggestedLeader) {
     List<Integer> priorityList = new ArrayList<>();
@@ -185,7 +158,8 @@ public class RatisPipelineProvider extends PipelineProvider {
       throw new IllegalStateException("Unknown factor: " + factor.name());
     }
 
-    DatanodeDetails suggestedLeader = getSuggestedLeader(dns);
+    DatanodeDetails suggestedLeader = leaderChoosePolicy.chooseLeader(
+        dns, getNodeManager(), getPipelineStateManager());
 
     Pipeline pipeline = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
