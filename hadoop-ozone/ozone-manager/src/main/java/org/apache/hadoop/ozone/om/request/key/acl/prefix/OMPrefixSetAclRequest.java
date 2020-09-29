@@ -46,7 +46,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclR
 public class OMPrefixSetAclRequest extends OMPrefixAclRequest {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMPrefixAddAclRequest.class);
+      LoggerFactory.getLogger(OMPrefixSetAclRequest.class);
 
   private OzoneObj ozoneObj;
   private List<OzoneAcl> ozoneAcls;

@@ -140,7 +140,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
       containerManager.notifyContainerReportProcessing(true, true);
     } catch (NodeNotFoundException ex) {
       containerManager.notifyContainerReportProcessing(true, false);
-      LOG.error("Received container report from unknown datanode {} {}",
+      LOG.error("Received container report from unknown datanode {}.",
           datanodeDetails, ex);
     }
 

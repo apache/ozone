@@ -65,7 +65,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -109,7 +108,6 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -428,9 +426,6 @@ public class TestKeyManagerImpl {
   }
 
   @Test
-  @Ignore
-  // TODO this test relies on KeyManagerImpl.createFile which is dead code.
-  // Move the test case out of this file, update the implementation.
   public void testCheckAccessForFileKey() throws Exception {
     OmKeyArgs keyArgs = createBuilder()
         .setKeyName("testdir/deep/NOTICE.txt")
@@ -461,8 +456,8 @@ public class TestKeyManagerImpl {
     OzoneObj nonExistentKey = OzoneObjInfo.Builder.fromKeyArgs(keyArgs)
         .setStoreType(OzoneObj.StoreType.OZONE)
         .build();
-    OzoneTestUtils.expectOmException(OMException.ResultCodes.KEY_NOT_FOUND,
-        () -> keyManager.checkAccess(nonExistentKey, currentUserReads()));
+    Assert.assertTrue(keyManager.checkAccess(nonExistentKey,
+            currentUserReads()));
   }
 
   @Test
@@ -1095,8 +1090,7 @@ public class TestKeyManagerImpl {
         tempFileStatus = keyManager.listStatus(dirArgs, false,
             tempFileStatus != null ?
                 tempFileStatus.get(tempFileStatus.size() - 1).getKeyInfo()
-                    .getKeyName() : null,
-            2);
+                    .getKeyName() : null, 2);
         tmpStatusSet.addAll(tempFileStatus);
       } while (tempFileStatus.size() == 2);
       verifyFileStatus(directory, new ArrayList<>(tmpStatusSet), directorySet,
@@ -1112,9 +1106,7 @@ public class TestKeyManagerImpl {
         tempFileStatus = keyManager.listStatus(dirArgs, true,
             tempFileStatus != null ?
                 tempFileStatus.get(tempFileStatus.size() - 1).getKeyInfo()
-                    .getKeyName() :
-                null,
-            2);
+                    .getKeyName() : null, 2);
         tmpStatusSet.addAll(tempFileStatus);
       } while (tempFileStatus.size() == 2);
       verifyFileStatus(directory, new ArrayList<>(tmpStatusSet), directorySet,
@@ -1381,7 +1373,7 @@ public class TestKeyManagerImpl {
   private RequestContext currentUserReads() throws IOException {
     return RequestContext.newBuilder()
         .setClientUgi(UserGroupInformation.getCurrentUser())
-        .setAclRights(ACLType.READ_ACL)
+        .setAclRights(ACLType.READ)
         .setAclType(ACLIdentityType.USER)
         .build();
   }

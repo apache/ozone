@@ -60,14 +60,14 @@ find_tests(){
   echo $tests
 }
 
-## @description wait until safemode exit (or 180 seconds)
+## @description wait until safemode exit (or 240 seconds)
 wait_for_safemode_exit(){
   # version-dependent
   : ${OZONE_SAFEMODE_STATUS_COMMAND:=ozone admin safemode status --verbose}
 
   #Reset the timer
   SECONDS=0
-  timeout_threshold=90
+  timeout_threshold=240
   if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
      timeout_threshold=600
   fi
@@ -83,6 +83,8 @@ wait_for_safemode_exit(){
      else
          status=$(docker-compose exec -T scm bash -c "$command")
      fi
+
+     echo "SECONDS: $SECONDS"
 
      echo $status
      if [[ "$status" ]]; then

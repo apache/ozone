@@ -28,8 +28,7 @@ summary: Hadoop 文件系统兼容使得任何使用类 HDFS 接口的应用无�
 </div>
 
 Hadoop 的文件系统接口兼容可以让任意像 Ozone 这样的存储后端轻松地整合进 Hadoop 生态系统，Ozone 文件系统就是一个兼容 Hadoop 的文件系统。
-目前ozone支持两种协议: o3fs和ofs。两者最大的区别是o3fs只支持在单个bucket上操作，而ofs则支持跨所有volume和bucket的操作。关于两者在操作
-上的具体区别可以参考ofs.md中的"Differences from existing o3fs"。
+目前ozone支持两种协议: o3fs和ofs。两者最大的区别是o3fs只支持在单个bucket上操作，而ofs则支持跨所有volume和bucket的操作。关于两者在操作上的具体区别请参考[OFS(英文页面)]({{< relref path="interface/ofs.md" lang="en" >}})中的"Differences from o3fs"。
 
 ## o3fs的配置及使用
 
@@ -115,7 +114,7 @@ hdfs dfs -ls o3fs://bucket.volume.om-host.example.com:6789/key
 注意：在这种情况下，`ozone.om.address` 配置中只有端口号会被用到，主机名是被忽略的。
 
 ## ofs的配置及使用
-这只是一个通用的介绍。了解更详细的用法，可以请参考ofs.md。
+这只是一个通用的介绍。了解更详细的用法，请参考[OFS(英文页面)]({{< relref path="interface/ofs.md" lang="en" >}})。
 
 请在 core-site.xml 中添加以下条目：
 

@@ -17,10 +17,12 @@
 Documentation       Execute MR jobs
 Library             OperatingSystem
 Resource            commonlib.robot
+Resource            lib/fs.robot
 Test Timeout        4 minute
 
 
 *** Variables ***
+${SCHEME}          o3fs
 ${volume}          volume1
 ${bucket}          bucket1
 
@@ -33,11 +35,16 @@ Find example jar
 
 Execute PI calculation
                     ${exampleJar}    Find example jar
-                    ${output} =      Execute                 yarn jar ${exampleJar} pi 3 3
+    ${root} =       Format FS URL    ${SCHEME}    ${volume}    ${bucket}
+                    ${output} =      Execute                 yarn jar ${exampleJar} pi -D fs.defaultFS=${root} 3 3
                     Should Contain   ${output}               completed successfully
 
 Execute WordCount
                     ${exampleJar}    Find example jar
                     ${random}        Generate Random String  2   [NUMBERS]
-                    ${output} =      Execute                 yarn jar ${exampleJar} wordcount o3fs://bucket1.volume1/key1 o3fs://bucket1.volume1/key1-${random}.count
+    ${root} =       Format FS URL    ${SCHEME}    ${volume}    ${bucket}
+    ${dir} =        Format FS URL    ${SCHEME}    ${volume}    ${bucket}   input/
+    ${result} =     Format FS URL    ${SCHEME}    ${volume}    ${bucket}   wordcount-${random}.txt
+    ${output} =     Execute          yarn jar ${exampleJar} wordcount -D fs.defaultFS=${root} ${dir} ${result}
+                    Should Contain   ${output}               map tasks=3
                     Should Contain   ${output}               completed successfully

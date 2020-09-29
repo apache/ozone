@@ -41,7 +41,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveA
 public class OMKeyRemoveAclRequest extends OMKeyAclRequest {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMKeyAddAclRequest.class);
+      LoggerFactory.getLogger(OMKeyRemoveAclRequest.class);
 
   private String path;
   private List<OzoneAcl> ozoneAcls;

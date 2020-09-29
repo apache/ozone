@@ -48,7 +48,7 @@ source "${COMPOSE_DIR}/../testlib.sh"
 # prepare pre-upgrade cluster
 start_docker_env
 execute_robot_test scm topology/loaddata.robot
-stop_docker_env
+KEEP_RUNNING=false stop_docker_env
 
 # run upgrade scripts
 SCRIPT_DIR=../../libexec/upgrade

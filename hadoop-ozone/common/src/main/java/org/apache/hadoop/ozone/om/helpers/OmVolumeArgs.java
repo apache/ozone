@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.LongAdder;
 
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -44,7 +45,9 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
   private long creationTime;
   private long modificationTime;
   private long quotaInBytes;
+  private long quotaInCounts;
   private final OmOzoneAclMap aclMap;
+  private final LongAdder usedBytes = new LongAdder();
 
   /**
    * Private constructor, constructed via builder.
@@ -52,7 +55,9 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
    * @param ownerName  - Volume owner's name
    * @param volume - volume name
    * @param quotaInBytes - Volume Quota in bytes.
+   * @param quotaInCounts - Volume Quota in counts.
    * @param metadata - metadata map for custom key/value data.
+   * @param usedBytes - Volume Quota Usage in bytes.
    * @param aclMap - User to access rights map.
    * @param creationTime - Volume creation time.
    * @param  objectID - ID of this object.
@@ -62,14 +67,16 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
   @SuppressWarnings({"checkstyle:ParameterNumber", "This is invoked from a " +
       "builder."})
   private OmVolumeArgs(String adminName, String ownerName, String volume,
-                       long quotaInBytes, Map<String, String> metadata,
-                       OmOzoneAclMap aclMap, long creationTime,
-                       long modificationTime, long objectID, long updateID) {
+      long quotaInBytes, long quotaInCounts, Map<String, String> metadata,
+      long usedBytes, OmOzoneAclMap aclMap, long creationTime,
+      long modificationTime, long objectID, long updateID) {
     this.adminName = adminName;
     this.ownerName = ownerName;
     this.volume = volume;
     this.quotaInBytes = quotaInBytes;
+    this.quotaInCounts = quotaInCounts;
     this.metadata = metadata;
+    this.usedBytes.add(usedBytes);
     this.aclMap = aclMap;
     this.creationTime = creationTime;
     this.modificationTime = modificationTime;
@@ -84,6 +91,10 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
 
   public void setQuotaInBytes(long quotaInBytes) {
     this.quotaInBytes = quotaInBytes;
+  }
+
+  public void setQuotaInCounts(long quotaInCounts) {
+    this.quotaInCounts= quotaInCounts;
   }
 
   public void setCreationTime(long time) {
@@ -154,9 +165,22 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     return quotaInBytes;
   }
 
+  /**
+   * Returns Quota in counts.
+   * @return long, Quota in counts.
+   */
+  public long getQuotaInCounts() {
+    return quotaInCounts;
+  }
+
   public OmOzoneAclMap getAclMap() {
     return aclMap;
   }
+
+  public LongAdder getUsedBytes() {
+    return usedBytes;
+  }
+
   /**
    * Returns new builder class that builds a OmVolumeArgs.
    *
@@ -176,8 +200,12 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     auditMap.put(OzoneConsts.MODIFICATION_TIME,
         String.valueOf(this.modificationTime));
     auditMap.put(OzoneConsts.QUOTA_IN_BYTES, String.valueOf(this.quotaInBytes));
+    auditMap.put(OzoneConsts.QUOTA_IN_COUNTS,
+        String.valueOf(this.quotaInCounts));
     auditMap.put(OzoneConsts.OBJECT_ID, String.valueOf(this.getObjectID()));
     auditMap.put(OzoneConsts.UPDATE_ID, String.valueOf(this.getUpdateID()));
+    auditMap.put(OzoneConsts.USED_BYTES,
+        String.valueOf(this.usedBytes));
     return auditMap;
   }
 
@@ -208,10 +236,12 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     private long creationTime;
     private long modificationTime;
     private long quotaInBytes;
+    private long quotaInCounts;
     private Map<String, String> metadata;
     private OmOzoneAclMap aclMap;
     private long objectID;
     private long updateID;
+    private long usedBytes;
 
     /**
      * Sets the Object ID for this Object.
@@ -267,8 +297,13 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
       return this;
     }
 
-    public Builder setQuotaInBytes(long quota) {
-      this.quotaInBytes = quota;
+    public Builder setQuotaInBytes(long quotaBytes) {
+      this.quotaInBytes = quotaBytes;
+      return this;
+    }
+
+    public Builder setQuotaInCounts(long quotaCounts) {
+      this.quotaInCounts = quotaCounts;
       return this;
     }
 
@@ -281,6 +316,11 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
       if (additionalMetaData != null) {
         metadata.putAll(additionalMetaData);
       }
+      return this;
+    }
+
+    public Builder setUsedBytes(long quotaUsage) {
+      this.usedBytes = quotaUsage;
       return this;
     }
 
@@ -298,7 +338,8 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
       Preconditions.checkNotNull(ownerName);
       Preconditions.checkNotNull(volume);
       return new OmVolumeArgs(adminName, ownerName, volume, quotaInBytes,
-          metadata, aclMap, creationTime, modificationTime, objectID, updateID);
+          quotaInCounts, metadata, usedBytes, aclMap, creationTime,
+          modificationTime, objectID, updateID);
     }
 
   }
@@ -310,6 +351,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
         .setOwnerName(ownerName)
         .setVolume(volume)
         .setQuotaInBytes(quotaInBytes)
+        .setQuotaInCounts(quotaInCounts)
         .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
         .addAllVolumeAcls(aclList)
         .setCreationTime(
@@ -317,6 +359,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
         .setModificationTime(modificationTime)
         .setObjectID(objectID)
         .setUpdateID(updateID)
+        .setUsedBytes(usedBytes.sum())
         .build();
   }
 
@@ -329,7 +372,9 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
         volInfo.getOwnerName(),
         volInfo.getVolume(),
         volInfo.getQuotaInBytes(),
+        volInfo.getQuotaInCounts(),
         KeyValueUtil.getFromProtobuf(volInfo.getMetadataList()),
+        volInfo.getUsedBytes(),
         aclMap,
         volInfo.getCreationTime(),
         volInfo.getModificationTime(),
@@ -344,7 +389,8 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
         ", admin='" + adminName + '\'' +
         ", owner='" + ownerName + '\'' +
         ", creationTime='" + creationTime + '\'' +
-        ", quota='" + quotaInBytes + '\'' +
+        ", quotaInBytes='" + quotaInBytes + '\'' +
+        ", usedBytes='" + usedBytes.sum() + '\'' +
         '}';
   }
 
@@ -360,7 +406,7 @@ public final class OmVolumeArgs extends WithObjectID implements Auditable {
     OmOzoneAclMap cloneAclMap = aclMap.copyObject();
 
     return new OmVolumeArgs(adminName, ownerName, volume, quotaInBytes,
-        cloneMetadata, cloneAclMap, creationTime, modificationTime,
-        objectID, updateID);
+        quotaInCounts, cloneMetadata, usedBytes.sum(), cloneAclMap,
+        creationTime, modificationTime, objectID, updateID);
   }
 }

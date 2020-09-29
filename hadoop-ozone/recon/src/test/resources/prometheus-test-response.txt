@@ -1,0 +1,21 @@
+{
+  "status": "success",
+  "data": {
+    "resultType": "vector",
+    "result": [
+      {
+        "metric": {
+          "__name__": "ratis_leader_election_electionCount",
+          "exported_instance": "33a5ac1d-8c65-4c74-a0b8-9314dfcccb42",
+          "group": "group-03CA9397D54B",
+          "instance": "ozone_datanode_1:9882",
+          "job": "ozone"
+        },
+        "value": [
+          1599159384.455,
+          "5"
+        ]
+      }
+    ]
+  }
+}

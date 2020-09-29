@@ -281,7 +281,7 @@ public class OzoneManagerServiceProviderImpl
       SecurityUtil.doAsLoginUser(() -> {
         try (InputStream inputStream = reconUtils.makeHttpCall(
             connectionFactory, getOzoneManagerSnapshotUrl(),
-            isOmSpengoEnabled())) {
+            isOmSpengoEnabled()).getInputStream()) {
           FileUtils.copyInputStreamToFile(inputStream, targetFile);
         }
         return null;

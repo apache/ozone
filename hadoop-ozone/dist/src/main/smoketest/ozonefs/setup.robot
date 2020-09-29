@@ -37,8 +37,8 @@ Setup for FS test
     Log    Completed setup for ${SCHEME} tests with ${BUCKET_TYPE}s in ${VOLUME}/${BUCKET} using FS base URL: ${BASE_URL}
 
 Create volumes for FS test
-    Execute And Ignore Error    ozone sh volume create ${VOLUME} --quota 100TB
-    Execute And Ignore Error    ozone sh volume create ${VOL2} --quota 100TB
+    Execute And Ignore Error    ozone sh volume create ${VOLUME} --spaceQuota 100TB
+    Execute And Ignore Error    ozone sh volume create ${VOL2} --spaceQuota 100TB
 
 Create buckets for FS test
     Execute                     ozone sh bucket create ${VOLUME}/${BUCKET}
@@ -46,8 +46,8 @@ Create buckets for FS test
     Execute                     ozone sh bucket create ${VOL2}/${BUCKET_IN_VOL2}
 
 Create links for FS test
-    Execute And Ignore Error    ozone sh volume create ${VOLUME}-src --quota 100TB
-    Execute And Ignore Error    ozone sh volume create ${VOL2}-src --quota 100TB
+    Execute And Ignore Error    ozone sh volume create ${VOLUME}-src --spaceQuota 100TB
+    Execute And Ignore Error    ozone sh volume create ${VOL2}-src --spaceQuota 100TB
     Execute                     ozone sh bucket create ${VOLUME}-src/${BUCKET}-src
     Execute                     ozone sh bucket create ${VOLUME}-src/${BUCKET2}-src
     Execute                     ozone sh bucket create ${VOL2}-src/${BUCKET_IN_VOL2}-src
