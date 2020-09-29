@@ -233,8 +233,7 @@ public class BlockDeletingService extends BackgroundService {
     }
   }
 
-  private class BlockDeletingTask
-      implements BackgroundTask<BackgroundTaskResult> {
+  private class BlockDeletingTask implements BackgroundTask {
 
     private final int priority;
     private final KeyValueContainerData containerData;

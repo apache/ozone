@@ -141,8 +141,7 @@ public class KeyDeletingService extends BackgroundService {
    * the blocks info in its deletedBlockLog), it removes these keys from the
    * DB.
    */
-  private class KeyDeletingTask implements
-      BackgroundTask<BackgroundTaskResult> {
+  private class KeyDeletingTask implements BackgroundTask {
 
     @Override
     public int getPriority() {
