@@ -193,6 +193,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForBlockClients;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
+import static org.apache.hadoop.hdds.ratis.RatisUpgradeUtils.waitForAllTxnsApplied;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
@@ -215,10 +216,12 @@ import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FLUSH_TXNS_RETRY_INTERVAL_SECONDS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MAX_TIME_TO_WAIT_FLUSH_TXNS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
@@ -234,6 +237,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
+import org.apache.ratis.server.impl.RaftServerProxy;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
@@ -327,20 +331,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean useRatisForReplication;
 
   private boolean isNativeAuthorizerEnabled;
+  private boolean prepareForUpgrade;
 
   private ExitManager exitManager;
 
   private enum State {
     INITIALIZED,
     RUNNING,
+    PREPARING_FOR_UPGRADE,
     STOPPED
   }
 
   // Used in MiniOzoneCluster testing
   private State omState;
 
-  private OzoneManager(OzoneConfiguration conf) throws IOException,
-      AuthenticationException {
+  private OzoneManager(OzoneConfiguration conf, boolean forUpgrade)
+      throws IOException, AuthenticationException {
     super(OzoneVersionInfo.OZONE_VERSION_INFO);
     Preconditions.checkNotNull(conf);
     configuration = conf;
@@ -486,6 +492,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     };
     ShutdownHookManager.get().addShutdownHook(shutdownHook,
         SHUTDOWN_HOOK_PRIORITY);
+    this.prepareForUpgrade = forUpgrade;
     omState = State.INITIALIZED;
   }
 
@@ -919,7 +926,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public static OzoneManager createOm(OzoneConfiguration conf)
       throws IOException, AuthenticationException {
-    return new OzoneManager(conf);
+    return new OzoneManager(conf, false);
+  }
+
+  public static OzoneManager createOmUpgradeMode(OzoneConfiguration conf)
+      throws IOException, AuthenticationException {
+    return new OzoneManager(conf, true);
   }
 
   /**
@@ -993,6 +1005,39 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
               .getLayoutVersion());
       return true;
     }
+  }
+
+  public boolean applyAllPendingTransactions()
+      throws InterruptedException, IOException {
+
+    if (!isRatisEnabled) {
+      LOG.info("Ratis not enabled. Nothing to do.");
+      return true;
+    }
+
+    waitForAllTxnsApplied(omRatisServer.getOmStateMachine(),
+        omRatisServer.getRaftGroup(),
+        (RaftServerProxy) omRatisServer.getServer(),
+        OZONE_OM_MAX_TIME_TO_WAIT_FLUSH_TXNS,
+        OZONE_OM_FLUSH_TXNS_RETRY_INTERVAL_SECONDS);
+
+    long appliedIndexFromRatis =
+        omRatisServer.getOmStateMachine().getLastAppliedTermIndex().getIndex();
+    OMTransactionInfo omTransactionInfo =
+        OMTransactionInfo.readTransactionInfo(metadataManager);
+    long index = omTransactionInfo.getTermIndex().getIndex();
+    if (index != appliedIndexFromRatis) {
+      throw new IllegalStateException(
+          String.format("Cannot prepare OM for Upgrade " +
+          "since transaction info table index %d does not match ratis %s",
+              index, appliedIndexFromRatis));
+    }
+
+    LOG.info("OM has been prepared for upgrade. All transactions " +
+        "upto {} have been flushed to the state machine, " +
+        "and a snapshot has been taken.",
+        omRatisServer.getOmStateMachine().getLastAppliedTermIndex().getIndex());
+    return true;
   }
 
   /**
@@ -1180,15 +1225,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // Allow OM to start as Http Server failure is not fatal.
       LOG.error("OM HttpServer failed to start.", ex);
     }
-    omRpcServer.start();
-    isOmRpcServerRunning = true;
 
+    if (!prepareForUpgrade) {
+      omRpcServer.start();
+      isOmRpcServerRunning = true;
+    }
     registerMXBean();
 
     startJVMPauseMonitor();
     setStartTime();
-    omState = State.RUNNING;
 
+    if (!prepareForUpgrade) {
+      omState = State.RUNNING;
+    } else {
+      omState = State.PREPARING_FOR_UPGRADE;
+      LOG.info("Started OM services in upgrade mode.");
+    }
   }
 
   /**

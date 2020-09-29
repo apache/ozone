@@ -246,4 +246,8 @@ public final class OMConfigKeys {
       "ozone.om.enable.filesystem.paths";
   public static final boolean OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT =
       false;
+
+  public static final long OZONE_OM_MAX_TIME_TO_WAIT_FLUSH_TXNS =
+      TimeUnit.MINUTES.toSeconds(5);
+  public static final long OZONE_OM_FLUSH_TXNS_RETRY_INTERVAL_SECONDS = 5L;
 }

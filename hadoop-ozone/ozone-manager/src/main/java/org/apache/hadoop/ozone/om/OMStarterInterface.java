@@ -30,4 +30,6 @@ public interface OMStarterInterface {
       AuthenticationException;
   boolean init(OzoneConfiguration conf) throws IOException,
       AuthenticationException;
+  boolean prepareForUpgrade(OzoneConfiguration conf) throws IOException,
+      AuthenticationException;
 }

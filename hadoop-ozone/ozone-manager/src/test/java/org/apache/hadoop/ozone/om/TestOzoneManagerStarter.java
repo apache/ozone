@@ -133,6 +133,8 @@ public class TestOzoneManagerStarter {
     private boolean initStatus = true;
     private boolean throwOnStart = false;
     private boolean throwOnInit = false;
+    private boolean prepareUpgradeCalled = false;
+    private boolean throwOnPrepareUpgrade = false;
 
     public void start(OzoneConfiguration conf) throws IOException,
         AuthenticationException {
@@ -149,6 +151,15 @@ public class TestOzoneManagerStarter {
         throw new IOException("Simulated Exception");
       }
       return initStatus;
+    }
+
+    public boolean prepareForUpgrade(OzoneConfiguration conf)
+        throws IOException, AuthenticationException {
+      prepareUpgradeCalled = true;
+      if (throwOnPrepareUpgrade) {
+        throw new IOException("Simulated Exception");
+      }
+      return true;
     }
   }
 }

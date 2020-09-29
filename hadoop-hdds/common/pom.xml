@@ -193,6 +193,14 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>hamcrest-all</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>com.codahale.metrics</groupId>
+      <artifactId>metrics-core</artifactId>
+      <version>3.0.2</version>
+      <scope>test</scope>
+      <!-- Needed for mocking RaftServerImpl -->
+    </dependency>
+
   </dependencies>
 
   <build>
