@@ -353,7 +353,11 @@ public class SCMContainerManager implements ContainerManager {
                   containerID);
         }
       }
-      containerStore.put(containerID, container);
+      if (newState == LifeCycleState.DELETED) {
+        containerStore.delete(containerID);
+      } else {
+        containerStore.put(containerID, container);
+      }
       return newState;
     } catch (ContainerNotFoundException cnfe) {
       throw new SCMException(
