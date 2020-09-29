@@ -64,7 +64,9 @@ public class TestOmVersionManagerRequestFactory {
     Assert.assertEquals(requestType, OMKeyCreateRequest.class);
 
     // Finalize the version manager.
-    omVersionManager.doFinalize(mock(OzoneManager.class));
+    OMUpgradeFinalizer f = new OMUpgradeFinalizer(omVersionManager);
+    f.finalize("randomeqq", mock(OzoneManager.class));
+//    omVersionManager.doFinalize(mock(OzoneManager.class));
 
     // Try getting 'CreateKey' again. Should return CreateECKey.
     requestType = omVersionManager.getRequestHandler(CreateKey.name());

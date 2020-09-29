@@ -2,6 +2,8 @@ package org.apache.hadoop.ozone.upgrade;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -10,7 +12,9 @@ import java.util.Collections;
 
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
-public interface UpgradeFinalizer {
+public interface UpgradeFinalizer<T> {
+
+  Logger LOG = LoggerFactory.getLogger(UpgradeFinalizer.class);
 
   enum Status {
     ALREADY_FINALIZED,
@@ -35,17 +39,20 @@ public interface UpgradeFinalizer {
   }
 
   StatusAndMessages STARTING_MSG = new StatusAndMessages(
-          Status.STARTING_FINALIZATION,
-          Arrays.asList("Starting Finalization")
-      );
-  StatusAndMessages FINALIZED_MSG =
-      new StatusAndMessages(Status.ALREADY_FINALIZED, Collections.emptyList());
-  StatusAndMessages FINALIZATION_REQUIRED_MSG = new StatusAndMessages(
-          Status.FINALIZATION_REQUIRED,
-          Collections.emptyList()
-      );
+      Status.STARTING_FINALIZATION,
+      Arrays.asList("Starting Finalization")
+  );
 
-  StatusAndMessages finalize(String clientID) throws IOException;
+  StatusAndMessages FINALIZED_MSG = new StatusAndMessages(
+      Status.ALREADY_FINALIZED, Collections.emptyList()
+  );
+
+  StatusAndMessages FINALIZATION_REQUIRED_MSG = new StatusAndMessages(
+      Status.FINALIZATION_REQUIRED,
+      Collections.emptyList()
+  );
+
+  StatusAndMessages finalize(String clientID, T service) throws IOException;
 
   StatusAndMessages reportStatus() throws IOException;
 

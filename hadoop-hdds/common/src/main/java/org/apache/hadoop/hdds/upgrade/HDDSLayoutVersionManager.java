@@ -20,10 +20,12 @@ package org.apache.hadoop.hdds.upgrade;
 
 
 import java.io.IOException;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeatureCatalog.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -33,8 +35,8 @@ import com.google.common.annotations.VisibleForTesting;
  * and DataNodes.
  */
 @SuppressWarnings("FinalClass")
-public class HDDSLayoutVersionManager extends
-    AbstractLayoutVersionManager {
+public final class HDDSLayoutVersionManager extends
+    AbstractLayoutVersionManager<HDDSLayoutFeature> {
 
   private static HDDSLayoutVersionManager hddsLayoutVersionManager;
 
@@ -76,4 +78,5 @@ public class HDDSLayoutVersionManager extends
       hddsLayoutVersionManager = null;
     }
   }
+
 }

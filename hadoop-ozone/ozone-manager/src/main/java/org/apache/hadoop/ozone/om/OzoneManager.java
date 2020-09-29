@@ -2674,7 +2674,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public StatusAndMessages finalizeUpgrade(String upgradeClientID)
       throws IOException {
-    return upgradeFinalizer.finalize(upgradeClientID);
+    return upgradeFinalizer.finalize(upgradeClientID, this);
   }
 
   @Override
