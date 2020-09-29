@@ -11,11 +11,9 @@ import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.UNMARK_FINALIZATION_OF_FEATURE_FAILED;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.UPDATE_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.ALREADY_FINALIZED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
@@ -255,7 +253,7 @@ public class OMUpgradeFinalizer implements UpgradeFinalizer<OzoneManager> {
         String feature, IOException e) throws OMException {
       String msg =
           "Failed to unmark finalization of " + feature + " LayoutFeature.";
-      logAndThrow(e, msg, UNMARK_FINALIZATION_OF_FEATURE_FAILED);
+      logAndThrow(e, msg, REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED);
     }
 
     private void logAndThrow(IOException e, String msg, ResultCodes resultCode)
