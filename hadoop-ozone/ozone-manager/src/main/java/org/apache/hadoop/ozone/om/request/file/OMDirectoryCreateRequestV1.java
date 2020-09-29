@@ -143,7 +143,7 @@ public class OMDirectoryCreateRequestV1 extends OMDirectoryCreateRequest {
           omDirectoryResult == FILE_EXISTS_IN_GIVENPATH) {
         throw new OMException("Unable to create directory: " + keyName
             + " in volume/bucket: " + volumeName + "/" + bucketName + " as " +
-                "file:" + omPathInfo.getFullKeyPathName() + " already exists",
+                "file:" + omPathInfo.getFileExistsInPath() + " already exists",
             FILE_ALREADY_EXISTS);
       } else if (omDirectoryResult == DIRECTORY_EXISTS_IN_GIVENPATH ||
           omDirectoryResult == NONE) {
@@ -206,9 +206,7 @@ public class OMDirectoryCreateRequestV1 extends OMDirectoryCreateRequest {
 
     switch (result) {
     case SUCCESS:
-      for (int indx = 0; indx < numKeys; indx++) {
-        omMetrics.incNumKeys();
-      }
+      omMetrics.incNumKeys(numKeys);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Directory created. Volume:{}, Bucket:{}, Key:{}",
             volumeName, bucketName, keyName);
@@ -272,7 +270,6 @@ public class OMDirectoryCreateRequestV1 extends OMDirectoryCreateRequest {
 
       LOG.debug("missing parent {} getting added to DirectoryTable",
               missingKey);
-      // what about keyArgs for parent directories? TODO
       OmDirectoryInfo dirInfo = createDirectoryInfoWithACL(missingKey,
               keyArgs, nextObjId, lastKnownParentId, trxnLogIndex, inheritAcls);
       objectCount++;
@@ -280,9 +277,10 @@ public class OMDirectoryCreateRequestV1 extends OMDirectoryCreateRequest {
       missingParentInfos.add(dirInfo);
 
       // add entry to directory table
+      String dirKey = omMetadataManager.getOzonePathKey(
+              dirInfo.getParentObjectID(), dirInfo.getName());
       omMetadataManager.getDirectoryTable().addCacheEntry(
-              new CacheKey<>(omMetadataManager.getOzoneKey(volumeName,
-                      bucketName, dirInfo.getName())),
+              new CacheKey<>(dirKey),
               new CacheValue<>(Optional.of(dirInfo),
                       trxnLogIndex));
 

@@ -67,7 +67,6 @@ public class TestOzoneDirectory {
   private OzoneFileSystem o3fs;
   private String volumeName;
   private String bucketName;
-  private int rootItemCount;
 
   @Test(timeout = 300_000)
   public void testMultiLevelDirs() throws Exception {
@@ -92,6 +91,9 @@ public class TestOzoneDirectory {
             dirKeys, omMgr);
     long d4ObjectID = verifyDirKey(d3ObjectID, "d4", "/d1/d2/d3/d4",
             dirKeys, omMgr);
+
+    Assert.assertEquals("Wrong OM numKeys metrics",
+            4, cluster.getOzoneManager().getMetrics().getNumKeys());
 
     // verify entries in directory table
     TableIterator<String, ? extends
@@ -127,6 +129,9 @@ public class TestOzoneDirectory {
     Assert.assertTrue("Wrong objectIds for sub-dirs[" + d5ObjectID +
                     "/d5, " + d6ObjectID + "/d6] of same parent!",
             d5ObjectID != d6ObjectID);
+
+    Assert.assertEquals("Wrong OM numKeys metrics",
+            6, cluster.getOzoneManager().getMetrics().getNumKeys());
   }
 
   /**
@@ -161,6 +166,8 @@ public class TestOzoneDirectory {
             dirInfo.getCreationTime() > 0);
     Assert.assertEquals("Mismatches directory modification time param",
             dirInfo.getCreationTime(), dirInfo.getModificationTime());
+    Assert.assertEquals("Wrong representation!",
+            dbKey + ":" + dirInfo.getObjectID(), dirInfo.toString());
     return dirInfo.getObjectID();
   }
 

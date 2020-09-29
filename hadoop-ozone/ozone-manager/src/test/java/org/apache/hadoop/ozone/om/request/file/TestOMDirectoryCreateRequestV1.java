@@ -27,7 +27,12 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
-import org.apache.hadoop.ozone.om.*;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -41,7 +46,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateD
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.jetbrains.annotations.NotNull;
-import org.junit.*;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.mockito.Mockito;
 
@@ -257,7 +266,6 @@ public class TestOMDirectoryCreateRequestV1 {
 
     // Key should exist in DB and cache.
     verifyDirectoriesInDB(dirs, bucketID);
-    verifyDirectoriesInCache(dirs, bucketID);
   }
 
   @Test
@@ -287,7 +295,7 @@ public class TestOMDirectoryCreateRequestV1 {
       // for index=0, parentID is bucketID
       OmDirectoryInfo omDirInfo = TestOMRequestUtils.createOmDirectoryInfo(
               dirs.get(indx), objID, parentID);
-      TestOMRequestUtils.addDirKeyToDirTable(true, omDirInfo,
+      TestOMRequestUtils.addDirKeyToDirTable(false, omDirInfo,
               txnID, omMetadataManager);
 
       parentID = omDirInfo.getObjectID();
@@ -309,11 +317,19 @@ public class TestOMDirectoryCreateRequestV1 {
     Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
             == OzoneManagerProtocolProtos.Status.DIRECTORY_ALREADY_EXISTS);
 
-    // Key should exist in DB and cache.
+    Assert.assertEquals("Wrong OM numKeys metrics",
+            0, ozoneManager.getMetrics().getNumKeys());
+
+    // Key should exist in DB and doesn't added to cache.
     verifyDirectoriesInDB(dirs, bucketID);
-    verifyDirectoriesInCache(dirs, bucketID);
+    verifyDirectoriesNotInCache(dirs, bucketID);
   }
 
+  /**
+   * Case: File exists with the same name as the requested directory.
+   * Say, requested to createDir '/a/b/c' and there is a file exists with
+   * same name.
+   */
   @Test
   public void testValidateAndUpdateCacheWithFilesInPath() throws Exception {
     String volumeName = "vol1";
@@ -329,8 +345,83 @@ public class TestOMDirectoryCreateRequestV1 {
             omMetadataManager.getBucketTable().get(bucketKey);
     long parentID = omBucketInfo.getObjectID();
 
-    long objID = 100;
+    // add all the parent directories into DirectoryTable. This won't create
+    // the leaf node and this will be used in CreateDirectoryReq.
+    for (int indx = 0; indx < dirs.size() - 1; indx++) {
+      long objID = 100 + indx;
+      long txnID = 5000 + indx;
+      // for index=0, parentID is bucketID
+      OmDirectoryInfo omDirInfo = TestOMRequestUtils.createOmDirectoryInfo(
+              dirs.get(indx), objID, parentID);
+      TestOMRequestUtils.addDirKeyToDirTable(false, omDirInfo,
+              txnID, omMetadataManager);
+
+      parentID = omDirInfo.getObjectID();
+    }
+
+    long objID = parentID + 100;
+    long txnID = 50000;
+
+    // Add a file into the FileTable, this is to simulate "file exists" check.
+    OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
+            bucketName, keyName, HddsProtos.ReplicationType.RATIS,
+            HddsProtos.ReplicationFactor.THREE, objID++);
+    String ozoneFileName = parentID + "/" + dirs.get(dirs.size() - 1);
+    omMetadataManager.getKeyTable().addCacheEntry(new CacheKey<>(ozoneFileName),
+            new CacheValue<>(Optional.of(omKeyInfo), ++txnID));
+    omMetadataManager.getKeyTable().put(ozoneFileName, omKeyInfo);
+
+    OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
+            keyName);
+    OMDirectoryCreateRequestV1 omDirCreateRequestV1 =
+            new OMDirectoryCreateRequestV1(omRequest);
+
+    OMRequest modifiedOmRequest =
+            omDirCreateRequestV1.preExecute(ozoneManager);
+
+    omDirCreateRequestV1 = new OMDirectoryCreateRequestV1(modifiedOmRequest);
+
+    OMClientResponse omClientResponse =
+            omDirCreateRequestV1.validateAndUpdateCache(ozoneManager, 100L,
+                    ozoneManagerDoubleBufferHelper);
+
+    Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
+            == OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS);
+
+    Assert.assertEquals("Wrong OM numKeys metrics",
+            0, ozoneManager.getMetrics().getNumKeys());
+
+    // Key should not exist in DB
+    Assert.assertTrue(omMetadataManager.getKeyTable().get(ozoneFileName) != null);
+    // Key should not exist in DB
+    Assert.assertEquals("Wrong directories count!",
+            3, omMetadataManager.getDirectoryTable().getEstimatedKeyCount());
+  }
+
+
+  /**
+   * Case: File exists in the given path.
+   * Say, requested to createDir '/a/b/c/d' and there is a file '/a/b' exists
+   * in the given path.
+   */
+  @Test
+  public void testValidateAndUpdateCacheWithFileExistsInGivenPath() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    List<String> dirs = new ArrayList<String>();
+    String keyName = createDirKey(dirs);
+
+    // Add volume and bucket entries to DB.
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+            omMetadataManager);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+            omMetadataManager.getBucketTable().get(bucketKey);
+    long parentID = omBucketInfo.getObjectID();
+
+    long objID = parentID + 100;
     long txnID = 5000;
+
     // for index=0, parentID is bucketID
     OmDirectoryInfo omDirInfo = TestOMRequestUtils.createOmDirectoryInfo(
             dirs.get(0), objID++, parentID);
@@ -361,15 +452,21 @@ public class TestOMDirectoryCreateRequestV1 {
             omDirCreateRequestV1.validateAndUpdateCache(ozoneManager, 100L,
                     ozoneManagerDoubleBufferHelper);
 
-    Assert.assertTrue(omClientResponse.getOMResponse().getStatus()
-            == OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS);
+    Assert.assertTrue("Invalid response code:" +
+                    omClientResponse.getOMResponse().getStatus(),
+            omClientResponse.getOMResponse().getStatus()
+                    == OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS);
+
+    Assert.assertEquals("Wrong OM numKeys metrics",
+            0, ozoneManager.getMetrics().getNumKeys());
 
     // Key should not exist in DB
     Assert.assertTrue(omMetadataManager.getKeyTable().get(ozoneKey) != null);
     // Key should not exist in DB
-    Assert.assertEquals("Unexpected directory entries!",
+    Assert.assertEquals("Wrong directories count!",
             1, omMetadataManager.getDirectoryTable().getEstimatedKeyCount());
   }
+
 
   @Test
   public void testCreateDirectoryOMMetric()
@@ -441,7 +538,7 @@ public class TestOMDirectoryCreateRequestV1 {
     }
   }
 
-  private void verifyDirectoriesInCache(List<String> dirs, long bucketID)
+  private void verifyDirectoriesNotInCache(List<String> dirs, long bucketID)
           throws IOException {
     // bucketID is the parent
     long parentID = bucketID;
@@ -453,13 +550,7 @@ public class TestOMDirectoryCreateRequestV1 {
       CacheValue<OmDirectoryInfo> omDirInfoCacheValue =
               omMetadataManager.getDirectoryTable()
                       .getCacheValue(new CacheKey<>(dbKey));
-      Assert.assertNotNull("Invalid directory!", omDirInfoCacheValue);
-      OmDirectoryInfo omDirInfo = omDirInfoCacheValue.getCacheValue();
-      Assert.assertEquals("Invalid directory!", dirName,
-              omDirInfo.getName());
-      Assert.assertEquals("Invalid dir path!",
-              parentID + "/" + dirName, omDirInfo.getPath());
-      parentID = omDirInfo.getObjectID();
+      Assert.assertNull("Unexpected directory!", omDirInfoCacheValue);
     }
   }
 

@@ -144,7 +144,7 @@ public class OmDirectoryInfo extends WithObjectID {
 
   @Override
   public String toString() {
-    return getObjectID() + ":" + getName();
+    return getPath() + ":" + getObjectID();
   }
 
   public long getParentObjectID() {
