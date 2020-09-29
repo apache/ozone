@@ -296,7 +296,8 @@ public final class OMFileRequest {
     public OMPathInfoV1(String leafNodeName, long lastKnownParentId,
                         List missingParents, OMDirectoryResult result,
                         List<OzoneAcl> aclList) {
-      this(leafNodeName, lastKnownParentId, missingParents, result, aclList, "");
+      this(leafNodeName, lastKnownParentId, missingParents, result, aclList,
+              "");
     }
 
     public String getLeafNodeName() {

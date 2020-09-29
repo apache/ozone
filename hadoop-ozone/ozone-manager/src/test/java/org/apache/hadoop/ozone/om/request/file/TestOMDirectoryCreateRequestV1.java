@@ -392,10 +392,10 @@ public class TestOMDirectoryCreateRequestV1 {
             0, ozoneManager.getMetrics().getNumKeys());
 
     // Key should not exist in DB
-    Assert.assertTrue(omMetadataManager.getKeyTable().get(ozoneFileName) != null);
+    Assert.assertNotNull(omMetadataManager.getKeyTable().get(ozoneFileName));
     // Key should not exist in DB
-    Assert.assertEquals("Wrong directories count!",
-            3, omMetadataManager.getDirectoryTable().getEstimatedKeyCount());
+    Assert.assertEquals("Wrong directories count!", 3,
+            omMetadataManager.getDirectoryTable().getEstimatedKeyCount());
   }
 
 
@@ -405,7 +405,8 @@ public class TestOMDirectoryCreateRequestV1 {
    * in the given path.
    */
   @Test
-  public void testValidateAndUpdateCacheWithFileExistsInGivenPath() throws Exception {
+  public void testValidateAndUpdateCacheWithFileExistsInGivenPath()
+          throws Exception {
     String volumeName = "vol1";
     String bucketName = "bucket1";
     List<String> dirs = new ArrayList<String>();
