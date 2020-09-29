@@ -98,6 +98,28 @@ public class OzoneManagerStarter extends GenericCli {
     }
   }
 
+
+  /**
+   * This function implements a sub-command to allow the OM to be
+   * "prepared for upgrade".
+   */
+  @CommandLine.Command(name = "--prepareForUpgrade",
+      aliases = {"--prepareForDowngrade", "--flushTransactions"},
+      customSynopsis = "ozone om [global options] --prepareForUpgrade",
+      hidden = false,
+      description = "Prepare the OM for upgrade/downgrade. (Flush Raft log " +
+          "transactions.)",
+      mixinStandardHelpOptions = true,
+      versionProvider = HddsVersionProvider.class)
+  public void prepareOmForUpgrade() throws Exception {
+    commonInit();
+    boolean result = receiver.prepareForUpgrade(conf);
+    if (!result) {
+      throw new Exception("Prepare OM For Upgrade failed.");
+    }
+    System.exit(0);
+  }
+
   /**
    * This function should be called by each command to ensure the configuration
    * is set and print the startup banner message.
@@ -129,6 +151,22 @@ public class OzoneManagerStarter extends GenericCli {
     public boolean init(OzoneConfiguration conf) throws IOException,
         AuthenticationException {
       return OzoneManager.omInit(conf);
+    }
+
+    public boolean prepareForUpgrade(OzoneConfiguration conf)
+        throws IOException, AuthenticationException {
+      try (OzoneManager om = OzoneManager.createOmUpgradeMode(conf)) {
+        om.start();
+        boolean success = false;
+        try {
+          LOG.info("Preparing OM for upgrade.");
+          success = om.applyAllPendingTransactions();
+        } catch (InterruptedException e) {
+          LOG.error("Error preparing OM for upgrade.", e);
+          Thread.currentThread().interrupt();
+        }
+        return success;
+      }
     }
   }
 

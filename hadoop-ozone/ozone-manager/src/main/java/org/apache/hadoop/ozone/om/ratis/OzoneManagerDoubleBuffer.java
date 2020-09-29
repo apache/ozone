@@ -319,7 +319,7 @@ public final class OzoneManagerDoubleBuffer {
 
           if (LOG.isDebugEnabled()) {
             LOG.debug("Sync Iteration {} flushed transactions in this " +
-                    "iteration{}", flushIterations.get(),
+                    "iteration {}", flushIterations.get(),
                 flushedTransactionsSize);
           }
 
