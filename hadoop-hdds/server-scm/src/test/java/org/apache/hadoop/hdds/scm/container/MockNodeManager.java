@@ -615,7 +615,7 @@ public class MockNodeManager implements NodeManager {
     numHealthyDisksPerDatanode = value;
   }
 
-  public void setNumRaftLogVolumes(int value) {
+  public void setNumMetaDataVolumes(int value) {
     numRaftLogDisksPerDatanode = value;
   }
 

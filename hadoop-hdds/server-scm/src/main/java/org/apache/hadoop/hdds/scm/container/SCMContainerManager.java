@@ -100,7 +100,7 @@ public class SCMContainerManager implements ContainerManager {
     this.containerStateManager = new ContainerStateManager(conf);
     this.numContainerPerVolume = conf
         .getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
-            ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);;
+            ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
 
     loadExistingContainers();
 

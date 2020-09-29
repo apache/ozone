@@ -370,9 +370,9 @@ public class TestBlockManager {
   public void testBlockDistributionWithMultipleRaftLogDisks() throws Exception {
     int threadCount = numContainerPerOwnerInPipeline *
         numContainerPerOwnerInPipeline;
-    int numRaftLogVolumes = 2;
+    int numMetaDataVolumes = 2;
     nodeManager.setNumHealthyVolumes(numContainerPerOwnerInPipeline);
-    nodeManager.setNumRaftLogVolumes(numRaftLogVolumes);
+    nodeManager.setNumMetaDataVolumes(numMetaDataVolumes);
     List<ExecutorService> executors = new ArrayList<>(threadCount);
     for (int i = 0; i < threadCount; i++) {
       executors.add(Executors.newSingleThreadExecutor());
@@ -419,7 +419,7 @@ public class TestBlockManager {
       // the pipeline per raft log disk config is set to 1 by default
       int numContainers = (int)Math.ceil((double)
               (numContainerPerOwnerInPipeline *
-                  numContainerPerOwnerInPipeline)/numRaftLogVolumes);
+                  numContainerPerOwnerInPipeline)/numMetaDataVolumes);
       Assert.assertTrue(numContainers == pipelineManager.
           getNumberOfContainers(pipeline.getId()));
       Assert.assertTrue(

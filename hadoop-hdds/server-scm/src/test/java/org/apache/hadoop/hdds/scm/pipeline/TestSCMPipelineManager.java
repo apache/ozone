@@ -276,6 +276,7 @@ public class TestSCMPipelineManager {
         new SCMPipelineManager(conf, nodeManagerMock,
             scmMetadataStore.getPipelineTable(), new EventQueue());
     pipelineManager.allowPipelineCreation();
+    nodeManagerMock.setNumPipelinePerDatanode(1);
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManagerMock,
             pipelineManager.getStateManager(), conf);
@@ -338,15 +339,20 @@ public class TestSCMPipelineManager {
 
   @Test
   public void testPipelineLimit() throws Exception {
-    int numRaftLogVolumes = 2;
+    int numMetaDataVolumes = 2;
     final OzoneConfiguration config = new OzoneConfiguration();
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     config.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
         false);
+    // turning off this config will ensure, pipeline creation is determined by
+    // metadata volume count.
     config.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 0);
     MockNodeManager nodeManagerMock = new MockNodeManager(true,
         3);
-    nodeManagerMock.setNumRaftLogVolumes(numRaftLogVolumes);
+    nodeManagerMock.setNumMetaDataVolumes(numMetaDataVolumes);
+    int pipelinePerDn = numMetaDataVolumes *
+        MockNodeManager.NUM_PIPELINE_PER_METADATA_DISK;
+    nodeManagerMock.setNumPipelinePerDatanode(pipelinePerDn );
     SCMPipelineManager pipelineManager =
         new SCMPipelineManager(config, nodeManagerMock,
             scmMetadataStore.getPipelineTable(), new EventQueue());
@@ -364,8 +370,7 @@ public class TestSCMPipelineManager {
     Assert.assertEquals(0, numPipelineAllocated);
 
     // max limit on no of pipelines is 4
-    for (int i = 0; i < numRaftLogVolumes *
-        MockNodeManager.NUM_PIPELINE_PER_METADATA_DISK; i++) {
+    for (int i = 0; i < pipelinePerDn; i++) {
       Pipeline pipeline = pipelineManager
           .createPipeline(HddsProtos.ReplicationType.RATIS,
               HddsProtos.ReplicationFactor.THREE);
