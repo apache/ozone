@@ -82,7 +82,7 @@ public abstract class BackgroundService {
     exec.scheduleWithFixedDelay(service, 0, interval, unit);
   }
 
-  public abstract BackgroundTaskQueue<BackgroundTaskResult> getTasks();
+  public abstract BackgroundTaskQueue getTasks();
 
   /**
    * Run one or more background tasks concurrently.
@@ -94,7 +94,7 @@ public abstract class BackgroundService {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Running background service : {}", serviceName);
       }
-      BackgroundTaskQueue<BackgroundTaskResult> tasks = getTasks();
+      BackgroundTaskQueue tasks = getTasks();
       if (tasks.isEmpty()) {
         // No task found, or some problems to init tasks
         // return and retry in next interval.
@@ -105,7 +105,7 @@ public abstract class BackgroundService {
       }
 
       while (tasks.size() > 0) {
-        BackgroundTask<BackgroundTaskResult> task = tasks.poll();
+        BackgroundTask task = tasks.poll();
         CompletableFuture.runAsync(() -> {
           long startTime = System.nanoTime();
           try {

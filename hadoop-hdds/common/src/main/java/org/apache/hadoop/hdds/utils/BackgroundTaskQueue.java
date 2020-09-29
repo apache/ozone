@@ -23,9 +23,9 @@ import java.util.PriorityQueue;
 /**
  * A priority queue that stores a number of {@link BackgroundTask}.
  */
-public class BackgroundTaskQueue<T> {
+public class BackgroundTaskQueue {
 
-  private final PriorityQueue<BackgroundTask<T>> tasks;
+  private final PriorityQueue<BackgroundTask> tasks;
 
   public BackgroundTaskQueue() {
     tasks = new PriorityQueue<>(
@@ -35,7 +35,7 @@ public class BackgroundTaskQueue<T> {
   /**
    * @return the head task in this queue.
    */
-  public synchronized BackgroundTask<T> poll() {
+  public synchronized BackgroundTask poll() {
     return tasks.poll();
   }
 
@@ -45,7 +45,7 @@ public class BackgroundTaskQueue<T> {
    *
    * @param task
    */
-  public synchronized void add(BackgroundTask<T> task) {
+  public synchronized void add(BackgroundTask task) {
     tasks.add(task);
   }
 
