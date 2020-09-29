@@ -1168,4 +1168,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
     return map;
   }
+
+  public SCMHAManager getScmHAManager() {
+    return scmHAManager;
+  }
 }
