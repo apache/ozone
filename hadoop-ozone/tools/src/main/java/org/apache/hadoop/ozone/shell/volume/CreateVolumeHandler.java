@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.shell.volume;
 
 import org.apache.hadoop.hdds.client.OzoneQuota;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
@@ -47,10 +46,6 @@ public class CreateVolumeHandler extends VolumeHandler {
   @CommandLine.Mixin
   private SetSpaceQuotaOptions quotaOptions;
 
-  @Option(names = {"--bucket-quota"},
-      description = "Bucket counts of the newly created volume (eg. 5)")
-  private long quotaInCounts = OzoneConsts.QUOTA_RESET;
-
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
@@ -67,10 +62,10 @@ public class CreateVolumeHandler extends VolumeHandler {
     if (quotaOptions.getQuotaInBytes() != null) {
       volumeArgsBuilder.setQuotaInBytes(OzoneQuota.parseQuota(
           quotaOptions.getQuotaInBytes(),
-          quotaInCounts).getQuotaInBytes());
+          quotaOptions.getQuotaInCounts()).getQuotaInBytes());
     }
 
-    volumeArgsBuilder.setQuotaInCounts(quotaInCounts);
+    volumeArgsBuilder.setQuotaInCounts(quotaOptions.getQuotaInCounts());
 
     client.getObjectStore().createVolume(volumeName,
         volumeArgsBuilder.build());

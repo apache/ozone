@@ -52,10 +52,6 @@ public class CreateBucketHandler extends BucketHandler {
   @CommandLine.Mixin
   private SetSpaceQuotaOptions quotaOptions;
 
-  @Option(names = {"--key-quota"},
-      description = "Key counts of the newly created bucket (eg. 5)")
-  private long quotaInCounts = OzoneConsts.QUOTA_RESET;
-
   /**
    * Executes create bucket.
    */
@@ -86,10 +82,10 @@ public class CreateBucketHandler extends BucketHandler {
 
     if (quotaOptions.getQuotaInBytes() != null) {
       bb.setQuotaInBytes(OzoneQuota.parseQuota(quotaOptions.getQuotaInBytes(),
-          quotaInCounts).getQuotaInBytes());
+          quotaOptions.getQuotaInCounts()).getQuotaInBytes());
     }
 
-    bb.setQuotaInCounts(quotaInCounts);
+    bb.setQuotaInCounts(quotaOptions.getQuotaInCounts());
 
     String volumeName = address.getVolumeName();
     String bucketName = address.getBucketName();

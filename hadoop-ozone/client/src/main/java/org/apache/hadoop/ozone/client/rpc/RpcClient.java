@@ -275,6 +275,8 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     verifyVolumeName(volumeName);
     Preconditions.checkNotNull(volArgs);
+    verifyCountsQuota(volArgs.getQuotaInCounts());
+    verifySpaceQuota(volArgs.getQuotaInBytes());
 
     String admin = volArgs.getAdmin() == null ?
         ugi.getUserName() : volArgs.getAdmin();
@@ -300,8 +302,8 @@ public class RpcClient implements ClientProtocol {
     builder.setVolume(volumeName);
     builder.setAdminName(admin);
     builder.setOwnerName(owner);
-    builder.setQuotaInBytes(getQuotaValue(volArgs.getQuotaInBytes()));
-    builder.setQuotaInCounts(getQuotaValue(volArgs.getQuotaInCounts()));
+    builder.setQuotaInBytes(quotaInBytes);
+    builder.setQuotaInCounts(quotaInCounts);
     builder.addAllMetadata(volArgs.getMetadata());
 
     //Remove duplicates and add ACLs

@@ -19,14 +19,12 @@
 package org.apache.hadoop.ozone.shell.volume;
 
 import org.apache.hadoop.hdds.client.OzoneQuota;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.SetSpaceQuotaOptions;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
 
 import java.io.IOException;
 
@@ -40,10 +38,6 @@ public class SetQuotaHandler extends VolumeHandler {
   @CommandLine.Mixin
   private SetSpaceQuotaOptions quotaOptions;
 
-  @Option(names = {"--bucket-quota"},
-      description = "Bucket counts of the volume to create (eg. 5)")
-  private long quotaInCounts = OzoneConsts.QUOTA_RESET;
-
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
@@ -56,10 +50,10 @@ public class SetQuotaHandler extends VolumeHandler {
     if (quotaOptions.getQuotaInBytes() != null
         && !quotaOptions.getQuotaInBytes().isEmpty()) {
       spaceQuota = OzoneQuota.parseQuota(quotaOptions.getQuotaInBytes(),
-          quotaInCounts).getQuotaInBytes();
+          quotaOptions.getQuotaInCounts()).getQuotaInBytes();
     }
-    if (quotaInCounts >= 0) {
-      countQuota = quotaInCounts;
+    if (quotaOptions.getQuotaInCounts() >= 0) {
+      countQuota = quotaOptions.getQuotaInCounts();
     }
 
     volume.setQuota(OzoneQuota.getOzoneQuota(spaceQuota, countQuota));

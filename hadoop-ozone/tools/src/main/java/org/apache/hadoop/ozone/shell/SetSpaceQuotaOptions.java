@@ -28,8 +28,17 @@ public class SetSpaceQuotaOptions {
       description = "The maximum space quota can be used (eg. 1GB)")
   private String quotaInBytes;
 
+  @CommandLine.Option(names = {"--count-quota"},
+      description = "For volume this parameter represents the number of " +
+          "buckets, and for buckets represents the number of keys (eg. 5)")
+  private long quotaInCounts;
+
   public String getQuotaInBytes() {
     return quotaInBytes;
+  }
+
+  public long getQuotaInCounts() {
+    return quotaInCounts;
   }
 
 }

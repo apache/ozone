@@ -37,10 +37,6 @@ public class ClearQuotaHandler extends BucketHandler {
   @CommandLine.Mixin
   private ClearSpaceQuotaOptions clrSpaceQuota;
 
-  @CommandLine.Option(names = {"--key-quota"},
-      description = "clear count quota")
-  private boolean clrKeyQuota;
-
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
@@ -52,7 +48,7 @@ public class ClearQuotaHandler extends BucketHandler {
     if (clrSpaceQuota.getClrSpaceQuota()) {
       bucket.clearSpaceQuota();
     }
-    if (clrKeyQuota) {
+    if (clrSpaceQuota.getClrCountQuota()) {
       bucket.clearCountQuota();
     }
   }
