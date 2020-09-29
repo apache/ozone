@@ -77,7 +77,7 @@ public class IncrementalContainerReportHandler extends
             ContainerReplicaProto.State.DELETED)) {
           nodeManager.addContainer(dd, id);
         }
-        processContainerReplica(dd, replicaProto);
+        processContainerReplica(dd, replicaProto, publisher);
       } catch (ContainerNotFoundException e) {
         success = false;
         LOG.warn("Container {} not found!", replicaProto.getContainerID());
