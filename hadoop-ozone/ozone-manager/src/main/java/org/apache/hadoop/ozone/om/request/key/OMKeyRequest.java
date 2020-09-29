@@ -33,6 +33,7 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
@@ -531,6 +532,27 @@ public abstract class OMKeyRequest extends OMClientRequest {
       encryptionInfo = OMPBHelper.convert(keyArgs.getFileEncryptionInfo());
     }
     return encryptionInfo;
+  }
+
+  /**
+   * Check volume quota in bytes.
+   * @param omVolumeArgs
+   * @param allocateSize
+   * @throws IOException
+   */
+  protected void checkVolumeQuotaInBytes(OmVolumeArgs omVolumeArgs,
+      long allocateSize) throws IOException {
+    if (omVolumeArgs.getQuotaInBytes() > OzoneConsts.QUOTA_RESET) {
+      long usedBytes = omVolumeArgs.getUsedBytes().sum();
+      long quotaInBytes = omVolumeArgs.getQuotaInBytes();
+      if (quotaInBytes - usedBytes < allocateSize) {
+        throw new OMException("The DiskSpace quota of volume:"
+            + omVolumeArgs.getVolume() + "exceeded: quotaInBytes: "
+            + quotaInBytes + " Bytes but diskspace consumed: " + (usedBytes
+            + allocateSize) + " Bytes.",
+            OMException.ResultCodes.QUOTA_EXCEEDED);
+      }
+    }
   }
 
   /**
