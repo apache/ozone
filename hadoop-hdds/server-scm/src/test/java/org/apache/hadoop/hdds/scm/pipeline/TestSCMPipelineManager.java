@@ -70,7 +70,6 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.mockito.InOrder;
 
-import javax.security.auth.login.Configuration;
 
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
@@ -342,7 +341,8 @@ public class TestSCMPipelineManager {
     int numRaftLogVolumes = 2;
     final OzoneConfiguration config = new OzoneConfiguration();
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
-    config.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
+    config.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
+        false);
     MockNodeManager nodeManagerMock = new MockNodeManager(true,
         3);
     nodeManagerMock.setNumRaftLogVolumes(numRaftLogVolumes);

@@ -134,10 +134,10 @@ public class SCMNodeManager implements NodeManager {
         DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
         DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
     this.numPipelinesPerRaftLogDisk =
-        conf.getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_PER_RAFT_LOG_DISK,
-            ScmConfigKeys.OZONE_SCM_PIPELINE_PER_RAFT_LOG_DISK_DEFAULT);
+        conf.getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_DISK,
+            ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_DISK_DEFAULT);
     String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
-    this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);;
+    this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
   }
 
   private void registerMXBean() {
@@ -549,13 +549,13 @@ public class SCMNodeManager implements NodeManager {
    * that it has atleast one healthy data volume.
    */
   @Override
-  public int maxPipelineLimit(DatanodeDetails dn) {
+  public int minPipelineLimit(DatanodeDetails dn) {
     try {
       if (heavyNodeCriteria > 0) {
         return heavyNodeCriteria;
       } else if (nodeStateManager.getNode(dn).getHealthyVolumeCount() > 0) {
         return numPipelinesPerRaftLogDisk *
-            nodeStateManager.getNode(dn).getRaftLogVolumeCount();
+            nodeStateManager.getNode(dn).getMetaDataVolumeCount();
       }
     } catch (NodeNotFoundException e) {
       LOG.warn("Cannot generate NodeStat, datanode {} not found.",
@@ -568,10 +568,10 @@ public class SCMNodeManager implements NodeManager {
    * Returns the pipeline limit for set of datanodes.
    */
   @Override
-  public int maxPipelineLimit(List<DatanodeDetails> dnList) {
+  public int minPipelineLimit(List<DatanodeDetails> dnList) {
     List<Integer> pipelineCountList = new ArrayList<>(dnList.size());
     for (DatanodeDetails dn : dnList) {
-        pipelineCountList.add(maxPipelineLimit(dn));
+      pipelineCountList.add(minPipelineLimit(dn));
     }
     Preconditions.checkArgument(!pipelineCountList.isEmpty());
     return Collections.min(pipelineCountList);

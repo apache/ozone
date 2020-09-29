@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -43,8 +42,7 @@ public class DatanodeInfo extends DatanodeDetails {
   private long lastStatsUpdatedTime;
 
   private List<StorageReportProto> storageReports;
-  private List<StorageContainerDatanodeProtocolProtos.
-      MetadataStorageReportProto> metadataStorageReports;
+  private List<MetadataStorageReportProto> metadataStorageReports;
 
   /**
    * Constructs DatanodeInfo from DatanodeDetails.
@@ -101,7 +99,7 @@ public class DatanodeInfo extends DatanodeDetails {
   }
 
   /**
-   * Updates the datanode storage reports.
+   * Updates the datanode metadata storage reports.
    *
    * @param reports list of metadata storage report
    */
@@ -144,10 +142,10 @@ public class DatanodeInfo extends DatanodeDetails {
   }
 
   /**
-   * Returns count of healthy raft log volumes reported from datanode.
-   * @return count of healthy raft log volumes
+   * Returns count of healthy metadata volumes reported from datanode.
+   * @return count of healthy metdata log volumes
    */
-  public int getRaftLogVolumeCount() {
+  public int getMetaDataVolumeCount() {
     try {
       lock.readLock().lock();
       return metadataStorageReports.size();

@@ -593,13 +593,13 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public int maxPipelineLimit(DatanodeDetails dn) {
+  public int minPipelineLimit(DatanodeDetails dn) {
     // by default 1 single node pipeline and 1 three node pipeline
     return numRaftLogDisksPerDatanode * NUM_PIPELINE_PER_RAFT_LOG_DISK;
   }
 
   @Override
-  public int maxPipelineLimit(List<DatanodeDetails> dn) {
+  public int minPipelineLimit(List<DatanodeDetails> dn) {
     // by default 1 single node pipeline and 1 three node pipeline
     return numRaftLogDisksPerDatanode * NUM_PIPELINE_PER_RAFT_LOG_DISK;
   }

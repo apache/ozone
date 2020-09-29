@@ -76,7 +76,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     this.conf = conf;
     this.stateManager = stateManager;
     String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
-    this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);;
+    this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
   }
 
   int currentPipelineCount(DatanodeDetails datanodeDetails, int nodesRequired) {
@@ -148,7 +148,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         .map(d ->
             new DnWithPipelines(d, currentPipelineCount(d, nodesRequired)))
         .filter(d ->
-            (d.getPipelines() < nodeManager.maxPipelineLimit(d.getDn())))
+            (d.getPipelines() < nodeManager.minPipelineLimit(d.getDn())))
         .sorted(Comparator.comparingInt(DnWithPipelines::getPipelines))
         .map(d -> d.getDn())
         .collect(Collectors.toList());

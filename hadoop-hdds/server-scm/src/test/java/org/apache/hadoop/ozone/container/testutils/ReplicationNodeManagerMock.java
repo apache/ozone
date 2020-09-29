@@ -350,12 +350,12 @@ public class ReplicationNodeManagerMock implements NodeManager {
   }
 
   @Override
-  public int maxPipelineLimit(DatanodeDetails dn) {
+  public int minPipelineLimit(DatanodeDetails dn) {
     return 0;
   }
 
   @Override
-  public int maxPipelineLimit(List<DatanodeDetails> dn) {
+  public int minPipelineLimit(List<DatanodeDetails> dn) {
     return 0;
   }
 }

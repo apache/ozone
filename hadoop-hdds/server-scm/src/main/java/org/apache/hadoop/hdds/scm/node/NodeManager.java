@@ -216,7 +216,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
 
   int getNumHealthyVolumes(List <DatanodeDetails> dnList);
 
-  int maxPipelineLimit(DatanodeDetails dn);
+  int minPipelineLimit(DatanodeDetails dn);
 
-  int maxPipelineLimit(List<DatanodeDetails> dn);
+  int minPipelineLimit(List<DatanodeDetails> dn);
 }

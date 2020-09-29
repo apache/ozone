@@ -687,8 +687,8 @@ public class SCMPipelineManager implements PipelineManager {
    * @param  pipeline
    * @return healthy volume count
    */
-  public int maxPipelineLimit(Pipeline pipeline) {
-    return nodeManager.maxPipelineLimit(pipeline.getNodes());
+  public int minPipelineLimit(Pipeline pipeline) {
+    return nodeManager.minPipelineLimit(pipeline.getNodes());
   }
 
   protected ReadWriteLock getLock() {
