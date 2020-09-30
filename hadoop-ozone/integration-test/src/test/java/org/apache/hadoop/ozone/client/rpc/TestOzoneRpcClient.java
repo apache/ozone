@@ -24,12 +24,20 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
 import java.io.IOException;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 
 
 /**
  * This class is to test all the public facing APIs of Ozone Client.
  */
 public class TestOzoneRpcClient extends TestOzoneRpcClientAbstract {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   /**
    * Create a MiniOzoneCluster for testing.

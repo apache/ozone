@@ -37,14 +37,26 @@ public final class S3GatewayConfigKeys {
       "ozone.s3g.http-address";
   public static final String OZONE_S3G_HTTPS_ADDRESS_KEY =
       "ozone.s3g.https-address";
-  public static final String OZONE_S3G_KEYTAB_FILE =
-      "ozone.s3g.keytab.file";
+
   public static final String OZONE_S3G_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int OZONE_S3G_HTTP_BIND_PORT_DEFAULT = 9878;
   public static final int OZONE_S3G_HTTPS_BIND_PORT_DEFAULT = 9879;
-  public static final String OZONE_S3G_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL =
-      "ozone.s3g.authentication.kerberos.principal";
+
   public static final String OZONE_S3G_DOMAIN_NAME = "ozone.s3g.domain.name";
+
+  public static final String OZONE_S3G_HTTP_AUTH_CONFIG_PREFIX =
+      "ozone.s3g.http.auth.";
+  public static final String OZONE_S3G_HTTP_AUTH_TYPE =
+      OZONE_S3G_HTTP_AUTH_CONFIG_PREFIX + "type";
+  public static final String OZONE_S3G_KEYTAB_FILE =
+      OZONE_S3G_HTTP_AUTH_CONFIG_PREFIX + "kerberos.keytab";
+  public static final String OZONE_S3G_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL =
+      OZONE_S3G_HTTP_AUTH_CONFIG_PREFIX + "kerberos.principal";
+
+  public static final String OZONE_S3G_CLIENT_BUFFER_SIZE_KEY =
+      "ozone.s3g.client.buffer.size";
+  public static final String OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT =
+      "4KB";
 
   /**
    * Never constructed.

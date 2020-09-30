@@ -25,7 +25,7 @@ jobs:
     name: check-comment
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@v2
       - run: ./.github/process-comment.sh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -18,38 +18,34 @@
 
 package org.apache.hadoop.ozone.om.request.volume;
 
-import java.io.IOException;
-import java.util.Map;
-
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeSetOwnerResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .SetVolumePropertyRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .SetVolumePropertyResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
@@ -65,19 +61,29 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
   }
 
   @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+
+    long modificationTime = Time.now();
+    SetVolumePropertyRequest modifiedRequest = getOmRequest()
+        .getSetVolumePropertyRequest().toBuilder()
+        .setModificationTime(modificationTime).build();
+
+    return getOmRequest().toBuilder()
+        .setSetVolumePropertyRequest(modifiedRequest.toBuilder())
+        .setUserInfo(getUserInfo())
+        .build();
+  }
+
+  @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
-
     SetVolumePropertyRequest setVolumePropertyRequest =
         getOmRequest().getSetVolumePropertyRequest();
-
     Preconditions.checkNotNull(setVolumePropertyRequest);
 
-    OMResponse.Builder omResponse = OMResponse.newBuilder().setCmdType(
-        OzoneManagerProtocolProtos.Type.SetVolumeProperty).setStatus(
-        OzoneManagerProtocolProtos.Status.OK).setSuccess(true);
-
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
     // In production this will never happen, this request will be called only
     // when we have ownerName in setVolumePropertyRequest.
     if (!setVolumePropertyRequest.hasOwnerName()) {
@@ -112,46 +118,35 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       }
 
       long maxUserVolumeCount = ozoneManager.getMaxUserVolumeCount();
-
-      String dbVolumeKey = omMetadataManager.getVolumeKey(volume);
-
       OzoneManagerProtocolProtos.UserVolumeInfo oldOwnerVolumeList = null;
       OzoneManagerProtocolProtos.UserVolumeInfo newOwnerVolumeList = null;
       OmVolumeArgs omVolumeArgs = null;
 
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume);
-
-      omVolumeArgs = omMetadataManager.getVolumeTable().get(dbVolumeKey);
-
-      if (omVolumeArgs == null) {
-        LOG.debug("Changing volume ownership failed for user:{} volume:{}",
-            newOwner, volume);
-        throw new OMException("Volume " + volume + " is not found",
-            OMException.ResultCodes.VOLUME_NOT_FOUND);
-      }
-
-      // Check if this transaction is a replay of ratis logs.
-      // If this is a replay, then the response has already been returned to
-      // the client. So take no further action and return a dummy
-      // OMClientResponse.
-      if (isReplay(ozoneManager, omVolumeArgs, transactionLogIndex)) {
-        LOG.debug("Replayed Transaction {} ignored. Request: {}",
-            transactionLogIndex, setVolumePropertyRequest);
-        return new OMVolumeSetOwnerResponse(createReplayOMResponse(omResponse));
-      }
-
+      omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
       oldOwner = omVolumeArgs.getOwnerName();
+
+      // Return OK immediately if newOwner is the same as oldOwner.
+      if (oldOwner.equals(newOwner)) {
+        LOG.warn("Volume '{}' owner is already user '{}'.", volume, oldOwner);
+        omResponse.setStatus(OzoneManagerProtocolProtos.Status.OK)
+          .setMessage(
+            "Volume '" + volume + "' owner is already '" + newOwner + "'.")
+          .setSuccess(false);
+        omResponse.setSetVolumePropertyResponse(
+            SetVolumePropertyResponse.newBuilder().setResponse(false).build());
+        omClientResponse = new OMVolumeSetOwnerResponse(omResponse.build());
+        // Note: addResponseToDoubleBuffer would be executed in finally block.
+        return omClientResponse;
+      }
 
       acquiredUserLocks =
           omMetadataManager.getLock().acquireMultiUserLock(newOwner, oldOwner);
-
       oldOwnerVolumeList =
           omMetadataManager.getUserTable().get(oldOwner);
-
       oldOwnerVolumeList = delVolumeFromOwnerList(
           oldOwnerVolumeList, volume, oldOwner, transactionLogIndex);
-
       newOwnerVolumeList = omMetadataManager.getUserTable().get(newOwner);
       newOwnerVolumeList = addVolumeToOwnerList(
           newOwnerVolumeList, volume, newOwner,
@@ -162,24 +157,27 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       omVolumeArgs.setUpdateID(transactionLogIndex,
           ozoneManager.isRatisEnabled());
 
+      // Update modificationTime.
+      omVolumeArgs.setModificationTime(
+          setVolumePropertyRequest.getModificationTime());
+
       // Update cache.
       omMetadataManager.getUserTable().addCacheEntry(
           new CacheKey<>(omMetadataManager.getUserKey(newOwner)),
-              new CacheValue<>(Optional.of(newOwnerVolumeList),
-                  transactionLogIndex));
+          new CacheValue<>(Optional.of(newOwnerVolumeList),
+              transactionLogIndex));
       omMetadataManager.getUserTable().addCacheEntry(
           new CacheKey<>(omMetadataManager.getUserKey(oldOwner)),
           new CacheValue<>(Optional.of(oldOwnerVolumeList),
               transactionLogIndex));
       omMetadataManager.getVolumeTable().addCacheEntry(
-          new CacheKey<>(dbVolumeKey),
+          new CacheKey<>(omMetadataManager.getVolumeKey(volume)),
           new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
 
       omResponse.setSetVolumePropertyResponse(
-          SetVolumePropertyResponse.newBuilder().build());
+          SetVolumePropertyResponse.newBuilder().setResponse(true).build());
       omClientResponse = new OMVolumeSetOwnerResponse(omResponse.build(),
           oldOwner, oldOwnerVolumeList, newOwnerVolumeList, omVolumeArgs);
-
     } catch (IOException ex) {
       exception = ex;
       omClientResponse = new OMVolumeSetOwnerResponse(

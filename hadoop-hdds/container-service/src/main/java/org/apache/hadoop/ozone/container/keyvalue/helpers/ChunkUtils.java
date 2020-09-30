@@ -261,6 +261,15 @@ public final class ChunkUtils {
     return Boolean.parseBoolean(overWrite);
   }
 
+  public static void verifyChunkFileExists(File file)
+      throws StorageContainerException {
+    if (!file.exists()) {
+      throw new StorageContainerException(
+          "Chunk file not found: " + file.getPath(),
+          UNABLE_TO_FIND_CHUNK);
+    }
+  }
+
   @VisibleForTesting
   static <T> T processFileExclusively(Path path, Supplier<T> op) {
     for (;;) {

@@ -227,10 +227,6 @@ public final class HddsConfigKeys {
       "hdds.container.chunk.persistdata";
   public static final boolean HDDS_CONTAINER_PERSISTDATA_DEFAULT = true;
 
-  public static final String HDDS_CONTAINER_SCRUB_ENABLED =
-      "hdds.container.scrub.enabled";
-  public static final boolean HDDS_CONTAINER_SCRUB_ENABLED_DEFAULT = false;
-
   public static final String HDDS_DATANODE_HTTP_ENABLED_KEY =
       "hdds.datanode.http.enabled";
   public static final String HDDS_DATANODE_HTTP_BIND_HOST_KEY =
@@ -245,10 +241,20 @@ public final class HddsConfigKeys {
   public static final String HDDS_DATANODE_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int HDDS_DATANODE_HTTP_BIND_PORT_DEFAULT = 9882;
   public static final int HDDS_DATANODE_HTTPS_BIND_PORT_DEFAULT = 9883;
+
+  public static final String OZONE_DATANODE_HTTP_AUTH_CONFIG_PREFIX =
+      "hdds.datanode.http.auth.";
+  public static final String HDDS_DATANODE_HTTP_AUTH_TYPE =
+      OZONE_DATANODE_HTTP_AUTH_CONFIG_PREFIX + "type";
   public static final String
       HDDS_DATANODE_HTTP_KERBEROS_PRINCIPAL_KEY =
-      "hdds.datanode.http.kerberos.principal";
+      OZONE_DATANODE_HTTP_AUTH_CONFIG_PREFIX +  "kerberos.principal";
   public static final String
       HDDS_DATANODE_HTTP_KERBEROS_KEYTAB_FILE_KEY =
-      "hdds.datanode.http.kerberos.keytab";
+      OZONE_DATANODE_HTTP_AUTH_CONFIG_PREFIX + "kerberos.keytab";
+
+  public static final String HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT =
+      "hdds.datanode.ratis.server.request.timeout";
+  public static final String
+      HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT = "2m";
 }

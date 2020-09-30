@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.protocol.ReconDatanodeProtocol;
 import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 
+import com.google.protobuf.ProtocolMessageEnum;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
 
 /**
@@ -48,7 +49,8 @@ public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer
   }
 
   @Override
-  public ProtocolMessageMetrics getProtocolMessageMetrics() {
+  public ProtocolMessageMetrics<ProtocolMessageEnum>
+      getProtocolMessageMetrics() {
     return ProtocolMessageMetrics
         .create("ReconDatanodeProtocol", "Recon Datanode protocol",
             StorageContainerDatanodeProtocolProtos.Type.values());

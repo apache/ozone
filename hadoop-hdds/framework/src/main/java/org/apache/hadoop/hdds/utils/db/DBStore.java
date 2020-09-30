@@ -35,7 +35,7 @@ import org.apache.hadoop.hdds.utils.db.cache.TableCacheImpl;
  *
  */
 @InterfaceStability.Evolving
-public interface DBStore extends AutoCloseable {
+public interface DBStore extends AutoCloseable, BatchOperationHandler {
 
   /**
    * Gets an existing TableStore.
@@ -141,22 +141,6 @@ public interface DBStore extends AutoCloseable {
    */
   long getEstimatedKeyCount() throws IOException;
 
-  /**
-   * Initialize an atomic batch operation which can hold multiple PUT/DELETE
-   * operations and committed later in one step.
-   *
-   * @return BatchOperation holder which can be used to add or commit batch
-   * operations.
-   */
-  BatchOperation initBatchOperation();
-
-  /**
-   * Commit the batch operations.
-   *
-   * @param operation which contains all the required batch operation.
-   * @throws IOException on Failure.
-   */
-  void commitBatchOperation(BatchOperation operation) throws IOException;
 
   /**
    * Get current snapshot of DB store as an artifact stored on

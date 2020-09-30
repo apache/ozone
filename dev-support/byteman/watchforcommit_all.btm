@@ -1,0 +1,47 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Measure overall time spent in Watch for commit calls
+
+RULE watchforcommit_all-FileSystem.close
+CLASS org.apache.hadoop.fs.FileSystem
+METHOD close
+IF TRUE
+DO
+  System.out.println("Closing file system instance: " + System.identityHashCode($0));
+  System.out.println("   watchForCommit.call: " + readCounter("watchForCommit.call"));
+  System.out.println("   watchForCommit.allTime: " + readCounter("watchForCommit.allTime"))
+
+ENDRULE
+
+RULE watchforcommit_all-BlockOutputStream.watchForCommit.Entry
+CLASS org.apache.hadoop.hdds.scm.storage.BlockOutputStream
+METHOD watchForCommit
+AT ENTRY
+IF TRUE
+DO resetTimer(Thread.currentThread());
+   incrementCounter("watchForCommit.call")
+ENDRULE
+
+RULE watchforcommit_all-BlockOutputStream.watchForCommit.Exit
+CLASS org.apache.hadoop.hdds.scm.storage.BlockOutputStream
+METHOD watchForCommit
+AT EXIT
+BIND elapsedTime = java.lang.Math.toIntExact(getElapsedTimeFromTimer(Thread.currentThread()))
+IF TRUE
+DO
+   System.out.println("watchForCommit: " + elapsedTime);
+   incrementCounter("watchForCommit.allTime", elapsedTime)
+ENDRULE

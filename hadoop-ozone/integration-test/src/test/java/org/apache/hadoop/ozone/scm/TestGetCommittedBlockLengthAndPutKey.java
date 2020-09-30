@@ -45,12 +45,20 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 
 /**
  * Test Container calls.
  */
 public class TestGetCommittedBlockLengthAndPutKey {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration ozoneConfig;

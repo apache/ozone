@@ -19,16 +19,16 @@
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-ozone</artifactId>
-    <version>0.6.0-SNAPSHOT</version>
+    <version>1.1.0-SNAPSHOT</version>
   </parent>
   <artifactId>hadoop-ozone-dist</artifactId>
   <name>Apache Hadoop Ozone Distribution</name>
-  <packaging>pom</packaging>
-  <version>0.6.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <version>1.1.0-SNAPSHOT</version>
   <properties>
     <file.encoding>UTF-8</file.encoding>
     <downloadSources>true</downloadSources>
-    <docker.ozone-runner.version>20191107-1</docker.ozone-runner.version>
+    <docker.ozone-runner.version>20200625-1</docker.ozone-runner.version>
   </properties>
 
   <build>
@@ -41,103 +41,17 @@
             <id>copy-classpath-files</id>
             <phase>prepare-package</phase>
             <goals>
-              <goal>copy</goal>
+              <goal>unpack-dependencies</goal>
             </goals>
             <configuration>
               <outputDirectory>
                 target/ozone-${ozone.version}/share/ozone/classpath
               </outputDirectory>
-              <artifactItems>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-hdds-server-scm</artifactId>
-                  <version>${hdds.version}</version>
-                  <classifier>classpath</classifier>
-                  <type>cp</type>
-                  <destFileName>hadoop-hdds-server-scm.classpath</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-hdds-tools</artifactId>
-                  <version>${hdds.version}</version>
-                  <classifier>classpath</classifier>
-                  <type>cp</type>
-                  <destFileName>hadoop-hdds-tools.classpath</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-ozone-s3gateway</artifactId>
-                  <version>${ozone.version}</version>
-                  <classifier>classpath</classifier>
-                  <type>cp</type>
-                  <destFileName>hadoop-ozone-s3gateway.classpath</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-ozone-csi</artifactId>
-                  <version>${ozone.version}</version>
-                  <classifier>classpath</classifier>
-                  <type>cp</type>
-                  <destFileName>hadoop-ozone-csi.classpath</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-ozone-ozone-manager</artifactId>
-                  <version>${ozone.version}</version>
-                  <classifier>classpath</classifier>
-                  <type>cp</type>
-                  <destFileName>hadoop-ozone-ozone-manager.classpath
-                  </destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-ozone-tools</artifactId>
-                  <version>${ozone.version}</version>
-                  <classifier>classpath</classifier>
-                  <type>cp</type>
-                  <destFileName>hadoop-ozone-tools.classpath</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-ozone-filesystem</artifactId>
-                  <version>${ozone.version}</version>
-                  <classifier>classpath</classifier>
-                  <type>cp</type>
-                  <destFileName>hadoop-ozone-filesystem.classpath</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-ozone-common</artifactId>
-                  <version>${ozone.version}</version>
-                  <classifier>classpath</classifier>
-                  <type>cp</type>
-                  <destFileName>hadoop-ozone-common.classpath</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-ozone-datanode</artifactId>
-                  <version>${ozone.version}</version>
-                  <classifier>classpath</classifier>
-                  <type>cp</type>
-                  <destFileName>hadoop-ozone-datanode.classpath</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-ozone-upgrade</artifactId>
-                  <version>${ozone.version}</version>
-                  <classifier>classpath</classifier>
-                  <type>cp</type>
-                  <destFileName>hadoop-ozone-upgrade.classpath</destFileName>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>org.apache.hadoop</groupId>
-                  <artifactId>hadoop-ozone-insight</artifactId>
-                  <version>${ozone.version}</version>
-                  <classifier>classpath</classifier>
-                  <type>cp</type>
-                  <destFileName>hadoop-ozone-insight.classpath</destFileName>
-                </artifactItem>
-              </artifactItems>
+              <includes>*.classpath</includes>
+              <includeArtifactIds>
+                hadoop-hdds-server-scm,hadoop-ozone-common,hadoop-ozone-csi,hadoop-ozone-datanode,hadoop-ozone-insight,
+                hadoop-ozone-ozone-manager,hadoop-ozone-recon,hadoop-ozone-s3gateway,hadoop-ozone-tools
+              </includeArtifactIds>
             </configuration>
           </execution>
           <execution>
@@ -147,8 +61,7 @@
               <goal>copy-dependencies</goal>
             </goals>
             <configuration>
-              <outputDirectory>target/ozone-${ozone.version}/share/ozone/lib
-              </outputDirectory>
+              <outputDirectory>target/ozone-${ozone.version}/share/ozone/lib</outputDirectory>
               <includeScope>runtime</includeScope>
             </configuration>
           </execution>
@@ -165,12 +78,7 @@
                 <artifactItem>
                   <groupId>com.google.protobuf</groupId>
                   <artifactId>protobuf-java</artifactId>
-                  <version>3.5.1</version>
-                </artifactItem>
-                <artifactItem>
-                  <groupId>com.google.guava</groupId>
-                  <artifactId>guava</artifactId>
-                  <version>26.0-android</version>
+                  <version>${protobuf-compile.version}</version>
                 </artifactItem>
               </artifactItems>
             </configuration>
@@ -179,7 +87,6 @@
       </plugin>
       <plugin>
         <artifactId>maven-resources-plugin</artifactId>
-        <version>3.1.0</version>
         <executions>
           <execution>
             <id>copy-compose-files</id>
@@ -313,10 +220,6 @@
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-ozone-upgrade</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-ozone-insight</artifactId>
     </dependency>
   </dependencies>
@@ -331,11 +234,11 @@
       <dependencies>
         <dependency>
           <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-ozone-filesystem-lib-current</artifactId>
+          <artifactId>hadoop-ozone-filesystem-hadoop2</artifactId>
         </dependency>
         <dependency>
           <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-ozone-filesystem-lib-legacy</artifactId>
+          <artifactId>hadoop-ozone-filesystem-hadoop3</artifactId>
         </dependency>
       </dependencies>
     </profile>
@@ -347,46 +250,66 @@
         </property>
       </activation>
 
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-dependency-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>copy-recon-classpath-file</id>
-                <phase>prepare-package</phase>
-                <goals>
-                  <goal>copy</goal>
-                </goals>
-                <configuration>
-                  <outputDirectory>
-                    target/ozone-${ozone.version}/share/ozone/classpath
-                  </outputDirectory>
-                  <artifactItems>
-                    <artifactItem>
-                      <groupId>org.apache.hadoop</groupId>
-                      <artifactId>hadoop-ozone-recon</artifactId>
-                      <version>${ozone.version}</version>
-                      <classifier>classpath</classifier>
-                      <type>cp</type>
-                      <destFileName>hadoop-ozone-recon.classpath</destFileName>
-                    </artifactItem>
-                  </artifactItems>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-
       <dependencies>
         <dependency>
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-ozone-recon</artifactId>
         </dependency>
       </dependencies>
+    </profile>
 
+    <profile>
+      <!-- turn on the profile to copy all the required jar files to measure coverage -->
+      <id>coverage</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-dependency-plugin</artifactId>
+            <version>3.1.1</version>
+            <executions>
+              <execution>
+                <id>copy-jacoco-files</id>
+                <phase>prepare-package</phase>
+                <goals>
+                  <goal>copy</goal>
+                </goals>
+                <configuration>
+                  <outputDirectory>
+                    target/ozone-${ozone.version}/share/coverage
+                  </outputDirectory>
+                  <artifactItems>
+                    <artifactItem>
+                      <groupId>org.jacoco</groupId>
+                      <artifactId>org.jacoco.agent</artifactId>
+                      <version>0.8.5</version>
+                      <classifier>runtime</classifier>
+                      <destFileName>jacoco-agent.jar</destFileName>
+                    </artifactItem>
+                    <artifactItem>
+                      <groupId>org.jacoco</groupId>
+                      <artifactId>org.jacoco.cli</artifactId>
+                      <version>0.8.5</version>
+                      <classifier>nodeps</classifier>
+                      <destFileName>jacoco-cli.jar</destFileName>
+                    </artifactItem>
+                    <artifactItem>
+                      <groupId>org.jacoco</groupId>
+                      <artifactId>org.jacoco.core</artifactId>
+                      <version>0.8.5</version>
+                      <destFileName>jacoco-core.jar</destFileName>
+                    </artifactItem>
+                    <artifactItem>
+                      <groupId>org.apache.hadoop</groupId>
+                      <artifactId>hadoop-hdds-test-utils</artifactId>
+                     </artifactItem>
+                    </artifactItems>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
     </profile>
 
     <profile>
@@ -434,7 +357,6 @@
           <plugin>
             <groupId>io.fabric8</groupId>
             <artifactId>docker-maven-plugin</artifactId>
-            <version>0.29.0</version>
             <executions>
               <execution>
                 <goals>
@@ -466,7 +388,6 @@
           <plugin>
             <groupId>io.fabric8</groupId>
             <artifactId>docker-maven-plugin</artifactId>
-            <version>0.29.0</version>
             <executions>
               <execution>
                 <goals>

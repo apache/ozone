@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -41,7 +41,7 @@ public class StaleNodeHandler implements EventHandler<DatanodeDetails> {
 
   private final NodeManager nodeManager;
   private final PipelineManager pipelineManager;
-  private final Configuration conf;
+  private final ConfigurationSource conf;
 
   public StaleNodeHandler(NodeManager nodeManager,
       PipelineManager pipelineManager, OzoneConfiguration conf) {

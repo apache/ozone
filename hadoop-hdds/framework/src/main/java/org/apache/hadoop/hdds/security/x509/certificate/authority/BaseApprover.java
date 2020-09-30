@@ -50,13 +50,22 @@ import java.util.concurrent.CompletableFuture;
  */
 public abstract class BaseApprover implements CertificateApprover {
   private static final Logger LOG =
-      LoggerFactory.getLogger(CertificateApprover.class);
+      LoggerFactory.getLogger(BaseApprover.class);
   private final PKIProfile profile;
   private final SecurityConfig securityConfig;
 
   public BaseApprover(PKIProfile pkiProfile, SecurityConfig config) {
     this.profile = Objects.requireNonNull(pkiProfile);
     this.securityConfig = Objects.requireNonNull(config);
+  }
+
+  /**
+   * Returns the PKI policy profile.
+   *
+   * @return PKIProfile
+   */
+  public PKIProfile getProfile() {
+    return profile;
   }
 
   /**

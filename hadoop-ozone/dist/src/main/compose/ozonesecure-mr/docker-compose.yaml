@@ -48,6 +48,7 @@ services:
       - docker-config
     environment:
       KERBEROS_KEYTABS: dn HTTP
+      HADOOP_OPTS: ${HADOOP_OPTS}
   om:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
     hostname: om
@@ -57,9 +58,11 @@ services:
       - ../..:/opt/hadoop
     ports:
       - 9874:9874
+      - 9862:9862
     environment:
       ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
       KERBEROS_KEYTABS: om HTTP testuser
+      HADOOP_OPTS: ${HADOOP_OPTS}
     env_file:
       - docker-config
     command: ["/opt/hadoop/bin/ozone","om"]
@@ -76,6 +79,7 @@ services:
       - ./docker-config
     environment:
       KERBEROS_KEYTABS: s3g HTTP
+      HADOOP_OPTS: ${HADOOP_OPTS}
     command: ["/opt/hadoop/bin/ozone","s3g"]
   scm:
     image: apache/ozone-runner:${OZONE_RUNNER_VERSION}
@@ -86,12 +90,14 @@ services:
       - ../..:/opt/hadoop
     ports:
       - 9876:9876
+      - 9860:9860
     env_file:
       - docker-config
     environment:
       ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
       OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-1}"
       KERBEROS_KEYTABS: scm HTTP
+      HADOOP_OPTS: ${HADOOP_OPTS}
     command: ["/opt/hadoop/bin/ozone","scm"]
   rm:
     image: apache/hadoop:${HADOOP_VERSION}
@@ -105,7 +111,7 @@ services:
     env_file:
       - ./docker-config
     environment:
-      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-lib-current-@project.version@.jar
+      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-hadoop3-@project.version@.jar
       KERBEROS_KEYTABS: rm HTTP hadoop
     command: ["yarn", "resourcemanager"]
   nm:
@@ -118,7 +124,7 @@ services:
     env_file:
       - ./docker-config
     environment:
-      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-lib-current-@project.version@.jar
+      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-hadoop3-@project.version@.jar
       WAIT_FOR: rm:8088
       KERBEROS_KEYTABS: nm HTTP
     command: ["yarn","nodemanager"]
@@ -136,7 +142,7 @@ services:
       - ./docker-config
     environment:
       KERBEROS_KEYTABS: jhs HTTP
-      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-lib-current-@project.version@.jar
+      HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-hadoop3-@project.version@.jar
       WAIT_FOR: rm:8088
     command: ["yarn","timelineserver"]
 networks:

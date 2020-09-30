@@ -19,8 +19,6 @@
  */
 package org.apache.hadoop.ozone.client;
 
-import java.io.IOException;
-
 /**
  * In-memory OzoneClient for testing.
  */
@@ -31,7 +29,8 @@ public class OzoneClientStub extends OzoneClient {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     //NOOP.
   }
+
 }

@@ -999,7 +999,7 @@ function hadoop_connect_to_hosts
   # shellcheck disable=SC2124
   local params="$@"
   local worker_file
-  local tmpslvnames
+  local tmp_worker_names
 
   #
   # ssh (or whatever) to a host
@@ -1030,10 +1030,10 @@ function hadoop_connect_to_hosts
     else
       # no spaces allowed in the pdsh arg host list
       # shellcheck disable=SC2086
-      tmpslvnames=$(echo ${HADOOP_WORKER_NAMES} | tr -s ' ' ,)
+      tmp_worker_names=$(echo ${HADOOP_WORKER_NAMES} | tr -s ' ' ,)
       PDSH_SSH_ARGS_APPEND="${HADOOP_SSH_OPTS}" pdsh \
         -f "${HADOOP_SSH_PARALLEL}" \
-        -w "${tmpslvnames}" $"${@// /\\ }" 2>&1
+        -w "${tmp_worker_names}" $"${@// /\\ }" 2>&1
     fi
   else
     if [[ -z "${HADOOP_WORKER_NAMES}" ]]; then
@@ -1541,6 +1541,21 @@ function hadoop_translate_cygwin_path
   fi
 }
 
+## @description  Adds default GC parameters
+## @description  Only for server components and only if no other -XX parameters
+## @description  are set
+## @audience     private
+## @stability    evolving
+## @replaceable  yes
+function hadoop_add_default_gc_opts
+{
+  if [[ "${HADOOP_SUBCMD_SUPPORTDAEMONIZATION}" == true ]]; then
+    if [[ ! "$HADOOP_OPTS" =~ "-XX" ]] ; then
+       hadoop_error "No '-XX:...' jvm parameters are set. Adding safer GC settings '-XX:ParallelGCThreads=8 -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled' to the HADOOP_OPTS"
+       HADOOP_OPTS="${HADOOP_OPTS} -XX:ParallelGCThreads=8 -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled"
+    fi
+  fi
+}
 ## @description  Adds the HADOOP_CLIENT_OPTS variable to
 ## @description  HADOOP_OPTS if HADOOP_SUBCMD_SUPPORTDAEMONIZATION is false
 ## @audience     public
@@ -2558,6 +2573,12 @@ function hadoop_parse_args
         shift
         ((HADOOP_PARSE_COUNTER=HADOOP_PARSE_COUNTER+1))
       ;;
+      --jvmargs)
+        shift
+        hadoop_add_param HADOOP_OPTS "$1" "$1"
+        shift
+        ((HADOOP_PARSE_COUNTER=HADOOP_PARSE_COUNTER+2))
+      ;;
       --config)
         shift
         confdir=$1
@@ -2678,14 +2699,14 @@ function hadoop_generic_java_subcmd_handler
 
     hadoop_verify_secure_prereq
     hadoop_setup_secure_service
-    priv_outfile="${HADOOP_LOG_DIR}/privileged-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.out"
-    priv_errfile="${HADOOP_LOG_DIR}/privileged-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.err"
-    priv_pidfile="${HADOOP_PID_DIR}/privileged-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}.pid"
-    daemon_outfile="${HADOOP_LOG_DIR}/hadoop-${HADOOP_SECURE_USER}-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.out"
-    daemon_pidfile="${HADOOP_PID_DIR}/hadoop-${HADOOP_SECURE_USER}-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}.pid"
+    priv_outfile="${HADOOP_LOG_DIR}/ozone-privileged-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.out"
+    priv_errfile="${HADOOP_LOG_DIR}/ozone-privileged-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.err"
+    priv_pidfile="${HADOOP_PID_DIR}/ozone-privileged-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}.pid"
+    daemon_outfile="${HADOOP_LOG_DIR}/ozone-${HADOOP_SECURE_USER}-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.out"
+    daemon_pidfile="${HADOOP_PID_DIR}/ozone-${HADOOP_SECURE_USER}-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}.pid"
   else
-    daemon_outfile="${HADOOP_LOG_DIR}/hadoop-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.out"
-    daemon_pidfile="${HADOOP_PID_DIR}/hadoop-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}.pid"
+    daemon_outfile="${HADOOP_LOG_DIR}/ozone-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.out"
+    daemon_pidfile="${HADOOP_PID_DIR}/ozone-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}.pid"
   fi
 
   # are we actually in daemon mode?
@@ -2693,9 +2714,9 @@ function hadoop_generic_java_subcmd_handler
   if [[ "${HADOOP_DAEMON_MODE}" != "default" ]]; then
     HADOOP_ROOT_LOGGER="${HADOOP_DAEMON_ROOT_LOGGER}"
     if [[ "${HADOOP_SUBCMD_SECURESERVICE}" = true ]]; then
-      HADOOP_LOGFILE="hadoop-${HADOOP_SECURE_USER}-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.log"
+      HADOOP_LOGFILE="ozone-${HADOOP_SECURE_USER}-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.log"
     else
-      HADOOP_LOGFILE="hadoop-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.log"
+      HADOOP_LOGFILE="ozone-${HADOOP_IDENT_STRING}-${HADOOP_SUBCMD}-${HOSTNAME}.log"
     fi
   fi
 
@@ -2729,4 +2750,52 @@ function hadoop_generic_java_subcmd_handler
   else
     hadoop_java_exec "${HADOOP_SUBCMD}" "${HADOOP_CLASSNAME}" "${HADOOP_SUBCMD_ARGS[@]}"
   fi
+}
+
+
+## @description Add all the required jar files to the classpath
+## @audience private
+## @stability evolving
+## @replaceable yes
+function hadoop_assembly_classpath() {
+  #
+  # Setting up classpath based on the generate classpath descriptors
+  #
+  ARTIFACT_NAME="$1"
+  if [ ! "$ARTIFACT_NAME" ]; then
+    echo "ERROR: Ozone components require to set OZONE_RUN_ARTIFACT_NAME to set the classpath"
+    exit 255
+  fi
+  export HDDS_LIB_JARS_DIR="${HADOOP_HDFS_HOME}/share/ozone/lib"
+  CLASSPATH_FILE="${HADOOP_HDFS_HOME}/share/ozone/classpath/${ARTIFACT_NAME}.classpath"
+  if [ ! "$CLASSPATH_FILE" ]; then
+    echo "ERROR: Classpath file descriptor $CLASSPATH_FILE is missing"
+    exit 255
+  fi
+  # shellcheck disable=SC1090,SC2086
+  source $CLASSPATH_FILE
+  OIFS=$IFS
+  IFS=':'
+
+  # shellcheck disable=SC2154
+  for jar in $classpath; do
+    hadoop_add_classpath "$jar"
+  done
+  hadoop_add_classpath "${HADOOP_HDFS_HOME}/share/ozone/web"
+
+  #We need to add the artifact manually as it's not part the generated classpath desciptor
+  ARTIFACT_LIB_DIR="${HADOOP_HDFS_HOME}/share/ozone/lib"
+  MAIN_ARTIFACT=$(find "$ARTIFACT_LIB_DIR" -name "${OZONE_RUN_ARTIFACT_NAME}-*.jar")
+  if [ ! "$MAIN_ARTIFACT" ]; then
+    echo "ERROR: Component jar file $MAIN_ARTIFACT is missing from ${HADOOP_HDFS_HOME}/share/ozone/lib"
+  fi
+  hadoop_add_classpath "${MAIN_ARTIFACT}"
+
+  #Add optional jars to the classpath
+  OPTIONAL_CLASSPATH_DIR="${HADOOP_HDFS_HOME}/share/ozone/lib/${ARTIFACT_NAME}"
+  if [[ -d "$OPTIONAL_CLASSPATH_DIR" ]]; then
+    hadoop_add_classpath "$OPTIONAL_CLASSPATH_DIR/*"
+  fi
+
+  IFS=$OIFS
 }

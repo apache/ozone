@@ -17,15 +17,14 @@
  */
 package org.apache.hadoop.hdds.fs;
 
-import org.apache.hadoop.conf.Configuration;
+import java.io.File;
+import java.time.Duration;
+
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-
-import java.io.File;
-import java.time.Duration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 
 /**
  * Uses DU for all volumes.  Saves used value in cache file.
@@ -35,13 +34,12 @@ public class DUFactory implements SpaceUsageCheckFactory {
   private static final String DU_CACHE_FILE = "scmUsed";
   private static final String EXCLUDE_PATTERN = "*.tmp.*";
 
-  private static final String CONFIG_PREFIX = "hdds.datanode.du";
-
   private Conf conf;
 
   @Override
-  public SpaceUsageCheckFactory setConfiguration(Configuration configuration) {
-    conf = OzoneConfiguration.of(configuration).getObject(Conf.class);
+  public SpaceUsageCheckFactory setConfiguration(
+      ConfigurationSource configuration) {
+    conf = configuration.getObject(Conf.class);
     return this;
   }
 
@@ -60,13 +58,11 @@ public class DUFactory implements SpaceUsageCheckFactory {
   /**
    * Configuration for {@link DUFactory}.
    */
-  @ConfigGroup(prefix = CONFIG_PREFIX)
+  @ConfigGroup(prefix = "hdds.datanode.du")
   public static class Conf {
 
-    private static final String REFRESH_PERIOD = "refresh.period";
-
     @Config(
-        key = REFRESH_PERIOD,
+        key = "refresh.period",
         defaultValue = "1h",
         type = ConfigType.TIME,
         tags = { ConfigTag.DATANODE },
@@ -75,16 +71,12 @@ public class DUFactory implements SpaceUsageCheckFactory {
     )
     private long refreshPeriod;
 
-    public void setRefreshPeriod(long millis) {
-      refreshPeriod = millis;
+    public void setRefreshPeriod(Duration duration) {
+      refreshPeriod = duration.toMillis();
     }
 
     public Duration getRefreshPeriod() {
       return Duration.ofMillis(refreshPeriod);
-    }
-
-    static String configKeyForRefreshPeriod() {
-      return CONFIG_PREFIX + "." + REFRESH_PERIOD;
     }
   }
 }

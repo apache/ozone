@@ -17,19 +17,20 @@
  */
 package org.apache.hadoop.hdds.fs;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.test.GenericTestUtils.LogCapturer;
-import org.junit.Before;
-import org.junit.Test;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.test.GenericTestUtils.LogCapturer;
+
 import static org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory.Conf.configKeyForClassName;
+import org.junit.Before;
+import org.junit.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.slf4j.LoggerFactory;
 
 /**
  * Tests for {@link SpaceUsageCheckFactory}.
@@ -39,7 +40,8 @@ public class TestSpaceUsageFactory {
   private LogCapturer capturer;
 
   /**
-   * Verifies that {@link SpaceUsageCheckFactory#create(Configuration)} creates
+   * Verifies that {@link SpaceUsageCheckFactory#create(ConfigurationSource)}
+   * creates
    * the correct implementation if configured.  This should be called from each
    * specific implementation's test class.
    * @return the instance created, so that further checks can done, if needed
@@ -47,7 +49,7 @@ public class TestSpaceUsageFactory {
   protected static <T extends SpaceUsageCheckFactory> T testCreateViaConfig(
       Class<T> factoryClass) {
 
-    Configuration conf = configFor(factoryClass);
+    OzoneConfiguration conf = configFor(factoryClass);
 
     SpaceUsageCheckFactory factory = SpaceUsageCheckFactory.create(conf);
 
@@ -104,10 +106,10 @@ public class TestSpaceUsageFactory {
         "in log output, but only got: " + output);
   }
 
-  private static <T extends SpaceUsageCheckFactory> Configuration configFor(
-      Class<T> factoryClass) {
+  private static <T extends SpaceUsageCheckFactory> OzoneConfiguration
+      configFor(Class<T> factoryClass) {
 
-    Configuration conf = new Configuration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setClass(configKeyForClassName(),
         factoryClass, SpaceUsageCheckFactory.class);
 
@@ -116,12 +118,12 @@ public class TestSpaceUsageFactory {
 
   private static void testDefaultFactoryForBrokenImplementation(
       Class<? extends SpaceUsageCheckFactory> brokenImplementationClass) {
-    Configuration conf = configFor(brokenImplementationClass);
+    OzoneConfiguration conf = configFor(brokenImplementationClass);
     assertCreatesDefaultImplementation(conf);
   }
 
   private void testDefaultFactoryForWrongConfig(String value) {
-    Configuration conf = new Configuration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(configKeyForClassName(), value);
 
     assertCreatesDefaultImplementation(conf);
@@ -133,7 +135,8 @@ public class TestSpaceUsageFactory {
     }
   }
 
-  private static void assertCreatesDefaultImplementation(Configuration conf) {
+  private static void assertCreatesDefaultImplementation(
+      OzoneConfiguration conf) {
     // given
     // conf
 
@@ -171,15 +174,16 @@ public class TestSpaceUsageFactory {
   }
 
   /**
-   * Spy factory to verify {@link SpaceUsageCheckFactory#create(Configuration)}
+   * Spy factory to verify
+   * {@link SpaceUsageCheckFactory#create(ConfigurationSource)}
    * properly configures it.
    */
   public static final class SpyFactory implements SpaceUsageCheckFactory {
 
-    private Configuration conf;
+    private ConfigurationSource conf;
 
     @Override
-    public SpaceUsageCheckFactory setConfiguration(Configuration config) {
+    public SpaceUsageCheckFactory setConfiguration(ConfigurationSource config) {
       this.conf = config;
       return this;
     }
@@ -189,7 +193,7 @@ public class TestSpaceUsageFactory {
       throw new UnsupportedOperationException();
     }
 
-    public Configuration getConf() {
+    public ConfigurationSource getConf() {
       return conf;
     }
   }

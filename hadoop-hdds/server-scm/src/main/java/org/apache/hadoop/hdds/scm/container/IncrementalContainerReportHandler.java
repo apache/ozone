@@ -54,40 +54,45 @@ public class IncrementalContainerReportHandler extends
   @Override
   public void onMessage(final IncrementalContainerReportFromDatanode report,
                         final EventPublisher publisher) {
+    final DatanodeDetails dnFromReport = report.getDatanodeDetails();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Processing incremental container report from data node {}",
-          report.getDatanodeDetails().getUuid());
+          dnFromReport.getUuid());
+    }
+    DatanodeDetails dd =
+        nodeManager.getNodeByUuid(dnFromReport.getUuidString());
+    if (dd == null) {
+      LOG.warn("Received container report from unknown datanode {}",
+          dnFromReport);
+      return;
     }
 
     boolean success = true;
     for (ContainerReplicaProto replicaProto :
         report.getReport().getReportList()) {
       try {
-        final DatanodeDetails dd = report.getDatanodeDetails();
         final ContainerID id = ContainerID.valueof(
             replicaProto.getContainerID());
-        nodeManager.addContainer(dd, id);
+        if (!replicaProto.getState().equals(
+            ContainerReplicaProto.State.DELETED)) {
+          nodeManager.addContainer(dd, id);
+        }
         processContainerReplica(dd, replicaProto);
       } catch (ContainerNotFoundException e) {
         success = false;
         LOG.warn("Container {} not found!", replicaProto.getContainerID());
       } catch (NodeNotFoundException ex) {
         success = false;
-        LOG.error("Received ICR from unknown datanode {} {}",
+        LOG.error("Received ICR from unknown datanode {}",
             report.getDatanodeDetails(), ex);
       } catch (IOException e) {
         success = false;
         LOG.error("Exception while processing ICR for container {}",
-            replicaProto.getContainerID());
+            replicaProto.getContainerID(), e);
       }
     }
 
-    if (success) {
-      getContainerManager().notifyContainerReportProcessing(false, true);
-    } else {
-      getContainerManager().notifyContainerReportProcessing(false, false);
-    }
-
+    getContainerManager().notifyContainerReportProcessing(false, success);
   }
 
   protected NodeManager getNodeManager() {

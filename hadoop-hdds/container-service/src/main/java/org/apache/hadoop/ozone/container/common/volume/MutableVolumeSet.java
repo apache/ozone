@@ -33,11 +33,9 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.fs.StorageType;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
@@ -65,7 +63,7 @@ public class MutableVolumeSet implements VolumeSet {
   private static final Logger LOG =
       LoggerFactory.getLogger(MutableVolumeSet.class);
 
-  private Configuration conf;
+  private ConfigurationSource conf;
 
   /**
    * Maintains a map of all active volumes in the DataNode.
@@ -106,12 +104,13 @@ public class MutableVolumeSet implements VolumeSet {
   private final HddsVolumeChecker volumeChecker;
   private Runnable failedVolumeListener;
 
-  public MutableVolumeSet(String dnUuid, Configuration conf)
+  public MutableVolumeSet(String dnUuid, ConfigurationSource conf)
       throws IOException {
     this(dnUuid, null, conf);
   }
 
-  public MutableVolumeSet(String dnUuid, String clusterID, Configuration conf)
+  public MutableVolumeSet(String dnUuid, String clusterID,
+      ConfigurationSource conf)
       throws IOException {
     this.datanodeUuid = dnUuid;
     this.clusterID = clusterID;
@@ -144,7 +143,7 @@ public class MutableVolumeSet implements VolumeSet {
   }
 
   @VisibleForTesting
-  HddsVolumeChecker getVolumeChecker(Configuration configuration)
+  HddsVolumeChecker getVolumeChecker(ConfigurationSource configuration)
       throws DiskChecker.DiskErrorException {
     return new HddsVolumeChecker(configuration, new Timer());
   }
@@ -162,15 +161,7 @@ public class MutableVolumeSet implements VolumeSet {
     failedVolumeMap = new ConcurrentHashMap<>();
     volumeStateMap = new EnumMap<>(StorageType.class);
 
-    Collection<String> rawLocations = conf.getTrimmedStringCollection(
-        HDDS_DATANODE_DIR_KEY);
-    if (rawLocations.isEmpty()) {
-      rawLocations = conf.getTrimmedStringCollection(DFS_DATANODE_DATA_DIR_KEY);
-    }
-    if (rawLocations.isEmpty()) {
-      throw new IllegalArgumentException("No location configured in either "
-          + HDDS_DATANODE_DIR_KEY + " or " + DFS_DATANODE_DATA_DIR_KEY);
-    }
+    Collection<String> rawLocations = getDatanodeStorageDirs(conf);
 
     for (StorageType storageType : StorageType.values()) {
       volumeStateMap.put(storageType, new ArrayList<>());
@@ -217,6 +208,20 @@ public class MutableVolumeSet implements VolumeSet {
     };
     ShutdownHookManager.get().addShutdownHook(shutdownHook,
         SHUTDOWN_HOOK_PRIORITY);
+  }
+
+  public static Collection<String> getDatanodeStorageDirs(
+      ConfigurationSource conf) {
+    Collection<String> rawLocations = conf.getTrimmedStringCollection(
+        HDDS_DATANODE_DIR_KEY);
+    if (rawLocations.isEmpty()) {
+      rawLocations = conf.getTrimmedStringCollection(DFS_DATANODE_DATA_DIR_KEY);
+    }
+    if (rawLocations.isEmpty()) {
+      throw new IllegalArgumentException("No location configured in either "
+          + HDDS_DATANODE_DIR_KEY + " or " + DFS_DATANODE_DATA_DIR_KEY);
+    }
+    return rawLocations;
   }
 
   /**
@@ -480,7 +485,7 @@ public class MutableVolumeSet implements VolumeSet {
     return ImmutableMap.copyOf(volumeStateMap);
   }
 
-  public StorageContainerDatanodeProtocolProtos.NodeReportProto getNodeReport()
+  public StorageLocationReport[] getStorageReport()
       throws IOException {
     boolean failed;
     this.readLock();
@@ -533,11 +538,7 @@ public class MutableVolumeSet implements VolumeSet {
         StorageLocationReport r = builder.build();
         reports[counter++] = r;
       }
-      NodeReportProto.Builder nrb = NodeReportProto.newBuilder();
-      for (int i = 0; i < reports.length; i++) {
-        nrb.addStorageReport(reports[i].getProtoBufMessage());
-      }
-      return nrb.build();
+      return reports;
     } finally {
       this.readUnlock();
     }

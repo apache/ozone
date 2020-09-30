@@ -73,7 +73,7 @@ public class BenchMarkContainerStateMap {
             .setReplicationFactor(pipeline.getFactor())
             .setUsedBytes(0)
             .setNumberOfKeys(0)
-            .setStateEnterTime(Time.monotonicNow())
+            .setStateEnterTime(Time.now())
             .setOwner(OzoneConsts.OZONE)
             .setContainerID(x)
             .setDeleteTransactionId(0)
@@ -93,7 +93,7 @@ public class BenchMarkContainerStateMap {
             .setReplicationFactor(pipeline.getFactor())
             .setUsedBytes(0)
             .setNumberOfKeys(0)
-            .setStateEnterTime(Time.monotonicNow())
+            .setStateEnterTime(Time.now())
             .setOwner(OzoneConsts.OZONE)
             .setContainerID(y)
             .setDeleteTransactionId(0)
@@ -112,7 +112,7 @@ public class BenchMarkContainerStateMap {
           .setReplicationFactor(pipeline.getFactor())
           .setUsedBytes(0)
           .setNumberOfKeys(0)
-          .setStateEnterTime(Time.monotonicNow())
+          .setStateEnterTime(Time.now())
           .setOwner(OzoneConsts.OZONE)
           .setContainerID(currentCount++)
           .setDeleteTransactionId(0)
@@ -142,7 +142,7 @@ public class BenchMarkContainerStateMap {
     Preconditions.checkArgument(numNodes >= 1);
     final List<DatanodeDetails> ids = new ArrayList<>(numNodes);
     for (int i = 0; i < numNodes; i++) {
-      ids.add(GenesisUtil.createDatanodeDetails(UUID.randomUUID().toString()));
+      ids.add(GenesisUtil.createDatanodeDetails(UUID.randomUUID()));
     }
     return createPipeline(containerName, ids);
   }
@@ -181,7 +181,7 @@ public class BenchMarkContainerStateMap {
         .setReplicationFactor(pipeline.getFactor())
         .setUsedBytes(0)
         .setNumberOfKeys(0)
-        .setStateEnterTime(Time.monotonicNow())
+        .setStateEnterTime(Time.now())
         .setOwner(OzoneConsts.OZONE)
         .setContainerID(cid)
         .setDeleteTransactionId(0)

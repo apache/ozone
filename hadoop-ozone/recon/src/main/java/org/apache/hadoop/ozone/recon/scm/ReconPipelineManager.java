@@ -18,15 +18,11 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_PIPELINE_DB;
-
-import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -34,11 +30,14 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.hdds.utils.db.Table;
+
+import com.google.common.annotations.VisibleForTesting;
+import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.annotations.VisibleForTesting;
+
 
 /**
  * Recon's overriding implementation of SCM's Pipeline Manager.
@@ -48,21 +47,17 @@ public class ReconPipelineManager extends SCMPipelineManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconPipelineManager.class);
 
-  public ReconPipelineManager(Configuration conf,
-                              NodeManager nodeManager,
-                              EventPublisher eventPublisher)
+  public ReconPipelineManager(ConfigurationSource conf,
+      NodeManager nodeManager,
+      Table<PipelineID, Pipeline> pipelineStore,
+      EventPublisher eventPublisher)
       throws IOException {
-    super(conf, nodeManager, eventPublisher, new PipelineStateManager(),
+    super(conf, nodeManager, pipelineStore, eventPublisher,
+        new PipelineStateManager(),
         new ReconPipelineFactory());
     initializePipelineState();
   }
-
-  @Override
-  protected File getPipelineDBPath(Configuration conf) {
-    File metaDir = ReconUtils.getReconScmDbDir(conf);
-    return new File(metaDir, RECON_SCM_PIPELINE_DB);
-  }
-
+  
   @Override
   public void triggerPipelineCreation() {
     // Don't do anything in Recon.
@@ -148,8 +143,7 @@ public class ReconPipelineManager extends SCMPipelineManager {
   void addPipeline(Pipeline pipeline) throws IOException {
     getLock().writeLock().lock();
     try {
-      getPipelineStore().put(pipeline.getId().getProtobuf().toByteArray(),
-          pipeline.getProtobufMessage().toByteArray());
+      getPipelineStore().put(pipeline.getId(), pipeline);
       getStateManager().addPipeline(pipeline);
       getNodeManager().addPipeline(pipeline);
     } finally {

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,13 +17,20 @@
  */
 package org.hadoop.ozone.recon.schema;
 
+import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
+
 import java.sql.Connection;
 import java.sql.SQLException;
 
 import javax.sql.DataSource;
 
+import com.google.inject.Singleton;
+
+import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.google.inject.Inject;
@@ -31,18 +38,19 @@ import com.google.inject.Inject;
 /**
  * Programmatic definition of Recon DDL.
  */
+@Singleton
 public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(UtilizationSchemaDefinition.class);
+
   private final DataSource dataSource;
+  private DSLContext dslContext;
 
   public static final String CLUSTER_GROWTH_DAILY_TABLE_NAME =
-      "cluster_growth_daily";
-
+      "CLUSTER_GROWTH_DAILY";
   public static final String FILE_COUNT_BY_SIZE_TABLE_NAME =
-      "file_count_by_size";
-
-  public static final String MISSING_CONTAINERS_TABLE_NAME =
-      "missing_containers";
+      "FILE_COUNT_BY_SIZE";
 
   @Inject
   UtilizationSchemaDefinition(DataSource dataSource) {
@@ -53,15 +61,19 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
   @Transactional
   public void initializeSchema() throws SQLException {
     Connection conn = dataSource.getConnection();
-    createClusterGrowthTable(conn);
-    createFileSizeCount(conn);
-    createMissingContainersTable(conn);
+    dslContext = DSL.using(conn);
+    if (!TABLE_EXISTS_CHECK.test(conn, FILE_COUNT_BY_SIZE_TABLE_NAME)) {
+      createFileSizeCountTable();
+    }
+    if (!TABLE_EXISTS_CHECK.test(conn, CLUSTER_GROWTH_DAILY_TABLE_NAME)) {
+      createClusterGrowthTable();
+    }
   }
 
-  void createClusterGrowthTable(Connection conn) {
-    DSL.using(conn).createTableIfNotExists(CLUSTER_GROWTH_DAILY_TABLE_NAME)
-        .column("timestamp", SQLDataType.TIMESTAMP)
-        .column("datanode_id", SQLDataType.INTEGER)
+  private void createClusterGrowthTable() {
+    dslContext.createTableIfNotExists(CLUSTER_GROWTH_DAILY_TABLE_NAME)
+        .column("timestamp", SQLDataType.TIMESTAMP.nullable(false))
+        .column("datanode_id", SQLDataType.INTEGER.nullable(false))
         .column("datanode_host", SQLDataType.VARCHAR(1024))
         .column("rack_id", SQLDataType.VARCHAR(1024))
         .column("available_size", SQLDataType.BIGINT)
@@ -73,21 +85,23 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
         .execute();
   }
 
-  void createFileSizeCount(Connection conn) {
-    DSL.using(conn).createTableIfNotExists(FILE_COUNT_BY_SIZE_TABLE_NAME)
-        .column("file_size", SQLDataType.BIGINT)
+  private void createFileSizeCountTable() {
+    dslContext.createTableIfNotExists(FILE_COUNT_BY_SIZE_TABLE_NAME)
+        .column("volume", SQLDataType.VARCHAR(64).nullable(false))
+        .column("bucket", SQLDataType.VARCHAR(64).nullable(false))
+        .column("file_size", SQLDataType.BIGINT.nullable(false))
         .column("count", SQLDataType.BIGINT)
-        .constraint(DSL.constraint("pk_file_size")
-            .primaryKey("file_size"))
+        .constraint(DSL.constraint("pk_volume_bucket_file_size")
+            .primaryKey("volume", "bucket", "file_size"))
         .execute();
   }
 
-  void createMissingContainersTable(Connection conn) {
-    DSL.using(conn).createTableIfNotExists(MISSING_CONTAINERS_TABLE_NAME)
-        .column("container_id", SQLDataType.BIGINT)
-        .column("missing_since", SQLDataType.BIGINT)
-        .constraint(DSL.constraint("pk_container_id")
-        .primaryKey("container_id"))
-        .execute();
+  /**
+   * Returns the DSL context.
+   *
+   * @return dslContext
+   */
+  public DSLContext getDSLContext() {
+    return dslContext;
   }
 }

@@ -45,6 +45,34 @@ public class ScmConfig {
   )
   private String keytab;
 
+  @Config(key = "unknown-container.action",
+      type = ConfigType.STRING,
+      defaultValue = "WARN",
+      tags = { ConfigTag.SCM, ConfigTag.MANAGEMENT },
+      description =
+          "The action taken by SCM to process unknown "
+          + "containers that reported by Datanodes. The default "
+          + "action is just logging container not found warning, "
+          + "another available action is DELETE action. "
+          + "These unknown containers will be deleted under this "
+          + "action way."
+  )
+  private String action;
+
+  @Config(key = "pipeline.choose.policy.impl",
+      type = ConfigType.STRING,
+      defaultValue = "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms" +
+          ".RandomPipelineChoosePolicy",
+      tags = { ConfigTag.SCM, ConfigTag.PIPELINE },
+      description =
+          "The full name of class which implements "
+          + "org.apache.hadoop.hdds.scm.PipelineChoosePolicy. "
+          + "The class decides which pipeline will be used to find or "
+          + "allocate container. If not set, "
+          + "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms. "
+          + "RandomPipelineChoosePolicy will be used as default value."
+  )
+  private String pipelineChoosePolicyName;
 
   public void setKerberosPrincipal(String kerberosPrincipal) {
     this.principal = kerberosPrincipal;
@@ -55,12 +83,28 @@ public class ScmConfig {
     this.keytab = kerberosKeytab;
   }
 
+  public void setUnknownContainerAction(String unknownContainerAction) {
+    this.action = unknownContainerAction;
+  }
+
+  public void setPipelineChoosePolicyName(String pipelineChoosePolicyName) {
+    this.pipelineChoosePolicyName = pipelineChoosePolicyName;
+  }
+
   public String getKerberosPrincipal() {
     return this.principal;
   }
 
   public String getKerberosKeytab() {
     return this.keytab;
+  }
+
+  public String getUnknownContainerAction() {
+    return this.action;
+  }
+
+  public String getPipelineChoosePolicyName() {
+    return pipelineChoosePolicyName;
   }
 
   /**
@@ -77,4 +121,7 @@ public class ScmConfig {
     public static final String HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY =
           "hdds.scm.kerberos.keytab.file";
   }
+
+  public static final String HDDS_SCM_UNKNOWN_CONTAINER_ACTION =
+      "hdds.scm.unknown-container.action";
 }

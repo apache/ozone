@@ -261,6 +261,11 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
+  public int getNumHealthyVolumes(List<DatanodeDetails> dnList) {
+    return 0;
+  }
+
+  @Override
   public void close() throws IOException {
 
   }

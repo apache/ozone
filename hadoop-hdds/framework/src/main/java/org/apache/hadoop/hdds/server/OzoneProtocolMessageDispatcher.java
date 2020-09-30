@@ -21,9 +21,8 @@ import org.apache.hadoop.hdds.function.FunctionWithServiceException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 
-import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.ServiceException;
-import io.opentracing.Scope;
+import io.opentracing.Span;
 import org.slf4j.Logger;
 
 /**
@@ -34,16 +33,18 @@ import org.slf4j.Logger;
  * It logs the message type/content on DEBUG/TRACING log for insight and create
  * a new span based on the tracing information.
  */
-public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE> {
+public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
 
   private String serviceName;
 
-  private final ProtocolMessageMetrics protocolMessageMetrics;
+  private final ProtocolMessageMetrics<TYPE>
+      protocolMessageMetrics;
 
   private Logger logger;
 
   public OzoneProtocolMessageDispatcher(String serviceName,
-      ProtocolMessageMetrics protocolMessageMetrics, Logger logger) {
+      ProtocolMessageMetrics<TYPE> protocolMessageMetrics,
+      Logger logger) {
     this.serviceName = serviceName;
     this.protocolMessageMetrics = protocolMessageMetrics;
     this.logger = logger;
@@ -52,10 +53,9 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE> {
   public RESPONSE processRequest(
       REQUEST request,
       FunctionWithServiceException<REQUEST, RESPONSE> methodCall,
-      ProtocolMessageEnum type,
+      TYPE type,
       String traceId) throws ServiceException {
-    Scope scope = TracingUtil
-        .importAndCreateScope(type.toString(), traceId);
+    Span span = TracingUtil.importAndCreateSpan(type.toString(), traceId);
     try {
       if (logger.isTraceEnabled()) {
         logger.trace(
@@ -67,9 +67,12 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE> {
         logger.debug("{} {} request is received",
             serviceName, type.toString());
       }
-      protocolMessageMetrics.increment(type);
+
+      long startTime = System.nanoTime();
 
       RESPONSE response = methodCall.apply(request);
+
+      protocolMessageMetrics.increment(type, System.nanoTime() - startTime);
 
       if (logger.isTraceEnabled()) {
         logger.trace(
@@ -82,7 +85,7 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE> {
       return response;
 
     } finally {
-      scope.close();
+      span.finish();
     }
   }
 }

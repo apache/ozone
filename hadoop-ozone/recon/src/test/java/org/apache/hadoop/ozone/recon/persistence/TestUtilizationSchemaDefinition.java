@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.persistence;
 import static org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition.CLUSTER_GROWTH_DAILY_TABLE_NAME;
 import static org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition.FILE_COUNT_BY_SIZE_TABLE_NAME;
 import static org.hadoop.ozone.recon.schema.tables.ClusterGrowthDailyTable.CLUSTER_GROWTH_DAILY;
+import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
 import static org.junit.Assert.assertEquals;
 
 import java.sql.Connection;
@@ -31,8 +32,6 @@ import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.sql.DataSource;
-
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.hadoop.ozone.recon.schema.UtilizationSchemaDefinition;
@@ -41,7 +40,7 @@ import org.hadoop.ozone.recon.schema.tables.daos.FileCountBySizeDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ClusterGrowthDaily;
 import org.hadoop.ozone.recon.schema.tables.pojos.FileCountBySize;
 import org.hadoop.ozone.recon.schema.tables.records.FileCountBySizeRecord;
-import org.jooq.Configuration;
+import org.jooq.Record3;
 import org.jooq.Table;
 import org.jooq.UniqueKey;
 import org.junit.Assert;
@@ -50,17 +49,11 @@ import org.junit.Test;
 /**
  * Test persistence module provides connection and transaction awareness.
  */
-public class TestUtilizationSchemaDefinition extends AbstractSqlDatabaseTest {
+public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
 
   @Test
   public void testReconSchemaCreated() throws Exception {
-    UtilizationSchemaDefinition schemaDefinition = getInjector().getInstance(
-        UtilizationSchemaDefinition.class);
-
-    schemaDefinition.initializeSchema();
-
-    Connection connection =
-        getInjector().getInstance(DataSource.class).getConnection();
+    Connection connection = getConnection();
     // Verify table definition
     DatabaseMetaData metaData = connection.getMetaData();
     ResultSet resultSet = metaData.getColumns(null, null,
@@ -68,12 +61,12 @@ public class TestUtilizationSchemaDefinition extends AbstractSqlDatabaseTest {
 
     List<Pair<String, Integer>> expectedPairs = new ArrayList<>();
 
-    expectedPairs.add(new ImmutablePair<>("timestamp", Types.VARCHAR));
+    expectedPairs.add(new ImmutablePair<>("timestamp", Types.TIMESTAMP));
     expectedPairs.add(new ImmutablePair<>("datanode_id", Types.INTEGER));
     expectedPairs.add(new ImmutablePair<>("datanode_host", Types.VARCHAR));
     expectedPairs.add(new ImmutablePair<>("rack_id", Types.VARCHAR));
-    expectedPairs.add(new ImmutablePair<>("available_size", Types.INTEGER));
-    expectedPairs.add(new ImmutablePair<>("used_size", Types.INTEGER));
+    expectedPairs.add(new ImmutablePair<>("available_size", Types.BIGINT));
+    expectedPairs.add(new ImmutablePair<>("used_size", Types.BIGINT));
     expectedPairs.add(new ImmutablePair<>("container_count", Types.INTEGER));
     expectedPairs.add(new ImmutablePair<>("block_count", Types.INTEGER));
 
@@ -92,9 +85,13 @@ public class TestUtilizationSchemaDefinition extends AbstractSqlDatabaseTest {
 
     List<Pair<String, Integer>> expectedPairsFileCount = new ArrayList<>();
     expectedPairsFileCount.add(
-        new ImmutablePair<>("file_size", Types.INTEGER));
+        new ImmutablePair<>("volume", Types.VARCHAR));
     expectedPairsFileCount.add(
-        new ImmutablePair<>("count", Types.INTEGER));
+        new ImmutablePair<>("bucket", Types.VARCHAR));
+    expectedPairsFileCount.add(
+        new ImmutablePair<>("file_size", Types.BIGINT));
+    expectedPairsFileCount.add(
+        new ImmutablePair<>("count", Types.BIGINT));
 
     List<Pair<String, Integer>> actualPairsFileCount = new ArrayList<>();
     while(resultSetFileCount.next()) {
@@ -103,7 +100,7 @@ public class TestUtilizationSchemaDefinition extends AbstractSqlDatabaseTest {
               "DATA_TYPE")));
     }
     assertEquals("Unexpected number of columns",
-        2, actualPairsFileCount.size());
+        4, actualPairsFileCount.size());
     assertEquals("Columns Do not Match ",
         expectedPairsFileCount, actualPairsFileCount);
   }
@@ -111,12 +108,7 @@ public class TestUtilizationSchemaDefinition extends AbstractSqlDatabaseTest {
   @Test
   public void testClusterGrowthDailyCRUDOperations() throws Exception {
     // Verify table exists
-    UtilizationSchemaDefinition schemaDefinition = getInjector().getInstance(
-        UtilizationSchemaDefinition.class);
-    schemaDefinition.initializeSchema();
-
-    DataSource ds = getInjector().getInstance(DataSource.class);
-    Connection connection = ds.getConnection();
+    Connection connection = getConnection();
 
     DatabaseMetaData metaData = connection.getMetaData();
     ResultSet resultSet = metaData.getTables(null, null,
@@ -127,9 +119,7 @@ public class TestUtilizationSchemaDefinition extends AbstractSqlDatabaseTest {
           resultSet.getString("TABLE_NAME"));
     }
 
-    ClusterGrowthDailyDao dao = new ClusterGrowthDailyDao(
-        getInjector().getInstance(Configuration.class));
-
+    ClusterGrowthDailyDao dao = getDao(ClusterGrowthDailyDao.class);
     long now = System.currentTimeMillis();
     ClusterGrowthDaily newRecord = new ClusterGrowthDaily();
     newRecord.setTimestamp(new Timestamp(now));
@@ -187,12 +177,7 @@ public class TestUtilizationSchemaDefinition extends AbstractSqlDatabaseTest {
 
   @Test
   public void testFileCountBySizeCRUDOperations() throws SQLException {
-    UtilizationSchemaDefinition schemaDefinition = getInjector().getInstance(
-        UtilizationSchemaDefinition.class);
-    schemaDefinition.initializeSchema();
-
-    DataSource ds = getInjector().getInstance(DataSource.class);
-    Connection connection = ds.getConnection();
+    Connection connection = getConnection();
 
     DatabaseMetaData metaData = connection.getMetaData();
     ResultSet resultSet = metaData.getTables(null, null,
@@ -203,25 +188,33 @@ public class TestUtilizationSchemaDefinition extends AbstractSqlDatabaseTest {
           resultSet.getString("TABLE_NAME"));
     }
 
-    FileCountBySizeDao fileCountBySizeDao = new FileCountBySizeDao(
-        getInjector().getInstance(Configuration.class));
+    FileCountBySizeDao fileCountBySizeDao = getDao(FileCountBySizeDao.class);
+    UtilizationSchemaDefinition utilizationSchemaDefinition =
+        getSchemaDefinition(UtilizationSchemaDefinition.class);
 
     FileCountBySize newRecord = new FileCountBySize();
+    newRecord.setVolume("vol1");
+    newRecord.setBucket("bucket1");
     newRecord.setFileSize(1024L);
     newRecord.setCount(1L);
 
     fileCountBySizeDao.insert(newRecord);
 
-    FileCountBySize dbRecord = fileCountBySizeDao.findById(1024L);
+    Record3<String, String, Long> recordToFind = utilizationSchemaDefinition
+        .getDSLContext().newRecord(FILE_COUNT_BY_SIZE.VOLUME,
+            FILE_COUNT_BY_SIZE.BUCKET,
+            FILE_COUNT_BY_SIZE.FILE_SIZE)
+        .value1("vol1")
+        .value2("bucket1")
+        .value3(1024L);
+    FileCountBySize dbRecord = fileCountBySizeDao.findById(recordToFind);
     assertEquals(Long.valueOf(1), dbRecord.getCount());
 
     dbRecord.setCount(2L);
     fileCountBySizeDao.update(dbRecord);
 
-    dbRecord = fileCountBySizeDao.findById(1024L);
+    dbRecord = fileCountBySizeDao.findById(recordToFind);
     assertEquals(Long.valueOf(2), dbRecord.getCount());
-
-
 
     Table<FileCountBySizeRecord> fileCountBySizeRecordTable =
         fileCountBySizeDao.getTable();

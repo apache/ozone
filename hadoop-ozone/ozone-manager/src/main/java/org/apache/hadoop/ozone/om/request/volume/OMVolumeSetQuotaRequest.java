@@ -24,6 +24,8 @@ import java.util.Map;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +35,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeSetQuotaResponse;
@@ -65,6 +66,20 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
   }
 
   @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+
+    long modificationTime = Time.now();
+    SetVolumePropertyRequest modifiedRequest = getOmRequest()
+        .getSetVolumePropertyRequest().toBuilder()
+        .setModificationTime(modificationTime).build();
+
+    return getOmRequest().toBuilder()
+        .setSetVolumePropertyRequest(modifiedRequest.toBuilder())
+        .setUserInfo(getUserInfo())
+        .build();
+  }
+
+  @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
       long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
@@ -74,9 +89,8 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
 
     Preconditions.checkNotNull(setVolumePropertyRequest);
 
-    OMResponse.Builder omResponse = OMResponse.newBuilder().setCmdType(
-        OzoneManagerProtocolProtos.Type.SetVolumeProperty).setStatus(
-        OzoneManagerProtocolProtos.Status.OK).setSuccess(true);
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
 
     // In production this will never happen, this request will be called only
     // when we have quota in bytes is set in setVolumePropertyRequest.
@@ -93,7 +107,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
     Map<String, String> auditMap = buildVolumeAuditMap(volume);
-    auditMap.put(OzoneConsts.QUOTA,
+    auditMap.put(OzoneConsts.QUOTA_IN_BYTES,
         String.valueOf(setVolumePropertyRequest.getQuotaInBytes()));
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
@@ -112,31 +126,20 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
 
       acquireVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume);
-      String dbVolumeKey = omMetadataManager.getVolumeKey(volume);
-      omVolumeArgs = omMetadataManager.getVolumeTable().get(dbVolumeKey);
 
-      if (omVolumeArgs == null) {
-        LOG.debug("volume:{} does not exist", volume);
-        throw new OMException(OMException.ResultCodes.VOLUME_NOT_FOUND);
-      }
-
-      // Check if this transaction is a replay of ratis logs.
-      // If this is a replay, then the response has already been returned to
-      // the client. So take no further action and return a dummy
-      // OMClientResponse.
-      if (isReplay(ozoneManager, omVolumeArgs, transactionLogIndex)) {
-        LOG.debug("Replayed Transaction {} ignored. Request: {}",
-            transactionLogIndex, setVolumePropertyRequest);
-        return new OMVolumeSetQuotaResponse(createReplayOMResponse(omResponse));
-      }
+      omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
 
       omVolumeArgs.setQuotaInBytes(setVolumePropertyRequest.getQuotaInBytes());
+      omVolumeArgs.setQuotaInCounts(
+          setVolumePropertyRequest.getQuotaInCounts());
       omVolumeArgs.setUpdateID(transactionLogIndex,
           ozoneManager.isRatisEnabled());
+      omVolumeArgs.setModificationTime(
+          setVolumePropertyRequest.getModificationTime());
 
       // update cache.
       omMetadataManager.getVolumeTable().addCacheEntry(
-          new CacheKey<>(dbVolumeKey),
+          new CacheKey<>(omMetadataManager.getVolumeKey(volume)),
           new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
 
       omResponse.setSetVolumePropertyResponse(

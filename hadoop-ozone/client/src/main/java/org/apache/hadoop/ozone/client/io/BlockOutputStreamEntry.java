@@ -55,7 +55,9 @@ public final class BlockOutputStreamEntry extends OutputStream {
   private long currentPosition;
   private Token<OzoneBlockTokenIdentifier> token;
 
+  private final int streamBufferSize;
   private final long streamBufferFlushSize;
+  private final boolean streamBufferFlushDelay;
   private final long streamBufferMaxSize;
   private final long watchTimeout;
   private BufferPool bufferPool;
@@ -64,7 +66,8 @@ public final class BlockOutputStreamEntry extends OutputStream {
   private BlockOutputStreamEntry(BlockID blockID, String key,
       XceiverClientManager xceiverClientManager,
       Pipeline pipeline, String requestId, int chunkSize,
-      long length, long streamBufferFlushSize, long streamBufferMaxSize,
+      long length, int streamBufferSize, long streamBufferFlushSize,
+      boolean streamBufferFlushDelay, long streamBufferMaxSize,
       long watchTimeout, BufferPool bufferPool,
       ChecksumType checksumType, int bytesPerChecksum,
       Token<OzoneBlockTokenIdentifier> token) {
@@ -77,7 +80,9 @@ public final class BlockOutputStreamEntry extends OutputStream {
     this.token = token;
     this.length = length;
     this.currentPosition = 0;
+    this.streamBufferSize = streamBufferSize;
     this.streamBufferFlushSize = streamBufferFlushSize;
+    this.streamBufferFlushDelay = streamBufferFlushDelay;
     this.streamBufferMaxSize = streamBufferMaxSize;
     this.watchTimeout = watchTimeout;
     this.bufferPool = bufferPool;
@@ -110,9 +115,9 @@ public final class BlockOutputStreamEntry extends OutputStream {
       }
       this.outputStream =
           new BlockOutputStream(blockID, xceiverClientManager,
-              pipeline, streamBufferFlushSize,
-              streamBufferMaxSize, bufferPool, checksumType,
-              bytesPerChecksum);
+              pipeline, streamBufferSize, streamBufferFlushSize,
+              streamBufferFlushDelay, streamBufferMaxSize, bufferPool,
+              checksumType, bytesPerChecksum);
     }
   }
 
@@ -215,7 +220,9 @@ public final class BlockOutputStreamEntry extends OutputStream {
     private String requestId;
     private int chunkSize;
     private long length;
+    private int  streamBufferSize;
     private long streamBufferFlushSize;
+    private boolean streamBufferFlushDelay;
     private long streamBufferMaxSize;
     private long watchTimeout;
     private BufferPool bufferPool;
@@ -269,8 +276,18 @@ public final class BlockOutputStreamEntry extends OutputStream {
       return this;
     }
 
+    public Builder setStreamBufferSize(int bufferSize) {
+      this.streamBufferSize = bufferSize;
+      return this;
+    }
+
     public Builder setStreamBufferFlushSize(long bufferFlushSize) {
       this.streamBufferFlushSize = bufferFlushSize;
+      return this;
+    }
+
+    public Builder setStreamBufferFlushDelay(boolean bufferFlushDelay) {
+      this.streamBufferFlushDelay = bufferFlushDelay;
       return this;
     }
 
@@ -297,7 +314,8 @@ public final class BlockOutputStreamEntry extends OutputStream {
     public BlockOutputStreamEntry build() {
       return new BlockOutputStreamEntry(blockID, key,
           xceiverClientManager, pipeline, requestId, chunkSize,
-          length, streamBufferFlushSize, streamBufferMaxSize, watchTimeout,
+          length, streamBufferSize, streamBufferFlushSize,
+          streamBufferFlushDelay, streamBufferMaxSize, watchTimeout,
           bufferPool, checksumType, bytesPerChecksum, token);
     }
   }
@@ -331,8 +349,16 @@ public final class BlockOutputStreamEntry extends OutputStream {
     return currentPosition;
   }
 
+  public int getStreamBufferSize() {
+    return streamBufferSize;
+  }
+
   public long getStreamBufferFlushSize() {
     return streamBufferFlushSize;
+  }
+
+  public boolean getStreamBufferFlushDelay() {
+    return streamBufferFlushDelay;
   }
 
   public long getStreamBufferMaxSize() {

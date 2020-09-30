@@ -49,6 +49,10 @@ public class BucketEncryptionKeyInfo {
     return version;
   }
 
+  public BucketEncryptionKeyInfo copy() {
+    return new BucketEncryptionKeyInfo(version, suite, keyName);
+  }
+
   /**
    * Builder for BucketEncryptionKeyInfo.
    */

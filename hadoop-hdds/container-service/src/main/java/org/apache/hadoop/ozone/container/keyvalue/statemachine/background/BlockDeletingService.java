@@ -18,39 +18,6 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.statemachine.background;
 
-import com.google.common.collect.Lists;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletionChoosingPolicy;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.interfaces.ContainerDeletionChoosingPolicy;
-import org.apache.hadoop.ozone.container.common.interfaces.Handler;
-import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.util.ReflectionUtils;
-import org.apache.ratis.thirdparty.com.google.protobuf
-    .InvalidProtocolBufferException;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.scm.container.common.helpers
-    .StorageContainerException;
-import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.util.Time;
-import org.apache.hadoop.hdds.utils.BackgroundService;
-import org.apache.hadoop.hdds.utils.BackgroundTask;
-import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
-import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
-import org.apache.hadoop.hdds.utils.BatchOperation;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.LinkedList;
@@ -61,14 +28,40 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys
-    .OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys
-    .OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys
-    .OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER;
-import static org.apache.hadoop.ozone.OzoneConfigKeys
-    .OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER_DEFAULT;
+import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.utils.BackgroundService;
+import org.apache.hadoop.hdds.utils.BackgroundTask;
+import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
+import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
+import org.apache.hadoop.hdds.utils.BatchOperation;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletionChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDeletionChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.util.Time;
+
+import com.google.common.collect.Lists;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER_DEFAULT;
+import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A per-datanode container block deleting service takes in charge
@@ -82,7 +75,7 @@ public class BlockDeletingService extends BackgroundService {
 
   private OzoneContainer ozoneContainer;
   private ContainerDeletionChoosingPolicy containerDeletionPolicy;
-  private final Configuration conf;
+  private final ConfigurationSource conf;
 
   // Throttle number of blocks to delete per task,
   // set to 1 for testing
@@ -98,14 +91,18 @@ public class BlockDeletingService extends BackgroundService {
 
   public BlockDeletingService(OzoneContainer ozoneContainer,
       long serviceInterval, long serviceTimeout, TimeUnit timeUnit,
-      Configuration conf) {
+      ConfigurationSource conf) {
     super("BlockDeletingService", serviceInterval, timeUnit,
         BLOCK_DELETING_SERVICE_CORE_POOL_SIZE, serviceTimeout);
     this.ozoneContainer = ozoneContainer;
-    containerDeletionPolicy = ReflectionUtils.newInstance(conf.getClass(
-        ScmConfigKeys.OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY,
-        TopNOrderedContainerDeletionChoosingPolicy.class,
-        ContainerDeletionChoosingPolicy.class), conf);
+    try {
+      containerDeletionPolicy = conf.getClass(
+          ScmConfigKeys.OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY,
+          TopNOrderedContainerDeletionChoosingPolicy.class,
+          ContainerDeletionChoosingPolicy.class).newInstance();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
     this.conf = conf;
     this.blockLimitPerTask =
         conf.getInt(OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER,
@@ -236,8 +233,7 @@ public class BlockDeletingService extends BackgroundService {
     }
   }
 
-  private class BlockDeletingTask
-      implements BackgroundTask<BackgroundTaskResult> {
+  private class BlockDeletingTask implements BackgroundTask {
 
     private final int priority;
     private final KeyValueContainerData containerData;
@@ -281,7 +277,7 @@ public class BlockDeletingService extends BackgroundService {
             .getHandler(container.getContainerType()));
 
         toDeleteBlocks.forEach(entry -> {
-          String blockName = DFSUtil.bytes2String(entry.getKey());
+          String blockName = StringUtils.bytes2String(entry.getKey());
           LOG.debug("Deleting block {}", blockName);
           try {
             ContainerProtos.BlockData data =
@@ -302,13 +298,19 @@ public class BlockDeletingService extends BackgroundService {
           String blockId =
               entry.substring(OzoneConsts.DELETING_KEY_PREFIX.length());
           String deletedEntry = OzoneConsts.DELETED_KEY_PREFIX + blockId;
-          batch.put(DFSUtil.string2Bytes(deletedEntry),
-              DFSUtil.string2Bytes(blockId));
-          batch.delete(DFSUtil.string2Bytes(entry));
+          batch.put(StringUtils.string2Bytes(deletedEntry),
+              StringUtils.string2Bytes(blockId));
+          batch.delete(StringUtils.string2Bytes(entry));
         });
-        meta.getStore().writeBatch(batch);
-        // update count of pending deletion blocks in in-memory container status
-        containerData.decrPendingDeletionBlocks(succeedBlocks.size());
+
+
+        int deleteBlockCount = succeedBlocks.size();
+        containerData.updateAndCommitDBCounters(meta, batch, deleteBlockCount);
+
+        // update count of pending deletion blocks and block count in in-memory
+        // container status.
+        containerData.decrPendingDeletionBlocks(deleteBlockCount);
+        containerData.decrKeyCount(deleteBlockCount);
 
         if (!succeedBlocks.isEmpty()) {
           LOG.info("Container: {}, deleted blocks: {}, task elapsed time: {}ms",

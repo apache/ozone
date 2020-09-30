@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,17 +19,26 @@ package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.conf.TestConfigurationFieldsBase;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 
 import java.util.Arrays;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 
 /**
  * Tests if configuration constants documented in ozone-defaults.xml.
  */
 public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   @Override
   public void initializeMemberVariables() {
@@ -38,13 +47,13 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         new Class[] {OzoneConfigKeys.class, ScmConfigKeys.class,
             OMConfigKeys.class, HddsConfigKeys.class,
             ReconServerConfigKeys.class,
-            S3GatewayConfigKeys.class
+            S3GatewayConfigKeys.class,
+            SCMHTTPServerConfig.class
         };
     errorIfMissingConfigProps = true;
     errorIfMissingXmlProps = true;
     xmlPropsToSkipCompare.add("hadoop.tags.custom");
     xmlPropsToSkipCompare.add("ozone.om.nodes.EXAMPLEOMSERVICEID");
-    xmlPrefixToSkipCompare.add("ipc.client.rpc-timeout.ms");
     addPropertiesNotInXml();
   }
 
@@ -58,7 +67,10 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OMConfigKeys.OZONE_OM_NODES_KEY,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE,
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY,
-        ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR
+        ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR,
+        ReconServerConfigKeys.RECON_METRICS_HTTP_CONNECTION_TIMEOUT,
+        ReconServerConfigKeys.RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT,
+        OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY
         // TODO HDDS-2856
     ));
   }

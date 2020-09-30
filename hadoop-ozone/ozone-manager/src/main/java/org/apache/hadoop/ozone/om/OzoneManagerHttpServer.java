@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.ozone.om;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.hdds.server.http.BaseHttpServer;
-
 import java.io.IOException;
+
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
+import org.apache.hadoop.hdds.server.http.BaseHttpServer;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_SERVICE_LIST_HTTP_ENDPOINT;
@@ -31,8 +31,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_SERVICE_LIST_HTTP_END
  */
 public class OzoneManagerHttpServer extends BaseHttpServer {
 
-  public OzoneManagerHttpServer(Configuration conf, OzoneManager om)
-      throws IOException {
+  public OzoneManagerHttpServer(MutableConfigurationSource conf,
+      OzoneManager om) throws IOException {
     super(conf, "ozoneManager");
     addServlet("serviceList", OZONE_OM_SERVICE_LIST_HTTP_ENDPOINT,
         ServiceListJSONServlet.class);
@@ -79,5 +79,15 @@ public class OzoneManagerHttpServer extends BaseHttpServer {
 
   @Override protected String getEnabledKey() {
     return OMConfigKeys.OZONE_OM_HTTP_ENABLED_KEY;
+  }
+
+  @Override
+  protected String getHttpAuthType() {
+    return OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
+  }
+
+  @Override
+  protected String getHttpAuthConfigPrefix() {
+    return OMConfigKeys.OZONE_OM_HTTP_AUTH_CONFIG_PREFIX;
   }
 }

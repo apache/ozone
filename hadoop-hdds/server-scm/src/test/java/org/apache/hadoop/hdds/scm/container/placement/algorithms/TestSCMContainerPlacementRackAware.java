@@ -21,10 +21,11 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
@@ -41,13 +42,14 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import org.hamcrest.MatcherAssert;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeTrue;
@@ -60,7 +62,7 @@ import static org.mockito.Mockito.when;
 @RunWith(Parameterized.class)
 public class TestSCMContainerPlacementRackAware {
   private NetworkTopology cluster;
-  private Configuration conf;
+  private ConfigurationSource conf;
   private NodeManager nodeManager;
   private Integer datanodeCount;
   private List<DatanodeDetails> datanodes = new ArrayList<>();
@@ -107,6 +109,8 @@ public class TestSCMContainerPlacementRackAware {
     nodeManager = Mockito.mock(NodeManager.class);
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
+    when(nodeManager.getClusterNetworkTopologyMap())
+        .thenReturn(cluster);
     when(nodeManager.getNodeStat(anyObject()))
         .thenReturn(new SCMNodeMetric(STORAGE_CAPACITY, 0L, 100L));
     if (datanodeCount > 4) {
@@ -376,5 +380,71 @@ public class TestSCMContainerPlacementRackAware {
         datanodeDetails.get(2)));
     Assert.assertTrue(cluster.isSameParent(datanodeDetails.get(1),
         datanodeDetails.get(2)));
+  }
+
+  @Test
+  public void testvalidateContainerPlacement() {
+    // Only run this test for the full set of DNs. 5 DNs per rack on 3 racks.
+    assumeTrue(datanodeCount == 15);
+    List<DatanodeDetails> dns = new ArrayList<>();
+    // First 5 node are on the same rack
+    dns.add(datanodes.get(0));
+    dns.add(datanodes.get(1));
+    dns.add(datanodes.get(2));
+    ContainerPlacementStatus stat = policy.validateContainerPlacement(dns, 3);
+    assertFalse(stat.isPolicySatisfied());
+    assertEquals(1, stat.misReplicationCount());
+
+    // Pick a new list which spans 2 racks
+    dns = new ArrayList<>();
+    dns.add(datanodes.get(0));
+    dns.add(datanodes.get(1));
+    dns.add(datanodes.get(5)); // This is on second rack
+    stat = policy.validateContainerPlacement(dns, 3);
+    assertTrue(stat.isPolicySatisfied());
+    assertEquals(0, stat.misReplicationCount());
+
+    // Pick single DN, expecting 3 replica. Policy is not met.
+    dns = new ArrayList<>();
+    dns.add(datanodes.get(0));
+    stat = policy.validateContainerPlacement(dns, 3);
+    assertFalse(stat.isPolicySatisfied());
+    assertEquals(1, stat.misReplicationCount());
+
+    // Pick single DN, expecting 1 replica. Policy is met.
+    dns = new ArrayList<>();
+    dns.add(datanodes.get(0));
+    stat = policy.validateContainerPlacement(dns, 1);
+    assertTrue(stat.isPolicySatisfied());
+    assertEquals(0, stat.misReplicationCount());
+  }
+
+  @Test
+  public void testvalidateContainerPlacementSingleRackCluster() {
+    assumeTrue(datanodeCount == 5);
+
+    // All nodes are on the same rack in this test, and the cluster only has
+    // one rack.
+    List<DatanodeDetails> dns = new ArrayList<>();
+    dns.add(datanodes.get(0));
+    dns.add(datanodes.get(1));
+    dns.add(datanodes.get(2));
+    ContainerPlacementStatus stat = policy.validateContainerPlacement(dns, 3);
+    assertTrue(stat.isPolicySatisfied());
+    assertEquals(0, stat.misReplicationCount());
+
+    // Single DN - policy met as cluster only has one rack.
+    dns = new ArrayList<>();
+    dns.add(datanodes.get(0));
+    stat = policy.validateContainerPlacement(dns, 3);
+    assertTrue(stat.isPolicySatisfied());
+    assertEquals(0, stat.misReplicationCount());
+
+    // Single DN - only 1 replica expected
+    dns = new ArrayList<>();
+    dns.add(datanodes.get(0));
+    stat = policy.validateContainerPlacement(dns, 1);
+    assertTrue(stat.isPolicySatisfied());
+    assertEquals(0, stat.misReplicationCount());
   }
 }

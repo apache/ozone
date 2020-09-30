@@ -17,13 +17,27 @@
 
 package org.apache.hadoop.ozone.container.common;
 
+
+import java.io.File;
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
 import com.google.common.collect.Lists;
+import com.google.common.primitives.Longs;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.utils.BackgroundService;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -35,40 +49,34 @@ import org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletio
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
-import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.ChunkLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.testutils.BlockDeletingServiceTestImpl;
-import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.GenericTestUtils.LogCapturer;
-import org.apache.hadoop.hdds.utils.BackgroundService;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+
+
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import org.junit.AfterClass;
 import org.junit.Assert;
-import org.junit.Test;
 import org.junit.BeforeClass;
+import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_BLOCK_COUNT_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_PENDING_DELETE_BLOCK_COUNT_KEY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -119,7 +127,8 @@ public class TestBlockDeletingService {
    * creates some fake chunk files for testing.
    */
   private void createToDeleteBlocks(ContainerSet containerSet,
-      Configuration conf, int numOfContainers, int numOfBlocksPerContainer,
+      MutableConfigurationSource conf, int numOfContainers,
+      int numOfBlocksPerContainer,
       int numOfChunksPerBlock) throws IOException {
     for (int x = 0; x < numOfContainers; x++) {
       conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
@@ -135,6 +144,8 @@ public class TestBlockDeletingService {
       containerSet.addContainer(container);
       data = (KeyValueContainerData) containerSet.getContainer(
           containerID).getContainerData();
+
+      long blockLength = 100;
       try(ReferenceCountedDB metadata = BlockUtils.getDB(data, conf)) {
         for (int j = 0; j < numOfBlocksPerContainer; j++) {
           BlockID blockID =
@@ -147,17 +158,28 @@ public class TestBlockDeletingService {
             ContainerProtos.ChunkInfo info =
                 ContainerProtos.ChunkInfo.newBuilder()
                     .setChunkName(blockID.getLocalID() + "_chunk_" + k)
-                    .setLen(0)
+                    .setLen(blockLength)
                     .setOffset(0)
                     .setChecksumData(Checksum.getNoChecksumDataProto())
                     .build();
             chunks.add(info);
           }
           kd.setChunks(chunks);
-          metadata.getStore().put(DFSUtil.string2Bytes(deleteStateName),
+          metadata.getStore().put(StringUtils.string2Bytes(deleteStateName),
               kd.getProtoBufMessage().toByteArray());
           container.getContainerData().incrPendingDeletionBlocks(1);
         }
+
+        container.getContainerData().setKeyCount(numOfBlocksPerContainer);
+        container.getContainerData().setBytesUsed(
+            blockLength * numOfBlocksPerContainer);
+        // Set block count, bytes used and pending delete block count.
+        metadata.getStore().put(DB_BLOCK_COUNT_KEY,
+            Longs.toByteArray(numOfBlocksPerContainer));
+        metadata.getStore().put(OzoneConsts.DB_CONTAINER_BYTES_USED_KEY,
+            Longs.toByteArray(blockLength * numOfBlocksPerContainer));
+        metadata.getStore().put(DB_PENDING_DELETE_BLOCK_COUNT_KEY,
+            Longs.toByteArray(numOfBlocksPerContainer));
       }
     }
   }
@@ -181,7 +203,7 @@ public class TestBlockDeletingService {
     List<Map.Entry<byte[], byte[]>> underDeletionBlocks =
         meta.getStore().getRangeKVs(null, 100,
             new MetadataKeyFilters.KeyPrefixFilter()
-            .addFilter(OzoneConsts.DELETING_KEY_PREFIX));
+                .addFilter(OzoneConsts.DELETING_KEY_PREFIX));
     return underDeletionBlocks.size();
   }
 
@@ -195,7 +217,7 @@ public class TestBlockDeletingService {
 
   @Test
   public void testBlockDeletion() throws Exception {
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL, 10);
     conf.setInt(OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER, 2);
     ContainerSet containerSet = new ContainerSet();
@@ -228,6 +250,8 @@ public class TestBlockDeletingService {
 
       // Ensure there are 3 blocks under deletion and 0 deleted blocks
       Assert.assertEquals(3, getUnderDeletionBlocksCount(meta));
+      Assert.assertEquals(3, Longs.fromByteArray(
+          meta.getStore().get(DB_PENDING_DELETE_BLOCK_COUNT_KEY)));
       Assert.assertEquals(0, getDeletedBlocksCount(meta));
 
       // An interval will delete 1 * 2 blocks
@@ -242,6 +266,14 @@ public class TestBlockDeletingService {
       deleteAndWait(svc, 3);
       Assert.assertEquals(0, getUnderDeletionBlocksCount(meta));
       Assert.assertEquals(3, getDeletedBlocksCount(meta));
+
+
+      // Check finally DB counters.
+      // Not checking bytes used, as handler is a mock call.
+      Assert.assertEquals(0, Longs.fromByteArray(
+          meta.getStore().get(DB_PENDING_DELETE_BLOCK_COUNT_KEY)));
+      Assert.assertEquals(0, Longs.fromByteArray(
+          meta.getStore().get(DB_BLOCK_COUNT_KEY)));
     }
 
     svc.shutdown();
@@ -250,7 +282,7 @@ public class TestBlockDeletingService {
   @Test
   @SuppressWarnings("java:S2699") // waitFor => assertion with timeout
   public void testShutdownService() throws Exception {
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 500,
         TimeUnit.MILLISECONDS);
     conf.setInt(OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL, 10);
@@ -275,7 +307,7 @@ public class TestBlockDeletingService {
 
   @Test
   public void testBlockDeletionTimeout() throws Exception {
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL, 10);
     conf.setInt(OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER, 2);
     ContainerSet containerSet = new ContainerSet();
@@ -291,8 +323,7 @@ public class TestBlockDeletingService {
 
     LogCapturer log = LogCapturer.captureLogs(BackgroundService.LOG);
     GenericTestUtils.waitFor(() -> {
-      if(log.getOutput().contains(
-          "Background task executes timed out, retrying in next interval")) {
+      if (log.getOutput().contains("Background task execution took")) {
         log.stopCapturing();
         return true;
       }
@@ -336,7 +367,7 @@ public class TestBlockDeletingService {
   }
 
   private BlockDeletingServiceTestImpl getBlockDeletingService(
-      ContainerSet containerSet, Configuration conf) {
+      ContainerSet containerSet, ConfigurationSource conf) {
     OzoneContainer ozoneContainer = mockDependencies(containerSet);
     return new BlockDeletingServiceTestImpl(ozoneContainer, 1000, conf);
   }
@@ -363,7 +394,7 @@ public class TestBlockDeletingService {
     //
     // Each time only 1 container can be processed, so each time
     // 1 block from 1 container can be deleted.
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     // Process 1 container per interval
     conf.set(
         ScmConfigKeys.OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY,
@@ -406,7 +437,7 @@ public class TestBlockDeletingService {
     // Each time containers can be all scanned, but only 2 blocks
     // per container can be actually deleted. So it requires 2 waves
     // to cleanup all blocks.
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL, 10);
     int blockLimitPerTask = 2;
     conf.setInt(OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER, blockLimitPerTask);

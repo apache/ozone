@@ -18,6 +18,11 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getOmKeyLocationInfo;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -36,69 +41,47 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.recon.AbstractOMMetadataManagerTest;
-import org.apache.hadoop.ozone.recon.GuiceInjectorUtilsForTestsImpl;
+import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.hadoop.ozone.recon.schema.StatsSchemaDefinition;
-import org.jooq.impl.DSL;
-import org.jooq.impl.DefaultConfiguration;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
-import com.google.inject.Injector;
-import javax.sql.DataSource;
+import org.junit.rules.TemporaryFolder;
 
 /**
  * Unit test for Container Key mapper task.
  */
-public class TestContainerKeyMapperTask extends AbstractOMMetadataManagerTest {
+public class TestContainerKeyMapperTask {
+
+  @Rule
+  public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
   private ContainerDBServiceProvider containerDbServiceProvider;
   private OMMetadataManager omMetadataManager;
   private ReconOMMetadataManager reconOMMetadataManager;
-  private Injector injector;
   private OzoneManagerServiceProviderImpl ozoneManagerServiceProvider;
-  private boolean setUpIsDone = false;
-  private GuiceInjectorUtilsForTestsImpl guiceInjectorTest =
-      new GuiceInjectorUtilsForTestsImpl();
-
-  private Injector getInjector() {
-    return injector;
-  }
-
-  private void initializeInjector() throws Exception {
-    omMetadataManager = initializeNewOmMetadataManager();
-    ozoneManagerServiceProvider = getMockOzoneManagerServiceProvider();
-    reconOMMetadataManager = getTestMetadataManager(omMetadataManager);
-
-    injector = guiceInjectorTest.getInjector(
-        ozoneManagerServiceProvider, reconOMMetadataManager, temporaryFolder);
-  }
 
   @Before
   public void setUp() throws Exception {
-    // The following setup is run only once
-    if (!setUpIsDone) {
-      initializeInjector();
+    omMetadataManager = initializeNewOmMetadataManager(
+        temporaryFolder.newFolder());
+    ozoneManagerServiceProvider = getMockOzoneManagerServiceProvider();
+    reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
+        temporaryFolder.newFolder());
 
-      DSL.using(new DefaultConfiguration().set(
-          injector.getInstance(DataSource.class)));
-
-      containerDbServiceProvider = injector.getInstance(
-          ContainerDBServiceProvider.class);
-
-      StatsSchemaDefinition schemaDefinition = getInjector().getInstance(
-          StatsSchemaDefinition.class);
-      schemaDefinition.initializeSchema();
-
-      setUpIsDone = true;
-    }
-
-    containerDbServiceProvider = injector.getInstance(
-        ContainerDBServiceProvider.class);
+    ReconTestInjector reconTestInjector =
+        new ReconTestInjector.Builder(temporaryFolder)
+            .withReconSqlDb()
+            .withReconOm(reconOMMetadataManager)
+            .withOmServiceProvider(ozoneManagerServiceProvider)
+            .withContainerDB()
+            .build();
+    containerDbServiceProvider =
+        reconTestInjector.getInstance(ContainerDBServiceProvider.class);
   }
 
   @Test

@@ -16,7 +16,7 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocolPB
     .StorageContainerDatanodeProtocolClientSideTranslatorPB;
@@ -46,7 +46,7 @@ public class EndpointStateMachine
   private final AtomicLong missedCount;
   private final InetSocketAddress address;
   private final Lock lock;
-  private final Configuration conf;
+  private final ConfigurationSource conf;
   private EndPointStates state;
   private VersionResponse version;
   private ZonedDateTime lastSuccessfulHeartbeat;
@@ -59,7 +59,7 @@ public class EndpointStateMachine
    */
   public EndpointStateMachine(InetSocketAddress address,
       StorageContainerDatanodeProtocolClientSideTranslatorPB endPoint,
-      Configuration conf) {
+      ConfigurationSource conf) {
     this.endPoint = endPoint;
     this.missedCount = new AtomicLong(0);
     this.address = address;

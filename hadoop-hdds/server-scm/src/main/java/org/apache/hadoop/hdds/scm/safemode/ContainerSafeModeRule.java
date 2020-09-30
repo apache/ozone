@@ -24,7 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -51,7 +51,7 @@ public class ContainerSafeModeRule extends
   private AtomicLong containerWithMinReplicas = new AtomicLong(0);
 
   public ContainerSafeModeRule(String ruleName, EventQueue eventQueue,
-      Configuration conf,
+      ConfigurationSource conf,
       List<ContainerInfo> containers, SCMSafeModeManager manager) {
     super(manager, ruleName, eventQueue);
     safeModeCutoff = conf.getDouble(
@@ -124,5 +124,11 @@ public class ContainerSafeModeRule extends
   @Override
   protected void cleanup() {
     containerMap.clear();
+  }
+
+  @Override
+  public String getStatusText() {
+    return "currentContainerThreshold " + getCurrentContainerThreshold()
+        + " >= safeModeCutoff " + this.safeModeCutoff;
   }
 }

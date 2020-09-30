@@ -42,9 +42,9 @@ public class MetricGroupDisplay {
    */
   private String description;
 
-  public MetricGroupDisplay(Component component, String description) {
+  public MetricGroupDisplay(Component component, String metricName) {
     this.component = component;
-    this.description = description;
+    this.description = metricName;
   }
 
   public MetricGroupDisplay(Type componentType, String metricName) {

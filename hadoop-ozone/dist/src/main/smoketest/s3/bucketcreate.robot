@@ -28,11 +28,11 @@ ${BUCKET}             generated
 
 *** Test Cases ***
 
+Create new bucket
+    Create bucket
+
 Create bucket which already exists
-# Bucket already is created in Test Setup.
-    ${result} =         Execute AWSS3APICli         create-bucket --bucket ${BUCKET}
-                        Should contain              ${result}         ${BUCKET}
-                        Should contain              ${result}         Location
+    Create bucket with name     ${BUCKET}
 
 Create bucket with invalid bucket name
     ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket bucket_1   255

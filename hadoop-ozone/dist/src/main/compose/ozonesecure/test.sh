@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+#suite:secure
+
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
@@ -23,7 +25,11 @@ source "$COMPOSE_DIR/../testlib.sh"
 
 export SECURITY_ENABLED=true
 
+: ${OZONE_BUCKET_KEY_NAME:=key1}
+
 start_docker_env
+
+execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
 
 execute_robot_test scm kinit.robot
 
@@ -31,13 +37,23 @@ execute_robot_test scm basic
 
 execute_robot_test scm security
 
-execute_robot_test scm ozonefs/ozonefs.robot
+for scheme in ofs o3fs; do
+  for bucket in link bucket; do
+    execute_robot_test scm -v SCHEME:${scheme} -v BUCKET_TYPE:${bucket} -N ozonefs-${scheme}-${bucket} ozonefs/ozonefs.robot
+  done
+done
 
-execute_robot_test s3g s3
+for bucket in link generated; do
+  execute_robot_test s3g -v BUCKET:${bucket} -N s3-${bucket} s3
+done
+
+#expects 4 pipelines, should be run before 
+#admincli which creates STANDALONE pipeline
+execute_robot_test scm recon
 
 execute_robot_test scm admincli
 
-execute_robot_test scm recon
+execute_robot_test scm spnego
 
 stop_docker_env
 

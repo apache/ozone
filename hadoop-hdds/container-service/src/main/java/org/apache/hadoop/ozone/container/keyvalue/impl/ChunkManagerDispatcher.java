@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 
@@ -55,8 +56,8 @@ public class ChunkManagerDispatcher implements ChunkManager {
   private final Map<ChunkLayOutVersion, ChunkManager> handlers
       = new EnumMap<>(ChunkLayOutVersion.class);
 
-  ChunkManagerDispatcher(boolean sync) {
-    handlers.put(FILE_PER_CHUNK, new FilePerChunkStrategy(sync));
+  ChunkManagerDispatcher(boolean sync, BlockManager manager) {
+    handlers.put(FILE_PER_CHUNK, new FilePerChunkStrategy(sync, manager));
     handlers.put(FILE_PER_BLOCK, new FilePerBlockStrategy(sync));
   }
 
@@ -70,11 +71,11 @@ public class ChunkManagerDispatcher implements ChunkManager {
   }
 
   @Override
-  public void finishWriteChunk(KeyValueContainer kvContainer, BlockID blockID,
-      ChunkInfo info) throws IOException {
+  public void finishWriteChunks(KeyValueContainer kvContainer,
+      BlockData blockData) throws IOException {
 
     selectHandler(kvContainer)
-        .finishWriteChunk(kvContainer, blockID, info);
+        .finishWriteChunks(kvContainer, blockData);
   }
 
   @Override

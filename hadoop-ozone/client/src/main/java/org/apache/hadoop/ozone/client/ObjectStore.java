@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,21 +20,19 @@ package org.apache.hadoop.ozone.client;
 
 import java.io.IOException;
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.Objects;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.crypto.key.KeyProvider;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -62,18 +60,24 @@ public class ObjectStore {
    */
   private int listCacheSize;
 
+  private String s3VolumeName;
+
   /**
    * Creates an instance of ObjectStore.
    * @param conf Configuration object.
    * @param proxy ClientProtocol proxy.
    */
-  public ObjectStore(Configuration conf, ClientProtocol proxy) {
+  public ObjectStore(ConfigurationSource conf, ClientProtocol proxy) {
     this.proxy = TracingUtil.createProxy(proxy, ClientProtocol.class, conf);
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
+    this.s3VolumeName = HddsClientUtils.getS3VolumeName(conf);
   }
 
   @VisibleForTesting
   protected ObjectStore() {
+    // For the unit test
+    OzoneConfiguration conf = new OzoneConfiguration();
+    this.s3VolumeName = HddsClientUtils.getS3VolumeName(conf);
     proxy = null;
   }
 
@@ -105,13 +109,17 @@ public class ObjectStore {
   /**
    * Creates an S3 bucket inside Ozone manager and creates the mapping needed
    * to access via both S3 and Ozone.
-   * @param userName - S3 user name.
-   * @param s3BucketName - S3 bucket Name.
+   * @param bucketName - S3 bucket Name.
    * @throws IOException - On failure, throws an exception like Bucket exists.
    */
-  public void createS3Bucket(String userName, String s3BucketName) throws
+  public void createS3Bucket(String bucketName) throws
       IOException {
-    proxy.createS3Bucket(userName, s3BucketName);
+    OzoneVolume volume = getVolume(s3VolumeName);
+    volume.createBucket(bucketName);
+  }
+
+  public OzoneBucket getS3Bucket(String bucketName) throws IOException {
+    return getVolume(s3VolumeName).getBucket(bucketName);
   }
 
   /**
@@ -120,44 +128,16 @@ public class ObjectStore {
    * @throws  IOException in case the bucket cannot be deleted.
    */
   public void deleteS3Bucket(String bucketName) throws IOException {
-    proxy.deleteS3Bucket(bucketName);
-  }
-
-  /**
-   * Returns the Ozone Namespace for the S3Bucket. It will return the
-   * OzoneVolume/OzoneBucketName.
-   * @param s3BucketName  - S3 Bucket Name.
-   * @return String - The Ozone canonical name for this s3 bucket. This
-   * string is useful for mounting an OzoneFS.
-   * @throws IOException - Error is throw if the s3bucket does not exist.
-   */
-  public String getOzoneBucketMapping(String s3BucketName) throws IOException {
-    return proxy.getOzoneBucketMapping(s3BucketName);
-  }
-
-  /**
-   * Returns the corresponding Ozone volume given an S3 Bucket.
-   * @param s3BucketName - S3Bucket Name.
-   * @return String - Ozone Volume name.
-   * @throws IOException - Throws if the s3Bucket does not exist.
-   */
-  @SuppressWarnings("StringSplitter")
-  public String getOzoneVolumeName(String s3BucketName) throws IOException {
-    String mapping = getOzoneBucketMapping(s3BucketName);
-    return mapping.split("/")[0];
-
-  }
-
-  /**
-   * Returns the corresponding Ozone bucket name for the given S3 bucket.
-   * @param s3BucketName - S3Bucket Name.
-   * @return String - Ozone bucket Name.
-   * @throws IOException - Throws if the s3bucket does not exist.
-   */
-  @SuppressWarnings("StringSplitter")
-  public String getOzoneBucketName(String s3BucketName) throws IOException {
-    String mapping = getOzoneBucketMapping(s3BucketName);
-    return mapping.split("/")[1];
+    try {
+      OzoneVolume volume = getVolume(s3VolumeName);
+      volume.deleteBucket(bucketName);
+    } catch (OMException ex) {
+      if (ex.getResult() == OMException.ResultCodes.VOLUME_NOT_FOUND) {
+        throw new OMException(OMException.ResultCodes.BUCKET_NOT_FOUND);
+      } else {
+        throw ex;
+      }
+    }
   }
 
 
@@ -174,37 +154,6 @@ public class ObjectStore {
 
   public S3SecretValue getS3Secret(String kerberosID) throws IOException {
     return proxy.getS3Secret(kerberosID);
-  }
-
-  /**
-   * Returns Iterator to iterate over all buckets for a user.
-   * The result can be restricted using bucket prefix, will return all
-   * buckets if bucket prefix is null.
-   *
-   * @param userName user name
-   * @param bucketPrefix Bucket prefix to match
-   * @return {@code Iterator<OzoneBucket>}
-   */
-  public Iterator<? extends OzoneBucket> listS3Buckets(String userName,
-                                                       String bucketPrefix) {
-    return listS3Buckets(userName, bucketPrefix, null);
-  }
-
-  /**
-   * Returns Iterator to iterate over all buckets after prevBucket for a
-   * specific user. If prevBucket is null it returns an iterator to iterate over
-   * all the buckets of a user. The result can be restricted using bucket
-   * prefix, will return all buckets if bucket prefix is null.
-   *
-   * @param userName user name
-   * @param bucketPrefix Bucket prefix to match
-   * @param prevBucket Buckets are listed after this bucket
-   * @return {@code Iterator<OzoneBucket>}
-   */
-  public Iterator<? extends OzoneBucket> listS3Buckets(String userName,
-                                                       String bucketPrefix,
-                                                       String prevBucket) {
-    return new S3BucketIterator(userName, bucketPrefix, prevBucket);
   }
 
   /**
@@ -236,10 +185,15 @@ public class ObjectStore {
   }
 
   /**
-   * Returns Iterator to iterate over the list of volumes after prevVolume owned
-   * by a specific user. The result can be restricted using volume prefix, will
-   * return all volumes if volume prefix is null. If user is not null, returns
-   * the volume of current user.
+   * Returns Iterator to iterate over the list of volumes after prevVolume
+   * accessible by a specific user. The result can be restricted using volume
+   * prefix, will return all volumes if volume prefix is null. If user is not
+   * null, returns the volume of current user.
+   *
+   * Definition of accessible:
+   * When ACL is enabled, accessible means the user has LIST permission.
+   * When ACL is disabled, accessible means the user is the owner of the volume.
+   * See {@code OzoneManager#listVolumeByUser}.
    *
    * @param user User Name
    * @param volumePrefix Volume prefix to match
@@ -299,6 +253,9 @@ public class ObjectStore {
 
     @Override
     public boolean hasNext() {
+      // IMPORTANT: Without this logic, remote iteration will not work.
+      // Removing this will break the listVolume call if we try to
+      // list more than 1000 (ozone.client.list.cache ) volumes.
       if (!currentIterator.hasNext() && currentValue != null) {
         currentIterator = getNextListOfVolumes(currentValue.getName())
             .iterator();
@@ -327,76 +284,6 @@ public class ObjectStore {
           return proxy.listVolumes(user, volPrefix, prevVolume, listCacheSize);
         }
         return proxy.listVolumes(volPrefix, prevVolume, listCacheSize);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }
-  }
-
-  /**
-   * An Iterator to iterate over {@link OzoneBucket} list.
-   */
-  public class S3BucketIterator implements Iterator<OzoneBucket> {
-
-    private String bucketPrefix = null;
-    private String userName;
-
-    private Iterator<OzoneBucket> currentIterator;
-    private OzoneBucket currentValue;
-
-
-    /**
-     * Creates an Iterator to iterate over all buckets after prevBucket for
-     * a user. If prevBucket is null it returns an iterator which list all
-     * the buckets of the user.
-     * The returned buckets match bucket prefix.
-     * @param user
-     * @param bucketPrefix
-     * @param prevBucket
-     */
-    public S3BucketIterator(String user, String bucketPrefix, String
-        prevBucket) {
-      Objects.requireNonNull(user);
-      this.userName = user;
-      this.bucketPrefix = bucketPrefix;
-      this.currentValue = null;
-      this.currentIterator = getNextListOfS3Buckets(prevBucket).iterator();
-    }
-
-    @Override
-    public boolean hasNext() {
-      if(!currentIterator.hasNext()) {
-        currentIterator = getNextListOfS3Buckets(
-            currentValue != null ? currentValue.getName() : null)
-            .iterator();
-      }
-      return currentIterator.hasNext();
-    }
-
-    @Override
-    public OzoneBucket next() {
-      if(hasNext()) {
-        currentValue = currentIterator.next();
-        return currentValue;
-      }
-      throw new NoSuchElementException();
-    }
-
-    /**
-     * Gets the next set of bucket list using proxy.
-     * @param prevBucket
-     * @return {@code List<OzoneVolume>}
-     */
-    private List<OzoneBucket> getNextListOfS3Buckets(String prevBucket) {
-      try {
-        return proxy.listS3Buckets(userName, bucketPrefix, prevBucket,
-            listCacheSize);
-      } catch (OMException e) {
-        if (e.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
-          return new ArrayList<>();
-        } else {
-          throw new RuntimeException(e);
-        }
       } catch (IOException e) {
         throw new RuntimeException(e);
       }

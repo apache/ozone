@@ -18,69 +18,18 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
-import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
-import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-
-import io.opentracing.Scope;
-import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
-import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
-import org.apache.ratis.RaftConfigKeys;
-import org.apache.hadoop.hdds.ratis.RatisHelper;
-import org.apache.ratis.conf.RaftProperties;
-import org.apache.ratis.grpc.GrpcConfigKeys;
-import org.apache.ratis.grpc.GrpcFactory;
-import org.apache.ratis.grpc.GrpcTlsConfig;
-import org.apache.ratis.netty.NettyConfigKeys;
-import org.apache.ratis.protocol.*;
-import org.apache.ratis.rpc.RpcType;
-import org.apache.ratis.rpc.SupportedRpcType;
-import org.apache.ratis.server.RaftServer;
-import org.apache.ratis.server.RaftServerConfigKeys;
-import org.apache.ratis.proto.RaftProtos;
-import org.apache.ratis.proto.RaftProtos.RoleInfoProto;
-import org.apache.ratis.server.protocol.TermIndex;
-import org.apache.ratis.server.impl.RaftServerProxy;
-import org.apache.ratis.util.SizeInBytes;
-import org.apache.ratis.util.TimeDuration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Collections;
 import java.util.Set;
 import java.util.UUID;
-import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -89,6 +38,74 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
+import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
+import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.opentracing.Scope;
+import io.opentracing.Span;
+import io.opentracing.util.GlobalTracer;
+import org.apache.ratis.RaftConfigKeys;
+import org.apache.ratis.conf.RaftProperties;
+import org.apache.ratis.grpc.GrpcConfigKeys;
+import org.apache.ratis.grpc.GrpcFactory;
+import org.apache.ratis.grpc.GrpcTlsConfig;
+import org.apache.ratis.netty.NettyConfigKeys;
+import org.apache.ratis.proto.RaftProtos;
+import org.apache.ratis.proto.RaftProtos.RoleInfoProto;
+import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.protocol.GroupInfoReply;
+import org.apache.ratis.protocol.GroupInfoRequest;
+import org.apache.ratis.protocol.GroupManagementRequest;
+import org.apache.ratis.protocol.NotLeaderException;
+import org.apache.ratis.protocol.RaftClientReply;
+import org.apache.ratis.protocol.RaftClientRequest;
+import org.apache.ratis.protocol.RaftGroup;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftGroupMemberId;
+import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.protocol.StateMachineException;
+import org.apache.ratis.rpc.RpcType;
+import org.apache.ratis.rpc.SupportedRpcType;
+import org.apache.ratis.server.RaftServer;
+import org.apache.ratis.server.RaftServerConfigKeys;
+import org.apache.ratis.server.impl.RaftServerProxy;
+import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.util.SizeInBytes;
+import org.apache.ratis.util.TimeDuration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 /**
  * Creates a ratis server endpoint that acts as the communication layer for
@@ -113,17 +130,24 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private long nodeFailureTimeoutMs;
   private boolean isStarted = false;
   private DatanodeDetails datanodeDetails;
-  private final OzoneConfiguration conf;
+  private final ConfigurationSource conf;
   // TODO: Remove the gids set when Ratis supports an api to query active
   // pipelines
   private final Set<RaftGroupId> raftGids = new HashSet<>();
   private final RaftPeerId raftPeerId;
   // pipelines for which I am the leader
   private Map<RaftGroupId, Boolean> groupLeaderMap = new ConcurrentHashMap<>();
+  // Timeout used while calling submitRequest directly.
+  private long requestTimeout;
+
+  /**
+   * Maintains a list of active volumes per StorageType.
+   */
+  private EnumMap<StorageType, List<String>> ratisVolumeMap;
 
   private XceiverServerRatis(DatanodeDetails dd, int port,
       ContainerDispatcher dispatcher, ContainerController containerController,
-      StateContext context, GrpcTlsConfig tlsConfig, OzoneConfiguration conf)
+      StateContext context, GrpcTlsConfig tlsConfig, ConfigurationSource conf)
       throws IOException {
     this.conf = conf;
     Objects.requireNonNull(dd, "id == null");
@@ -144,6 +168,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       builder.setParameters(GrpcFactory.newRaftParameters(tlsConfig));
     }
     this.server = builder.build();
+    this.requestTimeout = conf.getTimeDuration(
+        HddsConfigKeys.HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT,
+        HddsConfigKeys.HDDS_DATANODE_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    initializeRatisVolumeMap();
   }
 
   private ContainerStateMachine getStateMachine(RaftGroupId gid) {
@@ -194,9 +223,12 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     setNodeFailureTimeout(properties);
 
     // Set the ratis storage directory
-    String storageDir = HddsServerUtil.getOzoneDatanodeRatisDirectory(conf);
-    RaftServerConfigKeys.setStorageDir(properties,
-        Collections.singletonList(new File(storageDir)));
+    Collection<String> storageDirPaths =
+            HddsServerUtil.getOzoneDatanodeRatisDirectory(conf);
+    List<File> storageDirs= new ArrayList<>(storageDirPaths.size());
+    storageDirPaths.stream().forEach(d -> storageDirs.add(new File(d)));
+
+    RaftServerConfigKeys.setStorageDir(properties, storageDirs);
 
     // For grpc set the maximum message size
     GrpcConfigKeys.setMessageSizeMax(properties,
@@ -363,7 +395,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   public static XceiverServerRatis newXceiverServerRatis(
-      DatanodeDetails datanodeDetails, OzoneConfiguration ozoneConf,
+      DatanodeDetails datanodeDetails, ConfigurationSource ozoneConf,
       ContainerDispatcher dispatcher, ContainerController containerController,
       CertificateClient caClient, StateContext context) throws IOException {
     int localPort = ozoneConf.getInt(
@@ -390,12 +422,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   // In summary:
   // authenticate from server to client is via TLS.
   // authenticate from client to server is via block token (or container token).
+  // DN Ratis server act as both SSL client and server and we must pass TLS
+  // configuration for both.
   static GrpcTlsConfig createTlsServerConfigForDN(SecurityConfig conf,
       CertificateClient caClient) {
     if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
       return new GrpcTlsConfig(
           caClient.getPrivateKey(), caClient.getCertificate(),
-          null, false);
+          caClient.getCACertificate(), false);
     }
     return null;
   }
@@ -486,21 +520,62 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   public void submitRequest(ContainerCommandRequestProto request,
       HddsProtos.PipelineID pipelineID) throws IOException {
     RaftClientReply reply;
-    try (Scope scope = TracingUtil
-        .importAndCreateScope(
+    Span span = TracingUtil
+        .importAndCreateSpan(
             "XceiverServerRatis." + request.getCmdType().name(),
-            request.getTraceID())) {
+            request.getTraceID());
+    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
 
       RaftClientRequest raftClientRequest =
           createRaftClientRequest(request, pipelineID,
               RaftClientRequest.writeRequestType());
       try {
-        reply = server.submitClientRequestAsync(raftClientRequest).get();
+        reply = server.submitClientRequestAsync(raftClientRequest)
+            .get(requestTimeout, TimeUnit.MILLISECONDS);
       } catch (Exception e) {
         throw new IOException(e.getMessage(), e);
       }
       processReply(reply);
+    } finally {
+      span.finish();
     }
+  }
+
+  private void  initializeRatisVolumeMap() throws IOException {
+    ratisVolumeMap = new EnumMap<>(StorageType.class);
+    Collection<String> rawLocations = HddsServerUtil.
+            getOzoneDatanodeRatisDirectory(conf);
+
+    for (String locationString : rawLocations) {
+      try {
+        StorageLocation location = StorageLocation.parse(locationString);
+        StorageType type = location.getStorageType();
+        ratisVolumeMap.computeIfAbsent(type, k -> new ArrayList<String>(1));
+        ratisVolumeMap.get(location.getStorageType()).
+                add(location.getUri().getPath());
+
+      } catch (IOException e) {
+        LOG.error("Failed to parse the storage location: " +
+                locationString, e);
+      }
+    }
+  }
+
+  @Override
+  public List<MetadataStorageReportProto> getStorageReport()
+      throws IOException {
+    List<MetadataStorageReportProto> reportProto = new ArrayList<>();
+    for (StorageType storageType : ratisVolumeMap.keySet()) {
+      for (String path : ratisVolumeMap.get(storageType)) {
+        MetadataStorageReportProto.Builder builder = MetadataStorageReportProto.
+                newBuilder();
+        builder.setStorageLocation(path);
+        builder.setStorageType(StorageLocationReport.
+                getStorageTypeProto(storageType));
+        reportProto.add(builder.build());
+      }
+    }
+    return reportProto;
   }
 
   private RaftClientRequest createRaftClientRequest(
@@ -528,6 +603,14 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     case CANDIDATE:
       msg = datanode + " is in candidate state for " +
           roleInfoProto.getCandidateInfo().getLastLeaderElapsedTimeMs() + "ms";
+      break;
+    case FOLLOWER:
+      msg = datanode + " closes pipeline when installSnapshot from leader " +
+          "because leader snapshot doesn't contain any data to replay, " +
+          "all the log entries prior to the snapshot might have been purged." +
+          "So follower should not try to install snapshot from leader but" +
+          "can close the pipeline here. It's in follower state for " +
+          roleInfoProto.getRoleElapsedTimeMs() + "ms";
       break;
     case LEADER:
       StringBuilder sb = new StringBuilder();
@@ -650,7 +733,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     GroupManagementRequest request = GroupManagementRequest.newRemove(
         clientId, server.getId(), nextCallId(),
         RaftGroupId.valueOf(PipelineID.getFromProtobuf(pipelineId).getId()),
-        true);
+        true, false);
 
     RaftClientReply reply;
     try {
@@ -748,18 +831,27 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   }
 
   private void sendPipelineReport() {
-    // TODO: Send IncrementalPipelineReport instead of full PipelineReport
-    context.addReport(context.getParent().getContainer().getPipelineReport());
-    context.getParent().triggerHeartbeat();
+    if (context !=  null) {
+      // TODO: Send IncrementalPipelineReport instead of full PipelineReport
+      context.addReport(context.getParent().getContainer().getPipelineReport());
+      context.getParent().triggerHeartbeat();
+    }
   }
 
   private static List<ThreadPoolExecutor> createChunkExecutors(
-      Configuration conf) {
+      ConfigurationSource conf) {
     // TODO create single pool with N threads if using non-incremental chunks
-    final int threadCount = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_KEY,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_DEFAULT);
-    ThreadPoolExecutor[] executors = new ThreadPoolExecutor[threadCount];
+    final int threadCountPerDisk = conf.getInt(
+        OzoneConfigKeys
+            .DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_KEY,
+        OzoneConfigKeys
+            .DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT);
+
+    final int numberOfDisks =
+        MutableVolumeSet.getDatanodeStorageDirs(conf).size();
+
+    ThreadPoolExecutor[] executors =
+        new ThreadPoolExecutor[threadCountPerDisk * numberOfDisks];
     for (int i = 0; i < executors.length; i++) {
       ThreadFactory threadFactory = new ThreadFactoryBuilder()
           .setDaemon(true)

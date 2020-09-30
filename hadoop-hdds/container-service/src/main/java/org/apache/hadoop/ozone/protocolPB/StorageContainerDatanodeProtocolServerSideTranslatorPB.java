@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.protocol.StorageContainerDatanodeProtocol;
 
+import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.slf4j.Logger;
@@ -49,11 +50,11 @@ public class StorageContainerDatanodeProtocolServerSideTranslatorPB
 
   private final StorageContainerDatanodeProtocol impl;
   private final OzoneProtocolMessageDispatcher<SCMDatanodeRequest,
-      SCMDatanodeResponse> dispatcher;
+      SCMDatanodeResponse, ProtocolMessageEnum> dispatcher;
 
   public StorageContainerDatanodeProtocolServerSideTranslatorPB(
       StorageContainerDatanodeProtocol impl,
-      ProtocolMessageMetrics protocolMessageMetrics) {
+      ProtocolMessageMetrics<ProtocolMessageEnum> protocolMessageMetrics) {
     this.impl = impl;
     dispatcher =
         new OzoneProtocolMessageDispatcher<>("SCMDatanodeProtocol",
@@ -67,7 +68,7 @@ public class StorageContainerDatanodeProtocolServerSideTranslatorPB
         .getContainerReport();
     NodeReportProto dnNodeReport = request.getNodeReport();
     PipelineReportsProto pipelineReport = request.getPipelineReports();
-    return impl.register(request.getDatanodeDetails(), dnNodeReport,
+    return impl.register(request.getExtendedDatanodeDetails(), dnNodeReport,
         containerRequestProto, pipelineReport);
 
   }

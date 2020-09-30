@@ -44,7 +44,7 @@ public class TestSimplePipelineProvider {
   public void init() throws Exception {
     nodeManager = new MockNodeManager(true, 10);
     stateManager = new PipelineStateManager();
-    provider = new SimplePipelineProvider(nodeManager);
+    provider = new SimplePipelineProvider(nodeManager, stateManager);
   }
 
   @Test

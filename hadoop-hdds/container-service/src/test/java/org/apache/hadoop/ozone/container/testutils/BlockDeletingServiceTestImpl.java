@@ -16,17 +16,17 @@
  */
 package org.apache.hadoop.ozone.container.testutils;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.ozone.container.keyvalue.statemachine.background
-    .BlockDeletingService;
-import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 /**
  * A test class implementation for {@link BlockDeletingService}.
@@ -43,7 +43,7 @@ public class BlockDeletingServiceTestImpl
   private AtomicInteger numOfProcessed = new AtomicInteger(0);
 
   public BlockDeletingServiceTestImpl(OzoneContainer container,
-      int serviceInterval, Configuration conf) {
+      int serviceInterval, ConfigurationSource conf) {
     super(container, serviceInterval, SERVICE_TIMEOUT_IN_MILLISECONDS,
         TimeUnit.MILLISECONDS, conf);
   }

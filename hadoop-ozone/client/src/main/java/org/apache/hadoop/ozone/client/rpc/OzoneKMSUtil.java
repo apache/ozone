@@ -18,6 +18,12 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.CryptoCodec;
@@ -26,18 +32,14 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
-import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.KMSUtil;
-
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.security.GeneralSecurityException;
 
 /**
  * KMS utility class for Ozone Data Encryption At-Rest.
@@ -94,7 +96,7 @@ public final class OzoneKMSUtil {
   }
 
   public static URI getKeyProviderUri(UserGroupInformation ugi,
-      URI namespaceUri, String kmsUriSrv, Configuration conf)
+      URI namespaceUri, String kmsUriSrv, ConfigurationSource conf)
       throws IOException {
     URI keyProviderUri = null;
     Credentials credentials = ugi.getCredentials();
@@ -110,8 +112,10 @@ public final class OzoneKMSUtil {
     if (keyProviderUri == null) {
       // from client conf
       if (kmsUriSrv == null) {
+        Configuration hadoopConfig =
+            LegacyHadoopConfigurationSource.asHadoopConfiguration(conf);
         keyProviderUri = KMSUtil.getKeyProviderUri(
-            conf, keyProviderUriKeyName);
+            hadoopConfig, keyProviderUriKeyName);
       } else if (!kmsUriSrv.isEmpty()) {
         // from om server
         keyProviderUri = URI.create(kmsUriSrv);
@@ -120,18 +124,20 @@ public final class OzoneKMSUtil {
     // put back into UGI
     if (keyProviderUri != null && credsKey != null) {
       credentials.addSecretKey(
-          credsKey, DFSUtil.string2Bytes(keyProviderUri.toString()));
+          credsKey, StringUtils.string2Bytes(keyProviderUri.toString()));
     }
 
     return keyProviderUri;
   }
 
-  public static KeyProvider getKeyProvider(final Configuration conf,
+  public static KeyProvider getKeyProvider(final ConfigurationSource conf,
       final URI serverProviderUri) throws IOException{
     if (serverProviderUri == null) {
       throw new IOException("KMS serverProviderUri is not configured.");
     }
-    return KMSUtil.createKeyProviderFromUri(conf, serverProviderUri);
+    return KMSUtil.createKeyProviderFromUri(
+        LegacyHadoopConfigurationSource.asHadoopConfiguration(conf),
+        serverProviderUri);
   }
 
   public static CryptoProtocolVersion getCryptoProtocolVersion(
@@ -156,14 +162,16 @@ public final class OzoneKMSUtil {
     }
   }
 
-  public static CryptoCodec getCryptoCodec(Configuration conf,
+  public static CryptoCodec getCryptoCodec(ConfigurationSource conf,
       FileEncryptionInfo feInfo) throws IOException {
     CipherSuite suite = feInfo.getCipherSuite();
     if (suite.equals(CipherSuite.UNKNOWN)) {
       throw new IOException("NameNode specified unknown CipherSuite with ID " +
               suite.getUnknownValue() + ", cannot instantiate CryptoCodec.");
     } else {
-      CryptoCodec codec = CryptoCodec.getInstance(conf, suite);
+      Configuration hadoopConfig =
+          LegacyHadoopConfigurationSource.asHadoopConfiguration(conf);
+      CryptoCodec codec = CryptoCodec.getInstance(hadoopConfig, suite);
       if (codec == null) {
         throw new OMException("No configuration found for the cipher suite " +
                 suite.getConfigSuffix() + " prefixed with " +

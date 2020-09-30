@@ -82,16 +82,16 @@ And can be started with the help of Docker:
 cd hadoop-ozone/dist/target/ozone-*/compose/ozone
 docker-compose up -d --scale datanode=3
 ```
-For more information, you can check the [Contribution guideline](./CONTRIBUTION.md)
+For more information, you can check the [Contribution guideline](./CONTRIBUTING.md)
 
 ## Contribute
 
 All contributions are welcome.
 
- 1. Please open a [Jira](https://issues.apache.org/jira) issue
+ 1. Please open a [Jira](https://issues.apache.org/jira/projects/HDDS/issues) issue
  2. And create a pull request
 
-For more information, you can check the [Contribution guideline](./CONTRIBUTION.md)
+For more information, you can check the [Contribution guideline](./CONTRIBUTING.md)
 
 ## License
 

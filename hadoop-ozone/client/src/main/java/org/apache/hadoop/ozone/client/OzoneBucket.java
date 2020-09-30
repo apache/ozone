@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.client;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.util.Time;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -92,9 +93,19 @@ public class OzoneBucket extends WithMetadata {
   private int listCacheSize;
 
   /**
+   * Used bytes of the bucket.
+   */
+  private long usedBytes;
+
+  /**
    * Creation time of the bucket.
    */
   private Instant creationTime;
+
+  /**
+   * Modification time of the bucket.
+   */
+  private Instant modificationTime;
 
   /**
    * Bucket Encryption key name if bucket encryption is enabled.
@@ -103,8 +114,10 @@ public class OzoneBucket extends WithMetadata {
 
   private OzoneObj ozoneObj;
 
+  private String sourceVolume;
+  private String sourceBucket;
 
-  private OzoneBucket(Configuration conf, String volumeName,
+  private OzoneBucket(ConfigurationSource conf, String volumeName,
       String bucketName, ReplicationFactor defaultReplication,
       ReplicationType defaultReplicationType, ClientProtocol proxy) {
     Preconditions.checkNotNull(proxy, "Client proxy is not set.");
@@ -132,11 +145,13 @@ public class OzoneBucket extends WithMetadata {
         .setResType(OzoneObj.ResourceType.BUCKET)
         .setStoreType(OzoneObj.StoreType.OZONE).build();
   }
+
   @SuppressWarnings("parameternumber")
-  public OzoneBucket(Configuration conf, ClientProtocol proxy,
+  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
       String volumeName, String bucketName, StorageType storageType,
       Boolean versioning, long creationTime, Map<String, String> metadata,
-      String encryptionKeyName) {
+      String encryptionKeyName,
+      String sourceVolume, String sourceBucket) {
     this(conf, volumeName, bucketName, null, null, proxy);
     this.storageType = storageType;
     this.versioning = versioning;
@@ -144,6 +159,36 @@ public class OzoneBucket extends WithMetadata {
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.metadata = metadata;
     this.encryptionKeyName = encryptionKeyName;
+    this.sourceVolume = sourceVolume;
+    this.sourceBucket = sourceBucket;
+    modificationTime = Instant.now();
+    if (modificationTime.isBefore(this.creationTime)) {
+      modificationTime = Instant.ofEpochSecond(
+          this.creationTime.getEpochSecond(), this.creationTime.getNano());
+    }
+  }
+
+  @SuppressWarnings("parameternumber")
+  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
+      String volumeName, String bucketName, StorageType storageType,
+      Boolean versioning, long creationTime, long modificationTime,
+      Map<String, String> metadata, String encryptionKeyName,
+      String sourceVolume, String sourceBucket) {
+    this(conf, proxy, volumeName, bucketName, storageType, versioning,
+        creationTime, metadata, encryptionKeyName, sourceVolume, sourceBucket);
+    this.modificationTime = Instant.ofEpochMilli(modificationTime);
+  }
+
+  @SuppressWarnings("parameternumber")
+  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
+      String volumeName, String bucketName, StorageType storageType,
+      Boolean versioning, long creationTime, long modificationTime,
+      Map<String, String> metadata, String encryptionKeyName,
+      String sourceVolume, String sourceBucket, long usedBytes) {
+    this(conf, proxy, volumeName, bucketName, storageType, versioning,
+        creationTime, metadata, encryptionKeyName, sourceVolume, sourceBucket);
+    this.usedBytes = usedBytes;
+    this.modificationTime = Instant.ofEpochMilli(modificationTime);
   }
 
   /**
@@ -157,7 +202,7 @@ public class OzoneBucket extends WithMetadata {
    * @param creationTime creation time of the bucket.
    */
   @SuppressWarnings("parameternumber")
-  public OzoneBucket(Configuration conf, ClientProtocol proxy,
+  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
       String volumeName, String bucketName, StorageType storageType,
       Boolean versioning, long creationTime, Map<String, String> metadata) {
     this(conf, volumeName, bucketName, null, null, proxy);
@@ -166,6 +211,24 @@ public class OzoneBucket extends WithMetadata {
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.metadata = metadata;
+    modificationTime = Instant.now();
+    if (modificationTime.isBefore(this.creationTime)) {
+      modificationTime = Instant.ofEpochSecond(
+          this.creationTime.getEpochSecond(), this.creationTime.getNano());
+    }
+  }
+
+  /**
+   * @param modificationTime modification time of the bucket.
+   */
+  @SuppressWarnings("parameternumber")
+  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
+      String volumeName, String bucketName, StorageType storageType,
+      Boolean versioning, long creationTime, long modificationTime,
+      Map<String, String> metadata) {
+    this(conf, proxy, volumeName, bucketName, storageType, versioning,
+        creationTime, metadata);
+    this.modificationTime = Instant.ofEpochMilli(modificationTime);
   }
 
   @VisibleForTesting
@@ -187,8 +250,13 @@ public class OzoneBucket extends WithMetadata {
         .setVolumeName(volumeName)
         .setResType(OzoneObj.ResourceType.BUCKET)
         .setStoreType(OzoneObj.StoreType.OZONE).build();
+    long modifiedTime = Time.now();
+    if (modifiedTime < creationTime) {
+      this.modificationTime = Instant.ofEpochMilli(creationTime);
+    } else {
+      this.modificationTime = Instant.ofEpochMilli(modifiedTime);
+    }
   }
-
 
   /**
    * Returns Volume Name.
@@ -246,6 +314,15 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Returns modification time of the Bucket.
+   *
+   * @return modification time of the bucket
+   */
+  public Instant getModificationTime() {
+    return modificationTime;
+  }
+
+  /**
    * Return the bucket encryption key name.
    * @return the bucket encryption key name
    */
@@ -253,6 +330,16 @@ public class OzoneBucket extends WithMetadata {
     return encryptionKeyName;
   }
 
+  public String getSourceVolume() {
+    return sourceVolume;
+  }
+
+  public String getSourceBucket() {
+    return sourceBucket;
+  }
+
+  /**
+   * Builder for OmBucketInfo.
   /**
    * Adds ACLs to the Bucket.
    * @param addAcl ACL to be added
@@ -346,6 +433,10 @@ public class OzoneBucket extends WithMetadata {
     return proxy.getKeyDetails(volumeName, name, key);
   }
 
+  public long getUsedBytes() {
+    return usedBytes;
+  }
+
   /**
    * Returns Iterator to iterate over all keys in the bucket.
    * The result can be restricted using key prefix, will return all
@@ -382,9 +473,34 @@ public class OzoneBucket extends WithMetadata {
     proxy.deleteKey(volumeName, name, key);
   }
 
+  /**
+   * Deletes the given list of keys from the bucket.
+   * @param keyList List of the key name to be deleted.
+   * @throws IOException
+   */
+  public void deleteKeys(List<String> keyList) throws IOException {
+    proxy.deleteKeys(volumeName, name, keyList);
+  }
+
+  /**
+   * Rename the keyname from fromKeyName to toKeyName.
+   * @param fromKeyName The original key name.
+   * @param toKeyName New key name.
+   * @throws IOException
+   */
   public void renameKey(String fromKeyName, String toKeyName)
       throws IOException {
     proxy.renameKey(volumeName, name, fromKeyName, toKeyName);
+  }
+
+  /**
+   * Rename the key by keyMap, The key is fromKeyName and value is toKeyName.
+   * @param keyMap The key is original key name nad value is new key name.
+   * @throws IOException
+   */
+  public void renameKeys(Map<String, String> keyMap)
+      throws IOException {
+    proxy.renameKeys(volumeName, name, keyMap);
   }
 
   /**

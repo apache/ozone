@@ -20,36 +20,22 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-hdds</artifactId>
-    <version>0.6.0-SNAPSHOT</version>
+    <version>1.1.0-SNAPSHOT</version>
   </parent>
   <artifactId>hadoop-hdds-common</artifactId>
-  <version>0.6.0-SNAPSHOT</version>
+  <version>1.1.0-SNAPSHOT</version>
   <description>Apache Hadoop Distributed Data Store Common</description>
   <name>Apache Hadoop HDDS Common</name>
   <packaging>jar</packaging>
 
-  <properties>
-    <hdds.version>0.6.0-SNAPSHOT</hdds.version>
-    <log4j2.version>2.11.0</log4j2.version>
-    <disruptor.version>3.4.2</disruptor.version>
-    <declared.hdds.version>${hdds.version}</declared.hdds.version>
-  </properties>
-
   <dependencies>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-common</artifactId>
-      <version>${hadoop.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdfs</artifactId>
-      <version>${hadoop.version}</version>
+      <artifactId>hadoop-hdds-hadoop-dependency-client</artifactId>
     </dependency>
     <dependency>
       <groupId>info.picocli</groupId>
       <artifactId>picocli</artifactId>
-      <version>3.9.6</version>
     </dependency>
     <dependency>
       <groupId>com.google.protobuf</groupId>
@@ -61,21 +47,48 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>guava</artifactId>
       <scope>compile</scope>
     </dependency>
-
+    <!-- for the annotations in OzoneConfiguration -->
+    <dependency>
+      <groupId>com.sun.xml.bind</groupId>
+      <artifactId>jaxb-impl</artifactId>
+      <version>2.1.13</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdds-config</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdds-test-utils</artifactId>
+      <scope>test</scope>
     </dependency>
 
     <dependency>
       <groupId>javax.annotation</groupId>
       <artifactId>javax.annotation-api</artifactId>
-      <version>1.2</version>
     </dependency>
 
     <dependency>
       <groupId>org.fusesource.leveldbjni</groupId>
       <artifactId>leveldbjni-all</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.dropwizard.metrics</groupId>
+      <artifactId>metrics-core</artifactId>
     </dependency>
 
     <dependency>
@@ -107,21 +120,9 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>com.google.errorprone</groupId>
       <artifactId>error_prone_annotations</artifactId>
-      <version>2.2.0</version>
       <optional>true</optional>
     </dependency>
 
-    <dependency>
-      <groupId>org.rocksdb</groupId>
-      <artifactId>rocksdbjni</artifactId>
-      <version>6.6.4</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-common</artifactId>
-      <scope>test</scope>
-      <type>test-jar</type>
-    </dependency>
 
     <dependency>
       <groupId>org.apache.logging.log4j</groupId>
@@ -134,6 +135,16 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <version>${log4j2.version}</version>
     </dependency>
     <dependency>
+      <groupId>log4j</groupId>
+      <artifactId>log4j</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-log4j12</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>com.lmax</groupId>
       <artifactId>disruptor</artifactId>
       <version>${disruptor.version}</version>
@@ -141,37 +152,32 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-pool2</artifactId>
-      <version>2.6.0</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcpkix-jdk15on</artifactId>
       <version>${bouncycastle.version}</version>
     </dependency>
-    <!-- https://mvnrepository.com/artifact/commons-validator/commons-validator -->
     <dependency>
       <groupId>commons-validator</groupId>
       <artifactId>commons-validator</artifactId>
-      <version>1.6</version>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-api</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.jaegertracing</groupId>
       <artifactId>jaeger-client</artifactId>
-      <version>${jaeger.version}</version>
     </dependency>
     <dependency>
       <groupId>io.opentracing</groupId>
       <artifactId>opentracing-util</artifactId>
-      <version>0.31.0</version>
     </dependency>
     <dependency>
       <groupId>org.yaml</groupId>
       <artifactId>snakeyaml</artifactId>
-      <version>1.16</version>
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
@@ -179,11 +185,14 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>com.fasterxml.jackson.datatype</groupId>
-      <artifactId>jackson-datatype-jsr310</artifactId>
-      <version>${jackson2.version}</version>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdds-interface-client</artifactId>
     </dependency>
-
+    <dependency>
+      <groupId>org.hamcrest</groupId>
+      <artifactId>hamcrest-all</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -212,61 +221,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     </extensions>
     <plugins>
       <plugin>
-        <groupId>org.xolstice.maven.plugins</groupId>
-        <artifactId>protobuf-maven-plugin</artifactId>
-        <version>${protobuf-maven-plugin.version}</version>
-        <extensions>true</extensions>
-        <configuration>
-          <protocArtifact>
-            com.google.protobuf:protoc:${datanode.protobuf-compile.version}:exe:${os.detected.classifier}
-          </protocArtifact>
-          <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
-          <includes>
-            <include>DatanodeContainerProtocol.proto</include>
-          </includes>
-          <outputDirectory>target/generated-sources/java</outputDirectory>
-          <clearOutputDirectory>false</clearOutputDirectory>
-        </configuration>
-        <executions>
-          <execution>
-            <id>compile-protoc</id>
-              <goals>
-                <goal>compile</goal>
-                <goal>test-compile</goal>
-                <goal>compile-custom</goal>
-                <goal>test-compile-custom</goal>
-              </goals>
-              <configuration>
-                <pluginId>grpc-java</pluginId>
-                <pluginArtifact>
-                  io.grpc:protoc-gen-grpc-java:${datanode.grpc-compile.version}:exe:${os.detected.classifier}
-                </pluginArtifact>
-              </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <artifactId>maven-antrun-plugin</artifactId>
-        <executions>
-          <execution>
-            <phase>generate-sources</phase>
-            <configuration>
-              <tasks>
-                <replace token="com.google.protobuf" value="org.apache.ratis.thirdparty.com.google.protobuf"
-                  dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/datanode/proto">
-                </replace>
-                <replace token="io.grpc" value="org.apache.ratis.thirdparty.io.grpc"
-                  dir="target/generated-sources/java/org/apache/hadoop/hdds/protocol/datanode/proto">
-                </replace>
-              </tasks>
-            </configuration>
-            <goals>
-              <goal>run</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-maven-plugins</artifactId>
         <executions>
@@ -282,28 +236,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <includes>
                   <include>*/src/main/java/**/*.java</include>
                   <include>*/src/main/proto/*.proto</include>
-                </includes>
-              </source>
-            </configuration>
-          </execution>
-          <execution>
-            <id>compile-protoc</id>
-            <goals>
-              <goal>protoc</goal>
-            </goals>
-            <configuration>
-              <protocVersion>${protobuf.version}</protocVersion>
-              <protocCommand>${protoc.path}</protocCommand>
-              <imports>
-                <param>${basedir}/src/main/proto</param>
-              </imports>
-              <source>
-                <directory>${basedir}/src/main/proto</directory>
-                <includes>
-                  <include>StorageContainerLocationProtocol.proto</include>
-                  <include>hdds.proto</include>
-                  <include>ScmBlockLocationProtocol.proto</include>
-                  <include>SCMSecurityProtocol.proto</include>
                 </includes>
               </source>
             </configuration>

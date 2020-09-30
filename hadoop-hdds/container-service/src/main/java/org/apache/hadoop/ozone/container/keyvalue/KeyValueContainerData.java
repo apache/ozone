@@ -20,25 +20,34 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+
+import java.io.IOException;
 import java.util.Collections;
 
+import com.google.common.primitives.Longs;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto;
+import org.apache.hadoop.hdds.utils.BatchOperation;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.yaml.snakeyaml.nodes.Tag;
 
 
 import java.io.File;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static java.lang.Math.max;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_BLOCK_COUNT_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.CHUNKS_PATH;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_CONTAINER_BYTES_USED_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE;
 import static org.apache.hadoop.ozone.OzoneConsts.METADATA_PATH;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_PENDING_DELETE_BLOCK_COUNT_KEY;
 
 /**
  * This class represents the KeyValueContainer metadata, which is the
@@ -57,14 +66,14 @@ public class KeyValueContainerData extends ContainerData {
   private String metadataPath;
 
   //Type of DB used to store key to chunks mapping
-  private String containerDBType;
+  private String containerDBType = CONTAINER_DB_TYPE_ROCKSDB;
 
   private File dbFile = null;
 
   /**
    * Number of pending deletion blocks in KeyValueContainer.
    */
-  private final AtomicInteger numPendingDeletionBlocks;
+  private final AtomicLong numPendingDeletionBlocks;
 
   private long deleteTransactionId;
 
@@ -89,7 +98,7 @@ public class KeyValueContainerData extends ContainerData {
       long size, String originPipelineId, String originNodeId) {
     super(ContainerProtos.ContainerType.KeyValueContainer, id, layOutVersion,
         size, originPipelineId, originNodeId);
-    this.numPendingDeletionBlocks = new AtomicInteger(0);
+    this.numPendingDeletionBlocks = new AtomicLong(0);
     this.deleteTransactionId = 0;
   }
 
@@ -97,7 +106,7 @@ public class KeyValueContainerData extends ContainerData {
     super(source);
     Preconditions.checkArgument(source.getContainerType()
         == ContainerProtos.ContainerType.KeyValueContainer);
-    this.numPendingDeletionBlocks = new AtomicInteger(0);
+    this.numPendingDeletionBlocks = new AtomicLong(0);
     this.deleteTransactionId = 0;
   }
 
@@ -141,9 +150,6 @@ public class KeyValueContainerData extends ContainerData {
    * @return Path to base dir
    */
   public String getContainerPath() {
-    if (metadataPath == null) {
-      return null;
-    }
     return new File(metadataPath).getParent();
   }
 
@@ -182,7 +188,7 @@ public class KeyValueContainerData extends ContainerData {
    *
    * @param numBlocks increment number
    */
-  public void incrPendingDeletionBlocks(int numBlocks) {
+  public void incrPendingDeletionBlocks(long numBlocks) {
     this.numPendingDeletionBlocks.addAndGet(numBlocks);
   }
 
@@ -191,14 +197,14 @@ public class KeyValueContainerData extends ContainerData {
    *
    * @param numBlocks decrement number
    */
-  public void decrPendingDeletionBlocks(int numBlocks) {
+  public void decrPendingDeletionBlocks(long numBlocks) {
     this.numPendingDeletionBlocks.addAndGet(-1 * numBlocks);
   }
 
   /**
    * Get the number of pending deletion blocks.
    */
-  public int getNumPendingDeletionBlocks() {
+  public long getNumPendingDeletionBlocks() {
     return this.numPendingDeletionBlocks.get();
   }
 
@@ -226,7 +232,7 @@ public class KeyValueContainerData extends ContainerData {
   public ContainerDataProto getProtoBufMessage() {
     ContainerDataProto.Builder builder = ContainerDataProto.newBuilder();
     builder.setContainerID(this.getContainerID());
-    builder.setContainerPath(this.getMetadataPath());
+    builder.setContainerPath(this.getContainerPath());
     builder.setState(this.getState());
 
     for (Map.Entry<String, String> entry : getMetadata().entrySet()) {
@@ -250,5 +256,26 @@ public class KeyValueContainerData extends ContainerData {
   public static List<String> getYamlFields() {
     return Collections.unmodifiableList(KV_YAML_FIELDS);
   }
+
+  /**
+   * Update DB counters related to block metadata.
+   * @param db - Reference to container DB.
+   * @param batchOperation - Batch Operation to batch DB operations.
+   * @param deletedBlockCount - Number of blocks deleted.
+   * @throws IOException
+   */
+  public void updateAndCommitDBCounters(
+      ReferenceCountedDB db, BatchOperation batchOperation,
+      int deletedBlockCount) throws IOException {
+    // Set Bytes used and block count key.
+    batchOperation.put(DB_CONTAINER_BYTES_USED_KEY,
+        Longs.toByteArray(getBytesUsed()));
+    batchOperation.put(DB_BLOCK_COUNT_KEY, Longs.toByteArray(
+        getKeyCount() - deletedBlockCount));
+    batchOperation.put(DB_PENDING_DELETE_BLOCK_COUNT_KEY, Longs.toByteArray(
+        getNumPendingDeletionBlocks() - deletedBlockCount));
+    db.getStore().writeBatch(batchOperation);
+  }
+
 
 }

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -43,15 +43,11 @@ import io.grpc.stub.StreamObserver;
  */
 public class ControllerService extends ControllerImplBase {
 
-  private final String volumeOwner;
-
   private long defaultVolumeSize;
 
   private OzoneClient ozoneClient;
 
-  public ControllerService(OzoneClient ozoneClient, long volumeSize,
-      String volumeOwner) {
-    this.volumeOwner = volumeOwner;
+  public ControllerService(OzoneClient ozoneClient, long volumeSize) {
     this.defaultVolumeSize = volumeSize;
     this.ozoneClient = ozoneClient;
   }
@@ -60,8 +56,7 @@ public class ControllerService extends ControllerImplBase {
   public void createVolume(CreateVolumeRequest request,
       StreamObserver<CreateVolumeResponse> responseObserver) {
     try {
-      ozoneClient.getObjectStore()
-          .createS3Bucket(volumeOwner, request.getName());
+      ozoneClient.getObjectStore().createS3Bucket(request.getName());
 
       long size = findSize(request.getCapacityRange());
 

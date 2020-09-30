@@ -35,6 +35,8 @@ import org.junit.Test;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.junit.Assert.*;
 
@@ -43,6 +45,12 @@ import static org.junit.Assert.*;
  */
 
 public class TestContainerMapper {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient ozClient = null;

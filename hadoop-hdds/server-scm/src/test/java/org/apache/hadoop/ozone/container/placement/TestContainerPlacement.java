@@ -16,26 +16,23 @@
  */
 package org.apache.hadoop.ozone.container.placement;
 
-import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.scm.container.MockNodeManager;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms
-    .SCMContainerPlacementCapacity;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms
-    .SCMContainerPlacementRandom;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.junit.Assert;
-import org.junit.Test;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.container.MockNodeManager;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
+import org.junit.Assert;
 import static org.junit.Assert.assertEquals;
+import org.junit.Test;
 
 /**
  * Asserts that allocation strategy works as expected.
@@ -80,10 +77,11 @@ public class TestContainerPlacement {
         .getStandardDeviation(), 0.001);
 
     SCMContainerPlacementCapacity capacityPlacer = new
-        SCMContainerPlacementCapacity(nodeManagerCapacity, new Configuration(),
+        SCMContainerPlacementCapacity(nodeManagerCapacity,
+        new OzoneConfiguration(),
         null, true, null);
     SCMContainerPlacementRandom randomPlacer = new
-        SCMContainerPlacementRandom(nodeManagerRandom, new Configuration(),
+        SCMContainerPlacementRandom(nodeManagerRandom, new OzoneConfiguration(),
         null, true, null);
 
     for (int x = 0; x < opsCount; x++) {

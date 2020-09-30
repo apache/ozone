@@ -22,6 +22,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
@@ -30,9 +31,12 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import javax.annotation.Nullable;
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+
 /**
  * Response for CreateBucket request.
  */
+@CleanupTableInfo(cleanupTables = {BUCKET_TABLE})
 public final class OMBucketCreateResponse extends OMClientResponse {
 
   private final OmBucketInfo omBucketInfo;
@@ -44,7 +48,7 @@ public final class OMBucketCreateResponse extends OMClientResponse {
   }
 
   /**
-   * For when the request is not successful or it is a replay transaction.
+   * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
   public OMBucketCreateResponse(@Nonnull OMResponse omResponse) {

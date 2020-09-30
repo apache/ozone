@@ -21,11 +21,12 @@ import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.protocol.RaftGroup;
@@ -56,7 +57,8 @@ public final class RatisPipelineUtils {
    * @param grpcTlsConfig
    * @throws IOException
    */
-  public static void destroyPipeline(Pipeline pipeline, Configuration ozoneConf,
+  public static void destroyPipeline(Pipeline pipeline,
+      ConfigurationSource ozoneConf,
       GrpcTlsConfig grpcTlsConfig) {
     final RaftGroup group = RatisHelper.newRaftGroup(pipeline);
     if (LOG.isDebugEnabled()) {
@@ -82,7 +84,8 @@ public final class RatisPipelineUtils {
    * @throws IOException
    */
   static void destroyPipeline(DatanodeDetails dn, PipelineID pipelineID,
-      Configuration ozoneConf, GrpcTlsConfig grpcTlsConfig) throws IOException {
+      ConfigurationSource ozoneConf, GrpcTlsConfig grpcTlsConfig)
+      throws IOException {
     final String rpcType = ozoneConf
         .get(ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY,
             ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
@@ -92,7 +95,7 @@ public final class RatisPipelineUtils {
         .newRaftClient(SupportedRpcType.valueOfIgnoreCase(rpcType), p,
             retryPolicy, grpcTlsConfig, ozoneConf)) {
       client.groupRemove(RaftGroupId.valueOf(pipelineID.getId()),
-          true, p.getId());
+          true, false, p.getId());
     }
   }
 

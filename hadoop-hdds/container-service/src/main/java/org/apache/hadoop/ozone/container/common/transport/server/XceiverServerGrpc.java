@@ -18,19 +18,21 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server;
 
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.conf.Configuration;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto
-        .StorageContainerDatanodeProtocolProtos.PipelineReport;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.container.common.helpers.
-    StorageContainerException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.GrpcServerInterceptor;
@@ -39,7 +41,10 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 
+import com.google.common.base.Preconditions;
 import io.opentracing.Scope;
+import io.opentracing.Span;
+import io.opentracing.util.GlobalTracer;
 import org.apache.ratis.thirdparty.io.grpc.BindableService;
 import org.apache.ratis.thirdparty.io.grpc.Server;
 import org.apache.ratis.thirdparty.io.grpc.ServerBuilder;
@@ -49,12 +54,6 @@ import org.apache.ratis.thirdparty.io.grpc.netty.NettyServerBuilder;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Creates a Grpc server endpoint that acts as the communication layer for
@@ -77,7 +76,8 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
    *
    * @param conf - Configuration
    */
-  public XceiverServerGrpc(DatanodeDetails datanodeDetails, Configuration conf,
+  public XceiverServerGrpc(DatanodeDetails datanodeDetails,
+      ConfigurationSource conf,
       ContainerDispatcher dispatcher, CertificateClient caClient,
       BindableService... additionalServices) {
     Preconditions.checkNotNull(conf);
@@ -172,16 +172,19 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   @Override
   public void submitRequest(ContainerCommandRequestProto request,
       HddsProtos.PipelineID pipelineID) throws IOException {
-    try (Scope scope = TracingUtil
-        .importAndCreateScope(
+    Span span = TracingUtil
+        .importAndCreateSpan(
             "XceiverServerGrpc." + request.getCmdType().name(),
-            request.getTraceID())) {
+            request.getTraceID());
+    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
       ContainerProtos.ContainerCommandResponseProto response =
           storageContainer.dispatch(request, null);
       if (response.getResult() != ContainerProtos.Result.SUCCESS) {
         throw new StorageContainerException(response.getMessage(),
             response.getResult());
       }
+    } finally {
+      span.finish();
     }
   }
 

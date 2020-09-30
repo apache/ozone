@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.request.s3.bucket.S3BucketCreateRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .MultipartUploadAbortRequest;
@@ -137,6 +136,26 @@ public final class TestOMRequestUtils {
     OmKeyInfo omKeyInfo = createOmKeyInfo(volumeName, bucketName, keyName,
         replicationType, replicationFactor, trxnLogIndex);
 
+    addKeyToTable(openKeyTable, addToCache, omKeyInfo, clientID, trxnLogIndex,
+            omMetadataManager);
+
+  }
+
+  /**
+   * Add key entry to KeyTable. if openKeyTable flag is true, add's entries
+   * to openKeyTable, else add's it to keyTable.
+   * @throws Exception
+   */
+  public static void addKeyToTable(boolean openKeyTable, boolean addToCache,
+                                   OmKeyInfo omKeyInfo,  long clientID,
+                                   long trxnLogIndex,
+                                   OMMetadataManager omMetadataManager)
+          throws Exception {
+
+    String volumeName = omKeyInfo.getVolumeName();
+    String bucketName = omKeyInfo.getBucketName();
+    String keyName = omKeyInfo.getKeyName();
+
     if (openKeyTable) {
       String ozoneKey = omMetadataManager.getOpenKey(volumeName, bucketName,
           keyName, clientID);
@@ -214,13 +233,24 @@ public final class TestOMRequestUtils {
   public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
       String keyName, HddsProtos.ReplicationType replicationType,
       HddsProtos.ReplicationFactor replicationFactor, long objectID) {
+    return createOmKeyInfo(volumeName, bucketName, keyName, replicationType,
+            replicationFactor, objectID, Time.now());
+  }
+
+  /**
+   * Create OmKeyInfo.
+   */
+  public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
+      String keyName, HddsProtos.ReplicationType replicationType,
+      HddsProtos.ReplicationFactor replicationFactor, long objectID,
+      long creationTime) {
     return new OmKeyInfo.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-        .setCreationTime(Time.now())
+        .setCreationTime(creationTime)
         .setModificationTime(Time.now())
         .setDataSize(1000L)
         .setReplicationType(replicationType)
@@ -241,15 +271,6 @@ public final class TestOMRequestUtils {
     addVolumeToDB(volumeName, UUID.randomUUID().toString(), omMetadataManager);
   }
 
-  public static void addS3BucketToDB(String volumeName, String s3BucketName,
-      OMMetadataManager omMetadataManager) throws Exception {
-    omMetadataManager.getS3Table().put(s3BucketName,
-        S3BucketCreateRequest.formatS3MappingName(volumeName, s3BucketName));
-    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName).setBucketName(s3BucketName).build();
-    addBucketToOM(omMetadataManager, omBucketInfo);
-  }
-
   /**
    * Add volume creation entry to OM DB.
    * @param volumeName
@@ -262,6 +283,7 @@ public final class TestOMRequestUtils {
     OmVolumeArgs omVolumeArgs =
         OmVolumeArgs.newBuilder().setCreationTime(Time.now())
             .setVolume(volumeName).setAdminName(ownerName)
+            .setQuotaInBytes(Long.MAX_VALUE)
             .setOwnerName(ownerName).build();
     omMetadataManager.getVolumeTable().put(
         omMetadataManager.getVolumeKey(volumeName), omVolumeArgs);
@@ -308,30 +330,6 @@ public final class TestOMRequestUtils {
     return OzoneManagerProtocolProtos.OMRequest.newBuilder()
         .setCreateBucketRequest(req)
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
-        .setClientId(UUID.randomUUID().toString()).build();
-  }
-
-  public static OzoneManagerProtocolProtos.OMRequest createS3BucketRequest(
-      String userName, String s3BucketName) {
-    OzoneManagerProtocolProtos.S3CreateBucketRequest request =
-        OzoneManagerProtocolProtos.S3CreateBucketRequest.newBuilder()
-            .setUserName(userName)
-            .setS3Bucketname(s3BucketName).build();
-
-    return OzoneManagerProtocolProtos.OMRequest.newBuilder()
-        .setCreateS3BucketRequest(request)
-        .setCmdType(OzoneManagerProtocolProtos.Type.CreateS3Bucket)
-        .setClientId(UUID.randomUUID().toString()).build();
-  }
-
-  public static OzoneManagerProtocolProtos.OMRequest deleteS3BucketRequest(
-      String s3BucketName) {
-    OzoneManagerProtocolProtos.S3DeleteBucketRequest request =
-        OzoneManagerProtocolProtos.S3DeleteBucketRequest.newBuilder()
-            .setS3BucketName(s3BucketName).build();
-    return OzoneManagerProtocolProtos.OMRequest.newBuilder()
-        .setDeleteS3BucketRequest(request)
-        .setCmdType(OzoneManagerProtocolProtos.Type.DeleteS3Bucket)
         .setClientId(UUID.randomUUID().toString()).build();
   }
 
@@ -384,7 +382,7 @@ public final class TestOMRequestUtils {
       String newOwner) {
     SetVolumePropertyRequest setVolumePropertyRequest =
         SetVolumePropertyRequest.newBuilder().setVolumeName(volumeName)
-            .setOwnerName(newOwner).build();
+            .setOwnerName(newOwner).setModificationTime(Time.now()).build();
 
     return OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
         .setCmdType(OzoneManagerProtocolProtos.Type.SetVolumeProperty)
@@ -395,14 +393,17 @@ public final class TestOMRequestUtils {
   /**
    * Create OMRequest for set volume property request with quota set.
    * @param volumeName
-   * @param quota
+   * @param quotaInBytes
+   * @param quotaInCounts
    * @return OMRequest
    */
   public static OMRequest createSetVolumePropertyRequest(String volumeName,
-      long quota) {
+      long quotaInBytes, long quotaInCounts) {
     SetVolumePropertyRequest setVolumePropertyRequest =
         SetVolumePropertyRequest.newBuilder().setVolumeName(volumeName)
-            .setQuotaInBytes(quota).build();
+            .setQuotaInBytes(quotaInBytes)
+            .setQuotaInCounts(quotaInCounts)
+            .setModificationTime(Time.now()).build();
 
     return OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
         .setCmdType(OzoneManagerProtocolProtos.Type.SetVolumeProperty)

@@ -18,20 +18,20 @@
 package org.apache.hadoop.ozone.container.common.impl;
 
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
 import java.util.List;
 
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_DATA_DIR;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Defines layout versions for the Chunks.
@@ -40,17 +40,15 @@ public enum ChunkLayOutVersion {
 
   FILE_PER_CHUNK(1, "One file per chunk") {
     @Override
-    public File getChunkFile(ContainerData containerData, BlockID blockID,
-        ChunkInfo info) throws StorageContainerException {
-      File chunksLoc = verifyChunkDirExists(containerData);
-      return chunksLoc.toPath().resolve(info.getChunkName()).toFile();
+    public File getChunkFile(File chunkDir, BlockID blockID,
+        ChunkInfo info) {
+      return new File(chunkDir, info.getChunkName());
     }
   },
   FILE_PER_BLOCK(2, "One file per block") {
     @Override
-    public File getChunkFile(ContainerData containerData, BlockID blockID,
-        ChunkInfo info) throws StorageContainerException {
-      File chunkDir = verifyChunkDirExists(containerData);
+    public File getChunkFile(File chunkDir, BlockID blockID,
+        ChunkInfo info) {
       return new File(chunkDir, blockID.getLocalID() + ".block");
     }
   };
@@ -94,7 +92,8 @@ public enum ChunkLayOutVersion {
   /**
    * @return the latest version.
    */
-  public static ChunkLayOutVersion getConfiguredVersion(Configuration conf) {
+  public static ChunkLayOutVersion getConfiguredVersion(
+      ConfigurationSource conf) {
     try {
       return conf.getEnum(ScmConfigKeys.OZONE_SCM_CHUNK_LAYOUT_KEY,
           DEFAULT_LAYOUT);
@@ -117,15 +116,21 @@ public enum ChunkLayOutVersion {
     return description;
   }
 
-  public abstract File getChunkFile(ContainerData containerData,
-      BlockID blockID, ChunkInfo info) throws StorageContainerException;
+  public abstract File getChunkFile(File chunkDir,
+      BlockID blockID, ChunkInfo info);
+
+  public File getChunkFile(ContainerData containerData, BlockID blockID,
+      ChunkInfo info) throws StorageContainerException {
+    File chunkDir = getChunkDir(containerData);
+    return getChunkFile(chunkDir, blockID, info);
+  }
 
   @Override
   public String toString() {
     return "ChunkLayout:v" + version;
   }
 
-  private static File verifyChunkDirExists(ContainerData containerData)
+  private static File getChunkDir(ContainerData containerData)
       throws StorageContainerException {
     Preconditions.checkNotNull(containerData, "Container data can't be null");
 
@@ -135,13 +140,7 @@ public enum ChunkLayOutVersion {
       throw new StorageContainerException("Unable to get Chunks directory.",
           UNABLE_TO_FIND_DATA_DIR);
     }
-    File chunksLoc = new File(chunksPath);
-    if (!chunksLoc.exists()) {
-      LOG.error("Chunks path does not exist");
-      throw new StorageContainerException("Unable to get Chunks directory.",
-          UNABLE_TO_FIND_DATA_DIR);
-    }
-    return chunksLoc;
+    return new File(chunksPath);
   }
 
 }

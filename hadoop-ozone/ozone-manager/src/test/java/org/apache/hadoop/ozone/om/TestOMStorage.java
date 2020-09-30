@@ -18,13 +18,14 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.File;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import org.apache.commons.io.FileUtils;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -45,7 +46,7 @@ public class TestOMStorage {
     final File testDir = createTestDir();
     final File dbDir = new File(testDir, "omDbDir");
     final File metaDir = new File(testDir, "metaDir");   // should be ignored.
-    final Configuration conf = new OzoneConfiguration();
+    final MutableConfigurationSource conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, dbDir.getPath());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
 
@@ -65,7 +66,7 @@ public class TestOMStorage {
   public void testGetOmDbDirWithFallback() {
     final File testDir = createTestDir();
     final File metaDir = new File(testDir, "metaDir");
-    final Configuration conf = new OzoneConfiguration();
+    final MutableConfigurationSource conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
 
     try {

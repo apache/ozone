@@ -17,13 +17,19 @@
  */
 package org.hadoop.ozone.recon.codegen;
 
+import static org.hadoop.ozone.recon.codegen.SqlDbUtils.DERBY_DRIVER_CLASS;
+import static org.hadoop.ozone.recon.codegen.SqlDbUtils.createNewDerbyDatabase;
+
 import java.io.File;
+import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.util.Set;
 
 import javax.sql.DataSource;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.derby.jdbc.EmbeddedDataSource;
+import org.apache.hadoop.util.Time;
 import org.hadoop.ozone.recon.schema.ReconSchemaDefinition;
 import org.jooq.codegen.GenerationTool;
 import org.jooq.meta.jaxb.Configuration;
@@ -31,11 +37,11 @@ import org.jooq.meta.jaxb.Database;
 import org.jooq.meta.jaxb.Generate;
 import org.jooq.meta.jaxb.Generator;
 import org.jooq.meta.jaxb.Jdbc;
+import org.jooq.meta.jaxb.Logging;
 import org.jooq.meta.jaxb.Strategy;
 import org.jooq.meta.jaxb.Target;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.sqlite.SQLiteDataSource;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -55,10 +61,11 @@ public class JooqCodeGenerator {
   private static final Logger LOG =
       LoggerFactory.getLogger(JooqCodeGenerator.class);
 
-  private static final String SQLITE_DB =
-      System.getProperty("java.io.tmpdir") + "/recon-generated-schema";
-  private static final String JDBC_URL = "jdbc:sqlite:" + SQLITE_DB;
-
+  private static final String DB = Paths.get(
+      System.getProperty("java.io.tmpdir"),
+      "recon-generated-schema-" + Time.monotonicNow()).toString();
+  public static final String RECON_SCHEMA_NAME = "RECON";
+  private static final String JDBC_URL = "jdbc:derby:" + DB;
   private final Set<ReconSchemaDefinition> allDefinitions;
 
   @Inject
@@ -82,26 +89,25 @@ public class JooqCodeGenerator {
     Configuration configuration =
         new Configuration()
             .withJdbc(new Jdbc()
-                .withDriver("org.sqlite.JDBC")
-                .withUrl(JDBC_URL)
-                .withUser("sa")
-                .withPassword("sa"))
+                .withDriver(DERBY_DRIVER_CLASS)
+                .withUrl(JDBC_URL))
             .withGenerator(new Generator()
                 .withDatabase(new Database()
-                    .withName("org.jooq.meta.sqlite.SQLiteDatabase")
+                    .withName("org.jooq.meta.derby.DerbyDatabase")
                     .withOutputSchemaToDefault(true)
                     .withIncludeTables(true)
-                    .withIncludePrimaryKeys(true))
+                    .withIncludePrimaryKeys(true)
+                    .withInputSchema(RECON_SCHEMA_NAME))
                 .withGenerate(new Generate()
                     .withDaos(true)
-                    .withEmptyCatalogs(true)
-                    .withEmptySchemas(true))
+                    .withEmptyCatalogs(true))
                 .withStrategy(new Strategy().withName(
                     "org.hadoop.ozone.recon.codegen.TableNamingStrategy"))
                 .withTarget(new Target()
                     .withPackageName("org.hadoop.ozone.recon.schema")
                     .withClean(true)
-                    .withDirectory(outputDir)));
+                    .withDirectory(outputDir)))
+                .withLogging(Logging.WARN);
     GenerationTool.generate(configuration);
   }
 
@@ -109,27 +115,32 @@ public class JooqCodeGenerator {
    * Provider for embedded datasource.
    */
   static class LocalDataSourceProvider implements Provider<DataSource> {
-    private static SQLiteDataSource db;
-
+    private static EmbeddedDataSource dataSource;
     static {
-      db = new SQLiteDataSource();
-      db.setUrl(JDBC_URL);
+      try {
+        createNewDerbyDatabase(JDBC_URL, RECON_SCHEMA_NAME);
+      } catch (Exception e) {
+        LOG.error("Error creating Recon Derby DB.", e);
+      }
+      dataSource = new EmbeddedDataSource();
+      dataSource.setDatabaseName(DB);
+      dataSource.setUser(RECON_SCHEMA_NAME);
     }
 
     @Override
     public DataSource get() {
-      return db;
+      return dataSource;
     }
 
     static void cleanup() {
-      FileUtils.deleteQuietly(new File(SQLITE_DB));
+      FileUtils.deleteQuietly(new File(DB));
     }
   }
 
   public static void main(String[] args) {
     if (args.length < 1) {
       throw new IllegalArgumentException("Missing required arguments: " +
-          "Need a ouput directory for generated code.\nUsage: " +
+          "Need an output directory for generated code.\nUsage: " +
           "org.apache.hadoop.ozone.recon.persistence.JooqCodeGenerator " +
           "<outputDirectory>.");
     }
@@ -140,6 +151,7 @@ public class JooqCodeGenerator {
         new AbstractModule() {
           @Override
           protected void configure() {
+            System.setProperty("org.jooq.no-logo", "true");
             bind(DataSource.class).toProvider(new LocalDataSourceProvider());
             bind(JooqCodeGenerator.class);
           }

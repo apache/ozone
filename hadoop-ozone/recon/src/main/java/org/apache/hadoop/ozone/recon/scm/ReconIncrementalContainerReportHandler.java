@@ -50,9 +50,18 @@ public class ReconIncrementalContainerReportHandler
   @Override
   public void onMessage(final IncrementalContainerReportFromDatanode report,
                         final EventPublisher publisher) {
+    final DatanodeDetails dnFromReport = report.getDatanodeDetails();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Processing incremental container report from data node {}",
-          report.getDatanodeDetails());
+          dnFromReport);
+    }
+
+    DatanodeDetails dd =
+        getNodeManager().getNodeByUuid(dnFromReport.getUuidString());
+    if (dd == null) {
+      LOG.warn("Received container report from unknown datanode {}",
+          dnFromReport);
+      return;
     }
 
     ReconContainerManager containerManager =
@@ -61,11 +70,10 @@ public class ReconIncrementalContainerReportHandler
     for (ContainerReplicaProto replicaProto :
         report.getReport().getReportList()) {
       try {
-        final DatanodeDetails dd = report.getDatanodeDetails();
         final ContainerID id = ContainerID.valueof(
             replicaProto.getContainerID());
         try {
-          containerManager.checkAndAddNewContainer(id,
+          containerManager.checkAndAddNewContainer(id, replicaProto.getState(),
               report.getDatanodeDetails());
         } catch (IOException ioEx) {
           LOG.error("Exception while checking and adding new container.", ioEx);
@@ -78,7 +86,7 @@ public class ReconIncrementalContainerReportHandler
         LOG.warn("Container {} not found!", replicaProto.getContainerID());
       } catch (NodeNotFoundException ex) {
         success = false;
-        LOG.error("Received ICR from unknown datanode {} {}",
+        LOG.error("Received ICR from unknown datanode {}.",
             report.getDatanodeDetails(), ex);
       } catch (IOException e) {
         success = false;

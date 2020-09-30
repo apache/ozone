@@ -16,53 +16,48 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine;
 
-import com.google.common.base.Preconditions;
-import com.google.protobuf.GeneratedMessage;
-
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.PipelineAction;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerAction;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
-import org.apache.hadoop.ozone.container.common.states.DatanodeState;
-import org.apache.hadoop.ozone.container.common.states.datanode
-    .InitDatanodeState;
-import org.apache.hadoop.ozone.container.common.states.datanode
-    .RunningDatanodeState;
-import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
-import org.apache.hadoop.ozone.protocol.commands
-    .DeleteBlockCommandStatus.DeleteBlockCommandStatusBuilder;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-
-import static java.lang.Math.min;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
-import java.util.ArrayList;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.ozone.container.common.states.DatanodeState;
+import org.apache.hadoop.ozone.container.common.states.datanode.InitDatanodeState;
+import org.apache.hadoop.ozone.container.common.states.datanode.RunningDatanodeState;
+import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
+import org.apache.hadoop.ozone.protocol.commands.DeleteBlockCommandStatus.DeleteBlockCommandStatusBuilder;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+
+import com.google.common.base.Preconditions;
+import com.google.protobuf.GeneratedMessage;
+import static java.lang.Math.min;
+import org.apache.commons.collections.CollectionUtils;
+
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getLogWarnInterval;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Current Context of State Machine.
@@ -75,7 +70,7 @@ public class StateContext {
   private final Lock lock;
   private final DatanodeStateMachine parent;
   private final AtomicLong stateExecutionCount;
-  private final Configuration conf;
+  private final ConfigurationSource conf;
   private final Set<InetSocketAddress> endpoints;
   private final Map<InetSocketAddress, List<GeneratedMessage>> reports;
   private final Map<InetSocketAddress, Queue<ContainerAction>> containerActions;
@@ -83,6 +78,7 @@ public class StateContext {
   private DatanodeStateMachine.DatanodeStates state;
   private boolean shutdownOnError = false;
   private boolean shutdownGracefully = false;
+  private final AtomicLong threadPoolNotAvailableCount;
 
   /**
    * Starting with a 2 sec heartbeat frequency which will be updated to the
@@ -98,8 +94,9 @@ public class StateContext {
    * @param state  - State
    * @param parent Parent State Machine
    */
-  public StateContext(Configuration conf, DatanodeStateMachine.DatanodeStates
-      state, DatanodeStateMachine parent) {
+  public StateContext(ConfigurationSource conf,
+      DatanodeStateMachine.DatanodeStates
+          state, DatanodeStateMachine parent) {
     this.conf = conf;
     this.state = state;
     this.parent = parent;
@@ -111,6 +108,7 @@ public class StateContext {
     pipelineActions = new HashMap<>();
     lock = new ReentrantLock();
     stateExecutionCount = new AtomicLong(0);
+    threadPoolNotAvailableCount = new AtomicLong(0);
   }
 
   /**
@@ -160,7 +158,14 @@ public class StateContext {
    * @param state state.
    */
   public void setState(DatanodeStateMachine.DatanodeStates state) {
-    this.state = state;
+    if (this.state != state) {
+      if (this.state.isTransitionAllowedTo(state)) {
+        this.state = state;
+      } else {
+        LOG.warn("Ignore disallowed transition from {} to {}",
+            this.state, state);
+      }
+    }
   }
 
   /**
@@ -394,6 +399,20 @@ public class StateContext {
     }
   }
 
+  @VisibleForTesting
+  public boolean isThreadPoolAvailable(ExecutorService executor) {
+    if (!(executor instanceof ThreadPoolExecutor)) {
+      return true;
+    }
+
+    ThreadPoolExecutor ex = (ThreadPoolExecutor) executor;
+    if (ex.getQueue().size() == 0) {
+      return true;
+    }
+
+    return false;
+  }
+
   /**
    * Executes the required state function.
    *
@@ -416,6 +435,17 @@ public class StateContext {
       if (this.isEntering()) {
         task.onEnter();
       }
+
+      if (!isThreadPoolAvailable(service)) {
+        long count = threadPoolNotAvailableCount.getAndIncrement();
+        if (count % getLogWarnInterval(conf) == 0) {
+          LOG.warn("No available thread in pool for past {} seconds.",
+              unit.toSeconds(time) * (count + 1));
+        }
+        return;
+      }
+
+      threadPoolNotAvailableCount.set(0);
       task.execute(service);
       DatanodeStateMachine.DatanodeStates newState = task.await(time, unit);
       if (this.state != newState) {

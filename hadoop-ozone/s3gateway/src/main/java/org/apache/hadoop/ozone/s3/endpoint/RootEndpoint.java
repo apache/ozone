@@ -24,14 +24,11 @@ import java.io.IOException;
 import java.util.Iterator;
 
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.s3.commontypes.BucketMetadata;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.ozone.s3.util.OzoneS3Util.getS3Username;
 
 /**
  * Top level rest endpoint.
@@ -51,12 +48,9 @@ public class RootEndpoint extends EndpointBase {
   @GET
   public Response get()
       throws OS3Exception, IOException {
-    OzoneVolume volume;
     ListBucketResponse response = new ListBucketResponse();
 
-    String userName = getS3Username(getSignatureProcessor().getAwsAccessId());
-    Iterator<? extends OzoneBucket> bucketIterator = listS3Buckets(userName,
-        null);
+    Iterator<? extends OzoneBucket> bucketIterator = listS3Buckets(null);
 
     while (bucketIterator.hasNext()) {
       OzoneBucket next = bucketIterator.next();

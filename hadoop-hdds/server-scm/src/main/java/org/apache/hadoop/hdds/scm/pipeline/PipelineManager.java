@@ -18,23 +18,24 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.safemode.SafeModeNotification;
-
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
+import org.apache.hadoop.hdds.server.events.EventHandler;
+
 /**
  * Interface which exposes the api for pipeline management.
  */
 public interface PipelineManager extends Closeable, PipelineManagerMXBean,
-    SafeModeNotification {
+    EventHandler<SafeModeStatus> {
 
   Pipeline createPipeline(ReplicationType type, ReplicationFactor factor)
       throws IOException;
@@ -87,6 +88,8 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean,
   void triggerPipelineCreation();
 
   void incNumBlocksAllocatedMetric(PipelineID id);
+
+  int getNumHealthyVolumes(Pipeline pipeline);
 
   /**
    * Activates a dormant pipeline.

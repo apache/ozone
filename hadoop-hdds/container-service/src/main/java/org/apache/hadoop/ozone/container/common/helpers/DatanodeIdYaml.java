@@ -25,6 +25,7 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
@@ -79,7 +80,7 @@ public final class DatanodeIdYaml {
       }
 
       DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
-      builder.setUuid(datanodeDetailsYaml.getUuid())
+      builder.setUuid(UUID.fromString(datanodeDetailsYaml.getUuid()))
           .setIpAddress(datanodeDetailsYaml.getIpAddress())
           .setHostName(datanodeDetailsYaml.getHostName())
           .setCertSerialId(datanodeDetailsYaml.getCertSerialId());

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,10 +20,11 @@ package org.apache.hadoop.hdds.scm.cli.pipeline;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine;
 
-import java.util.concurrent.Callable;
+import java.io.IOException;
 
 /**
  * Handler of activate pipeline command.
@@ -33,20 +34,14 @@ import java.util.concurrent.Callable;
     description = "Activates the given Pipeline",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class ActivatePipelineSubcommand implements Callable<Void> {
-
-  @CommandLine.ParentCommand
-  private PipelineCommands parent;
+public class ActivatePipelineSubcommand extends ScmSubcommand {
 
   @CommandLine.Parameters(description = "ID of the pipeline to activate")
   private String pipelineId;
 
   @Override
-  public Void call() throws Exception {
-    try (ScmClient scmClient = parent.getParent().createScmClient()) {
-      scmClient.activatePipeline(
-          HddsProtos.PipelineID.newBuilder().setId(pipelineId).build());
-      return null;
-    }
+  public void execute(ScmClient scmClient) throws IOException {
+    scmClient.activatePipeline(
+        HddsProtos.PipelineID.newBuilder().setId(pipelineId).build());
   }
 }

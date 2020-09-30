@@ -29,7 +29,6 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SQL_DB_JDBC_URL;
 
 import java.io.File;
 import java.io.IOException;
@@ -80,6 +79,7 @@ import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
 import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -699,21 +699,25 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         OzoneConfiguration dnConf = new OzoneConfiguration(conf);
         String datanodeBaseDir = path + "/datanode-" + Integer.toString(i);
         Path metaDir = Paths.get(datanodeBaseDir, "meta");
-        Path dataDir = Paths.get(datanodeBaseDir, "data", "containers");
+        List<String> dataDirs = new ArrayList<>();
+        for (int j = 0; j < numDataVolumes; j++) {
+          Path dir = Paths.get(datanodeBaseDir, "data-" + j, "containers");
+          Files.createDirectories(dir);
+          dataDirs.add(dir.toString());
+        }
+        String listOfDirs = String.join(",", dataDirs);
         Path ratisDir = Paths.get(datanodeBaseDir, "data", "ratis");
-        Path wrokDir = Paths.get(datanodeBaseDir, "data", "replication",
+        Path workDir = Paths.get(datanodeBaseDir, "data", "replication",
             "work");
         Files.createDirectories(metaDir);
-        Files.createDirectories(dataDir);
         Files.createDirectories(ratisDir);
-        Files.createDirectories(wrokDir);
+        Files.createDirectories(workDir);
         dnConf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
-        dnConf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY,
-            dataDir.toString());
+        dnConf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, listOfDirs);
         dnConf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
             ratisDir.toString());
         dnConf.set(OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR,
-            wrokDir.toString());
+            workDir.toString());
         if (reconServer != null) {
           OzoneStorageContainerManager reconScm =
               reconServer.getReconStorageContainerManager();
@@ -800,8 +804,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           .getAbsolutePath());
       conf.set(OZONE_RECON_SCM_DB_DIR,
           tempNewFolder.getAbsolutePath());
-      conf.set(OZONE_RECON_SQL_DB_JDBC_URL, "jdbc:sqlite:" +
-          tempNewFolder.getAbsolutePath() + "/ozone_recon_sqlite.db");
+
+      ReconSqlDbConfig dbConfig = conf.getObject(ReconSqlDbConfig.class);
+      dbConfig.setJdbcUrl("jdbc:derby:" + tempNewFolder.getAbsolutePath()
+          + "/ozone_recon_derby.db");
+      conf.setFromObject(dbConfig);
 
       conf.set(OZONE_RECON_HTTP_ADDRESS_KEY, "0.0.0.0:0");
       conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, "0.0.0.0:0");

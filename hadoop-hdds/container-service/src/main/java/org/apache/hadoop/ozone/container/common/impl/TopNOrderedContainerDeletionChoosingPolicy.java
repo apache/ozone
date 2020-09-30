@@ -45,7 +45,7 @@ public class TopNOrderedContainerDeletionChoosingPolicy
   private static final Comparator<KeyValueContainerData>
         KEY_VALUE_CONTAINER_DATA_COMPARATOR = (KeyValueContainerData c1,
                                                KeyValueContainerData c2) ->
-              Integer.compare(c2.getNumPendingDeletionBlocks(),
+              Long.compare(c2.getNumPendingDeletionBlocks(),
                   c1.getNumPendingDeletionBlocks());
 
   @Override

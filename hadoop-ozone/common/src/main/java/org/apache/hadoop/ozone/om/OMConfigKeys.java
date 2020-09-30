@@ -76,6 +76,9 @@ public final class OMConfigKeys {
       "ozone.om.db.cache.size.mb";
   public static final int OZONE_OM_DB_CACHE_SIZE_DEFAULT = 128;
 
+  public static final String OZONE_OM_VOLUME_LISTALL_ALLOWED =
+      "ozone.om.volume.listall.allowed";
+  public static final boolean OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT = true;
   public static final String OZONE_OM_USER_MAX_VOLUME =
       "ozone.om.user.max.volume";
   public static final int OZONE_OM_USER_MAX_VOLUME_DEFAULT = 1024;
@@ -110,11 +113,11 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_RATIS_SEGMENT_SIZE_KEY
       = "ozone.om.ratis.segment.size";
   public static final String OZONE_OM_RATIS_SEGMENT_SIZE_DEFAULT
-      = "16KB";
+      = "4MB";
   public static final String OZONE_OM_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY
       = "ozone.om.ratis.segment.preallocated.size";
   public static final String OZONE_OM_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT
-      = "16KB";
+      = "4MB";
 
   // OM Ratis Log Appender configurations
   public static final String
@@ -130,12 +133,10 @@ public final class OMConfigKeys {
       "ozone.om.ratis.log.purge.gap";
   public static final int OZONE_OM_RATIS_LOG_PURGE_GAP_DEFAULT = 1000000;
 
-  // OM Snapshot configurations
   public static final String OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY
       = "ozone.om.ratis.snapshot.auto.trigger.threshold";
   public static final long
-      OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_DEFAULT
-      = 400000;
+      OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_DEFAULT = 400000;
 
   // OM Ratis server configurations
   public static final String OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_KEY
@@ -200,9 +201,14 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_KERBEROS_PRINCIPAL_KEY = "ozone.om"
       + ".kerberos.principal";
   public static final String OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE =
-      "ozone.om.http.kerberos.keytab";
+      "ozone.om.http.auth.kerberos.keytab";
   public static final String OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY
-      = "ozone.om.http.kerberos.principal";
+      = "ozone.om.http.auth.kerberos.principal";
+  public static final String OZONE_OM_HTTP_AUTH_TYPE =
+      "ozone.om.http.auth.type";
+  public static final String OZONE_OM_HTTP_AUTH_CONFIG_PREFIX =
+      "ozone.om.http.auth.";
+
   // Delegation token related keys
   public static final String  DELEGATION_REMOVER_SCAN_INTERVAL_KEY =
       "ozone.manager.delegation.remover.scan.interval";
@@ -228,4 +234,16 @@ public final class OMConfigKeys {
   // hadoop-policy.xml, "*" allows all users/groups to access.
   public static final String OZONE_OM_SECURITY_CLIENT_PROTOCOL_ACL =
       "ozone.om.security.client.protocol.acl";
+
+  public static final String OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY =
+          "ozone.om.keyname.character.check.enabled";
+  public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =
+          false;
+
+  // This config needs to be enabled, when S3G created objects used via
+  // FileSystem API.
+  public static final String OZONE_OM_ENABLE_FILESYSTEM_PATHS =
+      "ozone.om.enable.filesystem.paths";
+  public static final boolean OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT =
+      false;
 }

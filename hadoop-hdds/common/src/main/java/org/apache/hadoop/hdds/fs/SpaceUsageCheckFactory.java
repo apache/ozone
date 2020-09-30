@@ -17,20 +17,20 @@
  */
 package org.apache.hadoop.hdds.fs;
 
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.conf.Config;
-import org.apache.hadoop.hdds.conf.ConfigGroup;
-import org.apache.hadoop.hdds.conf.ConfigTag;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.conf.Config;
+import org.apache.hadoop.hdds.conf.ConfigGroup;
+import org.apache.hadoop.hdds.conf.ConfigTag;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Configures disk space checks (du, df, etc.) for HDDS volumes, allowing
@@ -57,7 +57,7 @@ public interface SpaceUsageCheckFactory {
    * Updates the factory with global configuration.
    * @return factory configured with {@code conf}
    */
-  default SpaceUsageCheckFactory setConfiguration(Configuration conf) {
+  default SpaceUsageCheckFactory setConfiguration(ConfigurationSource conf) {
     // override if configurable
     return this;
   }
@@ -68,14 +68,16 @@ public interface SpaceUsageCheckFactory {
    * Defaults to {@link DUFactory} if no class is configured or it cannot be
    * instantiated.
    */
-  static SpaceUsageCheckFactory create(Configuration config) {
-    Conf conf = OzoneConfiguration.of(config).getObject(Conf.class);
+  static SpaceUsageCheckFactory create(ConfigurationSource config) {
+    Conf conf = config.getObject(Conf.class);
     Class<? extends SpaceUsageCheckFactory> aClass = null;
     String className = conf.getClassName();
     if (className != null && !className.isEmpty()) {
       try {
-        aClass = config.getClassByName(className)
-            .asSubclass(SpaceUsageCheckFactory.class);
+        aClass =
+            SpaceUsageCheckFactory.class
+                .getClassLoader().loadClass(className)
+                .asSubclass(SpaceUsageCheckFactory.class);
       } catch (ClassNotFoundException | RuntimeException e) {
         Logger log = LoggerFactory.getLogger(SpaceUsageCheckFactory.class);
         log.warn("Error trying to create SpaceUsageCheckFactory: '{}'",
@@ -91,7 +93,8 @@ public interface SpaceUsageCheckFactory {
             aClass.getConstructor();
         instance = constructor.newInstance();
       } catch (IllegalAccessException | InstantiationException |
-          InvocationTargetException | NoSuchMethodException e) {
+          InvocationTargetException | NoSuchMethodException |
+          ClassCastException e) {
 
         Logger log = LoggerFactory.getLogger(SpaceUsageCheckFactory.class);
         log.warn("Error trying to create {}", aClass, e);

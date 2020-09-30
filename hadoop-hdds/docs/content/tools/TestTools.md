@@ -41,14 +41,14 @@ We use docker-compose based pseudo-cluster to run different configuration of Ozo
 
 The smoketests are available from the distribution (`./smoketest`) but the robot files defines only the tests: usually they start CLI and check the output.
 
-To run the tests in different environmente (docker-compose, kubernetes) you need a definition to start the containers and execute the right tests in the right containers.
+To run the tests in different environment (docker-compose, kubernetes) you need a definition to start the containers and execute the right tests in the right containers.
 
 These definition of the tests are included in the `compose` directory (check `./compose/*/test.sh` or `./compose/test-all.sh`).
 
-For example a simple way to test the distribution packege:
+For example a simple way to test the distribution package:
 
 ```
-cd compose/ozonze
+cd compose/ozone
 ./test.sh
 ```
 
@@ -56,7 +56,7 @@ cd compose/ozonze
 
 [Blockade](https://github.com/worstcase/blockade) is a tool to test network failures and partitions (it's inspired by the legendary [Jepsen tests](https://jepsen.io/analyses)).
 
-Blockade tests are implemented with the help of tests and can be started from the `./blockade` directory of the distrubution.
+Blockade tests are implemented with the help of tests and can be started from the `./blockade` directory of the distribution.
 
 ```
 cd blocakde

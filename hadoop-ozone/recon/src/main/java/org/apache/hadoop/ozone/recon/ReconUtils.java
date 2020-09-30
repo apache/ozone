@@ -18,43 +18,48 @@
 
 package org.apache.hadoop.ozone.recon;
 
-import static java.net.HttpURLConnection.HTTP_CREATED;
-import static java.net.HttpURLConnection.HTTP_OK;
-import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
-import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
-
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.Timestamp;
 import java.util.zip.GZIPOutputStream;
+
+import com.google.inject.Singleton;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdfs.web.URLConnectionFactory;
+import org.apache.hadoop.io.IOUtils;
 
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.io.IOUtils;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
+import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
+import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
+import static org.jooq.impl.DSL.currentTimestamp;
+import static org.jooq.impl.DSL.select;
+import static org.jooq.impl.DSL.using;
 
-import org.apache.http.util.EntityUtils;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
+import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
+import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Recon Utility class.
  */
+@Singleton
 public class ReconUtils {
 
   private final static int WRITE_BUFFER = 1048576; //1MB
@@ -65,7 +70,7 @@ public class ReconUtils {
   private static final Logger LOG = LoggerFactory.getLogger(
       ReconUtils.class);
 
-  public static File getReconScmDbDir(Configuration conf) {
+  public static File getReconScmDbDir(ConfigurationSource conf) {
     return new ReconUtils().getReconDbDir(conf, OZONE_RECON_SCM_DB_DIR);
   }
 
@@ -77,7 +82,7 @@ public class ReconUtils {
    * @param dirConfigKey key to check
    * @return Return File based on configured or fallback value.
    */
-  public File getReconDbDir(Configuration conf, String dirConfigKey) {
+  public File getReconDbDir(ConfigurationSource conf, String dirConfigKey) {
 
     File metadataDir = getDirectoryFromConfig(conf, dirConfigKey,
         "Recon");
@@ -218,31 +223,20 @@ public class ReconUtils {
   }
 
   /**
-   * Make HTTP GET call on the URL and return inputstream to the response.
-   * @param httpClient HttpClient to use.
+   * Make HTTP GET call on the URL and return HttpURLConnection instance.
+   * @param connectionFactory URLConnectionFactory to use.
    * @param url url to call
-   * @return Inputstream to the response of the HTTP call.
-   * @throws IOException While reading the response.
+   * @param isSpnego is SPNEGO enabled
+   * @return HttpURLConnection instance of the HTTP call.
+   * @throws IOException, AuthenticationException While reading the response.
    */
-  public InputStream makeHttpCall(CloseableHttpClient httpClient, String url)
-      throws IOException {
-
-    HttpGet httpGet = new HttpGet(url);
-    HttpResponse response = httpClient.execute(httpGet);
-    int errorCode = response.getStatusLine().getStatusCode();
-    HttpEntity entity = response.getEntity();
-
-    if ((errorCode == HTTP_OK) || (errorCode == HTTP_CREATED)) {
-      return entity.getContent();
-    }
-
-    if (entity != null) {
-      throw new IOException("Unexpected exception when trying to reach Ozone " +
-          "Manager, " + EntityUtils.toString(entity));
-    } else {
-      throw new IOException("Unexpected null in http payload," +
-          " while processing request");
-    }
+  public HttpURLConnection makeHttpCall(URLConnectionFactory connectionFactory,
+                                  String url, boolean isSpnego)
+      throws IOException, AuthenticationException {
+    HttpURLConnection urlConnection = (HttpURLConnection)
+          connectionFactory.openConnection(new URL(url), isSpnego);
+    urlConnection.connect();
+    return urlConnection;
   }
 
   /**
@@ -280,4 +274,29 @@ public class ReconUtils {
         new File(reconDbDir.getPath(), lastKnownSnapshotFileName);
   }
 
+  /**
+   * Upsert row in GlobalStats table.
+   *
+   * @param sqlConfiguration
+   * @param globalStatsDao
+   * @param key
+   * @param count
+   */
+  public static void upsertGlobalStatsTable(Configuration sqlConfiguration,
+                                            GlobalStatsDao globalStatsDao,
+                                            String key,
+                                            Long count) {
+    // Get the current timestamp
+    Timestamp now =
+        using(sqlConfiguration).fetchValue(select(currentTimestamp()));
+    GlobalStats record = globalStatsDao.fetchOneByKey(key);
+    GlobalStats newRecord = new GlobalStats(key, count, now);
+
+    // Insert a new record for key if it does not exist
+    if (record == null) {
+      globalStatsDao.insert(newRecord);
+    } else {
+      globalStatsDao.update(newRecord);
+    }
+  }
 }

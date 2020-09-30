@@ -277,7 +277,7 @@ public class TestNodeDecommissionManager {
     DatanodeDetails multiDn = dns.get(0);
 
     DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
-    builder.setUuid(UUID.randomUUID().toString())
+    builder.setUuid(UUID.randomUUID())
         .setHostName(multiDn.getHostName())
         .setIpAddress(multiDn.getIpAddress())
         .addPort(DatanodeDetails.newPort(

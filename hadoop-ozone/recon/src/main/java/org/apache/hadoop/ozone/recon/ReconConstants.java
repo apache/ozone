@@ -32,22 +32,25 @@ public final class ReconConstants {
 
   public static final String RECON_CONTAINER_KEY_DB = "recon-container-key.db";
 
-  public static final String CONTAINER_COUNT_KEY = "totalCount";
+  public static final String CONTAINER_COUNT_KEY = "containerCount";
 
-  public static final String RECON_OM_SNAPSHOT_DB =
-      "om.snapshot.db";
+  public static final String RECON_OM_SNAPSHOT_DB = "om.snapshot.db";
 
-  public static final String CONTAINER_KEY_TABLE =
-      "containerKeyTable";
+  public static final String CONTAINER_KEY_TABLE = "containerKeyTable";
 
   public static final String CONTAINER_KEY_COUNT_TABLE =
       "containerKeyCountTable";
 
   // By default, limit the number of results returned
   public static final String DEFAULT_FETCH_COUNT = "1000";
+  public static final String DEFAULT_BATCH_NUMBER = "1";
+  public static final String RECON_QUERY_BATCH_PARAM = "batchNum";
   public static final String RECON_QUERY_PREVKEY = "prevKey";
   public static final String PREV_CONTAINER_ID_DEFAULT_VALUE = "0";
   public static final String RECON_QUERY_LIMIT = "limit";
+  public static final String RECON_QUERY_VOLUME = "volume";
+  public static final String RECON_QUERY_BUCKET = "bucket";
+  public static final String RECON_QUERY_FILE_SIZE = "fileSize";
 
   public static final String RECON_SCM_CONTAINER_DB =
       "recon-" + CONTAINER_DB_SUFFIX;

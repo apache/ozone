@@ -18,14 +18,35 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
+import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Container2BCSIDMapProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadChunkResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
@@ -33,11 +54,18 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.utils.Cache;
 import org.apache.hadoop.hdds.utils.ResourceLimitCache;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.util.Time;
-import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import org.apache.ratis.proto.RaftProtos.LogEntryProto;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
+import org.apache.ratis.proto.RaftProtos.RoleInfoProto;
+import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
+import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
@@ -46,53 +74,17 @@ import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.impl.RaftServerProxy;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.raftlog.RaftLog;
-import org.apache.ratis.statemachine.impl.SingleFileSnapshotInfo;
-import org.apache.ratis.thirdparty.com.google.protobuf
-    .InvalidProtocolBufferException;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.
-    Container2BCSIDMapProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .WriteChunkRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ReadChunkRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ReadChunkResponseProto;
-import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
-import org.apache.ratis.protocol.Message;
-import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.server.storage.RaftStorage;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.proto.RaftProtos.RoleInfoProto;
-import org.apache.ratis.proto.RaftProtos.LogEntryProto;
 import org.apache.ratis.statemachine.StateMachineStorage;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.statemachine.impl.BaseStateMachine;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
+import org.apache.ratis.statemachine.impl.SingleFileSnapshotInfo;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
-import java.util.concurrent.Executors;
-import java.io.FileOutputStream;
-import java.io.FileInputStream;
-import java.io.OutputStream;
 
 /** A {@link org.apache.ratis.statemachine.StateMachine} for containers.
  *
@@ -111,7 +103,7 @@ import java.io.OutputStream;
  * processed in 2 phases. The 2 phases are divided in
  * {@link #startTransaction(RaftClientRequest)}, in the first phase the user
  * data is written directly into the state machine via
- * {@link #writeStateMachineData} and in the second phase the
+ * {@link #write} and in the second phase the
  * transaction is committed via {@link #applyTransaction(TransactionContext)}
  *
  * For the requests with no stateMachine data, the transaction is directly
@@ -123,7 +115,7 @@ import java.io.OutputStream;
  * the write chunk operation will fail otherwise as the container still hasn't
  * been created. Hence the create container operation has been split in the
  * {@link #startTransaction(RaftClientRequest)}, this will help in synchronizing
- * the calls in {@link #writeStateMachineData}
+ * the calls in {@link #write}
  *
  * 2) Write chunk commit operation is executed after write chunk state machine
  * operation. This will ensure that commit operation is sync'd with the state
@@ -161,7 +153,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   public ContainerStateMachine(RaftGroupId gid, ContainerDispatcher dispatcher,
       ContainerController containerController,
       List<ThreadPoolExecutor> chunkExecutors,
-      XceiverServerRatis ratisServer, Configuration conf) {
+      XceiverServerRatis ratisServer, ConfigurationSource conf) {
     this.gid = gid;
     this.dispatcher = dispatcher;
     this.containerController = containerController;
@@ -169,7 +161,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     metrics = CSMMetrics.create(gid);
     this.writeChunkFutureMap = new ConcurrentHashMap<>();
     applyTransactionCompletionMap = new ConcurrentHashMap<>();
-    int numPendingRequests = OzoneConfiguration.of(conf)
+    int numPendingRequests = conf
         .getObject(DatanodeRatisServerConfig.class)
         .getLeaderNumPendingRequests();
     int pendingRequestsByteLimit = (int) conf.getStorageSize(
@@ -244,19 +236,25 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     // initialize the dispatcher with snapshot so that it build the missing
     // container list
+    buildMissingContainerSet(snapshotFile);
+    return last.getIndex();
+  }
+
+  @VisibleForTesting
+  public void buildMissingContainerSet(File snapshotFile) throws IOException {
+    // initialize the dispatcher with snapshot so that it build the missing
+    // container list
     try (FileInputStream fin = new FileInputStream(snapshotFile)) {
       ContainerProtos.Container2BCSIDMapProto proto =
-          ContainerProtos.Container2BCSIDMapProto
-              .parseFrom(fin);
+              ContainerProtos.Container2BCSIDMapProto
+                      .parseFrom(fin);
       // read the created containers list from the snapshot file and add it to
       // the container2BCSIDMap here.
       // container2BCSIDMap will further grow as and when containers get created
       container2BCSIDMap.putAll(proto.getContainer2BCSIDMap());
       dispatcher.buildMissingContainerSetAndValidate(container2BCSIDMap);
     }
-    return last.getIndex();
   }
-
   /**
    * As a part of taking snapshot with Ratis StateMachine, it will persist
    * the existing container set in the snapshotFile.
@@ -428,7 +426,10 @@ public class ContainerStateMachine extends BaseStateMachine {
       if (((RaftServerProxy) server).getImpl(gid).isLeader()) {
         stateMachineDataCache.put(entryIndex, write.getData());
       }
-    } catch (IOException | InterruptedException ioe) {
+    } catch (InterruptedException ioe) {
+      Thread.currentThread().interrupt();
+      return completeExceptionally(ioe);
+    } catch (IOException ioe) {
       return completeExceptionally(ioe);
     }
     DispatcherContext context =
@@ -446,9 +447,9 @@ public class ContainerStateMachine extends BaseStateMachine {
           try {
             return runCommand(requestProto, context);
           } catch (Exception e) {
-            LOG.error(gid + ": writeChunk writeStateMachineData failed: blockId"
-                + write.getBlockID() + " logIndex " + entryIndex + " chunkName "
-                + write.getChunkData().getChunkName() + e);
+            LOG.error("{}: writeChunk writeStateMachineData failed: blockId" +
+                "{} logIndex {} chunkName {} {}", gid, write.getBlockID(),
+                entryIndex, write.getChunkData().getChunkName(), e);
             metrics.incNumWriteDataFails();
             // write chunks go in parallel. It's possible that one write chunk
             // see the stateMachine is marked unhealthy by other parallel thread
@@ -460,9 +461,9 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     writeChunkFutureMap.put(entryIndex, writeChunkFuture);
     if (LOG.isDebugEnabled()) {
-      LOG.debug(gid + ": writeChunk writeStateMachineData : blockId " +
-          write.getBlockID() + " logIndex " + entryIndex + " chunkName "
-          + write.getChunkData().getChunkName());
+      LOG.error("{}: writeChunk writeStateMachineData : blockId" +
+              "{} logIndex {} chunkName {} {}", gid, write.getBlockID(),
+          entryIndex, write.getChunkData().getChunkName());
     }
     // Remove the future once it finishes execution from the
     // writeChunkFutureMap.
@@ -516,7 +517,7 @@ public class ContainerStateMachine extends BaseStateMachine {
    * and also with applyTransaction.
    */
   @Override
-  public CompletableFuture<Message> writeStateMachineData(LogEntryProto entry) {
+  public CompletableFuture<Message> write(LogEntryProto entry) {
     try {
       metrics.incNumWriteStateMachineOps();
       long writeStateMachineStartTime = Time.monotonicNowNanos();
@@ -617,7 +618,7 @@ public class ContainerStateMachine extends BaseStateMachine {
    * @return Combined future of all writeChunks till the log index given.
    */
   @Override
-  public CompletableFuture<Void> flushStateMachineData(long index) {
+  public CompletableFuture<Void> flush(long index) {
     List<CompletableFuture<ContainerCommandResponseProto>> futureList =
         writeChunkFutureMap.entrySet().stream().filter(x -> x.getKey() <= index)
             .map(Map.Entry::getValue).collect(Collectors.toList());
@@ -631,7 +632,7 @@ public class ContainerStateMachine extends BaseStateMachine {
    * evicted.
    */
   @Override
-  public CompletableFuture<ByteString> readStateMachineData(
+  public CompletableFuture<ByteString> read(
       LogEntryProto entry) {
     StateMachineLogEntryProto smLogEntryProto = entry.getStateMachineLogEntry();
     metrics.incNumReadStateMachineOps();
@@ -815,7 +816,11 @@ public class ContainerStateMachine extends BaseStateMachine {
             Time.monotonicNowNanos() - applyTxnStartTime);
       });
       return applyTransactionFuture;
-    } catch (IOException | InterruptedException e) {
+    } catch (InterruptedException e) {
+      metrics.incNumApplyTransactionsFails();
+      Thread.currentThread().interrupt();
+      return completeExceptionally(e);
+    } catch (IOException e) {
       metrics.incNumApplyTransactionsFails();
       return completeExceptionally(e);
     }
@@ -828,7 +833,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public CompletableFuture<Void> truncateStateMachineData(long index) {
+  public CompletableFuture<Void> truncate(long index) {
     stateMachineDataCache.removeIf(k -> k >= index);
     return CompletableFuture.completedFuture(null);
   }
@@ -874,6 +879,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         containerController.markContainerForClose(cid);
         containerController.quasiCloseContainer(cid);
       } catch (IOException e) {
+        LOG.debug("Failed to quasi-close container {}", cid);
       }
     }
   }
@@ -914,7 +920,7 @@ public class ContainerStateMachine extends BaseStateMachine {
         builder.append(", container path=");
         builder.append(location);
       }
-    } catch (Throwable t) {
+    } catch (Exception t) {
       LOG.info("smProtoToString failed", t);
       builder.append("smProtoToString failed with");
       builder.append(t.getMessage());

@@ -110,6 +110,10 @@ public class ContainerMetadataScanner extends Thread {
         } catch (InterruptedException e) {
           LOG.info("Background ContainerMetadataScanner interrupted." +
               " Going to exit");
+          // Restore the interruption flag and the internal `stopping`
+          // variable to prevent the next iteration thus stopping the thread
+          interrupt();
+          this.stopping = true;
         }
       }
     }
@@ -129,13 +133,19 @@ public class ContainerMetadataScanner extends Thread {
     return metrics;
   }
 
+  /**
+   * Shutdown the ContainerMetadataScanner thread.
+   */
+  // Ignore the sonar false positive on the InterruptedException issue
+  // as this a normal flow of a shutdown.
+  @SuppressWarnings("squid:S2142")
   public synchronized void shutdown() {
     this.stopping = true;
     this.interrupt();
     try {
       this.join();
     } catch (InterruptedException ex) {
-      LOG.warn("Unexpected exception while stopping metadata scanner.", ex);
+      LOG.debug("Interrupted exception while stopping metadata scanner.", ex);
     }
   }
 }

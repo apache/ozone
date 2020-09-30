@@ -23,7 +23,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.function.Consumer;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
@@ -45,7 +45,7 @@ import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 @SuppressWarnings("visibilitymodifier")
 public abstract class Handler {
 
-  protected final Configuration conf;
+  protected final ConfigurationSource conf;
   protected final ContainerSet containerSet;
   protected final VolumeSet volumeSet;
   protected String scmID;
@@ -53,7 +53,7 @@ public abstract class Handler {
   protected String datanodeId;
   private Consumer<ContainerReplicaProto> icrSender;
 
-  protected Handler(Configuration config, String datanodeId,
+  protected Handler(ConfigurationSource config, String datanodeId,
       ContainerSet contSet, VolumeSet volumeSet,
       ContainerMetrics containerMetrics,
       Consumer<ContainerReplicaProto> icrSender) {
@@ -66,7 +66,7 @@ public abstract class Handler {
   }
 
   public static Handler getHandlerForContainerType(
-      final ContainerType containerType, final Configuration config,
+      final ContainerType containerType, final ConfigurationSource config,
       final String datanodeId, final ContainerSet contSet,
       final VolumeSet volumeSet, final ContainerMetrics metrics,
       Consumer<ContainerReplicaProto> icrSender) {

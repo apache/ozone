@@ -24,16 +24,15 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import com.google.common.annotations.VisibleForTesting;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_LEVELDB;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_ROCKSDB;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_LEVELDB;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
 
 import org.iq80.leveldb.Options;
 import org.rocksdb.BlockBasedTableConfig;
@@ -52,11 +51,11 @@ public class MetadataStoreBuilder {
   private File dbFile;
   private long cacheSize;
   private boolean createIfMissing = true;
-  private Optional<Configuration> optionalConf = Optional.empty();
+  private Optional<ConfigurationSource> optionalConf = Optional.empty();
   private String dbType;
   @VisibleForTesting
-  public static final Map<Configuration, org.rocksdb.Options> CACHED_OPTS =
-      new ConcurrentHashMap<>();
+  public static final Map<ConfigurationSource, org.rocksdb.Options>
+      CACHED_OPTS = new ConcurrentHashMap<>();
   @VisibleForTesting
   public static final OzoneConfiguration DEFAULT_CONF =
       new OzoneConfiguration();
@@ -80,7 +79,7 @@ public class MetadataStoreBuilder {
     return this;
   }
 
-  public MetadataStoreBuilder setConf(Configuration configuration) {
+  public MetadataStoreBuilder setConf(ConfigurationSource configuration) {
     this.optionalConf = Optional.of(configuration);
     return this;
   }
@@ -102,25 +101,22 @@ public class MetadataStoreBuilder {
     }
 
     // Build db store based on configuration
-    final Configuration conf = optionalConf.orElse(DEFAULT_CONF);
+    final ConfigurationSource conf = optionalConf.orElse(DEFAULT_CONF);
 
     if (dbType == null) {
-      LOG.debug("dbType is null, using ");
-      dbType = conf.getTrimmed(OzoneConfigKeys.OZONE_METADATA_STORE_IMPL,
-              OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_DEFAULT);
-      LOG.debug("dbType is null, using dbType {} from ozone configuration",
-          dbType);
+      dbType = CONTAINER_DB_TYPE_ROCKSDB;
+      LOG.debug("dbType is null, using dbType {}.", dbType);
     } else {
       LOG.debug("Using dbType {} for metastore", dbType);
     }
-    if (OZONE_METADATA_STORE_IMPL_LEVELDB.equals(dbType)) {
+    if (CONTAINER_DB_TYPE_LEVELDB.equals(dbType)) {
       Options options = new Options();
       options.createIfMissing(createIfMissing);
       if (cacheSize > 0) {
         options.cacheSize(cacheSize);
       }
       return new LevelDBStore(dbFile, options);
-    } else if (OZONE_METADATA_STORE_IMPL_ROCKSDB.equals(dbType)) {
+    } else if (CONTAINER_DB_TYPE_ROCKSDB.equals(dbType)) {
       org.rocksdb.Options opts;
       // Used cached options if config object passed down is the same
       if (CACHED_OPTS.containsKey(conf)) {
@@ -148,10 +144,8 @@ public class MetadataStoreBuilder {
       return new RocksDBStore(dbFile, opts);
     }
     
-    throw new IllegalArgumentException("Invalid argument for "
-        + OzoneConfigKeys.OZONE_METADATA_STORE_IMPL
-        + ". Expecting " + OZONE_METADATA_STORE_IMPL_LEVELDB
-        + " or " + OZONE_METADATA_STORE_IMPL_ROCKSDB
-        + ", but met " + dbType);
+    throw new IllegalArgumentException("Invalid Container DB type. Expecting "
+        + CONTAINER_DB_TYPE_LEVELDB + " or "
+        + CONTAINER_DB_TYPE_ROCKSDB + ", but met " + dbType);
   }
 }

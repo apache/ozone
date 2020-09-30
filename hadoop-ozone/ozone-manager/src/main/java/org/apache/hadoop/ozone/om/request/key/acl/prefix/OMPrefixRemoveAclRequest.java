@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl.OMPrefixAclOpResult;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.key.acl.prefix.OMPrefixAclResponse;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -45,7 +46,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveA
 public class OMPrefixRemoveAclRequest extends OMPrefixAclRequest {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMPrefixAddAclRequest.class);
+      LoggerFactory.getLogger(OMPrefixRemoveAclRequest.class);
 
   private OzoneObj ozoneObj;
   private List<OzoneAcl> ozoneAcls;
@@ -68,10 +69,7 @@ public class OMPrefixRemoveAclRequest extends OMPrefixAclRequest {
 
   @Override
   OMResponse.Builder onInit() {
-    return OMResponse.newBuilder().setCmdType(
-        OzoneManagerProtocolProtos.Type.RemoveAcl).setStatus(
-        OzoneManagerProtocolProtos.Status.OK).setSuccess(true);
-
+    return OmResponseUtil.getOMResponseBuilder(getOmRequest());
   }
 
   @Override
@@ -103,12 +101,6 @@ public class OMPrefixRemoveAclRequest extends OMPrefixAclRequest {
           LOG.debug("Acl {} not removed from path {} as it does not exist",
               ozoneAcls, ozoneObj.getPath());
         }
-      }
-      break;
-    case REPLAY:
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Replayed Transaction {} ignored. Request: {}", trxnLogIndex,
-            getOmRequest());
       }
       break;
     case FAILURE:

@@ -17,13 +17,11 @@
 
 package org.apache.hadoop.ozone.container.common.report;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.NodeReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
+
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -39,7 +37,7 @@ public class TestReportPublisherFactory {
 
   @Test
   public void testGetContainerReportPublisher() {
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     ReportPublisherFactory factory = new ReportPublisherFactory(conf);
     ReportPublisher publisher = factory
         .getPublisherFor(ContainerReportsProto.class);
@@ -49,7 +47,7 @@ public class TestReportPublisherFactory {
 
   @Test
   public void testGetNodeReportPublisher() {
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     ReportPublisherFactory factory = new ReportPublisherFactory(conf);
     ReportPublisher publisher = factory
         .getPublisherFor(NodeReportProto.class);
@@ -59,7 +57,7 @@ public class TestReportPublisherFactory {
 
   @Test
   public void testInvalidReportPublisher() {
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     ReportPublisherFactory factory = new ReportPublisherFactory(conf);
     exception.expect(RuntimeException.class);
     exception.expectMessage("No publisher found for report");

@@ -18,21 +18,26 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import org.apache.commons.io.IOUtils;
-import org.apache.hadoop.conf.Configuration;
+import java.io.File;
+import java.io.IOException;
+import java.util.List;
+import java.util.concurrent.TimeoutException;
+
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
-import org.apache.hadoop.hdds.scm.PlacementPolicy;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms
-    .SCMContainerPlacementCapacity;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
@@ -40,32 +45,36 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.test.PathUtils;
+
+import org.apache.commons.io.IOUtils;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import org.junit.After;
+import static org.junit.Assert.assertEquals;
+import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.mockito.Mockito;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.List;
-import java.util.concurrent.TimeoutException;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys
-    .OZONE_SCM_DB_CACHE_SIZE_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys
-    .OZONE_SCM_DB_CACHE_SIZE_MB;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState
-    .HEALTHY;
-import static org.junit.Assert.assertEquals;
-
 /**
  * Test for different container placement policy.
  */
 public class TestContainerPlacement {
+
   @Rule
   public ExpectedException thrown = ExpectedException.none();
+  private SCMMetadataStore scmMetadataStore;
 
+  @Before
+  public void createDbStore() throws IOException {
+    scmMetadataStore = new SCMMetadataStoreImpl(getConf());
+  }
+
+  @After
+  public void destroyDBStore() throws Exception {
+    scmMetadataStore.getStore().close();
+  }
   /**
    * Returns a new copy of Configuration.
    *
@@ -101,14 +110,16 @@ public class TestContainerPlacement {
     return nodeManager;
   }
 
-  SCMContainerManager createContainerManager(Configuration config,
+  SCMContainerManager createContainerManager(ConfigurationSource config,
       NodeManager scmNodeManager) throws IOException {
     EventQueue eventQueue = new EventQueue();
-    final int cacheSize = config.getInt(OZONE_SCM_DB_CACHE_SIZE_MB,
-        OZONE_SCM_DB_CACHE_SIZE_DEFAULT);
+
     PipelineManager pipelineManager =
-        new SCMPipelineManager(config, scmNodeManager, eventQueue);
-    return new SCMContainerManager(config, pipelineManager);
+        new SCMPipelineManager(config, scmNodeManager,
+            scmMetadataStore.getPipelineTable(), eventQueue);
+    return new SCMContainerManager(config, scmMetadataStore.getContainerTable(),
+        scmMetadataStore.getStore(),
+        pipelineManager);
 
   }
 

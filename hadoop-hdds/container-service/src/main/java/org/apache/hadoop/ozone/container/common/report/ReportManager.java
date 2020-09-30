@@ -17,19 +17,20 @@
 
 package org.apache.hadoop.ozone.container.common.report;
 
-import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.protobuf.GeneratedMessage;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.util.concurrent.HadoopExecutors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.util.concurrent.HadoopExecutors;
+
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.protobuf.GeneratedMessage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * ReportManager is responsible for managing all the {@link ReportPublisher}
@@ -89,7 +90,7 @@ public final class ReportManager {
    * @param conf  - Conf
    * @return builder - Builder.
    */
-  public static Builder newBuilder(Configuration conf) {
+  public static Builder newBuilder(ConfigurationSource conf) {
     return new Builder(conf);
   }
 
@@ -103,7 +104,7 @@ public final class ReportManager {
     private ReportPublisherFactory publisherFactory;
 
 
-    private Builder(Configuration conf) {
+    private Builder(ConfigurationSource conf) {
       this.reportPublishers = new ArrayList<>();
       this.publisherFactory = new ReportPublisherFactory(conf);
     }

@@ -18,12 +18,14 @@
 package org.apache.hadoop.hdds.scm.protocol;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ActivatePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ActivatePipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ClosePipelineRequestProto;
@@ -36,6 +38,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineBatchRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineBatchResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetPipelineRequestProto;
@@ -45,10 +49,11 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.NodeQueryResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ReplicationManagerStatusResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMDeleteContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMDeleteContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerRequestProto;
@@ -60,18 +65,15 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.
-    StorageContainerLocationProtocolProtos.DecommissionNodesRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.
-    StorageContainerLocationProtocolProtos.DecommissionNodesResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.
-    StorageContainerLocationProtocolProtos.RecommissionNodesRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.
-    StorageContainerLocationProtocolProtos.RecommissionNodesResponseProto;
-import org.apache.hadoop.hdds.protocol.proto.
-    StorageContainerLocationProtocolProtos.StartMaintenanceNodesRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.
-    StorageContainerLocationProtocolProtos.StartMaintenanceNodesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetSafeModeRuleStatusesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -80,13 +82,13 @@ import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 
+import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.errorPipelineAlreadyExists;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.success;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class is the server-side translator that forwards requests received on
@@ -104,7 +106,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   private final StorageContainerLocationProtocol impl;
 
   private OzoneProtocolMessageDispatcher<ScmContainerLocationRequest,
-      ScmContainerLocationResponse>
+      ScmContainerLocationResponse, ProtocolMessageEnum>
       dispatcher;
 
   /**
@@ -116,7 +118,8 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
    */
   public StorageContainerLocationProtocolServerSideTranslatorPB(
       StorageContainerLocationProtocol impl,
-      ProtocolMessageMetrics protocolMetrics) throws IOException {
+      ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics)
+      throws IOException {
     this.impl = impl;
     this.dispatcher =
         new OzoneProtocolMessageDispatcher<>("ScmContainerLocation",
@@ -156,6 +159,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setGetContainerWithPipelineResponse(getContainerWithPipeline(
                 request.getGetContainerWithPipelineRequest()))
+            .build();
+      case GetContainerWithPipelineBatch:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetContainerWithPipelineBatchResponse(
+                getContainerWithPipelineBatch(
+                    request.getGetContainerWithPipelineBatchRequest()))
             .build();
       case ListContainer:
         return ScmContainerLocationResponse.newBuilder()
@@ -260,32 +271,37 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setGetPipelineResponse(getPipeline(
                 request.getGetPipelineRequest()))
             .build();
-      case DecommissionNodes:
+      case GetSafeModeRuleStatuses:
         return ScmContainerLocationResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setStatus(Status.OK)
-            .setDecommissionNodesResponse(decommissionNodes(
-                request.getDecommissionNodesRequest()))
+            .setCmdType(request.getCmdType()).setStatus(Status.OK)
+            .setGetSafeModeRuleStatusesResponse(getSafeModeRuleStatues(
+                request.getGetSafeModeRuleStatusesRequest()))
             .build();
-      case RecommissionNodes:
-        return ScmContainerLocationResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setStatus(Status.OK)
-            .setRecommissionNodesResponse(recommissionNodes(
-                request.getRecommissionNodesRequest()))
-            .build();
-      case StartMaintenanceNodes:
-        return ScmContainerLocationResponse.newBuilder()
-            .setCmdType(request.getCmdType())
-            .setStatus(Status.OK)
-            .setStartMaintenanceNodesResponse(startMaintenanceNodes(
-                request.getStartMaintenanceNodesRequest()))
+        case DecommissionNodes:
+          return ScmContainerLocationResponse.newBuilder()
+              .setCmdType(request.getCmdType())
+              .setStatus(Status.OK)
+              .setDecommissionNodesResponse(decommissionNodes(
+                  request.getDecommissionNodesRequest()))
+              .build();
+        case RecommissionNodes:
+          return ScmContainerLocationResponse.newBuilder()
+              .setCmdType(request.getCmdType())
+              .setStatus(Status.OK)
+              .setRecommissionNodesResponse(recommissionNodes(
+                  request.getRecommissionNodesRequest()))
+              .build();
+        case StartMaintenanceNodes:
+          return ScmContainerLocationResponse.newBuilder()
+              .setCmdType(request.getCmdType())
+              .setStatus(Status.OK)
+              .setStartMaintenanceNodesResponse(startMaintenanceNodes(
+                  request.getStartMaintenanceNodesRequest()))
             .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
       }
-
     } catch (IOException e) {
       throw new ServiceException(e);
     }
@@ -319,6 +335,19 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return GetContainerWithPipelineResponseProto.newBuilder()
         .setContainerWithPipeline(container.getProtobuf())
         .build();
+  }
+
+  public GetContainerWithPipelineBatchResponseProto
+      getContainerWithPipelineBatch(
+      GetContainerWithPipelineBatchRequestProto request) throws IOException {
+    List<ContainerWithPipeline> containers = impl
+        .getContainerWithPipelineBatch(request.getContainerIDsList());
+    GetContainerWithPipelineBatchResponseProto.Builder builder =
+        GetContainerWithPipelineBatchResponseProto.newBuilder();
+    for (ContainerWithPipeline container : containers) {
+      builder.addContainerWithPipelines(container.getProtobuf());
+    }
+    return builder.build();
   }
 
   public SCMListContainerResponseProto listContainer(
@@ -455,6 +484,21 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return InSafeModeResponseProto.newBuilder()
         .setInSafeMode(impl.inSafeMode()).build();
 
+  }
+
+  public GetSafeModeRuleStatusesResponseProto getSafeModeRuleStatues(
+      GetSafeModeRuleStatusesRequestProto request) throws IOException {
+    Map<String, Pair<Boolean, String>>
+        map = impl.getSafeModeRuleStatuses();
+    List<SafeModeRuleStatusProto> proto = new ArrayList();
+    for (Map.Entry<String, Pair<Boolean, String>> entry : map.entrySet()) {
+      proto.add(SafeModeRuleStatusProto.newBuilder().setRuleName(entry.getKey())
+          .setValidate(entry.getValue().getLeft())
+          .setStatusText(entry.getValue().getRight())
+          .build());
+    }
+    return GetSafeModeRuleStatusesResponseProto.newBuilder()
+        .addAllSafeModeRuleStatusesProto(proto).build();
   }
 
   public ForceExitSafeModeResponseProto forceExitSafeMode(

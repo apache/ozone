@@ -27,6 +27,8 @@ services:
       command: ["/opt/hadoop/bin/ozone","datanode"]
       env_file:
         - ./docker-config
+      environment:
+        HADOOP_OPTS: ${HADOOP_OPTS}
       networks:
          net:
             ipv4_address: 10.5.0.4
@@ -41,6 +43,8 @@ services:
       command: ["/opt/hadoop/bin/ozone","datanode"]
       env_file:
         - ./docker-config
+      environment:
+        HADOOP_OPTS: ${HADOOP_OPTS}
       networks:
          net:
             ipv4_address: 10.5.0.5
@@ -55,6 +59,8 @@ services:
       command: ["/opt/hadoop/bin/ozone","datanode"]
       env_file:
         - ./docker-config
+      environment:
+         HADOOP_OPTS: ${HADOOP_OPTS}
       networks:
          net:
             ipv4_address: 10.5.0.6
@@ -69,6 +75,8 @@ services:
       command: ["/opt/hadoop/bin/ozone","datanode"]
       env_file:
         - ./docker-config
+      environment:
+        HADOOP_OPTS: ${HADOOP_OPTS}
       networks:
          net:
             ipv4_address: 10.5.0.7
@@ -83,6 +91,8 @@ services:
      command: ["/opt/hadoop/bin/ozone","datanode"]
      env_file:
        - ./docker-config
+     environment:
+       HADOOP_OPTS: ${HADOOP_OPTS}
      networks:
        net:
          ipv4_address: 10.5.0.8
@@ -97,6 +107,8 @@ services:
      command: ["/opt/hadoop/bin/ozone","datanode"]
      env_file:
        - ./docker-config
+     environment:
+       HADOOP_OPTS: ${HADOOP_OPTS}
      networks:
        net:
          ipv4_address: 10.5.0.9
@@ -107,8 +119,10 @@ services:
          - ../..:/opt/hadoop
       ports:
          - 9874:9874
+         - 9862:9862
       environment:
          ENSURE_OM_INITIALIZED: /data/metadata/om/current/VERSION
+         HADOOP_OPTS: ${HADOOP_OPTS}
       env_file:
           - ./docker-config
       command: ["/opt/hadoop/bin/ozone","om"]
@@ -122,11 +136,13 @@ services:
          - ../..:/opt/hadoop
       ports:
          - 9876:9876
+         - 9860:9860
       env_file:
           - ./docker-config
       environment:
           ENSURE_SCM_INITIALIZED: /data/metadata/scm/current/VERSION
-          OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-1}"
+          OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "${OZONE_SAFEMODE_MIN_DATANODES:-6}"
+          HADOOP_OPTS: ${HADOOP_OPTS}
       command: ["/opt/hadoop/bin/ozone","scm"]
       networks:
          net:

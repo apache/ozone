@@ -31,13 +31,13 @@ docker-compose exec om bash
 
 kinit -kt /etc/security/keytabs/testuser.keytab testuser/om@EXAMPLE.COM
 
-ozone sh volume create /vol1
+ozone sh volume create /volume1
 
-ozone sh bucket create /vol1/bucket1
+ozone sh bucket create /volume1/bucket1
 
-ozone sh key put /vol1/bucket1/key1 LICENSE.txt
+ozone sh key put /volume1/bucket1/key1 LICENSE.txt
 
-ozone fs -ls o3fs://bucket1.vol1/
+ozone fs -ls o3fs://bucket1.volume1/
 ```
 
 ## Yarn Resource Manager Setup
@@ -57,7 +57,7 @@ hadoop fs -mkdir /user/hadoop
 
 ### WordCount
 ```
-yarn jar $HADOOP_MAPRED_HOME/hadoop-mapreduce-examples-*.jar wordcount o3fs://bucket1.vol1/key1 o3fs://bucket1.vol1/key1.count
+yarn jar $HADOOP_MAPRED_HOME/hadoop-mapreduce-examples-*.jar wordcount o3fs://bucket1.volume1/key1 o3fs://bucket1.volume1/key1.count
 
 hadoop fs -cat /key1.count/part-r-00000
 ```
@@ -69,5 +69,5 @@ yarn jar $HADOOP_MAPRED_HOME/hadoop-mapreduce-examples-*.jar pi 10 100
 
 ### RandomWrite
 ```
-yarn jar $HADOOP_MAPRED_HOME/hadoop-mapreduce-examples-*.jar randomwriter -Dtest.randomwrite.total_bytes=10000000  o3fs://bucket1.vol1/randomwrite.out
+yarn jar $HADOOP_MAPRED_HOME/hadoop-mapreduce-examples-*.jar randomwriter -Dtest.randomwrite.total_bytes=10000000  o3fs://bucket1.volume1/randomwrite.out
 ```

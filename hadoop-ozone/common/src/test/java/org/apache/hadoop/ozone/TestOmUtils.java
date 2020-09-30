@@ -18,31 +18,28 @@
 
 package org.apache.hadoop.ozone;
 
-import org.apache.commons.io.FileUtils;
+import java.io.File;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.List;
+import java.util.Map;
+
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.io.IOUtils;
+
+import static org.apache.hadoop.ozone.OmUtils.getOzoneManagerServiceId;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
+
+import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.List;
-import java.util.Map;
-
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assume.assumeTrue;
 
 /**
  * Unit tests for {@link OmUtils}.
@@ -55,36 +52,6 @@ public class TestOmUtils {
   @Rule
   public Timeout timeout = new Timeout(60_000);
 
-  @Test
-  public void testWriteCheckpointToOutputStream() throws Exception {
-
-    FileInputStream fis = null;
-    FileOutputStream fos = null;
-
-    try {
-      String testDirName = folder.newFolder().getAbsolutePath();
-      File file = new File(testDirName + "/temp1.txt");
-      FileWriter writer = new FileWriter(file);
-      writer.write("Test data 1");
-      writer.close();
-
-      file = new File(testDirName + "/temp2.txt");
-      writer = new FileWriter(file);
-      writer.write("Test data 2");
-      writer.close();
-
-      File outputFile =
-          new File(Paths.get(testDirName, "output_file.tgz").toString());
-      TestDBCheckpoint dbCheckpoint = new TestDBCheckpoint(
-          Paths.get(testDirName));
-      OmUtils.writeOmDBCheckpointToStream(dbCheckpoint,
-          new FileOutputStream(outputFile));
-      assertNotNull(outputFile);
-    } finally {
-      IOUtils.closeStream(fis);
-      IOUtils.closeStream(fos);
-    }
-  }
 
   @Test
   public void createOMDirCreatesDirectoryIfNecessary() throws IOException {
@@ -138,56 +105,48 @@ public class TestOmUtils {
     assertTrue(rpcAddrs.stream().anyMatch(
         a -> a.getAddress().getHostAddress().equals("1.1.1.3")));
   }
-}
 
-class TestDBCheckpoint implements DBCheckpoint {
+  @Test
+  public void testGetOzoneManagerServiceId() throws IOException {
 
-  private Path checkpointFile;
+    // If the above is not configured, look at 'ozone.om.service.ids'.
+    // If no config is set, return null. (Non HA)
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    assertNull(getOzoneManagerServiceId(configuration));
 
-  TestDBCheckpoint(Path checkpointFile) {
-    this.checkpointFile = checkpointFile;
-  }
+    // Verify 'ozone.om.internal.service.id' takes precedence
+    configuration.set(OZONE_OM_INTERNAL_SERVICE_ID, "om1");
+    configuration.set(OZONE_OM_SERVICE_IDS_KEY, "om2,om1");
+    String id = getOzoneManagerServiceId(configuration);
+    assertEquals("om1", id);
 
-  @Override
-  public Path getCheckpointLocation() {
-    return checkpointFile;
-  }
+    configuration.set(OZONE_OM_SERVICE_IDS_KEY, "om2,om3");
+    try {
+      getOzoneManagerServiceId(configuration);
+      Assert.fail();
+    } catch (IOException ioEx) {
+      assertTrue(ioEx.getMessage()
+          .contains("Cannot find the internal service id om1 in [om2, om3]"));
+    }
 
-  @Override
-  public long getCheckpointTimestamp() {
-    return 0;
-  }
+    // When internal service ID is not defined.
+    // Verify if count(ozone.om.service.ids) == 1, return that id.
+    configuration = new OzoneConfiguration();
+    configuration.set(OZONE_OM_SERVICE_IDS_KEY, "om2");
+    id = getOzoneManagerServiceId(configuration);
+    assertEquals("om2", id);
 
-  @Override
-  public long getLatestSequenceNumber() {
-    return 0;
-  }
-
-  @Override
-  public long checkpointCreationTimeTaken() {
-    return 0;
-  }
-
-  @Override
-  public void cleanupCheckpoint() throws IOException {
-    FileUtils.deleteDirectory(checkpointFile.toFile());
-  }
-
-  @Override
-  public void setRatisSnapshotIndex(long omRatisSnapshotIndex) {
-  }
-
-  @Override
-  public long getRatisSnapshotIndex() {
-    return 0;
-  }
-
-  @Override
-  public void setRatisSnapshotTerm(long omRatisSnapshotTermIndex) {
-  }
-
-  @Override
-  public long getRatisSnapshotTerm() {
-    return 0;
+    // Verify if more than count(ozone.om.service.ids) > 1 and internal
+    // service id is not defined, throw exception
+    configuration.set(OZONE_OM_SERVICE_IDS_KEY, "om2,om1");
+    try {
+      getOzoneManagerServiceId(configuration);
+      Assert.fail();
+    } catch (IOException ioEx) {
+      assertTrue(ioEx.getMessage()
+          .contains("More than 1 OzoneManager ServiceID (ozone.om.service" +
+              ".ids) configured"));
+    }
   }
 }
+

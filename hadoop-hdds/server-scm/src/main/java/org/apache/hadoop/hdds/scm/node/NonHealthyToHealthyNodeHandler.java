@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -31,7 +31,7 @@ public class NonHealthyToHealthyNodeHandler
     implements EventHandler<DatanodeDetails> {
 
   private final PipelineManager pipelineManager;
-  private final Configuration conf;
+  private final ConfigurationSource conf;
 
   public NonHealthyToHealthyNodeHandler(
       PipelineManager pipelineManager, OzoneConfiguration conf) {

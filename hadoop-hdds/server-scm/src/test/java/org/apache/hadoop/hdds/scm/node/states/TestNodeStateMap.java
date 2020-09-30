@@ -134,8 +134,7 @@ public class TestNodeStateMap {
   }
 
   private DatanodeDetails generateDatanode() {
-    String uuid = UUID.randomUUID().toString();
-    return DatanodeDetails.newBuilder().setUuid(uuid).build();
+    return DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
   }
 
 }

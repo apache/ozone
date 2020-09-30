@@ -18,20 +18,27 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_SCM_CONTAINER_DB;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.FINALIZE;
 
-import java.io.File;
 import java.io.IOException;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,6 +50,7 @@ public class ReconContainerManager extends SCMContainerManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconContainerManager.class);
   private StorageContainerServiceProvider scmClient;
+  private ContainerSchemaManager containerSchemaManager;
 
   /**
    * Constructs a mapping class that creates mapping between container names
@@ -52,44 +60,62 @@ public class ReconContainerManager extends SCMContainerManager {
    * CacheSize is specified
    * in MB.
    *
-   * @param conf            - {@link Configuration}
-   * @param pipelineManager - {@link PipelineManager}
    * @throws IOException on Failure.
    */
   public ReconContainerManager(
-      Configuration conf, PipelineManager pipelineManager,
-      StorageContainerServiceProvider scm) throws IOException {
-    super(conf, pipelineManager);
+      ConfigurationSource conf,
+      Table<ContainerID, ContainerInfo> containerStore,
+      BatchOperationHandler batchHandler,
+      PipelineManager pipelineManager,
+      StorageContainerServiceProvider scm,
+      ContainerSchemaManager containerSchemaManager) throws IOException {
+    super(conf, containerStore, batchHandler, pipelineManager);
     this.scmClient = scm;
-  }
-
-  @Override
-  protected File getContainerDBPath(Configuration conf) {
-    File metaDir = ReconUtils.getReconScmDbDir(conf);
-    return new File(metaDir, RECON_SCM_CONTAINER_DB);
+    this.containerSchemaManager = containerSchemaManager;
   }
 
   /**
    * Check and add new container if not already present in Recon.
-   * @param containerID containerID to check.
+   *
+   * @param containerID     containerID to check.
    * @param datanodeDetails Datanode from where we got this container.
    * @throws IOException on Error.
    */
   public void checkAndAddNewContainer(ContainerID containerID,
-                                      DatanodeDetails datanodeDetails)
+      ContainerReplicaProto.State replicaState,
+      DatanodeDetails datanodeDetails)
       throws IOException {
     if (!exists(containerID)) {
       LOG.info("New container {} got from {}.", containerID,
           datanodeDetails.getHostName());
       ContainerWithPipeline containerWithPipeline =
           scmClient.getContainerWithPipeline(containerID.getId());
-      LOG.debug("Verified new container from SCM {} ",
-          containerWithPipeline.getContainerInfo().containerID());
+      LOG.debug("Verified new container from SCM {}, {} ",
+          containerID, containerWithPipeline.getPipeline().getId());
       // If no other client added this, go ahead and add this container.
       if (!exists(containerID)) {
         addNewContainer(containerID.getId(), containerWithPipeline);
       }
+    } else {
+      // Check if container state is not open. In SCM, container state
+      // changes to CLOSING first, and then the close command is pushed down
+      // to Datanodes. Recon 'learns' this from DN, and hence replica state
+      // will move container state to 'CLOSING'.
+      ContainerInfo containerInfo = getContainer(containerID);
+      if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)
+          && !replicaState.equals(ContainerReplicaProto.State.OPEN)
+          && isHealthy(replicaState)) {
+        LOG.info("Container {} has state OPEN, but Replica has State {}.",
+            containerID, replicaState);
+        updateContainerState(containerID, FINALIZE);
+      }
     }
+  }
+
+  private boolean isHealthy(ContainerReplicaProto.State replicaState) {
+    return replicaState != ContainerReplicaProto.State.UNHEALTHY
+        && replicaState != ContainerReplicaProto.State.INVALID
+        && replicaState != ContainerReplicaProto.State.DELETED;
   }
 
   /**
@@ -104,18 +130,32 @@ public class ReconContainerManager extends SCMContainerManager {
     ContainerInfo containerInfo = containerWithPipeline.getContainerInfo();
     getLock().lock();
     try {
-      if (getPipelineManager().containsPipeline(
-          containerWithPipeline.getPipeline().getId())) {
-        getContainerStateManager().addContainerInfo(containerId, containerInfo,
-            getPipelineManager(), containerWithPipeline.getPipeline());
+      boolean success = false;
+      if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)) {
+        PipelineID pipelineID = containerWithPipeline.getPipeline().getId();
+        if (getPipelineManager().containsPipeline(pipelineID)) {
+          getContainerStateManager().addContainerInfo(containerId,
+              containerInfo, getPipelineManager(),
+              containerWithPipeline.getPipeline());
+          success = true;
+        } else {
+          // Get open container for a pipeline that Recon does not know
+          // about yet. Cannot update internal state until pipeline is synced.
+          LOG.warn(String.format(
+              "Pipeline %s not found. Cannot add container %s",
+              pipelineID, containerInfo.containerID()));
+        }
+      } else {
+        // Non 'Open' Container. No need to worry about pipeline since SCM
+        // returns a random pipelineID.
+        getContainerStateManager().addContainerInfo(containerId,
+            containerInfo, getPipelineManager(), null);
+        success = true;
+      }
+      if (success) {
         addContainerToDB(containerInfo);
         LOG.info("Successfully added container {} to Recon.",
             containerInfo.containerID());
-      } else {
-        throw new IOException(
-            String.format("Pipeline %s not found. Cannot add container %s",
-                containerWithPipeline.getPipeline().getId(),
-                containerInfo.containerID()));
       }
     } catch (IOException ex) {
       LOG.info("Exception while adding container {} .",
@@ -127,5 +167,27 @@ public class ReconContainerManager extends SCMContainerManager {
     } finally {
       getLock().unlock();
     }
+  }
+
+  /**
+   * Add a container Replica for given DataNode.
+   *
+   * @param containerID
+   * @param replica
+   */
+  @Override
+  public void updateContainerReplica(ContainerID containerID,
+      ContainerReplica replica)
+      throws ContainerNotFoundException {
+    super.updateContainerReplica(containerID, replica);
+    // Update container_history table
+    long currentTime = System.currentTimeMillis();
+    String datanodeHost = replica.getDatanodeDetails().getHostName();
+    containerSchemaManager.upsertContainerHistory(containerID.getId(),
+        datanodeHost, currentTime);
+  }
+
+  public ContainerSchemaManager getContainerSchemaManager() {
+    return containerSchemaManager;
   }
 }
