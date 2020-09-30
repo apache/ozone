@@ -18,22 +18,17 @@
 package org.apache.hadoop.hdds.utils;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
-import java.util.concurrent.CompletionService;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * An abstract class for a background service in ozone.
@@ -50,10 +45,9 @@ public abstract class BackgroundService {
   // Executor to launch child tasks
   private final ScheduledExecutorService exec;
   private final ThreadGroup threadGroup;
-  private final ThreadFactory threadFactory;
   private final String serviceName;
   private final long interval;
-  private final long serviceTimeout;
+  private final long serviceTimeoutInNanos;
   private final TimeUnit unit;
   private final PeriodicalTask service;
 
@@ -62,11 +56,11 @@ public abstract class BackgroundService {
     this.interval = interval;
     this.unit = unit;
     this.serviceName = serviceName;
-    this.serviceTimeout = serviceTimeout;
+    this.serviceTimeoutInNanos = TimeDuration.valueOf(serviceTimeout, unit)
+            .toLong(TimeUnit.NANOSECONDS);
     threadGroup = new ThreadGroup(serviceName);
-    ThreadFactory tf = r -> new Thread(threadGroup, r);
-    threadFactory = new ThreadFactoryBuilder()
-        .setThreadFactory(tf)
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setThreadFactory(r -> new Thread(threadGroup, r))
         .setDaemon(true)
         .setNameFormat(serviceName + "#%d")
         .build();
@@ -81,11 +75,6 @@ public abstract class BackgroundService {
   @VisibleForTesting
   public int getThreadCount() {
     return threadGroup.activeCount();
-  }
-
-  @VisibleForTesting
-  public void triggerBackgroundTaskForTesting() {
-    service.run();
   }
 
   // start service
@@ -114,41 +103,27 @@ public abstract class BackgroundService {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Number of background tasks to execute : {}", tasks.size());
       }
-      CompletionService<BackgroundTaskResult> taskCompletionService =
-          new ExecutorCompletionService<>(exec);
 
-      List<Future<BackgroundTaskResult>> results = Lists.newArrayList();
       while (tasks.size() > 0) {
         BackgroundTask task = tasks.poll();
-        Future<BackgroundTaskResult> result =
-            taskCompletionService.submit(task);
-        results.add(result);
-      }
-
-      results.parallelStream().forEach(taskResultFuture -> {
-        try {
-          // Collect task results
-          BackgroundTaskResult result = serviceTimeout > 0
-              ? taskResultFuture.get(serviceTimeout, unit)
-              : taskResultFuture.get();
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("task execution result size {}", result.getSize());
+        CompletableFuture.runAsync(() -> {
+          long startTime = System.nanoTime();
+          try {
+            BackgroundTaskResult result = task.call();
+            if (LOG.isDebugEnabled()) {
+              LOG.debug("task execution result size {}", result.getSize());
+            }
+          } catch (Exception e) {
+            LOG.warn("Background task execution failed", e);
+          } finally {
+            long endTime = System.nanoTime();
+            if (endTime - startTime > serviceTimeoutInNanos) {
+              LOG.warn("{} Background task execution took {}ns > {}ns(timeout)",
+                  serviceName, endTime - startTime, serviceTimeoutInNanos);
+            }
           }
-        } catch (InterruptedException e) {
-          LOG.warn(
-              "Background task failed due to interruption, retrying in " +
-                  "next interval", e);
-          // Re-interrupt the thread while catching InterruptedException
-          Thread.currentThread().interrupt();
-        } catch (ExecutionException e) {
-          LOG.warn(
-              "Background task fails to execute, "
-                  + "retrying in next interval", e);
-        } catch (TimeoutException e) {
-          LOG.warn("Background task executes timed out, "
-              + "retrying in next interval", e);
-        }
-      });
+        }, exec);
+      }
     }
   }
 

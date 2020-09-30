@@ -70,8 +70,8 @@ public class ContainerSafeModeRule extends
       // now. These containers can be handled by tracking pipelines.
 
       Optional.ofNullable(container.getState())
-          .filter(state -> state != HddsProtos.LifeCycleState.OPEN)
-          .filter(state -> state != HddsProtos.LifeCycleState.CLOSING)
+          .filter(state -> (state == HddsProtos.LifeCycleState.QUASI_CLOSED ||
+              state == HddsProtos.LifeCycleState.CLOSED))
           .ifPresent(s -> containerMap.put(container.getContainerID(),
               container));
     });

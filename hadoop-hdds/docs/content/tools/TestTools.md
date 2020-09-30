@@ -74,6 +74,16 @@ This is a way to get [chaos](https://en.wikipedia.org/wiki/Chaos_engineering) in
 
 Freon is a command line application which is included in the Ozone distribution. It's a load generator which is used in our stress tests.
 
+Random keys:
+
+In randomkeys mode, the data written into ozone cluster is randomly generated. Each key will be of size 10 KB.
+
+The number of volumes/buckets/keys can be configured. The replication type and factor (eg. replicate with ratis to 3 nodes) also can be configured.
+
+For more information use:
+
+bin/ozone freon --help
+
 For example:
 
 ```
@@ -97,8 +107,6 @@ Total bytes written: 10240000
 Total Execution time: 00:00:16,898
 ***********************
 ```
-
-For more information check the [documentation page](https://hadoop.apache.org/ozone/docs/0.4.0-alpha/freon.html)
 
 ## Genesis
 
