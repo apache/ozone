@@ -36,6 +36,8 @@ import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
+import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
+
 /**
  * A class that encapsulates OzoneVolume.
  */
@@ -280,6 +282,30 @@ public class OzoneVolume extends WithMetadata {
     boolean result = proxy.setVolumeOwner(name, userName);
     this.owner = userName;
     return result;
+  }
+
+  /**
+   * Clean the space quota of the volume.
+   *
+   * @throws IOException
+   */
+  public void clearSpaceQuota() throws IOException {
+    OzoneVolume ozoneVolume = proxy.getVolumeDetails(name);
+    proxy.setVolumeQuota(name, ozoneVolume.getQuotaInCounts(), QUOTA_RESET);
+    this.quotaInBytes = QUOTA_RESET;
+    this.quotaInCounts = ozoneVolume.getQuotaInCounts();
+  }
+
+  /**
+   * Clean the count quota of the volume.
+   *
+   * @throws IOException
+   */
+  public void clearCountQuota() throws IOException {
+    OzoneVolume ozoneVolume = proxy.getVolumeDetails(name);
+    proxy.setVolumeQuota(name, QUOTA_RESET, ozoneVolume.getQuotaInBytes());
+    this.quotaInBytes = ozoneVolume.getQuotaInBytes();
+    this.quotaInCounts = QUOTA_RESET;
   }
 
   /**

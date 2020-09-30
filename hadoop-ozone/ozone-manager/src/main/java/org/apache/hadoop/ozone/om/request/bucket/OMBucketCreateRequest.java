@@ -27,6 +27,7 @@ import com.google.common.base.Optional;
 
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -192,6 +193,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
         throw new OMException("Bucket already exist", BUCKET_ALREADY_EXISTS);
       }
 
+      //Check quotaInBytes to update
+      checkQuotaBytesValid(metadataManager, omVolumeArgs, omBucketInfo,
+          volumeKey);
+
       // Add objectID and updateID
       omBucketInfo.setObjectID(
           OMFileRequest.getObjIDFromTxId(transactionLogIndex));
@@ -297,4 +302,37 @@ public class OMBucketCreateRequest extends OMClientRequest {
             CipherSuite.convert(metadata.getCipher())));
     return bekb.build();
   }
+
+  public boolean checkQuotaBytesValid(OMMetadataManager metadataManager,
+      OmVolumeArgs omVolumeArgs, OmBucketInfo omBucketInfo, String volumeKey)
+      throws IOException {
+    long quotaInBytes = omBucketInfo.getQuotaInBytes();
+    long volumeQuotaInBytes = omVolumeArgs.getQuotaInBytes();
+
+    long totalBucketQuota = 0;
+    if (quotaInBytes == OzoneConsts.QUOTA_RESET || quotaInBytes == 0) {
+      return false;
+    } else if (quotaInBytes > OzoneConsts.QUOTA_RESET) {
+      totalBucketQuota = quotaInBytes;
+    }
+
+    List<OmBucketInfo>  bucketList = metadataManager.listBuckets(
+        omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE);
+    for(OmBucketInfo bucketInfo : bucketList) {
+      long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
+      if(nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {
+        totalBucketQuota += nextQuotaInBytes;
+      }
+    }
+    if(volumeQuotaInBytes < totalBucketQuota
+        && volumeQuotaInBytes != OzoneConsts.QUOTA_RESET) {
+      throw new IllegalArgumentException("Total buckets quota in this volume " +
+          "should not be greater than volume quota : the total space quota is" +
+          " set to:" + totalBucketQuota + ". But the volume space quota is:" +
+          volumeQuotaInBytes);
+    }
+    return true;
+
+  }
+
 }

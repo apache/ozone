@@ -21,22 +21,21 @@ package org.apache.hadoop.ozone.shell.volume;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
-
+import org.apache.hadoop.ozone.shell.ClearSpaceQuotaOptions;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
 
 import java.io.IOException;
 
 /**
- * Executes update volume calls.
+ * clear quota of the volume.
  */
-@Command(name = "update",
-    description = "Updates parameter of the volumes")
-public class UpdateVolumeHandler extends VolumeHandler {
+@Command(name = "clrquota",
+    description = "clear quota of the volume")
+public class ClearQuotaHandler extends VolumeHandler {
 
-  @Option(names = {"--user"},
-      description = "Owner of the volume to set")
-  private String ownerName;
+  @CommandLine.Mixin
+  private ClearSpaceQuotaOptions clrSpaceQuota;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
@@ -44,16 +43,11 @@ public class UpdateVolumeHandler extends VolumeHandler {
     String volumeName = address.getVolumeName();
     OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
 
-    if (ownerName != null && !ownerName.isEmpty()) {
-      boolean result = volume.setOwner(ownerName);
-      if (LOG.isDebugEnabled() && !result) {
-        out().format("Volume '%s' owner is already '%s'. Unchanged.%n",
-            volumeName, ownerName);
-      }
+    if (clrSpaceQuota.getClrSpaceQuota()) {
+      volume.clearSpaceQuota();
     }
-
-    // For printing newer modificationTime.
-    OzoneVolume updatedVolume = client.getObjectStore().getVolume(volumeName);
-    printObjectAsJson(updatedVolume);
+    if (clrSpaceQuota.getClrCountQuota()) {
+      volume.clearCountQuota();
+    }
   }
 }

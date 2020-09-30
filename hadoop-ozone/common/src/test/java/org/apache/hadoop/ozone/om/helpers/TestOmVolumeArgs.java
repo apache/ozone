@@ -41,8 +41,8 @@ public class TestOmVolumeArgs {
     String owner = UserGroupInformation.getCurrentUser().getUserName();
     OmVolumeArgs omVolumeArgs = new OmVolumeArgs.Builder().setVolume(volumeName)
         .setAdminName(admin).setCreationTime(Time.now()).setOwnerName(owner)
-        .setObjectID(1L).setUpdateID(1L).setQuotaInBytes(100L).addMetadata(
-            "key1", "value1").addMetadata("key2", "value2")
+        .setObjectID(1L).setUpdateID(1L).setQuotaInBytes(Long.MAX_VALUE)
+        .addMetadata("key1", "value1").addMetadata("key2", "value2")
         .addOzoneAcls(OzoneAcl.toProtobuf(
             new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, "user1",
                 IAccessAuthorizer.ACLType.READ, ACCESS))).build();
