@@ -141,15 +141,14 @@ public class OMFailoverProxyProvider implements
 
         if (omProxyInfo.getAddress() != null) {
 
-          ProxyInfo<OzoneManagerProtocolPB> proxyInfo =
-              new ProxyInfo(null, omProxyInfo.toString());
 
           // For a non-HA OM setup, nodeId might be null. If so, we assign it
           // a dummy value
           if (nodeId == null) {
             nodeId = OzoneConsts.OM_NODE_ID_DUMMY;
           }
-          omProxies.put(nodeId, proxyInfo);
+          // ProxyInfo will be set during first time call to server.
+          omProxies.put(nodeId, null);
           omProxyInfos.put(nodeId, omProxyInfo);
           omNodeIDList.add(nodeId);
         } else {
@@ -199,31 +198,30 @@ public class OMFailoverProxyProvider implements
   @Override
   public synchronized ProxyInfo getProxy() {
     ProxyInfo currentProxyInfo = omProxies.get(currentProxyOMNodeId);
-    createOMProxyIfNeeded(currentProxyInfo, currentProxyOMNodeId);
+    if (currentProxyInfo == null) {
+      currentProxyInfo = createOMProxy(currentProxyOMNodeId);
+    }
     return currentProxyInfo;
   }
 
   /**
-   * Creates proxy object if it does not already exist.
+   * Creates proxy object.
    */
-  protected void createOMProxyIfNeeded(ProxyInfo proxyInfo,
-      String nodeId) {
-    if (proxyInfo.proxy == null) {
-      InetSocketAddress address = omProxyInfos.get(nodeId).getAddress();
-      try {
-        OzoneManagerProtocolPB proxy = createOMProxy(address);
-        try {
-          proxyInfo.proxy = proxy;
-        } catch (IllegalAccessError iae) {
-          omProxies.put(nodeId,
-              new ProxyInfo<>(proxy, proxyInfo.proxyInfo));
-        }
-      } catch (IOException ioe) {
-        LOG.error("{} Failed to create RPC proxy to OM at {}",
-            this.getClass().getSimpleName(), address, ioe);
-        throw new RuntimeException(ioe);
-      }
+  protected ProxyInfo createOMProxy(String nodeId) {
+    OMProxyInfo omProxyInfo = omProxyInfos.get(nodeId);
+    InetSocketAddress address = omProxyInfo.getAddress();
+    ProxyInfo proxyInfo;
+    try {
+      OzoneManagerProtocolPB proxy = createOMProxy(address);
+      // Create proxyInfo here, to make it work with all Hadoop versions.
+      proxyInfo = new ProxyInfo<>(proxy, omProxyInfos.toString());
+      omProxies.put(nodeId, proxyInfo);
+    } catch (IOException ioe) {
+      LOG.error("{} Failed to create RPC proxy to OM at {}",
+          this.getClass().getSimpleName(), address, ioe);
+      throw new RuntimeException(ioe);
     }
+    return proxyInfo;
   }
 
   @VisibleForTesting
@@ -480,10 +478,9 @@ public class OMFailoverProxyProvider implements
    */
   @Override
   public synchronized void close() throws IOException {
-    for (ProxyInfo<OzoneManagerProtocolPB> proxy : omProxies.values()) {
-      OzoneManagerProtocolPB omProxy = proxy.proxy;
-      if (omProxy != null) {
-        RPC.stopProxy(omProxy);
+    for (ProxyInfo<OzoneManagerProtocolPB> proxyInfo : omProxies.values()) {
+      if (proxyInfo != null) {
+        RPC.stopProxy(proxyInfo.proxy);
       }
     }
   }
@@ -491,6 +488,11 @@ public class OMFailoverProxyProvider implements
   @VisibleForTesting
   public List<ProxyInfo> getOMProxies() {
     return new ArrayList<ProxyInfo>(omProxies.values());
+  }
+
+  @VisibleForTesting
+  public Map<String, ProxyInfo<OzoneManagerProtocolPB>> getOMProxyMap() {
+    return omProxies;
   }
 
   @VisibleForTesting
