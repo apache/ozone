@@ -384,7 +384,8 @@ public class TestSchemaOneBackwardsCompatibility {
       Assert.assertEquals(TestDB.BYTES_USED,
           metadataTable.get(OzoneConsts.CONTAINER_BYTES_USED).longValue());
       Assert.assertEquals(TestDB.NUM_PENDING_DELETION_BLOCKS,
-          metadataTable.get(OzoneConsts.PENDING_DELETE_BLOCK_COUNT).longValue());
+          metadataTable.get(OzoneConsts.PENDING_DELETE_BLOCK_COUNT)
+              .longValue());
     }
   }
 
