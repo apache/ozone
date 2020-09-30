@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -39,12 +40,18 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   protected Map<String, T> featureMap = new HashMap<>();
   protected volatile boolean isInitialized = false;
 
-  protected void init(int version, T[] lfs) {
+  protected void init(int version, T[] lfs) throws IOException {
     if (!isInitialized) {
       metadataLayoutVersion = version;
       initializeFeatures(lfs);
       softwareLayoutVersion = features.lastKey();
       isInitialized = true;
+      if (softwareIsBehindMetaData()) {
+        throw new IOException(
+            String.format("Cannot initialize VersionManager. Metadata " +
+                    "layout version (%d) > software layout version (%d)",
+                metadataLayoutVersion, softwareLayoutVersion));
+      }
     }
   }
 

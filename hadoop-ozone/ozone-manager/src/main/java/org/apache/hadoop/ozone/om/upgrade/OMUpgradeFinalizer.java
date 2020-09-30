@@ -74,7 +74,7 @@ public class OMUpgradeFinalizer implements UpgradeFinalizer<OzoneManager> {
     assertClientId(upgradeClientID);
     List<String> returningMsgs = new ArrayList<>(msgs.size()+10);
     status = isDone ? FINALIZATION_DONE : FINALIZATION_IN_PROGRESS;
-    while (msgs.size() >= 0) {
+    while (msgs.size() > 0) {
       returningMsgs.add(msgs.poll());
     }
     return new StatusAndMessages(status, returningMsgs);
