@@ -82,6 +82,8 @@ public final class ContainerProtocolCalls  {
    *
    * @param xceiverClient client to perform call
    * @param datanodeBlockID blockID to identify container
+   * @param tokens list of tokens the current user has, possibly including a
+   *   token for this block
    * @return container protocol get block response
    * @throws IOException if there is an I/O error while performing the call
    */
@@ -185,6 +187,8 @@ public final class ContainerProtocolCalls  {
    * @param xceiverClient client to perform call
    * @param containerBlockData block data to identify container
    * @param eof whether this is the last putBlock for the same block
+   * @param tokens list of tokens the current user has, possibly including a
+   *   token for this block
    * @return putBlockResponse
    * @throws IOException if there is an error while performing the call
    * @throws InterruptedException
@@ -221,6 +225,8 @@ public final class ContainerProtocolCalls  {
    * @param chunk information about chunk to read
    * @param blockID ID of the block
    * @param validators functions to validate the response
+   * @param tokens list of tokens the current user has, possibly including a
+   *   token for this block
    * @return container protocol read chunk response
    * @throws IOException if there is an I/O error while performing the call
    */
@@ -288,6 +294,8 @@ public final class ContainerProtocolCalls  {
    * @param chunk information about chunk to write
    * @param blockID ID of the block
    * @param data the data of the chunk to write
+   * @param tokens list of tokens the current user has, possibly including a
+   *   token for this block
    * @throws IOException if there is an I/O error while performing the call
    */
   public static XceiverClientReply writeChunkAsync(
