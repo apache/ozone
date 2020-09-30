@@ -75,7 +75,7 @@ public class NodeStateMap {
         throw new NodeAlreadyExistsException("Node UUID: " + id);
       }
       nodeMap.put(id, new DatanodeInfo(datanodeDetails, nodeStatus));
-      nodeToContainer.put(id, Collections.emptySet());
+      nodeToContainer.put(id, new HashSet<>());
     } finally {
       lock.writeLock().unlock();
     }
