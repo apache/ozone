@@ -521,7 +521,7 @@ public class SCMNodeManager implements NodeManager {
   }
 
   /**
-   * Returns the max of no healthy volumes reported out of the set
+   * Returns the min of no healthy volumes reported out of the set
    * of datanodes constituting the pipeline.
    */
   @Override
@@ -537,7 +537,7 @@ public class SCMNodeManager implements NodeManager {
       }
     }
     Preconditions.checkArgument(!volumeCountList.isEmpty());
-    return Collections.max(volumeCountList);
+    return Collections.min(volumeCountList);
   }
 
   /**
