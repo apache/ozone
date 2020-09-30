@@ -297,6 +297,10 @@ public class SCMBlockProtocolServer implements
     }
   }
 
+  public StorageContainerManager getScm() {
+    return scm;
+  }
+
   @Override
   public List<DatanodeDetails> sortDatanodes(List<String> nodes,
       String clientMachine) throws IOException {

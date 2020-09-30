@@ -1027,6 +1027,25 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return replicationManager;
   }
 
+  /**
+   * Check if the current scm is the leader.
+   * @return - if the current scm is the leader.
+   */
+  public boolean checkLeader() {
+    return scmHAManager.isLeader();
+  }
+
+  /**
+   * Get suggested leader from Raft.
+   * @return - suggested leader address.
+   */
+  public String getSuggestedLeader() {
+    if (scmHAManager.getSuggestedLeader() == null) {
+      return null;
+    }
+    return scmHAManager.getSuggestedLeader().getAddress();
+  }
+
   public void checkAdminAccess(String remoteUser) throws IOException {
     if (remoteUser != null && !scmAdminUsernames.contains(remoteUser)) {
       throw new IOException(
