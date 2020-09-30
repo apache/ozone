@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -51,6 +52,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL;
 import static org.junit.Assert.*;
@@ -309,6 +311,111 @@ public class TestSchemaOneBackwardsCompatibility {
     }
   }
 
+  @Test
+  public void testReadBlockData() throws Exception {
+    try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
+      Table<String, BlockData> blockDataTable =
+          refCountedDB.getStore().getBlockDataTable();
+
+      // Test encoding keys and decoding database values.
+      for (String blockID: TestDB.BLOCK_IDS) {
+        BlockData blockData = blockDataTable.get(blockID);
+        Assert.assertEquals(Long.toString(blockData.getLocalID()), blockID);
+      }
+
+      // Test decoding keys from the database.
+      List<? extends Table.KeyValue<String, BlockData>> blockKeyValues =
+          blockDataTable.getRangeKVs(null, 100,
+              MetadataKeyFilters.getUnprefixedKeyFilter());
+
+      List<String> decodedKeys = new ArrayList<>();
+
+      for (Table.KeyValue<String, BlockData> blockDataKV:
+           blockKeyValues) {
+        decodedKeys.add(blockDataKV.getKey());
+      }
+
+      Assert.assertEquals(TestDB.BLOCK_IDS, decodedKeys);
+    }
+  }
+
+  @Test
+  public void testReadDeletingBlockData() throws Exception {
+    try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
+      Table<String, BlockData> blockDataTable =
+          refCountedDB.getStore().getBlockDataTable();
+
+      for (String blockID: TestDB.DELETING_BLOCK_IDS) {
+        BlockData blockData =
+            blockDataTable.get(OzoneConsts.DELETING_KEY_PREFIX + blockID);
+        Assert.assertEquals(Long.toString(blockData.getLocalID()), blockID);
+      }
+
+      // Test decoding keys from the database.
+      List<? extends Table.KeyValue<String, BlockData>> blockKeyValues =
+          blockDataTable.getRangeKVs(null, 100,
+              MetadataKeyFilters.getDeletingKeyFilter());
+
+      List<String> decodedKeys = new ArrayList<>();
+
+      for (Table.KeyValue<String, BlockData> blockDataKV:
+          blockKeyValues) {
+        decodedKeys.add(blockDataKV.getKey());
+      }
+
+      // Apply the deleting prefix to the saved block IDs so we can compare
+      // them to the retrieved keys.
+      List<String> expectedKeys = TestDB.DELETING_BLOCK_IDS.stream()
+          .map(key -> OzoneConsts.DELETING_KEY_PREFIX + key)
+          .collect(Collectors.toList());
+
+      Assert.assertEquals(expectedKeys, decodedKeys);
+    }
+  }
+
+  @Test
+  public void testReadMetadata() throws Exception {
+    try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
+      Table<String, Long> metadataTable =
+          refCountedDB.getStore().getMetadataTable();
+
+      Assert.assertEquals(TestDB.KEY_COUNT,
+          metadataTable.get(OzoneConsts.BLOCK_COUNT).longValue());
+      Assert.assertEquals(TestDB.BYTES_USED,
+          metadataTable.get(OzoneConsts.CONTAINER_BYTES_USED).longValue());
+      Assert.assertEquals(TestDB.NUM_PENDING_DELETION_BLOCKS,
+          metadataTable.get(OzoneConsts.PENDING_DELETE_BLOCK_COUNT)
+              .longValue());
+    }
+  }
+
+  @Test
+  public void testReadDeletedBlocks() throws Exception {
+    try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
+      Table<String, ChunkInfoList> deletedBlocksTable =
+          refCountedDB.getStore().getDeletedBlocksTable();
+
+      for (String blockID: TestDB.DELETED_BLOCK_IDS) {
+        // Since chunk info for deleted blocks was not stored in schema
+        // version 1, there is no value to retrieve here.
+        Assert.assertTrue(deletedBlocksTable.isExist(blockID));
+      }
+
+      // Test decoding keys from the database.
+      List<? extends Table.KeyValue<String, ChunkInfoList>> chunkInfoKeyValues =
+          deletedBlocksTable.getRangeKVs(null, 100);
+
+      List<String> decodedKeys = new ArrayList<>();
+
+      for (Table.KeyValue<String, ChunkInfoList> kv:
+          chunkInfoKeyValues) {
+        decodedKeys.add(kv.getKey());
+      }
+
+      Assert.assertEquals(TestDB.DELETED_BLOCK_IDS, decodedKeys);
+    }
+  }
+
   private void runBlockDeletingService() throws Exception {
     conf.setInt(OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL, 10);
     conf.setInt(OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER, 2);
@@ -416,17 +523,19 @@ public class TestSchemaOneBackwardsCompatibility {
    * data in schema version 1. The values are arbitrary. We only care that
    * it has keys representing metadata, deleted blocks, pending delete blocks,
    * and regular blocks.
+   * <p>
+   * The contents of the database are listed below. All values are present in
+   * the default column family. String values are surrounded by double
+   * quotes, protobuf objects are surrounded by angle brackets, and longs are
+   * written literally.
    *
-   * The contents of the database (all present in the default column family)
-   * are:
-   *
-   * #BLOCKCOUNT : 4
-   * #BYTESUSED : 400
-   * #PENDINGDELETEBLOCKCOUNT : 2
-   * #deleted#1596029079371 : 1596029079371
-   * #deleted#1596029079374 : 1596029079374
-   * #deleting#1596029079378 : <block_data>
-   * #deleting#1596029079380 : <block_data>
+   * "#BLOCKCOUNT" : 4
+   * "#BYTESUSED" : 400
+   * "#PENDINGDELETEBLOCKCOUNT" : 2
+   * "#deleted#1596029079371" : 1596029079371
+   * "#deleted#1596029079374" : 1596029079374
+   * "#deleting#1596029079378" : <block_data>
+   * "#deleting#1596029079380" : <block_data>
    * 1596029079382 : <block_data>
    * 1596029079385 : <block_data>
    */
@@ -443,6 +552,19 @@ public class TestSchemaOneBackwardsCompatibility {
     public static final long BYTES_USED = 400;
     public static final long NUM_PENDING_DELETION_BLOCKS = 2;
     public static final long NUM_DELETED_BLOCKS = 2;
+
+    // All keys are stored as strings, since the codecs reading to the
+    // database should handle conversion from long to string for keys before
+    // data is returned to the caller.
+    public static final List<String> DELETED_BLOCK_IDS = Arrays.asList(
+        "1596029079371",
+        "1596029079374");
+    public static final List<String> DELETING_BLOCK_IDS = Arrays.asList(
+        "1596029079378",
+        "1596029079380");
+    public static final List<String> BLOCK_IDS = Arrays.asList(
+        "1596029079382",
+        "1596029079385");
 
     private final ClassLoader loader;
 

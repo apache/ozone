@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.metadata;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
-import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.rocksdb.RocksDB;
@@ -39,32 +38,35 @@ public class DatanodeSchemaOneDBDefinition
   // codecs/classes are applied on top. By defining different DBDefinitions
   // with different codecs that all map to the default table, clients are
   // unaware they are using the same table for both interpretations of the data.
+
+  // Note that the current RDBStore implementation requires all column
+  // families to use the same codec instance for each key/value type.
   public static final DBColumnFamilyDefinition<String, BlockData>
-          BLOCK_DATA =
-          new DBColumnFamilyDefinition<>(
-                  StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
-                  String.class,
-                  new StringCodec(),
-                  BlockData.class,
-                  new BlockDataCodec());
+      BLOCK_DATA =
+      new DBColumnFamilyDefinition<>(
+          StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+          String.class,
+          new SchemaOneKeyCodec(),
+          BlockData.class,
+          new BlockDataCodec());
 
   public static final DBColumnFamilyDefinition<String, Long>
-          METADATA =
-          new DBColumnFamilyDefinition<>(
-                  StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
-                  String.class,
-                  new StringCodec(),
-                  Long.class,
-                  new LongCodec());
+        METADATA =
+        new DBColumnFamilyDefinition<>(
+            StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+            String.class,
+            new SchemaOneKeyCodec(),
+            Long.class,
+            new LongCodec());
 
   public static final DBColumnFamilyDefinition<String, ChunkInfoList>
-          DELETED_BLOCKS =
-          new DBColumnFamilyDefinition<>(
-                  StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
-                  String.class,
-                  new StringCodec(),
-                  ChunkInfoList.class,
-                  new SchemaOneChunkInfoListCodec());
+        DELETED_BLOCKS =
+        new DBColumnFamilyDefinition<>(
+            StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+            String.class,
+            new SchemaOneKeyCodec(),
+            ChunkInfoList.class,
+            new SchemaOneChunkInfoListCodec());
 
   protected DatanodeSchemaOneDBDefinition(String dbPath) {
     super(dbPath);
