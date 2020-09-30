@@ -20,6 +20,7 @@ MESSAGE="Marking this issue as un-mergeable as requested.
 
 Please use \`/ready\` comment when it's resolved.
 
+Please note that the PR will be closed after 21 days of inactivity from now. (But can be re-opened anytime later...)
 > $@"
 
 URL="$(jq -r '.issue.pull_request.url' "$GITHUB_EVENT_PATH")/reviews"
@@ -29,3 +30,10 @@ curl -s -o /dev/null \
   --header "authorization: Bearer $GITHUB_TOKEN" \
   --header 'content-type: application/json' \
   "$URL"
+
+curl -s -o /dev/null \
+  -X POST \
+  --data '{"labels": [ "pending" ]}' \
+  --header "authorization: Bearer $GITHUB_TOKEN" \
+  "$(jq -r '.issue.url' "$GITHUB_EVENT_PATH")/labels"
+

@@ -21,36 +21,35 @@
  */
 package org.apache.hadoop.hdds.scm.server;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.RemovalListener;
-import com.google.protobuf.BlockingService;
-
+import javax.management.ObjectName;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
+
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.block.BlockManagerImpl;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.block.PendingDeleteHandler;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms
-    .SCMContainerPlacementMetrics;
-import org.apache.hadoop.hdds.scm.net.NetworkTopology;
-import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
-import org.apache.hadoop.hdds.scm.safemode.SafeModeHandler;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerActionsHandler;
@@ -59,16 +58,20 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
+import org.apache.hadoop.hdds.scm.container.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
-import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.ContainerStat;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
-import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
-import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreRDBImpl;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.DeadNodeHandler;
 import org.apache.hadoop.hdds.scm.node.NewNodeHandler;
 import org.apache.hadoop.hdds.scm.node.StartDatanodeAdminHandler;
@@ -82,6 +85,8 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineActionHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineReportHandler;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.PipelineChoosePolicyFactory;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
@@ -90,7 +95,9 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.hdfs.DFSUtil;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.HddsVersionInfo;
+import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.metrics2.MetricsSystem;
@@ -106,22 +113,16 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.JvmPauseMonitor;
-import org.apache.hadoop.hdds.utils.HddsVersionInfo;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalListener;
+import com.google.protobuf.BlockingService;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.management.ObjectName;
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.TimeUnit;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
 
 /**
  * StorageContainerManager is the main entry point for the service that
@@ -195,7 +196,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   private JvmPauseMonitor jvmPauseMonitor;
   private final OzoneConfiguration configuration;
-  private final SafeModeHandler safeModeHandler;
   private SCMContainerMetrics scmContainerMetrics;
   private SCMContainerPlacementMetrics placementMetrics;
   private MetricsSystem ms;
@@ -204,6 +204,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    *  Network topology Map.
    */
   private NetworkTopology clusterMap;
+  private PipelineChoosePolicy pipelineChoosePolicy;
 
   /**
    * Creates a new StorageContainerManager. Configuration will be
@@ -246,7 +247,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     scmStorageConfig = new SCMStorageConfig(conf);
     if (scmStorageConfig.getState() != StorageState.INITIALIZED) {
       LOG.error("Please make sure you have run \'ozone scm --init\' " +
-          "command to generate all the required metadata.");
+          "command to generate all the required metadata to " +
+          scmStorageConfig.getStorageDir() + ".");
       throw new SCMException("SCM not initialized due to storage config " +
           "failure.", ResultCodes.SCM_NOT_INITIALIZED);
     }
@@ -308,7 +310,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         new PendingDeleteHandler(scmBlockManager.getSCMBlockDeletingService());
 
     ContainerReportHandler containerReportHandler =
-        new ContainerReportHandler(scmNodeManager, containerManager);
+        new ContainerReportHandler(scmNodeManager, containerManager, conf);
 
     IncrementalContainerReportHandler incrementalContainerReportHandler =
         new IncrementalContainerReportHandler(
@@ -337,14 +339,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     blockProtocolServer = new SCMBlockProtocolServer(conf, this);
     clientProtocolServer = new SCMClientProtocolServer(conf, this);
     httpServer = new StorageContainerManagerHttpServer(conf);
-
-    safeModeHandler = new SafeModeHandler(configuration);
-    safeModeHandler.notifyImmediately(clientProtocolServer, scmBlockManager);
-    safeModeHandler.notifyAfterDelay(replicationManager, pipelineManager);
-
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager,
         containerManager, eventQueue, replicationManager);
-
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.RETRIABLE_DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.NODE_REPORT, nodeReportHandler);
@@ -367,7 +363,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         (DeletedBlockLogImpl) scmBlockManager.getDeletedBlockLog());
     eventQueue.addHandler(SCMEvents.PIPELINE_ACTIONS, pipelineActionHandler);
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
-    eventQueue.addHandler(SCMEvents.SAFE_MODE_STATUS, safeModeHandler);
+    eventQueue.addHandler(SCMEvents.SAFE_MODE_STATUS, clientProtocolServer);
+    eventQueue.addHandler(SCMEvents.SAFE_MODE_STATUS, scmBlockManager);
+    eventQueue
+        .addHandler(SCMEvents.DELAYED_SAFE_MODE_STATUS, replicationManager);
+    eventQueue
+        .addHandler(SCMEvents.DELAYED_SAFE_MODE_STATUS, pipelineManager);
+
 
     // Emit initial safe mode status, as now handlers are registered.
     scmSafeModeManager.emitSafeModeStatus();
@@ -416,15 +418,22 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       pipelineManager = configurator.getPipelineManager();
     } else {
       pipelineManager =
-          new SCMPipelineManager(conf, scmNodeManager, eventQueue);
+          new SCMPipelineManager(conf, scmNodeManager,
+              scmMetadataStore.getPipelineTable(),
+              eventQueue);
     }
 
     if (configurator.getContainerManager() != null) {
       containerManager = configurator.getContainerManager();
     } else {
-      containerManager = new SCMContainerManager(conf, pipelineManager);
+      containerManager =
+          new SCMContainerManager(conf,
+              scmMetadataStore.getContainerTable(),
+              scmMetadataStore.getBatchHandler(),
+              pipelineManager);
     }
 
+    pipelineChoosePolicy = PipelineChoosePolicyFactory.getPolicy(conf);
     if (configurator.getScmBlockManager() != null) {
       scmBlockManager = configurator.getScmBlockManager();
     } else {
@@ -507,7 +516,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if(configurator.getMetadataStore() != null) {
       scmMetadataStore = configurator.getMetadataStore();
     } else {
-      scmMetadataStore = new SCMMetadataStoreRDBImpl(conf);
+      scmMetadataStore = new SCMMetadataStoreImpl(conf);
     }
   }
 
@@ -516,7 +525,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    *
    * @param conf
    */
-  private void loginAsSCMUser(Configuration conf)
+  private void loginAsSCMUser(ConfigurationSource conf)
       throws IOException, AuthenticationException {
     if (LOG.isDebugEnabled()) {
       ScmConfig scmConfig = configuration.getObject(ScmConfig.class);
@@ -526,18 +535,20 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmConfig.getKerberosKeytab());
     }
 
-    if (SecurityUtil.getAuthenticationMethod(conf).equals(
+    Configuration hadoopConf =
+        LegacyHadoopConfigurationSource.asHadoopConfiguration(conf);
+    if (SecurityUtil.getAuthenticationMethod(hadoopConf).equals(
         AuthenticationMethod.KERBEROS)) {
-      UserGroupInformation.setConfiguration(conf);
+      UserGroupInformation.setConfiguration(hadoopConf);
       InetSocketAddress socAddr = HddsServerUtil
           .getScmBlockClientBindAddress(conf);
-      SecurityUtil.login(conf,
+      SecurityUtil.login(hadoopConf,
             ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY,
             ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
             socAddr.getHostName());
     } else {
       throw new AuthenticationException(SecurityUtil.getAuthenticationMethod(
-          conf) + " authentication method not support. "
+          hadoopConf) + " authentication method not support. "
           + "SCM user login failed.");
     }
     LOG.info("SCM login successful.");
@@ -610,7 +621,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             .setSecretManager(null)
             .build();
 
-    DFSUtil.addPBProtocol(conf, protocol, instance, rpcServer);
+    HddsServerUtil.addPBProtocol(conf, protocol, instance, rpcServer);
     return rpcServer;
   }
 
@@ -644,8 +655,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         }
         scmStorageConfig.initialize();
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
-                + ";cid={}", scmStorageConfig.getStorageDir(),
-                scmStorageConfig.getClusterID());
+            + ";cid={};layoutVersion={}", scmStorageConfig.getStorageDir(),
+            scmStorageConfig.getClusterID(),
+            scmStorageConfig.getLayoutVersion());
         return true;
       } catch (IOException ioe) {
         LOG.error("Could not initialize SCM version file", ioe);
@@ -653,8 +665,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       }
     } else {
       LOG.info("SCM already initialized. Reusing existing cluster id for sd={}"
-              + ";cid={}", scmStorageConfig.getStorageDir(),
-              scmStorageConfig.getClusterID());
+          + ";cid={};layoutVersion={}", scmStorageConfig.getStorageDir(),
+          scmStorageConfig.getClusterID(),
+          scmStorageConfig.getLayoutVersion());
       return true;
     }
   }
@@ -993,11 +1006,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   @VisibleForTesting
-  public SafeModeHandler getSafeModeHandler() {
-    return safeModeHandler;
-  }
-
-  @VisibleForTesting
   public SCMSafeModeManager getScmSafeModeManager() {
     return scmSafeModeManager;
   }
@@ -1128,5 +1136,36 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   public NetworkTopology getClusterMap() {
     return this.clusterMap;
+  }
+
+  /**
+   * Get the safe mode status of all rules.
+   *
+   * @return map of rule statuses.
+   */
+  public Map<String, Pair<Boolean, String>> getRuleStatus() {
+    return scmSafeModeManager.getRuleStatus();
+  }
+
+  @Override
+  public Map<String, String> getRuleStatusMetrics() {
+    Map<String, String> map = new HashMap<>();
+    for (Map.Entry<String, Pair<Boolean, String>> entry :
+        scmSafeModeManager.getRuleStatus().entrySet()) {
+      map.put(entry.getKey(), entry.getValue().getRight());
+    }
+    return map;
+  }
+
+  public PipelineChoosePolicy getPipelineChoosePolicy() {
+    return this.pipelineChoosePolicy;
+  }
+
+  public String getScmId() {
+    return getScmStorageConfig().getScmId();
+  }
+
+  public String getClusterId() {
+    return getScmStorageConfig().getClusterID();
   }
 }

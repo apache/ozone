@@ -26,19 +26,21 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.security.token.BlockTokenVerifier;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
+import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -58,6 +60,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
+import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +75,7 @@ public class OzoneContainer {
 
   private final HddsDispatcher hddsDispatcher;
   private final Map<ContainerType, Handler> handlers;
-  private final OzoneConfiguration config;
+  private final ConfigurationSource config;
   private final MutableVolumeSet volumeSet;
   private final ContainerSet containerSet;
   private final XceiverServerSpi writeChannel;
@@ -81,6 +84,7 @@ public class OzoneContainer {
   private ContainerMetadataScanner metadataScanner;
   private List<ContainerDataScanner> dataScanners;
   private final BlockDeletingService blockDeletingService;
+  private final GrpcTlsConfig tlsClientConfig;
 
   /**
    * Construct OzoneContainer object.
@@ -90,7 +94,7 @@ public class OzoneContainer {
    * @throws DiskOutOfSpaceException
    * @throws IOException
    */
-  public OzoneContainer(DatanodeDetails datanodeDetails, OzoneConfiguration
+  public OzoneContainer(DatanodeDetails datanodeDetails, ConfigurationSource
       conf, StateContext context, CertificateClient certClient)
       throws IOException {
     config = conf;
@@ -148,6 +152,12 @@ public class OzoneContainer {
     blockDeletingService =
         new BlockDeletingService(this, svcInterval, serviceTimeout,
             TimeUnit.MILLISECONDS, config);
+    tlsClientConfig = RatisHelper.createTlsClientConfig(
+        secConf, certClient != null ? certClient.getCACertificate() : null);
+  }
+
+  public GrpcTlsConfig getTlsClientConfig() {
+    return tlsClientConfig;
   }
 
   private GrpcReplicationService createReplicationService() {
@@ -162,6 +172,7 @@ public class OzoneContainer {
     Iterator<HddsVolume> volumeSetIterator = volumeSet.getVolumesList()
         .iterator();
     ArrayList<Thread> volumeThreads = new ArrayList<Thread>();
+    long startTime = System.currentTimeMillis();
 
     //TODO: diskchecker should be run before this, to see how disks are.
     // And also handle disk failure tolerance need to be added
@@ -178,9 +189,12 @@ public class OzoneContainer {
         volumeThreads.get(i).join();
       }
     } catch (InterruptedException ex) {
-      LOG.info("Volume Threads Interrupted exception", ex);
+      LOG.error("Volume Threads Interrupted exception", ex);
+      Thread.currentThread().interrupt();
     }
 
+    LOG.info("Build ContainerSet costs {}s",
+        (System.currentTimeMillis() - startTime) / 1000);
   }
 
   /**
@@ -293,8 +307,21 @@ public class OzoneContainer {
    * Returns node report of container storage usage.
    */
   public StorageContainerDatanodeProtocolProtos.NodeReportProto getNodeReport()
-      throws IOException {
-    return volumeSet.getNodeReport();
+          throws IOException {
+    StorageLocationReport[] reports = volumeSet.getStorageReport();
+    StorageContainerDatanodeProtocolProtos.NodeReportProto.Builder nrb
+            = StorageContainerDatanodeProtocolProtos.
+            NodeReportProto.newBuilder();
+    for (int i = 0; i < reports.length; i++) {
+      nrb.addStorageReport(reports[i].getProtoBufMessage());
+    }
+    List<StorageContainerDatanodeProtocolProtos.
+            MetadataStorageReportProto> metadataReport =
+            writeChannel.getStorageReport();
+    if (metadataReport != null) {
+      nrb.addAllMetadataStorageReport(metadataReport);
+    }
+    return nrb.build();
   }
 
   @VisibleForTesting

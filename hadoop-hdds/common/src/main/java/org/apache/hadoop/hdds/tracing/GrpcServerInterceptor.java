@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.tracing;
 
 import io.opentracing.Scope;
+import io.opentracing.Span;
+import io.opentracing.util.GlobalTracer;
 import org.apache.ratis.thirdparty.io.grpc.ForwardingServerCallListener.SimpleForwardingServerCallListener;
 import org.apache.ratis.thirdparty.io.grpc.Metadata;
 import org.apache.ratis.thirdparty.io.grpc.ServerCall;
@@ -39,11 +41,14 @@ public class GrpcServerInterceptor implements ServerInterceptor {
         next.startCall(call, headers)) {
       @Override
       public void onMessage(ReqT message) {
-        try (Scope scope = TracingUtil
-            .importAndCreateScope(
+        Span span = TracingUtil
+            .importAndCreateSpan(
                 call.getMethodDescriptor().getFullMethodName(),
-                headers.get(GrpcClientInterceptor.TRACING_HEADER))) {
+                headers.get(GrpcClientInterceptor.TRACING_HEADER));
+        try (Scope scope = GlobalTracer.get().activateSpan(span)) {
           super.onMessage(message);
+        } finally {
+          span.finish();
         }
       }
     };

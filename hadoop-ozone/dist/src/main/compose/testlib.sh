@@ -17,39 +17,69 @@
 set -e
 
 COMPOSE_ENV_NAME=$(basename "$COMPOSE_DIR")
-COMPOSE_FILE=$COMPOSE_DIR/docker-compose.yaml
 RESULT_DIR=${RESULT_DIR:-"$COMPOSE_DIR/result"}
 RESULT_DIR_INSIDE="/tmp/smoketest/$(basename "$COMPOSE_ENV_NAME")/result"
 SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
 
+OM_HA_PARAM=""
+if [[ -n "${OM_SERVICE_ID}" ]]; then
+  OM_HA_PARAM="--om-service-id=${OM_SERVICE_ID}"
+else
+  OM_SERVICE_ID=om
+fi
+
 ## @description create results directory, purging any prior data
 create_results_dir() {
   #delete previous results
-  rm -rf "$RESULT_DIR"
+  [[ "${OZONE_KEEP_RESULTS:-}" == "true" ]] || rm -rf "$RESULT_DIR"
   mkdir -p "$RESULT_DIR"
   #Should be writeable from the docker containers where user is different.
   chmod ogu+w "$RESULT_DIR"
 }
 
+## @description find all the test.sh scripts in the immediate child dirs
+find_tests(){
+  if [[ -n "${OZONE_ACCEPTANCE_SUITE}" ]]; then
+     tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$" | sort)
 
-## @description wait until safemode exit (or 180 seconds)
-## @param the docker-compose file
+     # 'misc' is default suite, add untagged tests, too
+    if [[ "misc" == "${OZONE_ACCEPTANCE_SUITE}" ]]; then
+       untagged="$(find . -mindepth 2 -maxdepth 2 -name test.sh | xargs grep -L "^#suite:")"
+       if [[ -n "${untagged}" ]]; then
+         tests=$(echo ${tests} ${untagged} | xargs -n1 | sort)
+       fi
+     fi
+
+    if [[ -z "${tests}" ]]; then
+       echo "No tests found for suite ${OZONE_ACCEPTANCE_SUITE}"
+       exit 1
+  fi
+  else
+    tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | grep "${OZONE_TEST_SELECTOR:-""}" | sort)
+  fi
+  echo $tests
+}
+
+## @description wait until safemode exit (or 240 seconds)
 wait_for_safemode_exit(){
-  local compose_file=$1
+  # version-dependent
+  : ${OZONE_SAFEMODE_STATUS_COMMAND:=ozone admin safemode status --verbose}
 
   #Reset the timer
   SECONDS=0
 
-  #Don't give it up until 180 seconds
-  while [[ $SECONDS -lt 180 ]]; do
+  #Don't give it up until 240 seconds
+  while [[ $SECONDS -lt 240 ]]; do
 
      #This line checks the safemode status in scm
-     local command="ozone admin safemode status"
+     local command="${OZONE_SAFEMODE_STATUS_COMMAND}"
      if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
-         status=$(docker-compose -f "${compose_file}" exec -T scm bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
+         status=$(docker-compose exec -T scm bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
      else
-         status=$(docker-compose -f "${compose_file}" exec -T scm bash -c "$command")
+         status=$(docker-compose exec -T scm bash -c "$command")
      fi
+
+     echo "SECONDS: $SECONDS"
 
      echo $status
      if [[ "$status" ]]; then
@@ -73,9 +103,9 @@ start_docker_env(){
 
   create_results_dir
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
-  docker-compose -f "$COMPOSE_FILE" --no-ansi down
-  if ! { docker-compose -f "$COMPOSE_FILE" --no-ansi up -d --scale datanode="${datanode_count}" \
-      && wait_for_safemode_exit "$COMPOSE_FILE"; }; then
+  docker-compose --no-ansi down
+  if ! { docker-compose --no-ansi up -d --scale datanode="${datanode_count}" \
+      && wait_for_safemode_exit ; }; then
     OUTPUT_NAME="$COMPOSE_ENV_NAME"
     stop_docker_env
     return 1
@@ -96,13 +126,22 @@ execute_robot_test(){
   TEST_NAME="$(basename "$COMPOSE_DIR")-${TEST_NAME%.*}"
   set +e
   OUTPUT_NAME="$COMPOSE_ENV_NAME-$TEST_NAME-$CONTAINER"
-  OUTPUT_PATH="$RESULT_DIR_INSIDE/robot-$OUTPUT_NAME.xml"
+
+  # find unique filename
+  declare -i i=0
+  OUTPUT_FILE="robot-${OUTPUT_NAME}.xml"
+  while [[ -f $RESULT_DIR/$OUTPUT_FILE ]]; do
+    let i++
+    OUTPUT_FILE="robot-${OUTPUT_NAME}-${i}.xml"
+  done
+
+  OUTPUT_PATH="$RESULT_DIR_INSIDE/${OUTPUT_FILE}"
   # shellcheck disable=SC2068
-  docker-compose -f "$COMPOSE_FILE" exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
-    && docker-compose -f "$COMPOSE_FILE" exec -T -e SECURITY_ENABLED="${SECURITY_ENABLED}" -e OM_HA_PARAM="${OM_HA_PARAM}" "$CONTAINER" python -m robot ${ARGUMENTS[@]} --log NONE -N "$TEST_NAME" --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" "$SMOKETEST_DIR_INSIDE/$TEST"
+  docker-compose exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
+    && docker-compose exec -T "$CONTAINER" robot -v OM_SERVICE_ID:"${OM_SERVICE_ID}" -v SECURITY_ENABLED:"${SECURITY_ENABLED}" -v OM_HA_PARAM:"${OM_HA_PARAM}" -v KEY_NAME:"${OZONE_BUCKET_KEY_NAME}" ${ARGUMENTS[@]} --log NONE --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" "$SMOKETEST_DIR_INSIDE/$TEST"
   local -i rc=$?
 
-  FULL_CONTAINER_NAME=$(docker-compose -f "$COMPOSE_FILE" ps | grep "_${CONTAINER}_" | head -n 1 | awk '{print $1}')
+  FULL_CONTAINER_NAME=$(docker-compose ps | grep "_${CONTAINER}_" | head -n 1 | awk '{print $1}')
   docker cp "$FULL_CONTAINER_NAME:$OUTPUT_PATH" "$RESULT_DIR/"
 
   copy_daemon_logs
@@ -119,7 +158,7 @@ execute_robot_test(){
 ## @description Copy any 'out' files for daemon processes to the result dir
 copy_daemon_logs() {
   local c f
-  for c in $(docker-compose -f "$COMPOSE_FILE" ps | grep "^${COMPOSE_ENV_NAME}_" | awk '{print $1}'); do
+  for c in $(docker-compose ps | grep "^${COMPOSE_ENV_NAME}_" | awk '{print $1}'); do
     for f in $(docker exec "${c}" ls -1 /var/log/hadoop | grep -F '.out'); do
       docker cp "${c}:/var/log/hadoop/${f}" "$RESULT_DIR/"
     done
@@ -133,7 +172,7 @@ copy_daemon_logs() {
 execute_command_in_container(){
   set -e
   # shellcheck disable=SC2068
-  docker-compose -f "$COMPOSE_FILE" exec -T "$@"
+  docker-compose exec -T "$@"
   set +e
 }
 
@@ -141,7 +180,7 @@ execute_command_in_container(){
 ## @param       List of container names, eg datanode_1 datanode_2
 stop_containers() {
   set -e
-  docker-compose -f "$COMPOSE_FILE" --no-ansi stop $@
+  docker-compose --no-ansi stop $@
   set +e
 }
 
@@ -150,7 +189,7 @@ stop_containers() {
 ## @param       List of container names, eg datanode_1 datanode_2
 start_containers() {
   set -e
-  docker-compose -f "$COMPOSE_FILE" --no-ansi start $@
+  docker-compose --no-ansi start $@
   set +e
 }
 
@@ -169,7 +208,7 @@ wait_for_port(){
 
   while [[ $SECONDS -lt $timeout ]]; do
      set +e
-     docker-compose -f "${COMPOSE_FILE}" exec -T scm /bin/bash -c "nc -z $host $port"
+     docker-compose exec -T scm /bin/bash -c "nc -z $host $port"
      status=$?
      set -e
      if [ $status -eq 0 ] ; then
@@ -186,9 +225,16 @@ wait_for_port(){
 
 ## @description  Stops a docker-compose based test environment (with saving the logs)
 stop_docker_env(){
-  docker-compose -f "$COMPOSE_FILE" --no-ansi logs > "$RESULT_DIR/docker-$OUTPUT_NAME.log"
+  docker-compose --no-ansi logs > "$RESULT_DIR/docker-$OUTPUT_NAME.log"
   if [ "${KEEP_RUNNING:-false}" = false ]; then
-     docker-compose -f "$COMPOSE_FILE" --no-ansi down
+     docker-compose --no-ansi down
+  fi
+}
+
+## @description  Removes the given docker images if configured not to keep them (via KEEP_IMAGE=false)
+cleanup_docker_images() {
+  if [[ "${KEEP_IMAGE:-true}" == false ]]; then
+    docker image rm "$@"
   fi
 }
 
@@ -202,4 +248,40 @@ generate_report(){
      echo "Robot framework is not installed, the reports can be generated (sudo pip install robotframework)."
      exit 1
   fi
+}
+
+## @description  Copy results of a single test environment to the "all tests" dir.
+copy_results() {
+  local test_dir="$1"
+  local all_result_dir="$2"
+
+  local result_dir="${test_dir}/result"
+  local test_dir_name=$(basename ${test_dir})
+  if [[ -n "$(find "${result_dir}" -name "*.xml")" ]]; then
+    rebot --nostatusrc -N "${test_dir_name}" -o "${all_result_dir}/${test_dir_name}.xml" "${result_dir}/*.xml"
+  fi
+
+  cp "${result_dir}"/docker-*.log "${all_result_dir}"/
+  if [[ -n "$(find "${result_dir}" -name "*.out")" ]]; then
+    cp "${result_dir}"/*.out* "${all_result_dir}"/
+  fi
+}
+
+run_test_script() {
+  local d="$1"
+
+  echo "Executing test in ${d}"
+
+  #required to read the .env file from the right location
+  cd "${d}" || return
+
+  ret=0
+  if ! ./test.sh; then
+    ret=1
+    echo "ERROR: Test execution of ${d} is FAILED!!!!"
+  fi
+
+  cd - > /dev/null
+
+  return ${ret}
 }

@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.s3;
 
 import java.io.IOException;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 
 /**
@@ -32,7 +32,7 @@ public class S3GatewayHttpServer extends BaseHttpServer {
    */
   public static final int FILTER_PRIORITY_DO_AFTER = 50;
 
-  public S3GatewayHttpServer(Configuration conf,
+  public S3GatewayHttpServer(MutableConfigurationSource conf,
       String name) throws IOException {
     super(conf, name);
   }
@@ -85,6 +85,16 @@ public class S3GatewayHttpServer extends BaseHttpServer {
   @Override
   protected String getEnabledKey() {
     return S3GatewayConfigKeys.OZONE_S3G_HTTP_ENABLED_KEY;
+  }
+
+  @Override
+  protected String getHttpAuthType() {
+    return S3GatewayConfigKeys.OZONE_S3G_HTTP_AUTH_TYPE;
+  }
+
+  @Override
+  protected String getHttpAuthConfigPrefix() {
+    return S3GatewayConfigKeys.OZONE_S3G_HTTP_AUTH_CONFIG_PREFIX;
   }
 
 }

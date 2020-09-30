@@ -35,6 +35,10 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.StringUtils;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
+
 /**
  * This class maintains Node related metrics.
  */
@@ -42,7 +46,7 @@ import org.apache.hadoop.util.StringUtils;
 @Metrics(about = "SCM NodeManager Metrics", context = OzoneConsts.OZONE)
 public final class SCMNodeMetrics implements MetricsSource {
 
-  private static final String SOURCE_NAME =
+  public static final String SOURCE_NAME =
       SCMNodeMetrics.class.getSimpleName();
 
   private @Metric MutableCounterLong numHBProcessed;
@@ -111,7 +115,7 @@ public final class SCMNodeMetrics implements MetricsSource {
   }
 
   /**
-   * Get aggregated counter and gauage metrics.
+   * Get aggregated counter and gauge metrics.
    */
   @Override
   @SuppressWarnings("SuspiciousMethodCalls")

@@ -32,7 +32,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.util.concurrent.MoreExecutors;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdfs.server.datanode.DataNode;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
@@ -91,7 +91,7 @@ public class HddsVolumeChecker {
    * @param conf  Configuration object.
    * @param timer {@link Timer} object used for throttling checks.
    */
-  public HddsVolumeChecker(Configuration conf, Timer timer)
+  public HddsVolumeChecker(ConfigurationSource conf, Timer timer)
       throws DiskErrorException {
     maxAllowedTimeForCheckMs = conf.getTimeDuration(
         DFSConfigKeysLegacy.DFS_DATANODE_DISK_CHECK_TIMEOUT_KEY,

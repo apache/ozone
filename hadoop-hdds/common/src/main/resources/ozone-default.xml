@@ -38,6 +38,16 @@
     </description>
   </property>
   <property>
+    <name>ozone.container.cache.lock.stripes</name>
+    <value>1024</value>
+    <tag>PERFORMANCE, CONTAINER, STORAGE</tag>
+    <description>Container DB open is an exclusive operation. We use a stripe
+      lock to guarantee that different threads can open different container DBs
+      concurrently, while for one container DB, only one thread can open it at
+      the same time. This setting controls the lock stripes.
+    </description>
+  </property>
+  <property>
     <name>dfs.container.ipc</name>
     <value>9859</value>
     <tag>OZONE, CONTAINER, MANAGEMENT</tag>
@@ -196,11 +206,13 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.num.write.chunk.threads</name>
-    <value>60</value>
+    <name>dfs.container.ratis.num.write.chunk.threads.per.volume</name>
+    <value>10</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
-    <description>Maximum number of threads in the thread pool that Ratis
-      will use for writing chunks (60 by default).
+    <description>Maximum number of threads in the thread pool that Datanode
+      will use for writing replicated chunks.
+      This is a per configured locations!
+      (10 thread per disk by default).
     </description>
   </property>
   <property>
@@ -242,19 +254,6 @@
     <tag>OZONE, RATIS, PERFORMANCE</tag>
     <description>The size of the buffer which is preallocated for raft segment
       used by Apache Ratis on datanodes.(16 KB by default)
-    </description>
-  </property>
-  <property>
-    <name>dfs.ratis.client.request.max.retries</name>
-    <value>180</value>
-    <tag>OZONE, RATIS, MANAGEMENT</tag>
-    <description>Number of retries for ratis client request.</description>
-  </property>
-  <property>
-    <name>dfs.ratis.client.request.retry.interval</name>
-    <value>1000ms</value>
-    <tag>OZONE, RATIS, MANAGEMENT</tag>
-    <description>Interval between successive retries for a ratis client request.
     </description>
   </property>
   <property>
@@ -387,10 +386,22 @@
     </description>
   </property>
   <property>
+    <name>ozone.client.stream.buffer.flush.delay</name>
+    <value>true</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      Default true, when call flush() and determine whether the data in the
+      current buffer is greater than ozone.client.stream.buffer.size, if
+      greater than then send buffer to the datanode. You can turn this off
+      by setting this configuration to false.
+    </description>
+  </property>
+  <property>
     <name>ozone.client.stream.buffer.size</name>
     <value>4MB</value>
     <tag>OZONE, CLIENT</tag>
-    <description>The size of chunks the client will send to the server.</description>
+    <description>The size of chunks the client will send to the server.
+    </description>
   </property>
   <property>
     <name>ozone.client.stream.buffer.flush.size</name>
@@ -584,6 +595,16 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.volume.listall.allowed</name>
+    <value>true</value>
+    <tag>OM, MANAGEMENT</tag>
+    <description>
+      Allows everyone to list all volumes when set to true. Defaults to true.
+      When set to false, non-admin users can only list the volumes they have
+      access to. Admins can always list all volumes.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.user.max.volume</name>
     <value>1024</value>
     <tag>OM, MANAGEMENT</tag>
@@ -621,17 +642,6 @@
       For production clusters or any time you care about performance, it is
       recommended that ozone.om.db.dirs, ozone.scm.db.dirs and
       dfs.container.ratis.datanode.storage.dir be configured separately.
-    </description>
-  </property>
-  <property>
-    <name>ozone.metastore.impl</name>
-    <value>RocksDB</value>
-    <tag>OZONE, OM, SCM, CONTAINER, STORAGE</tag>
-    <description>
-      Ozone metadata store implementation. Ozone metadata are well
-      distributed to multiple services such as ozoneManager, scm. They are stored in
-      some local key-value databases. This property determines which database
-      library to use. Supported value is either LevelDB or RocksDB.
     </description>
   </property>
 
@@ -808,7 +818,7 @@
     <name>ozone.scm.pipeline.owner.container.count</name>
     <value>3</value>
     <tag>OZONE, SCM, PIPELINE</tag>
-    <description>Number of containers per owner in a pipeline.
+    <description>Number of containers per owner per disk in a pipeline.
     </description>
   </property>
   <property>
@@ -968,6 +978,16 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.heartbeat.rpc-retry-count</name>
+    <value>15</value>
+    <tag>OZONE, MANAGEMENT</tag>
+    <description>
+      Retry count for the RPC from Datanode to SCM. The rpc-retry-interval
+      is 1s. Make sure rpc-retry-count * (rpc-timeout + rpc-retry-interval)
+      is less than hdds.heartbeat.interval.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.heartbeat.thread.interval</name>
     <value>3s</value>
     <tag>OZONE, MANAGEMENT</tag>
@@ -1063,19 +1083,6 @@
     <description>
       Setting this flag to true dumps the HTTP request/ response in
       the logs. Very useful when debugging REST protocol.
-    </description>
-  </property>
-
-  <property>
-    <name>ozone.scm.container.creation.lease.timeout</name>
-    <value>60s</value>
-    <tag>OZONE, SCM</tag>
-    <description>
-      Container creation timeout in milliseconds to be used by SCM. When
-      BEGIN_CREATE event happens the container is moved from ALLOCATED to
-      CREATING state, SCM will now wait for the configured amount of time
-      to get COMPLETE_CREATE event if it doesn't receive it will move the
-      container to DELETING.
     </description>
   </property>
 
@@ -1346,16 +1353,6 @@
   </property>
 
   <property>
-    <name>hdds.container.scrub.enabled</name>
-    <value>false</value>
-    <tag>DATANODE</tag>
-    <description>
-      Boolean value to enable data and metadata scrubbing in the containers
-      running on each datanode.
-    </description>
-  </property>
-
-  <property>
     <name>hdds.container.action.max.limit</name>
     <value>20</value>
     <tag>DATANODE</tag>
@@ -1413,15 +1410,13 @@
   </property>
 
   <property>
-    <name>ozone.s3g.authentication.kerberos.principal</name>
-    <value/>
+    <name>ozone.s3g.volume.name</name>
+    <value>s3v</value>
     <tag>OZONE, S3GATEWAY</tag>
-    <description>The server principal used by Ozone S3Gateway server. This is
-      typically set to
-      HTTP/_HOST@REALM.TLD The SPNEGO server principal begins with the prefix
-      HTTP/ by convention.</description>
+    <description>
+      The volume name to access through the s3gateway.
+    </description>
   </property>
-
   <property>
     <name>ozone.s3g.domain.name</name>
     <value/>
@@ -1478,7 +1473,17 @@
   </property>
 
   <property>
-    <name>ozone.s3g.keytab.file</name>
+    <name>ozone.s3g.http.auth.kerberos.principal</name>
+    <value/>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>The server principal used by Ozone S3Gateway server. This is
+      typically set to
+      HTTP/_HOST@REALM.TLD The SPNEGO server principal begins with the prefix
+      HTTP/ by convention.</description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.http.auth.kerberos.keytab</name>
     <value/>
     <tag>OZONE, S3GATEWAY</tag>
     <description>The keytab file used by the S3Gateway server to login as its
@@ -1497,9 +1502,19 @@
   <property>
     <name>ozone.security.enabled</name>
     <value>false</value>
-    <tag> OZONE, SECURITY</tag>
+    <tag>OZONE, SECURITY</tag>
     <description>True if security is enabled for ozone. When this property is
      true, hadoop.security.authentication should be Kerberos.
+    </description>
+  </property>
+  <property>
+    <name>ozone.security.http.kerberos.enabled</name>
+    <value>false</value>
+    <tag>OZONE, SECURITY</tag>
+    <description>True if Kerberos authentication for Ozone HTTP web consoles
+      is enabled using the SPNEGO protocol. When this property is
+      true, hadoop.security.authentication should be Kerberos and
+      ozone.security.enabled should be set to true.
     </description>
   </property>
 
@@ -1529,6 +1544,15 @@
     <tag>OZONE, CLIENT, MANAGEMENT</tag>
     <description>
       Ozone client to verify checksum of the checksum blocksize data.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.client.read.timeout</name>
+    <value>30s</value>
+    <tag>OZONE, CLIENT, MANAGEMENT</tag>
+    <description>
+      Timeout for ozone grpc client during read.
     </description>
   </property>
 
@@ -1585,19 +1609,19 @@
 
   <property>
     <name>ozone.om.ratis.segment.size</name>
-    <value>16KB</value>
+    <value>4MB</value>
     <tag>OZONE, OM, RATIS, PERFORMANCE</tag>
     <description>The size of the raft segment used by Apache Ratis on OM.
-      (16 KB by default)
+      (4 MB by default)
     </description>
   </property>
 
   <property>
     <name>ozone.om.ratis.segment.preallocated.size</name>
-    <value>16KB</value>
+    <value>4MB</value>
     <tag>OZONE, OM, RATIS, PERFORMANCE</tag>
     <description>The size of the buffer which is preallocated for raft segment
-      used by Apache Ratis on OM.(16 KB by default)
+      used by Apache Ratis on OM.(4 MB by default)
     </description>
   </property>
 
@@ -1621,15 +1645,6 @@
     <tag>OZONE, OM, RATIS</tag>
     <description>The minimum gap between log indices for Raft server to purge
       its log segments after taking snapshot.
-    </description>
-  </property>
-
-  <property>
-    <name>ozone.om.ratis.snapshot.auto.trigger.threshold</name>
-    <value>400000</value>
-    <tag>OZONE, DEBUG, OM, RATIS</tag>
-    <description>The log index threshold after ratis will auto trigger
-      snapshot on the OM state machine.
     </description>
   </property>
 
@@ -1683,17 +1698,6 @@
       loses the leader role. The scheduled check is an secondary
       check to ensure that the leader role is updated periodically
       .</description>
-  </property>
-
-  <property>
-    <name>ipc.client.rpc-timeout.ms</name>
-    <value>900000</value>
-    <description>
-      RpcClient timeout on waiting response from server. The default value is
-      set to 15 minutes. If ipc.client.ping is set to true and this rpc-timeout
-      is greater than the value of ipc.ping.interval, the effective value of
-      the rpc-timeout is rounded up to multiple of ipc.ping.interval.
-    </description>
   </property>
 
   <property>
@@ -1764,14 +1768,14 @@
     <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM</description>
   </property>
   <property>
-    <name>ozone.om.http.kerberos.principal</name>
+    <name>ozone.om.http.auth.kerberos.principal</name>
     <value>HTTP/_HOST@EXAMPLE.COM</value>
     <description>
       OzoneManager http server kerberos principal.
     </description>
   </property>
   <property>
-    <name>ozone.om.http.kerberos.keytab</name>
+    <name>ozone.om.http.auth.kerberos.keytab</name>
     <value>/etc/security/keytabs/HTTP.keytab</value>
     <description>
       OzoneManager http server kerberos keytab.
@@ -1930,19 +1934,13 @@
       not be renewed.
     </description>
   </property>
-
+  
   <property>
-    <name>ozone.fs.isolated-classloader</name>
-    <value></value>
+    <name>ozone.fs.iterate.batch-size</name>
+    <value>100</value>
     <tag>OZONE, OZONEFS</tag>
     <description>
-      Enable it for older hadoops to separate the classloading of all the
-      Ozone classes. With 'true' value, ozonefs can be used with older
-      hadoop versions as the hadoop3/ozone related classes are loaded by
-      an isolated classloader.
-
-      Default depends from the used jar. true for ozone-filesystem-lib-legacy
-      jar and false for the ozone-filesystem-lib-current.jar
+      Iterate batch size of delete when use BasicOzoneFileSystem.
     </description>
   </property>
   <property>
@@ -2003,7 +2001,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.freon.http.kerberos.principal</name>
+    <name>ozone.freon.http.auth.kerberos.principal</name>
     <value>HTTP/_HOST@EXAMPLE.COM</value>
     <tag>SECURITY</tag>
     <description>
@@ -2011,7 +2009,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.freon.http.kerberos.keytab</name>
+    <name>ozone.freon.http.auth.kerberos.keytab</name>
     <value>/etc/security/keytabs/HTTP.keytab</value>
     <tag>SECURITY</tag>
     <description>
@@ -2065,7 +2063,7 @@
   </property>
 
   <property>
-    <name>hdds.datanode.http.kerberos.principal</name>
+    <name>hdds.datanode.http.auth.kerberos.principal</name>
     <value>HTTP/_HOST@EXAMPLE.COM</value>
     <tag>HDDS, SECURITY, MANAGEMENT</tag>
     <description>
@@ -2073,7 +2071,7 @@
     </description>
   </property>
   <property>
-    <name>hdds.datanode.http.kerberos.keytab</name>
+    <name>hdds.datanode.http.auth.kerberos.keytab</name>
     <value>/etc/security/keytabs/HTTP.keytab</value>
     <tag>HDDS, SECURITY, MANAGEMENT</tag>
     <description>
@@ -2139,29 +2137,13 @@
     </description>
   </property>
   <property>
-    <name>ozone.client.failover.sleep.base.millis</name>
-    <value>500</value>
+    <name>ozone.client.wait.between.retries.millis</name>
+    <value>2000</value>
     <description>
-      Expert only. The time to wait, in milliseconds, between failover
-      attempts increases exponentially as a function of the number of
-      attempts made so far, with a random factor of +/- 50%. This option
-      specifies the base value used in the failover calculation. The
-      first failover will retry immediately. The 2nd failover attempt
-      will delay at least ozone.client.failover.sleep.base.millis
-      milliseconds. And so on.
-    </description>
-  </property>
-  <property>
-    <name>ozone.client.failover.sleep.max.millis</name>
-    <value>15000</value>
-    <description>
-      Expert only. The time to wait, in milliseconds, between failover
-      attempts increases exponentially as a function of the number of
-      attempts made so far, with a random factor of +/- 50%. This option
-      specifies the maximum value to wait between failovers.
-      Specifically, the time between two failover attempts will not
-      exceed +/- 50% of ozone.client.failover.sleep.max.millis
-      milliseconds.
+      Expert only. The time to wait, in milliseconds, between retry attempts
+      to contact OM. Wait time increases linearly if same OM is retried
+      again. If retrying on multiple OMs proxies in round robin fashion, the
+      wait time is introduced after all the OM proxies have been attempted once.
     </description>
   </property>
   <property>
@@ -2215,16 +2197,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.recon.keytab.file</name>
-    <value/>
-    <tag>RECON, SECURITY</tag>
-    <description>
-      DEPRECATED. Use "ozone.recon.http.kerberos.keytab.file" instead.
-      The keytab file for HTTP Kerberos authentication in Recon.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.http.kerberos.keytab.file</name>
+    <name>ozone.recon.http.auth.kerberos.keytab</name>
     <value/>
     <tag>RECON, SECURITY</tag>
     <description>
@@ -2232,12 +2205,52 @@
     </description>
   </property>
   <property>
-    <name>ozone.recon.authentication.kerberos.principal</name>
+    <name>ozone.recon.http.auth.kerberos.principal</name>
     <value/>
     <tag>RECON</tag>
     <description>The server principal used by Ozone Recon server. This is
       typically set to HTTP/_HOST@REALM.TLD The SPNEGO server principal
       begins with the prefix HTTP/ by convention.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.http.auth.type </name>
+    <value>simple</value>
+    <tag>DATANODE, SECURITY</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
+  </property>
+  <property>
+    <name>ozone.freon.http.auth.type </name>
+    <value>simple</value>
+    <tag>FREON, SECURITY</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.http.auth.type </name>
+    <value>simple</value>
+    <tag>OM, SECURITY</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.http.auth.type </name>
+    <value>simple</value>
+    <tag>RECON, SECURITY</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.http.auth.type </name>
+    <value>simple</value>
+    <tag>S3G, SECURITY</tag>
+    <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
+      will be used for http authentication.
     </description>
   </property>
   <property>
@@ -2285,15 +2298,6 @@
     <tag>OZONE, PERFORMANCE</tag>
     <description>
       Whether to enable topology aware read to improve the read performance.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.container.db.impl</name>
-    <value>RocksDB</value>
-    <tag>OZONE, RECON, STORAGE</tag>
-    <description>
-      Ozone Recon container DB store implementation.Supported value is either
-      LevelDB or RocksDB.
     </description>
   </property>
   <property>
@@ -2363,105 +2367,10 @@
   </property>
   <property>
     <name>hdds.tracing.enabled</name>
-    <value>true</value>
+    <value>false</value>
     <tag>OZONE, HDDS</tag>
     <description>
       If enabled, tracing information is sent to tracing server.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.sql.db.driver</name>
-    <value>org.sqlite.JDBC</value>
-    <tag>OZONE, RECON</tag>
-    <description>
-      Database driver class name available on the
-      Ozone Recon classpath.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.sql.db.jdbc.url</name>
-    <value>jdbc:sqlite:${ozone.recon.db.dir}/ozone_recon_sqlite.db</value>
-    <tag>OZONE, RECON</tag>
-    <description>
-      Ozone Recon SQL database jdbc url.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.sql.db.username</name>
-    <value/>
-    <tag>OZONE, RECON</tag>
-    <description>
-      Ozone Recon SQL database username.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.sql.db.password</name>
-    <value/>
-    <tag>OZONE, RECON</tag>
-    <description>
-      Ozone Recon database password.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.sql.db.auto.commit</name>
-    <value>false</value>
-    <tag>OZONE, RECON</tag>
-    <description>
-      Sets the Ozone Recon database connection property of auto-commit to
-      true/false.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.sql.db.conn.timeout</name>
-    <value>30000</value>
-    <tag>OZONE, RECON</tag>
-    <description>
-      Sets time in milliseconds before call to getConnection is timed out.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.sql.db.conn.max.active</name>
-    <value>1</value>
-    <tag>OZONE, RECON</tag>
-    <description>
-      The max active connections to the SQL database. The default SQLite
-      database only allows single active connection, set this to a
-      reasonable value like 10, for external production database.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.sql.db.conn.max.age</name>
-    <value>1800</value>
-    <tag>OZONE, RECON</tag>
-    <description>
-      Sets maximum time a connection can be active in seconds.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.sql.db.conn.idle.max.age</name>
-    <value>3600</value>
-    <tag>OZONE, RECON</tag>
-    <description>
-      Sets maximum time to live for idle connection in seconds.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.sql.db.conn.idle.test.period</name>
-    <value>60</value>
-    <tag>OZONE, RECON</tag>
-    <description>
-      This sets the time (in seconds), for a connection to remain idle before
-      sending a test query to the DB. This is useful to prevent a DB from
-      timing out connections on its end.
-    </description>
-  </property>
-  <property>
-    <name>ozone.recon.sql.db.conn.idle.test</name>
-    <value>SELECT 1</value>
-    <tag>OZONE, RECON</tag>
-    <description>
-      The query to send to the DB to maintain keep-alives and test for dead
-      connections.
     </description>
   </property>
   <property>
@@ -2544,6 +2453,14 @@
     </description>
   </property>
   <property>
+    <name>ozone.s3g.client.buffer.size</name>
+    <tag>OZONE, S3GATEWAY</tag>
+    <value>4KB</value>
+    <description>
+      The size of the buffer which is for read block. (4KB by default).
+    </description>
+  </property>
+  <property>
     <name>ssl.server.keystore.keypassword</name>
     <tag>OZONE, SECURITY, MANAGEMENT</tag>
     <value></value>
@@ -2580,6 +2497,39 @@
     <value></value>
     <description>
       Truststore password for HTTPS SSL configuration
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.ratis.server.request.timeout</name>
+    <tag>OZONE, DATANODE</tag>
+    <value>2m</value>
+    <description>
+      Timeout for the request submitted directly to Ratis in datanode.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.keyname.character.check.enabled</name>
+    <tag>OZONE, OM</tag>
+    <value>false</value>
+    <description>If true, then enable to check if the key name
+      contains illegal characters when creating/renaming key.
+      For the definition of illegal characters, follow the
+      rules in Amazon S3's object key naming guide.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.enable.filesystem.paths</name>
+    <tag>OZONE, OM</tag>
+    <value>false</value>
+    <description>If true, key names will be interpreted as file system paths.
+      "/" will be treated as a special character and paths will be normalized
+      and must follow Unix filesystem path naming conventions. This flag will
+      be helpful when objects created by S3G need to be accessed using OFS/O3Fs.
+      If false, it will fallback to default behavior of Key/MPU create
+      requests where key paths are not normalized and any intermediate
+      directories will not be created or any file checks happens to check
+      filesystem semantics.
     </description>
   </property>
 </configuration>

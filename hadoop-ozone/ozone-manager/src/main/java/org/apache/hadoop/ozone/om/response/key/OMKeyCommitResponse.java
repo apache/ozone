@@ -19,7 +19,10 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -27,39 +30,34 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import java.io.IOException;
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
+
 /**
  * Response for CommitKey request.
  */
+@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, KEY_TABLE})
 public class OMKeyCommitResponse extends OMClientResponse {
 
   private OmKeyInfo omKeyInfo;
   private String ozoneKeyName;
   private String openKeyName;
+  private OmVolumeArgs omVolumeArgs;
+  private OmBucketInfo omBucketInfo;
 
   public OMKeyCommitResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo, String ozoneKeyName, String openKeyName) {
+      @Nonnull OmKeyInfo omKeyInfo, String ozoneKeyName, String openKeyName,
+      @Nonnull OmVolumeArgs omVolumeArgs, @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse);
     this.omKeyInfo = omKeyInfo;
     this.ozoneKeyName = ozoneKeyName;
     this.openKeyName = openKeyName;
+    this.omVolumeArgs = omVolumeArgs;
+    this.omBucketInfo = omBucketInfo;
   }
 
   /**
-   * When the KeyCommit request is a replay but the openKey should be deleted
-   * from the OpenKey table.
-   * Note that this response will result in openKey deletion only. Key will
-   * not be added to Key table.
-   * @param openKeyName openKey to be deleted from OpenKey table
-   */
-  public OMKeyCommitResponse(@Nonnull OMResponse omResponse,
-      String openKeyName) {
-    super(omResponse);
-    this.omKeyInfo = null;
-    this.openKeyName = openKeyName;
-  }
-
-  /**
-   * For when the request is not successful or it is a replay transaction.
+   * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
   public OMKeyCommitResponse(@Nonnull OMResponse omResponse) {
@@ -75,11 +73,17 @@ public class OMKeyCommitResponse extends OMClientResponse {
     omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
         openKeyName);
 
-    // Add entry to Key table if omKeyInfo is available i.e. it is not a
-    // replayed transaction.
-    if (omKeyInfo != null) {
-      omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKeyName,
-          omKeyInfo);
-    }
+    omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKeyName,
+        omKeyInfo);
+
+    // update volume usedBytes.
+    omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
+        omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
+        omVolumeArgs);
+    // update bucket usedBytes.
+    omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+        omMetadataManager.getBucketKey(omVolumeArgs.getVolume(),
+            omBucketInfo.getBucketName()), omBucketInfo);
   }
+
 }

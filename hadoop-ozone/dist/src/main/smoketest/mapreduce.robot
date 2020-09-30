@@ -17,21 +17,34 @@
 Documentation       Execute MR jobs
 Library             OperatingSystem
 Resource            commonlib.robot
+Resource            lib/fs.robot
 Test Timeout        4 minute
 
 
 *** Variables ***
-${volume}          vol1
+${SCHEME}          o3fs
+${volume}          volume1
 ${bucket}          bucket1
-${hadoop.version}  3.2.0
 
+*** Keywords ***
+Find example jar
+                    ${jar} =            Execute                 find /opt/hadoop/share/hadoop/mapreduce/ -name "*.jar" | grep mapreduce-examples | grep -v sources | grep -v test
+                    [return]            ${jar}
 
 *** Test cases ***
+
 Execute PI calculation
-                    ${output} =      Execute                 yarn jar ./share/hadoop/mapreduce/hadoop-mapreduce-examples-${hadoop.version}.jar pi 3 3
+                    ${exampleJar}    Find example jar
+    ${root} =       Format FS URL    ${SCHEME}    ${volume}    ${bucket}
+                    ${output} =      Execute                 yarn jar ${exampleJar} pi -D fs.defaultFS=${root} 3 3
                     Should Contain   ${output}               completed successfully
 
 Execute WordCount
+                    ${exampleJar}    Find example jar
                     ${random}        Generate Random String  2   [NUMBERS]
-                    ${output} =      Execute                 yarn jar ./share/hadoop/mapreduce/hadoop-mapreduce-examples-${hadoop.version}.jar wordcount o3fs://bucket1.vol1/key1 o3fs://bucket1.vol1/key1-${random}.count
+    ${root} =       Format FS URL    ${SCHEME}    ${volume}    ${bucket}
+    ${dir} =        Format FS URL    ${SCHEME}    ${volume}    ${bucket}   input/
+    ${result} =     Format FS URL    ${SCHEME}    ${volume}    ${bucket}   wordcount-${random}.txt
+    ${output} =     Execute          yarn jar ${exampleJar} wordcount -D fs.defaultFS=${root} ${dir} ${result}
+                    Should Contain   ${output}               map tasks=3
                     Should Contain   ${output}               completed successfully

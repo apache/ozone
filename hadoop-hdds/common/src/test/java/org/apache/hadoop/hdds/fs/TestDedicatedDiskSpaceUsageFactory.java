@@ -17,14 +17,14 @@
  */
 package org.apache.hadoop.hdds.fs;
 
-import org.apache.hadoop.conf.Configuration;
-import org.junit.Test;
-
 import java.io.File;
 import java.time.Duration;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+
 import static org.apache.hadoop.hdds.fs.DedicatedDiskSpaceUsageFactory.Conf.configKeyForRefreshPeriod;
 import static org.apache.hadoop.test.GenericTestUtils.getTestDir;
+import org.junit.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
@@ -41,7 +41,7 @@ public class TestDedicatedDiskSpaceUsageFactory {
 
   @Test
   public void testParams() {
-    Configuration conf = new Configuration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(configKeyForRefreshPeriod(), "2m");
     File dir = getTestDir(getClass().getSimpleName());
 

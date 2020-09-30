@@ -1,3 +1,11 @@
+---
+title: Decommissioning in Ozone
+summary: Formal process to shut down machines in a safe way after the required replications.
+date: 2019-07-31
+jira: HDDS-1881
+status: implementing
+author: Anu Engineer, Marton Elek, Stephen O'Donnell
+---
 <!--
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -11,15 +19,6 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-
----
-title: Decommissioning in Ozone
-summary: Formal process to shut down machines in a safe way after the required replications.
-date: 2019-07-31
-jira: HDDS-1881
-status: current
-author: Anu Engineer, Marton Elek, Stephen O'Donnell
----
 
 # Abstract
 

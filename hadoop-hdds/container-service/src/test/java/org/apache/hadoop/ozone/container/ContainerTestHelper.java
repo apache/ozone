@@ -570,11 +570,11 @@ public final class ContainerTestHelper {
     // Add 2ms delay so that localID based on UtcTime
     // won't collide.
     sleep(2);
-    return new BlockID(containerID, HddsUtils.getUtcTime());
+    return new BlockID(containerID, HddsUtils.getTime());
   }
 
   public static long getTestContainerID() {
-    return HddsUtils.getUtcTime();
+    return HddsUtils.getTime();
   }
 
   public static String getFixedLengthString(String string, int length) {
@@ -583,6 +583,11 @@ public final class ContainerTestHelper {
 
   private static RaftServerImpl getRaftServerImpl(HddsDatanodeService dn,
       Pipeline pipeline) throws Exception {
+    if (!pipeline.getNodes().contains(dn.getDatanodeDetails())) {
+      throw new IllegalArgumentException("Pipeline:" + pipeline.getId() +
+          " not exist in datanode:" + dn.getDatanodeDetails().getUuid());
+    }
+
     XceiverServerSpi server = dn.getDatanodeStateMachine().
         getContainer().getWriteChannel();
     RaftServerProxy proxy =

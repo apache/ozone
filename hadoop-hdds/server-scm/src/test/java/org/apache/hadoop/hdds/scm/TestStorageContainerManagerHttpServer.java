@@ -26,8 +26,8 @@ import java.net.URLConnection;
 import java.util.Arrays;
 import java.util.Collection;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManagerHttpServer;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.http.HttpConfig;
@@ -54,7 +54,7 @@ public class TestStorageContainerManagerHttpServer {
       .getTempPath(TestStorageContainerManagerHttpServer.class.getSimpleName());
   private static String keystoresDir;
   private static String sslConfDir;
-  private static Configuration conf;
+  private static OzoneConfiguration conf;
   private static URLConnectionFactory connectionFactory;
 
   @Parameters public static Collection<Object[]> policy() {
@@ -76,7 +76,7 @@ public class TestStorageContainerManagerHttpServer {
     File base = new File(BASEDIR);
     FileUtil.fullyDelete(base);
     base.mkdirs();
-    conf = new Configuration();
+    conf = new OzoneConfiguration();
     keystoresDir = new File(BASEDIR).getAbsolutePath();
     sslConfDir = KeyStoreTestUtil.getClasspathDir(
         TestStorageContainerManagerHttpServer.class);
@@ -90,6 +90,7 @@ public class TestStorageContainerManagerHttpServer {
   }
 
   @AfterClass public static void tearDown() throws Exception {
+    connectionFactory.destroy();
     FileUtil.fullyDelete(new File(BASEDIR));
     KeyStoreTestUtil.cleanupSSLConfig(keystoresDir, sslConfDir);
   }

@@ -24,11 +24,14 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
+
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,6 +69,8 @@ import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -88,6 +93,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
     CreateBucketRequest createBucketRequest =
         getOmRequest().getCreateBucketRequest();
     BucketInfo bucketInfo = createBucketRequest.getBucketInfo();
+    // Verify resource name
+    OmUtils.validateBucketName(bucketInfo.getBucketName());
 
     // Get KMS provider.
     KeyProviderCryptoExtension kmsProvider =
@@ -99,11 +106,27 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     BucketInfo.Builder newBucketInfo = bucketInfo.toBuilder();
 
-    // Set creation time.
-    newBucketInfo.setCreationTime(Time.now());
+    // Set creation time & modification time.
+    long initialTime = Time.now();
+    newBucketInfo.setCreationTime(initialTime)
+        .setModificationTime(initialTime);
 
     if (bucketInfo.hasBeinfo()) {
       newBucketInfo.setBeinfo(getBeinfo(kmsProvider, bucketInfo));
+    }
+
+    boolean hasSourceVolume = bucketInfo.hasSourceVolume();
+    boolean hasSourceBucket = bucketInfo.hasSourceBucket();
+
+    if (hasSourceBucket != hasSourceVolume) {
+      throw new OMException("Both source volume and source bucket are " +
+          "required for bucket links",
+          OMException.ResultCodes.INVALID_REQUEST);
+    }
+
+    if (hasSourceBucket && bucketInfo.hasBeinfo()) {
+      throw new OMException("Encryption cannot be set for bucket links",
+          OMException.ResultCodes.INVALID_REQUEST);
     }
 
     newCreateBucketRequest.setBucketInfo(newBucketInfo.build());
@@ -128,9 +151,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
     String volumeName = bucketInfo.getVolumeName();
     String bucketName = bucketInfo.getBucketName();
 
-    OMResponse.Builder omResponse = OMResponse.newBuilder().setCmdType(
-        OzoneManagerProtocolProtos.Type.CreateBucket).setStatus(
-        OzoneManagerProtocolProtos.Status.OK);
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
     OmBucketInfo omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo);
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
@@ -157,31 +179,17 @@ public class OMBucketCreateRequest extends OMClientRequest {
           BUCKET_LOCK, volumeName, bucketName);
 
       OmVolumeArgs omVolumeArgs =
-          metadataManager.getVolumeTable().get(volumeKey);
+          metadataManager.getVolumeTable().getReadCopy(volumeKey);
       //Check if the volume exists
       if (omVolumeArgs == null) {
         LOG.debug("volume: {} not found ", volumeName);
-        throw new OMException("Volume doesn't exist",
-            OMException.ResultCodes.VOLUME_NOT_FOUND);
+        throw new OMException("Volume doesn't exist", VOLUME_NOT_FOUND);
       }
 
       //Check if bucket already exists
-      OmBucketInfo dbBucketInfo = metadataManager.getBucketTable()
-          .get(bucketKey);
-      if (dbBucketInfo != null) {
-        // Check if this transaction is a replay of ratis logs.
-        if (isReplay(ozoneManager, dbBucketInfo, transactionLogIndex)) {
-          // Replay implies the response has already been returned to
-          // the client. So take no further action and return a dummy
-          // OMClientResponse.
-          LOG.debug("Replayed Transaction {} ignored. Request: {}",
-              transactionLogIndex, createBucketRequest);
-          return new OMBucketCreateResponse(createReplayOMResponse(omResponse));
-        } else {
-          LOG.debug("bucket: {} already exists ", bucketName);
-          throw new OMException("Bucket already exist",
-              OMException.ResultCodes.BUCKET_ALREADY_EXISTS);
-        }
+      if (metadataManager.getBucketTable().isExist(bucketKey)) {
+        LOG.debug("bucket: {} already exists ", bucketName);
+        throw new OMException("Bucket already exist", BUCKET_ALREADY_EXISTS);
       }
 
       // Add objectID and updateID
@@ -205,7 +213,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
     } catch (IOException ex) {
       exception = ex;
       omClientResponse = new OMBucketCreateResponse(
-          createErrorOMResponse(omResponse, exception), omBucketInfo);
+          createErrorOMResponse(omResponse, exception));
     } finally {
       addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
           ozoneManagerDoubleBufferHelper);

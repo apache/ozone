@@ -36,6 +36,8 @@ import com.google.common.collect.Sets;
 import org.junit.Assert;
 import org.junit.Test;
 
+import static java.util.Collections.singleton;
+
 /**
  * Test object multi delete.
  */
@@ -96,17 +98,16 @@ public class TestObjectMultiDelete {
         .collect(Collectors.toSet());
 
     //THEN
+    Assert.assertEquals(singleton("key3"), keysAtTheEnd);
     Assert.assertEquals(0, response.getDeletedObjects().size());
     Assert.assertEquals(0, response.getErrors().size());
   }
 
   private OzoneBucket initTestData(OzoneClient client) throws IOException {
-    client.getObjectStore().createS3Bucket("bilbo", "b1");
-
-    String volumeName = client.getObjectStore().getOzoneVolumeName("b1");
+    client.getObjectStore().createS3Bucket("b1");
 
     OzoneBucket bucket =
-        client.getObjectStore().getVolume(volumeName).getBucket("b1");
+        client.getObjectStore().getS3Bucket("b1");
 
     bucket.createKey("key1", 0).close();
     bucket.createKey("key2", 0).close();

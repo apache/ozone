@@ -32,8 +32,6 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 /**
  * Holds the data structures which maintain the information about pipeline and
@@ -152,9 +150,14 @@ class PipelineStateMap {
   List<Pipeline> getPipelines(ReplicationType type) {
     Preconditions.checkNotNull(type, "Replication type cannot be null");
 
-    return pipelineMap.values().stream()
-        .filter(p -> p.getType().equals(type))
-        .collect(Collectors.toList());
+    List<Pipeline> pipelines = new ArrayList<>();
+    for (Pipeline pipeline : pipelineMap.values()) {
+      if (pipeline.getType() == type) {
+        pipelines.add(pipeline);
+      }
+    }
+
+    return pipelines;
   }
 
   /**
@@ -168,10 +171,14 @@ class PipelineStateMap {
     Preconditions.checkNotNull(type, "Replication type cannot be null");
     Preconditions.checkNotNull(factor, "Replication factor cannot be null");
 
-    return pipelineMap.values().stream()
-        .filter(pipeline -> pipeline.getType() == type
-            && pipeline.getFactor() == factor)
-        .collect(Collectors.toList());
+    List<Pipeline> pipelines = new ArrayList<>();
+    for (Pipeline pipeline : pipelineMap.values()) {
+      if (pipeline.getType() == type && pipeline.getFactor() == factor) {
+        pipelines.add(pipeline);
+      }
+    }
+
+    return pipelines;
   }
 
   /**
@@ -188,10 +195,16 @@ class PipelineStateMap {
 
     Set<PipelineState> pipelineStates = new HashSet<>();
     pipelineStates.addAll(Arrays.asList(states));
-    return pipelineMap.values().stream().filter(
-        pipeline -> pipeline.getType() == type && pipelineStates
-            .contains(pipeline.getPipelineState()))
-        .collect(Collectors.toList());
+
+    List<Pipeline> pipelines = new ArrayList<>();
+    for (Pipeline pipeline : pipelineMap.values()) {
+      if (pipeline.getType() == type
+          && pipelineStates.contains(pipeline.getPipelineState())) {
+        pipelines.add(pipeline);
+      }
+    }
+
+    return pipelines;
   }
 
   /**
@@ -210,14 +223,21 @@ class PipelineStateMap {
     Preconditions.checkNotNull(state, "Pipeline state cannot be null");
 
     if (state == PipelineState.OPEN) {
-      return Collections.unmodifiableList(
-          query2OpenPipelines.get(new PipelineQuery(type, factor)));
+      return new ArrayList<>(
+          query2OpenPipelines.getOrDefault(
+              new PipelineQuery(type, factor), Collections.EMPTY_LIST));
     }
-    return pipelineMap.values().stream().filter(
-        pipeline -> pipeline.getType() == type
-            && pipeline.getPipelineState() == state
-            && pipeline.getFactor() == factor)
-        .collect(Collectors.toList());
+
+    List<Pipeline> pipelines = new ArrayList<>();
+    for (Pipeline pipeline : pipelineMap.values()) {
+      if (pipeline.getType() == type
+          && pipeline.getPipelineState() == state
+          && pipeline.getFactor() == factor) {
+        pipelines.add(pipeline);
+      }
+    }
+
+    return pipelines;
   }
 
   /**
@@ -226,7 +246,7 @@ class PipelineStateMap {
    *
    * @param type - ReplicationType
    * @param state - Required PipelineState
-   * @param excludeDns list of dns to exclude
+   * @param excludeDns dns to exclude
    * @param excludePipelines pipelines to exclude
    * @return List of pipelines with specified replication type,
    * replication factor and pipeline state
@@ -241,36 +261,36 @@ class PipelineStateMap {
         .checkNotNull(excludeDns, "Datanode exclude list cannot be null");
     Preconditions
         .checkNotNull(excludeDns, "Pipeline exclude list cannot be null");
-    return getPipelines(type, factor, state).stream().filter(
-        pipeline -> !discardPipeline(pipeline, excludePipelines)
-            && !discardDatanode(pipeline, excludeDns))
-        .collect(Collectors.toList());
-  }
 
-  private boolean discardPipeline(Pipeline pipeline,
-      Collection<PipelineID> excludePipelines) {
-    if (excludePipelines.isEmpty()) {
-      return false;
+    List<Pipeline> pipelines = null;
+    if (state == PipelineState.OPEN) {
+      pipelines = new ArrayList<>(query2OpenPipelines.getOrDefault(
+          new PipelineQuery(type, factor), Collections.EMPTY_LIST));
+    } else {
+      pipelines = new ArrayList<>(pipelineMap.values());
     }
-    Predicate<PipelineID> predicate = p -> p.equals(pipeline.getId());
-    return excludePipelines.parallelStream().anyMatch(predicate);
-  }
 
-  private boolean discardDatanode(Pipeline pipeline,
-      Collection<DatanodeDetails> excludeDns) {
-    if (excludeDns.isEmpty()) {
-      return false;
-    }
-    boolean discard = false;
-    for (DatanodeDetails dn : pipeline.getNodes()) {
-      Predicate<DatanodeDetails> predicate = p -> p.equals(dn);
-      discard = excludeDns.parallelStream().anyMatch(predicate);
-      if (discard) {
-        break;
+    Iterator<Pipeline> iter = pipelines.iterator();
+    while (iter.hasNext()) {
+      Pipeline pipeline = iter.next();
+      if (pipeline.getType() != type ||
+          pipeline.getPipelineState() != state ||
+          pipeline.getFactor() != factor ||
+          excludePipelines.contains(pipeline.getId())) {
+        iter.remove();
+      } else {
+        for (DatanodeDetails dn : pipeline.getNodes()) {
+          if (excludeDns.contains(dn)) {
+            iter.remove();
+            break;
+          }
+        }
       }
     }
-    return discard;
+
+    return pipelines;
   }
+
   /**
    * Get set of containerIDs corresponding to a pipeline.
    *
@@ -372,13 +392,20 @@ class PipelineStateMap {
     Pipeline updatedPipeline = pipelineMap.compute(pipelineID,
         (id, p) -> Pipeline.newBuilder(pipeline).setState(state).build());
     PipelineQuery query = new PipelineQuery(pipeline);
+    List<Pipeline> pipelineList = query2OpenPipelines.get(query);
     if (updatedPipeline.getPipelineState() == PipelineState.OPEN) {
       // for transition to OPEN state add pipeline to query2OpenPipelines
-      query2OpenPipelines.get(query).add(updatedPipeline);
+      if (pipelineList == null) {
+        pipelineList = new CopyOnWriteArrayList<>();
+        query2OpenPipelines.put(query, pipelineList);
+      }
+      pipelineList.add(updatedPipeline);
     } else {
       // for transition from OPEN to CLOSED state remove pipeline from
       // query2OpenPipelines
-      query2OpenPipelines.get(query).remove(pipeline);
+      if (pipelineList != null) {
+        pipelineList.remove(pipeline);
+      }
     }
     return updatedPipeline;
   }

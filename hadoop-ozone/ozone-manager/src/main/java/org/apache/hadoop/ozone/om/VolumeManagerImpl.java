@@ -20,10 +20,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -32,10 +30,8 @@ import org.apache.hadoop.ozone.protocol.proto
     .OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto
     .OzoneManagerProtocolProtos.UserVolumeInfo;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import com.google.common.base.Preconditions;
@@ -248,7 +244,6 @@ public class VolumeManagerImpl implements VolumeManager {
     }
   }
 
-
   private void setOwnerCommitToDB(UserVolumeInfo oldOwnerVolumeList,
       UserVolumeInfo newOwnerVolumeList, OmVolumeArgs newOwnerVolumeArgs,
       String oldOwner) throws IOException {
@@ -269,44 +264,6 @@ public class VolumeManagerImpl implements VolumeManager {
       metadataManager.getVolumeTable().putWithBatch(batch,
           dbVolumeKey, newOwnerVolumeArgs);
       metadataManager.getStore().commitBatchOperation(batch);
-    }
-  }
-
-
-  /**
-   * Changes the Quota on a volume.
-   *
-   * @param volume - Name of the volume.
-   * @param quota - Quota in bytes.
-   *
-   * @throws IOException
-   */
-  @Override
-  public void setQuota(String volume, long quota) throws IOException {
-    Preconditions.checkNotNull(volume);
-    metadataManager.getLock().acquireLock(VOLUME_LOCK, volume);
-    try {
-      String dbVolumeKey = metadataManager.getVolumeKey(volume);
-      OmVolumeArgs volumeArgs =
-          metadataManager.getVolumeTable().get(dbVolumeKey);
-      if (volumeArgs == null) {
-        LOG.debug("volume:{} does not exist", volume);
-        throw new OMException(ResultCodes.VOLUME_NOT_FOUND);
-      }
-
-      Preconditions.checkState(volume.equals(volumeArgs.getVolume()));
-
-      volumeArgs.setQuotaInBytes(quota);
-
-      metadataManager.getVolumeTable().put(dbVolumeKey, volumeArgs);
-    } catch (IOException ex) {
-      if (!(ex instanceof OMException)) {
-        LOG.error("Changing volume quota failed for volume:{} quota:{}", volume,
-            quota, ex);
-      }
-      throw ex;
-    } finally {
-      metadataManager.getLock().releaseLock(VOLUME_LOCK, volume);
     }
   }
 
@@ -453,23 +410,11 @@ public class VolumeManagerImpl implements VolumeManager {
   @Override
   public List<OmVolumeArgs> listVolumes(String userName,
       String prefix, String startKey, int maxKeys) throws IOException {
-    metadataManager.getLock().acquireLock(USER_LOCK, userName);
+    metadataManager.getLock().acquireReadLock(USER_LOCK, userName);
     try {
-      List<OmVolumeArgs> volumes = metadataManager.listVolumes(
-          userName, prefix, startKey, maxKeys);
-      UserGroupInformation userUgi = ProtobufRpcEngine.Server.
-          getRemoteUser();
-      if (userUgi == null || !aclEnabled) {
-        return volumes;
-      }
-
-      List<OmVolumeArgs> filteredVolumes = volumes.stream().
-          filter(v -> v.getAclMap().
-              hasAccess(IAccessAuthorizer.ACLType.LIST, userUgi))
-          .collect(Collectors.toList());
-      return filteredVolumes;
+      return metadataManager.listVolumes(userName, prefix, startKey, maxKeys);
     } finally {
-      metadataManager.getLock().releaseLock(USER_LOCK, userName);
+      metadataManager.getLock().releaseReadLock(USER_LOCK, userName);
     }
   }
 

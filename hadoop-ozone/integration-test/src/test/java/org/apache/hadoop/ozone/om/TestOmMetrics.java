@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -19,11 +19,11 @@ package org.apache.hadoop.ozone.om;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyLong;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.client.BlockID;
@@ -32,20 +32,26 @@ import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.test.MetricsAsserts;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.Timeout;
 import org.mockito.Mockito;
 
 /**
  * Test for OM metrics.
  */
-@SuppressWarnings("deprecation")
 public class TestOmMetrics {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
   private MiniOzoneCluster cluster;
   private OzoneManager ozoneManager;
 
@@ -56,8 +62,6 @@ public class TestOmMetrics {
 
   /**
    * Create a MiniDFSCluster for testing.
-   *
-   * @throws IOException
    */
   @Before
   public void setup() throws Exception {
@@ -107,7 +111,7 @@ public class TestOmMetrics {
     assertCounter("NumVolumeCheckAccesses", 1L, omMetrics);
     assertCounter("NumVolumeDeletes", 1L, omMetrics);
     assertCounter("NumVolumeLists", 1L, omMetrics);
-    assertCounter("NumVolumes", 0L, omMetrics);
+    assertCounter("NumVolumes", 1L, omMetrics);
 
     ozoneManager.createVolume(null);
     ozoneManager.createVolume(null);
@@ -115,7 +119,9 @@ public class TestOmMetrics {
     ozoneManager.deleteVolume(null);
 
     omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumVolumes", 2L, omMetrics);
+
+    // Accounting 's3v' volume which is created by default.
+    assertCounter("NumVolumes", 3L, omMetrics);
 
 
     // inject exception to test for Failure Metrics
@@ -148,32 +154,21 @@ public class TestOmMetrics {
 
     // As last call for volumesOps does not increment numVolumes as those are
     // failed.
-    assertCounter("NumVolumes", 2L, omMetrics);
+    assertCounter("NumVolumes", 3L, omMetrics);
 
     cluster.restartOzoneManager();
-    assertCounter("NumVolumes", 2L, omMetrics);
+    assertCounter("NumVolumes", 3L, omMetrics);
 
 
   }
 
   @Test
-  @Ignore("Test failing because of table cache. Revisit later.")
   public void testBucketOps() throws IOException {
     BucketManager bucketManager =
         (BucketManager) HddsWhiteboxTestUtils.getInternalState(
             ozoneManager, "bucketManager");
     BucketManager mockBm = Mockito.spy(bucketManager);
 
-    S3BucketManager s3BucketManager =
-        (S3BucketManager) HddsWhiteboxTestUtils.getInternalState(
-            ozoneManager, "s3BucketManager");
-    S3BucketManager mockS3Bm = Mockito.spy(s3BucketManager);
-
-    Mockito.doNothing().when(mockS3Bm).createS3Bucket("random", "random");
-    Mockito.doNothing().when(mockS3Bm).deleteS3Bucket("random");
-    Mockito.doReturn(true).when(mockS3Bm).createOzoneVolumeIfNeeded(null);
-
-    Mockito.doNothing().when(mockBm).createBucket(null);
     Mockito.doNothing().when(mockBm).createBucket(null);
     Mockito.doNothing().when(mockBm).deleteBucket(null, null);
     Mockito.doReturn(null).when(mockBm).getBucketInfo(null, null);
@@ -182,6 +177,7 @@ public class TestOmMetrics {
 
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "bucketManager", mockBm);
+
     doBucketOps();
 
     MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
@@ -198,28 +194,8 @@ public class TestOmMetrics {
     ozoneManager.createBucket(null);
     ozoneManager.deleteBucket(null, null);
 
-    //Taking already existing value, as the same metrics is used over all the
-    // test cases.
-    long numVolumesOps = MetricsAsserts.getLongCounter("NumVolumeOps",
-        omMetrics);
-    long numVolumes = MetricsAsserts.getLongCounter("NumVolumes",
-        omMetrics);
-    long numVolumeCreates = MetricsAsserts.getLongCounter("NumVolumeCreates",
-        omMetrics);
-
-    ozoneManager.createS3Bucket("random", "random");
-    ozoneManager.createS3Bucket("random1", "random1");
-    ozoneManager.createS3Bucket("random2", "random2");
-    ozoneManager.deleteS3Bucket("random");
-
     omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumBuckets", 4L, omMetrics);
-
-    assertCounter("NumVolumeOps", numVolumesOps + 3, omMetrics);
-    assertCounter("NumVolumeCreates", numVolumeCreates + 3, omMetrics);
-    assertCounter("NumVolumes", numVolumes + 3, omMetrics);
-
-
+    assertCounter("NumBuckets", 2L, omMetrics);
 
     // inject exception to test for Failure Metrics
     Mockito.doThrow(exception).when(mockBm).createBucket(null);
@@ -233,11 +209,11 @@ public class TestOmMetrics {
     doBucketOps();
 
     omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumBucketOps", 18L, omMetrics);
-    assertCounter("NumBucketCreates", 8L, omMetrics);
+    assertCounter("NumBucketOps", 14L, omMetrics);
+    assertCounter("NumBucketCreates", 5L, omMetrics);
     assertCounter("NumBucketUpdates", 2L, omMetrics);
     assertCounter("NumBucketInfos", 2L, omMetrics);
-    assertCounter("NumBucketDeletes", 4L, omMetrics);
+    assertCounter("NumBucketDeletes", 3L, omMetrics);
     assertCounter("NumBucketLists", 2L, omMetrics);
 
     assertCounter("NumBucketCreateFails", 1L, omMetrics);
@@ -246,10 +222,10 @@ public class TestOmMetrics {
     assertCounter("NumBucketDeleteFails", 1L, omMetrics);
     assertCounter("NumBucketListFails", 1L, omMetrics);
 
-    assertCounter("NumBuckets", 4L, omMetrics);
+    assertCounter("NumBuckets", 2L, omMetrics);
 
     cluster.restartOzoneManager();
-    assertCounter("NumBuckets", 4L, omMetrics);
+    assertCounter("NumBuckets", 2L, omMetrics);
   }
 
   @Test
@@ -257,20 +233,28 @@ public class TestOmMetrics {
     KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
         .getInternalState(ozoneManager, "keyManager");
     KeyManager mockKm = Mockito.spy(keyManager);
+    BucketManager mockBm = Mockito.mock(BucketManager.class);
 
-    Mockito.doReturn(null).when(mockKm).openKey(null);
-    Mockito.doNothing().when(mockKm).deleteKey(null);
-    Mockito.doReturn(null).when(mockKm).lookupKey(null, "");
-    Mockito.doReturn(null).when(mockKm).listKeys(null, null, null, null, 0);
-    Mockito.doReturn(null).when(mockKm).listTrash(
-        null, null, null, null, 0);
-    Mockito.doNothing().when(mockKm).commitKey(any(OmKeyArgs.class), anyLong());
-    Mockito.doReturn(null).when(mockKm).initiateMultipartUpload(
-        any(OmKeyArgs.class));
+    OmBucketInfo mockBucket = OmBucketInfo.newBuilder()
+        .setVolumeName("").setBucketName("")
+        .build();
+    Mockito.when(mockBm.getBucketInfo(any(), any())).thenReturn(mockBucket);
+    Mockito.doReturn(null).when(mockKm).openKey(any());
+    Mockito.doNothing().when(mockKm).deleteKey(any());
+    Mockito.doReturn(null).when(mockKm).lookupKey(any(), any());
+    Mockito.doReturn(null).when(mockKm).listKeys(any(), any(), any(), any(),
+        anyInt());
+    Mockito.doReturn(null).when(mockKm).listTrash(any(), any(), any(), any(),
+        anyInt());
+    Mockito.doNothing().when(mockKm).commitKey(any(), anyLong());
+    Mockito.doReturn(null).when(mockKm).initiateMultipartUpload(any());
 
     HddsWhiteboxTestUtils.setInternalState(
+        ozoneManager, "bucketManager", mockBm);
+    HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "keyManager", mockKm);
-    doKeyOps();
+    OmKeyArgs keyArgs = createKeyArgs();
+    doKeyOps(keyArgs);
 
     MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
     assertCounter("NumKeyOps", 7L, omMetrics);
@@ -283,34 +267,32 @@ public class TestOmMetrics {
     assertCounter("NumInitiateMultipartUploads", 1L, omMetrics);
 
 
-    ozoneManager.openKey(null);
-    ozoneManager.commitKey(createKeyArgs(), 0);
-    ozoneManager.openKey(null);
-    ozoneManager.commitKey(createKeyArgs(), 0);
-    ozoneManager.openKey(null);
-    ozoneManager.commitKey(createKeyArgs(), 0);
-    ozoneManager.deleteKey(null);
+    ozoneManager.openKey(keyArgs);
+    ozoneManager.commitKey(keyArgs, 0);
+    ozoneManager.openKey(keyArgs);
+    ozoneManager.commitKey(keyArgs, 0);
+    ozoneManager.openKey(keyArgs);
+    ozoneManager.commitKey(keyArgs, 0);
+    ozoneManager.deleteKey(keyArgs);
 
 
     omMetrics = getMetrics("OMMetrics");
     assertCounter("NumKeys", 2L, omMetrics);
 
     // inject exception to test for Failure Metrics
-    Mockito.doThrow(exception).when(mockKm).openKey(null);
-    Mockito.doThrow(exception).when(mockKm).deleteKey(null);
-    Mockito.doThrow(exception).when(mockKm).lookupKey(null, "");
+    Mockito.doThrow(exception).when(mockKm).openKey(any());
+    Mockito.doThrow(exception).when(mockKm).deleteKey(any());
+    Mockito.doThrow(exception).when(mockKm).lookupKey(any(), any());
     Mockito.doThrow(exception).when(mockKm).listKeys(
-        null, null, null, null, 0);
+        any(), any(), any(), any(), anyInt());
     Mockito.doThrow(exception).when(mockKm).listTrash(
-        null, null, null, null, 0);
-    Mockito.doThrow(exception).when(mockKm).commitKey(any(OmKeyArgs.class),
-        anyLong());
-    Mockito.doThrow(exception).when(mockKm).initiateMultipartUpload(
-        any(OmKeyArgs.class));
+        any(), any(), any(), any(), anyInt());
+    Mockito.doThrow(exception).when(mockKm).commitKey(any(), anyLong());
+    Mockito.doThrow(exception).when(mockKm).initiateMultipartUpload(any());
 
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "keyManager", mockKm);
-    doKeyOps();
+    doKeyOps(keyArgs);
 
     omMetrics = getMetrics("OMMetrics");
     assertCounter("NumKeyOps", 21L, omMetrics);
@@ -404,39 +386,39 @@ public class TestOmMetrics {
   /**
    * Test key operations with ignoring thrown exception.
    */
-  private void doKeyOps() {
+  private void doKeyOps(OmKeyArgs keyArgs) {
     try {
-      ozoneManager.openKey(null);
+      ozoneManager.openKey(keyArgs);
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.deleteKey(null);
+      ozoneManager.deleteKey(keyArgs);
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.lookupKey(null);
+      ozoneManager.lookupKey(keyArgs);
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.listKeys(null, null, null, null, 0);
+      ozoneManager.listKeys("", "", null, null, 0);
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.listTrash(null, null, null, null, 0);
+      ozoneManager.listTrash("", "", null, null, 0);
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.commitKey(createKeyArgs(), 0);
+      ozoneManager.commitKey(keyArgs, 0);
     } catch (IOException ignored) {
     }
 
     try {
-      ozoneManager.initiateMultipartUpload(null);
+      ozoneManager.initiateMultipartUpload(keyArgs);
     } catch (IOException ignored) {
     }
 
@@ -444,12 +426,12 @@ public class TestOmMetrics {
 
   private OmKeyArgs createKeyArgs() {
     OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
-        .setBlockID(new BlockID(new ContainerBlockID(1, 1))).build();
+        .setBlockID(new BlockID(new ContainerBlockID(1, 1)))
+        .build();
     keyLocationInfo.setCreateVersion(0);
-    List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
-    omKeyLocationInfoList.add(keyLocationInfo);
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setLocationInfoList(
-        omKeyLocationInfoList).build();
-    return keyArgs;
+
+    return new OmKeyArgs.Builder()
+        .setLocationInfoList(Collections.singletonList(keyLocationInfo))
+        .build();
   }
 }

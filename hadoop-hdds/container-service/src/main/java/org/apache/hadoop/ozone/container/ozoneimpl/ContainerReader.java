@@ -18,37 +18,27 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import com.google.common.base.Preconditions;
-import com.google.common.primitives.Longs;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.container.common.helpers
-    .StorageContainerException;
-import org.apache.hadoop.hdfs.DFSUtil;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.common.Storage;
-import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueBlockIterator;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
-import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
-import java.util.List;
+
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.common.Storage;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class used to read .container files from Volume and build container map.
@@ -81,12 +71,12 @@ public class ContainerReader implements Runnable {
       ContainerReader.class);
   private HddsVolume hddsVolume;
   private final ContainerSet containerSet;
-  private final OzoneConfiguration config;
+  private final ConfigurationSource config;
   private final File hddsVolumeDir;
   private final MutableVolumeSet volumeSet;
 
   ContainerReader(MutableVolumeSet volSet, HddsVolume volume, ContainerSet cset,
-                  OzoneConfiguration conf) {
+      ConfigurationSource conf) {
     Preconditions.checkNotNull(volume);
     this.hddsVolume = volume;
     this.hddsVolumeDir = hddsVolume.getHddsRootDir();
@@ -130,6 +120,7 @@ public class ContainerReader implements Runnable {
       return;
     }
 
+    LOG.info("Start to verify containers on volume {}", hddsVolumeRootDir);
     for (File scmLoc : scmDir) {
       File currentDir = new File(scmLoc, Storage.STORAGE_DIR_CURRENT);
       File[] containerTopDirs = currentDir.listFiles();
@@ -154,6 +145,7 @@ public class ContainerReader implements Runnable {
         }
       }
     }
+    LOG.info("Finish verifying containers on volume {}", hddsVolumeRootDir);
   }
 
   private void verifyContainerFile(long containerID, File containerFile) {
@@ -191,36 +183,8 @@ public class ContainerReader implements Runnable {
         KeyValueContainerUtil.parseKVContainerData(kvContainerData, config);
         KeyValueContainer kvContainer = new KeyValueContainer(
             kvContainerData, config);
-        try(ReferenceCountedDB containerDB = BlockUtils.getDB(kvContainerData,
-            config)) {
-          MetadataKeyFilters.KeyPrefixFilter filter =
-              new MetadataKeyFilters.KeyPrefixFilter()
-                  .addFilter(OzoneConsts.DELETING_KEY_PREFIX);
-          int numPendingDeletionBlocks =
-              containerDB.getStore().getSequentialRangeKVs(null,
-                  Integer.MAX_VALUE, filter)
-                  .size();
-          kvContainerData.incrPendingDeletionBlocks(numPendingDeletionBlocks);
-          byte[] delTxnId = containerDB.getStore().get(
-              DFSUtil.string2Bytes(OzoneConsts.DELETE_TRANSACTION_KEY_PREFIX));
-          if (delTxnId != null) {
-            kvContainerData
-                .updateDeleteTransactionId(Longs.fromByteArray(delTxnId));
-          }
-          // sets the BlockCommitSequenceId.
-          byte[] bcsId = containerDB.getStore().get(DFSUtil.string2Bytes(
-              OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX));
-          if (bcsId != null) {
-            kvContainerData
-                .updateBlockCommitSequenceId(Longs.fromByteArray(bcsId));
-          }
-          if (kvContainer.getContainerState()
-              == ContainerProtos.ContainerDataProto.State.OPEN) {
-            // commitSpace for Open Containers relies on usedBytes
-            initializeUsedBytes(kvContainer);
-          }
-          containerSet.addContainer(kvContainer);
-        }
+
+        containerSet.addContainer(kvContainer);
       } else {
         throw new StorageContainerException("Container File is corrupted. " +
             "ContainerType is KeyValueContainer but cast to " +
@@ -232,30 +196,6 @@ public class ContainerReader implements Runnable {
       throw new StorageContainerException("Unrecognized ContainerType " +
           containerData.getContainerType(),
           ContainerProtos.Result.UNKNOWN_CONTAINER_TYPE);
-    }
-  }
-
-  private void initializeUsedBytes(KeyValueContainer container)
-      throws IOException {
-    try (KeyValueBlockIterator blockIter = new KeyValueBlockIterator(
-        container.getContainerData().getContainerID(),
-        new File(container.getContainerData().getContainerPath()))) {
-      long usedBytes = 0;
-
-      while (blockIter.hasNext()) {
-        BlockData block = blockIter.nextBlock();
-        long blockLen = 0;
-
-        List<ContainerProtos.ChunkInfo> chunkInfoList = block.getChunks();
-        for (ContainerProtos.ChunkInfo chunk : chunkInfoList) {
-          ChunkInfo info = ChunkInfo.getFromProtoBuf(chunk);
-          blockLen += info.getLen();
-        }
-
-        usedBytes += blockLen;
-      }
-
-      container.getContainerData().setBytesUsed(usedBytes);
     }
   }
 }

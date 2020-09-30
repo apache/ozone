@@ -23,6 +23,7 @@ import java.io.IOException;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,9 +77,8 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumVolumeDeletes();
 
-    OMResponse.Builder omResponse = OMResponse.newBuilder().setCmdType(
-        OzoneManagerProtocolProtos.Type.DeleteVolume).setStatus(
-        OzoneManagerProtocolProtos.Status.OK).setSuccess(true);
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean acquiredUserLock = false;
@@ -98,16 +98,6 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
           VOLUME_LOCK, volume);
 
       OmVolumeArgs omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
-
-      // Check if this transaction is a replay of ratis logs.
-      // If this is a replay, then the response has already been returned to
-      // the client. So take no further action and return a dummy
-      // OMClientResponse.
-      if (isReplay(ozoneManager, omVolumeArgs, transactionLogIndex)) {
-        LOG.debug("Replayed Transaction {} ignored. Request: {}",
-            transactionLogIndex, deleteVolumeRequest);
-        return new OMVolumeDeleteResponse(createReplayOMResponse(omResponse));
-      }
 
       owner = omVolumeArgs.getOwnerName();
       acquiredUserLock = omMetadataManager.getLock().acquireWriteLock(USER_LOCK,

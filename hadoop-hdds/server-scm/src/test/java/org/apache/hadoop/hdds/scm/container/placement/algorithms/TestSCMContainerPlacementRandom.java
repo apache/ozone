@@ -19,10 +19,11 @@ package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -30,6 +31,9 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.junit.Assert;
 import org.junit.Test;
+import static junit.framework.TestCase.assertEquals;
+import static junit.framework.TestCase.assertTrue;
+import static org.junit.Assert.assertFalse;
 import static org.mockito.Matchers.anyObject;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.when;
@@ -42,7 +46,7 @@ public class TestSCMContainerPlacementRandom {
   @Test
   public void chooseDatanodes() throws SCMException {
     //given
-    Configuration conf = new OzoneConfiguration();
+    ConfigurationSource conf = new OzoneConfiguration();
 
     List<DatanodeDetails> datanodes = new ArrayList<>();
     for (int i = 0; i < 5; i++) {
@@ -86,5 +90,41 @@ public class TestSCMContainerPlacementRandom {
           datanodes.get(2), datanode0Details);
 
     }
+  }
+
+  @Test
+  public void testPlacementPolicySatisified() {
+    //given
+    ConfigurationSource conf = new OzoneConfiguration();
+
+    List<DatanodeDetails> datanodes = new ArrayList<>();
+    for (int i = 0; i < 3; i++) {
+      datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    }
+
+    NodeManager mockNodeManager = Mockito.mock(NodeManager.class);
+    SCMContainerPlacementRandom scmContainerPlacementRandom =
+        new SCMContainerPlacementRandom(mockNodeManager, conf, null, true,
+            null);
+    ContainerPlacementStatus status =
+        scmContainerPlacementRandom.validateContainerPlacement(datanodes, 3);
+    assertTrue(status.isPolicySatisfied());
+    assertEquals(0, status.misReplicationCount());
+
+    status = scmContainerPlacementRandom.validateContainerPlacement(
+        new ArrayList<DatanodeDetails>(), 3);
+    assertFalse(status.isPolicySatisfied());
+
+    // Only expect 1 more replica to give us one rack on this policy.
+    assertEquals(1, status.misReplicationCount(), 3);
+
+    datanodes = new ArrayList<DatanodeDetails>();
+    datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    status = scmContainerPlacementRandom.validateContainerPlacement(
+        datanodes, 3);
+    assertTrue(status.isPolicySatisfied());
+
+    // Only expect 1 more replica to give us one rack on this policy.
+    assertEquals(0, status.misReplicationCount(), 3);
   }
 }

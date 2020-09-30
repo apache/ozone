@@ -285,7 +285,7 @@ public class CertificateCodec {
   }
 
   /**
-   * Returns the Certificate holder from X509Ceritificate class.
+   * Returns the Certificate holder from X509Certificate class.
    *
    * @param x509cert - Certificate class.
    * @return X509CertificateHolder

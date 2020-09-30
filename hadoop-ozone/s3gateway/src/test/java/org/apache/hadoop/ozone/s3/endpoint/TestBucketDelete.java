@@ -25,6 +25,7 @@ import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.ObjectStoreStub;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
@@ -41,7 +42,7 @@ import org.junit.Test;
 public class TestBucketDelete {
 
   private String bucketName = OzoneConsts.BUCKET;
-  private OzoneClientStub clientStub;
+  private OzoneClient clientStub;
   private ObjectStore objectStoreStub;
   private BucketEndpoint bucketEndpoint;
 
@@ -52,7 +53,7 @@ public class TestBucketDelete {
     clientStub = new OzoneClientStub();
     objectStoreStub = clientStub.getObjectStore();
 
-    objectStoreStub.createS3Bucket(OzoneConsts.OZONE, bucketName);
+    clientStub.getObjectStore().createS3Bucket(bucketName);
 
     // Create HeadBucket and setClient to OzoneClientStub
     bucketEndpoint = new BucketEndpoint();

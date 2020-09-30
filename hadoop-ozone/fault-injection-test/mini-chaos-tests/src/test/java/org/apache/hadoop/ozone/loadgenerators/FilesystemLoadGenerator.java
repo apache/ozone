@@ -20,8 +20,6 @@ package org.apache.hadoop.ozone.loadgenerators;
 
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.ozone.utils.LoadBucket;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 
@@ -32,9 +30,6 @@ import java.nio.ByteBuffer;
  * apis.
  */
 public class FilesystemLoadGenerator extends LoadGenerator {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(FilesystemLoadGenerator.class);
-
 
   private final LoadBucket fsBucket;
   private final DataBuffer dataBuffer;
@@ -45,25 +40,19 @@ public class FilesystemLoadGenerator extends LoadGenerator {
   }
 
   @Override
-  public String generateLoad() throws Exception {
+  public void generateLoad() throws Exception {
     int index = RandomUtils.nextInt();
     ByteBuffer buffer = dataBuffer.getBuffer(index);
-    String keyName = getKeyName(index, name());
+    String keyName = getKeyName(index);
     fsBucket.writeKey(true, buffer, keyName);
 
     fsBucket.readKey(true, buffer, keyName);
 
     fsBucket.deleteKey(true, keyName);
-    return keyName;
   }
 
   @Override
   public void initialize() {
     // Nothing to do here
-  }
-
-  @Override
-  public String name() {
-    return "FileSystem";
   }
 }

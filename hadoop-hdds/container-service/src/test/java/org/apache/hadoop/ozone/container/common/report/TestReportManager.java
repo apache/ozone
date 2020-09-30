@@ -17,16 +17,15 @@
 
 package org.apache.hadoop.ozone.container.common.report;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.junit.Test;
-import org.mockito.Mockito;
-
 import java.util.concurrent.ScheduledExecutorService;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+
+import org.junit.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import org.mockito.Mockito;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -37,7 +36,7 @@ public class TestReportManager {
 
   @Test
   public void testReportManagerInit() {
-    Configuration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     StateContext dummyContext = Mockito.mock(StateContext.class);
     ReportPublisher dummyPublisher = Mockito.mock(ReportPublisher.class);
     ReportManager.Builder builder = ReportManager.newBuilder(conf);

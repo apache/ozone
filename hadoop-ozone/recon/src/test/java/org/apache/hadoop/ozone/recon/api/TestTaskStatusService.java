@@ -20,51 +20,40 @@ package org.apache.hadoop.ozone.recon.api;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Injector;
-import org.apache.hadoop.ozone.recon.persistence.AbstractSqlDatabaseTest;
-import org.hadoop.ozone.recon.schema.ReconTaskSchemaDefinition;
+
+import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
-import org.jooq.Configuration;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
 import javax.ws.rs.core.Response;
 
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Test for Task Status Service.
  */
-public class TestTaskStatusService extends AbstractSqlDatabaseTest {
+public class TestTaskStatusService extends AbstractReconSqlDBTest {
   private TaskStatusService taskStatusService;
-  private Configuration sqlConfiguration;
-  private Injector childInjector;
 
   @Before
-  public void setUp() throws SQLException {
-    sqlConfiguration = getInjector().getInstance((Configuration.class));
+  public void setUp() {
     Injector parentInjector = getInjector();
-    childInjector = parentInjector.createChildInjector(new AbstractModule() {
+    parentInjector.createChildInjector(new AbstractModule() {
       @Override
       protected void configure() {
         taskStatusService = new TaskStatusService();
-        bind(ReconTaskStatusDao.class).
-            toInstance(new ReconTaskStatusDao(sqlConfiguration));
         bind(TaskStatusService.class).toInstance(taskStatusService);
       }
     });
-    ReconTaskSchemaDefinition schemaDefinition = getInjector().
-        getInstance(ReconTaskSchemaDefinition.class);
-    schemaDefinition.initializeSchema();
   }
 
   @Test
   public void testGetTaskTimes() {
-    ReconTaskStatusDao reconTaskStatusDao =
-        new ReconTaskStatusDao(sqlConfiguration);
+    ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
 
     ReconTaskStatus reconTaskStatusRecord = new ReconTaskStatus(
         "Dummy_Task", System.currentTimeMillis(), 0L);

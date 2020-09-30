@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.om.request.bucket;
 
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -48,6 +50,9 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     doPreExecute(volumeName, bucketName);
+    // Verify invalid bucket name throws exception
+    LambdaTestUtils.intercept(OMException.class, "Invalid bucket name: b1",
+        () -> doPreExecute("volume1", "b1"));
   }
 
 
@@ -163,6 +168,8 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
 
     Assert.assertEquals(bucketInfoFromProto.getCreationTime(),
         dbBucketInfo.getCreationTime());
+    Assert.assertEquals(bucketInfoFromProto.getModificationTime(),
+        dbBucketInfo.getModificationTime());
     Assert.assertEquals(bucketInfoFromProto.getAcls(),
         dbBucketInfo.getAcls());
     Assert.assertEquals(bucketInfoFromProto.getIsVersionEnabled(),
@@ -211,33 +218,5 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
             .setVolume(volumeName).setAdminName(UUID.randomUUID().toString())
             .setOwnerName(UUID.randomUUID().toString()).build();
     TestOMRequestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
-  }
-
-  @Test
-  public void testReplayRequest() throws Exception {
-
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    OMRequest originalRequest = TestOMRequestUtils.createBucketRequest(
-        bucketName, volumeName, false, StorageTypeProto.SSD);
-    OMBucketCreateRequest omBucketCreateRequest = new OMBucketCreateRequest(
-        originalRequest);
-
-    // Manually add volume to DB table
-    addCreateVolumeToTable(volumeName, omMetadataManager);
-
-    // Execute the original request
-    omBucketCreateRequest.preExecute(ozoneManager);
-    omBucketCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-        ozoneManagerDoubleBufferHelper);
-
-    // Replay the transaction - Execute the same request again
-    OMClientResponse omClientResponse =
-        omBucketCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
-
-    // Replay should result in Replay response
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
-        omClientResponse.getOMResponse().getStatus());
   }
 }

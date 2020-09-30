@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.stream.Collectors;
@@ -294,41 +295,50 @@ public class SCMNodeManager implements NodeManager {
    *                        independent
    *                        of Namenode if required.
    * @param nodeReport      NodeReport.
-   * @return SCMHeartbeatResponseProto
+   * @return SCMRegisteredResponseProto
    */
   @Override
   public RegisteredCommand register(
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
       PipelineReportsProto pipelineReportsProto) {
 
-    InetAddress dnAddress = Server.getRemoteIp();
-    if (dnAddress != null) {
-      // Mostly called inside an RPC, update ip and peer hostname
-      datanodeDetails.setHostName(dnAddress.getHostName());
-      datanodeDetails.setIpAddress(dnAddress.getHostAddress());
-    }
-    try {
-      String dnsName;
-      String networkLocation;
-      datanodeDetails.setNetworkName(datanodeDetails.getUuidString());
-      if (useHostname) {
-        dnsName = datanodeDetails.getHostName();
-      } else {
-        dnsName = datanodeDetails.getIpAddress();
+    if (!isNodeRegistered(datanodeDetails)) {
+      InetAddress dnAddress = Server.getRemoteIp();
+      if (dnAddress != null) {
+        // Mostly called inside an RPC, update ip and peer hostname
+        datanodeDetails.setHostName(dnAddress.getHostName());
+        datanodeDetails.setIpAddress(dnAddress.getHostAddress());
       }
-      networkLocation = nodeResolve(dnsName);
-      if (networkLocation != null) {
-        datanodeDetails.setNetworkLocation(networkLocation);
-      }
-      nodeStateManager.addNode(datanodeDetails);
-      clusterMap.add(datanodeDetails);
-      addEntryTodnsToUuidMap(dnsName, datanodeDetails.getUuidString());
-      // Updating Node Report, as registration is successful
-      processNodeReport(datanodeDetails, nodeReport);
-      LOG.info("Registered Data node : {}", datanodeDetails);
-    } catch (NodeAlreadyExistsException e) {
-      if (LOG.isTraceEnabled()) {
-        LOG.trace("Datanode is already registered. Datanode: {}",
+      try {
+        String dnsName;
+        String networkLocation;
+        datanodeDetails.setNetworkName(datanodeDetails.getUuidString());
+        if (useHostname) {
+          dnsName = datanodeDetails.getHostName();
+        } else {
+          dnsName = datanodeDetails.getIpAddress();
+        }
+        networkLocation = nodeResolve(dnsName);
+        if (networkLocation != null) {
+          datanodeDetails.setNetworkLocation(networkLocation);
+        }
+
+        clusterMap.add(datanodeDetails);
+        nodeStateManager.addNode(datanodeDetails);
+        // Check that datanode in nodeStateManager has topology parent set
+        DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
+        Preconditions.checkState(dn.getParent() != null);
+        addEntryTodnsToUuidMap(dnsName, datanodeDetails.getUuidString());
+        // Updating Node Report, as registration is successful
+        processNodeReport(datanodeDetails, nodeReport);
+        LOG.info("Registered Data node : {}", datanodeDetails);
+      } catch (NodeAlreadyExistsException e) {
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("Datanode is already registered. Datanode: {}",
+              datanodeDetails.toString());
+        }
+      } catch (NodeNotFoundException e) {
+        LOG.error("Cannot find datanode {} from nodeStateManager",
             datanodeDetails.toString());
       }
     }
@@ -657,6 +667,26 @@ public class SCMNodeManager implements NodeManager {
   }
 
   /**
+   * Returns the max of no healthy volumes reported out of the set
+   * of datanodes constituting the pipeline.
+   */
+  @Override
+  public int getNumHealthyVolumes(List<DatanodeDetails> dnList) {
+    List<Integer> volumeCountList = new ArrayList<>(dnList.size());
+    for (DatanodeDetails dn : dnList) {
+      try {
+        volumeCountList.add(nodeStateManager.getNode(dn).
+                getHealthyVolumeCount());
+      } catch (NodeNotFoundException e) {
+        LOG.warn("Cannot generate NodeStat, datanode {} not found.",
+                dn.getUuid());
+      }
+    }
+    Preconditions.checkArgument(!volumeCountList.isEmpty());
+    return Collections.max(volumeCountList);
+  }
+
+  /**
    * Get set of pipelines a datanode is part of.
    *
    * @param datanodeDetails - datanodeID
@@ -771,7 +801,8 @@ public class SCMNodeManager implements NodeManager {
       LOG.warn("uuid is null");
       return null;
     }
-    DatanodeDetails temp = DatanodeDetails.newBuilder().setUuid(uuid).build();
+    DatanodeDetails temp = DatanodeDetails.newBuilder()
+        .setUuid(UUID.fromString(uuid)).build();
     try {
       return nodeStateManager.getNode(temp);
     } catch (NodeNotFoundException e) {
@@ -801,7 +832,8 @@ public class SCMNodeManager implements NodeManager {
     }
 
     for (String uuid : uuids) {
-      DatanodeDetails temp = DatanodeDetails.newBuilder().setUuid(uuid).build();
+      DatanodeDetails temp = DatanodeDetails.newBuilder()
+          .setUuid(UUID.fromString(uuid)).build();
       try {
         results.add(nodeStateManager.getNode(temp));
       } catch (NodeNotFoundException e) {

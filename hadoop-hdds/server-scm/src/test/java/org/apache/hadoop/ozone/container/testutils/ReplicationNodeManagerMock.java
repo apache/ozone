@@ -316,7 +316,7 @@ public class ReplicationNodeManagerMock implements NodeManager {
    *
    * @param dd DatanodeDetailsProto
    * @param nodeReport NodeReportProto
-   * @return SCMHeartbeatResponseProto
+   * @return SCMRegisteredResponseProto
    */
   @Override
   public RegisteredCommand register(DatanodeDetails dd,
@@ -399,5 +399,10 @@ public class ReplicationNodeManagerMock implements NodeManager {
   @Override
   public NetworkTopology getClusterNetworkTopologyMap() {
     return null;
+  }
+
+  @Override
+  public int getNumHealthyVolumes(List<DatanodeDetails> dnList) {
+    return 0;
   }
 }

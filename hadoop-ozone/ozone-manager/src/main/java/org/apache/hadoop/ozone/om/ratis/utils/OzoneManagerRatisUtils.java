@@ -18,7 +18,13 @@
 package org.apache.hadoop.ozone.om.ratis.utils;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketDeleteRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketSetPropertyRequest;
@@ -28,20 +34,21 @@ import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketSetAclRequest;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeysDeleteRequest;
 import org.apache.hadoop.ozone.om.request.key.OMAllocateBlockRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyDeleteRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRenameRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeysRenameRequest;
+import org.apache.hadoop.ozone.om.request.key.OMTrashRecoverRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixSetAclRequest;
-import org.apache.hadoop.ozone.om.request.s3.bucket.S3BucketCreateRequest;
-import org.apache.hadoop.ozone.om.request.s3.bucket.S3BucketDeleteRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3InitiateMultipartUploadRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadCommitPartRequest;
@@ -62,9 +69,14 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.ratis.util.FileUtils;
 import org.rocksdb.RocksDBException;
 
 import java.io.IOException;
+import java.nio.file.Path;
+
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_TABLE;
 
 /**
  * Utility class used by OzoneManager HA.
@@ -114,18 +126,18 @@ public final class OzoneManagerRatisUtils {
       return new OMKeyCommitRequest(omRequest);
     case DeleteKey:
       return new OMKeyDeleteRequest(omRequest);
+    case DeleteKeys:
+      return new OMKeysDeleteRequest(omRequest);
     case RenameKey:
       return new OMKeyRenameRequest(omRequest);
+    case RenameKeys:
+      return new OMKeysRenameRequest(omRequest);
     case CreateDirectory:
       return new OMDirectoryCreateRequest(omRequest);
     case CreateFile:
       return new OMFileCreateRequest(omRequest);
     case PurgeKeys:
       return new OMKeyPurgeRequest(omRequest);
-    case CreateS3Bucket:
-      return new S3BucketCreateRequest(omRequest);
-    case DeleteS3Bucket:
-      return new S3BucketDeleteRequest(omRequest);
     case InitiateMultiPartUpload:
       return new S3InitiateMultipartUploadRequest(omRequest);
     case CommitMultiPartUpload:
@@ -146,6 +158,8 @@ public final class OzoneManagerRatisUtils {
       return new OMRenewDelegationTokenRequest(omRequest);
     case GetS3Secret:
       return new S3GetSecretRequest(omRequest);
+    case RecoverTrash:
+      return new OMTrashRecoverRequest(omRequest);
     default:
       throw new IllegalStateException("Unrecognized write command " +
           "type request" + cmdType);
@@ -214,5 +228,84 @@ public final class OzoneManagerRatisUtils {
         return Status.INTERNAL_ERROR;
       }
     }
+  }
+
+  /**
+   * Obtain OMTransactionInfo from Checkpoint.
+   */
+  public static OMTransactionInfo getTrxnInfoFromCheckpoint(
+      OzoneConfiguration conf, Path dbPath) throws Exception {
+
+    if (dbPath != null) {
+      Path dbDir = dbPath.getParent();
+      Path dbFile = dbPath.getFileName();
+      if (dbDir != null && dbFile != null) {
+        return getTransactionInfoFromDB(conf, dbDir, dbFile.toString());
+      }
+    }
+    
+    throw new IOException("Checkpoint " + dbPath + " does not have proper " +
+        "DB location");
+  }
+
+  /**
+   * Obtain Transaction info from DB.
+   * @param tempConfig
+   * @param dbDir path to DB
+   * @return OMTransactionInfo
+   * @throws Exception
+   */
+  private static OMTransactionInfo getTransactionInfoFromDB(
+      OzoneConfiguration tempConfig, Path dbDir, String dbName)
+      throws Exception {
+    DBStore dbStore = OmMetadataManagerImpl.loadDB(tempConfig, dbDir.toFile(),
+        dbName);
+
+    Table<String, OMTransactionInfo> transactionInfoTable =
+        dbStore.getTable(TRANSACTION_INFO_TABLE,
+            String.class, OMTransactionInfo.class);
+
+    OMTransactionInfo omTransactionInfo =
+        transactionInfoTable.get(TRANSACTION_INFO_KEY);
+    dbStore.close();
+
+    if (omTransactionInfo == null) {
+      throw new IOException("Failed to read OMTransactionInfo from DB " +
+          dbName + " at " + dbDir);
+    }
+    return omTransactionInfo;
+  }
+
+  /**
+   * Verify transaction info with provided lastAppliedIndex.
+   *
+   * If transaction info transaction Index is less than or equal to
+   * lastAppliedIndex, return false, else return true.
+   * @param omTransactionInfo
+   * @param lastAppliedIndex
+   * @param leaderId
+   * @param newDBlocation
+   * @return boolean
+   */
+  public static boolean verifyTransactionInfo(
+      OMTransactionInfo omTransactionInfo,
+      long lastAppliedIndex,
+      String leaderId, Path newDBlocation) {
+    if (omTransactionInfo.getTransactionIndex() <= lastAppliedIndex) {
+      OzoneManager.LOG.error("Failed to install checkpoint from OM leader: {}" +
+              ". The last applied index: {} is greater than or equal to the " +
+              "checkpoint's applied index: {}. Deleting the downloaded " +
+              "checkpoint {}", leaderId, lastAppliedIndex,
+          omTransactionInfo.getTransactionIndex(), newDBlocation);
+      try {
+        FileUtils.deleteFully(newDBlocation);
+      } catch (IOException e) {
+        OzoneManager.LOG.error("Failed to fully delete the downloaded DB " +
+            "checkpoint {} from OM leader {}.", newDBlocation, leaderId, e);
+      }
+      return false;
+    }
+
+    return true;
   }
 }

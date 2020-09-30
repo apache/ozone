@@ -97,8 +97,8 @@ public interface ChunkManager {
     // if applicable
   }
 
-  default void finishWriteChunk(KeyValueContainer kvContainer, BlockID blockID,
-      ChunkInfo info) throws IOException {
+  default void finishWriteChunks(KeyValueContainer kvContainer,
+      BlockData blockData) throws IOException {
     // no-op
   }
 }

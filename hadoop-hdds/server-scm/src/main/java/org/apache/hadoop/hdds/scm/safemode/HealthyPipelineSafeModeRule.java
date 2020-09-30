@@ -19,20 +19,21 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import java.util.HashSet;
 import java.util.Set;
-import org.apache.hadoop.conf.Configuration;
+
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.TypedEvent;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class defining Safe mode exit criteria for Pipelines.
@@ -52,7 +53,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   HealthyPipelineSafeModeRule(String ruleName, EventQueue eventQueue,
       PipelineManager pipelineManager,
-      SCMSafeModeManager manager, Configuration configuration) {
+      SCMSafeModeManager manager, ConfigurationSource configuration) {
     super(manager, ruleName, eventQueue);
     healthyPipelinesPercent =
         configuration.getDouble(HddsConfigKeys.
@@ -105,10 +106,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   @Override
   protected boolean validate() {
-    if (currentHealthyPipelineCount >= healthyPipelineThresholdCount) {
-      return true;
-    }
-    return false;
+    return currentHealthyPipelineCount >= healthyPipelineThresholdCount;
   }
 
   @Override
@@ -148,5 +146,12 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   @VisibleForTesting
   public int getHealthyPipelineThresholdCount() {
     return healthyPipelineThresholdCount;
+  }
+
+  @Override
+  public String getStatusText() {
+    return "currentHealthyPipelineCount " + this.currentHealthyPipelineCount
+        + " >= healthyPipelineThresholdCount "
+        + this.healthyPipelineThresholdCount;
   }
 }

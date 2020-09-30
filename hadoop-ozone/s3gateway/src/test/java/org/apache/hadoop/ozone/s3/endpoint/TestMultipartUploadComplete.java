@@ -21,6 +21,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
@@ -50,14 +51,13 @@ import static org.mockito.Mockito.when;
 
 public class TestMultipartUploadComplete {
 
-  private final static ObjectEndpoint REST = new ObjectEndpoint();;
-  private final static OzoneClientStub CLIENT = new OzoneClientStub();
+  private final static ObjectEndpoint REST = new ObjectEndpoint();
+  private final static OzoneClient CLIENT = new OzoneClientStub();
 
   @BeforeClass
   public static void setUp() throws Exception {
 
-    CLIENT.getObjectStore().createS3Bucket(OzoneConsts.OZONE,
-        OzoneConsts.S3_BUCKET);
+    CLIENT.getObjectStore().createS3Bucket(OzoneConsts.S3_BUCKET);
 
 
     HttpHeaders headers = Mockito.mock(HttpHeaders.class);
@@ -77,7 +77,7 @@ public class TestMultipartUploadComplete {
     assertNotNull(multipartUploadInitiateResponse.getUploadID());
     String uploadID = multipartUploadInitiateResponse.getUploadID();
 
-    assertEquals(response.getStatus(), 200);
+    assertEquals(200, response.getStatus());
 
     return uploadID;
 
@@ -88,7 +88,7 @@ public class TestMultipartUploadComplete {
     ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes());
     Response response = REST.put(OzoneConsts.S3_BUCKET, key, content.length(),
         partNumber, uploadID, body);
-    assertEquals(response.getStatus(), 200);
+    assertEquals(200, response.getStatus());
     assertNotNull(response.getHeaderString("ETag"));
     Part part = new Part();
     part.seteTag(response.getHeaderString("ETag"));
@@ -103,16 +103,16 @@ public class TestMultipartUploadComplete {
     Response response = REST.completeMultipartUpload(OzoneConsts.S3_BUCKET, key,
         uploadID, completeMultipartUploadRequest);
 
-    assertEquals(response.getStatus(), 200);
+    assertEquals(200, response.getStatus());
 
     CompleteMultipartUploadResponse completeMultipartUploadResponse =
         (CompleteMultipartUploadResponse) response.getEntity();
 
-    assertEquals(completeMultipartUploadResponse.getBucket(),
-        OzoneConsts.S3_BUCKET);
-    assertEquals(completeMultipartUploadResponse.getKey(), key);
-    assertEquals(completeMultipartUploadResponse.getLocation(),
-        OzoneConsts.S3_BUCKET);
+    assertEquals(OzoneConsts.S3_BUCKET,
+        completeMultipartUploadResponse.getBucket());
+    assertEquals(key, completeMultipartUploadResponse.getKey());
+    assertEquals(OzoneConsts.S3_BUCKET,
+        completeMultipartUploadResponse.getLocation());
     assertNotNull(completeMultipartUploadResponse.getETag());
   }
 

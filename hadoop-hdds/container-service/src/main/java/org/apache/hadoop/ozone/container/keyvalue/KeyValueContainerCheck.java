@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
@@ -47,8 +47,8 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_LEVELDB;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_IMPL_ROCKSDB;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_LEVELDB;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
 
 /**
  * Class to run integrity checks on Datanode Containers.
@@ -62,11 +62,11 @@ public class KeyValueContainerCheck {
 
   private long containerID;
   private KeyValueContainerData onDiskContainerData; //loaded from fs/disk
-  private Configuration checkConfig;
+  private ConfigurationSource checkConfig;
 
   private String metadataPath;
 
-  public KeyValueContainerCheck(String metadataPath, Configuration conf,
+  public KeyValueContainerCheck(String metadataPath, ConfigurationSource conf,
       long containerID) {
     Preconditions.checkArgument(metadataPath != null);
 
@@ -186,8 +186,8 @@ public class KeyValueContainerCheck {
     }
 
     dbType = onDiskContainerData.getContainerDBType();
-    if (!dbType.equals(OZONE_METADATA_STORE_IMPL_ROCKSDB) &&
-        !dbType.equals(OZONE_METADATA_STORE_IMPL_LEVELDB)) {
+    if (!dbType.equals(CONTAINER_DB_TYPE_ROCKSDB) &&
+        !dbType.equals(CONTAINER_DB_TYPE_LEVELDB)) {
       String errStr = "Unknown DBType [" + dbType
           + "] in Container File for  [" + containerID + "]";
       throw new IOException(errStr);

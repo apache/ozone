@@ -18,10 +18,15 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -37,8 +42,14 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 
-import static org.apache.hadoop.ozone.om.request.TestOMRequestUtils.addKeyToTable;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.request.TestOMRequestUtils.addVolumeAndBucketToDB;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests OMCreateKeyRequest class.
@@ -83,7 +94,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
             ozoneManagerDoubleBufferHelper);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assert.assertEquals(OK,
         omKeyCreateResponse.getOMResponse().getStatus());
 
     // Check open table whether key is added or not.
@@ -311,6 +322,11 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   @SuppressWarnings("parameterNumber")
   private OMRequest createKeyRequest(boolean isMultipartKey, int partNumber) {
+    return createKeyRequest(isMultipartKey, partNumber, keyName);
+  }
+
+  private OMRequest createKeyRequest(boolean isMultipartKey, int partNumber,
+      String keyName) {
 
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
@@ -328,48 +344,170 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateKey)
         .setClientId(UUID.randomUUID().toString())
         .setCreateKeyRequest(createKeyRequest).build();
-
   }
 
   @Test
-  public void testReplayRequest() throws Exception {
+  public void testKeyCreateWithFileSystemPathsEnabled() throws Exception {
 
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    configuration.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
+    when(ozoneManager.getConfiguration()).thenReturn(configuration);
+    when(ozoneManager.getEnableFileSystemPaths()).thenReturn(true);
 
-    KeyArgs keyArgs = KeyArgs.newBuilder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .setFactor(replicationFactor)
-        .setType(replicationType)
-        .build();
+    // Add volume and bucket entries to DB.
+    addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager);
 
-    CreateKeyRequest.Builder req = CreateKeyRequest.newBuilder()
-        .setKeyArgs(keyArgs);
-    OMRequest originalRequest = OMRequest.newBuilder()
-        .setCreateKeyRequest(req)
-        .setCmdType(OzoneManagerProtocolProtos.Type.CreateKey)
-        .setClientId(UUID.randomUUID().toString())
-        .build();
 
-    OMKeyCreateRequest omKeyCreateRequest = new OMKeyCreateRequest(
-        originalRequest);
+    keyName = "dir1/dir2/dir3/file1";
+    createAndCheck(keyName);
 
-    // Manually add volume, bucket and key to DB table
-    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager);
-    addKeyToTable(false, false, volumeName, bucketName, keyName, clientID,
-        replicationType, replicationFactor, 1L, omMetadataManager);
+    // Key with leading '/'.
+    String keyName = "/a/b/c/file1";
+    createAndCheck(keyName);
 
-    // Replay the transaction - Execute the createKey request again
+    // Commit openKey entry.
+    TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
+        keyName.substring(1), 0L, RATIS, THREE, omMetadataManager);
+
+    // Now create another file in same dir path.
+    keyName = "/a/b/c/file2";
+    createAndCheck(keyName);
+
+    // Create key with multiple /'s
+    // converted to a/b/c/file5
+    keyName = "///a/b///c///file5";
+    createAndCheck(keyName);
+
+    // converted to a/b/c/.../file3
+    keyName = "///a/b///c//.../file3";
+    createAndCheck(keyName);
+
+    // converted to r1/r2
+    keyName = "././r1/r2/";
+    createAndCheck(keyName);
+
+    // converted to ..d1/d2/d3
+    keyName = "..d1/d2/d3/";
+    createAndCheck(keyName);
+
+    // Create a file, where a file already exists in the path.
+    // Now try with a file exists in path. Should fail.
+    keyName = "/a/b/c/file1/file3";
+    checkNotAFile(keyName);
+
+    // Empty keyName.
+    keyName = "";
+    checkNotAValidPath(keyName);
+
+    // Key name ends with /
+    keyName = "/a/./";
+    checkNotAValidPath(keyName);
+
+    keyName = "/////";
+    checkNotAValidPath(keyName);
+
+    keyName = "../../b/c";
+    checkNotAValidPath(keyName);
+
+    keyName = "../../b/c/";
+    checkNotAValidPath(keyName);
+
+    keyName = "../../b:/c/";
+    checkNotAValidPath(keyName);
+
+    keyName = ":/c/";
+    checkNotAValidPath(keyName);
+
+    keyName = "";
+    checkNotAValidPath(keyName);
+
+    keyName = "../a/b";
+    checkNotAValidPath(keyName);
+
+    keyName = "/../a/b";
+    checkNotAValidPath(keyName);
+
+  }
+
+
+  private void checkNotAValidPath(String keyName) {
+    OMRequest omRequest = createKeyRequest(false, 0, keyName);
+    OMKeyCreateRequest omKeyCreateRequest = new OMKeyCreateRequest(omRequest);
+
+    try {
+      omKeyCreateRequest.preExecute(ozoneManager);
+      fail("checkNotAValidPath failed for path" + keyName);
+    } catch (IOException ex) {
+      Assert.assertTrue(ex instanceof OMException);
+      OMException omException = (OMException) ex;
+      Assert.assertEquals(OMException.ResultCodes.INVALID_KEY_NAME,
+          omException.getResult());
+    }
+
+
+  }
+  private void checkNotAFile(String keyName) throws Exception {
+    OMRequest omRequest = createKeyRequest(false, 0, keyName);
+
+    OMKeyCreateRequest omKeyCreateRequest = new OMKeyCreateRequest(omRequest);
+
+    omRequest = omKeyCreateRequest.preExecute(ozoneManager);
+
+    omKeyCreateRequest = new OMKeyCreateRequest(omRequest);
+
     OMClientResponse omClientResponse =
-        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager,
+            101L, ozoneManagerDoubleBufferHelper);
 
-    // Replay should result in Replay response
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.REPLAY,
+    Assert.assertEquals(NOT_A_FILE,
         omClientResponse.getOMResponse().getStatus());
+  }
+
+
+  private void createAndCheck(String keyName) throws Exception {
+    OMRequest omRequest = createKeyRequest(false, 0, keyName);
+
+    OMKeyCreateRequest omKeyCreateRequest = new OMKeyCreateRequest(omRequest);
+
+    omRequest = omKeyCreateRequest.preExecute(ozoneManager);
+
+    omKeyCreateRequest = new OMKeyCreateRequest(omRequest);
+
+    OMClientResponse omClientResponse =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager,
+            101L, ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(OK, omClientResponse.getOMResponse().getStatus());
+
+    checkCreatedPaths(omKeyCreateRequest, omRequest, keyName);
+  }
+
+  private void checkCreatedPaths(OMKeyCreateRequest omKeyCreateRequest,
+      OMRequest omRequest, String keyName) throws Exception {
+    keyName = omKeyCreateRequest.validateAndNormalizeKey(true, keyName);
+    // Check intermediate directories created or not.
+    Path keyPath = Paths.get(keyName);
+    checkIntermediatePaths(keyPath);
+
+    // Check open key entry
+    String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
+        keyName, omRequest.getCreateKeyRequest().getClientID());
+    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    Assert.assertNotNull(omKeyInfo);
+  }
+
+
+
+  private void checkIntermediatePaths(Path keyPath) throws Exception {
+    // Check intermediate paths are created
+    keyPath = keyPath.getParent();
+    while(keyPath != null) {
+      Assert.assertNotNull(omMetadataManager.getKeyTable().get(
+          omMetadataManager.getOzoneDirKey(volumeName, bucketName,
+              keyPath.toString())));
+      keyPath = keyPath.getParent();
+    }
   }
 
 }

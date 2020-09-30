@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.s3.security;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -29,11 +30,13 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.IOException;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.S3_SECRET_TABLE;
+
 /**
  * Response for GetS3Secret request.
  */
+@CleanupTableInfo(cleanupTables = {S3_SECRET_TABLE})
 public class S3GetSecretResponse extends OMClientResponse {
-
 
   private S3SecretValue s3SecretValue;
 

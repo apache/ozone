@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+#suite:unsecure
+
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
@@ -26,19 +28,24 @@ source "$COMPOSE_DIR/../testlib.sh"
 
 start_docker_env
 
-#Due to the limitation of the current auditparser test, it should be the
-#first test in a clean cluster.
-
-#Disabling for now, audit parser tool during parse getting exception.
-#execute_robot_test om auditparser
+execute_robot_test scm lib
+execute_robot_test scm ozone-lib
 
 execute_robot_test scm basic
 
 execute_robot_test scm gdpr
 
-execute_robot_test scm ozonefs/ozonefs.robot
+for scheme in ofs o3fs; do
+  for bucket in link bucket; do
+    execute_robot_test scm -v SCHEME:${scheme} -v BUCKET_TYPE:${bucket} -N ozonefs-${scheme}-${bucket} ozonefs/ozonefs.robot
+  done
+done
 
-execute_robot_test scm s3
+execute_robot_test scm security/ozone-secure-token.robot
+
+for bucket in link generated; do
+  execute_robot_test scm -v BUCKET:${bucket} -N s3-${bucket} s3
+done
 
 execute_robot_test scm recon
 

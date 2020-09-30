@@ -23,7 +23,9 @@ import java.util.List;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -76,6 +78,22 @@ public final class OzoneTestUtils {
   }
 
   /**
+   * Close all containers.
+   *
+   * @param eventPublisher event publisher.
+   * @param scm StorageContainerManager instance.
+   * @return true if close containers is successful.
+   * @throws IOException
+   */
+  public static void closeAllContainers(EventPublisher eventPublisher,
+      StorageContainerManager scm) {
+    for (ContainerID containerID :
+        scm.getContainerManager().getContainerIDs()) {
+      eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
+    }
+  }
+
+  /**
    * Performs the provided consumer on containers which contain the blocks
    * listed in omKeyLocationInfoGroups.
    *
@@ -85,7 +103,7 @@ public final class OzoneTestUtils {
    */
   public static void performOperationOnKeyContainers(
       CheckedConsumer<BlockID, Exception> consumer,
-      List<OmKeyLocationInfoGroup> omKeyLocationInfoGroups) throws Exception {
+      List<OmKeyLocationInfoGroup> omKeyLocationInfoGroups) throws Exception{
 
     for (OmKeyLocationInfoGroup omKeyLocationInfoGroup :
         omKeyLocationInfoGroups) {

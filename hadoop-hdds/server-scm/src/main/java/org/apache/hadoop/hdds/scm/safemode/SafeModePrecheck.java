@@ -19,7 +19,7 @@
 package org.apache.hadoop.hdds.scm.safemode;
 
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmOps;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -33,7 +33,7 @@ public class SafeModePrecheck implements Precheck<ScmOps> {
   private AtomicBoolean inSafeMode;
   public static final String PRECHECK_TYPE = "SafeModePrecheck";
 
-  public SafeModePrecheck(Configuration conf) {
+  public SafeModePrecheck(ConfigurationSource conf) {
     boolean safeModeEnabled = conf.getBoolean(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED_DEFAULT);

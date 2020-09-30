@@ -18,12 +18,21 @@
  */
 package org.apache.hadoop.hdds.security.x509.certificates.utils;
 
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.conf.Configuration;
+import java.io.IOException;
+import java.io.StringReader;
+import java.io.StringWriter;
+import java.security.KeyPair;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.exceptions.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.SecurityUtil;
+
+import com.google.common.base.Preconditions;
 import org.apache.logging.log4j.util.Strings;
 import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.ASN1Object;
@@ -49,14 +58,6 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequestBuilder;
 import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemReader;
-
-import java.io.IOException;
-import java.io.StringReader;
-import java.io.StringWriter;
-import java.security.KeyPair;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
 
 /**
  * A certificate sign request object that wraps operations to build a
@@ -154,7 +155,7 @@ public final class CertificateSignRequest {
     private boolean digitalEncryption;
 
     public CertificateSignRequest.Builder setConfiguration(
-        Configuration configuration) {
+        ConfigurationSource configuration) {
       this.config = new SecurityConfig(configuration);
       return this;
     }

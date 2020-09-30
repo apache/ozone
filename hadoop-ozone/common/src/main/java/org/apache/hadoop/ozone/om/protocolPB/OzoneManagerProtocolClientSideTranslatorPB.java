@@ -21,28 +21,20 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.io.retry.RetryProxy;
-import org.apache.hadoop.ipc.ProtobufHelper;
-import org.apache.hadoop.ipc.ProtocolTranslator;
-import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
-import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -53,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
+import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -61,25 +54,9 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListMultipartUploadsRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListMultipartUploadsResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupFileRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupFileResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListStatusRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListStatusResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateDirectoryRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketArgs;
@@ -88,13 +65,24 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelD
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateDirectoryRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateVolumeRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteBucketRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteVolumeRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetDelegationTokenResponseProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
@@ -106,12 +94,16 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBuc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListMultipartUploadsRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListMultipartUploadsResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListStatusRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTrashResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListVolumeResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupFileRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupFileResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartCommitUploadPartRequest;
@@ -126,19 +118,20 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Multipa
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverTrashResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RemoveAclResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysMap;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeysRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenewDelegationTokenResponseProto;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3BucketInfoRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3BucketInfoResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3CreateBucketRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3DeleteBucketRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3ListBucketsRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -146,24 +139,16 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeI
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.security.AccessControlException;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.proto.SecurityProtos.CancelDelegationTokenRequestProto;
-import org.apache.hadoop.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
-import org.apache.hadoop.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
+import org.apache.hadoop.ozone.security.proto.SecurityProtos.CancelDelegationTokenRequestProto;
+import org.apache.hadoop.ozone.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
+import org.apache.hadoop.ozone.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.hdds.utils.db.DBUpdatesWrapper;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.RpcController;
-import com.google.protobuf.ServiceException;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.io.retry.RetryPolicy.RetryAction.FAILOVER_AND_RETRY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.ACCESS_DENIED;
@@ -171,186 +156,21 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 
 /**
- *  The client side implementation of OzoneManagerProtocol.
+ * The client side implementation of OzoneManagerProtocol.
  */
 
 @InterfaceAudience.Private
 public final class OzoneManagerProtocolClientSideTranslatorPB
-    implements OzoneManagerProtocol, ProtocolTranslator {
+    implements OzoneManagerProtocol {
 
-  /**
-   * RpcController is not used and hence is set to null.
-   */
-  private static final RpcController NULL_RPC_CONTROLLER = null;
-
-  private final OMFailoverProxyProvider omFailoverProxyProvider;
-  private final OzoneManagerProtocolPB rpcProxy;
   private final String clientID;
-  private static final Logger FAILOVER_PROXY_PROVIDER_LOG =
-      LoggerFactory.getLogger(OMFailoverProxyProvider.class);
 
-  public OzoneManagerProtocolClientSideTranslatorPB(
-      OzoneManagerProtocolPB proxy, String clientId) {
-    this.rpcProxy = proxy;
+  private OmTransport transport;
+
+  public OzoneManagerProtocolClientSideTranslatorPB(OmTransport omTransport,
+      String clientId) {
     this.clientID = clientId;
-    this.omFailoverProxyProvider = null;
-  }
-
-  /**
-   * Constructor for OM Protocol Client. This creates a {@link RetryProxy}
-   * over {@link OMFailoverProxyProvider} proxy. OMFailoverProxyProvider has
-   * one {@link OzoneManagerProtocolPB} proxy pointing to each OM node in the
-   * cluster.
-   */
-  public OzoneManagerProtocolClientSideTranslatorPB(OzoneConfiguration conf,
-      String clientId, String omServiceId, UserGroupInformation ugi)
-      throws IOException {
-    this.omFailoverProxyProvider = new OMFailoverProxyProvider(conf, ugi,
-        omServiceId);
-
-    int maxFailovers = conf.getInt(
-        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
-        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT);
-    int sleepBase = conf.getInt(
-        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_SLEEP_BASE_MILLIS_KEY,
-        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_SLEEP_BASE_MILLIS_DEFAULT);
-    int sleepMax = conf.getInt(
-        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_SLEEP_MAX_MILLIS_KEY,
-        OzoneConfigKeys.OZONE_CLIENT_FAILOVER_SLEEP_MAX_MILLIS_DEFAULT);
-
-    this.rpcProxy = createRetryProxy(omFailoverProxyProvider, maxFailovers,
-        sleepBase, sleepMax);
-    this.clientID = clientId;
-  }
-
-  /**
-   * Creates a {@link RetryProxy} encapsulating the
-   * {@link OMFailoverProxyProvider}. The retry proxy fails over on network
-   * exception or if the current proxy is not the leader OM.
-   */
-  private OzoneManagerProtocolPB createRetryProxy(
-      OMFailoverProxyProvider failoverProxyProvider,
-      int maxFailovers, int delayMillis, int maxDelayBase) {
-
-    // Client attempts contacting each OM ipc.client.connect.max.retries
-    // (default = 10) times before failing over to the next OM, if
-    // available.
-    // Client will attempt upto maxFailovers number of failovers between
-    // available OMs before throwing exception.
-    RetryPolicy retryPolicy = new RetryPolicy() {
-      @Override
-      public RetryAction shouldRetry(Exception exception, int retries,
-          int failovers, boolean isIdempotentOrAtMostOnce)
-          throws Exception {
-        if (isAccessControlException(exception)) {
-          return RetryAction.FAIL; // do not retry
-        }
-        if (exception instanceof ServiceException) {
-          OMNotLeaderException notLeaderException =
-              getNotLeaderException(exception);
-          if (notLeaderException != null &&
-              notLeaderException.getSuggestedLeaderNodeId() != null) {
-            // TODO: NotLeaderException should include the host
-            //  address of the suggested leader along with the nodeID.
-            //  Failing over just based on nodeID is not very robust.
-
-            // OMFailoverProxyProvider#performFailover() is a dummy call and
-            // does not perform any failover. Failover manually to the next OM.
-            omFailoverProxyProvider.performFailoverToNextProxy();
-            return getRetryAction(FAILOVER_AND_RETRY, failovers);
-          }
-
-          OMLeaderNotReadyException leaderNotReadyException =
-              getLeaderNotReadyException(exception);
-          // As in this case, current OM node is leader, but it is not ready.
-          // OMFailoverProxyProvider#performFailover() is a dummy call and
-          // does not perform any failover.
-          // So Just retry with same OM node.
-          if (leaderNotReadyException != null) {
-            return getRetryAction(FAILOVER_AND_RETRY, failovers);
-          }
-        }
-
-        // For all other exceptions other than LeaderNotReadyException and
-        // NotLeaderException fail over manually to the next OM Node proxy.
-        // OMFailoverProxyProvider#performFailover() is a dummy call and
-        // does not perform any failover.
-        omFailoverProxyProvider.performFailoverToNextProxy();
-        return getRetryAction(FAILOVER_AND_RETRY, failovers);
-      }
-
-      private RetryAction getRetryAction(RetryAction fallbackAction,
-          int failovers) {
-        if (failovers <= maxFailovers) {
-          return fallbackAction;
-        } else {
-          FAILOVER_PROXY_PROVIDER_LOG.error("Failed to connect to OMs: {}. " +
-              "Attempted {} failovers.",
-              omFailoverProxyProvider.getOMProxyInfos(), maxFailovers);
-          return RetryAction.FAIL;
-        }
-      }
-    };
-
-    OzoneManagerProtocolPB proxy = (OzoneManagerProtocolPB) RetryProxy.create(
-        OzoneManagerProtocolPB.class, failoverProxyProvider, retryPolicy);
-    return proxy;
-  }
-
-  /**
-   * Unwrap exception to check if it is a {@link AccessControlException}.
-   */
-  private boolean isAccessControlException(Exception ex) {
-    if (ex instanceof ServiceException) {
-      Throwable t = ex.getCause();
-      while (t != null) {
-        if (t instanceof AccessControlException) {
-          return true;
-        }
-        t = t.getCause();
-      }
-    }
-    return false;
-  }
-  
-  /**
-   * Check if exception is a OMNotLeaderException.
-   * @return OMNotLeaderException.
-   */
-  private OMNotLeaderException getNotLeaderException(Exception exception) {
-    Throwable cause = exception.getCause();
-    if (cause instanceof RemoteException) {
-      IOException ioException =
-          ((RemoteException) cause).unwrapRemoteException();
-      if (ioException instanceof OMNotLeaderException) {
-        return (OMNotLeaderException) ioException;
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Check if exception is OMLeaderNotReadyException.
-   * @param exception
-   * @return OMLeaderNotReadyException
-   */
-  private OMLeaderNotReadyException getLeaderNotReadyException(
-      Exception exception) {
-    Throwable cause = exception.getCause();
-    if (cause instanceof RemoteException) {
-      IOException ioException =
-          ((RemoteException) cause).unwrapRemoteException();
-      if (ioException instanceof OMLeaderNotReadyException) {
-        return (OMLeaderNotReadyException) ioException;
-      }
-    }
-    return null;
-  }
-
-
-  @VisibleForTesting
-  public OMFailoverProxyProvider getOMFailoverProxyProvider() {
-    return omFailoverProxyProvider;
+    this.transport = omTransport;
   }
 
   /**
@@ -368,17 +188,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    */
   @Override
   public void close() throws IOException {
-
-  }
-
-  /**
-   * Return the proxy object underlying this protocol translator.
-   *
-   * @return the proxy object underlying this protocol translator.
-   */
-  @Override
-  public Object getUnderlyingProxyObject() {
-    return rpcProxy;
+    //transport is not reusable
+    transport.close();
   }
 
   /**
@@ -400,30 +211,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    */
   private OMResponse submitRequest(OMRequest omRequest)
       throws IOException {
-    try {
-      OMRequest payload = OMRequest.newBuilder(omRequest)
-          .setTraceID(TracingUtil.exportCurrentSpan())
-          .build();
+    OMRequest payload = OMRequest.newBuilder(omRequest)
+        .setTraceID(TracingUtil.exportCurrentSpan())
+        .build();
 
-      OMResponse omResponse =
-          rpcProxy.submitRequest(NULL_RPC_CONTROLLER, payload);
-
-      if (omResponse.hasLeaderOMNodeId() && omFailoverProxyProvider != null) {
-        String leaderOmId = omResponse.getLeaderOMNodeId();
-
-        // Failover to the OM node returned by OMResponse leaderOMNodeId if
-        // current proxy is not pointing to that node.
-        omFailoverProxyProvider.performFailoverIfRequired(leaderOmId);
-      }
-
-      return omResponse;
-    } catch (ServiceException e) {
-      OMNotLeaderException notLeaderException = getNotLeaderException(e);
-      if (notLeaderException == null) {
-        throw ProtobufHelper.getRemoteException(e);
-      }
-      throw new IOException("Could not determine or connect to OM Leader.");
-    }
+    return transport.submitRequest(payload);
   }
 
   /**
@@ -448,14 +240,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   /**
-   * Changes the owner of a volume.
-   *
-   * @param volume - Name of the volume.
-   * @param owner - Name of the owner.
-   * @throws IOException
+   * {@inheritDoc}
    */
   @Override
-  public void setOwner(String volume, String owner) throws IOException {
+  public boolean setOwner(String volume, String owner) throws IOException {
     SetVolumePropertyRequest.Builder req =
         SetVolumePropertyRequest.newBuilder();
     req.setVolumeName(volume).setOwnerName(owner);
@@ -465,21 +253,28 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .build();
 
     OMResponse omResponse = submitRequest(omRequest);
-    handleError(omResponse);
+    OzoneManagerProtocolProtos.SetVolumePropertyResponse response =
+        handleError(omResponse).getSetVolumePropertyResponse();
+
+    return response.getResponse();
   }
 
   /**
    * Changes the Quota on a volume.
    *
    * @param volume - Name of the volume.
-   * @param quota - Quota in bytes.
+   * @param quotaInCounts - Volume quota in counts.
+   * @param quotaInBytes - Volume quota in bytes.
    * @throws IOException
    */
   @Override
-  public void setQuota(String volume, long quota) throws IOException {
+  public void setQuota(String volume, long quotaInCounts,
+      long quotaInBytes) throws IOException {
     SetVolumePropertyRequest.Builder req =
         SetVolumePropertyRequest.newBuilder();
-    req.setVolumeName(volume).setQuotaInBytes(quota);
+    req.setVolumeName(volume)
+       .setQuotaInBytes(quotaInBytes)
+       .setQuotaInCounts(quotaInCounts);
 
     OMRequest omRequest = createOMRequest(Type.SetVolumeProperty)
         .setSetVolumePropertyRequest(req)
@@ -564,7 +359,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   /**
-   * Lists volume owned by a specific user.
+   * Lists volumes accessible by a specific user.
    *
    * @param userName - user name
    * @param prefix - Filter prefix -- Return only entries that match this.
@@ -890,6 +685,33 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
+  public void renameKeys(OmRenameKeys omRenameKeys) throws IOException {
+
+    List<RenameKeysMap> renameKeyList  = new ArrayList<>();
+    for (Map.Entry< String, String> entry :
+        omRenameKeys.getFromAndToKey().entrySet()) {
+      RenameKeysMap.Builder renameKey = RenameKeysMap.newBuilder()
+          .setFromKeyName(entry.getKey())
+          .setToKeyName(entry.getValue());
+      renameKeyList.add(renameKey.build());
+    }
+
+    RenameKeysArgs.Builder renameKeyArgs = RenameKeysArgs.newBuilder()
+        .setVolumeName(omRenameKeys.getVolume())
+        .setBucketName(omRenameKeys.getBucket())
+        .addAllRenameKeysMap(renameKeyList);
+
+    RenameKeysRequest.Builder reqKeys = RenameKeysRequest.newBuilder()
+        .setRenameKeysArgs(renameKeyArgs.build());
+
+    OMRequest omRequest = createOMRequest(Type.RenameKeys)
+        .setRenameKeysRequest(reqKeys.build())
+        .build();
+
+    handleError(submitRequest(omRequest));
+  }
+
+  @Override
   public void renameKey(OmKeyArgs args, String toKeyName) throws IOException {
     RenameKeyRequest.Builder req = RenameKeyRequest.newBuilder();
     KeyArgs keyArgs = KeyArgs.newBuilder()
@@ -924,6 +746,29 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OMRequest omRequest = createOMRequest(Type.DeleteKey)
         .setDeleteKeyRequest(req)
+        .build();
+
+    handleError(submitRequest(omRequest));
+
+  }
+
+  /**
+   * Deletes existing key/keys. This interface supports delete
+   * multiple keys and a single key.
+   *
+   * @param deleteKeys
+   * @throws IOException
+   */
+  @Override
+  public void deleteKeys(OmDeleteKeys deleteKeys) throws IOException {
+    DeleteKeysRequest.Builder req = DeleteKeysRequest.newBuilder();
+    DeleteKeyArgs deletedKeys = DeleteKeyArgs.newBuilder()
+        .setBucketName(deleteKeys.getBucket())
+        .setVolumeName(deleteKeys.getVolume())
+        .addAllKeys(deleteKeys.getKeyNames()).build();
+    req.setDeleteKeys(deletedKeys);
+    OMRequest omRequest = createOMRequest(Type.DeleteKeys)
+        .setDeleteKeysRequest(req)
         .build();
 
     handleError(submitRequest(omRequest));
@@ -982,83 +827,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .map(OmKeyInfo::getFromProtobuf)
             .collect(Collectors.toList()));
     return keys;
-
-  }
-
-  @Override
-  public void createS3Bucket(String userName, String s3BucketName)
-      throws IOException {
-    S3CreateBucketRequest req = S3CreateBucketRequest.newBuilder()
-        .setUserName(userName)
-        .setS3Bucketname(s3BucketName)
-        .build();
-
-    OMRequest omRequest = createOMRequest(Type.CreateS3Bucket)
-        .setCreateS3BucketRequest(req)
-        .build();
-
-    handleError(submitRequest(omRequest));
-
-  }
-
-  @Override
-  public void deleteS3Bucket(String s3BucketName) throws IOException {
-    S3DeleteBucketRequest request  = S3DeleteBucketRequest.newBuilder()
-        .setS3BucketName(s3BucketName)
-        .build();
-
-    OMRequest omRequest = createOMRequest(Type.DeleteS3Bucket)
-        .setDeleteS3BucketRequest(request)
-        .build();
-
-    handleError(submitRequest(omRequest));
-
-  }
-
-  @Override
-  public String getOzoneBucketMapping(String s3BucketName)
-      throws IOException {
-    S3BucketInfoRequest request  = S3BucketInfoRequest.newBuilder()
-        .setS3BucketName(s3BucketName)
-        .build();
-
-    OMRequest omRequest = createOMRequest(Type.InfoS3Bucket)
-        .setInfoS3BucketRequest(request)
-        .build();
-
-    S3BucketInfoResponse resp = handleError(submitRequest(omRequest))
-        .getInfoS3BucketResponse();
-    return resp.getOzoneMapping();
-  }
-
-  @Override
-  public List<OmBucketInfo> listS3Buckets(String userName, String startKey,
-                                          String prefix, int count)
-      throws IOException {
-    List<OmBucketInfo> buckets = new ArrayList<>();
-    S3ListBucketsRequest.Builder reqBuilder = S3ListBucketsRequest.newBuilder();
-    reqBuilder.setUserName(userName);
-    reqBuilder.setCount(count);
-    if (startKey != null) {
-      reqBuilder.setStartKey(startKey);
-    }
-    if (prefix != null) {
-      reqBuilder.setPrefix(prefix);
-    }
-    S3ListBucketsRequest request = reqBuilder.build();
-
-    OMRequest omRequest = createOMRequest(Type.ListS3Buckets)
-        .setListS3BucketsRequest(request)
-        .build();
-
-    S3ListBucketsResponse resp = handleError(submitRequest(omRequest))
-        .getListS3BucketsResponse();
-
-    buckets.addAll(
-        resp.getBucketInfoList().stream()
-            .map(OmBucketInfo::getFromProtobuf)
-            .collect(Collectors.toList()));
-    return buckets;
 
   }
 
@@ -1413,6 +1181,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
+        .setSortDatanodes(args.getSortDatanodes())
         .build();
     GetFileStatusRequest req =
         GetFileStatusRequest.newBuilder()
@@ -1574,7 +1343,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public DBUpdatesWrapper getDBUpdates(DBUpdatesRequest dbUpdatesRequest)
+  public DBUpdates getDBUpdates(DBUpdatesRequest dbUpdatesRequest)
       throws IOException {
     OMRequest omRequest = createOMRequest(Type.DBUpdates)
         .setDbUpdatesRequest(dbUpdatesRequest)
@@ -1583,7 +1352,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     DBUpdatesResponse dbUpdatesResponse =
         handleError(submitRequest(omRequest)).getDbUpdatesResponse();
 
-    DBUpdatesWrapper dbUpdatesWrapper = new DBUpdatesWrapper();
+    DBUpdates dbUpdatesWrapper = new DBUpdates();
     for (ByteString byteString : dbUpdatesResponse.getDataList()) {
       dbUpdatesWrapper.addWriteBatch(byteString.toByteArray(), 0L);
     }
@@ -1626,6 +1395,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
+        .setSortDatanodes(args.getSortDatanodes())
         .build();
     ListStatusRequest listStatusRequest =
         ListStatusRequest.newBuilder()
@@ -1707,20 +1477,24 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         "The destination bucket name cannot be null or empty. " +
         "Please enter a valid destination bucket name.");
 
-    RecoverTrashRequest recoverRequest = RecoverTrashRequest.newBuilder()
+    RecoverTrashRequest.Builder req = RecoverTrashRequest.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setDestinationBucket(destinationBucket)
-        .build();
+        .setDestinationBucket(destinationBucket);
 
     OMRequest omRequest = createOMRequest(Type.RecoverTrash)
-        .setRecoverTrashRequest(recoverRequest)
+        .setRecoverTrashRequest(req)
         .build();
 
     RecoverTrashResponse recoverResponse =
         handleError(submitRequest(omRequest)).getRecoverTrashResponse();
 
     return recoverResponse.getResponse();
+  }
+
+  @VisibleForTesting
+  public OmTransport getTransport() {
+    return transport;
   }
 }

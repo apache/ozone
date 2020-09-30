@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.recon.api;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,12 +52,21 @@ import org.apache.hadoop.ozone.recon.api.types.KeyMetadata.ContainerBlockMetadat
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
+import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
+import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
+import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
+import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ContainerDBServiceProvider;
+import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
+import org.hadoop.ozone.recon.schema.tables.pojos.ContainerHistory;
+import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 
+import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_BATCH_NUMBER;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.PREV_CONTAINER_ID_DEFAULT_VALUE;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_BATCH_PARAM;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 
@@ -77,11 +85,14 @@ public class ContainerEndpoint {
   private ReconOMMetadataManager omMetadataManager;
 
   private ReconContainerManager containerManager;
+  private ContainerSchemaManager containerSchemaManager;
 
   @Inject
-  public ContainerEndpoint(OzoneStorageContainerManager reconSCM) {
+  public ContainerEndpoint(OzoneStorageContainerManager reconSCM,
+                           ContainerSchemaManager containerSchemaManager) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
+    this.containerSchemaManager = containerSchemaManager;
   }
 
   /**
@@ -146,7 +157,7 @@ public class ContainerEndpoint {
         // Directly calling get() on the Key table instead of iterating since
         // only full keys are supported now. When we change to using a prefix
         // of the key, this needs to change to prefix seek.
-        OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(
+        OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().getSkipCache(
             containerKeyPrefix.getKeyPrefix());
         if (null != omKeyInfo) {
           // Filter keys by version.
@@ -204,6 +215,21 @@ public class ContainerEndpoint {
   }
 
   /**
+   * Return Container replica history for the container identified by the id
+   * param.
+   *
+   * @param containerID the given containerID.
+   * @return {@link Response}
+   */
+  @GET
+  @Path("/{id}/replicaHistory")
+  public Response getReplicaHistoryForContainer(
+      @PathParam("id") Long containerID) {
+    return Response.ok(
+        containerSchemaManager.getAllContainerHistory(containerID)).build();
+  }
+
+  /**
    * Return
    * {@link org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata}
    * for all missing containers.
@@ -214,28 +240,117 @@ public class ContainerEndpoint {
   @Path("/missing")
   public Response getMissingContainers() {
     List<MissingContainerMetadata> missingContainers = new ArrayList<>();
-    containerDBServiceProvider.getMissingContainers().forEach(container -> {
-      long containerID = container.getContainerId();
-      try {
-        ContainerInfo containerInfo =
-            containerManager.getContainer(new ContainerID(containerID));
-        long keyCount = containerInfo.getNumberOfKeys();
-        UUID pipelineID = containerInfo.getPipelineID().getId();
+    containerSchemaManager.getUnhealthyContainers(
+        UnHealthyContainerStates.MISSING, 0, Integer.MAX_VALUE)
+        .forEach(container -> {
+          long containerID = container.getContainerId();
+          try {
+            ContainerInfo containerInfo =
+                containerManager.getContainer(new ContainerID(containerID));
+            long keyCount = containerInfo.getNumberOfKeys();
+            UUID pipelineID = containerInfo.getPipelineID().getId();
 
-        // TODO: Find out which datanodes had replicas of this container
-        // and populate this list
-        List datanodes = Collections.emptyList();
-        missingContainers.add(new MissingContainerMetadata(containerID,
-            container.getMissingSince(), keyCount, pipelineID, datanodes));
-      } catch (IOException ioEx) {
-        throw new WebApplicationException(ioEx,
-            Response.Status.INTERNAL_SERVER_ERROR);
-      }
-    });
+            List<ContainerHistory> datanodes =
+                containerSchemaManager.getLatestContainerHistory(containerID,
+                    containerInfo.getReplicationFactor().getNumber());
+            missingContainers.add(new MissingContainerMetadata(containerID,
+                container.getInStateSince(), keyCount, pipelineID, datanodes));
+          } catch (IOException ioEx) {
+            throw new WebApplicationException(ioEx,
+                Response.Status.INTERNAL_SERVER_ERROR);
+          }
+        });
     MissingContainersResponse response =
         new MissingContainersResponse(missingContainers.size(),
             missingContainers);
     return Response.ok(response).build();
+  }
+
+  /**
+   * Return
+   * {@link org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata}
+   * for all unhealthy containers.
+   *
+   * @param state Return only containers matching the given unhealthy state,
+   *              eg UNDER_REPLICATED, MIS_REPLICATED, OVER_REPLICATED or
+   *              MISSING. Passing null returns all containers.
+   * @param limit The limit of unhealthy containers to return.
+   * @param batchNum The batch number (like "page number") of results to return.
+   *                 Passing 1, will return records 1 to limit. 2 will return
+   *                 limit + 1 to 2 * limit, etc.
+   * @return {@link Response}
+   */
+  @GET
+  @Path("/unhealthy/{state}")
+  public Response getUnhealthyContainers(
+      @PathParam("state") String state,
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
+          int limit,
+      @DefaultValue(DEFAULT_BATCH_NUMBER)
+      @QueryParam(RECON_QUERY_BATCH_PARAM) int batchNum) {
+    int offset = Math.max(((batchNum - 1) * limit), 0);
+
+    List<UnhealthyContainerMetadata> unhealthyMeta = new ArrayList<>();
+    List<UnhealthyContainersSummary> summary;
+    try {
+      UnHealthyContainerStates internalState = null;
+
+      if (state != null) {
+        // If an invalid state is passed in, this will throw
+        // illegalArgumentException and fail the request
+        internalState = UnHealthyContainerStates.valueOf(state);
+      }
+
+      summary = containerSchemaManager.getUnhealthyContainersSummary();
+      List<UnhealthyContainers> containers = containerSchemaManager
+          .getUnhealthyContainers(internalState, offset, limit);
+      for (UnhealthyContainers c : containers) {
+        long containerID = c.getContainerId();
+        ContainerInfo containerInfo =
+            containerManager.getContainer(new ContainerID(containerID));
+        long keyCount = containerInfo.getNumberOfKeys();
+        UUID pipelineID = containerInfo.getPipelineID().getId();
+        List<ContainerHistory> datanodes =
+            containerSchemaManager.getLatestContainerHistory(
+                containerID,
+                containerInfo.getReplicationFactor().getNumber());
+        unhealthyMeta.add(new UnhealthyContainerMetadata(
+            c, datanodes, pipelineID, keyCount));
+      }
+    } catch (IOException ex) {
+      throw new WebApplicationException(ex,
+          Response.Status.INTERNAL_SERVER_ERROR);
+    } catch (IllegalArgumentException e) {
+      throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
+    }
+
+    UnhealthyContainersResponse response =
+        new UnhealthyContainersResponse(unhealthyMeta);
+    for (UnhealthyContainersSummary s : summary) {
+      response.setSummaryCount(s.getContainerState(), s.getCount());
+    }
+    return Response.ok(response).build();
+  }
+
+  /**
+   * Return
+   * {@link org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata}
+   * for all unhealthy containers.
+
+   * @param limit The limit of unhealthy containers to return.
+   * @param batchNum The batch number (like "page number") of results to return.
+   *                 Passing 1, will return records 1 to limit. 2 will return
+   *                 limit + 1 to 2 * limit, etc.
+   * @return {@link Response}
+   */
+  @GET
+  @Path("/unhealthy")
+  public Response getUnhealthyContainers(
+      @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
+          int limit,
+      @DefaultValue(DEFAULT_BATCH_NUMBER)
+      @QueryParam(RECON_QUERY_BATCH_PARAM) int batchNum) {
+    return getUnhealthyContainers(null, limit, batchNum);
   }
 
   /**

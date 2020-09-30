@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 
 import java.io.IOException;
@@ -32,18 +31,17 @@ import java.util.List;
 /**
  * Implements Api for creating stand alone pipelines.
  */
-public class SimplePipelineProvider implements PipelineProvider {
+public class SimplePipelineProvider extends PipelineProvider {
 
-  private final NodeManager nodeManager;
-
-  public SimplePipelineProvider(NodeManager nodeManager) {
-    this.nodeManager = nodeManager;
+  public SimplePipelineProvider(NodeManager nodeManager,
+      PipelineStateManager stateManager) {
+    super(nodeManager, stateManager);
   }
 
   @Override
   public Pipeline create(ReplicationFactor factor) throws IOException {
-    List<DatanodeDetails> dns =
-        nodeManager.getNodes(NodeStatus.inServiceHealthy());
+    List<DatanodeDetails> dns = pickNodesNeverUsed(ReplicationType.STAND_ALONE,
+        factor);
     if (dns.size() < factor.getNumber()) {
       String e = String
           .format("Cannot create pipeline of factor %d using %d nodes.",

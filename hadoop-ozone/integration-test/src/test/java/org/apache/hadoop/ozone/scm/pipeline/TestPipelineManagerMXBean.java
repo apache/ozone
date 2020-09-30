@@ -34,6 +34,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
+import org.junit.Rule;
+import org.junit.rules.Timeout;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -42,6 +44,12 @@ import static org.junit.Assert.fail;
  * Test cases to verify the metrics exposed by SCMPipelineManager via MXBean.
  */
 public class TestPipelineManagerMXBean {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private MiniOzoneCluster cluster;
   private static MBeanServer mbs;

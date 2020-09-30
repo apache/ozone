@@ -18,10 +18,22 @@
 
 package org.apache.hadoop.hdds.scm;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import org.apache.hadoop.conf.Configuration;
+import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.security.cert.X509Certificate;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -39,9 +51,12 @@ import org.apache.hadoop.hdds.tracing.GrpcClientInterceptor;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.util.Time;
+import java.util.concurrent.TimeoutException;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import io.opentracing.Scope;
+import io.opentracing.Span;
 import io.opentracing.util.GlobalTracer;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.Status;
@@ -52,33 +67,19 @@ import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.InterruptedIOException;
-import java.security.cert.X509Certificate;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
 /**
  * A Client for the storageContainer protocol for read object data.
  */
 public class XceiverClientGrpc extends XceiverClientSpi {
   static final Logger LOG = LoggerFactory.getLogger(XceiverClientGrpc.class);
   private final Pipeline pipeline;
-  private final Configuration config;
+  private final ConfigurationSource config;
   private Map<UUID, XceiverClientProtocolServiceStub> asyncStubs;
   private XceiverClientMetrics metrics;
   private Map<UUID, ManagedChannel> channels;
   private final Semaphore semaphore;
   private boolean closed = false;
+  private final long timeout;
   private SecurityConfig secConfig;
   private final boolean topologyAwareRead;
   private X509Certificate caCert;
@@ -94,11 +95,14 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * @param config   -- Ozone Config
    * @param caCert   - SCM ca certificate.
    */
-  public XceiverClientGrpc(Pipeline pipeline, Configuration config,
+  public XceiverClientGrpc(Pipeline pipeline, ConfigurationSource config,
       X509Certificate caCert) {
     super();
     Preconditions.checkNotNull(pipeline);
     Preconditions.checkNotNull(config);
+    timeout = config.getTimeDuration(OzoneConfigKeys.
+        OZONE_CLIENT_READ_TIMEOUT, OzoneConfigKeys
+        .OZONE_CLIENT_READ_TIMEOUT_DEFAULT, TimeUnit.SECONDS);
     this.pipeline = pipeline;
     this.config = config;
     this.secConfig = new SecurityConfig(config);
@@ -121,7 +125,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * @param pipeline - Pipeline that defines the machines.
    * @param config   -- Ozone Config
    */
-  public XceiverClientGrpc(Pipeline pipeline, Configuration config) {
+  public XceiverClientGrpc(Pipeline pipeline, ConfigurationSource config) {
     this(pipeline, config, null);
   }
 
@@ -244,6 +248,36 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   }
 
   @Override
+  public Map<DatanodeDetails, ContainerCommandResponseProto>
+      sendCommandOnAllNodes(
+      ContainerCommandRequestProto request) throws IOException {
+    HashMap<DatanodeDetails, ContainerCommandResponseProto>
+            responseProtoHashMap = new HashMap<>();
+    List<DatanodeDetails> datanodeList = pipeline.getNodes();
+    HashMap<DatanodeDetails, CompletableFuture<ContainerCommandResponseProto>>
+            futureHashMap = new HashMap<>();
+    for (DatanodeDetails dn : datanodeList) {
+      try {
+        futureHashMap.put(dn, sendCommandAsync(request, dn).getResponse());
+      } catch (InterruptedException e) {
+        LOG.error("Command execution was interrupted.");
+      }
+    }
+    try{
+      for (Map.Entry<DatanodeDetails,
+              CompletableFuture<ContainerCommandResponseProto> >
+              entry : futureHashMap.entrySet()){
+        responseProtoHashMap.put(entry.getKey(), entry.getValue().get());
+      }
+    } catch (InterruptedException e) {
+      LOG.error("Command execution was interrupted.");
+    } catch (ExecutionException e) {
+      LOG.error("Failed to execute command " + request, e);
+    }
+    return responseProtoHashMap;
+  }
+
+  @Override
   public ContainerCommandResponseProto sendCommand(
       ContainerCommandRequestProto request, List<CheckedBiFunction> validators)
       throws IOException {
@@ -265,14 +299,18 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   private XceiverClientReply sendCommandWithTraceIDAndRetry(
       ContainerCommandRequestProto request, List<CheckedBiFunction> validators)
       throws IOException {
-    try (Scope scope = GlobalTracer.get()
-        .buildSpan("XceiverClientGrpc." + request.getCmdType().name())
-        .startActive(true)) {
-      ContainerCommandRequestProto finalPayload =
-          ContainerCommandRequestProto.newBuilder(request)
-              .setTraceID(TracingUtil.exportCurrentSpan()).build();
-      return sendCommandWithRetry(finalPayload, validators);
-    }
+
+    String spanName = "XceiverClientGrpc." + request.getCmdType().name();
+
+    return TracingUtil.executeInNewSpan(spanName,
+        (SupplierWithIOException<XceiverClientReply>) () -> {
+
+          ContainerCommandRequestProto finalPayload =
+              ContainerCommandRequestProto.newBuilder(request)
+                  .setTraceID(TracingUtil.exportCurrentSpan()).build();
+          return sendCommandWithRetry(finalPayload, validators);
+
+        });
   }
 
   private XceiverClientReply sendCommandWithRetry(
@@ -290,7 +328,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     List<DatanodeDetails> datanodeList = null;
 
     DatanodeBlockID blockID = null;
-    if (request.getCmdType() == ContainerProtos.Type.ReadChunk) {
+    if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
+      blockID = request.getGetBlock().getBlockID();
+    } else if  (request.getCmdType() == ContainerProtos.Type.ReadChunk) {
       blockID = request.getReadChunk().getBlockID();
     } else if (request.getCmdType() == ContainerProtos.Type.GetSmallFile) {
       blockID = request.getGetSmallFile().getBlock().getBlockID();
@@ -306,15 +346,17 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           // Pull the Cached DN to the top of the DN list
           Collections.swap(datanodeList, 0, getBlockDNCacheIndex);
         }
-      } else if (topologyAwareRead) {
-        datanodeList = pipeline.getNodesInOrder();
       }
     }
     if (datanodeList == null) {
-      datanodeList = pipeline.getNodes();
-      // Shuffle datanode list so that clients do not read in the same order
-      // every time.
-      Collections.shuffle(datanodeList);
+      if (topologyAwareRead) {
+        datanodeList = pipeline.getNodesInOrder();
+      } else {
+        datanodeList = pipeline.getNodes();
+        // Shuffle datanode list so that clients do not read in the same order
+        // every time.
+        Collections.shuffle(datanodeList);
+      }
     }
 
     for (DatanodeDetails dn : datanodeList) {
@@ -342,7 +384,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         responseProto = null;
       } catch (ExecutionException e) {
         LOG.debug("Failed to execute command {} on datanode {}",
-            request, dn.getUuid(), e);
+            request, dn, e);
         if (Status.fromThrowable(e.getCause()).getCode()
             == Status.UNAUTHENTICATED.getCode()) {
           throw new SCMSecurityException("Failed to authenticate with "
@@ -387,9 +429,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   public XceiverClientReply sendCommandAsync(
       ContainerCommandRequestProto request)
       throws IOException, ExecutionException, InterruptedException {
-    try (Scope scope = GlobalTracer.get()
-        .buildSpan("XceiverClientGrpc." + request.getCmdType().name())
-        .startActive(true)) {
+
+    Span span = GlobalTracer.get()
+        .buildSpan("XceiverClientGrpc." + request.getCmdType().name()).start();
+
+    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
 
       ContainerCommandRequestProto finalPayload =
           ContainerCommandRequestProto.newBuilder(request)
@@ -405,35 +449,47 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         asyncReply.getResponse().get();
       }
       return asyncReply;
+
+    } finally {
+      span.finish();
     }
   }
 
-  private XceiverClientReply sendCommandAsync(
+  @VisibleForTesting
+  public XceiverClientReply sendCommandAsync(
       ContainerCommandRequestProto request, DatanodeDetails dn)
       throws IOException, InterruptedException {
     checkOpen(dn, request.getEncodedToken());
     UUID dnId = dn.getUuid();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Send command {} to datanode {}",
-          request.getCmdType(), dn.getNetworkFullPath());
+          request.getCmdType(), dn.getIpAddress());
     }
     final CompletableFuture<ContainerCommandResponseProto> replyFuture =
         new CompletableFuture<>();
     semaphore.acquire();
-    long requestTime = Time.monotonicNowNanos();
+    long requestTime = System.nanoTime();
     metrics.incrPendingContainerOpsMetrics(request.getCmdType());
     // create a new grpc stream for each non-async call.
 
     // TODO: for async calls, we should reuse StreamObserver resources.
+    // set the grpc dealine here so as if the response is not received
+    // in the configured time, the rpc will fail with DEADLINE_EXCEEDED here
     final StreamObserver<ContainerCommandRequestProto> requestObserver =
-        asyncStubs.get(dnId)
+        asyncStubs.get(dnId).withDeadlineAfter(timeout, TimeUnit.SECONDS)
             .send(new StreamObserver<ContainerCommandResponseProto>() {
               @Override
               public void onNext(ContainerCommandResponseProto value) {
                 replyFuture.complete(value);
                 metrics.decrPendingContainerOpsMetrics(request.getCmdType());
+                long cost = System.nanoTime() - requestTime;
                 metrics.addContainerOpsLatency(request.getCmdType(),
-                    Time.monotonicNowNanos() - requestTime);
+                    cost);
+                if (LOG.isDebugEnabled()) {
+                  LOG.debug("Executed command {} on datanode {}, cost = {}, "
+                          + "cmdType = {}", request, dn,
+                      cost, request.getCmdType());
+                }
                 semaphore.release();
               }
 
@@ -441,8 +497,14 @@ public class XceiverClientGrpc extends XceiverClientSpi {
               public void onError(Throwable t) {
                 replyFuture.completeExceptionally(t);
                 metrics.decrPendingContainerOpsMetrics(request.getCmdType());
+                long cost = System.nanoTime() - requestTime;
                 metrics.addContainerOpsLatency(request.getCmdType(),
-                    Time.monotonicNowNanos() - requestTime);
+                    System.nanoTime() - requestTime);
+                if (LOG.isDebugEnabled()) {
+                  LOG.debug("Executed command {} on datanode {}, cost = {}, "
+                          + "cmdType = {}", request, dn,
+                      cost, request.getCmdType());
+                }
                 semaphore.release();
               }
 

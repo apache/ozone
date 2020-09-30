@@ -25,7 +25,7 @@ import org.apache.hadoop.net.NetUtils;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_BEFORE_DB_CHECKPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT;
 
 /**
@@ -129,8 +129,24 @@ public final class OMNodeDetails {
     return rpcAddress;
   }
 
-  public InetAddress getAddress() {
+  public boolean isHostUnresolved() {
+    return rpcAddress.isUnresolved();
+  }
+
+  public InetAddress getInetAddress() {
     return rpcAddress.getAddress();
+  }
+
+  public String getHostName() {
+    return rpcAddress.getHostName();
+  }
+
+  public String getRatisHostPortStr() {
+    StringBuilder hostPort = new StringBuilder();
+    hostPort.append(getHostName())
+        .append(":")
+        .append(ratisPort);
+    return hostPort.toString();
   }
 
   public int getRatisPort() {
@@ -149,12 +165,12 @@ public final class OMNodeDetails {
     if (httpPolicy.isHttpEnabled()) {
       if (StringUtils.isNotEmpty(httpAddress)) {
         return "http://" + httpAddress + OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT
-            + "?" + OM_RATIS_SNAPSHOT_BEFORE_DB_CHECKPOINT + "=true";
+            + "?" + OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=true";
       }
     } else {
       if (StringUtils.isNotEmpty(httpsAddress)) {
         return "https://" + httpsAddress + OZONE_OM_DB_CHECKPOINT_HTTP_ENDPOINT
-            + "?" + OM_RATIS_SNAPSHOT_BEFORE_DB_CHECKPOINT + "=true";
+            + "?" + OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=true";
       }
     }
     return null;

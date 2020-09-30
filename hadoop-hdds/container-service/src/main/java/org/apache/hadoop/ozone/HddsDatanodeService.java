@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -23,17 +23,21 @@ import java.net.InetAddress;
 import java.security.KeyPair;
 import java.security.cert.CertificateException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ConcurrentHashMap;
 
+import com.sun.jmx.mbeanserver.Introspector;
 import org.apache.hadoop.conf.Configurable;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
@@ -46,6 +50,8 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClie
 import org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.utils.HddsVersionInfo;
+import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
@@ -55,21 +61,21 @@ import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.util.ServicePlugin;
-import org.apache.hadoop.util.StringUtils;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import io.prometheus.client.CollectorRegistry;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getX509Certificate;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
 import static org.apache.hadoop.util.ExitUtil.terminate;
-import org.apache.ratis.metrics.MetricRegistries;
-import org.apache.ratis.metrics.MetricsReporting;
+
+import org.apache.hadoop.util.Time;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
+
+import javax.management.ObjectName;
 
 /**
  * Datanode service plugin to start the HDDS container services.
@@ -93,7 +99,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private HddsDatanodeHttpServer httpServer;
   private boolean printBanner;
   private String[] args;
-  private volatile AtomicBoolean isStopped = new AtomicBoolean(false);
+  private final AtomicBoolean isStopped = new AtomicBoolean(false);
+  private final Map<String, RatisDropwizardExports> ratisMetricsMap =
+      new ConcurrentHashMap<>();
+  private DNMXBeanImpl serviceRuntimeInfo =
+      new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) {};
+  private ObjectName dnInfoBeanName;
 
   //Constructor for DataNode PluginService
   public HddsDatanodeService(){}
@@ -132,6 +143,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   public static void main(String[] args) {
     try {
+      Introspector.checkCompliance(DNMXBeanImpl.class);
       HddsDatanodeService hddsDatanodeService =
           createHddsDatanodeService(args, true);
       hddsDatanodeService.run(args);
@@ -148,8 +160,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   @Override
   public Void call() throws Exception {
     if (printBanner) {
-      StringUtils
-          .startupShutdownMessage(HddsDatanodeService.class, args, LOG);
+      StringUtils.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
+          HddsDatanodeService.class, args, LOG);
     }
     start(createOzoneConfiguration());
     join();
@@ -180,15 +192,10 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   }
 
   public void start() {
+    serviceRuntimeInfo.setStartTime();
 
-    //All the Ratis metrics (registered from now) will be published via JMX and
-    //via the prometheus exporter (used by the /prom servlet
-    MetricRegistries.global()
-        .addReporterRegistration(MetricsReporting.jmxReporter());
-    MetricRegistries.global().addReporterRegistration(
-        registry -> CollectorRegistry.defaultRegistry.register(
-            new RatisDropwizardExports(
-                registry.getDropWizardMetricRegistry())));
+    RatisDropwizardExports.
+        registerRatisMetricReporters(ratisMetricsMap);
 
     OzoneConfiguration.activate();
     HddsServerUtil.initializeMetrics(conf, "HddsDatanode");
@@ -198,6 +205,12 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       datanodeDetails = initializeDatanodeDetails();
       datanodeDetails.setHostName(hostname);
       datanodeDetails.setIpAddress(ip);
+      datanodeDetails.setVersion(
+          HddsVersionInfo.HDDS_VERSION_INFO.getVersion());
+      datanodeDetails.setSetupTime(Time.now());
+      datanodeDetails.setRevision(
+          HddsVersionInfo.HDDS_VERSION_INFO.getRevision());
+      datanodeDetails.setBuildDate(HddsVersionInfo.HDDS_VERSION_INFO.getDate());
       TracingUtil.initTracing(
           "HddsDatanodeService." + datanodeDetails.getUuidString()
               .substring(0, 8), conf);
@@ -252,7 +265,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           .equalsIgnoreCase(System.getenv("OZONE_DATANODE_STANDALONE_TEST"))) {
         startRatisForTest();
       }
-
+      registerMXBean();
     } catch (IOException e) {
       throw new RuntimeException("Can't start the HDDS datanode plugin", e);
     } catch (AuthenticationException ex) {
@@ -339,9 +352,15 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         dnCertClient.storeCertificate(pemEncodedCert, true);
         dnCertClient.storeCertificate(response.getX509CACertificate(), true,
             true);
-        datanodeDetails.setCertSerialId(getX509Certificate(pemEncodedCert).
-            getSerialNumber().toString());
+        String dnCertSerialId = getX509Certificate(pemEncodedCert).
+            getSerialNumber().toString();
+        datanodeDetails.setCertSerialId(dnCertSerialId);
         persistDatanodeDetails(datanodeDetails);
+        // Rebuild dnCertClient with the new CSR result so that the default
+        // certSerialId and the x509Certificate can be updated.
+        dnCertClient = new DNCertificateClient(
+            new SecurityConfig(config), dnCertSerialId);
+
       } else {
         throw new RuntimeException("Unable to retrieve datanode certificate " +
             "chain");
@@ -352,12 +371,27 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     }
   }
 
+  private void registerMXBean() {
+    Map<String, String> jmxProperties = new HashMap<>();
+    jmxProperties.put("component", "ServerRuntime");
+    this.dnInfoBeanName = HddsUtils.registerWithJmxProperties(
+        "HddsDatanodeService",
+        "HddsDatanodeServiceInfo", jmxProperties, this.serviceRuntimeInfo);
+  }
+
+  private void unregisterMXBean() {
+    if (this.dnInfoBeanName != null) {
+      MBeans.unregister(this.dnInfoBeanName);
+      this.dnInfoBeanName = null;
+    }
+  }
+
   /**
    * Creates CSR for DN.
    * @param config
    * */
   @VisibleForTesting
-  public PKCS10CertificationRequest getCSR(Configuration config)
+  public PKCS10CertificationRequest getCSR(ConfigurationSource config)
       throws IOException {
     CertificateSignRequest.Builder builder = dnCertClient.getCSRBuilder();
     KeyPair keyPair = new KeyPair(dnCertClient.getPublicKey(),
@@ -401,8 +435,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     } else {
       // There is no datanode.id file, this might be the first time datanode
       // is started.
-      String datanodeUuid = UUID.randomUUID().toString();
-      return DatanodeDetails.newBuilder().setUuid(datanodeUuid).build();
+      return DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
     }
   }
 
@@ -498,8 +531,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   @Override
   public void stop() {
-    if (!isStopped.get()) {
-      isStopped.set(true);
+    if (!isStopped.getAndSet(true)) {
       if (plugins != null) {
         for (ServicePlugin plugin : plugins) {
           try {
@@ -520,6 +552,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
           LOG.error("Stopping HttpServer is failed.", e);
         }
       }
+      unregisterMXBean();
     }
   }
 

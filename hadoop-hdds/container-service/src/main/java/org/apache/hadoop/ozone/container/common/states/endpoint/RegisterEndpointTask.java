@@ -19,10 +19,10 @@ package org.apache.hadoop.ozone.container.common.states.endpoint;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
-        .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+    .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.ozone.container.common.statemachine
     .EndpointStateMachine;
 import org.apache.hadoop.hdds.protocol.proto
@@ -49,7 +49,7 @@ public final class RegisterEndpointTask implements
   static final Logger LOG = LoggerFactory.getLogger(RegisterEndpointTask.class);
 
   private final EndpointStateMachine rpcEndPoint;
-  private final Configuration conf;
+  private final ConfigurationSource conf;
   private Future<EndpointStateMachine.EndPointStates> result;
   private DatanodeDetails datanodeDetails;
   private final OzoneContainer datanodeContainerManager;
@@ -64,7 +64,7 @@ public final class RegisterEndpointTask implements
    */
   @VisibleForTesting
   public RegisterEndpointTask(EndpointStateMachine rpcEndPoint,
-      Configuration conf, OzoneContainer ozoneContainer,
+      ConfigurationSource conf, OzoneContainer ozoneContainer,
       StateContext context) {
     this.rpcEndPoint = rpcEndPoint;
     this.conf = conf;
@@ -119,8 +119,8 @@ public final class RegisterEndpointTask implements
             datanodeContainerManager.getPipelineReport();
         // TODO : Add responses to the command Queue.
         SCMRegisteredResponseProto response = rpcEndPoint.getEndPoint()
-            .register(datanodeDetails.getProtoBufMessage(), nodeReport,
-                containerReport, pipelineReportsProto);
+            .register(datanodeDetails.getExtendedProtoBufMessage(),
+                nodeReport, containerReport, pipelineReportsProto);
         Preconditions.checkState(UUID.fromString(response.getDatanodeUUID())
                 .equals(datanodeDetails.getUuid()),
             "Unexpected datanode ID in the response.");
@@ -163,7 +163,7 @@ public final class RegisterEndpointTask implements
    */
   public static class Builder {
     private EndpointStateMachine endPointStateMachine;
-    private Configuration conf;
+    private ConfigurationSource conf;
     private DatanodeDetails datanodeDetails;
     private OzoneContainer container;
     private StateContext context;
@@ -191,7 +191,7 @@ public final class RegisterEndpointTask implements
      * @param config - config
      * @return Builder.
      */
-    public Builder setConfig(Configuration config) {
+    public Builder setConfig(ConfigurationSource config) {
       this.conf = config;
       return this;
     }

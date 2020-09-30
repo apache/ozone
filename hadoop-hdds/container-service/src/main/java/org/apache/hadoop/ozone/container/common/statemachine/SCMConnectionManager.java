@@ -16,22 +16,6 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.io.retry.RetryPolicies;
-import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.metrics2.util.MBeans;
-import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
-import org.apache.hadoop.ozone.protocolPB
-    .StorageContainerDatanodeProtocolClientSideTranslatorPB;
-import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import javax.management.ObjectName;
 import java.io.Closeable;
 import java.io.IOException;
@@ -45,9 +29,26 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
+import org.apache.hadoop.io.IOUtils;
+import org.apache.hadoop.io.retry.RetryPolicies;
+import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
+import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.metrics2.util.MBeans;
+import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
+import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
+import org.apache.hadoop.security.UserGroupInformation;
+
 import static java.util.Collections.unmodifiableList;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil
-    .getScmRpcTimeOutInMilliseconds;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcTimeOutInMilliseconds;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcRetryCount;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * SCMConnectionManager - Acts as a class that manages the membership
@@ -62,10 +63,10 @@ public class SCMConnectionManager
   private final Map<InetSocketAddress, EndpointStateMachine> scmMachines;
 
   private final int rpcTimeout;
-  private final Configuration conf;
+  private final ConfigurationSource conf;
   private ObjectName jmxBean;
 
-  public SCMConnectionManager(Configuration conf) {
+  public SCMConnectionManager(ConfigurationSource conf) {
     this.mapLock = new ReentrantReadWriteLock();
     Long timeOut = getScmRpcTimeOutInMilliseconds(conf);
     this.rpcTimeout = timeOut.intValue();
@@ -82,7 +83,7 @@ public class SCMConnectionManager
    *
    * @return ozoneConfig.
    */
-  public Configuration getConf() {
+  public ConfigurationSource getConf() {
     return conf;
   }
 
@@ -139,19 +140,24 @@ public class SCMConnectionManager
         return;
       }
 
-      RPC.setProtocolEngine(conf, StorageContainerDatanodeProtocolPB.class,
+      Configuration hadoopConfig =
+          LegacyHadoopConfigurationSource.asHadoopConfiguration(this.conf);
+      RPC.setProtocolEngine(
+          hadoopConfig,
+          StorageContainerDatanodeProtocolPB.class,
           ProtobufRpcEngine.class);
       long version =
           RPC.getProtocolVersion(StorageContainerDatanodeProtocolPB.class);
 
       RetryPolicy retryPolicy =
-          RetryPolicies.retryForeverWithFixedSleep(
+          RetryPolicies.retryUpToMaximumCountWithFixedSleep(
+              getScmRpcRetryCount(conf),
               1000, TimeUnit.MILLISECONDS);
 
       StorageContainerDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
           StorageContainerDatanodeProtocolPB.class, version,
-          address, UserGroupInformation.getCurrentUser(), conf,
-          NetUtils.getDefaultSocketFactory(conf), getRpcTimeout(),
+          address, UserGroupInformation.getCurrentUser(), hadoopConfig,
+          NetUtils.getDefaultSocketFactory(hadoopConfig), getRpcTimeout(),
           retryPolicy).getProxy();
 
       StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient =
@@ -159,7 +165,7 @@ public class SCMConnectionManager
           rpcProxy);
 
       EndpointStateMachine endPoint =
-          new EndpointStateMachine(address, rpcClient, conf);
+          new EndpointStateMachine(address, rpcClient, this.conf);
       endPoint.setPassive(false);
       scmMachines.put(address, endPoint);
     } finally {
@@ -181,19 +187,21 @@ public class SCMConnectionManager
             "Ignoring the request.");
         return;
       }
-
-      RPC.setProtocolEngine(conf, ReconDatanodeProtocolPB.class,
+      Configuration hadoopConfig =
+          LegacyHadoopConfigurationSource.asHadoopConfiguration(this.conf);
+      RPC.setProtocolEngine(hadoopConfig, ReconDatanodeProtocolPB.class,
           ProtobufRpcEngine.class);
       long version =
           RPC.getProtocolVersion(ReconDatanodeProtocolPB.class);
 
       RetryPolicy retryPolicy =
-          RetryPolicies.retryUpToMaximumCountWithFixedSleep(10,
-              60000, TimeUnit.MILLISECONDS);
+          RetryPolicies.retryUpToMaximumCountWithFixedSleep(
+              getScmRpcRetryCount(conf),
+              1000, TimeUnit.MILLISECONDS);
       ReconDatanodeProtocolPB rpcProxy = RPC.getProtocolProxy(
           ReconDatanodeProtocolPB.class, version,
-          address, UserGroupInformation.getCurrentUser(), conf,
-          NetUtils.getDefaultSocketFactory(conf), getRpcTimeout(),
+          address, UserGroupInformation.getCurrentUser(), hadoopConfig,
+          NetUtils.getDefaultSocketFactory(hadoopConfig), getRpcTimeout(),
           retryPolicy).getProxy();
 
       StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient =

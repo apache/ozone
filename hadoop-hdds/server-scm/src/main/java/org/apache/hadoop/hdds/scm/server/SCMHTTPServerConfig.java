@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 /**
  * SCM HTTP Server configuration in Java style configuration class.
  */
-@ConfigGroup(prefix = "hdds.scm.http")
+@ConfigGroup(prefix = "hdds.scm.http.auth")
 public class SCMHTTPServerConfig {
 
   @Config(key = "kerberos.principal",
@@ -75,9 +75,17 @@ public class SCMHTTPServerConfig {
    *    ScmConfigKeys.HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
    */
   public static class ConfigStrings {
+    public static final String HDDS_SCM_HTTP_AUTH_CONFIG_PREFIX =
+        SCMHTTPServerConfig.class.getAnnotation(ConfigGroup.class).prefix() +
+            ".";
+
+    public static final String HDDS_SCM_HTTP_AUTH_TYPE =
+        HDDS_SCM_HTTP_AUTH_CONFIG_PREFIX + "type";
+
     public static final String HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY =
-          "hdds.scm.http.kerberos.principal";
+        HDDS_SCM_HTTP_AUTH_CONFIG_PREFIX + "kerberos.principal";
+
     public static final String HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY =
-          "hdds.scm.http.kerberos.keytab";
+        HDDS_SCM_HTTP_AUTH_CONFIG_PREFIX + "kerberos.keytab";
   }
 }

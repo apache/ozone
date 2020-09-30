@@ -18,31 +18,35 @@
 
 package org.apache.hadoop.ozone.client.protocol;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.crypto.key.KeyProvider;
-import org.apache.hadoop.hdds.protocol.StorageType;
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.client.*;
-import org.apache.hadoop.hdds.client.OzoneQuota;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
-
 import java.io.IOException;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.crypto.key.KeyProvider;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.client.BucketArgs;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
+import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.VolumeArgs;
+import org.apache.hadoop.ozone.client.io.OzoneInputStream;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -54,8 +58,7 @@ import org.apache.hadoop.security.token.Token;
  * and perform client operations. The protocol used for communication is
  * determined by the implementation class specified by
  * property <code>ozone.client.protocol</code>. The build-in implementation
- * includes: {@link org.apache.hadoop.ozone.client.rpc.RpcClient} for RPC and
- * {@link  org.apache.hadoop.ozone.client.rest.RestClient} for REST.
+ * includes: {@link org.apache.hadoop.ozone.client.rpc.RpcClient} for RPC.
  */
 @KerberosInfo(serverPrincipal = OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY)
 public interface ClientProtocol {
@@ -88,17 +91,20 @@ public interface ClientProtocol {
    * Sets the owner of volume.
    * @param volumeName Name of the Volume
    * @param owner to be set for the Volume
+   * @return true if operation succeeded, false if specified user is
+   *         already the owner.
    * @throws IOException
    */
-  void setVolumeOwner(String volumeName, String owner) throws IOException;
+  boolean setVolumeOwner(String volumeName, String owner) throws IOException;
 
   /**
    * Set Volume Quota.
    * @param volumeName Name of the Volume
-   * @param quota Quota to be set for the Volume
+   * @param quotaInBytes The maximum size this volume can be used.
+   * @param quotaInCounts The maximum number of buckets in this volume.
    * @throws IOException
    */
-  void setVolumeQuota(String volumeName, OzoneQuota quota)
+  void setVolumeQuota(String volumeName, long quotaInBytes, long quotaInCounts)
       throws IOException;
 
   /**
@@ -289,6 +295,17 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
+   * Deletes keys through the list.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyNameList List of the Key
+   * @throws IOException
+   */
+  void deleteKeys(String volumeName, String bucketName,
+                  List<String> keyNameList)
+      throws IOException;
+
+  /**
    * Renames an existing key within a bucket.
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket
@@ -297,7 +314,17 @@ public interface ClientProtocol {
    * @throws IOException
    */
   void renameKey(String volumeName, String bucketName, String fromKeyName,
-      String toKeyName) throws IOException;
+                 String toKeyName) throws IOException;
+
+  /**
+   * Renames existing keys within a bucket.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyMap The key is original key name nad value is new key name.
+   * @throws IOException
+   */
+  void renameKeys(String volumeName, String bucketName,
+                  Map<String, String> keyMap) throws IOException;
 
   /**
    * Returns list of Keys in {Volume/Bucket} that matches the keyPrefix,
@@ -342,7 +369,7 @@ public interface ClientProtocol {
    * @param bucketName - The bucket name.
    * @param keyName - The key user want to recover.
    * @param destinationBucket - The bucket user want to recover to.
-   * @return The recoverTrash
+   * @return The result of recovering operation is success or not.
    * @throws IOException
    */
   boolean recoverTrash(String volumeName, String bucketName, String keyName,
@@ -358,65 +385,6 @@ public interface ClientProtocol {
    */
   OzoneKeyDetails getKeyDetails(String volumeName, String bucketName,
                                 String keyName)
-      throws IOException;
-
-  /**
-   * Creates an S3 bucket inside Ozone manager and creates the mapping needed
-   * to access via both S3 and Ozone.
-   * @param userName - S3 user name.
-   * @param s3BucketName - S3 bucket Name.
-   * @throws IOException - On failure, throws an exception like Bucket exists.
-   */
-  void createS3Bucket(String userName, String s3BucketName) throws IOException;
-
-  /**
-   * Deletes an s3 bucket and removes mapping of Ozone volume/bucket.
-   * @param bucketName - S3 Bucket Name.
-   * @throws  IOException in case the bucket cannot be deleted.
-   */
-  void deleteS3Bucket(String bucketName) throws IOException;
-
-
-  /**
-   * Returns the Ozone Namespace for the S3Bucket. It will return the
-   * OzoneVolume/OzoneBucketName.
-   * @param s3BucketName  - S3 Bucket Name.
-   * @return String - The Ozone canonical name for this s3 bucket. This
-   * string is useful for mounting an OzoneFS.
-   * @throws IOException - Error is throw if the s3bucket does not exist.
-   */
-  String getOzoneBucketMapping(String s3BucketName) throws IOException;
-
-  /**
-   * Returns the corresponding Ozone volume given an S3 Bucket.
-   * @param s3BucketName - S3Bucket Name.
-   * @return String - Ozone Volume name.
-   * @throws IOException - Throws if the s3Bucket does not exist.
-   */
-  String getOzoneVolumeName(String s3BucketName) throws IOException;
-
-  /**
-   * Returns the corresponding Ozone bucket name for the given S3 bucket.
-   * @param s3BucketName - S3Bucket Name.
-   * @return String - Ozone bucket Name.
-   * @throws IOException - Throws if the s3bucket does not exist.
-   */
-  String getOzoneBucketName(String s3BucketName) throws IOException;
-
-  /**
-   * Returns Iterator to iterate over all buckets after prevBucket for a
-   * specific user. If prevBucket is null it returns an iterator to iterate over
-   * all the buckets of a user. The result can be restricted using bucket
-   * prefix, will return all buckets if bucket prefix is null.
-   *
-   * @param userName user name
-   * @param bucketPrefix Bucket prefix to match
-   * @param prevBucket Buckets are listed after this bucket
-   * @return {@code Iterator<OzoneBucket>}
-   * @throws IOException
-   */
-  List<OzoneBucket> listS3Buckets(String userName, String bucketPrefix,
-                                String prevBucket, int maxListResult)
       throws IOException;
 
   /**
@@ -537,9 +505,6 @@ public interface ClientProtocol {
    * @throws IOException
    */
   S3SecretValue getS3Secret(String kerberosID) throws IOException;
-
-  @VisibleForTesting
-  OMFailoverProxyProvider getOMProxyProvider();
 
   /**
    * Get KMS client provider.
@@ -686,4 +651,8 @@ public interface ClientProtocol {
    * */
   List<OzoneAcl> getAcl(OzoneObj obj) throws IOException;
 
+  /**
+   * Getter for OzoneManagerClient.
+   */
+  OzoneManagerProtocol getOzoneManagerClient();
 }

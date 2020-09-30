@@ -17,13 +17,12 @@
  */
 package org.apache.hadoop.hdds.fs;
 
-import org.apache.hadoop.conf.Configuration;
-import org.junit.Test;
-
 import java.io.File;
 import java.time.Duration;
 
-import static org.apache.hadoop.hdds.fs.DUFactory.Conf.configKeyForRefreshPeriod;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.junit.Test;
+
 import static org.apache.hadoop.test.GenericTestUtils.getTestDir;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -40,16 +39,21 @@ public class TestDUFactory {
 
   @Test
   public void testParams() {
-    Configuration conf = new Configuration();
-    conf.set(configKeyForRefreshPeriod(), "1h");
     File dir = getTestDir(getClass().getSimpleName());
+    Duration refresh = Duration.ofHours(1);
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    DUFactory.Conf duConf = conf.getObject(DUFactory.Conf.class);
+    duConf.setRefreshPeriod(refresh);
+    conf.setFromObject(duConf);
 
     SpaceUsageCheckParams params = new DUFactory()
         .setConfiguration(conf)
         .paramsFor(dir);
 
     assertSame(dir, params.getDir());
-    assertEquals(Duration.ofHours(1), params.getRefresh());
+    assertEquals(refresh, params.getRefresh());
     assertSame(DU.class, params.getSource().getClass());
     assertSame(SaveSpaceUsageToFile.class, params.getPersistence().getClass());
   }

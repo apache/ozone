@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -52,7 +52,7 @@ public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
    * @param conf Config
    */
   public SCMContainerPlacementRandom(final NodeManager nodeManager,
-      final Configuration conf, final NetworkTopology networkTopology,
+      final ConfigurationSource conf, final NetworkTopology networkTopology,
       final boolean fallback, final SCMContainerPlacementMetrics metrics) {
     super(nodeManager, conf);
   }

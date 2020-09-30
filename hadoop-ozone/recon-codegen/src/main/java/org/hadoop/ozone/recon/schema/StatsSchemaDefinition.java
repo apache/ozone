@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,7 +18,11 @@
 
 package org.hadoop.ozone.recon.schema;
 
+import static org.hadoop.ozone.recon.codegen.SqlDbUtils.TABLE_EXISTS_CHECK;
+
 import com.google.inject.Inject;
+import com.google.inject.Singleton;
+import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
 
@@ -29,9 +33,11 @@ import java.sql.SQLException;
 /**
  * Class used to create tables that are required for storing Ozone statistics.
  */
+@Singleton
 public class StatsSchemaDefinition implements ReconSchemaDefinition {
 
-  public static final String GLOBAL_STATS_TABLE_NAME = "global_stats";
+  public static final String GLOBAL_STATS_TABLE_NAME = "GLOBAL_STATS";
+  private DSLContext dslContext;
   private final DataSource dataSource;
 
   @Inject
@@ -42,16 +48,18 @@ public class StatsSchemaDefinition implements ReconSchemaDefinition {
   @Override
   public void initializeSchema() throws SQLException {
     Connection conn = dataSource.getConnection();
-    createGlobalStatsTable(conn);
+    dslContext = DSL.using(conn);
+    if (!TABLE_EXISTS_CHECK.test(conn, GLOBAL_STATS_TABLE_NAME)) {
+      createGlobalStatsTable();
+    }
   }
 
   /**
    * Create the Ozone Global Stats table.
-   * @param conn connection
    */
-  private void createGlobalStatsTable(Connection conn) {
-    DSL.using(conn).createTableIfNotExists(GLOBAL_STATS_TABLE_NAME)
-        .column("key", SQLDataType.VARCHAR(255))
+  private void createGlobalStatsTable() {
+    dslContext.createTableIfNotExists(GLOBAL_STATS_TABLE_NAME)
+        .column("key", SQLDataType.VARCHAR(255).nullable(false))
         .column("value", SQLDataType.BIGINT)
         .column("last_updated_timestamp", SQLDataType.TIMESTAMP)
         .constraint(DSL.constraint("pk_key")

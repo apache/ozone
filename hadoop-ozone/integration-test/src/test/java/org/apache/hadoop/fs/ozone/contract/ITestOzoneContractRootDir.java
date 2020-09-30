@@ -18,14 +18,14 @@
 
 package org.apache.hadoop.fs.ozone.contract;
 
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.contract.AbstractContractRootDirectoryTest;
 import org.apache.hadoop.fs.contract.AbstractFSContract;
 
-import java.io.IOException;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 
 /**
  * Ozone contract test for ROOT directory operations.

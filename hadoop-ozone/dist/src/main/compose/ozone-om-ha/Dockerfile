@@ -38,7 +38,7 @@ RUN sudo chmod 700 /opt/.ssh
 RUN sudo sh -c 'echo "export JAVA_HOME=/usr/lib/jvm/jre/" >> /etc/profile'
 
 # Install required robot framework libraries
-RUN sudo pip install robotframework-sshlibrary
+RUN sudo pip3 install robotframework-sshlibrary
 
 # Add start script to start OMs
 ADD startOM.sh /opt/startOM.sh

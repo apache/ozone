@@ -17,27 +17,30 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
-import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
+import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.test.GenericTestUtils;
+
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.slf4j.LoggerFactory;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * This class tests OneReplicaPipelineSafeModeRule.
@@ -49,7 +52,6 @@ public class TestOneReplicaPipelineSafeModeRule {
   private OneReplicaPipelineSafeModeRule rule;
   private SCMPipelineManager pipelineManager;
   private EventQueue eventQueue;
-
 
   private void setup(int nodes, int pipelineFactorThreeCount,
       int pipelineFactorOneCount) throws Exception {
@@ -66,9 +68,15 @@ public class TestOneReplicaPipelineSafeModeRule {
     MockNodeManager mockNodeManager = new MockNodeManager(true, nodes);
 
     eventQueue = new EventQueue();
+
+    SCMMetadataStore scmMetadataStore =
+            new SCMMetadataStoreImpl(ozoneConfiguration);
+
     pipelineManager =
         new SCMPipelineManager(ozoneConfiguration, mockNodeManager,
+            scmMetadataStore.getPipelineTable(),
             eventQueue);
+    pipelineManager.allowPipelineCreation();
 
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(mockNodeManager,

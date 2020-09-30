@@ -17,25 +17,34 @@
  */
 package org.apache.hadoop.ozone.dn.ratis;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.segmentparser.DatanodeRatisLogParser;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.segmentparser.DatanodeRatisLogParser;
+
+import org.apache.hadoop.test.GenericTestUtils;
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.Timeout;
+
 /**
  * Test Datanode Ratis log parser.
  */
 public class TestDnRatisLogParser {
+
+  /**
+    * Set a timeout for each test.
+    */
+  @Rule
+  public Timeout timeout = new Timeout(300000);
 
   private static MiniOzoneCluster cluster = null;
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -62,9 +71,9 @@ public class TestDnRatisLogParser {
   }
 
   @Test
-  public void testRatisLogParsing() {
+  public void testRatisLogParsing() throws Exception {
     cluster.stop();
-    Configuration conf = cluster.getHddsDatanodes().get(0).getConf();
+    OzoneConfiguration conf = cluster.getHddsDatanodes().get(0).getConf();
     String path =
         conf.get(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR);
     UUID pid = cluster.getStorageContainerManager().getPipelineManager()
@@ -72,7 +81,7 @@ public class TestDnRatisLogParser {
     File pipelineDir = new File(path, pid.toString());
     File currentDir = new File(pipelineDir, "current");
     File logFile = new File(currentDir, "log_inprogress_0");
-    Assert.assertTrue(logFile.exists());
+    GenericTestUtils.waitFor(logFile::exists, 100, 15000);
     Assert.assertTrue(logFile.isFile());
 
     DatanodeRatisLogParser datanodeRatisLogParser =

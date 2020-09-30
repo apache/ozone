@@ -31,9 +31,8 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.conf.RatisClientConfig;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
@@ -42,9 +41,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
 import org.apache.ratis.protocol.AlreadyClosedException;
 import org.apache.ratis.protocol.GroupMismatchException;
 import org.apache.ratis.protocol.NotReplicatedException;
@@ -200,6 +196,23 @@ public final class HddsClientUtils {
   }
 
   /**
+   * verifies that key name is a valid name.
+   *
+   * @param keyName key name to be validated
+   *
+   * @throws IllegalArgumentException
+   */
+  public static void verifyKeyName(String keyName) {
+    if (keyName == null) {
+      throw new IllegalArgumentException("Key name is null");
+    }
+    if(!OzoneConsts.KEYNAME_ILLEGAL_CHARACTER_CHECK_REGEX
+            .matcher(keyName).matches()){
+      throw new IllegalArgumentException("Invalid key name: " + keyName);
+    }
+  }
+
+  /**
    * Checks that object parameters passed as reference is not null.
    *
    * @param references Array of object references to be checked.
@@ -216,58 +229,28 @@ public final class HddsClientUtils {
    * @param conf Configuration object
    * @return list cache size
    */
-  public static int getListCacheSize(Configuration conf) {
+  public static int getListCacheSize(ConfigurationSource conf) {
     return conf.getInt(OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SIZE,
         OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SIZE_DEFAULT);
   }
 
   /**
-   * @return a default instance of {@link CloseableHttpClient}.
+   * Returns the s3VolumeName configured in ConfigurationSource.
+   * @param conf Configuration object
+   * @return s3 volume name
    */
-  public static CloseableHttpClient newHttpClient() {
-    return HddsClientUtils.newHttpClient(new Configuration());
-  }
-
-  /**
-   * Returns a {@link CloseableHttpClient} configured by given configuration.
-   * If conf is null, returns a default instance.
-   *
-   * @param conf configuration
-   * @return a {@link CloseableHttpClient} instance.
-   */
-  public static CloseableHttpClient newHttpClient(Configuration conf) {
-    long socketTimeout = OzoneConfigKeys
-        .OZONE_CLIENT_SOCKET_TIMEOUT_DEFAULT;
-    long connectionTimeout = OzoneConfigKeys
-        .OZONE_CLIENT_CONNECTION_TIMEOUT_DEFAULT;
-    if (conf != null) {
-      socketTimeout = conf.getTimeDuration(
-          OzoneConfigKeys.OZONE_CLIENT_SOCKET_TIMEOUT,
-          OzoneConfigKeys.OZONE_CLIENT_SOCKET_TIMEOUT_DEFAULT,
-          TimeUnit.MILLISECONDS);
-      connectionTimeout = conf.getTimeDuration(
-          OzoneConfigKeys.OZONE_CLIENT_CONNECTION_TIMEOUT,
-          OzoneConfigKeys.OZONE_CLIENT_CONNECTION_TIMEOUT_DEFAULT,
-          TimeUnit.MILLISECONDS);
-    }
-
-    CloseableHttpClient client = HttpClients.custom()
-        .setDefaultRequestConfig(
-            RequestConfig.custom()
-                .setSocketTimeout(Math.toIntExact(socketTimeout))
-                .setConnectTimeout(Math.toIntExact(connectionTimeout))
-                .build())
-        .build();
-    return client;
+  public static String getS3VolumeName(ConfigurationSource conf) {
+    return conf.get(OzoneConfigKeys.OZONE_S3_VOLUME_NAME,
+            OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT);
   }
 
   /**
    * Returns the maximum no of outstanding async requests to be handled by
    * Standalone and Ratis client.
    */
-  public static int getMaxOutstandingRequests(Configuration config) {
-    return OzoneConfiguration.of(config)
-        .getObject(RatisClientConfig.class)
+  public static int getMaxOutstandingRequests(ConfigurationSource config) {
+    return config
+        .getObject(RatisClientConfig.RaftConfig.class)
         .getMaxOutstandingRequests();
   }
 

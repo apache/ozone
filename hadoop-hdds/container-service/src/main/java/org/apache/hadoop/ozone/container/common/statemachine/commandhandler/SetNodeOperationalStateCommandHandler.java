@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -31,7 +32,6 @@ import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.conf.Configuration;
 
 import org.apache.hadoop.hdds.protocol.proto.
     StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
@@ -50,7 +50,7 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SetNodeOperationalStateCommandHandler.class);
-  private final Configuration conf;
+  private final ConfigurationSource conf;
   private final AtomicInteger invocationCount = new AtomicInteger(0);
   private final AtomicLong totalTime = new AtomicLong(0);
 
@@ -59,7 +59,7 @@ public class SetNodeOperationalStateCommandHandler implements CommandHandler {
    *
    * @param conf - Configuration for the datanode.
    */
-  public SetNodeOperationalStateCommandHandler(Configuration conf) {
+  public SetNodeOperationalStateCommandHandler(ConfigurationSource conf) {
     this.conf = conf;
   }
 

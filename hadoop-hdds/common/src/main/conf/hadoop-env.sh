@@ -30,6 +30,9 @@
 ## {YARN_xyz|HDFS_xyz} > HADOOP_xyz > hard-coded defaults
 ##
 
+# Enable core dump when crash in C++
+ulimit -c unlimited
+
 # Many of the options here are built from the perspective that users
 # may want to provide OVERWRITING values on the command line.
 # For example:
@@ -397,7 +400,16 @@ export HADOOP_OS_TYPE=${HADOOP_OS_TYPE:-$(uname -s)}
 # These options will be appended to the options specified as HADOOP_OPTS
 # and therefore may override any similar flags set in HADOOP_OPTS
 #
-# export HDFS_OM_OPTS=""
+# export OZONE_OM_OPTS=""
+
+###
+# Ozone DataNode specific parameters
+###
+# Specify the JVM options to be used when starting Ozone DataNodes.
+# These options will be appended to the options specified as HADOOP_OPTS
+# and therefore may override any similar flags set in HADOOP_OPTS
+#
+# export OZONE_DATANODE_OPTS=""
 
 ###
 # HDFS StorageContainerManager specific parameters
@@ -406,7 +418,7 @@ export HADOOP_OS_TYPE=${HADOOP_OS_TYPE:-$(uname -s)}
 # These options will be appended to the options specified as HADOOP_OPTS
 # and therefore may override any similar flags set in HADOOP_OPTS
 #
-# export HDFS_STORAGECONTAINERMANAGER_OPTS=""
+# export OZONE_SCM_OPTS=""
 
 ###
 # Advanced Users Only!

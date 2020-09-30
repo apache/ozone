@@ -18,105 +18,134 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.fs.protocolPB.PBHelper;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto;
+import java.util.Objects;
 
-import java.io.IOException;
-import java.net.URI;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto.Builder;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
 /**
  * File Status of the Ozone Key.
  */
-public class OzoneFileStatus extends FileStatus {
+public class OzoneFileStatus {
 
   private static final long serialVersionUID = 1L;
 
-  transient private OmKeyInfo keyInfo;
-
-  public OzoneFileStatus(OmKeyInfo key, long blockSize, boolean isDirectory) {
-    super(key.getDataSize(), isDirectory, key.getFactor().getNumber(),
-        blockSize, key.getModificationTime(), getPath(key.getKeyName()));
-    keyInfo = key;
-  }
-
-  public OzoneFileStatus(FileStatus status, OmKeyInfo key) throws IOException {
-    super(status);
-    keyInfo = key;
-  }
-
-  // Use this constructor only for directories
-  public OzoneFileStatus(String keyName) {
-    super(0, true, 0, 0, 0, getPath(keyName));
-  }
-
-  public OzoneFileStatusProto getProtobuf() throws IOException {
-    OzoneFileStatusProto.Builder builder = OzoneFileStatusProto.newBuilder()
-        .setStatus(PBHelper.convert(this));
-    if (keyInfo != null) {
-      builder.setKeyInfo(keyInfo.getProtobuf());
-    }
-    return builder.build();
-  }
-
-  public static OzoneFileStatus getFromProtobuf(OzoneFileStatusProto response)
-      throws IOException {
-    return new OzoneFileStatus(PBHelper.convert(response.getStatus()),
-        OmKeyInfo.getFromProtobuf(response.getKeyInfo()));
-  }
-
-  public static Path getPath(String keyName) {
-    return new Path(OZONE_URI_DELIMITER + keyName);
-  }
-
-  public FileStatus makeQualified(URI defaultUri, Path parent,
-                                  String owner, String group) {
-    // fully-qualify path
-    setPath(parent.makeQualified(defaultUri, null));
-    setGroup(group);
-    setOwner(owner);
-    if (isDirectory()) {
-      setPermission(FsPermission.getDirDefault());
-    } else {
-      setPermission(FsPermission.getFileDefault());
-    }
-    return this; // API compatibility
-  }
-
-  /** Get the modification time of the file/directory.
-   *
-   * o3fs uses objects as "fake" directories, which are not updated to
-   * reflect the accurate modification time. We choose to report the
-   * current time because some parts of the ecosystem (e.g. the
-   * HistoryServer) use modification time to ignore "old" directories.
-   *
-   * @return for files the modification time in milliseconds since January 1,
-   *         1970 UTC or for directories the current time.
+  /**
+   * The key info object for files. Leave null for the root directory.
    */
-  @Override
-  public long getModificationTime(){
-    if (isDirectory() && super.getModificationTime() == 0) {
-      return System.currentTimeMillis();
-    } else {
-      return super.getModificationTime();
-    }
+  private OmKeyInfo keyInfo;
+
+  private boolean isDirectory;
+
+  private long blockSize;
+
+  public OzoneFileStatus() {
+    isDirectory = true;
+  }
+
+  public OzoneFileStatus(OmKeyInfo keyInfo,
+      long blockSize, boolean isDirectory) {
+    this.keyInfo = keyInfo;
+    this.isDirectory = isDirectory;
+    this.blockSize = blockSize;
   }
 
   public OmKeyInfo getKeyInfo() {
     return keyInfo;
   }
 
+  public long getBlockSize() {
+    return blockSize;
+  }
+
+  public String getTrimmedName() {
+    String keyName = keyInfo.getKeyName();
+    if (keyName.endsWith(OZONE_URI_DELIMITER)) {
+      return keyName.substring(0, keyName.length() - 1);
+    } else {
+      return keyName;
+    }
+  }
+
+  public String getPath() {
+    if (keyInfo == null) {
+      return OZONE_URI_DELIMITER;
+    } else {
+      String path = OZONE_URI_DELIMITER + keyInfo.getKeyName();
+      if (path.endsWith(OZONE_URI_DELIMITER)) {
+        return path.substring(0, path.length() - 1);
+      } else {
+        return path;
+      }
+    }
+  }
+
+  public boolean isDirectory() {
+    if (keyInfo == null) {
+      return true;
+    }
+    return isDirectory;
+  }
+
+  public boolean isFile() {
+    return !isDirectory();
+  }
+
+  public OzoneFileStatusProto getProtobuf() {
+
+    Builder builder = OzoneFileStatusProto.newBuilder()
+        .setBlockSize(blockSize)
+        .setIsDirectory(isDirectory);
+    //key info can be null for the fake root entry.
+    if (keyInfo != null) {
+      builder.setKeyInfo(keyInfo.getProtobuf());
+    }
+    return builder.build();
+  }
+
+  public static OzoneFileStatus getFromProtobuf(OzoneFileStatusProto status) {
+    return new OzoneFileStatus(
+        OmKeyInfo.getFromProtobuf(status.getKeyInfo()),
+        status.getBlockSize(),
+        status.getIsDirectory());
+  }
+
   @Override
   public boolean equals(Object o) {
-    return super.equals(o);
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof OzoneFileStatus)) {
+      return false;
+    }
+    OzoneFileStatus that = (OzoneFileStatus) o;
+    return isDirectory == that.isDirectory &&
+        blockSize == that.blockSize &&
+        getTrimmedName().equals(that.getTrimmedName());
   }
 
   @Override
   public int hashCode() {
-    return super.hashCode();
+    return Objects.hash(getTrimmedName());
   }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append(getClass().getSimpleName());
+    sb.append("{");
+    if (keyInfo == null) {
+      sb.append("<root>");
+    } else {
+      sb.append(getTrimmedName());
+      if (isDirectory) {
+        sb.append(" (dir)");
+      }
+    }
+    sb.append("}");
+    return sb.toString();
+  }
+
 }

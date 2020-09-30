@@ -16,28 +16,32 @@
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-main-ozone</artifactId>
-    <version>0.6.0-SNAPSHOT</version>
+    <version>1.1.0-SNAPSHOT</version>
   </parent>
   <artifactId>hadoop-ozone</artifactId>
-  <version>0.6.0-SNAPSHOT</version>
+  <version>1.1.0-SNAPSHOT</version>
   <description>Apache Hadoop Ozone Project</description>
   <name>Apache Hadoop Ozone</name>
   <packaging>pom</packaging>
 
   <properties>
     <docker.image>apache/ozone:${project.version}</docker.image>
+    <spring.version>5.2.5.RELEASE</spring.version>
+    <jooq.version>3.11.10</jooq.version>
   </properties>
   <modules>
+    <module>interface-client</module>
+    <module>interface-storage</module>
     <module>common</module>
     <module>client</module>
     <module>ozone-manager</module>
     <module>tools</module>
     <module>integration-test</module>
+    <module>ozonefs-common</module>
     <module>ozonefs</module>
     <module>datanode</module>
     <module>s3gateway</module>
     <module>dist</module>
-    <module>upgrade</module>
     <module>csi</module>
     <module>fault-injection-test</module>
     <module>insight</module>
@@ -61,6 +65,16 @@
       <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-ozone-client</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-ozone-interface-client</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-ozone-interface-storage</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
@@ -95,18 +109,55 @@
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-ozone-filesystem-lib-current</artifactId>
+        <artifactId>hadoop-ozone-filesystem-shaded</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-ozone-filesystem-lib-legacy</artifactId>
+        <artifactId>hadoop-ozone-filesystem-common</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-ozone-filesystem-hadoop3</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-ozone-filesystem-hadoop2</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-hdds-config</artifactId>
         <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-interface-client</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-test-utils</artifactId>
+        <version>${hdds.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-hadoop-dependency-client</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-hadoop-dependency-server</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-hadoop-dependency-test</artifactId>
+        <version>${hdds.version}</version>
+        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
@@ -167,11 +218,6 @@
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-ozone-upgrade</artifactId>
-        <version>${ozone.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-hdds-container-service</artifactId>
         <version>${hdds.version}</version>
         <type>test-jar</type>
@@ -183,34 +229,9 @@
         <version>${hdds.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.sun.xml.bind</groupId>
-        <artifactId>jaxb-impl</artifactId>
-        <version>2.3.0.1</version>
-      </dependency>
-      <dependency>
-        <groupId>com.sun.xml.bind</groupId>
-        <artifactId>jaxb-core</artifactId>
-        <version>2.3.0.1</version>
-      </dependency>
-      <dependency>
-        <groupId>javax.xml.bind</groupId>
-        <artifactId>jaxb-api</artifactId>
-        <version>2.3.0</version>
-      </dependency>
-      <dependency>
-        <groupId>javax.activation</groupId>
-        <artifactId>activation</artifactId>
-        <version>1.1.1</version>
-      </dependency>
-      <dependency>
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcprov-jdk15on</artifactId>
         <version>${bouncycastle.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>commons-lang</groupId>
-        <artifactId>commons-lang</artifactId>
-        <version>2.6</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -244,7 +265,15 @@
             <exclude>**/hs_err*.log</exclude>
             <exclude>**/target/**</exclude>
             <exclude>.gitattributes</exclude>
-            <exclude>.idea/**</exclude>
+            <exclude>**/.attach_*</exclude>
+            <exclude>**/**.rej</exclude>
+            <exclude>**/.factorypath</exclude>
+            <exclude>public</exclude>
+            <exclude>**/*.iml</exclude>
+            <exclude>**/output.xml</exclude>
+            <exclude>**/log.html</exclude>
+            <exclude>**/report.html</exclude>
+            <exclude>**/.idea/**</exclude>
             <exclude>**/.ssh/id_rsa*</exclude>
             <exclude>dev-support/*tests</exclude>
             <exclude>dev-support/checkstyle*</exclude>
@@ -265,12 +294,12 @@
             <exclude>src/test/resources/ssl/*</exclude>
             <exclude>src/main/compose/ozonesecure/docker-image/runner/build/apache-rat-0.12/README-CLI.txt</exclude>
             <exclude>src/main/compose/ozonesecure/docker-image/runner/build/apache-rat-0.12/README-ANT.txt</exclude>
-            <exclude>webapps/static/angular-1.6.4.min.js</exclude>
+            <exclude>webapps/static/angular-1.7.9.min.js</exclude>
             <exclude>webapps/static/angular-nvd3-1.0.9.min.js</exclude>
-            <exclude>webapps/static/angular-route-1.6.4.min.js</exclude>
+            <exclude>webapps/static/angular-route-1.7.9.min.js</exclude>
             <exclude>webapps/static/bootstrap-3.4.1/**</exclude>
             <exclude>webapps/static/d3-3.5.17.min.js</exclude>
-            <exclude>webapps/static/jquery-3.4.1.min.js</exclude>
+            <exclude>webapps/static/jquery-3.5.1.min.js</exclude>
             <exclude>webapps/static/jquery.dataTables.min.js</exclude>
             <exclude>webapps/static/nvd3-1.8.5.min.css.map</exclude>
             <exclude>webapps/static/nvd3-1.8.5.min.css</exclude>
@@ -279,8 +308,11 @@
             <exclude>**/dependency-reduced-pom.xml</exclude>
             <exclude>**/node_modules/**</exclude>
             <exclude>**/yarn.lock</exclude>
+            <exclude>**/pnpm-lock.yaml</exclude>
             <exclude>**/ozone-recon-web/build/**</exclude>
+            <exclude>src/test/resources/prometheus-test-response.txt</exclude>
             <exclude>src/main/license/**</exclude>
+            <exclude>src/main/resources/proto.lock</exclude>
           </excludes>
         </configuration>
       </plugin>
@@ -290,37 +322,15 @@
         <executions>
           <execution>
             <id>add-classpath-descriptor</id>
-            <phase>package</phase>
+            <phase>prepare-package</phase>
             <goals>
               <goal>build-classpath</goal>
             </goals>
             <configuration>
-              <outputFile>${project.build.directory}/classpath</outputFile>
+              <outputFile>${project.build.outputDirectory}/${project.artifactId}.classpath</outputFile>
               <prefix>$HDDS_LIB_JARS_DIR</prefix>
               <outputFilterFile>true</outputFilterFile>
               <includeScope>runtime</includeScope>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>build-helper-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>attach-classpath-artifact</id>
-            <phase>package</phase>
-            <goals>
-              <goal>attach-artifact</goal>
-            </goals>
-            <configuration>
-              <artifacts>
-                <artifact>
-                  <file>${project.build.directory}/classpath</file>
-                  <type>cp</type>
-                  <classifier>classpath</classifier>
-                </artifact>
-              </artifacts>
             </configuration>
           </execution>
         </executions>
@@ -360,8 +370,9 @@
         </property>
       </activation>
       <modules>
-        <module>ozonefs-lib-current</module>
-        <module>ozonefs-lib-legacy</module>
+        <module>ozonefs-shaded</module>
+        <module>ozonefs-hadoop2</module>
+        <module>ozonefs-hadoop3</module>
       </modules>
     </profile>
     <profile>

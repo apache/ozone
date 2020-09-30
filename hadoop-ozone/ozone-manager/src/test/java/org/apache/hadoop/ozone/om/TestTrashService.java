@@ -55,6 +55,7 @@ public class TestTrashService {
   public TemporaryFolder tempFolder = new TemporaryFolder();
 
   private KeyManager keyManager;
+  private OmMetadataManagerImpl omMetadataManager;
   private String volumeName;
   private String bucketName;
 
@@ -69,8 +70,8 @@ public class TestTrashService {
     System.setProperty(DBConfigFromFile.CONFIG_DIR, "/");
     ServerUtils.setOzoneMetaDirPath(configuration, folder.toString());
 
-    OmMetadataManagerImpl omMetadataManager =
-        new OmMetadataManagerImpl(configuration);
+    omMetadataManager = new OmMetadataManagerImpl(configuration);
+
     keyManager = new KeyManagerImpl(
         new ScmBlockLocationTestingClient(null, null, 0),
         omMetadataManager, configuration, UUID.randomUUID().toString(), null);
@@ -86,11 +87,9 @@ public class TestTrashService {
     String destinationBucket = "destBucket";
     createAndDeleteKey(keyName);
 
-    /* TODO:HDDS-2424. */
-    // boolean recoverOperation =
-    //     ozoneManager.recoverTrash(
-    //         volumeName, bucketName, keyName, destinationBucket);
-    // Assert.assertTrue(recoverOperation);
+    boolean recoverOperation = omMetadataManager
+        .recoverTrash(volumeName, bucketName, keyName, destinationBucket);
+    Assert.assertTrue(recoverOperation);
   }
 
   private void createAndDeleteKey(String keyName) throws IOException {

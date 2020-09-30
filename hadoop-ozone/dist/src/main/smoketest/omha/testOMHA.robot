@@ -26,7 +26,7 @@ ${SECURITY_ENABLED}                 false
 ${HOST}                             om1
 ${USERNAME}                         hadoop
 ${PUBLIC_KEY}                       /opt/.ssh/id_rsa
-${OM_SERVICE_ID}                    omservice
+${OM_SERVICE_ID}                    %{OM_SERVICE_ID}
 ${OZONE_LOG_DIR}                    /ozone/logs/
 ${RATIS_DIR}                        /data/metadata/ratis
 ${VOLUME}                           volume1
@@ -92,7 +92,7 @@ Put Multiple Keys
     END
 
 Get OM Leader Node
-    ${result} =             Execute                 ozone admin om getserviceroles --service-id=omservice
+    ${result} =             Execute                 ozone admin om roles --service-id=omservice
                             LOG                     ${result}
                             Should Contain          ${result}               LEADER              1
                             Should Contain          ${result}               FOLLOWER            2

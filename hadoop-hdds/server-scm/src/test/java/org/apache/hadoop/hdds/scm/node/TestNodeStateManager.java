@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -32,7 +32,10 @@ import org.apache.hadoop.util.Time;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -47,12 +50,27 @@ import static junit.framework.TestCase.assertNull;
 public class TestNodeStateManager {
 
   private NodeStateManager nsm;
-  private Configuration conf;
+  private ConfigurationSource conf;
   private MockEventPublisher eventPublisher;
 
   @Before
   public void setUp() {
-    conf = new Configuration();
+    conf = new ConfigurationSource() {
+      @Override
+      public String get(String key) {
+        return null;
+      }
+
+      @Override
+      public Collection<String> getConfigKeys() {
+        return null;
+      }
+
+      @Override
+      public char[] getPassword(String key) throws IOException {
+        return new char[0];
+      }
+    };
     eventPublisher = new MockEventPublisher();
     nsm = new NodeStateManager(conf, eventPublisher);
   }
@@ -254,8 +272,7 @@ public class TestNodeStateManager {
   }
 
   private DatanodeDetails generateDatanode() {
-    String uuid = UUID.randomUUID().toString();
-    return DatanodeDetails.newBuilder().setUuid(uuid).build();
+    return DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
   }
 
   static class  MockEventPublisher implements EventPublisher {

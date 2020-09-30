@@ -16,21 +16,6 @@
  */
 package org.apache.hadoop.ozone.container.common.states.datanode;
 
-import com.google.common.base.Strings;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.statemachine
-    .DatanodeStateMachine;
-import org.apache.hadoop.ozone.container.common.statemachine
-    .SCMConnectionManager;
-import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.common.states.DatanodeState;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -42,8 +27,21 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.states.DatanodeState;
+
+import com.google.common.base.Strings;
 import static org.apache.hadoop.hdds.HddsUtils.getReconAddresses;
 import static org.apache.hadoop.hdds.HddsUtils.getSCMAddresses;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Init Datanode State is the task that gets run when we are in Init State.
@@ -52,7 +50,7 @@ public class InitDatanodeState implements DatanodeState,
     Callable<DatanodeStateMachine.DatanodeStates> {
   static final Logger LOG = LoggerFactory.getLogger(InitDatanodeState.class);
   private final SCMConnectionManager connectionManager;
-  private final Configuration conf;
+  private final ConfigurationSource conf;
   private final StateContext context;
   private Future<DatanodeStateMachine.DatanodeStates> result;
 
@@ -63,7 +61,7 @@ public class InitDatanodeState implements DatanodeState,
    * @param connectionManager - Connection Manager
    * @param context - Current Context
    */
-  public InitDatanodeState(Configuration conf,
+  public InitDatanodeState(ConfigurationSource conf,
                            SCMConnectionManager connectionManager,
                            StateContext context) {
     this.conf = conf;

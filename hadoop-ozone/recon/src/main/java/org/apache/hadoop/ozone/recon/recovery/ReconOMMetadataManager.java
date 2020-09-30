@@ -41,4 +41,10 @@ public interface ReconOMMetadataManager extends OMMetadataManager {
    * Database.
    */
   long getLastSequenceNumberFromDB();
+
+  /**
+   * Check if OM tables are initialized.
+   * @return true if OM Tables are initialized, otherwise false.
+   */
+  boolean isOmTablesInitialized();
 }

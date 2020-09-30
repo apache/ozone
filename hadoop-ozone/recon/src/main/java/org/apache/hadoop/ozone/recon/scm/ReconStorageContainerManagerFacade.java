@@ -18,9 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREFIX;
-import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpcServerStartMessage;
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashSet;
@@ -28,9 +25,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-
-import com.google.inject.Inject;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerActionsHandler;
@@ -38,6 +34,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
@@ -49,13 +47,19 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineActionHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.safemode.SafeModeManager;
-import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.ozone.recon.fsck.MissingContainerTask;
+import org.apache.hadoop.ozone.recon.fsck.ContainerHealthTask;
+import org.apache.hadoop.ozone.recon.persistence.ContainerSchemaManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
-import org.hadoop.ozone.recon.schema.tables.daos.MissingContainersDao;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
+import com.google.inject.Inject;
+import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREFIX;
+import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpcServerStartMessage;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,6 +77,7 @@ public class ReconStorageContainerManagerFacade
   private final ReconDatanodeProtocolServer datanodeProtocolServer;
   private final EventQueue eventQueue;
   private final SCMStorageConfig scmStorageConfig;
+  private final DBStore dbStore;
 
   private ReconNodeManager nodeManager;
   private ReconPipelineManager pipelineManager;
@@ -80,26 +85,44 @@ public class ReconStorageContainerManagerFacade
   private NetworkTopology clusterMap;
   private StorageContainerServiceProvider scmServiceProvider;
   private Set<ReconScmTask> reconScmTasks = new HashSet<>();
+  private SCMContainerPlacementMetrics placementMetrics;
+  private PlacementPolicy containerPlacementPolicy;
 
   @Inject
   public ReconStorageContainerManagerFacade(OzoneConfiguration conf,
       StorageContainerServiceProvider scmServiceProvider,
-      MissingContainersDao missingContainersDao,
-      ReconTaskStatusDao reconTaskStatusDao)
+      ReconTaskStatusDao reconTaskStatusDao,
+      ContainerSchemaManager containerSchemaManager)
       throws IOException {
     this.eventQueue = new EventQueue();
     eventQueue.setSilent(true);
     this.ozoneConfiguration = getReconScmConfiguration(conf);
     this.scmStorageConfig = new ReconStorageConfig(conf);
     this.clusterMap = new NetworkTopologyImpl(conf);
+    dbStore = DBStoreBuilder
+        .createDBStore(ozoneConfiguration, new ReconSCMDBDefinition());
+
     this.nodeManager =
-        new ReconNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
+        new ReconNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
+            ReconSCMDBDefinition.NODES.getTable(dbStore));
+    placementMetrics = SCMContainerPlacementMetrics.create();
+    this.containerPlacementPolicy =
+        ContainerPlacementPolicyFactory.getPolicy(conf, nodeManager,
+        clusterMap, true, placementMetrics);
     this.datanodeProtocolServer = new ReconDatanodeProtocolServer(
         conf, this, eventQueue);
     this.pipelineManager =
-        new ReconPipelineManager(conf, nodeManager, eventQueue);
-    this.containerManager = new ReconContainerManager(conf, pipelineManager,
-        scmServiceProvider);
+
+        new ReconPipelineManager(conf,
+            nodeManager,
+            ReconSCMDBDefinition.PIPELINES.getTable(dbStore),
+            eventQueue);
+    this.containerManager = new ReconContainerManager(conf,
+        ReconSCMDBDefinition.CONTAINERS.getTable(dbStore),
+        dbStore,
+        pipelineManager,
+        scmServiceProvider,
+        containerSchemaManager);
     this.scmServiceProvider = scmServiceProvider;
 
     NodeReportHandler nodeReportHandler =
@@ -141,19 +164,22 @@ public class ReconStorageContainerManagerFacade
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
     eventQueue.addHandler(SCMEvents.NEW_NODE, newNodeHandler);
 
+    ReconTaskConfig reconTaskConfig = conf.getObject(ReconTaskConfig.class);
     reconScmTasks.add(new PipelineSyncTask(
-        this,
+        pipelineManager,
         scmServiceProvider,
-        reconTaskStatusDao));
-    reconScmTasks.add(new MissingContainerTask(
-        this,
         reconTaskStatusDao,
-        missingContainersDao));
-    reconScmTasks.forEach(ReconScmTask::register);
+        reconTaskConfig));
+    reconScmTasks.add(new ContainerHealthTask(
+        containerManager,
+        reconTaskStatusDao,
+        containerSchemaManager,
+        containerPlacementPolicy,
+        reconTaskConfig));
   }
 
   /**
-   *  For every config key which is prefixed by 'recon.scm', create a new
+   *  For every config key which is prefixed by 'recon.scmconfig', create a new
    *  config key without the prefix keeping the same value.
    *  For example, if recon.scm.a.b. = xyz, we add a new config like
    *  a.b.c = xyz. This is done to override Recon's passive SCM configs if
@@ -214,6 +240,11 @@ public class ReconStorageContainerManagerFacade
     IOUtils.cleanupWithLogger(LOG, nodeManager);
     IOUtils.cleanupWithLogger(LOG, containerManager);
     IOUtils.cleanupWithLogger(LOG, pipelineManager);
+    try {
+      dbStore.close();
+    } catch (Exception e) {
+      LOG.error("Can't close dbStore ", e);
+    }
   }
 
   public ReconDatanodeProtocolServer getDatanodeProtocolServer() {

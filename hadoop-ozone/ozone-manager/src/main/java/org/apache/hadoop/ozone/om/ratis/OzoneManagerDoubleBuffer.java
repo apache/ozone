@@ -19,15 +19,26 @@
 package org.apache.hadoop.ozone.om.ratis;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.function.SupplierWithIOException;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +51,12 @@ import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.ratis.util.ExitUtils;
 
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.BUCKET;
+import static org.apache.hadoop.ozone.OzoneConsts.VOLUME;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteBucket;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteVolume;
+
 /**
  * This class implements DoubleBuffer implementation of OMClientResponse's. In
  * DoubleBuffer it has 2 buffers one is currentBuffer and other is
@@ -50,7 +67,7 @@ import org.apache.ratis.util.ExitUtils;
  * methods.
  *
  */
-public class OzoneManagerDoubleBuffer {
+public final class OzoneManagerDoubleBuffer {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerDoubleBuffer.class);
@@ -85,20 +102,72 @@ public class OzoneManagerDoubleBuffer {
   private final OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot;
 
   private final boolean isRatisEnabled;
+  private final boolean isTracingEnabled;
 
-  public OzoneManagerDoubleBuffer(OMMetadataManager omMetadataManager,
-      OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot) {
-    this(omMetadataManager, ozoneManagerRatisSnapShot, true);
+  /**
+   * function which will get term associated with the transaction index.
+   */
+  private Function<Long, Long> indexToTerm;
+
+
+
+  /**
+   *  Builder for creating OzoneManagerDoubleBuffer.
+   */
+  public static class Builder {
+    private OMMetadataManager mm;
+    private OzoneManagerRatisSnapshot rs;
+    private boolean isRatisEnabled = false;
+    private boolean isTracingEnabled = false;
+    private Function<Long, Long> indexToTerm = null;
+
+    public Builder setOmMetadataManager(OMMetadataManager omm) {
+      this.mm = omm;
+      return this;
+    }
+
+    public Builder setOzoneManagerRatisSnapShot(
+        OzoneManagerRatisSnapshot omrs) {
+      this.rs = omrs;
+      return this;
+    }
+
+    public Builder enableRatis(boolean enableRatis) {
+      this.isRatisEnabled = enableRatis;
+      return this;
+    }
+
+    public Builder enableTracing(boolean enableTracing) {
+      this.isTracingEnabled = enableTracing;
+      return this;
+    }
+
+    public Builder setIndexToTerm(Function<Long, Long> termGet) {
+      this.indexToTerm = termGet;
+      return this;
+    }
+
+    public OzoneManagerDoubleBuffer build() {
+      if (isRatisEnabled) {
+        Preconditions.checkNotNull(rs, "When ratis is enabled, " +
+                "OzoneManagerRatisSnapshot should not be null");
+        Preconditions.checkNotNull(indexToTerm, "When ratis is enabled " +
+            "indexToTerm should not be null");
+      }
+      return new OzoneManagerDoubleBuffer(mm, rs, isRatisEnabled,
+          isTracingEnabled, indexToTerm);
+    }
   }
 
-  public OzoneManagerDoubleBuffer(OMMetadataManager omMetadataManager,
+  private OzoneManagerDoubleBuffer(OMMetadataManager omMetadataManager,
       OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot,
-      boolean isRatisEnabled) {
+      boolean isRatisEnabled, boolean isTracingEnabled,
+      Function<Long, Long> indexToTerm) {
     this.currentBuffer = new ConcurrentLinkedQueue<>();
     this.readyBuffer = new ConcurrentLinkedQueue<>();
 
     this.isRatisEnabled = isRatisEnabled;
-
+    this.isTracingEnabled = isTracingEnabled;
     if (!isRatisEnabled) {
       this.currentFutureQueue = new ConcurrentLinkedQueue<>();
       this.readyFutureQueue = new ConcurrentLinkedQueue<>();
@@ -111,6 +180,7 @@ public class OzoneManagerDoubleBuffer {
     this.ozoneManagerRatisSnapShot = ozoneManagerRatisSnapShot;
     this.ozoneManagerDoubleBufferMetrics =
         OzoneManagerDoubleBufferMetrics.create();
+    this.indexToTerm = indexToTerm;
 
     isRunning.set(true);
     // Daemon thread which runs in back ground and flushes transactions to DB.
@@ -120,8 +190,46 @@ public class OzoneManagerDoubleBuffer {
 
   }
 
+  // TODO: pass the trace id further down and trace all methods of DBStore.
 
+  /**
+   * add to write batch with trace span if tracing is enabled.
+   */
+  private Void addToBatchWithTrace(OMResponse omResponse,
+      SupplierWithIOException<Void> supplier) throws IOException {
+    if (!isTracingEnabled) {
+      return supplier.get();
+    }
+    String spanName = "DB-addToWriteBatch" + "-" +
+        omResponse.getCmdType().toString();
+    return TracingUtil.executeAsChildSpan(spanName, omResponse.getTraceID(),
+        supplier);
+  }
 
+  /**
+   * flush write batch with trace span if tracing is enabled.
+   */
+  private Void flushBatchWithTrace(String parentName, int batchSize,
+      SupplierWithIOException<Void> supplier) throws IOException {
+    if (!isTracingEnabled) {
+      return supplier.get();
+    }
+    String spanName = "DB-commitWriteBatch-Size-" + batchSize;
+    return TracingUtil.executeAsChildSpan(spanName, parentName, supplier);
+  }
+
+  /**
+   * Add to writeBatch {@link OMTransactionInfo}.
+   */
+  private Void addToBatchTransactionInfoWithTrace(String parentName,
+      long transactionIndex, SupplierWithIOException<Void> supplier)
+      throws IOException {
+    if (!isTracingEnabled) {
+      return supplier.get();
+    }
+    String spanName = "DB-addWriteBatch-transactioninfo-" + transactionIndex;
+    return TracingUtil.executeAsChildSpan(spanName, parentName, supplier);
+  }
 
   /**
    * Runs in a background thread and batches the transaction in currentBuffer
@@ -131,14 +239,27 @@ public class OzoneManagerDoubleBuffer {
     while (isRunning.get()) {
       try {
         if (canFlush()) {
+          Map<String, List<Long>> cleanupEpochs = new HashMap<>();
+
           setReadyBuffer();
+          List<Long> flushedEpochs = null;
           try(BatchOperation batchOperation = omMetadataManager.getStore()
               .initBatchOperation()) {
 
+            AtomicReference<String> lastTraceId = new AtomicReference<>();
             readyBuffer.iterator().forEachRemaining((entry) -> {
               try {
-                entry.getResponse().checkAndUpdateDB(omMetadataManager,
-                    batchOperation);
+                OMResponse omResponse = entry.getResponse().getOMResponse();
+                lastTraceId.set(omResponse.getTraceID());
+                addToBatchWithTrace(omResponse,
+                    (SupplierWithIOException<Void>) () -> {
+                      entry.getResponse().checkAndUpdateDB(omMetadataManager,
+                          batchOperation);
+                      return null;
+                    });
+
+                setCleanupEpoch(entry, cleanupEpochs);
+
               } catch (IOException ex) {
                 // During Adding to RocksDB batch entry got an exception.
                 // We should terminate the OM.
@@ -146,8 +267,34 @@ public class OzoneManagerDoubleBuffer {
               }
             });
 
+            // Only when ratis is enabled commit transaction info to DB.
+            if (isRatisEnabled) {
+              flushedEpochs =
+                  readyBuffer.stream().map(DoubleBufferEntry::getTrxLogIndex)
+                      .sorted().collect(Collectors.toList());
+              long lastRatisTransactionIndex =
+                  flushedEpochs.get(flushedEpochs.size() - 1);
+              long term = indexToTerm.apply(lastRatisTransactionIndex);
+
+              addToBatchTransactionInfoWithTrace(lastTraceId.get(),
+                  lastRatisTransactionIndex,
+                  (SupplierWithIOException<Void>) () -> {
+                  omMetadataManager.getTransactionInfoTable().putWithBatch(
+                      batchOperation, TRANSACTION_INFO_KEY,
+                      new OMTransactionInfo.Builder()
+                      .setTransactionIndex(lastRatisTransactionIndex)
+                      .setCurrentTerm(term).build());
+                  return null;
+                });
+            }
+
             long startTime = Time.monotonicNowNanos();
-            omMetadataManager.getStore().commitBatchOperation(batchOperation);
+            flushBatchWithTrace(lastTraceId.get(), readyBuffer.size(),
+                (SupplierWithIOException<Void>) () -> {
+                  omMetadataManager.getStore().commitBatchOperation(
+                      batchOperation);
+                  return null;
+                });
             ozoneManagerDoubleBufferMetrics.updateFlushTime(
                 Time.monotonicNowNanos() - startTime);
           }
@@ -173,16 +320,20 @@ public class OzoneManagerDoubleBuffer {
                 flushedTransactionsSize);
           }
 
-          long lastRatisTransactionIndex =
-              readyBuffer.stream().map(DoubleBufferEntry::getTrxLogIndex)
-                  .max(Long::compareTo).get();
+          // When non-HA do the sort step here, as the sorted list is not
+          // required for flush to DB. As in non-HA we want to complete
+          // futures as quick as possible after flush to DB, to release rpc
+          // handler threads.
+          if (!isRatisEnabled) {
+            flushedEpochs =
+                readyBuffer.stream().map(DoubleBufferEntry::getTrxLogIndex)
+                    .sorted().collect(Collectors.toList());
+          }
 
-          List<Long> flushedEpochs =
-              readyBuffer.stream().map(DoubleBufferEntry::getTrxLogIndex)
-                  .sorted().collect(Collectors.toList());
 
-          cleanupCache(flushedEpochs);
+          // Clean up committed transactions.
 
+          cleanupCache(cleanupEpochs);
 
           readyBuffer.clear();
 
@@ -217,30 +368,62 @@ public class OzoneManagerDoubleBuffer {
     }
   }
 
-  private void cleanupCache(List<Long> lastRatisTransactionIndex) {
-    // As now only volume and bucket transactions are handled only called
-    // cleanupCache on bucketTable.
-    // TODO: After supporting all write operations we need to call
-    //  cleanupCache on the tables only when buffer has entries for that table.
-    omMetadataManager.getBucketTable().cleanupCache(lastRatisTransactionIndex);
-    omMetadataManager.getVolumeTable().cleanupCache(lastRatisTransactionIndex);
-    omMetadataManager.getUserTable().cleanupCache(lastRatisTransactionIndex);
+  /**
+   * Set cleanup epoch for the DoubleBufferEntry.
+   * @param entry
+   * @param cleanupEpochs
+   */
+  private void setCleanupEpoch(DoubleBufferEntry entry, Map<String,
+      List<Long>> cleanupEpochs) {
+    // Add epochs depending on operated tables. In this way
+    // cleanup will be called only when required.
 
-    //TODO: Optimization we can do here is for key transactions we can only
-    // cleanup cache when it is key commit transaction. In this way all
-    // intermediate transactions for a key will be read from in-memory cache.
-    omMetadataManager.getOpenKeyTable().cleanupCache(lastRatisTransactionIndex);
-    omMetadataManager.getKeyTable().cleanupCache(lastRatisTransactionIndex);
-    omMetadataManager.getDeletedTable().cleanupCache(lastRatisTransactionIndex);
-    omMetadataManager.getS3Table().cleanupCache(lastRatisTransactionIndex);
-    omMetadataManager.getMultipartInfoTable().cleanupCache(
-        lastRatisTransactionIndex);
-    omMetadataManager.getS3SecretTable().cleanupCache(
-        lastRatisTransactionIndex);
-    omMetadataManager.getDelegationTokenTable().cleanupCache(
-        lastRatisTransactionIndex);
-    omMetadataManager.getPrefixTable().cleanupCache(lastRatisTransactionIndex);
+    // As bucket and volume table is full cache add cleanup
+    // epochs only when request is delete to cleanup deleted
+    // entries.
 
+    String opName =
+        entry.getResponse().getOMResponse().getCmdType().name();
+
+    if (opName.toLowerCase().contains(VOLUME) ||
+        opName.toLowerCase().contains(BUCKET)) {
+      if (DeleteBucket.name().equals(opName)
+          || DeleteVolume.name().equals(opName)) {
+        addCleanupEntry(entry, cleanupEpochs);
+      }
+    } else {
+      addCleanupEntry(entry, cleanupEpochs);
+    }
+  }
+
+
+  private void addCleanupEntry(DoubleBufferEntry entry, Map<String,
+      List<Long>> cleanupEpochs) {
+    Class<? extends OMClientResponse> responseClass =
+        entry.getResponse().getClass();
+    CleanupTableInfo cleanupTableInfo =
+        responseClass.getAnnotation(CleanupTableInfo.class);
+    if (cleanupTableInfo != null) {
+      String[] cleanupTables = cleanupTableInfo.cleanupTables();
+      for (String table : cleanupTables) {
+        cleanupEpochs.computeIfAbsent(table, list -> new ArrayList<>())
+            .add(entry.getTrxLogIndex());
+      }
+    } else {
+      // This is to catch early errors, when an new response class missed to
+      // add CleanupTableInfo annotation.
+      throw new RuntimeException("CleanupTableInfo Annotation is missing " +
+          "for" + responseClass);
+    }
+  }
+
+
+
+  private void cleanupCache(Map<String, List<Long>> cleanupEpochs) {
+    cleanupEpochs.forEach((tableName, epochs) -> {
+      Collections.sort(epochs);
+      omMetadataManager.getTable(tableName).cleanupCache(epochs);
+    });
   }
 
   /**
@@ -267,6 +450,9 @@ public class OzoneManagerDoubleBuffer {
   /**
    * Stop OM DoubleBuffer flush thread.
    */
+  // Ignore the sonar false positive on the InterruptedException issue
+  // as this a normal flow of a shutdown.
+  @SuppressWarnings("squid:S2142")
   public void stop() {
     if (isRunning.compareAndSet(true, false)) {
       LOG.info("Stopping OMDoubleBuffer flush thread");
@@ -275,7 +461,7 @@ public class OzoneManagerDoubleBuffer {
         // Wait for daemon thread to exit
         daemon.join();
       } catch (InterruptedException e) {
-        LOG.error("Interrupted while waiting for daemon to exit.");
+        LOG.debug("Interrupted while waiting for daemon to exit.", e);
       }
 
       // stop metrics.
@@ -369,4 +555,3 @@ public class OzoneManagerDoubleBuffer {
   }
 
 }
-

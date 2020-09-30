@@ -94,6 +94,7 @@ public class MockNodeManager implements NodeManager {
   private final Node2ContainerMap node2ContainerMap;
   private NetworkTopology clusterMap;
   private ConcurrentMap<String, Set<String>> dnsToUuidMap;
+  private int numHealthyDisksPerDatanode;
 
   public MockNodeManager(NetworkTopologyImpl clusterMap,
                          List<DatanodeDetails> nodes,
@@ -123,6 +124,7 @@ public class MockNodeManager implements NodeManager {
     }
     safemode = false;
     this.commandMap = new HashMap<>();
+    numHealthyDisksPerDatanode = 1;
   }
 
   public MockNodeManager(boolean initializeFakeNodes, int nodeCount) {
@@ -436,6 +438,19 @@ public class MockNodeManager implements NodeManager {
     }
   }
 
+  public void setNodeState(DatanodeDetails dn, HddsProtos.NodeState state) {
+    healthyNodes.remove(dn);
+    staleNodes.remove(dn);
+    deadNodes.remove(dn);
+    if (state == HEALTHY) {
+      healthyNodes.add(dn);
+    } else if (state == STALE) {
+      staleNodes.add(dn);
+    } else {
+      deadNodes.add(dn);
+    }
+  }
+
   /**
    * Closes this stream and releases any system resources associated with it. If
    * the stream is already closed then invoking this method has no effect.
@@ -470,7 +485,7 @@ public class MockNodeManager implements NodeManager {
    *
    * @param datanodeDetails DatanodeDetails
    * @param nodeReport NodeReportProto
-   * @return SCMHeartbeatResponseProto
+   * @return SCMRegisteredResponseProto
    */
   @Override
   public RegisteredCommand register(DatanodeDetails datanodeDetails,
@@ -626,6 +641,15 @@ public class MockNodeManager implements NodeManager {
 
   public void setNetworkTopology(NetworkTopology topology) {
     this.clusterMap = topology;
+  }
+
+  @Override
+  public int getNumHealthyVolumes(List<DatanodeDetails> dnList) {
+    return numHealthyDisksPerDatanode;
+  }
+
+  public void setNumHealthyVolumes(int value) {
+    numHealthyDisksPerDatanode = value;
   }
 
   /**
