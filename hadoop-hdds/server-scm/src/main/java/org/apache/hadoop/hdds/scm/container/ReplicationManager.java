@@ -49,7 +49,6 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -280,10 +279,9 @@ public class ReplicationManager
        * the replicas are not in OPEN state, send CLOSE_CONTAINER command.
        */
       if (state == LifeCycleState.OPEN) {
-        // TODO - fix this
-        //if (!isContainerHealthy(container, replicas)) {
-        //  eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, id);
-       // }
+        if (!isOpenContainerHealthy(container, replicas)) {
+          eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, id);
+        }
         return;
       }
 
@@ -325,13 +323,16 @@ public class ReplicationManager
 
       ContainerReplicaCount replicaSet =
           getContainerReplicaCount(container, replicas);
+      ContainerPlacementStatus placementStatus = getPlacementStatus(
+          replicas, container.getReplicationFactor().getNumber());
 
       /*
        * Check if the container is under replicated and take appropriate
        * action.
        */
-      if (!replicaSet.isSufficientlyReplicated()) {
-        handleUnderReplicatedContainer(container, replicaSet);
+      if (!replicaSet.isSufficientlyReplicated()
+          || !placementStatus.isPolicySatisfied()) {
+        handleUnderReplicatedContainer(container, replicaSet, placementStatus);
         return;
       }
 
@@ -544,26 +545,21 @@ public class ReplicationManager
    *                   current replica count and inflight adds and deletes
    */
   private void handleUnderReplicatedContainer(final ContainerInfo container,
-      final ContainerReplicaCount replicaSet) {
+      final ContainerReplicaCount replicaSet,
+      final ContainerPlacementStatus placementStatus) {
     LOG.debug("Handling under-replicated container: {}",
-
         container.getContainerID());
     Set<ContainerReplica> replicas = replicaSet.getReplica();
     try {
 
-      if (replicaSet.isSufficientlyReplicated()) {
+      if (replicaSet.isSufficientlyReplicated()
+          && placementStatus.isPolicySatisfied()) {
         LOG.info("The container {} with replicas {} is sufficiently "+
-            "replicated", container.getContainerID(), replicaSet);
-        return;
-      }
-      int repDelta = replicaSet.additionalReplicaNeeded();
-      if (repDelta <= 0) {
-        LOG.info("The container {} with {} is not sufficiently " +
-            "replicated but no further replicas will be scheduled until "+
-            "in-flight operations complete",
+            "replicated and is not mis-replicated",
             container.getContainerID(), replicaSet);
         return;
       }
+      int repDelta = replicaSet.additionalReplicaNeeded();
       final ContainerID id = container.containerID();
       final List<DatanodeDetails> deletionInFlight = inflightDeletion
           .getOrDefault(id, Collections.emptyList())
@@ -597,10 +593,10 @@ public class ReplicationManager
         List<DatanodeDetails> targetReplicas = new ArrayList<>(source);
         // Then add any pending additions
         targetReplicas.addAll(replicationInFlight);
-        final ContainerPlacementStatus placementStatus =
+        final ContainerPlacementStatus inFlightplacementStatus =
             containerPlacement.validateContainerPlacement(
                 targetReplicas, replicationFactor);
-        final int misRepDelta = placementStatus.misReplicationCount();
+        final int misRepDelta = inFlightplacementStatus.misReplicationCount();
         final int replicasNeeded
             = repDelta < misRepDelta ? misRepDelta : repDelta;
         if (replicasNeeded <= 0) {
@@ -689,13 +685,13 @@ public class ReplicationManager
                 .putIfAbsent(r.getOriginDatanodeId(), r));
 
         eligibleReplicas.removeAll(uniqueReplicas.values());
-        // Replica which are maintenance or decommissioned are not eligible to
-        // be removed, as they do not count toward over-replication and they
-        // also many not be available
-        eligibleReplicas.removeIf(r ->
-            r.getDatanodeDetails().getPersistedOpState() !=
-                HddsProtos.NodeOperationalState.IN_SERVICE);
       }
+      // Replica which are maintenance or decommissioned are not eligible to
+      // be removed, as they do not count toward over-replication and they
+      // also many not be available
+      eligibleReplicas.removeIf(r ->
+          r.getDatanodeDetails().getPersistedOpState() !=
+              HddsProtos.NodeOperationalState.IN_SERVICE);
 
       final List<ContainerReplica> unhealthyReplicas = eligibleReplicas
           .stream()
@@ -958,6 +954,20 @@ public class ReplicationManager
     default:
       return false;
     }
+  }
+
+  /**
+   * An open container is healthy if all its replicas are in the same state as
+   * the container.
+   * @param container The container to check
+   * @param replicas The replicas belonging to the container
+   * @return True if the container is healthy, false otherwise
+   */
+  private boolean isOpenContainerHealthy(
+      ContainerInfo container, Set<ContainerReplica> replicas) {
+    LifeCycleState state = container.getState();
+    return replicas.stream()
+        .allMatch(r -> ReplicationManager.compareState(state, r.getState()));
   }
 
   @Override
