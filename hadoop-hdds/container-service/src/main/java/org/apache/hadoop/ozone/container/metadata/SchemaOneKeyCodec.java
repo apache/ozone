@@ -26,25 +26,38 @@ import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
- * Codec to convert String to/from byte array.
+ * Containers written using schema version 1 wrote unprefixed block ID keys
+ * as longs, and metadata or prefixed block IDs as Strings. This was done
+ * before codecs were introduced, so callers could serialize their data
+ * however they wanted. This codec handles this by checking for string
+ * prefixes in the data, and determining which format it should be
+ * encoded/decoded to/from.
  */
-public class SchemaOneBlockKeyCodec implements Codec<String> {
+public class SchemaOneKeyCodec implements Codec<String> {
 
   @Override
   public byte[] toPersistedFormat(String stringObject) {
     try {
+      // If the caller's string has no prefix, it should be stored as a long
+      // to be encoded as a long to be consistent with the schema one
+      // container format.
       long longObject = Long.parseLong(stringObject);
       return Longs.toByteArray(longObject);
     } catch (NumberFormatException ex) {
+      // If long parsing fails, the caller used a prefix and the data should
+      // be encoded as a String.
       return StringUtils.string2Bytes(stringObject);
     }
   }
 
   @Override
   public String fromPersistedFormat(byte[] rawData) throws IOException {
+    // Default interpretation of the data is a String.
     String result = StringUtils.bytes2String(rawData);
 
-    if (!result.startsWith(OzoneConsts.DELETING_KEY_PREFIX)) {
+    // If the data read does not contain a known prefix, treat it as a long.
+    if (!result.startsWith(OzoneConsts.DELETING_KEY_PREFIX) &&
+        !result.startsWith(SchemaOneDeletedBlocksTable.DELETED_KEY_PREFIX)) {
       result = Long.toString(Longs.fromByteArray(rawData));
     }
 

@@ -39,12 +39,15 @@ public class DatanodeSchemaOneDBDefinition
   // codecs/classes are applied on top. By defining different DBDefinitions
   // with different codecs that all map to the default table, clients are
   // unaware they are using the same table for both interpretations of the data.
+
+  // Note that the current RDBStore implementation requires all column
+  // families to use the same codec instance for each key/value type.
   public static final DBColumnFamilyDefinition<String, BlockData>
       BLOCK_DATA =
       new DBColumnFamilyDefinition<>(
           StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
           String.class,
-          new SchemaOneBlockKeyCodec(),
+          new SchemaOneKeyCodec(),
           BlockData.class,
           new BlockDataCodec());
 
@@ -53,7 +56,7 @@ public class DatanodeSchemaOneDBDefinition
         new DBColumnFamilyDefinition<>(
             StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
             String.class,
-            new SchemaOneBlockKeyCodec(),
+            new SchemaOneKeyCodec(),
             Long.class,
             new LongCodec());
 
@@ -62,7 +65,7 @@ public class DatanodeSchemaOneDBDefinition
         new DBColumnFamilyDefinition<>(
             StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
             String.class,
-            new SchemaOneBlockKeyCodec(),
+            new SchemaOneKeyCodec(),
             ChunkInfoList.class,
             new SchemaOneChunkInfoListCodec());
 
