@@ -18,10 +18,7 @@
 
 package org.apache.hadoop.ozone.container.common;
 
-import com.google.common.primitives.Longs;
-import jdk.internal.org.objectweb.asm.TypeReference;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
@@ -49,12 +46,7 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksIterator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
-import sun.util.locale.provider.LocaleServiceProviderPool;
 
 import java.io.File;
 import java.io.IOException;
@@ -333,7 +325,8 @@ public class TestSchemaOneBackwardsCompatibility {
 
       // Test decoding keys from the database.
       List<? extends Table.KeyValue<String, BlockData>> blockKeyValues =
-          blockDataTable.getRangeKVs(null, 100);
+          blockDataTable.getRangeKVs(null, 100,
+              MetadataKeyFilters.getUnprefixedKeyFilter());
 
       List<String> decodedKeys = new ArrayList<>();
 

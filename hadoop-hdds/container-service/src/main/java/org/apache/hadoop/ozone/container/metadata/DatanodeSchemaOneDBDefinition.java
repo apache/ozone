@@ -40,31 +40,31 @@ public class DatanodeSchemaOneDBDefinition
   // with different codecs that all map to the default table, clients are
   // unaware they are using the same table for both interpretations of the data.
   public static final DBColumnFamilyDefinition<String, BlockData>
-          BLOCK_DATA =
-          new DBColumnFamilyDefinition<>(
-                  StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
-                  String.class,
-                  new StringCodec(),
-                  BlockData.class,
-                  new BlockDataCodec());
+      BLOCK_DATA =
+      new DBColumnFamilyDefinition<>(
+          StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+          String.class,
+          new SchemaOneBlockKeyCodec(),
+          BlockData.class,
+          new BlockDataCodec());
 
   public static final DBColumnFamilyDefinition<String, Long>
-          METADATA =
-          new DBColumnFamilyDefinition<>(
-                  StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
-                  String.class,
-                  new StringCodec(),
-                  Long.class,
-                  new LongCodec());
+        METADATA =
+        new DBColumnFamilyDefinition<>(
+            StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+            String.class,
+            new SchemaOneBlockKeyCodec(),
+            Long.class,
+            new LongCodec());
 
   public static final DBColumnFamilyDefinition<String, ChunkInfoList>
-          DELETED_BLOCKS =
-          new DBColumnFamilyDefinition<>(
-                  StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
-                  String.class,
-                  new StringCodec(),
-                  ChunkInfoList.class,
-                  new SchemaOneChunkInfoListCodec());
+        DELETED_BLOCKS =
+        new DBColumnFamilyDefinition<>(
+            StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+            String.class,
+            new SchemaOneBlockKeyCodec(),
+            ChunkInfoList.class,
+            new SchemaOneChunkInfoListCodec());
 
   protected DatanodeSchemaOneDBDefinition(String dbPath) {
     super(dbPath);
