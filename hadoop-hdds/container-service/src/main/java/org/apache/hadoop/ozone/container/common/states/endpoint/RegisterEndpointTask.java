@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.success;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
@@ -160,6 +162,8 @@ public final class RegisterEndpointTask implements
             "Unexpected datanode ID in the response.");
         Preconditions.checkState(!StringUtils.isBlank(response.getClusterID()),
             "Invalid cluster ID in the response.");
+        Preconditions.checkState(response.getErrorCode() == success,
+            "DataNode has higher Software Layout Version than SCM.");
         if (response.hasHostname() && response.hasIpAddress()) {
           datanodeDetails.setHostName(response.getHostname());
           datanodeDetails.setIpAddress(response.getIpAddress());

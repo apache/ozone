@@ -66,7 +66,8 @@ public class ReconNodeManager extends SCMNodeManager {
                           EventPublisher eventPublisher,
                           NetworkTopology networkTopology,
                           Table<UUID, DatanodeDetails> nodeDB) {
-    super(conf, scmStorageConfig, eventPublisher, networkTopology);
+    // TODO: Provide Layoutversion management for Recon.
+    super(conf, scmStorageConfig, eventPublisher, networkTopology, null);
     this.nodeDB = nodeDB;
     loadExistingNodes();
   }
@@ -78,7 +79,7 @@ public class ReconNodeManager extends SCMNodeManager {
           iterator = nodeDB.iterator();
       while (iterator.hasNext()) {
         DatanodeDetails datanodeDetails = iterator.next().getValue();
-        register(datanodeDetails, null, null);
+        register(datanodeDetails, null, null, null);
         nodeCount++;
       }
       LOG.info("Loaded {} nodes from node DB.", nodeCount);

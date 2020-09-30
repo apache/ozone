@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.protocol;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
-        .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -58,7 +60,8 @@ public interface StorageContainerNodeProtocol {
    */
   RegisteredCommand register(DatanodeDetails datanodeDetails,
                              NodeReportProto nodeReport,
-                             PipelineReportsProto pipelineReport);
+                             PipelineReportsProto pipelineReport,
+                             LayoutVersionProto layoutVersionInfo);
 
   /**
    * Send heartbeat to indicate the datanode is alive and doing well.

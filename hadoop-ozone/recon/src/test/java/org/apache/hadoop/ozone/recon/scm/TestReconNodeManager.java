@@ -84,7 +84,7 @@ public class TestReconNodeManager {
     String uuidString = datanodeDetails.getUuidString();
 
     // Register a random datanode.
-    reconNodeManager.register(datanodeDetails, null, null);
+    reconNodeManager.register(datanodeDetails, null, null, null);
     reconNewNodeHandler.onMessage(reconNodeManager.getNodeByUuid(uuidString),
         null);
 

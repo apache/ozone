@@ -50,14 +50,17 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Incremen
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 /**
  * Test Recon ICR handler.
  */
 public class TestReconIncrementalContainerReportHandler
     extends AbstractReconContainerManagerTest {
+  private HDDSLayoutVersionManager versionManager;
 
   @Test
   public void testProcessICR() throws IOException, NodeNotFoundException {
@@ -81,9 +84,17 @@ public class TestReconIncrementalContainerReportHandler
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
     SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
+    this.versionManager =
+        Mockito.mock(HDDSLayoutVersionManager.class);
+    Mockito.when(versionManager.getMetadataLayoutVersion())
+        .thenReturn(METADATA_LAYOUT_VERSION);
+    Mockito.when(versionManager.getSoftwareLayoutVersion())
+        .thenReturn(SOFTWARE_LAYOUT_VERSION);
+
     NodeManager nodeManager =
-        new SCMNodeManager(conf, storageConfig, eventQueue, clusterMap);
-    nodeManager.register(datanodeDetails, null, null);
+        new SCMNodeManager(conf, storageConfig, eventQueue, clusterMap,
+            versionManager);
+    nodeManager.register(datanodeDetails, null, null, null);
 
     ReconContainerManager containerManager = getContainerManager();
     ReconIncrementalContainerReportHandler reconIcr =
