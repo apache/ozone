@@ -196,11 +196,12 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
           OmKeyLocationInfo.getFromProtobuf(blockLocation));
       omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
-      // check volume quota
+      // check volume and bucket quota
       long preAllocatedSpace = newLocationList.size()
           * ozoneManager.getScmBlockSize()
           * openKeyInfo.getFactor().getNumber();
       checkVolumeQuotaInBytes(omVolumeArgs, preAllocatedSpace);
+      checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
       // Append new block
       openKeyInfo.appendNewBlocks(newLocationList, false);
 
@@ -218,6 +219,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       // update usedBytes atomically.
       omVolumeArgs.getUsedBytes().add(preAllocatedSpace);
       omBucketInfo.getUsedBytes().add(preAllocatedSpace);
+      long vol = omVolumeArgs.getUsedBytes().sum();
+      long buk = omBucketInfo.getUsedBytes().sum();
 
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
           .setKeyLocation(blockLocation).build());
