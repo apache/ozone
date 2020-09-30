@@ -108,11 +108,11 @@ public class SCMContainerManager implements ContainerManager {
   }
 
   private int getOpenContainerCountPerPipeline(Pipeline pipeline) {
-    int totalContainerCountPerDn = numContainerPerVolume *
-        pipelineManager.getNumHealthyVolumes(pipeline);
+    int minContainerCountPerDn = numContainerPerVolume *
+        pipelineManager.minHealthyVolumeNum(pipeline);
     int minPipelineCountPerDn = pipelineManager.minPipelineLimit(pipeline);
     return (int) Math.ceil(
-        ((double) totalContainerCountPerDn / minPipelineCountPerDn));
+        ((double) minContainerCountPerDn / minPipelineCountPerDn));
   }
 
   private void loadExistingContainers() throws IOException {

@@ -104,7 +104,7 @@ public class SCMNodeManager implements NodeManager {
   private final boolean useHostname;
   private final ConcurrentHashMap<String, Set<String>> dnsToUuidMap =
       new ConcurrentHashMap<>();
-  private final int numPipelinesPerRaftLogDisk;
+  private final int numPipelinesPerMetadataVolume;
   private final int heavyNodeCriteria;
 
   /**
@@ -133,9 +133,9 @@ public class SCMNodeManager implements NodeManager {
     this.useHostname = conf.getBoolean(
         DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
         DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
-    this.numPipelinesPerRaftLogDisk =
-        conf.getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_DISK,
-            ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_DISK_DEFAULT);
+    this.numPipelinesPerMetadataVolume =
+        conf.getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME,
+            ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME_DEFAULT);
     String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
     this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
   }
@@ -525,7 +525,7 @@ public class SCMNodeManager implements NodeManager {
    * of datanodes constituting the pipeline.
    */
   @Override
-  public int getNumHealthyVolumes(List<DatanodeDetails> dnList) {
+  public int minHealthyVolumeNum(List<DatanodeDetails> dnList) {
     List<Integer> volumeCountList = new ArrayList<>(dnList.size());
     for (DatanodeDetails dn : dnList) {
       try {
@@ -549,12 +549,12 @@ public class SCMNodeManager implements NodeManager {
    * that it has atleast one healthy data volume.
    */
   @Override
-  public int minPipelineLimit(DatanodeDetails dn) {
+  public int pipelineLimit(DatanodeDetails dn) {
     try {
       if (heavyNodeCriteria > 0) {
         return heavyNodeCriteria;
       } else if (nodeStateManager.getNode(dn).getHealthyVolumeCount() > 0) {
-        return numPipelinesPerRaftLogDisk *
+        return numPipelinesPerMetadataVolume *
             nodeStateManager.getNode(dn).getMetaDataVolumeCount();
       }
     } catch (NodeNotFoundException e) {
@@ -571,7 +571,7 @@ public class SCMNodeManager implements NodeManager {
   public int minPipelineLimit(List<DatanodeDetails> dnList) {
     List<Integer> pipelineCountList = new ArrayList<>(dnList.size());
     for (DatanodeDetails dn : dnList) {
-      pipelineCountList.add(minPipelineLimit(dn));
+      pipelineCountList.add(pipelineLimit(dn));
     }
     Preconditions.checkArgument(!pipelineCountList.isEmpty());
     return Collections.min(pipelineCountList);

@@ -148,7 +148,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         .map(d ->
             new DnWithPipelines(d, currentPipelineCount(d, nodesRequired)))
         .filter(d ->
-            (d.getPipelines() < nodeManager.minPipelineLimit(d.getDn())))
+            (d.getPipelines() < nodeManager.pipelineLimit(d.getDn())))
         .sorted(Comparator.comparingInt(DnWithPipelines::getPipelines))
         .map(d -> d.getDn())
         .collect(Collectors.toList());

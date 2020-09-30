@@ -672,13 +672,13 @@ public class SCMPipelineManager implements PipelineManager {
   }
 
   /**
-   * returns max count of healthy volumes from the set of
+   * returns min number of healthy volumes from the set of
    * datanodes constituting the pipeline.
    * @param  pipeline
    * @return healthy volume count
    */
-  public int getNumHealthyVolumes(Pipeline pipeline) {
-    return nodeManager.getNumHealthyVolumes(pipeline.getNodes());
+  public int minHealthyVolumeNum(Pipeline pipeline) {
+    return nodeManager.minHealthyVolumeNum(pipeline.getNodes());
   }
 
   /**
