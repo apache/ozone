@@ -89,7 +89,8 @@ public class TestReplicationManager {
   private SCMNodeManager scmNodeManager;
 
   @Before
-  public void setup() throws IOException, InterruptedException, NodeNotFoundException {
+  public void setup()
+      throws IOException, InterruptedException, NodeNotFoundException {
     conf = new OzoneConfiguration();
     containerManager = Mockito.mock(ContainerManager.class);
     nodeManager = new SimpleMockNodeManager();

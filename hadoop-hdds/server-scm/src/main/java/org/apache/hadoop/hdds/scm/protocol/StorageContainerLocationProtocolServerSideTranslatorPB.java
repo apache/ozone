@@ -277,27 +277,27 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setGetSafeModeRuleStatusesResponse(getSafeModeRuleStatues(
                 request.getGetSafeModeRuleStatusesRequest()))
             .build();
-        case DecommissionNodes:
-          return ScmContainerLocationResponse.newBuilder()
-              .setCmdType(request.getCmdType())
-              .setStatus(Status.OK)
-              .setDecommissionNodesResponse(decommissionNodes(
-                  request.getDecommissionNodesRequest()))
-              .build();
-        case RecommissionNodes:
-          return ScmContainerLocationResponse.newBuilder()
-              .setCmdType(request.getCmdType())
-              .setStatus(Status.OK)
-              .setRecommissionNodesResponse(recommissionNodes(
-                  request.getRecommissionNodesRequest()))
-              .build();
-        case StartMaintenanceNodes:
-          return ScmContainerLocationResponse.newBuilder()
-              .setCmdType(request.getCmdType())
-              .setStatus(Status.OK)
-              .setStartMaintenanceNodesResponse(startMaintenanceNodes(
-                  request.getStartMaintenanceNodesRequest()))
+      case DecommissionNodes:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setDecommissionNodesResponse(decommissionNodes(
+                request.getDecommissionNodesRequest()))
             .build();
+      case RecommissionNodes:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setRecommissionNodesResponse(recommissionNodes(
+                request.getRecommissionNodesRequest()))
+            .build();
+      case StartMaintenanceNodes:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setStartMaintenanceNodesResponse(startMaintenanceNodes(
+                request.getStartMaintenanceNodesRequest()))
+          .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
