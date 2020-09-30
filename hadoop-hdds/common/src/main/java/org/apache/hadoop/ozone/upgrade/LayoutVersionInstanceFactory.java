@@ -180,10 +180,15 @@ public class LayoutVersionInstanceFactory<T> {
   }
 
   /**
-   * To be called on finalization when there is an MLV update.
-   * @param lvm LayoutVersionManager instance.
+   * To be called on finalization of a new LayoutFeature.
+   * Unregisters all the requests handlers that are there for layout versions
+   * before the feature's layout version.
+   * If the feature's layout version does not define a new handler for a
+   * request type, the previously registered handler remains registered.
+   *
+   * @param feature the feature to be finalized.
    */
-  public void onFinalize(LayoutVersionManager lvm) {
+  public void finalizeFeature(LayoutFeature feature) {
     Iterator<Map.Entry<String, PriorityQueue<VersionedInstance<T>>>> iterator =
         instances.entrySet().iterator();
     while (iterator.hasNext()) {
@@ -192,13 +197,13 @@ public class LayoutVersionInstanceFactory<T> {
       PriorityQueue<VersionedInstance<T>> vInstances = next.getValue();
       VersionedInstance<T> prevInstance = null;
       while (!vInstances.isEmpty() &&
-          vInstances.peek().version < lvm.getMetadataLayoutVersion()) {
+          vInstances.peek().version < feature.layoutVersion()) {
         prevInstance = vInstances.poll();
         LOG.info("Unregistering {} from factory. ", prevInstance.instance);
       }
 
       if ((vInstances.isEmpty() ||
-          vInstances.peek().version > lvm.getMetadataLayoutVersion())
+          vInstances.peek().version > feature.layoutVersion())
           && prevInstance != null) {
         vInstances.offer(prevInstance);
       }

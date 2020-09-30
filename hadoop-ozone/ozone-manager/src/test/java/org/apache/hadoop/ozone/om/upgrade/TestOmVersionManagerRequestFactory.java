@@ -47,12 +47,15 @@ import org.reflections.Reflections;
 public class TestOmVersionManagerRequestFactory {
 
   private static OMLayoutVersionManagerImpl omVersionManager;
+  private static OzoneManager om;
 
   @BeforeClass
   public static void setup() throws OMException {
     OMStorage omStorage = mock(OMStorage.class);
     when(omStorage.getLayoutVersion()).thenReturn(0);
     omVersionManager = OMLayoutVersionManagerImpl.initialize(omStorage);
+    om = mock(OzoneManager.class);
+    when(om.getOmStorage()).thenReturn(omStorage);
   }
 
   @Test
@@ -65,8 +68,7 @@ public class TestOmVersionManagerRequestFactory {
 
     // Finalize the version manager.
     OMUpgradeFinalizer f = new OMUpgradeFinalizer(omVersionManager);
-    f.finalize("randomeqq", mock(OzoneManager.class));
-//    omVersionManager.doFinalize(mock(OzoneManager.class));
+    f.finalize("random", om);
 
     // Try getting 'CreateKey' again. Should return CreateECKey.
     requestType = omVersionManager.getRequestHandler(CreateKey.name());

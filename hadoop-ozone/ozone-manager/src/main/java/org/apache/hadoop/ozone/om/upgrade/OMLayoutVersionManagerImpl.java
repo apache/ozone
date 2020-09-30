@@ -171,4 +171,10 @@ public final class OMLayoutVersionManagerImpl
         .key(type).build();
     return requestFactory.get(this, versionFactoryKey);
   }
+
+  @Override
+  public void finalized(OMLayoutFeature layoutFeature) {
+    super.finalized(layoutFeature);
+    requestFactory.finalizeFeature(layoutFeature);
+  }
 }
