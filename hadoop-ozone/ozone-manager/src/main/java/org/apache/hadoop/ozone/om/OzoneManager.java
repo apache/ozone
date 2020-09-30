@@ -2681,7 +2681,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean takeover
   ) throws IOException {
-    return upgradeFinalizer.reportStatus();
+    return upgradeFinalizer.reportStatus(upgradeClientID, takeover);
   }
 
   @Override

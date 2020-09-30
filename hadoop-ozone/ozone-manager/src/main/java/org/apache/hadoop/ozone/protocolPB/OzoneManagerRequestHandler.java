@@ -211,8 +211,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       case FinalizeUpgradeProgress:
         FinalizeUpgradeProgressResponse upgradeProgressResponse =
             reportUpgradeProgress(request.getFinalizeUpgradeProgressRequest());
-            responseBuilder
-                .setFinalizeUpgradeProgressResponse(upgradeProgressResponse);
+        responseBuilder
+            .setFinalizeUpgradeProgressResponse(upgradeProgressResponse);
         break;
       default:
         responseBuilder.setSuccess(false);

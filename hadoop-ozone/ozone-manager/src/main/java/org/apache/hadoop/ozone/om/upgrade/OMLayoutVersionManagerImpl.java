@@ -45,8 +45,7 @@ import com.google.common.annotations.VisibleForTesting;
  */
 public final class OMLayoutVersionManagerImpl
     extends AbstractLayoutVersionManager<OMLayoutFeature>
-    implements OmLayoutVersionManager
-{
+    implements OmLayoutVersionManager {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMLayoutVersionManagerImpl.class);

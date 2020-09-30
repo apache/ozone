@@ -32,8 +32,7 @@ import com.google.common.base.Preconditions;
  */
 @SuppressWarnings("visibilitymodifier")
 public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
-    implements LayoutVersionManager
-{
+    implements LayoutVersionManager {
 
   protected int metadataLayoutVersion; // MLV.
   protected int softwareLayoutVersion; // SLV.

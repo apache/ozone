@@ -12,6 +12,7 @@ import java.util.Queue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.UPDATE_LAYOUT_VERSION_FAILED;
@@ -20,10 +21,14 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATI
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 
+/**
+ * UpgradeFinalizer implementation for the Ozone Manager service.
+ */
 public class OMUpgradeFinalizer implements UpgradeFinalizer<OzoneManager> {
 
   private Status status = ALREADY_FINALIZED;
   private OMLayoutVersionManagerImpl versionManager;
+  private String clientID;
 
   private Queue<String> msgs = new ConcurrentLinkedQueue<>();
   private boolean isDone = false;
@@ -38,11 +43,13 @@ public class OMUpgradeFinalizer implements UpgradeFinalizer<OzoneManager> {
   }
 
   @Override
-  public StatusAndMessages finalize(String clientID, OzoneManager om)
+  public StatusAndMessages finalize(String upgradeClientID, OzoneManager om)
       throws IOException {
     if (!versionManager.needsFinalization()) {
       return FINALIZED_MSG;
     }
+    clientID = upgradeClientID;
+
 // This requires some more investigation on how to do it properly while
 // requests are on the fly, and post finalize features one by one.
 // Until that is done, monitoring is not really doing anything meaningful
@@ -58,7 +65,13 @@ public class OMUpgradeFinalizer implements UpgradeFinalizer<OzoneManager> {
   }
 
   @Override
-  public StatusAndMessages reportStatus() throws IOException {
+  public StatusAndMessages reportStatus(
+      String upgradeClientID, boolean takeover
+  ) throws IOException {
+    if (takeover) {
+      clientID = upgradeClientID;
+    }
+    assertClientId(upgradeClientID);
     List<String> returningMsgs = new ArrayList<>(msgs.size()+10);
     status = isDone ? FINALIZATION_DONE : FINALIZATION_IN_PROGRESS;
     while (msgs.size() >= 0) {
@@ -67,7 +80,14 @@ public class OMUpgradeFinalizer implements UpgradeFinalizer<OzoneManager> {
     return new StatusAndMessages(status, returningMsgs);
   }
 
-
+  private void assertClientId(String id) throws OMException {
+    if (!this.clientID.equals(id)) {
+      throw new OMException("Unknown client tries to get finalization status.\n"
+          + "The requestor is not the initiating client of the finalization,"
+          + " if you want to take over, and get unsent status messages, check"
+          + " -takeover option.", INVALID_REQUEST);
+    }
+  }
 
 
 
@@ -75,7 +95,7 @@ public class OMUpgradeFinalizer implements UpgradeFinalizer<OzoneManager> {
   private class Worker implements Callable<Void> {
     private OzoneManager ozoneManager;
 
-    public Worker(OzoneManager om) {
+    Worker(OzoneManager om) {
       ozoneManager = om;
     }
 

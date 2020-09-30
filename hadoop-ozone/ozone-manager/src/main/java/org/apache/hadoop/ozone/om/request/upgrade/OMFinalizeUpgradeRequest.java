@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Finaliz
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpgradeFinalizationStatus;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,7 +64,8 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
 
       String upgradeClientID = request.getUpgradeClientId();
 
-      StatusAndMessages omStatus = ozoneManager.finalizeUpgrade(upgradeClientID);
+      StatusAndMessages omStatus =
+          ozoneManager.finalizeUpgrade(upgradeClientID);
 
       UpgradeFinalizationStatus.Status protoStatus =
           UpgradeFinalizationStatus.Status.valueOf(omStatus.status().name());
