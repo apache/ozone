@@ -19,11 +19,14 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 import com.google.common.primitives.Longs;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.hdfs.protocol.proto.NamenodeProtocolProtos;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Containers written using schema version 1 wrote unprefixed block ID keys
@@ -34,6 +37,8 @@ import org.apache.hadoop.ozone.OzoneConsts;
  * encoded/decoded to/from.
  */
 public class SchemaOneKeyCodec implements Codec<String> {
+  private static final Logger LOG = LoggerFactory.getLogger(
+      SchemaOneKeyCodec.class);
 
   @Override
   public byte[] toPersistedFormat(String stringObject) {
@@ -50,18 +55,52 @@ public class SchemaOneKeyCodec implements Codec<String> {
     }
   }
 
+  /**
+   * Determines whether the byte array was originally stored as a string or a
+   * long, decodes the data in the corresponding format, and returns it as a
+   * String. Data is determined to have been stored as a string if it matches
+   * the known format of a metadata key or a prefixed block ID key. If the
+   * data does not match one of these formats, it will be parsed as a long
+   * only if it is 8 bytes long. Otherwise, it will be parsed as a
+   * String.
+   * <p>
+   * Note that it is technically possible, although highly unlikely, that
+   * {@code rawData} was originally encoded as a long, but also happens to match
+   * the regex of a known string format when decoded. In this case this method
+   * will decode the data as a string. Log trace messages have been added to
+   * help debug these errors if necessary.
+   *
+   * @param rawData Byte array from the key/value store. Should not be null.
+   */
   @Override
   public String fromPersistedFormat(byte[] rawData) throws IOException {
-    // Default interpretation of the data is a String.
-    String result = StringUtils.bytes2String(rawData);
+    final String prefixedBlockRegex = "^#[a-zA-Z]+#[0-9]+$";
+    final String metadataRegex = "^#[a-zA-Z]$";
 
-    // If the data read does not contain a known prefix, treat it as a long.
-    if (!result.startsWith(OzoneConsts.DELETING_KEY_PREFIX) &&
-        !result.startsWith(SchemaOneDeletedBlocksTable.DELETED_KEY_PREFIX)) {
-      result = Long.toString(Longs.fromByteArray(rawData));
+    String stringData = StringUtils.bytes2String(rawData);
+
+    if (stringData.matches(prefixedBlockRegex)
+        || stringData.matches(metadataRegex)) {
+
+      LOG.trace("Byte array {} matched the format for a string key." +
+          " It will be parsed as the string {}", rawData, stringData);
+      return stringData;
     }
+    else if (rawData.length == Long.BYTES) {
+      long longData = Longs.fromByteArray(rawData);
+      LOG.trace("Byte array {} did not match the format for a string key " +
+              "and has {} bytes. It will be parsed as the long {}",
+          rawData, Long.BYTES, longData);
 
-    return result;
+      return Long.toString(longData);
+    }
+    else {
+      LOG.trace("Byte array {} did not match the format for a string key " +
+          "and does not have {} bytes. It will be parsed as the string {}",
+          rawData, Long.BYTES, stringData);
+
+      return stringData;
+    }
   }
 
   @Override
