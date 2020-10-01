@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
@@ -336,6 +337,20 @@ public class TestSchemaOneBackwardsCompatibility {
       }
 
       Assert.assertEquals(TestDB.BLOCK_IDS, decodedKeys);
+
+      // Test reading blocks with block iterator.
+      try(BlockIterator<BlockData> iter =
+              refCountedDB.getStore().getBlockIterator()) {
+
+        List<String> iteratorBlockIDs = new ArrayList<>();
+
+        while(iter.hasNext()) {
+          long localID = iter.nextBlock().getBlockID().getLocalID();
+          iteratorBlockIDs.add(Long.toString(localID));
+        }
+
+        Assert.assertEquals(TestDB.BLOCK_IDS, iteratorBlockIDs);
+      }
     }
   }
 
@@ -370,6 +385,23 @@ public class TestSchemaOneBackwardsCompatibility {
           .collect(Collectors.toList());
 
       Assert.assertEquals(expectedKeys, decodedKeys);
+
+      // Test reading deleting blocks with block iterator.
+      MetadataKeyFilters.KeyPrefixFilter filter =
+          MetadataKeyFilters.getDeletingKeyFilter();
+
+      try(BlockIterator<BlockData> iter =
+              refCountedDB.getStore().getBlockIterator(filter)) {
+
+        List<String> iteratorBlockIDs = new ArrayList<>();
+
+        while(iter.hasNext()) {
+          long localID = iter.nextBlock().getBlockID().getLocalID();
+          iteratorBlockIDs.add(Long.toString(localID));
+        }
+
+        Assert.assertEquals(TestDB.DELETING_BLOCK_IDS, iteratorBlockIDs);
+      }
     }
   }
 
