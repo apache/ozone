@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
@@ -375,6 +376,12 @@ public interface OMMetadataManager extends DBStoreHAManager {
       String bucketName, String prefix) throws IOException;
 
   /**
+   * Gets the DirectoryTable.
+   * @return Table.
+   */
+  Table<String, OmDirectoryInfo> getDirectoryTable();
+
+  /**
    * Return table mapped to the specified table name.
    * @param tableName
    * @return Table
@@ -398,4 +405,14 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
       getKeyIterator();
+
+  /**
+   * Given a volume, bucket and a key, return the corresponding DB prefixKey
+   * key.
+   *
+   * @param parentObjectId - parent object Id
+   * @param pathComponentName   - path component name
+   * @return DB directory key as String.
+   */
+  String getOzonePathKey(long parentObjectId, String pathComponentName);
 }
