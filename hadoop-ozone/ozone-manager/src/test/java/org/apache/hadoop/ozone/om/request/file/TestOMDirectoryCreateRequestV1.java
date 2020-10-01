@@ -131,7 +131,7 @@ public class TestOMDirectoryCreateRequestV1 {
     String volumeName = "vol1";
     String bucketName = "bucket1";
     List<String> dirs = new ArrayList<String>();
-    String keyName = createDirKey(dirs);
+    String keyName = createDirKey(dirs, 3);
 
     // Add volume and bucket entries to DB.
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -165,7 +165,7 @@ public class TestOMDirectoryCreateRequestV1 {
     String volumeName = "vol1";
     String bucketName = "bucket1";
     List<String> dirs = new ArrayList<String>();
-    String keyName = createDirKey(dirs);
+    String keyName = createDirKey(dirs, 3);
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             keyName);
@@ -194,7 +194,7 @@ public class TestOMDirectoryCreateRequestV1 {
     String volumeName = "vol1";
     String bucketName = "bucket1";
     List<String> dirs = new ArrayList<String>();
-    String keyName = createDirKey(dirs);
+    String keyName = createDirKey(dirs, 3);
 
     OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
             keyName);
@@ -224,7 +224,7 @@ public class TestOMDirectoryCreateRequestV1 {
     String volumeName = "vol1";
     String bucketName = "bucket1";
     List<String> dirs = new ArrayList<String>();
-    String keyName = createDirKey(dirs);
+    String keyName = createDirKey(dirs, 3);
 
     // Add volume and bucket entries to DB.
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -274,7 +274,7 @@ public class TestOMDirectoryCreateRequestV1 {
     String volumeName = "vol1";
     String bucketName = "bucket1";
     List<String> dirs = new ArrayList<String>();
-    String keyName = createDirKey(dirs);
+    String keyName = createDirKey(dirs, 3);
 
     // Add volume and bucket entries to DB.
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -335,7 +335,7 @@ public class TestOMDirectoryCreateRequestV1 {
     String volumeName = "vol1";
     String bucketName = "bucket1";
     List<String> dirs = new ArrayList<String>();
-    String keyName = createDirKey(dirs);
+    String keyName = createDirKey(dirs, 3);
 
     // Add volume and bucket entries to DB.
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -410,7 +410,7 @@ public class TestOMDirectoryCreateRequestV1 {
     String volumeName = "vol1";
     String bucketName = "bucket1";
     List<String> dirs = new ArrayList<String>();
-    String keyName = createDirKey(dirs);
+    String keyName = createDirKey(dirs, 3);
 
     // Add volume and bucket entries to DB.
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -468,14 +468,87 @@ public class TestOMDirectoryCreateRequestV1 {
             1, omMetadataManager.getDirectoryTable().getEstimatedKeyCount());
   }
 
-
   @Test
-  public void testCreateDirectoryOMMetric()
-          throws Exception {
+  public void testCreateDirectoryUptoLimitOfMaxLevels255() throws Exception {
     String volumeName = "vol1";
     String bucketName = "bucket1";
     List<String> dirs = new ArrayList<String>();
-    String keyName = createDirKey(dirs);
+    String keyName = createDirKey(dirs, 255);
+
+    // Add volume and bucket entries to DB.
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+            omMetadataManager);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+            omMetadataManager.getBucketTable().get(bucketKey);
+    long bucketID = omBucketInfo.getObjectID();
+
+    OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
+            OzoneFSUtils.addTrailingSlashIfNeeded(keyName));
+    OMDirectoryCreateRequestV1 omDirCreateRequestV1 =
+            new OMDirectoryCreateRequestV1(omRequest);
+
+    OMRequest modifiedOmRequest = omDirCreateRequestV1.preExecute(ozoneManager);
+
+    omDirCreateRequestV1 = new OMDirectoryCreateRequestV1(modifiedOmRequest);
+
+    Assert.assertEquals(0L, omMetrics.getNumKeys());
+    OMClientResponse omClientResponse =
+            omDirCreateRequestV1.validateAndUpdateCache(ozoneManager, 100L,
+                    ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+            omClientResponse.getOMResponse().getStatus());
+
+    verifyDirectoriesInDB(dirs, bucketID);
+
+    Assert.assertEquals(dirs.size(), omMetrics.getNumKeys());
+  }
+
+  @Test
+  public void testCreateDirectoryExceedLimitOfMaxLevels255() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    List<String> dirs = new ArrayList<String>();
+    String keyName = createDirKey(dirs, 256);
+
+    // Add volume and bucket entries to DB.
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+            omMetadataManager);
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+            omMetadataManager.getBucketTable().get(bucketKey);
+    long bucketID = omBucketInfo.getObjectID();
+
+    OMRequest omRequest = createDirectoryRequest(volumeName, bucketName,
+            OzoneFSUtils.addTrailingSlashIfNeeded(keyName));
+    OMDirectoryCreateRequestV1 omDirCreateRequestV1 =
+            new OMDirectoryCreateRequestV1(omRequest);
+
+    OMRequest modifiedOmRequest = omDirCreateRequestV1.preExecute(ozoneManager);
+
+    omDirCreateRequestV1 = new OMDirectoryCreateRequestV1(modifiedOmRequest);
+
+    Assert.assertEquals(0L, omMetrics.getNumKeys());
+    OMClientResponse omClientResponse =
+            omDirCreateRequestV1.validateAndUpdateCache(ozoneManager,
+                    100L, ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_KEY_NAME,
+            omClientResponse.getOMResponse().getStatus());
+
+    Assert.assertEquals("Unexpected directories!", 0,
+            omMetadataManager.getDirectoryTable().getEstimatedKeyCount());
+
+    Assert.assertEquals(0, omMetrics.getNumKeys());
+  }
+
+  @Test
+  public void testCreateDirectoryOMMetric() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    List<String> dirs = new ArrayList<String>();
+    String keyName = createDirKey(dirs, 3);
 
     // Add volume and bucket entries to DB.
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -509,10 +582,10 @@ public class TestOMDirectoryCreateRequestV1 {
 
 
   @NotNull
-  private String createDirKey(List<String> dirs) {
+  private String createDirKey(List<String> dirs, int depth) {
     String keyName = RandomStringUtils.randomAlphabetic(5);
     dirs.add(keyName);
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < depth; i++) {
       String dirName = RandomStringUtils.randomAlphabetic(5);
       dirs.add(dirName);
       keyName += "/" + dirName;

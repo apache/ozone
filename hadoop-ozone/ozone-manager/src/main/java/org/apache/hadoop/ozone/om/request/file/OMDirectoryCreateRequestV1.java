@@ -250,7 +250,7 @@ public class OMDirectoryCreateRequestV1 extends OMDirectoryCreateRequest {
     long baseObjId = objIdRange.getLeft();
     long maxObjId = objIdRange.getRight();
     long maxLevels = maxObjId - baseObjId;
-    long objectCount = 1; // baseObjID is used by the leaf directory
+    long objectCount = 1;
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -275,14 +275,6 @@ public class OMDirectoryCreateRequestV1 extends OMDirectoryCreateRequest {
       objectCount++;
 
       missingParentInfos.add(dirInfo);
-
-      // add entry to directory table
-      String dirKey = omMetadataManager.getOzonePathKey(
-              dirInfo.getParentObjectID(), dirInfo.getName());
-      omMetadataManager.getDirectoryTable().addCacheEntry(
-              new CacheKey<>(dirKey),
-              new CacheValue<>(Optional.of(dirInfo),
-                      trxnLogIndex));
 
       // updating id for the next sub-dir
       lastKnownParentId = nextObjId;
