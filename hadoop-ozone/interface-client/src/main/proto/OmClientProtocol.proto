@@ -776,6 +776,17 @@ message KeyInfo {
     optional uint64 updateID = 15;
 }
 
+message DirectoryInfo {
+    required string name = 1;
+    required uint64 creationTime = 2;
+    required uint64 modificationTime = 3;
+    repeated hadoop.hdds.KeyValue metadata = 4;
+    repeated OzoneAclInfo acls = 5;
+    required uint64 objectID = 6;
+    required uint64 updateID = 7;
+    required uint64 parentID = 8;
+}
+
 message RepeatedKeyInfo {
     repeated KeyInfo keyInfo = 1;
 }
