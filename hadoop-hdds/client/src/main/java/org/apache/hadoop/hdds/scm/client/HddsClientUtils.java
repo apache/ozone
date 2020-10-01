@@ -41,10 +41,10 @@ import org.apache.hadoop.ozone.OzoneConsts;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import org.apache.ratis.protocol.AlreadyClosedException;
-import org.apache.ratis.protocol.GroupMismatchException;
-import org.apache.ratis.protocol.NotReplicatedException;
-import org.apache.ratis.protocol.RaftRetryFailureException;
+import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
+import org.apache.ratis.protocol.exceptions.GroupMismatchException;
+import org.apache.ratis.protocol.exceptions.NotReplicatedException;
+import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 
 /**
  * Utility methods for Ozone and Container Clients.
