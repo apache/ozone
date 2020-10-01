@@ -24,11 +24,11 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.Collections;
 
-import com.google.common.primitives.Longs;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
     .ContainerDataProto;
-import org.apache.hadoop.hdds.utils.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
@@ -42,12 +42,13 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static java.lang.Math.max;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_BLOCK_COUNT_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.CHUNKS_PATH;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_CONTAINER_BYTES_USED_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE;
 import static org.apache.hadoop.ozone.OzoneConsts.METADATA_PATH;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_PENDING_DELETE_BLOCK_COUNT_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_VERSION;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_BYTES_USED;
+import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COUNT;
+import static org.apache.hadoop.ozone.OzoneConsts.PENDING_DELETE_BLOCK_COUNT;
 
 /**
  * This class represents the KeyValueContainer metadata, which is the
@@ -70,6 +71,8 @@ public class KeyValueContainerData extends ContainerData {
 
   private File dbFile = null;
 
+  private String schemaVersion;
+
   /**
    * Number of pending deletion blocks in KeyValueContainer.
    */
@@ -86,6 +89,7 @@ public class KeyValueContainerData extends ContainerData {
     KV_YAML_FIELDS.add(METADATA_PATH);
     KV_YAML_FIELDS.add(CHUNKS_PATH);
     KV_YAML_FIELDS.add(CONTAINER_DB_TYPE);
+    KV_YAML_FIELDS.add(SCHEMA_VERSION);
   }
 
   /**
@@ -110,6 +114,21 @@ public class KeyValueContainerData extends ContainerData {
     this.deleteTransactionId = 0;
   }
 
+  /**
+   * @param version The schema version indicating the table layout of the
+   * container's database.
+   */
+  public void setSchemaVersion(String version) {
+    schemaVersion = version;
+  }
+
+  /**
+   * @return The schema version describing the container database's table
+   * layout.
+   */
+  public String getSchemaVersion() {
+    return schemaVersion;
+  }
 
   /**
    * Sets Container dbFile. This should be called only during creation of
@@ -267,15 +286,16 @@ public class KeyValueContainerData extends ContainerData {
   public void updateAndCommitDBCounters(
       ReferenceCountedDB db, BatchOperation batchOperation,
       int deletedBlockCount) throws IOException {
+    Table<String, Long> metadataTable = db.getStore().getMetadataTable();
+
     // Set Bytes used and block count key.
-    batchOperation.put(DB_CONTAINER_BYTES_USED_KEY,
-        Longs.toByteArray(getBytesUsed()));
-    batchOperation.put(DB_BLOCK_COUNT_KEY, Longs.toByteArray(
-        getKeyCount() - deletedBlockCount));
-    batchOperation.put(DB_PENDING_DELETE_BLOCK_COUNT_KEY, Longs.toByteArray(
-        getNumPendingDeletionBlocks() - deletedBlockCount));
-    db.getStore().writeBatch(batchOperation);
+    metadataTable.putWithBatch(batchOperation, CONTAINER_BYTES_USED,
+            getBytesUsed());
+    metadataTable.putWithBatch(batchOperation, BLOCK_COUNT,
+            getKeyCount() - deletedBlockCount);
+    metadataTable.putWithBatch(batchOperation, PENDING_DELETE_BLOCK_COUNT,
+            (long)(getNumPendingDeletionBlocks() - deletedBlockCount));
+
+    db.getStore().getBatchHandler().commitBatchOperation(batchOperation);
   }
-
-
 }

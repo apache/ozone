@@ -347,7 +347,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     long lastAppliedIndex = lastTermIndex.getIndex();
     snapshotInfo.updateTermIndex(lastTermIndex.getTerm(),
         lastAppliedIndex);
-    ozoneManager.getMetadataManager().getStore().flush();
+    ozoneManager.getMetadataManager().getStore().flushDB();
     return lastAppliedIndex;
   }
 

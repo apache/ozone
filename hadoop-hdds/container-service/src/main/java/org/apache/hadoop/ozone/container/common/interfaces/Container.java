@@ -127,13 +127,6 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
   void updateDeleteTransactionId(long deleteTransactionId);
 
   /**
-   * Returns blockIterator for the container.
-   * @return BlockIterator
-   * @throws IOException
-   */
-  BlockIterator blockIterator() throws IOException;
-
-  /**
    * Import the container from an external archive.
    */
   void importContainerData(InputStream stream,

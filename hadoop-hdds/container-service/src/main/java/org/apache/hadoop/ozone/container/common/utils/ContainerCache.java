@@ -18,20 +18,21 @@
 
 package org.apache.hadoop.ozone.container.common.utils;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.google.common.util.concurrent.Striped;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.utils.MetadataStore;
-import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.collections.MapIterator;
 import org.apache.commons.collections.map.LRUMap;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,11 +116,14 @@ public final class ContainerCache extends LRUMap {
    * @param containerID - ID of the container.
    * @param containerDBType - DB type of the container.
    * @param containerDBPath - DB path of the container.
+   * @param schemaVersion - Schema version of the container.
    * @param conf - Hadoop Configuration.
    * @return ReferenceCountedDB.
    */
   public ReferenceCountedDB getDB(long containerID, String containerDBType,
-                             String containerDBPath, ConfigurationSource conf)
+                                  String containerDBPath,
+                                  String schemaVersion,
+                                  ConfigurationSource conf)
       throws IOException {
     Preconditions.checkState(containerID >= 0,
         "Container ID cannot be negative.");
@@ -139,14 +143,20 @@ public final class ContainerCache extends LRUMap {
       }
 
       try {
-        MetadataStore metadataStore =
-            MetadataStoreBuilder.newBuilder()
-                .setDbFile(new File(containerDBPath))
-                .setCreateIfMissing(false)
-                .setConf(conf)
-                .setDBType(containerDBType)
-                .build();
-        db = new ReferenceCountedDB(metadataStore, containerDBPath);
+        DatanodeStore store;
+
+        if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
+          store = new DatanodeStoreSchemaOneImpl(conf,
+                  containerID, containerDBPath);
+        } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
+          store = new DatanodeStoreSchemaTwoImpl(conf,
+                  containerID, containerDBPath);
+        } else {
+          throw new IllegalArgumentException(
+                  "Unrecognized database schema version: " + schemaVersion);
+        }
+
+        db = new ReferenceCountedDB(store, containerDBPath);
       } catch (Exception e) {
         LOG.error("Error opening DB. Container:{} ContainerPath:{}",
             containerID, containerDBPath, e);

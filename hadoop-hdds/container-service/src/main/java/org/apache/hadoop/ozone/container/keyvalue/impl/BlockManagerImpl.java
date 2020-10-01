@@ -19,19 +19,20 @@
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
 import com.google.common.base.Preconditions;
-import com.google.common.primitives.Longs;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
-import org.apache.hadoop.hdds.utils.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.slf4j.Logger;
@@ -40,14 +41,10 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BCSID_MISMATCH;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_BLOCK_COMMIT_SEQUENCE_ID_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_BLOCK_COUNT_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_CONTAINER_BYTES_USED_KEY;
 
 /**
  * This class is for performing block related operations on the KeyValue
@@ -128,10 +125,12 @@ public class BlockManagerImpl implements BlockManager {
         return data.getSize();
       }
       // update the blockData as well as BlockCommitSequenceId here
-      BatchOperation batch = new BatchOperation();
-      batch.put(Longs.toByteArray(data.getLocalID()),
-          data.getProtoBufMessage().toByteArray());
-      batch.put(DB_BLOCK_COMMIT_SEQUENCE_ID_KEY, Longs.toByteArray(bcsId));
+      BatchOperation batch = db.getStore().getBatchHandler()
+              .initBatchOperation();
+      db.getStore().getBlockDataTable().putWithBatch(
+              batch, Long.toString(data.getLocalID()), data);
+      db.getStore().getMetadataTable().putWithBatch(
+              batch, OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID, bcsId);
 
       // Set Bytes used, this bytes used will be updated for every write and
       // only get committed for every put block. In this way, when datanode
@@ -139,16 +138,18 @@ public class BlockManagerImpl implements BlockManager {
       // block length is used, And also on restart the blocks committed to DB
       // is only used to compute the bytes used. This is done to keep the
       // current behavior and avoid DB write during write chunk operation.
-      batch.put(DB_CONTAINER_BYTES_USED_KEY,
-          Longs.toByteArray(container.getContainerData().getBytesUsed()));
+      db.getStore().getMetadataTable().putWithBatch(
+              batch, OzoneConsts.CONTAINER_BYTES_USED,
+              container.getContainerData().getBytesUsed());
 
       // Set Block Count for a container.
       if (incrKeyCount) {
-        batch.put(DB_BLOCK_COUNT_KEY,
-            Longs.toByteArray(container.getContainerData().getKeyCount() + 1));
+        db.getStore().getMetadataTable().putWithBatch(
+                batch, OzoneConsts.BLOCK_COUNT,
+                container.getContainerData().getKeyCount() + 1);
       }
 
-      db.getStore().writeBatch(batch);
+      db.getStore().getBatchHandler().commitBatchOperation(batch);
 
       container.updateBlockCommitSequenceId(bcsId);
       // Increment block count finally here for in-memory.
@@ -257,19 +258,22 @@ public class BlockManagerImpl implements BlockManager {
       // are not atomic. Leaving it here since the impact is refusing
       // to delete a Block which might have just gotten inserted after
       // the get check.
-      byte[] blockKey = Longs.toByteArray(blockID.getLocalID());
 
+      // Throw an exception if block data not found in the block data table.
       getBlockByID(db, blockID);
 
       // Update DB to delete block and set block count and bytes used.
-      BatchOperation batch = new BatchOperation();
-      batch.delete(blockKey);
+      BatchOperation batch = db.getStore().getBatchHandler()
+              .initBatchOperation();
+      String localID = Long.toString(blockID.getLocalID());
+      db.getStore().getBlockDataTable().deleteWithBatch(batch, localID);
       // Update DB to delete block and set block count.
       // No need to set bytes used here, as bytes used is taken care during
       // delete chunk.
-      batch.put(DB_BLOCK_COUNT_KEY,
-          Longs.toByteArray(container.getContainerData().getKeyCount() - 1));
-      db.getStore().writeBatch(batch);
+      long blockCount = container.getContainerData().getKeyCount() - 1;
+      db.getStore().getMetadataTable()
+              .putWithBatch(batch, OzoneConsts.BLOCK_COUNT, blockCount);
+      db.getStore().getBatchHandler().commitBatchOperation(batch);
 
       // Decrement block count here
       container.getContainerData().decrKeyCount();
@@ -299,13 +303,12 @@ public class BlockManagerImpl implements BlockManager {
           (KeyValueContainerData) container.getContainerData();
       try (ReferenceCountedDB db = BlockUtils.getDB(cData, config)) {
         result = new ArrayList<>();
-        byte[] startKeyInBytes = Longs.toByteArray(startLocalID);
-        List<Map.Entry<byte[], byte[]>> range = db.getStore()
-            .getSequentialRangeKVs(startKeyInBytes, count,
-                MetadataKeyFilters.getNormalKeyFilter());
-        for (Map.Entry<byte[], byte[]> entry : range) {
-          BlockData value = BlockUtils.getBlockData(entry.getValue());
-          BlockData data = new BlockData(value.getBlockID());
+        List<? extends Table.KeyValue<String, BlockData>> range =
+            db.getStore().getBlockDataTable()
+            .getSequentialRangeKVs(Long.toString(startLocalID), count,
+                MetadataKeyFilters.getUnprefixedKeyFilter());
+        for (Table.KeyValue<String, BlockData> entry: range) {
+          BlockData data = new BlockData(entry.getValue().getBlockID());
           result.add(data);
         }
         return result;
@@ -324,14 +327,14 @@ public class BlockManagerImpl implements BlockManager {
 
   private byte[] getBlockByID(ReferenceCountedDB db, BlockID blockID)
       throws IOException {
-    byte[] blockKey = Longs.toByteArray(blockID.getLocalID());
+    String blockKey = Long.toString(blockID.getLocalID());
 
-    byte[] blockData = db.getStore().get(blockKey);
+    BlockData blockData = db.getStore().getBlockDataTable().get(blockKey);
     if (blockData == null) {
       throw new StorageContainerException(NO_SUCH_BLOCK_ERR_MSG,
           NO_SUCH_BLOCK);
     }
 
-    return blockData;
+    return blockData.getProtoBufMessage().toByteArray();
   }
 }
