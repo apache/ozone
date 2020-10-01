@@ -18,7 +18,7 @@ Documentation       Test ozone shell CLI usage
 Library             OperatingSystem
 Resource            ../commonlib.robot
 Resource            ozone-shell-lib.robot
-Test Timeout        2 minute
+Test Timeout        5 minute
 Suite Setup         Generate prefix
 
 *** Test Cases ***

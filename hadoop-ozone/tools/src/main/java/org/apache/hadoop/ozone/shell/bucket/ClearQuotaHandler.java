@@ -16,44 +16,40 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.ozone.shell.volume;
+package org.apache.hadoop.ozone.shell.bucket;
 
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
-
+import org.apache.hadoop.ozone.shell.ClearSpaceQuotaOptions;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
 
 import java.io.IOException;
 
 /**
- * Executes update volume calls.
+ * clean quota of the bucket.
  */
-@Command(name = "update",
-    description = "Updates parameter of the volumes")
-public class UpdateVolumeHandler extends VolumeHandler {
+@Command(name = "clrquota",
+    description = "clear quota of the bucket")
+public class ClearQuotaHandler extends BucketHandler {
 
-  @Option(names = {"--user"},
-      description = "Owner of the volume to set")
-  private String ownerName;
+  @CommandLine.Mixin
+  private ClearSpaceQuotaOptions clrSpaceQuota;
 
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
     String volumeName = address.getVolumeName();
-    OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
+    String bucketName = address.getBucketName();
+    OzoneBucket bucket = client.getObjectStore().getVolume(volumeName)
+        .getBucket(bucketName);
 
-    if (ownerName != null && !ownerName.isEmpty()) {
-      boolean result = volume.setOwner(ownerName);
-      if (LOG.isDebugEnabled() && !result) {
-        out().format("Volume '%s' owner is already '%s'. Unchanged.%n",
-            volumeName, ownerName);
-      }
+    if (clrSpaceQuota.getClrSpaceQuota()) {
+      bucket.clearSpaceQuota();
     }
-
-    // For printing newer modificationTime.
-    OzoneVolume updatedVolume = client.getObjectStore().getVolume(volumeName);
-    printObjectAsJson(updatedVolume);
+    if (clrSpaceQuota.getClrCountQuota()) {
+      bucket.clearCountQuota();
+    }
   }
 }
