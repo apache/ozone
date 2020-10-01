@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketAddAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketSetAclRequest;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest;
+import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestV1;
 import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeysDeleteRequest;
 import org.apache.hadoop.ozone.om.request.key.OMAllocateBlockRequest;
@@ -83,8 +84,22 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_
  */
 public final class OzoneManagerRatisUtils {
 
+  // TODO: Temporary workaround for OM upgrade path and will be replaced once
+  //  upgrade HDDS-3698 story reaches consensus.
+  private static boolean omLayoutVersionV1 = true;
+
   private OzoneManagerRatisUtils() {
   }
+
+  /**
+   * Sets layout version.
+   *
+   * @param layoutVersionV1 om layout version
+   */
+  public static void setOmLayoutVersionV1(boolean layoutVersionV1) {
+    OzoneManagerRatisUtils.omLayoutVersionV1 = layoutVersionV1;
+  }
+
   /**
    * Create OMClientRequest which encapsulates the OMRequest.
    * @param omRequest
@@ -133,6 +148,9 @@ public final class OzoneManagerRatisUtils {
     case RenameKeys:
       return new OMKeysRenameRequest(omRequest);
     case CreateDirectory:
+      if (omLayoutVersionV1) {
+        return new OMDirectoryCreateRequestV1(omRequest);
+      }
       return new OMDirectoryCreateRequest(omRequest);
     case CreateFile:
       return new OMFileCreateRequest(omRequest);
