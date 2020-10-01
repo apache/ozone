@@ -2769,4 +2769,14 @@
       during OzoneManager init/SCM bootstrap.
     </description>
   </property>
+
+  <property>
+    <name>ozone.om.layout.version</name>
+    <tag>OZONE, OM</tag>
+    <value>V0</value>
+    <description>Temporary workaround for OM upgrade and will be replaced once
+      upgrade HDDS-3698 story reaches consensus. Defaulting to 'V0' so that
+      existing unit test cases won't be affected. New OM version should be 'V1'
+    </description>
+  </property>
 </configuration>

@@ -216,6 +216,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_DEF
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LAYOUT_VERSION;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LAYOUT_VERSION_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_USER_MAX_VOLUME;
@@ -1105,6 +1107,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (omRatisServer != null) {
       omRatisServer.start();
     }
+
+    // TODO: Temporary workaround for OM upgrade path and will be replaced once
+    //  upgrade HDDS-3698 story reaches consensus.
+    getOMLayoutVersion();
 
     metadataManager.start(configuration);
     startSecretManagerIfNecessary();
@@ -3662,6 +3668,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public boolean getEnableFileSystemPaths() {
     return configuration.getBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS,
         OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
+  }
+
+  private void getOMLayoutVersion() {
+    String version = configuration.getTrimmed(OZONE_OM_LAYOUT_VERSION,
+            OZONE_OM_LAYOUT_VERSION_DEFAULT);
+    boolean omLayoutVersionV1 =
+            StringUtils.equalsIgnoreCase(version, "V1");
+    OzoneManagerRatisUtils.setOmLayoutVersionV1(omLayoutVersionV1);
   }
 
   /**
