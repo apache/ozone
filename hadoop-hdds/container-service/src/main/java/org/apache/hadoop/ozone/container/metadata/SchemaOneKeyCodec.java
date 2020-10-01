@@ -19,12 +19,10 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import java.io.IOException;
-import java.util.Arrays;
 
 import com.google.common.primitives.Longs;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.hdfs.protocol.proto.NamenodeProtocolProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,16 +83,14 @@ public class SchemaOneKeyCodec implements Codec<String> {
       LOG.trace("Byte array {} matched the format for a string key." +
           " It will be parsed as the string {}", rawData, stringData);
       return stringData;
-    }
-    else if (rawData.length == Long.BYTES) {
+    } else if (rawData.length == Long.BYTES) {
       long longData = Longs.fromByteArray(rawData);
       LOG.trace("Byte array {} did not match the format for a string key " +
               "and has {} bytes. It will be parsed as the long {}",
           rawData, Long.BYTES, longData);
 
       return Long.toString(longData);
-    }
-    else {
+    } else {
       LOG.trace("Byte array {} did not match the format for a string key " +
           "and does not have {} bytes. It will be parsed as the string {}",
           rawData, Long.BYTES, stringData);
