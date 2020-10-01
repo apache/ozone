@@ -25,6 +25,8 @@ import com.google.protobuf.ServiceException;
 import io.opentracing.Span;
 import org.slf4j.Logger;
 
+import java.util.function.UnaryOperator;
+
 /**
  * Dispatch message after tracing and message logging for insight.
  * <p>
@@ -41,13 +43,25 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
       protocolMessageMetrics;
 
   private Logger logger;
+  private final UnaryOperator<REQUEST> requestPreprocessor;
+  private final UnaryOperator<RESPONSE> responsePreprocessor;
 
   public OzoneProtocolMessageDispatcher(String serviceName,
       ProtocolMessageMetrics<TYPE> protocolMessageMetrics,
       Logger logger) {
+    this(serviceName, protocolMessageMetrics, logger, req -> req, resp -> resp);
+  }
+
+  public OzoneProtocolMessageDispatcher(String serviceName,
+      ProtocolMessageMetrics<TYPE> protocolMessageMetrics,
+      Logger logger,
+      UnaryOperator<REQUEST> requestPreprocessor,
+      UnaryOperator<RESPONSE> responsePreprocessor) {
     this.serviceName = serviceName;
     this.protocolMessageMetrics = protocolMessageMetrics;
     this.logger = logger;
+    this.requestPreprocessor = requestPreprocessor;
+    this.responsePreprocessor = responsePreprocessor;
   }
 
   public RESPONSE processRequest(
@@ -62,7 +76,7 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
             "[service={}] [type={}] request is received: <json>{}</json>",
             serviceName,
             type.toString(),
-            request.toString().replaceAll("\n", "\\\\n"));
+            escapeNewLines(requestPreprocessor.apply(request)));
       } else if (logger.isDebugEnabled()) {
         logger.debug("{} {} request is received",
             serviceName, type.toString());
@@ -80,12 +94,16 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
                 + "<json>{}</json>",
             serviceName,
             type.toString(),
-            response.toString().replaceAll("\n", "\\\\n"));
+            escapeNewLines(responsePreprocessor.apply(response)));
       }
       return response;
 
     } finally {
       span.finish();
     }
+  }
+
+  private static String escapeNewLines(Object input) {
+    return input.toString().replaceAll("\n", "\\\\n");
   }
 }
