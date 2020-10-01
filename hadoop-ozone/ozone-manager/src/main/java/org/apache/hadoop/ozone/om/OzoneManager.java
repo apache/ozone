@@ -406,6 +406,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
 
+    this.prepareForUpgrade = forUpgrade;
+
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
     omRpcAddressTxt = new Text(omNodeDetails.getRpcAddressString());
 
@@ -491,7 +493,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     };
     ShutdownHookManager.get().addShutdownHook(shutdownHook,
         SHUTDOWN_HOOK_PRIORITY);
-    this.prepareForUpgrade = forUpgrade;
     omState = State.INITIALIZED;
   }
 
@@ -1018,7 +1019,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         omRatisServer.getRaftGroup(),
         (RaftServerProxy) omRatisServer.getServer(),
         OZONE_OM_MAX_TIME_TO_WAIT_FLUSH_TXNS,
-        OZONE_OM_FLUSH_TXNS_RETRY_INTERVAL_SECONDS);
+        OZONE_OM_FLUSH_TXNS_RETRY_INTERVAL_SECONDS,
+        true);
 
     long appliedIndexFromRatis =
         omRatisServer.getOmStateMachine().getLastAppliedTermIndex().getIndex();
@@ -1333,7 +1335,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         RatisDropwizardExports.
             registerRatisMetricReporters(ratisMetricsMap);
         omRatisServer = OzoneManagerRatisServer.newOMRatisServer(
-            configuration, this, omNodeDetails, peerNodes);
+            configuration, this, omNodeDetails, peerNodes, prepareForUpgrade);
       }
       LOG.info("OzoneManager Ratis server initialized at port {}",
           omRatisServer.getServerPort());

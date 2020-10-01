@@ -111,6 +111,7 @@ public final class OzoneManagerRatisServer {
   private Optional<RaftPeerId> cachedLeaderPeerId = Optional.empty();
 
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
+  private boolean forUpgrade = false;
 
   private static long nextCallId() {
     return CALL_ID_COUNTER.getAndIncrement() & Long.MAX_VALUE;
@@ -249,11 +250,13 @@ public final class OzoneManagerRatisServer {
   private OzoneManagerRatisServer(ConfigurationSource conf,
       OzoneManager om,
       String raftGroupIdStr, RaftPeerId localRaftPeerId,
-      InetSocketAddress addr, List<RaftPeer> raftPeers)
+      InetSocketAddress addr, List<RaftPeer> raftPeers, boolean forUpgrade)
       throws IOException {
     this.ozoneManager = om;
     this.omRatisAddress = addr;
     this.port = addr.getPort();
+    this.forUpgrade = forUpgrade;
+
     RaftProperties serverProperties = newRaftProperties(conf);
 
     this.raftPeerId = localRaftPeerId;
@@ -292,12 +295,20 @@ public final class OzoneManagerRatisServer {
     }, roleCheckInitialDelayMs, roleCheckIntervalMs, TimeUnit.MILLISECONDS);
   }
 
+  public static OzoneManagerRatisServer newOMRatisServer(
+      ConfigurationSource ozoneConf, OzoneManager omProtocol,
+      OMNodeDetails omNodeDetails, List<OMNodeDetails> peerNodes)
+      throws IOException {
+    return newOMRatisServer(ozoneConf, omProtocol, omNodeDetails, peerNodes,
+        false);
+  }
   /**
    * Creates an instance of OzoneManagerRatisServer.
    */
   public static OzoneManagerRatisServer newOMRatisServer(
       ConfigurationSource ozoneConf, OzoneManager omProtocol,
-      OMNodeDetails omNodeDetails, List<OMNodeDetails> peerNodes)
+      OMNodeDetails omNodeDetails, List<OMNodeDetails> peerNodes,
+      boolean forUpgrade)
       throws IOException {
 
     // RaftGroupId is the omServiceId
@@ -332,7 +343,7 @@ public final class OzoneManagerRatisServer {
     }
 
     return new OzoneManagerRatisServer(ozoneConf, omProtocol, omServiceId,
-        localRaftPeerId, ratisAddr, raftPeers);
+        localRaftPeerId, ratisAddr, raftPeers, forUpgrade);
   }
 
   public RaftGroup getRaftGroup() {
@@ -432,7 +443,14 @@ public final class OzoneManagerRatisServer {
     final int logPurgeGap = conf.getInt(
         OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP,
         OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP_DEFAULT);
-    RaftServerConfigKeys.Log.setPurgeGap(properties, logPurgeGap);
+
+    if (forUpgrade) {
+      LOG.info("Setting purge gap to 1.");
+      RaftServerConfigKeys.Log.setPurgeGap(properties, 1);
+    } else {
+      LOG.info("Setting purge gap to 1000.");
+      RaftServerConfigKeys.Log.setPurgeGap(properties, logPurgeGap);
+    }
 
     // For grpc set the maximum message size
     // TODO: calculate the optimal max message size

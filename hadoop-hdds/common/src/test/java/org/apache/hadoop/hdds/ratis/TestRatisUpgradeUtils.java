@@ -62,7 +62,8 @@ public class TestRatisUpgradeUtils {
     when(stateMachine.getLastAppliedTermIndex()).thenReturn(termIndex);
     when(stateMachine.takeSnapshot()).thenReturn(1L);
 
-    waitForAllTxnsApplied(stateMachine, raftGroup, raftServerProxy, 10, 2);
+    waitForAllTxnsApplied(stateMachine, raftGroup, raftServerProxy,
+        10, 2, false);
     verify(stateMachine.getLastAppliedTermIndex(),
         times(4)); // 3 checks + 1 after snapshot
   }
@@ -91,7 +92,8 @@ public class TestRatisUpgradeUtils {
     LambdaTestUtils.intercept(IOException.class, "State Machine has not " +
         "applied  all the transactions", () ->
         waitForAllTxnsApplied(stateMachine, raftGroup, raftServerProxy,
-            10, 2));
+            10, 2,
+            false));
   }
 
 }

@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.ratis;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.ratis.protocol.RaftGroup;
@@ -52,15 +54,17 @@ public final class RatisUpgradeUtils {
       RaftGroup raftGroup,
       RaftServerProxy server,
       long maxTimeToWaitSeconds,
-      long timeBetweenRetryInSeconds)
+      long timeBetweenRetryInSeconds,
+      boolean purgeLogsAfter)
       throws InterruptedException, IOException {
 
+    RaftServerImpl impl = server.getImpl(raftGroup.getGroupId());
     long intervalTime = TimeUnit.SECONDS.toMillis(timeBetweenRetryInSeconds);
     long endTime = System.currentTimeMillis() +
         TimeUnit.SECONDS.toMillis(maxTimeToWaitSeconds);
     boolean success = false;
     while (System.currentTimeMillis() < endTime) {
-      success = checkIfAllTransactionsApplied(stateMachine, server, raftGroup);
+      success = checkIfAllTransactionsApplied(stateMachine, impl);
       if (success) {
         break;
       }
@@ -78,14 +82,26 @@ public final class RatisUpgradeUtils {
       throw new IOException("Index from Snapshot does not match last applied " +
           "Index");
     }
+
+    if (purgeLogsAfter) {
+      CompletableFuture<Long> purgeFuture =
+          impl.getState().getLog().purge(snapshotIndex);
+      try {
+        Long purgeIndex = purgeFuture.get();
+        if (purgeIndex != snapshotIndex) {
+          throw new IOException("Purge index " + purgeIndex +
+              " does not match last applied index " + snapshotIndex);
+        }
+      } catch (ExecutionException e) {
+        throw new IOException("Unable to purge logs.", e);
+      }
+    }
   }
 
   private static boolean checkIfAllTransactionsApplied(
       StateMachine stateMachine,
-      RaftServerProxy serverProxy,
-      RaftGroup raftGroup) throws IOException {
+      RaftServerImpl impl) {
     LOG.info("Checking for pending transactions to be applied.");
-    RaftServerImpl impl = serverProxy.getImpl(raftGroup.getGroupId());
     long lastCommittedIndex = impl.getState().getLog().getLastCommittedIndex();
     long appliedIndex = stateMachine.getLastAppliedTermIndex().getIndex();
     LOG.info("lastCommittedIndex = {}, appliedIndex = {}",
