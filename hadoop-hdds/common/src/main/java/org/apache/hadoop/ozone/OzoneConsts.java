@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone;
 
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.thirdparty.io.grpc.Context;
@@ -139,29 +138,16 @@ public final class OzoneConsts {
     }
   }
 
+  // Block ID prefixes used in datanode containers.
   public static final String DELETING_KEY_PREFIX = "#deleting#";
-  public static final String DELETED_KEY_PREFIX = "#deleted#";
-  public static final String DELETE_TRANSACTION_KEY_PREFIX = "#delTX#";
-  public static final String BLOCK_COMMIT_SEQUENCE_ID_PREFIX = "#BCSID";
 
+  // Metadata keys for datanode containers.
+  public static final String DELETE_TRANSACTION_KEY = "#delTX";
+  public static final String BLOCK_COMMIT_SEQUENCE_ID = "#BCSID";
   public static final String BLOCK_COUNT = "#BLOCKCOUNT";
   public static final String CONTAINER_BYTES_USED = "#BYTESUSED";
   public static final String PENDING_DELETE_BLOCK_COUNT =
       "#PENDINGDELETEBLOCKCOUNT";
-
-
-  public static final byte[] DB_BLOCK_COUNT_KEY =
-      StringUtils.string2Bytes(OzoneConsts.BLOCK_COUNT);
-  public static final byte[] DB_CONTAINER_BYTES_USED_KEY =
-      StringUtils.string2Bytes(OzoneConsts.CONTAINER_BYTES_USED);
-  public static final byte[] DB_PENDING_DELETE_BLOCK_COUNT_KEY =
-      StringUtils.string2Bytes(PENDING_DELETE_BLOCK_COUNT);
-  public static final byte[] DB_CONTAINER_DELETE_TRANSACTION_KEY =
-      StringUtils.string2Bytes(DELETE_TRANSACTION_KEY_PREFIX);
-  public static final byte[] DB_BLOCK_COMMIT_SEQUENCE_ID_KEY =
-      StringUtils.string2Bytes(BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
-
-
 
   /**
    * OM LevelDB prefixes.
@@ -258,6 +244,18 @@ public final class OzoneConsts {
   public static final String DATA_SCAN_TIMESTAMP = "dataScanTimestamp";
   public static final String ORIGIN_PIPELINE_ID = "originPipelineId";
   public static final String ORIGIN_NODE_ID = "originNodeId";
+  public static final String SCHEMA_VERSION = "schemaVersion";
+
+  // Supported .container datanode schema versions.
+  // Since containers in older schema versions are currently not reformatted to
+  // newer schema versions, a datanode may have containers with a mix of schema
+  // versions, requiring this property to be tracked on a per container basis.
+  // V1: All data in default column family.
+  public static final String SCHEMA_V1 = "1";
+  // V2: Metadata, block data, and deleted blocks in their own column families.
+  public static final String SCHEMA_V2 = "2";
+  // Most recent schema version that all new containers should be created with.
+  public static final String SCHEMA_LATEST = SCHEMA_V2;
 
   // Supported store types.
   public static final String OZONE = "ozone";
