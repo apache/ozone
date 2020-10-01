@@ -361,4 +361,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         .setUpdateID(objectId);
   }
 
+  static long getMaxNumOfRecursiveDirs() {
+    return MAX_NUM_OF_RECURSIVE_DIRS;
+  }
 }
