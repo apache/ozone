@@ -77,7 +77,7 @@ public final class ContainerUtils {
       ContainerCommandRequestProto request) {
     String logInfo = "Operation: {} , Trace ID: {} , Message: {} , " +
         "Result: {} , StorageContainerException Occurred.";
-    log.info(logInfo, request.getCmdType().name(), request.getTraceID(),
+    log.info(logInfo, request.getCmdType(), request.getTraceID(),
         ex.getMessage(), ex.getResult().getValueDescriptor().getName(), ex);
     return getContainerCommandResponse(request, ex.getResult(), ex.getMessage())
         .build();
@@ -105,7 +105,6 @@ public final class ContainerUtils {
    * Verifies that this is indeed a new container.
    *
    * @param containerFile - Container File to verify
-   * @throws FileAlreadyExistsException
    */
   public static void verifyIsNewContainer(File containerFile) throws
       FileAlreadyExistsException {
@@ -129,7 +128,7 @@ public final class ContainerUtils {
    *
    * @throws IOException when read/write error occurs
    */
-  public synchronized static void writeDatanodeDetailsTo(
+  public static synchronized void writeDatanodeDetailsTo(
       DatanodeDetails datanodeDetails, File path) throws IOException {
     if (path.exists()) {
       if (!path.delete() || !path.createNewFile()) {
@@ -151,7 +150,7 @@ public final class ContainerUtils {
    * @return {@link DatanodeDetails}
    * @throws IOException If the id file is malformed or other I/O exceptions
    */
-  public synchronized static DatanodeDetails readDatanodeDetailsFrom(File path)
+  public static synchronized DatanodeDetails readDatanodeDetailsFrom(File path)
       throws IOException {
     if (!path.exists()) {
       throw new IOException("Datanode ID file not found.");
@@ -159,7 +158,7 @@ public final class ContainerUtils {
     try {
       return DatanodeIdYaml.readDatanodeIdFile(path);
     } catch (IOException e) {
-      LOG.warn("Error loading DatanodeDetails yaml from " +
+      LOG.warn("Error loading DatanodeDetails yaml from {}",
           path.getAbsolutePath(), e);
       // Try to load as protobuf before giving up
       try (FileInputStream in = new FileInputStream(path)) {
@@ -175,8 +174,6 @@ public final class ContainerUtils {
   /**
    * Verify that the checksum stored in containerData is equal to the
    * computed checksum.
-   * @param containerData
-   * @throws IOException
    */
   public static void verifyChecksum(ContainerData containerData)
       throws IOException {
@@ -200,7 +197,6 @@ public final class ContainerUtils {
    * Return the SHA-256 checksum of the containerData.
    * @param containerDataYamlStr ContainerData as a Yaml String
    * @return Checksum of the container data
-   * @throws StorageContainerException
    */
   public static String getChecksum(String containerDataYamlStr)
       throws StorageContainerException {

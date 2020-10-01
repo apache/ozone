@@ -37,12 +37,12 @@ import java.util.function.UnaryOperator;
  */
 public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
 
-  private String serviceName;
+  private final String serviceName;
 
   private final ProtocolMessageMetrics<TYPE>
       protocolMessageMetrics;
 
-  private Logger logger;
+  private final Logger logger;
   private final UnaryOperator<REQUEST> requestPreprocessor;
   private final UnaryOperator<RESPONSE> responsePreprocessor;
 
@@ -75,11 +75,11 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
         logger.trace(
             "[service={}] [type={}] request is received: <json>{}</json>",
             serviceName,
-            type.toString(),
+            type,
             escapeNewLines(requestPreprocessor.apply(request)));
       } else if (logger.isDebugEnabled()) {
         logger.debug("{} {} request is received",
-            serviceName, type.toString());
+            serviceName, type);
       }
 
       long startTime = System.nanoTime();
@@ -93,7 +93,7 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
             "[service={}] [type={}] request is processed. Response: "
                 + "<json>{}</json>",
             serviceName,
-            type.toString(),
+            type,
             escapeNewLines(responsePreprocessor.apply(response)));
       }
       return response;
