@@ -30,11 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.*;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .MultipartUploadAbortRequest;
@@ -218,6 +214,25 @@ public final class TestOMRequestUtils {
   }
 
   /**
+   * Add dir key entry to DirectoryTable.
+   *
+   * @throws Exception
+   */
+  public static void addDirKeyToDirTable(boolean addToCache,
+                                         OmDirectoryInfo omDirInfo,
+                                         long trxnLogIndex,
+                                         OMMetadataManager omMetadataManager)
+          throws Exception {
+    String ozoneKey = omDirInfo.getPath();
+    if (addToCache) {
+      omMetadataManager.getDirectoryTable().addCacheEntry(
+              new CacheKey<>(ozoneKey),
+              new CacheValue<>(Optional.of(omDirInfo), trxnLogIndex));
+    }
+    omMetadataManager.getDirectoryTable().put(ozoneKey, omDirInfo);
+  }
+
+  /**
    * Create OmKeyInfo.
    */
   public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
@@ -225,6 +240,22 @@ public final class TestOMRequestUtils {
       HddsProtos.ReplicationFactor replicationFactor) {
     return createOmKeyInfo(volumeName, bucketName, keyName, replicationType,
         replicationFactor, 0L);
+  }
+
+  /**
+   * Create OmDirectoryInfo.
+   */
+  public static OmDirectoryInfo createOmDirectoryInfo(String keyName,
+                                                      long objectID,
+                                                      long parentObjID) {
+    return new OmDirectoryInfo.Builder()
+            .setName(keyName)
+            .setCreationTime(Time.now())
+            .setModificationTime(Time.now())
+            .setObjectID(objectID)
+            .setParentObjectID(parentObjID)
+            .setUpdateID(objectID)
+            .build();
   }
 
   /**
