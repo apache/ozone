@@ -117,6 +117,7 @@
                     <include>org.apache.commons.logging.**.*</include>
                     <include>org.apache.commons.pool2.**.*</include>
                     <include>org.apache.commons.validator.**.*</include>
+                    <include>org.apache.commons.lang3.**.*</include>
                     <include>org.sqlite.**.*</include>
                     <include>org.apache.thrift.**.*</include>
                   </includes>
