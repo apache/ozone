@@ -34,7 +34,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.UPDATE_LAYOUT_VERSION_FAILED;
-import static org.apache.hadoop.ozone.om.upgrade.OmUpgradeAction.NOOP;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.ALREADY_FINALIZED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
@@ -44,6 +43,8 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATI
  * UpgradeFinalizer implementation for the Ozone Manager service.
  */
 public class OMUpgradeFinalizer implements UpgradeFinalizer<OzoneManager> {
+
+  private  static final OmUpgradeAction NOOP = a -> {};
 
   private Status status = ALREADY_FINALIZED;
   private OMLayoutVersionManagerImpl versionManager;
