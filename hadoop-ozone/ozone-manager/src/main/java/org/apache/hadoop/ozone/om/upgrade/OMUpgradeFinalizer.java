@@ -82,7 +82,7 @@ public class OMUpgradeFinalizer implements UpgradeFinalizer<OzoneManager> {
   }
 
   @Override
-  public StatusAndMessages reportStatus(
+  public synchronized StatusAndMessages reportStatus(
       String upgradeClientID, boolean takeover
   ) throws IOException {
     if (takeover) {
