@@ -284,11 +284,11 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     try {
       reconScm.getDatanodeProtocolServer()
           .register(datanodeDetailsProto, nodeReportProto,
-              containerReportsProto, pipelineReportsProto, layoutInfo);
+              containerReportsProto, pipelineReportsProto, null);
       reconScm.getDatanodeProtocolServer()
           .register(datanodeDetailsProto2, nodeReportProto2,
               ContainerReportsProto.newBuilder().build(),
-              PipelineReportsProto.newBuilder().build(), layoutInfo);
+              PipelineReportsProto.newBuilder().build(), null);
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
     } catch (Exception ex) {

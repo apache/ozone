@@ -188,10 +188,15 @@ public class TestSCMNodeManager {
       throws IOException, InterruptedException, AuthenticationException {
 
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      Integer nodeManagerSoftwareLayoutVersion =
+          nodeManager.getLayoutVersionManager().getSoftwareLayoutVersion();
       LayoutVersionProto layoutInfoSuccess = LayoutVersionProto.newBuilder()
-          .setMetadataLayoutVersion(1).setSoftwareLayoutVersion(1).build();
+          .setMetadataLayoutVersion(1)
+          .setSoftwareLayoutVersion(nodeManagerSoftwareLayoutVersion).build();
       LayoutVersionProto layoutInfoFailure = LayoutVersionProto.newBuilder()
-          .setMetadataLayoutVersion(1).setSoftwareLayoutVersion(2).build();
+          .setMetadataLayoutVersion(1)
+          .setSoftwareLayoutVersion(nodeManagerSoftwareLayoutVersion + 1)
+          .build();
       RegisteredCommand rcmd = nodeManager.register(
           MockDatanodeDetails.randomDatanodeDetails(), null,
           getRandomPipelineReports(), layoutInfoSuccess);

@@ -760,4 +760,13 @@ public class SCMNodeManager implements NodeManager {
   long getSkippedHealthChecks() {
     return nodeStateManager.getSkippedHealthChecks();
   }
+
+  /**
+   * @return  HDDSLayoutVersionManager
+   */
+  @VisibleForTesting
+  @Override
+  public HDDSLayoutVersionManager getLayoutVersionManager() {
+    return scmLayoutVersionManager;
+  }
 }
