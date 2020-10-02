@@ -77,7 +77,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
       metadataLayoutVersion = layoutFeature.layoutVersion();
     } else {
       throw new IllegalArgumentException(
-          "Finalize attempt on a layoutFeature which has already been"
+          "Finalize attempt on a layoutFeature which has already been "
               + "finalized. Software Layout version: " + softwareLayoutVersion
               + " Feature Layout version: " + layoutFeature.layoutVersion());
     }

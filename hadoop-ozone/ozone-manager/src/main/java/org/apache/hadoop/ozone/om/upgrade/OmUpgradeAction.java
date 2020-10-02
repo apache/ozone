@@ -25,4 +25,5 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
  * Upgrade Action for OzoneManager which takes in an 'OM' instance.
  */
 public interface OmUpgradeAction extends UpgradeAction<OzoneManager> {
+  OmUpgradeAction NOOP = a -> {};
 }

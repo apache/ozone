@@ -183,7 +183,7 @@ public class StorageInfo {
       throws InconsistentStorageStateException {
     int upgradeMark = getUpgradingToLayoutVersion();
     if (upgradeMark != INVALID_LAYOUT_VERSION) {
-      throw new InconsistentStorageStateException("Ozone Manager died during"
+      throw new InconsistentStorageStateException("Ozone Manager died during "
           + "a LayoutFeature upgrade.");
       //TODO add recovery steps here, or point to a recovery doc.
     }

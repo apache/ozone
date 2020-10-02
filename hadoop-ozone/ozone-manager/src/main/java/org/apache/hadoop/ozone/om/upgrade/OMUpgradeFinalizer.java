@@ -34,6 +34,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.UPDATE_LAYOUT_VERSION_FAILED;
+import static org.apache.hadoop.ozone.om.upgrade.OmUpgradeAction.NOOP;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.ALREADY_FINALIZED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
@@ -50,8 +51,6 @@ public class OMUpgradeFinalizer implements UpgradeFinalizer<OzoneManager> {
 
   private Queue<String> msgs = new ConcurrentLinkedQueue<>();
   private boolean isDone = false;
-
-  private static final OmUpgradeAction NOOP = a -> {};
 
   public OMUpgradeFinalizer(OMLayoutVersionManagerImpl versionManager) {
     this.versionManager = versionManager;
@@ -107,12 +106,33 @@ public class OMUpgradeFinalizer implements UpgradeFinalizer<OzoneManager> {
     }
   }
 
-
-
-
+  /**
+   * This class implements the finalization logic applied to every
+   * LayoutFeature that needs to be finalized.
+   *
+   * For the first approach this happens synchronously within the state machine
+   * during the FinalizeUpgrade request, but ideally this has to be moved to
+   * individual calls that are going into the StateMaching one by one.
+   * The prerequisits for this to happen in the background are the following:
+   * - more fine grained control for LayoutFeatures to prepare the
+   *    finalization outside the state machine, do the switch from old to new
+   *    logic inside the statemachine and apply the finalization, and then do
+   *    any cleanup necessary outside the state machine
+   * - a way to post a request to the state machine that is not part of the
+   *    client API, so basically not an OMRequest, but preferably an internal
+   *    request, which is posted from the leader OM to the follower OMs only.
+   * - ensure that there is a possibility to implement a rollback logic if
+   *    something goes wrong inside the state machine, to avoid OM stuck in an
+   *    intermediate state due to an error.
+   */
   private class Worker implements Callable<Void> {
     private OzoneManager ozoneManager;
 
+    /**
+     * Initiates the Worker, for the specified OM instance.
+     * @param om the OzoneManager instance on which to finalize the new
+     *           LayoutFeatures.
+     */
     Worker(OzoneManager om) {
       ozoneManager = om;
     }
