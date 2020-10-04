@@ -114,7 +114,7 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       if (ozoneManager.getAclsEnabled()) {
         checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-            volume, null, null);
+            volume, null, null, null);
       }
 
       long maxUserVolumeCount = ozoneManager.getMaxUserVolumeCount();

@@ -136,7 +136,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
       if (ozoneManager.getAclsEnabled()) {
         checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE, volume,
-            null, null);
+            null, null, owner);
       }
 
       // acquire lock.

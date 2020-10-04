@@ -171,7 +171,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
       if (ozoneManager.getAclsEnabled()) {
         checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
-            volumeName, bucketName, null);
+            volumeName, bucketName, null, null);
       }
 
       acquiredVolumeLock =
