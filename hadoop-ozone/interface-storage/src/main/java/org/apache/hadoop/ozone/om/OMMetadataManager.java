@@ -399,4 +399,15 @@ public interface OMMetadataManager {
    * @return DB directory key as String.
    */
   String getOzonePathKey(long parentObjectId, String pathComponentName);
+
+  /**
+   * Returns DB key name of an open file in OM metadata store. Should be
+   * #open# prefix followed by actual leaf node name.
+   *
+   * @param parentObjectId - parent object Id
+   * @param fileName       - file name
+   * @param id             - client id for this open request
+   * @return DB directory key as String.
+   */
+  String getOpenFileName(long parentObjectId, String fileName, long id);
 }

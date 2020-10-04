@@ -72,6 +72,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto
     .OzoneManagerProtocolProtos.UserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -85,6 +86,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRE
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT;
 
 import org.apache.ratis.util.ExitUtils;
 import org.eclipse.jetty.util.StringUtil;
@@ -129,6 +132,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * |  directoryTable    | parentId/directoryName -> DirectoryInfo         |
    * |----------------------------------------------------------------------|
+   * |  fileTable         | parentId/fileName -> FileInfo                   |
+   * |----------------------------------------------------------------------|
    * |  transactionInfoTable | #TRANSACTIONINFO -> OMTransactionInfo        |
    * |----------------------------------------------------------------------|
    */
@@ -144,6 +149,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public static final String DELEGATION_TOKEN_TABLE = "dTokenTable";
   public static final String PREFIX_TABLE = "prefixTable";
   public static final String DIRECTORY_TABLE = "directoryTable";
+  public static final String FILE_TABLE = "fileTable";
+  public static final String OPEN_FILE_TABLE = "openFileTable";
   public static final String TRANSACTION_INFO_TABLE =
       "transactionInfoTable";
 
@@ -163,6 +170,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table dTokenTable;
   private Table prefixTable;
   private Table dirTable;
+  private Table fileTable;
+  private Table openFileTable;
+  private boolean enableFSPaths;
   private Table transactionInfoTable;
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
@@ -184,6 +194,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     // For test purpose only
     ignorePipelineinKey = conf.getBoolean(
         "ozone.om.ignore.pipeline", Boolean.TRUE);
+
+    setEnableFileSystemPaths(conf);
+
     start(conf);
   }
 
@@ -191,9 +204,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * For subclass overriding.
    */
   protected OmMetadataManagerImpl() {
-    this.lock = new OzoneManagerLock(new OzoneConfiguration());
+    OzoneConfiguration conf = new OzoneConfiguration();
+    this.lock = new OzoneManagerLock(conf);
     this.openKeyExpireThresholdMS =
         OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT;
+    setEnableFileSystemPaths(conf);
   }
 
   @Override
@@ -217,6 +232,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public Table<String, OmKeyInfo> getKeyTable() {
+    if (enableFSPaths && OzoneManagerRatisUtils.isOmLayoutVersionV1()) {
+      return fileTable;
+    }
     return keyTable;
   }
 
@@ -227,6 +245,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public Table<String, OmKeyInfo> getOpenKeyTable() {
+    if (enableFSPaths && OzoneManagerRatisUtils.isOmLayoutVersionV1()) {
+      return openFileTable;
+    }
     return openKeyTable;
   }
 
@@ -334,6 +355,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(S3_SECRET_TABLE)
         .addTable(PREFIX_TABLE)
         .addTable(DIRECTORY_TABLE)
+        .addTable(FILE_TABLE)
+        .addTable(OPEN_FILE_TABLE)
         .addTable(TRANSACTION_INFO_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
         .addCodec(OmKeyInfo.class, new OmKeyInfoCodec(true))
@@ -346,6 +369,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addCodec(S3SecretValue.class, new S3SecretValueCodec())
         .addCodec(OmPrefixInfo.class, new OmPrefixInfoCodec())
         .addCodec(OmDirectoryInfo.class, new OmDirectoryInfoCodec())
+
         .addCodec(OMTransactionInfo.class, new OMTransactionInfoCodec());
   }
 
@@ -403,6 +427,14 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     dirTable = this.store.getTable(DIRECTORY_TABLE, String.class,
             OmDirectoryInfo.class);
     checkTableStatus(dirTable, DIRECTORY_TABLE);
+
+    openFileTable = this.store.getTable(OPEN_FILE_TABLE, String.class,
+            OmKeyInfo.class);
+    checkTableStatus(dirTable, DIRECTORY_TABLE);
+
+    fileTable = this.store.getTable(FILE_TABLE, String.class,
+            OmKeyInfo.class);
+    checkTableStatus(fileTable, FILE_TABLE);
 
     transactionInfoTable = this.store.getTable(TRANSACTION_INFO_TABLE,
         String.class, OMTransactionInfo.class);
@@ -1159,4 +1191,24 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     return builder.toString();
   }
 
+  @Override
+  public String getOpenFileName(long parentID, String fileName,
+                                long id) {
+    StringBuilder openKey = new StringBuilder();
+    openKey.append(parentID);
+    openKey.append(OM_KEY_PREFIX).append(fileName);
+    openKey.append(OM_KEY_PREFIX).append(id);
+    return openKey.toString();
+  }
+
+  /**
+   * Sets enabling FS semantics for the paths.
+   *
+   * @param conf ozone configuration
+   */
+  @VisibleForTesting
+  public void setEnableFileSystemPaths(OzoneConfiguration conf) {
+    enableFSPaths = conf.getBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+            OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
+  }
 }

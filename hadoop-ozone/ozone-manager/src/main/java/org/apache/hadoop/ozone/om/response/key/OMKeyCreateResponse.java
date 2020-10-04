@@ -44,8 +44,8 @@ public class OMKeyCreateResponse extends OMClientResponse {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(OMKeyCreateResponse.class);
-  private OmKeyInfo omKeyInfo;
-  private long openKeySessionID;
+  protected OmKeyInfo omKeyInfo;
+  protected long openKeySessionID;
   private List<OmKeyInfo> parentKeyInfos;
   private OmVolumeArgs omVolumeArgs;
   private OmBucketInfo omBucketInfo;

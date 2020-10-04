@@ -52,6 +52,8 @@ public final class OmKeyInfo extends WithObjectID {
   private HddsProtos.ReplicationType type;
   private HddsProtos.ReplicationFactor factor;
   private FileEncryptionInfo encInfo;
+  private String fileName; // leaf node name
+  private long parentObjectID; // pointer to parent directory
 
   /**
    * ACL Information.
@@ -94,6 +96,22 @@ public final class OmKeyInfo extends WithObjectID {
     this.updateID = updateID;
   }
 
+  @SuppressWarnings("parameternumber")
+  OmKeyInfo(String volumeName, String bucketName, String keyName,
+            String fileName, List<OmKeyLocationInfoGroup> versions,
+            long dataSize, long creationTime, long modificationTime,
+            HddsProtos.ReplicationType type,
+            HddsProtos.ReplicationFactor factor,
+            Map<String, String> metadata,
+            FileEncryptionInfo encInfo, List<OzoneAcl> acls,
+            long parentObjectID, long objectID, long updateID) {
+    this(volumeName, bucketName, keyName, versions, dataSize,
+            creationTime, modificationTime, type, factor, metadata, encInfo, acls,
+            objectID, updateID);
+    this.fileName = fileName;
+    this.parentObjectID = parentObjectID;
+  }
+
   public String getVolumeName() {
     return volumeName;
   }
@@ -125,6 +143,23 @@ public final class OmKeyInfo extends WithObjectID {
   public void setDataSize(long size) {
     this.dataSize = size;
   }
+
+  public void setFileName(String fileName) {
+    this.fileName = fileName;
+  }
+
+  public String getFileName() {
+    return fileName;
+  }
+
+  public void setParentObjectID(long parentObjectID) {
+    this.parentObjectID = parentObjectID;
+  }
+
+  public long getParentObjectID() {
+    return parentObjectID;
+  }
+
 
   public synchronized OmKeyLocationInfoGroup getLatestVersionLocations() {
     return keyLocationVersions.size() == 0? null :
@@ -267,6 +302,8 @@ public final class OmKeyInfo extends WithObjectID {
     private List<OzoneAcl> acls;
     private long objectID;
     private long updateID;
+    private String fileName;
+    private long parentObjectID;
 
     public Builder() {
       this.metadata = new HashMap<>();
@@ -369,11 +406,22 @@ public final class OmKeyInfo extends WithObjectID {
       return this;
     }
 
+    public Builder setFileName(String fileName) {
+      this.fileName = fileName;
+      return this;
+    }
+
+    public Builder setParentObjectID(long parentObjectID) {
+      this.parentObjectID = parentObjectID;
+      return this;
+    }
+
     public OmKeyInfo build() {
       return new OmKeyInfo(
-          volumeName, bucketName, keyName, omKeyLocationInfoGroups,
-          dataSize, creationTime, modificationTime, type, factor, metadata,
-          encInfo, acls, objectID, updateID);
+              volumeName, bucketName, keyName, fileName,
+              omKeyLocationInfoGroups, dataSize, creationTime,
+              modificationTime, type, factor, metadata, encInfo, acls,
+              parentObjectID, objectID, updateID);
     }
   }
 
@@ -413,7 +461,8 @@ public final class OmKeyInfo extends WithObjectID {
         .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
         .addAllAcls(OzoneAclUtil.toProtobuf(acls))
         .setObjectID(objectID)
-        .setUpdateID(updateID);
+        .setUpdateID(updateID)
+        .setParentID(parentObjectID);
     if (encInfo != null) {
       kb.setFileEncryptionInfo(OMPBHelper.convert(encInfo));
     }
