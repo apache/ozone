@@ -37,7 +37,7 @@ Test ozone shell
                     Should contain      ${result}       creationTime
     ${result} =     Execute             ozone sh volume list | jq -r '. | select(.name=="${volume}")'
                     Should contain      ${result}       creationTime
-# TODO: Disable updating the owner, acls should be used to give access to other user.        
+# TODO: Disable updating the owner, acls should be used to give access to other user.
                     Execute             ozone sh volume setquota ${protocol}${server}/${volume} --space-quota 10TB --count-quota 100
 #    ${result} =     Execute             ozone sh volume info ${protocol}${server}/${volume} | jq -r '. | select(.volumeName=="${volume}") | .owner | .name'
 #                    Should Be Equal     ${result}       bill

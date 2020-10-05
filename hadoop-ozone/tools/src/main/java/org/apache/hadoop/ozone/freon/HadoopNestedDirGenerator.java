@@ -62,9 +62,10 @@ public class HadoopNestedDirGenerator extends BaseFreonGenerator
       defaultValue = "10")
   private int span;
 
-  @Option(names = {"-l", "--nameLen"},
+  @Option(names = {"-l", "--name-len", "--nameLen"},
       description =
-          "Length of the random name of directory you want to create.",
+          "Length of the random name of directory you want to create. Full " +
+              "name --nameLen will be removed in later versions.",
       defaultValue = "10")
   private int length;
 
