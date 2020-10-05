@@ -41,7 +41,7 @@ public class RatisVersionInfo {
         RATIS_VERSION_PROPERTIES)) {
       info.load(is);
     } catch (IOException ex) {
-      LoggerFactory.getLogger(getClass()).warn("Could not read '" +
+      LoggerFactory.getLogger(getClass()).warn("Could not read " +
           RATIS_VERSION_PROPERTIES, ex);
     }
   }
