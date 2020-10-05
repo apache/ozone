@@ -822,6 +822,13 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.pipeline.per.metadata.disk</name>
+    <value>2</value>
+    <tag>OZONE, SCM, PIPELINE</tag>
+    <description>Number of pipelines to be created per raft log disk.
+    </description>
+  </property>
+  <property>
   <name>ozone.datanode.pipeline.limit</name>
   <value>2</value>
   <tag>OZONE, SCM, PIPELINE</tag>

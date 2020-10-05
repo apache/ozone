@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
@@ -107,6 +108,8 @@ public class SCMNodeManager implements NodeManager {
   private final boolean useHostname;
   private final ConcurrentHashMap<String, Set<String>> dnsToUuidMap =
       new ConcurrentHashMap<>();
+  private final int numPipelinesPerMetadataVolume;
+  private final int heavyNodeCriteria;
 
   /**
    * Constructs SCM machine Manager.
@@ -134,6 +137,11 @@ public class SCMNodeManager implements NodeManager {
     this.useHostname = conf.getBoolean(
         DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
         DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+    this.numPipelinesPerMetadataVolume =
+        conf.getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME,
+            ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME_DEFAULT);
+    String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
+    this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
   }
 
   private void registerMXBean() {
@@ -483,6 +491,8 @@ public class SCMNodeManager implements NodeManager {
       DatanodeInfo datanodeInfo = nodeStateManager.getNode(datanodeDetails);
       if (nodeReport != null) {
         datanodeInfo.updateStorageReports(nodeReport.getStorageReportList());
+        datanodeInfo.updateMetaDataStorageReports(nodeReport.
+            getMetadataStorageReportList());
         metrics.incNumNodeReportProcessed();
       }
     } catch (NodeNotFoundException e) {
@@ -667,11 +677,11 @@ public class SCMNodeManager implements NodeManager {
   }
 
   /**
-   * Returns the max of no healthy volumes reported out of the set
+   * Returns the min of no healthy volumes reported out of the set
    * of datanodes constituting the pipeline.
    */
   @Override
-  public int getNumHealthyVolumes(List<DatanodeDetails> dnList) {
+  public int minHealthyVolumeNum(List<DatanodeDetails> dnList) {
     List<Integer> volumeCountList = new ArrayList<>(dnList.size());
     for (DatanodeDetails dn : dnList) {
       try {
@@ -683,7 +693,44 @@ public class SCMNodeManager implements NodeManager {
       }
     }
     Preconditions.checkArgument(!volumeCountList.isEmpty());
-    return Collections.max(volumeCountList);
+    return Collections.min(volumeCountList);
+  }
+
+  /**
+   * Returns the pipeline limit for the datanode.
+   * if the datanode pipeline limit is set, consider that as the max
+   * pipeline limit.
+   * In case, the pipeline limit is not set, the max pipeline limit
+   * will be based on the no of raft log volume reported and provided
+   * that it has atleast one healthy data volume.
+   */
+  @Override
+  public int pipelineLimit(DatanodeDetails dn) {
+    try {
+      if (heavyNodeCriteria > 0) {
+        return heavyNodeCriteria;
+      } else if (nodeStateManager.getNode(dn).getHealthyVolumeCount() > 0) {
+        return numPipelinesPerMetadataVolume *
+            nodeStateManager.getNode(dn).getMetaDataVolumeCount();
+      }
+    } catch (NodeNotFoundException e) {
+      LOG.warn("Cannot generate NodeStat, datanode {} not found.",
+          dn.getUuid());
+    }
+    return 0;
+  }
+
+  /**
+   * Returns the pipeline limit for set of datanodes.
+   */
+  @Override
+  public int minPipelineLimit(List<DatanodeDetails> dnList) {
+    List<Integer> pipelineCountList = new ArrayList<>(dnList.size());
+    for (DatanodeDetails dn : dnList) {
+      pipelineCountList.add(pipelineLimit(dn));
+    }
+    Preconditions.checkArgument(!pipelineCountList.isEmpty());
+    return Collections.min(pipelineCountList);
   }
 
   /**

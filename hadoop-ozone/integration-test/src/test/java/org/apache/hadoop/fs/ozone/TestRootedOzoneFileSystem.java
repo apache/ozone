@@ -818,11 +818,11 @@ public class TestRootedOzoneFileSystem {
     VolumeArgs volumeArgs = new VolumeArgs.Builder()
         .setAcls(Collections.singletonList(aclWorldAccess))
         .setQuotaInCounts(1000)
-        .setQuotaInBytes("1TB").build();
+        .setQuotaInBytes(Long.MAX_VALUE).build();
     // Sanity check
     Assert.assertNull(volumeArgs.getOwner());
     Assert.assertNull(volumeArgs.getAdmin());
-    Assert.assertEquals("1TB", volumeArgs.getQuotaInBytes());
+    Assert.assertEquals(Long.MAX_VALUE, volumeArgs.getQuotaInBytes());
     Assert.assertEquals(1000, volumeArgs.getQuotaInCounts());
     Assert.assertEquals(0, volumeArgs.getMetadata().size());
     Assert.assertEquals(1, volumeArgs.getAcls().size());

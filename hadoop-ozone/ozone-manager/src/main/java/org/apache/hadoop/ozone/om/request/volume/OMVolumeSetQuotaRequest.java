@@ -19,10 +19,12 @@
 package org.apache.hadoop.ozone.om.request.volume;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.util.Time;
@@ -122,16 +124,24 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
             null, null);
       }
 
-      OmVolumeArgs omVolumeArgs = null;
-
       acquireVolumeLock = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume);
 
-      omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
+      OmVolumeArgs omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
+      if (checkQuotaBytesValid(omMetadataManager,
+          setVolumePropertyRequest.getQuotaInBytes(), volume)) {
+        omVolumeArgs.setQuotaInBytes(
+            setVolumePropertyRequest.getQuotaInBytes());
+      } else {
+        omVolumeArgs.setQuotaInBytes(omVolumeArgs.getQuotaInBytes());
+      }
+      if (checkQuotaCountsValid(setVolumePropertyRequest.getQuotaInCounts())) {
+        omVolumeArgs.setQuotaInCounts(
+            setVolumePropertyRequest.getQuotaInCounts());
+      } else {
+        omVolumeArgs.setQuotaInCounts(omVolumeArgs.getQuotaInCounts());
+      }
 
-      omVolumeArgs.setQuotaInBytes(setVolumePropertyRequest.getQuotaInBytes());
-      omVolumeArgs.setQuotaInCounts(
-          setVolumePropertyRequest.getQuotaInCounts());
       omVolumeArgs.setUpdateID(transactionLogIndex,
           ozoneManager.isRatisEnabled());
       omVolumeArgs.setModificationTime(
@@ -174,7 +184,39 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
     return omClientResponse;
   }
 
+  public boolean checkQuotaBytesValid(OMMetadataManager metadataManager,
+      long volumeQuotaInBytes, String volumeName) throws IOException {
+    long totalBucketQuota = 0;
 
+    if (volumeQuotaInBytes == 0) {
+      return false;
+    }
+
+    List<OmBucketInfo> bucketList = metadataManager.listBuckets(
+        volumeName, null, null, Integer.MAX_VALUE);
+    for(OmBucketInfo bucketInfo : bucketList) {
+      long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
+      if(nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {
+        totalBucketQuota += nextQuotaInBytes;
+      }
+    }
+    if(volumeQuotaInBytes < totalBucketQuota &&
+        volumeQuotaInBytes != OzoneConsts.QUOTA_RESET) {
+      throw new IllegalArgumentException("Total buckets quota in this volume " +
+          "should not be greater than volume quota : the total space quota is" +
+          ":" + totalBucketQuota + ". But the volume space quota is:" +
+          volumeQuotaInBytes);
+    }
+    return true;
+  }
+
+  public boolean checkQuotaCountsValid(long quotaInCounts) {
+
+    if ((quotaInCounts <= 0 && quotaInCounts != OzoneConsts.QUOTA_RESET)) {
+      return false;
+    }
+    return true;
+  }
 }
 
 

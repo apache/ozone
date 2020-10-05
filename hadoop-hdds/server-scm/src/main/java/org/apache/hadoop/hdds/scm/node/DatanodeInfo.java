@@ -22,6 +22,8 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.util.Time;
 
 import java.util.Collections;
@@ -41,6 +43,7 @@ public class DatanodeInfo extends DatanodeDetails {
   private long lastStatsUpdatedTime;
 
   private List<StorageReportProto> storageReports;
+  private List<MetadataStorageReportProto> metadataStorageReports;
 
   private NodeStatus nodeStatus;
 
@@ -55,6 +58,7 @@ public class DatanodeInfo extends DatanodeDetails {
     this.lastHeartbeatTime = Time.monotonicNow();
     this.storageReports = Collections.emptyList();
     this.nodeStatus = nodeStatus;
+    this.metadataStorageReports = Collections.emptyList();
   }
 
   /**
@@ -110,6 +114,22 @@ public class DatanodeInfo extends DatanodeDetails {
   }
 
   /**
+   * Updates the datanode metadata storage reports.
+   *
+   * @param reports list of metadata storage report
+   */
+  public void updateMetaDataStorageReports(
+      List<MetadataStorageReportProto> reports) {
+    try {
+      lock.writeLock().lock();
+      lastStatsUpdatedTime = Time.monotonicNow();
+      metadataStorageReports = reports;
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  /**
    * Returns the storage reports associated with this datanode.
    *
    * @return list of storage report
@@ -131,6 +151,19 @@ public class DatanodeInfo extends DatanodeDetails {
     try {
       lock.readLock().lock();
       return storageReports.size() - getFailedVolumeCount();
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+  /**
+   * Returns count of healthy metadata volumes reported from datanode.
+   * @return count of healthy metdata log volumes
+   */
+  public int getMetaDataVolumeCount() {
+    try {
+      lock.readLock().lock();
+      return metadataStorageReports.size();
     } finally {
       lock.readLock().unlock();
     }

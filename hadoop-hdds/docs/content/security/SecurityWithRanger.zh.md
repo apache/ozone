@@ -2,6 +2,9 @@
 title: "Apache Ranger"
 date: "2019-April-03"
 weight: 5
+menu:
+   main:
+      parent: 安全
 summary: Apache Ranger 是一个用于管理和监控 Hadoop 平台复杂数据权限的框架。
 icon: user
 ---

@@ -119,12 +119,11 @@ public class TestOMFailovers {
     }
 
     @Override
-    protected void createOMProxyIfNeeded(ProxyInfo proxyInfo,
-        String nodeId) {
-      if (proxyInfo.proxy == null) {
-        proxyInfo.proxy = new MockOzoneManagerProtocol(nodeId,
-            testException);
-      }
+    protected ProxyInfo createOMProxy(String nodeId) {
+      ProxyInfo proxyInfo = new ProxyInfo<>(new MockOzoneManagerProtocol(nodeId,
+          testException), nodeId);
+      getOMProxyMap().put(nodeId, proxyInfo);
+      return proxyInfo;
     }
 
     @Override
@@ -137,7 +136,7 @@ public class TestOMFailovers {
 
       for (int i = 1; i <= 3; i++) {
         String nodeId = "om" + i;
-        omProxies.put(nodeId, new ProxyInfo<>(null, nodeId));
+        omProxies.put(nodeId, null);
         omProxyInfos.put(nodeId, null);
         omNodeIDList.add(nodeId);
       }

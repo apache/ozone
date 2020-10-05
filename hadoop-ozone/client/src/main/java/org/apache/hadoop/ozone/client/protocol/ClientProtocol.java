@@ -100,11 +100,11 @@ public interface ClientProtocol {
   /**
    * Set Volume Quota.
    * @param volumeName Name of the Volume
-   * @param quotaInBytes The maximum size this volume can be used.
    * @param quotaInCounts The maximum number of buckets in this volume.
+   * @param quotaInBytes The maximum size this volume can be used.
    * @throws IOException
    */
-  void setVolumeQuota(String volumeName, long quotaInBytes, long quotaInCounts)
+  void setVolumeQuota(String volumeName, long quotaInCounts, long quotaInBytes)
       throws IOException;
 
   /**
@@ -655,4 +655,15 @@ public interface ClientProtocol {
    * Getter for OzoneManagerClient.
    */
   OzoneManagerProtocol getOzoneManagerClient();
+
+  /**
+   * Set Bucket Quota.
+   * @param volumeName Name of the Volume.
+   * @param bucketName Name of the Bucket.
+   * @param quotaInBytes The maximum size this buckets can be used.
+   * @param quotaInCounts The maximum number of keys in this bucket.
+   * @throws IOException
+   */
+  void setBucketQuota(String volumeName, String bucketName, long quotaInCounts,
+      long quotaInBytes) throws IOException;
 }

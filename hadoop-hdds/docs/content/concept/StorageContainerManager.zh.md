@@ -2,6 +2,9 @@
 title: "Storage Container Manager"
 date: "2017-09-14"
 weight: 3
+menu: 
+  main:
+     parent: 概念
 summary:  Storage Container Manager（SCM）是 Ozone 的核心元数据服务，它提供了 Ozone 的分布式数据块服务层。
 ---
 <!---

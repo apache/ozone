@@ -71,6 +71,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.mockito.InOrder;
 
+
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -276,6 +277,7 @@ public class TestSCMPipelineManager {
         new SCMPipelineManager(conf, nodeManagerMock,
             scmMetadataStore.getPipelineTable(), new EventQueue());
     pipelineManager.allowPipelineCreation();
+    nodeManagerMock.setNumPipelinePerDatanode(1);
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManagerMock,
             pipelineManager.getStateManager(), conf);
@@ -327,6 +329,78 @@ public class TestSCMPipelineManager {
         SCMPipelineMetrics.class.getSimpleName());
     numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
     Assert.assertEquals(5, numPipelineAllocated);
+
+    numPipelineCreateFailed = getLongCounter(
+        "NumPipelineCreationFailed", metrics);
+    Assert.assertEquals(1, numPipelineCreateFailed);
+
+    // clean up
+    pipelineManager.close();
+  }
+
+  @Test
+  public void testPipelineLimit() throws Exception {
+    int numMetaDataVolumes = 2;
+    final OzoneConfiguration config = new OzoneConfiguration();
+    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    config.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
+        false);
+    // turning off this config will ensure, pipeline creation is determined by
+    // metadata volume count.
+    config.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 0);
+    MockNodeManager nodeManagerMock = new MockNodeManager(true,
+        3);
+    nodeManagerMock.setNumMetaDataVolumes(numMetaDataVolumes);
+    int pipelinePerDn = numMetaDataVolumes *
+        MockNodeManager.NUM_PIPELINE_PER_METADATA_DISK;
+    nodeManagerMock.setNumPipelinePerDatanode(pipelinePerDn);
+    SCMPipelineManager pipelineManager =
+        new SCMPipelineManager(config, nodeManagerMock,
+            scmMetadataStore.getPipelineTable(), new EventQueue());
+    pipelineManager.allowPipelineCreation();
+    PipelineProvider mockRatisProvider =
+        new MockRatisPipelineProvider(nodeManagerMock,
+            pipelineManager.getStateManager(), config);
+    pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
+        mockRatisProvider);
+
+    MetricsRecordBuilder metrics = getMetrics(
+        SCMPipelineMetrics.class.getSimpleName());
+    long numPipelineAllocated = getLongCounter("NumPipelineAllocated",
+        metrics);
+    Assert.assertEquals(0, numPipelineAllocated);
+
+    // max limit on no of pipelines is 4
+    for (int i = 0; i < pipelinePerDn; i++) {
+      Pipeline pipeline = pipelineManager
+          .createPipeline(HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.THREE);
+      Assert.assertNotNull(pipeline);
+    }
+
+    metrics = getMetrics(
+        SCMPipelineMetrics.class.getSimpleName());
+    numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
+    Assert.assertEquals(4, numPipelineAllocated);
+
+    long numPipelineCreateFailed = getLongCounter(
+        "NumPipelineCreationFailed", metrics);
+    Assert.assertEquals(0, numPipelineCreateFailed);
+    //This should fail...
+    try {
+      pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
+          HddsProtos.ReplicationFactor.THREE);
+      fail();
+    } catch (SCMException ioe) {
+      // pipeline creation failed this time.
+      Assert.assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
+          ioe.getResult());
+    }
+
+    metrics = getMetrics(
+        SCMPipelineMetrics.class.getSimpleName());
+    numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
+    Assert.assertEquals(4, numPipelineAllocated);
 
     numPipelineCreateFailed = getLongCounter(
         "NumPipelineCreationFailed", metrics);
