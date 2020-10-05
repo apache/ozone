@@ -356,9 +356,15 @@ public class SCMContainerManager implements ContainerManager {
       if (!skipPipelineToContainerRemove) {
         if (oldState == LifeCycleState.OPEN &&
             newState != LifeCycleState.OPEN) {
-          pipelineManager
-              .removeContainerFromPipeline(container.getPipelineID(),
-                  containerID);
+          try {
+            pipelineManager
+                .removeContainerFromPipeline(container.getPipelineID(),
+                    containerID);
+          } catch (PipelineNotFoundException e) {
+            LOG.warn("Unable to remove container {} from pipeline {} " +
+                " as the pipeline no longer exists",
+                containerID, container.getPipelineID());
+          }
         }
       }
       if (newState == LifeCycleState.DELETED) {
