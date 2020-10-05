@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrefixInfo;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedPrefixInfo;
 
 import java.util.BitSet;
 import java.util.HashMap;
@@ -150,11 +150,12 @@ public final class OmPrefixInfo extends WithObjectID {
   /**
    * Creates PrefixInfo protobuf from OmPrefixInfo.
    */
-  public PrefixInfo getProtobuf() {
-    PrefixInfo.Builder pib =  PrefixInfo.newBuilder().setName(name)
+  public PersistedPrefixInfo getProtobuf() {
+    PersistedPrefixInfo.Builder pib =
+        PersistedPrefixInfo.newBuilder().setName(name)
         .addAllMetadata(KeyValueUtil.toProtobuf(metadata));
     if (acls != null) {
-      pib.addAllAcls(OzoneAclUtil.toProtobuf(acls));
+      pib.addAllAcls(OzoneAclStorageUtil.toProtobuf(acls));
     }
     return pib.build();
   }
@@ -164,7 +165,7 @@ public final class OmPrefixInfo extends WithObjectID {
    * @param prefixInfo
    * @return instance of OmPrefixInfo
    */
-  public static OmPrefixInfo getFromProtobuf(PrefixInfo prefixInfo) {
+  public static OmPrefixInfo getFromProtobuf(PersistedPrefixInfo prefixInfo) {
     OmPrefixInfo.Builder opib = OmPrefixInfo.newBuilder()
         .setName(prefixInfo.getName());
     if (prefixInfo.getMetadataList() != null) {
@@ -172,7 +173,7 @@ public final class OmPrefixInfo extends WithObjectID {
           .getFromProtobuf(prefixInfo.getMetadataList()));
     }
     if (prefixInfo.getAclsList() != null) {
-      opib.setAcls(OzoneAclUtil.fromProtobuf(prefixInfo.getAclsList()));
+      opib.setAcls(OzoneAclStorageUtil.fromProtobuf(prefixInfo.getAclsList()));
     }
     return opib.build();
   }
