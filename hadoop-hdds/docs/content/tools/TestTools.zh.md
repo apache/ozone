@@ -88,7 +88,7 @@ bin/ozone freon --help
 例如：
 
 ```
-ozone freon randomkeys --numOfVolumes=10 --numOfBuckets 10 --numOfKeys 10  --replicationType=RATIS --factor=THREE
+ozone freon randomkeys --num-of-volumes=10 --num-of-buckets 10 --num-of-keys 10  --replication-type=RATIS --factor=THREE
 ```
 
 ```

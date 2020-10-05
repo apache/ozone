@@ -51,7 +51,7 @@ Verify SPNEGO enabled URL
 *** Test Cases ***
 Generate Freon data
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
-                        Execute                             ozone freon rk --replicationType=RATIS --numOfVolumes 1 --numOfBuckets 1 --numOfKeys 2 --keySize 1025
+                        Execute                             ozone freon rk --replication-type=RATIS --num-of-volumes 1 --num-of-buckets 1 --num-of-keys 2 --key-size 1025
 
 Test OM portal
     Verify SPNEGO enabled URL       ${OM_URL}
