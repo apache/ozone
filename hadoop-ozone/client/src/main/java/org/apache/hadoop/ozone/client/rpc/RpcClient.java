@@ -132,6 +132,7 @@ public class RpcClient implements ClientProtocol {
   private final int chunkSize;
   private final ChecksumType checksumType;
   private final int bytesPerChecksum;
+  private final boolean unsafeByteBufferConversion;
   private boolean verifyChecksum;
   private final UserGroupInformation ugi;
   private final ACLType userRights;
@@ -211,6 +212,10 @@ public class RpcClient implements ClientProtocol {
     blockSize = (long) conf.getStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
         OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
 
+    unsafeByteBufferConversion = conf.getBoolean(
+            OzoneConfigKeys.OZONE_UNSAFEBYTEOPERATIONS_ENABLED,
+            OzoneConfigKeys.OZONE_UNSAFEBYTEOPERATIONS_ENABLED_DEFAULT);
+        
     int configuredChecksumSize = (int) conf.getStorageSize(
         OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM,
         OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_DEFAULT,
@@ -1279,6 +1284,7 @@ public class RpcClient implements ClientProtocol {
             .setBytesPerChecksum(bytesPerChecksum)
             .setMaxRetryCount(maxRetryCount)
             .setRetryInterval(retryInterval)
+            .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
             .build();
     keyOutputStream
         .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
