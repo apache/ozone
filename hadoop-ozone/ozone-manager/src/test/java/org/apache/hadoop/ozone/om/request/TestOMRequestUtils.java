@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType;
 
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -736,12 +737,11 @@ public final class TestOMRequestUtils {
   /**
    * Create OmKeyInfo.
    */
+  @SuppressWarnings("parameterNumber")
   public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
-                                          String keyName,
-                                          HddsProtos.ReplicationType replicationType,
-                                          HddsProtos.ReplicationFactor replicationFactor,
-                                          long objectID, long parentID,
-                                          long creationTime) {
+      String keyName, HddsProtos.ReplicationType replicationType,
+      HddsProtos.ReplicationFactor replicationFactor, long objectID,
+      long parentID, long creationTime) {
     String fileName = OzoneFSUtils.getFileName(keyName);
     return new OmKeyInfo.Builder()
             .setVolumeName(volumeName)
@@ -810,5 +810,36 @@ public final class TestOMRequestUtils {
     OmBucketInfo omBucketInfo =
             omMetadataManager.getBucketTable().get(bucketKey);
     return omBucketInfo.getObjectID();
+  }
+
+  /**
+   * Add path components to the directory table and returns last directory's
+   * object id.
+   *
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @param key        key name
+   * @param omMetaMgr  metdata manager
+   * @return last directory object id
+   * @throws Exception
+   */
+  public static long addParentsToDirTable(String volumeName, String bucketName,
+                                    String key, OMMetadataManager omMetaMgr)
+          throws Exception {
+    long bucketId = TestOMRequestUtils.getBucketId(volumeName, bucketName,
+            omMetaMgr);
+    String[] pathComponents = StringUtils.split(key, '/');
+    long objectId = bucketId + 100;
+    long parentId = bucketId;
+    long txnID = 5000;
+    for (String pathElement : pathComponents) {
+      OmDirectoryInfo omDirInfo =
+              TestOMRequestUtils.createOmDirectoryInfo(pathElement, ++objectId,
+                      parentId);
+      TestOMRequestUtils.addDirKeyToDirTable(true, omDirInfo,
+              txnID, omMetaMgr);
+      parentId = omDirInfo.getObjectID();
+    }
+    return parentId;
   }
 }

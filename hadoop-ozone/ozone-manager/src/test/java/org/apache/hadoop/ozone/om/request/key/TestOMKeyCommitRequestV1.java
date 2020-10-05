@@ -117,6 +117,74 @@ public class TestOMKeyCommitRequestV1 extends TestOMKeyRequestV1 {
 
   }
 
+  @Test
+  public void testValidateAndUpdateCacheWithSubDirs() throws Exception {
+    String parentDir = "dir1/dir2/dir3/";
+    keyName = parentDir + UUID.randomUUID().toString();
+
+    OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest());
+
+    OMKeyCommitRequestV1 omKeyCommitRequestV1 =
+        new OMKeyCommitRequestV1(modifiedOmRequest);
+
+    TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager);
+
+    long parentId = TestOMRequestUtils.addParentsToDirTable(volumeName,
+            bucketName, parentDir, omMetadataManager);
+
+    long objectId = 100;
+
+    OmKeyInfo omKeyInfoV1 =
+            TestOMRequestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+                    HddsProtos.ReplicationType.RATIS,
+                    HddsProtos.ReplicationFactor.ONE, objectId, parentId,
+                    Time.now());
+
+    String fileName = OzoneFSUtils.getFileName(keyName);
+    TestOMRequestUtils.addFileToKeyTable(true, false,
+            fileName, omKeyInfoV1, clientID,  txnLogId, omMetadataManager);
+
+    String ozoneFileKey = omMetadataManager.getOzonePathKey(parentId, fileName);
+
+    // Key should not be there in key table, as validateAndUpdateCache is
+    // still not called.
+    OmKeyInfo dbOMKeyInfo = omMetadataManager.getKeyTable().get(ozoneFileKey);
+
+    Assert.assertNull(dbOMKeyInfo);
+
+    OMClientResponse omClientResponse =
+        omKeyCommitRequestV1.validateAndUpdateCache(ozoneManager, txnLogId,
+                ozoneManagerDoubleBufferHelper);
+
+    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+
+    // Entry should be deleted from openKey Table.
+    dbOMKeyInfo = omMetadataManager.getOpenKeyTable().get(ozoneFileKey);
+    Assert.assertNull(dbOMKeyInfo);
+
+    // Now entry should be created in key Table.
+    dbOMKeyInfo = omMetadataManager.getKeyTable().get(ozoneFileKey);
+
+    Assert.assertNotNull(dbOMKeyInfo);
+
+    // Check modification time
+    CommitKeyRequest commitKeyRequest = modifiedOmRequest.getCommitKeyRequest();
+    Assert.assertEquals(commitKeyRequest.getKeyArgs().getModificationTime(),
+            dbOMKeyInfo.getModificationTime());
+
+    // Check block location.
+    List<OmKeyLocationInfo> locationInfoListFromCommitKeyRequest =
+        commitKeyRequest.getKeyArgs()
+        .getKeyLocationsList().stream().map(OmKeyLocationInfo::getFromProtobuf)
+        .collect(Collectors.toList());
+
+    Assert.assertEquals(locationInfoListFromCommitKeyRequest,
+        dbOMKeyInfo.getLatestVersionLocations().getLocationList());
+
+  }
+
   private long getbucketID() throws java.io.IOException {
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =

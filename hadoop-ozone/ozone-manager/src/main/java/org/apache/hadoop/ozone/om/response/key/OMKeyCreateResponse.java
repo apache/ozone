@@ -44,8 +44,8 @@ public class OMKeyCreateResponse extends OMClientResponse {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(OMKeyCreateResponse.class);
-  protected OmKeyInfo omKeyInfo;
-  protected long openKeySessionID;
+  private OmKeyInfo omKeyInfo;
+  private long openKeySessionID;
   private List<OmKeyInfo> parentKeyInfos;
   private OmVolumeArgs omVolumeArgs;
   private OmBucketInfo omBucketInfo;
@@ -107,6 +107,14 @@ public class OMKeyCreateResponse extends OMClientResponse {
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
         omMetadataManager.getBucketKey(omVolumeArgs.getVolume(),
             omBucketInfo.getBucketName()), omBucketInfo);
+  }
+
+  public long getOpenKeySessionID() {
+    return openKeySessionID;
+  }
+
+  public OmKeyInfo getOmKeyInfo() {
+    return omKeyInfo;
   }
 }
 

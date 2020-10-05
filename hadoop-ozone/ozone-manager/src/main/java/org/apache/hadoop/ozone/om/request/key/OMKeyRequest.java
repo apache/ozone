@@ -574,7 +574,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
             .setReplicationFactor(factor)
             .setFileEncryptionInfo(encInfo)
             .setAcls(getAclsForKey(keyArgs, omBucketInfo, prefixManager))
-            .addAllMetadata(KeyValueUtil.getFromProtobuf(keyArgs.getMetadataList()))
+            .addAllMetadata(KeyValueUtil.getFromProtobuf(
+                    keyArgs.getMetadataList()))
             .setUpdateID(transactionLogIndex);
     long objectID;
     if (omPathInfo == null) {

@@ -18,15 +18,11 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
-import org.apache.hadoop.ozone.om.request.key.TestOMKeyRequest;
 import org.apache.hadoop.ozone.om.request.key.TestOMKeyRequestV1;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -35,15 +31,17 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
-import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.List;
 import java.util.UUID;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.*;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.DIRECTORY_NOT_FOUND;
 
 /**
  * Tests OMFileCreateRequest V1 layout version.
@@ -223,7 +221,8 @@ public class TestOMFileCreateRequestV1 extends TestOMKeyRequestV1 {
     testNonRecursivePath("a/b", false, false, true);
 
     // Create parent dirs for the path
-    createDirParents("a/b/c");
+    TestOMRequestUtils.addParentsToDirTable(volumeName, bucketName,
+            "a/b/c", omMetadataManager);
     TestOMRequestUtils.addKeyToTable(false, volumeName, bucketName,
         "a/b/c/d", 0L,  HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, omMetadataManager);
@@ -292,7 +291,8 @@ public class TestOMFileCreateRequestV1 extends TestOMKeyRequestV1 {
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager);
     // Create parent dirs for the path
-    long parentId = createDirParents(parentDir);
+    long parentId = TestOMRequestUtils.addParentsToDirTable(volumeName,
+            bucketName, parentDir, omMetadataManager);
 
     // Need to add the path which starts with "c/d/e" to OpenKeyTable as this is
     // non-recursive parent should exist.
@@ -377,12 +377,12 @@ public class TestOMFileCreateRequestV1 extends TestOMKeyRequestV1 {
     long parentId = bucketId;
     for (int indx = 0; indx < pathComponents.length; indx++) {
       String pathElement = pathComponents[indx];
-        // Reached last component, which is file name
-        if (indx == pathComponents.length - 1) {
-          String dbOpenFileName = omMetadataManager.getOpenFileName(
-                  parentId, pathElement, id);
-          OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable()
-                  .get(dbOpenFileName);
+      // Reached last component, which is file name
+      if (indx == pathComponents.length - 1) {
+        String dbOpenFileName = omMetadataManager.getOpenFileName(
+                parentId, pathElement, id);
+        OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable()
+                .get(dbOpenFileName);
         if (doAssert) {
           Assert.assertNotNull("Invalid key!", omKeyInfo);
         }
@@ -420,24 +420,6 @@ public class TestOMFileCreateRequestV1 extends TestOMKeyRequestV1 {
       parentId = dirInfo.getObjectID();
     }
     return dirInfo;
-  }
-
-  private long createDirParents(String key) throws Exception {
-    long bucketId = TestOMRequestUtils.getBucketId(volumeName, bucketName,
-            omMetadataManager);
-    String[] pathComponents = StringUtils.split(key, '/');
-    long objectId = bucketId + 100;
-    long parentId = bucketId;
-    long txnID = 5000;
-    for (String pathElement : pathComponents) {
-      OmDirectoryInfo omDirInfo =
-              TestOMRequestUtils.createOmDirectoryInfo(pathElement, ++objectId,
-                      parentId);
-      TestOMRequestUtils.addDirKeyToDirTable(true, omDirInfo,
-              txnID, omMetadataManager);
-      parentId = omDirInfo.getObjectID();
-    }
-    return parentId;
   }
 
   /**

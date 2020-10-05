@@ -24,7 +24,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 import javax.annotation.Nonnull;
@@ -72,9 +71,11 @@ public class OMFileCreateResponseV1 extends OMFileCreateResponse {
       }
     }
 
-    String openKey = omMetadataMgr.getOpenFileName(omKeyInfo.getParentObjectID(),
-            omKeyInfo.getFileName(), openKeySessionID);
-    omMetadataMgr.getOpenKeyTable().putWithBatch(batchOp, openKey, omKeyInfo);
+    String openKey = omMetadataMgr.getOpenFileName(
+            getOmKeyInfo().getParentObjectID(), getOmKeyInfo().getFileName(),
+            getOpenKeySessionID());
+    omMetadataMgr.getOpenKeyTable().putWithBatch(batchOp, openKey,
+            getOmKeyInfo());
   }
 
 }

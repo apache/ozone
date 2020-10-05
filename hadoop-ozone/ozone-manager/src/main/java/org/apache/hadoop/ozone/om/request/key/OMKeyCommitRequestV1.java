@@ -64,7 +64,7 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-                                                 long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
 
     CommitKeyRequest commitKeyRequest = getOmRequest().getCommitKeyRequest();
 
@@ -120,20 +120,13 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
-      String leafNodeName = OzoneFSUtils.getFileName(keyName);
+      String fileName = OzoneFSUtils.getFileName(keyName);
       omBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
       long bucketId = omBucketInfo.getObjectID();
-      OmDirectoryInfo parentInfo = getParentInfo(bucketId, pathComponents,
-              leafNodeName, omMetadataManager);
-      if (parentInfo == null) {
-        throw new OMException("Failed to commit key, as parent directory of "
-                + keyName + " entry is not found in Directory table",
-                KEY_NOT_FOUND);
-      }
-      String dbFileKey = omMetadataManager.getOzonePathKey
-              (parentInfo.getObjectID(), leafNodeName);
-      dbOpenFileKey = omMetadataManager.getOpenFileName(
-              parentInfo.getObjectID(), leafNodeName,
+      long parentID = getParentID(bucketId, pathComponents, keyName,
+              omMetadataManager);
+      String dbFileKey = omMetadataManager.getOzonePathKey(parentID, fileName);
+      dbOpenFileKey = omMetadataManager.getOpenFileName(parentID, fileName,
               commitKeyRequest.getClientID());
 
       omKeyInfo = omMetadataManager.getOpenKeyTable().get(dbOpenFileKey);
@@ -221,19 +214,29 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
     return omClientResponse;
   }
 
-  private OmDirectoryInfo getParentInfo(long bucketId,
-                                        Iterator<Path> pathComponents,
-                                        String leafNodeName,
+  /**
+   * Get parent id for the user given path.
+   *
+   * @param bucketId          bucket id
+   * @param pathComponents    fie path elements
+   * @param keyName           user given key name
+   * @param omMetadataManager metadata manager
+   * @return lastKnownParentID
+   * @throws IOException DB failure or parent not exists in DirectoryTable
+   */
+  private long getParentID(long bucketId, Iterator<Path> pathComponents,
+                                        String keyName,
                                         OMMetadataManager omMetadataManager)
           throws IOException {
 
     long lastKnownParentId = bucketId;
+    boolean parentFound = true; // default bucketID as parent
     OmDirectoryInfo omDirectoryInfo = null;
     while (pathComponents.hasNext()) {
       String nodeName = pathComponents.next().toString();
-      // if it finds the fileName, then returns its parentDir info
-      if (leafNodeName.equals(nodeName)) {
-        return omDirectoryInfo;
+      // Reached last component, which would be a file. Returns its parentID.
+      if (!pathComponents.hasNext()) {
+        return lastKnownParentId;
       }
       String dbNodeName = lastKnownParentId + "/" + nodeName;
       omDirectoryInfo = omMetadataManager.
@@ -241,9 +244,16 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
       if (omDirectoryInfo != null) {
         lastKnownParentId = omDirectoryInfo.getObjectID();
       } else {
-        return null;
+        parentFound = false;
+        break;
       }
     }
-    return null;
+
+    if (!parentFound) {
+      throw new OMException("Failed to commit key, as parent directory of "
+              + keyName + " entry is not found in DirectoryTable",
+              KEY_NOT_FOUND);
+    }
+    return lastKnownParentId;
   }
 }

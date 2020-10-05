@@ -165,10 +165,10 @@ public class TestOzoneFileOps {
   }
 
   /**
-   * Verify key name format and the DB key existence in the expected openFileKeys
-   * list.
+   * Verify key name format and the DB key existence in the expected
+   * openFileKeys list.
    *
-   * @param key     table keyName
+   * @param key          table keyName
    * @param openFileKeys expected keyName
    */
   private void verifyOpenKeyFormat(String key, ArrayList<String> openFileKeys) {

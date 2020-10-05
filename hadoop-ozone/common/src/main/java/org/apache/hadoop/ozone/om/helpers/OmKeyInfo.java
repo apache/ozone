@@ -106,8 +106,8 @@ public final class OmKeyInfo extends WithObjectID {
             FileEncryptionInfo encInfo, List<OzoneAcl> acls,
             long parentObjectID, long objectID, long updateID) {
     this(volumeName, bucketName, keyName, versions, dataSize,
-            creationTime, modificationTime, type, factor, metadata, encInfo, acls,
-            objectID, updateID);
+            creationTime, modificationTime, type, factor, metadata, encInfo,
+            acls, objectID, updateID);
     this.fileName = fileName;
     this.parentObjectID = parentObjectID;
   }
@@ -406,13 +406,13 @@ public final class OmKeyInfo extends WithObjectID {
       return this;
     }
 
-    public Builder setFileName(String fileName) {
-      this.fileName = fileName;
+    public Builder setFileName(String keyFileName) {
+      this.fileName = keyFileName;
       return this;
     }
 
-    public Builder setParentObjectID(long parentObjectID) {
-      this.parentObjectID = parentObjectID;
+    public Builder setParentObjectID(long parentID) {
+      this.parentObjectID = parentID;
       return this;
     }
 

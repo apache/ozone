@@ -124,8 +124,8 @@ public class OMFileCreateRequestV1 extends OMFileCreateRequest {
       OmKeyInfo dbFileInfo = null;
 
       OMFileRequest.OMPathInfoV1 pathInfoV1 =
-              OMFileRequest.verifyDirectoryKeysInPath(omMetadataManager, volumeName,
-                      bucketName, keyName, Paths.get(keyName));
+              OMFileRequest.verifyDirectoryKeysInPath(omMetadataManager,
+                      volumeName, bucketName, keyName, Paths.get(keyName));
 
       if (pathInfoV1.getDirectoryResult()
               == OMFileRequest.OMDirectoryResult.FILE_EXISTS) {
