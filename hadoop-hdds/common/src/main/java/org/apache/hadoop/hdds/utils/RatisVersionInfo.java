@@ -21,40 +21,29 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.ThreadUtil;
 
 import org.slf4j.LoggerFactory;
 
 /**
- * This class returns build information about Hadoop components.
+ * This class returns build information about Ratis projects.
  */
-@InterfaceAudience.Public
-@InterfaceStability.Stable
-public class VersionInfo {
+public class RatisVersionInfo {
+
+  private static final String RATIS_VERSION_PROPERTIES =
+      "ratis-version.properties";
 
   private final Properties info = new Properties();
 
-  public VersionInfo(String component) {
-    String versionInfoFile = component + "-version-info.properties";
-    InputStream is = null;
-    try {
-      is = ThreadUtil.getResourceAsStream(
+  public RatisVersionInfo() {
+    try (InputStream is = ThreadUtil.getResourceAsStream(
         getClass().getClassLoader(),
-        versionInfoFile);
+        RATIS_VERSION_PROPERTIES)) {
       info.load(is);
     } catch (IOException ex) {
-      LoggerFactory.getLogger(getClass()).warn("Could not read '" +
-          versionInfoFile + "', " + ex.toString(), ex);
-    } finally {
-      IOUtils.closeStream(is);
+      LoggerFactory.getLogger(getClass()).warn("Could not read " +
+          RATIS_VERSION_PROPERTIES, ex);
     }
-  }
-
-  public String getRelease() {
-    return info.getProperty("release", "Unknown");
   }
 
   public String getVersion() {
@@ -65,34 +54,8 @@ public class VersionInfo {
     return info.getProperty("revision", "Unknown");
   }
 
-  public String getBranch() {
-    return info.getProperty("branch", "Unknown");
-  }
-
-  public String getDate() {
-    return info.getProperty("date", "Unknown");
-  }
-
-  public String getUser() {
-    return info.getProperty("user", "Unknown");
-  }
-
-  public String getUrl() {
-    return info.getProperty("url", "Unknown");
-  }
-
-  public String getSrcChecksum() {
-    return info.getProperty("srcChecksum", "Unknown");
-  }
-
-  public String getProtocVersion() {
-    return info.getProperty("protocVersion", "Unknown");
-  }
-
   public String getBuildVersion() {
     return getVersion() +
-        " from " + getRevision() +
-        " by " + getUser() +
-        " source checksum " + getSrcChecksum();
+        " from " + getRevision();
   }
 }
