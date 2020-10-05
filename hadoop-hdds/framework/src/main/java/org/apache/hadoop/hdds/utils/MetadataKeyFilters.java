@@ -30,41 +30,25 @@ import com.google.common.base.Strings;
  * An utility class to filter levelDB keys.
  */
 public final class MetadataKeyFilters {
-
-  private static KeyPrefixFilter deletingKeyFilter =
-      new MetadataKeyFilters.KeyPrefixFilter()
-          .addFilter(OzoneConsts.DELETING_KEY_PREFIX);
-
-  private static KeyPrefixFilter deletedKeyFilter =
-      new MetadataKeyFilters.KeyPrefixFilter()
-          .addFilter(OzoneConsts.DELETED_KEY_PREFIX);
-
-  private static KeyPrefixFilter normalKeyFilter =
-      new MetadataKeyFilters.KeyPrefixFilter()
-          .addFilter(OzoneConsts.DELETING_KEY_PREFIX, true)
-          .addFilter(OzoneConsts.DELETED_KEY_PREFIX, true)
-          .addFilter(OzoneConsts.DELETE_TRANSACTION_KEY_PREFIX, true)
-          .addFilter(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX, true)
-          .addFilter(OzoneConsts.BLOCK_COUNT, true)
-          .addFilter(OzoneConsts.CONTAINER_BYTES_USED, true)
-          .addFilter(OzoneConsts.PENDING_DELETE_BLOCK_COUNT, true);
-
-  private MetadataKeyFilters() {
-  }
+  private MetadataKeyFilters() { }
 
   public static KeyPrefixFilter getDeletingKeyFilter() {
-    return deletingKeyFilter;
+    return new MetadataKeyFilters.KeyPrefixFilter()
+            .addFilter(OzoneConsts.DELETING_KEY_PREFIX);
   }
 
-  public static KeyPrefixFilter getDeletedKeyFilter() {
-    return deletedKeyFilter;
-  }
-
-  public static KeyPrefixFilter getNormalKeyFilter() {
-    return normalKeyFilter;
+  /**
+   * @return A {@link KeyPrefixFilter} that ignores all keys beginning with
+   * #. This uses the convention that key prefixes are surrounded by
+   * # to ignore keys with any prefix currently used or that will be
+   * added in the future.
+   */
+  public static KeyPrefixFilter getUnprefixedKeyFilter() {
+    return new MetadataKeyFilters.KeyPrefixFilter()
+            .addFilter("#", true);
   }
   /**
-   * Interface for levelDB key filters.
+   * Interface for RocksDB key filters.
    */
   public interface MetadataKeyFilter {
     /**

@@ -31,6 +31,7 @@
   </properties>
   <modules>
     <module>interface-client</module>
+    <module>interface-storage</module>
     <module>common</module>
     <module>client</module>
     <module>ozone-manager</module>
@@ -69,6 +70,11 @@
       <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-ozone-interface-client</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-ozone-interface-storage</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
@@ -267,7 +273,7 @@
             <exclude>**/output.xml</exclude>
             <exclude>**/log.html</exclude>
             <exclude>**/report.html</exclude>
-            <exclude>.idea/**</exclude>
+            <exclude>**/.idea/**</exclude>
             <exclude>**/.ssh/id_rsa*</exclude>
             <exclude>dev-support/*tests</exclude>
             <exclude>dev-support/checkstyle*</exclude>
@@ -304,6 +310,7 @@
             <exclude>**/yarn.lock</exclude>
             <exclude>**/pnpm-lock.yaml</exclude>
             <exclude>**/ozone-recon-web/build/**</exclude>
+            <exclude>src/test/resources/prometheus-test-response.txt</exclude>
             <exclude>src/main/license/**</exclude>
             <exclude>src/main/resources/proto.lock</exclude>
           </excludes>

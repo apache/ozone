@@ -41,7 +41,6 @@ import java.util.function.LongSupplier;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -114,44 +113,51 @@ public final class RandomKeyGenerator implements Callable<Void> {
   private volatile boolean completed = false;
   private volatile Throwable exception;
 
-  @Option(names = "--numOfThreads",
-      description = "number of threads to be launched for the run",
+  @Option(names = {"--num-of-threads", "--numOfThreads"},
+      description = "number of threads to be launched for the run. Full name " +
+          "--numOfThreads will be removed in later versions.",
       defaultValue = "10")
   private int numOfThreads = 10;
 
-  @Option(names = "--numOfVolumes",
-      description = "specifies number of Volumes to be created in offline mode",
+  @Option(names = {"--num-of-volumes", "--numOfVolumes"},
+      description = "specifies number of Volumes to be created in offline " +
+          "mode. Full name --numOfVolumes will be removed in later versions.",
       defaultValue = "10")
   private int numOfVolumes = 10;
 
-  @Option(names = "--numOfBuckets",
-      description = "specifies number of Buckets to be created per Volume",
+  @Option(names = {"--num-of-buckets", "--numOfBuckets"},
+      description = "specifies number of Buckets to be created per Volume. " +
+          "Full name --numOfBuckets will be removed in later versions.",
       defaultValue = "1000")
   private int numOfBuckets = 1000;
 
   @Option(
-      names = "--numOfKeys",
-      description = "specifies number of Keys to be created per Bucket",
+      names = {"--num-of-keys", "--numOfKeys"},
+      description = "specifies number of Keys to be created per Bucket. Full" +
+          " name --numOfKeys will be removed in later versions.",
       defaultValue = "500000"
   )
   private int numOfKeys = 500000;
 
   @Option(
-      names = "--keySize",
-      description = "Specifies the size of Key in bytes to be created",
+      names = {"--key-size", "--keySize"},
+      description = "Specifies the size of Key in bytes to be created. Full" +
+          " name --keySize will be removed in later versions.",
       defaultValue = "10240"
   )
   private long keySize = 10240;
 
   @Option(
-      names = "--validateWrites",
-      description = "Specifies whether to validate keys after writing"
+      names = {"--validate-writes", "--validateWrites"},
+      description = "Specifies whether to validate keys after writing. Full" +
+          " name --validateWrites will be removed in later versions."
   )
   private boolean validateWrites = false;
 
   @Option(
-      names = "--bufferSize",
-      description = "Specifies the buffer size while writing",
+      names = {"--buffer-size", "--bufferSize"},
+      description = "Specifies the buffer size while writing. Full name " +
+          "--bufferSize will be removed in later versions.",
       defaultValue = "4096"
   )
   private int bufferSize = 4096;
@@ -163,8 +169,9 @@ public final class RandomKeyGenerator implements Callable<Void> {
   private String jsonDir;
 
   @Option(
-      names = "--replicationType",
-      description = "Replication type (STAND_ALONE, RATIS)",
+      names = {"--replication-type", "--replicationType"},
+      description = "Replication type (STAND_ALONE, RATIS). Full name " +
+          "--replicationType will be removed in later versions.",
       defaultValue = "STAND_ALONE"
   )
   private ReplicationType type = ReplicationType.STAND_ALONE;
@@ -823,22 +830,22 @@ public final class RandomKeyGenerator implements Callable<Void> {
 
     private String getInStorageUnits(Double value) {
       double size;
-      OzoneQuota.Units unit;
+      OzoneConsts.Units unit;
       if ((long) (value / OzoneConsts.TB) != 0) {
         size = value / OzoneConsts.TB;
-        unit = OzoneQuota.Units.TB;
+        unit = OzoneConsts.Units.TB;
       } else if ((long) (value / OzoneConsts.GB) != 0) {
         size = value / OzoneConsts.GB;
-        unit = OzoneQuota.Units.GB;
+        unit = OzoneConsts.Units.GB;
       } else if ((long) (value / OzoneConsts.MB) != 0) {
         size = value / OzoneConsts.MB;
-        unit = OzoneQuota.Units.MB;
+        unit = OzoneConsts.Units.MB;
       } else if ((long) (value / OzoneConsts.KB) != 0) {
         size = value / OzoneConsts.KB;
-        unit = OzoneQuota.Units.KB;
+        unit = OzoneConsts.Units.KB;
       } else {
         size = value;
-        unit = OzoneQuota.Units.BYTES;
+        unit = OzoneConsts.Units.BYTES;
       }
       return size + " " + unit;
     }

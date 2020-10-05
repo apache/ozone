@@ -129,16 +129,16 @@ The following data is persisted in Ozone Manager side in a specific RocksDB dire
  * PrefixInfo table
    * specific index table to store directory level ACL and to provide better performance for hierarchical queries
  * S3 secret table
-   * For S# secret management
+   * For S3 secret management
  * Multipart info table
    * Inflight uploads should be tracked
  * Deleted table
   * To track the blocks which should be deleted from the datanodes
 
-## Notable configuration
+## Notable configurations
 
-key | default | description | 
-----|-------------|--------
+key | default | description
+----|---------|------------
 ozone.om.address | 0.0.0.0:9862 | RPC address of the OM. Required by the client.
 ozone.om.http-address | 0.0.0.0:9874 | Default port of the HTTP server.
 ozone.metadata.dirs | none | Directory to store persisted data (RocksDB).

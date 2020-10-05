@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.common;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -27,9 +28,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import com.google.common.collect.Lists;
-import com.google.common.primitives.Longs;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
@@ -38,10 +37,12 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -75,8 +76,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 
-import static org.apache.hadoop.ozone.OzoneConsts.DB_BLOCK_COUNT_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_PENDING_DELETE_BLOCK_COUNT_KEY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -165,8 +164,8 @@ public class TestBlockDeletingService {
             chunks.add(info);
           }
           kd.setChunks(chunks);
-          metadata.getStore().put(StringUtils.string2Bytes(deleteStateName),
-              kd.getProtoBufMessage().toByteArray());
+          metadata.getStore().getBlockDataTable().put(
+                  deleteStateName, kd);
           container.getContainerData().incrPendingDeletionBlocks(1);
         }
 
@@ -174,12 +173,14 @@ public class TestBlockDeletingService {
         container.getContainerData().setBytesUsed(
             blockLength * numOfBlocksPerContainer);
         // Set block count, bytes used and pending delete block count.
-        metadata.getStore().put(DB_BLOCK_COUNT_KEY,
-            Longs.toByteArray(numOfBlocksPerContainer));
-        metadata.getStore().put(OzoneConsts.DB_CONTAINER_BYTES_USED_KEY,
-            Longs.toByteArray(blockLength * numOfBlocksPerContainer));
-        metadata.getStore().put(DB_PENDING_DELETE_BLOCK_COUNT_KEY,
-            Longs.toByteArray(numOfBlocksPerContainer));
+        metadata.getStore().getMetadataTable().put(
+                OzoneConsts.BLOCK_COUNT, (long)numOfBlocksPerContainer);
+        metadata.getStore().getMetadataTable().put(
+                OzoneConsts.CONTAINER_BYTES_USED,
+                blockLength * numOfBlocksPerContainer);
+        metadata.getStore().getMetadataTable().put(
+                OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
+                (long)numOfBlocksPerContainer);
       }
     }
   }
@@ -200,19 +201,14 @@ public class TestBlockDeletingService {
    */
   private int getUnderDeletionBlocksCount(ReferenceCountedDB meta)
       throws IOException {
-    List<Map.Entry<byte[], byte[]>> underDeletionBlocks =
-        meta.getStore().getRangeKVs(null, 100,
-            new MetadataKeyFilters.KeyPrefixFilter()
-                .addFilter(OzoneConsts.DELETING_KEY_PREFIX));
-    return underDeletionBlocks.size();
+    return meta.getStore().getBlockDataTable()
+        .getRangeKVs(null, 100,
+        MetadataKeyFilters.getDeletingKeyFilter()).size();
   }
 
   private int getDeletedBlocksCount(ReferenceCountedDB db) throws IOException {
-    List<Map.Entry<byte[], byte[]>> underDeletionBlocks =
-        db.getStore().getRangeKVs(null, 100,
-            new MetadataKeyFilters.KeyPrefixFilter()
-            .addFilter(OzoneConsts.DELETED_KEY_PREFIX));
-    return underDeletionBlocks.size();
+    return db.getStore().getDeletedBlocksTable()
+          .getRangeKVs(null, 100).size();
   }
 
   @Test
@@ -250,8 +246,9 @@ public class TestBlockDeletingService {
 
       // Ensure there are 3 blocks under deletion and 0 deleted blocks
       Assert.assertEquals(3, getUnderDeletionBlocksCount(meta));
-      Assert.assertEquals(3, Longs.fromByteArray(
-          meta.getStore().get(DB_PENDING_DELETE_BLOCK_COUNT_KEY)));
+      Assert.assertEquals(3,
+          meta.getStore().getMetadataTable()
+                  .get(OzoneConsts.PENDING_DELETE_BLOCK_COUNT).longValue());
       Assert.assertEquals(0, getDeletedBlocksCount(meta));
 
       // An interval will delete 1 * 2 blocks
@@ -270,10 +267,12 @@ public class TestBlockDeletingService {
 
       // Check finally DB counters.
       // Not checking bytes used, as handler is a mock call.
-      Assert.assertEquals(0, Longs.fromByteArray(
-          meta.getStore().get(DB_PENDING_DELETE_BLOCK_COUNT_KEY)));
-      Assert.assertEquals(0, Longs.fromByteArray(
-          meta.getStore().get(DB_BLOCK_COUNT_KEY)));
+      Assert.assertEquals(0,
+              meta.getStore().getMetadataTable()
+                      .get(OzoneConsts.PENDING_DELETE_BLOCK_COUNT).longValue());
+      Assert.assertEquals(0,
+              meta.getStore().getMetadataTable()
+                      .get(OzoneConsts.BLOCK_COUNT).longValue());
     }
 
     svc.shutdown();
@@ -323,8 +322,7 @@ public class TestBlockDeletingService {
 
     LogCapturer log = LogCapturer.captureLogs(BackgroundService.LOG);
     GenericTestUtils.waitFor(() -> {
-      if(log.getOutput().contains(
-          "Background task executes timed out, retrying in next interval")) {
+      if (log.getOutput().contains("Background task execution took")) {
         log.stopCapturing();
         return true;
       }
@@ -469,6 +467,61 @@ public class TestBlockDeletingService {
           .deleteBlock(any(), any());
     } finally {
       service.shutdown();
+    }
+  }
+
+  @Test
+  public void testDeletedChunkInfo() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL, 10);
+    conf.setInt(OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER, 2);
+    ContainerSet containerSet = new ContainerSet();
+    createToDeleteBlocks(containerSet, conf, 1, 2, 3);
+
+    List<ContainerData> containerData = Lists.newArrayList();
+    containerSet.listContainer(0L, 1, containerData);
+
+    try(ReferenceCountedDB meta = BlockUtils.getDB(
+            (KeyValueContainerData) containerData.get(0), conf)) {
+
+      // Collect all ChunkInfo from blocks marked for deletion.
+      List<? extends Table.KeyValue<String, BlockData>> deletingBlocks =
+              meta.getStore().getBlockDataTable()
+              .getRangeKVs(null, 100,
+                      MetadataKeyFilters.getDeletingKeyFilter());
+
+      // Delete all blocks marked for deletion.
+      BlockDeletingServiceTestImpl svc =
+              getBlockDeletingService(containerSet, conf);
+      svc.start();
+      GenericTestUtils.waitFor(svc::isStarted, 100, 3000);
+      deleteAndWait(svc, 1);
+      svc.shutdown();
+
+      // Get deleted blocks from their table, and check their ChunkInfo lists
+      // against those we saved for them before deletion.
+      List<? extends Table.KeyValue<String, ChunkInfoList>> deletedBlocks =
+              meta.getStore().getDeletedBlocksTable()
+              .getRangeKVs(null, 100);
+
+      Assert.assertEquals(deletingBlocks.size(), deletedBlocks.size());
+
+      Iterator<? extends Table.KeyValue<String, BlockData>>
+              deletingBlocksIter = deletingBlocks.iterator();
+      Iterator<? extends Table.KeyValue<String, ChunkInfoList>>
+              deletedBlocksIter = deletedBlocks.iterator();
+
+      while(deletingBlocksIter.hasNext() && deletedBlocksIter.hasNext())  {
+        List<ContainerProtos.ChunkInfo> deletingChunks =
+                deletingBlocksIter.next().getValue().getChunks();
+        List<ContainerProtos.ChunkInfo> deletedChunks =
+                deletedBlocksIter.next().getValue().asList();
+
+        // On each element of each list, this call uses the equals method
+        // for ChunkInfos generated by protobuf.
+        // This checks their internal fields for equality.
+        Assert.assertEquals(deletingChunks, deletedChunks);
+      }
     }
   }
 }

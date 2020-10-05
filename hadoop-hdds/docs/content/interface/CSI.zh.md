@@ -1,6 +1,9 @@
 ---
 title: CSI 协议
 weight: 3
+menu:
+   main:
+      parent: "编程接口"
 summary: Ozone 支持 容器存储接口 (CSI) 协议。你可以通过 Ozone CSI 挂载 Ozone 桶的方式使用 Ozone。
 ---
 

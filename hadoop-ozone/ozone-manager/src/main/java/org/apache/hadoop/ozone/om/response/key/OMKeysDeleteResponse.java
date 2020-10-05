@@ -21,7 +21,9 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -43,14 +45,19 @@ public class OMKeysDeleteResponse extends OMClientResponse {
   private List<OmKeyInfo> omKeyInfoList;
   private boolean isRatisEnabled;
   private long trxnLogIndex;
+  private OmVolumeArgs omVolumeArgs;
+  private OmBucketInfo omBucketInfo;
 
   public OMKeysDeleteResponse(@Nonnull OMResponse omResponse,
-                              @Nonnull List<OmKeyInfo> keyDeleteList,
-                              long trxnLogIndex, boolean isRatisEnabled) {
+      @Nonnull List<OmKeyInfo> keyDeleteList, long trxnLogIndex,
+      boolean isRatisEnabled, @Nonnull OmVolumeArgs omVolumeArgs,
+      @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse);
     this.omKeyInfoList = keyDeleteList;
     this.isRatisEnabled = isRatisEnabled;
     this.trxnLogIndex = trxnLogIndex;
+    this.omVolumeArgs = omVolumeArgs;
+    this.omBucketInfo = omBucketInfo;
   }
 
   /**
@@ -105,5 +112,14 @@ public class OMKeysDeleteResponse extends OMClientResponse {
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
           deleteKey, repeatedOmKeyInfo);
     }
+
+    // update volume usedBytes.
+    omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
+        omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
+        omVolumeArgs);
+    // update bucket usedBytes.
+    omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+        omMetadataManager.getBucketKey(omVolumeArgs.getVolume(),
+            omBucketInfo.getBucketName()), omBucketInfo);
   }
 }

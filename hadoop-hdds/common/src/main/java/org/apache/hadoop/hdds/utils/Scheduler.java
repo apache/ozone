@@ -96,7 +96,7 @@ public class Scheduler {
       try {
         scheduledExecutorService.awaitTermination(60, TimeUnit.SECONDS);
       } catch (InterruptedException e) {
-        LOG.info("{} interrupted while waiting for task completion {}",
+        LOG.info("{} interrupted while waiting for task completion.",
                 threadName, e);
         // Re-interrupt the thread while catching InterruptedException
         Thread.currentThread().interrupt();

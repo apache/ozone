@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.om.response.file;
 
 import javax.annotation.Nonnull;
 
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
@@ -33,9 +35,11 @@ import java.util.List;
 public class OMFileCreateResponse extends OMKeyCreateResponse {
 
   public OMFileCreateResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo,
-      @Nonnull List<OmKeyInfo> parentKeyInfos, long openKeySessionID) {
-    super(omResponse, omKeyInfo, parentKeyInfos, openKeySessionID);
+      @Nonnull OmKeyInfo omKeyInfo, @Nonnull List<OmKeyInfo> parentKeyInfos,
+      long openKeySessionID, @Nonnull OmVolumeArgs omVolumeArgs,
+      @Nonnull OmBucketInfo omBucketInfo) {
+    super(omResponse, omKeyInfo, parentKeyInfos, openKeySessionID,
+        omVolumeArgs, omBucketInfo);
   }
 
   /**

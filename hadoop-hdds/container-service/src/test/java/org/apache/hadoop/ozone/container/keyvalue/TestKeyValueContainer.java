@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
-import com.google.common.primitives.Longs;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -26,7 +25,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
 import org.apache.hadoop.hdds.scm.container.common.helpers
     .StorageContainerException;
-import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -51,7 +50,6 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
-import org.rocksdb.Options;
 
 import java.io.File;
 
@@ -64,11 +62,9 @@ import java.util.Map;
 import java.util.List;
 import java.util.UUID;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertSame;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -123,31 +119,6 @@ public class TestKeyValueContainer {
     keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
   }
 
-  @Test
-  public void testBlockIterator() throws Exception{
-    keyValueContainerData = new KeyValueContainerData(100L,
-        layout,
-        (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
-        datanodeId.toString());
-    keyValueContainer = new KeyValueContainer(
-        keyValueContainerData, conf);
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
-    KeyValueBlockIterator blockIterator = keyValueContainer.blockIterator();
-    //As no blocks created, hasNext should return false.
-    assertFalse(blockIterator.hasNext());
-    int blockCount = 10;
-    addBlocks(blockCount);
-    blockIterator = keyValueContainer.blockIterator();
-    assertTrue(blockIterator.hasNext());
-    BlockData blockData;
-    int blockCounter = 0;
-    while(blockIterator.hasNext()) {
-      blockData = blockIterator.nextBlock();
-      assertEquals(blockCounter++, blockData.getBlockID().getLocalID());
-    }
-    assertEquals(blockCount, blockCounter);
-  }
-
   private void addBlocks(int count) throws Exception {
     long containerId = keyValueContainerData.getContainerID();
 
@@ -165,9 +136,8 @@ public class TestKeyValueContainer {
             .getLocalID(), 0), 0, 1024);
         chunkList.add(info.getProtoBufMessage());
         blockData.setChunks(chunkList);
-        metadataStore.getStore().put(Longs.toByteArray(blockID.getLocalID()),
-            blockData
-            .getProtoBufMessage().toByteArray());
+        metadataStore.getStore().getBlockDataTable()
+                .put(Long.toString(blockID.getLocalID()), blockData);
       }
     }
   }
@@ -207,19 +177,21 @@ public class TestKeyValueContainer {
     keyValueContainerData.setState(
         ContainerProtos.ContainerDataProto.State.CLOSED);
 
-    int numberOfKeysToWrite = 12;
+    long numberOfKeysToWrite = 12;
     //write one few keys to check the key count after import
     try(ReferenceCountedDB metadataStore =
         BlockUtils.getDB(keyValueContainerData, conf)) {
-      for (int i = 0; i < numberOfKeysToWrite; i++) {
-        metadataStore.getStore().put(("test" + i).getBytes(UTF_8),
-            "test".getBytes(UTF_8));
+      Table<String, BlockData> blockDataTable =
+              metadataStore.getStore().getBlockDataTable();
+
+      for (long i = 0; i < numberOfKeysToWrite; i++) {
+        blockDataTable.put("test" + i, new BlockData(new BlockID(i, i)));
       }
 
       // As now when we put blocks, we increment block count and update in DB.
       // As for test, we are doing manually so adding key count to DB.
-      metadataStore.getStore().put(OzoneConsts.DB_BLOCK_COUNT_KEY,
-          Longs.toByteArray(numberOfKeysToWrite));
+      metadataStore.getStore().getMetadataTable()
+              .put(OzoneConsts.BLOCK_COUNT, numberOfKeysToWrite);
     }
     BlockUtils.removeDB(keyValueContainerData, conf);
 
@@ -410,30 +382,5 @@ public class TestKeyValueContainer {
       assertEquals(ContainerProtos.Result.UNSUPPORTED_REQUEST, ex
           .getResult());
     }
-  }
-
-  @Test
-  public void testRocksDBCreateUsesCachedOptions() throws Exception {
-    int initialSize = MetadataStoreBuilder.CACHED_OPTS.size();
-
-    // Create Container 1
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
-    Assert.assertTrue("Rocks DB options should be cached.",
-        MetadataStoreBuilder.CACHED_OPTS.containsKey(conf));
-
-    Options opts = MetadataStoreBuilder.CACHED_OPTS.get(conf);
-
-    // Create Container 2
-    keyValueContainerData = new KeyValueContainerData(2L,
-        layout,
-        (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
-        datanodeId.toString());
-
-    keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
-    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
-
-    assertEquals(initialSize + 1, MetadataStoreBuilder.CACHED_OPTS.size());
-    Options cachedOpts = MetadataStoreBuilder.CACHED_OPTS.get(conf);
-    assertSame("Cache object should not be updated.", opts, cachedOpts);
   }
 }

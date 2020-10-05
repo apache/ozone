@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import com.google.common.base.Optional;
 import org.apache.commons.codec.digest.DigestUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_MULTIPART_MIN_SIZE;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -139,6 +140,15 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
       OmMultipartKeyInfo multipartKeyInfo = omMetadataManager
           .getMultipartInfoTable().get(multipartKey);
+
+      // Check for directory exists with same name, if it exists throw error. 
+      if (ozoneManager.getEnableFileSystemPaths()) {
+        if (checkDirectoryAlreadyExists(volumeName, bucketName, keyName,
+            omMetadataManager)) {
+          throw new OMException("Can not Complete MPU for file: " + keyName +
+              " as there is already directory in the given path", NOT_A_FILE);
+        }
+      }
 
       if (multipartKeyInfo == null) {
         throw new OMException(

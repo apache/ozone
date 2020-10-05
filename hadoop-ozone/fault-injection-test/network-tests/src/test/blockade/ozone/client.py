@@ -66,10 +66,10 @@ class OzoneClient:
         """
         command = [Command.freon,
                    " rk",
-                   " --numOfVolumes " + str(num_volumes),
-                   " --numOfBuckets " + str(num_buckets),
-                   " --numOfKeys " + str(num_keys),
-                   " --keySize " + str(key_size),
-                   " --replicationType " + replication_type,
+                   " --num-of-volumes " + str(num_volumes),
+                   " --num-of-buckets " + str(num_buckets),
+                   " --num-of-keys " + str(num_keys),
+                   " --key-size " + str(key_size),
+                   " --replication-type " + replication_type,
                    " --factor " + replication_factor]
         return util.run_docker_command(command, self.cluster.client)

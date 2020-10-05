@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -68,6 +68,8 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE,
         OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY,
         ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR,
+        ReconServerConfigKeys.RECON_METRICS_HTTP_CONNECTION_TIMEOUT,
+        ReconServerConfigKeys.RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT,
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY
         // TODO HDDS-2856
     ));

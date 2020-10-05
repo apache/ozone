@@ -125,7 +125,7 @@ class BackgroundPipelineCreator {
         try {
           pipelineManager.scrubPipeline(type, factor);
         } catch (IOException e) {
-          LOG.error("Error while scrubbing pipelines {}", e);
+          LOG.error("Error while scrubbing pipelines.", e);
         }
       }
     }

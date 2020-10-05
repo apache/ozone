@@ -326,9 +326,9 @@ public class TestOzoneFileSystem {
 
     // Deleting the only child should create the parent dir key if it does
     // not exist
-    String parentKey = o3fs.pathToKey(parent) + "/";
-    OzoneKeyDetails parentKeyInfo = getKey(parent, true);
-    assertEquals(parentKey, parentKeyInfo.getName());
+    FileStatus fileStatus = o3fs.getFileStatus(parent);
+    Assert.assertTrue(fileStatus.isDirectory());
+    assertEquals(parent.toString(), fileStatus.getPath().toUri().getPath());
   }
 
 

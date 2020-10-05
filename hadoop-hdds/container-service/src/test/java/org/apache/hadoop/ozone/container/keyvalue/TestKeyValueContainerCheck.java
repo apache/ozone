@@ -18,10 +18,8 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
-import com.google.common.primitives.Longs;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -31,6 +29,7 @@ import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
@@ -166,8 +165,8 @@ import static org.junit.Assert.assertFalse;
     containerData.setDbFile(dbFile);
     try (ReferenceCountedDB ignored =
             BlockUtils.getDB(containerData, conf);
-        KeyValueBlockIterator kvIter = new KeyValueBlockIterator(containerID,
-            new File(containerData.getContainerPath()))) {
+        BlockIterator<BlockData> kvIter =
+                ignored.getStore().getBlockIterator()) {
       BlockData block = kvIter.nextBlock();
       assertFalse(block.getChunks().isEmpty());
       ContainerProtos.ChunkInfo c = block.getChunks().get(0);
@@ -250,16 +249,13 @@ import static org.junit.Assert.assertFalse;
         }
         blockData.setChunks(chunkList);
 
+        // normal key
+        String key = Long.toString(blockID.getLocalID());
         if (i >= normalBlocks) {
           // deleted key
-          metadataStore.getStore().put(StringUtils.string2Bytes(
-              OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID()),
-              blockData.getProtoBufMessage().toByteArray());
-        } else {
-          // normal key
-          metadataStore.getStore().put(Longs.toByteArray(blockID.getLocalID()),
-              blockData.getProtoBufMessage().toByteArray());
+          key = OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID();
         }
+        metadataStore.getStore().getBlockDataTable().put(key, blockData);
       }
 
       chunkManagerTestInfo.validateFileCount(chunksPath, totalBlocks,

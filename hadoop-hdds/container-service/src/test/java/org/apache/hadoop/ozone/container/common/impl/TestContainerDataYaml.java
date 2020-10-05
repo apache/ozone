@@ -85,6 +85,7 @@ public class TestContainerDataYaml {
     keyValueContainerData.setMetadataPath(testRoot);
     keyValueContainerData.setChunksPath(testRoot);
     keyValueContainerData.updateDataScanTime(SCAN_TIME);
+    keyValueContainerData.setSchemaVersion(OzoneConsts.SCHEMA_LATEST);
 
     File containerFile = new File(testRoot, containerPath);
 
@@ -127,6 +128,8 @@ public class TestContainerDataYaml {
     assertEquals(SCAN_TIME, kvData.lastDataScanTime().get());
     assertEquals(SCAN_TIME.toEpochMilli(),
         kvData.getDataScanTimestamp().longValue());
+    assertEquals(OzoneConsts.SCHEMA_LATEST,
+            kvData.getSchemaVersion());
 
     // Update ContainerData.
     kvData.addMetadata(OzoneConsts.VOLUME, VOLUME_OWNER);

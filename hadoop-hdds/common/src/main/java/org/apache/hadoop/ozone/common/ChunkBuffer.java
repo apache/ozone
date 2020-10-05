@@ -17,15 +17,16 @@
  */
 package org.apache.hadoop.ozone.common;
 
-import org.apache.hadoop.hdds.scm.ByteStringConversion;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.Supplier;
+
+import org.apache.hadoop.hdds.scm.ByteStringConversion;
+
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 /** Buffer for a block chunk. */
 public interface ChunkBuffer {
@@ -86,6 +87,13 @@ public interface ChunkBuffer {
   /** Similar to {@link ByteBuffer#put(byte[])}. */
   default ChunkBuffer put(byte[] b) {
     return put(ByteBuffer.wrap(b));
+  }
+
+  /** Similar to {@link ByteBuffer#put(byte[])}. */
+  default ChunkBuffer put(byte b) {
+    byte[] buf = new byte[1];
+    buf[0] = (byte) b;
+    return put(buf, 0, 1);
   }
 
   /** Similar to {@link ByteBuffer#put(byte[], int, int)}. */

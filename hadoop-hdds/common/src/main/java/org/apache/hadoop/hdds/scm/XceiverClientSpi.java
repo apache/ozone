@@ -31,9 +31,9 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.CheckedBiFunction;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.scm.storage.CheckedBiFunction;
 
 /**
  * A Client for the storageContainer protocol.
@@ -43,7 +43,7 @@ public abstract class XceiverClientSpi implements Closeable {
   private final AtomicInteger referenceCount;
   private boolean isEvicted;
 
-  XceiverClientSpi() {
+  public XceiverClientSpi() {
     this.referenceCount = new AtomicInteger(0);
     this.isEvicted = false;
   }
