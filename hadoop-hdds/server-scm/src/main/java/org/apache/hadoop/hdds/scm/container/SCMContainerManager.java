@@ -107,6 +107,14 @@ public class SCMContainerManager implements ContainerManager {
     scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
   }
 
+  private int getOpenContainerCountPerPipeline(Pipeline pipeline) {
+    int minContainerCountPerDn = numContainerPerVolume *
+        pipelineManager.minHealthyVolumeNum(pipeline);
+    int minPipelineCountPerDn = pipelineManager.minPipelineLimit(pipeline);
+    return (int) Math.ceil(
+        ((double) minContainerCountPerDn / minPipelineCountPerDn));
+  }
+
   private void loadExistingContainers() throws IOException {
 
     TableIterator<ContainerID, ? extends KeyValue<ContainerID, ContainerInfo>>
@@ -440,8 +448,7 @@ public class SCMContainerManager implements ContainerManager {
       synchronized (pipeline) {
         containerIDs = getContainersForOwner(pipeline, owner);
 
-        if (containerIDs.size() < numContainerPerVolume * pipelineManager.
-                getNumHealthyVolumes(pipeline)) {
+        if (containerIDs.size() < getOpenContainerCountPerPipeline(pipeline)) {
           containerInfo =
                   containerStateManager.allocateContainer(
                           pipelineManager, owner, pipeline);
