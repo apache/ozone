@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -80,7 +80,7 @@ public class BlockOutputStream extends OutputStream {
   private AtomicReference<BlockID> blockID;
 
   private final BlockData.Builder containerBlockData;
-  private XceiverClientManager xceiverClientManager;
+  private XceiverClientFactory xceiverClientFactory;
   private XceiverClientSpi xceiverClient;
   private final int bytesPerChecksum;
   private int chunkIndex;
@@ -129,7 +129,7 @@ public class BlockOutputStream extends OutputStream {
    * Creates a new BlockOutputStream.
    *
    * @param blockID              block ID
-   * @param xceiverClientManager client manager that controls client
+   * @param xceiverClientFactory client manager that controls client
    * @param pipeline             pipeline where block will be written
    * @param bufferPool           pool of buffers
    * @param streamBufferFlushSize flush size
@@ -139,7 +139,7 @@ public class BlockOutputStream extends OutputStream {
    */
   @SuppressWarnings("parameternumber")
   public BlockOutputStream(BlockID blockID,
-      XceiverClientManager xceiverClientManager, Pipeline pipeline,
+      XceiverClientFactory xceiverClientFactory, Pipeline pipeline,
       int streamBufferSize, long streamBufferFlushSize,
       boolean streamBufferFlushDelay, long streamBufferMaxSize,
       BufferPool bufferPool, ChecksumType checksumType,
@@ -150,8 +150,8 @@ public class BlockOutputStream extends OutputStream {
     this.containerBlockData =
         BlockData.newBuilder().setBlockID(blockID.getDatanodeBlockIDProtobuf())
             .addMetadata(keyValue);
-    this.xceiverClientManager = xceiverClientManager;
-    this.xceiverClient = xceiverClientManager.acquireClient(pipeline);
+    this.xceiverClientFactory = xceiverClientFactory;
+    this.xceiverClient = xceiverClientFactory.acquireClient(pipeline);
     this.streamBufferSize = streamBufferSize;
     this.streamBufferFlushSize = streamBufferFlushSize;
     this.streamBufferMaxSize = streamBufferMaxSize;
@@ -477,7 +477,7 @@ public class BlockOutputStream extends OutputStream {
 
   @Override
   public void flush() throws IOException {
-    if (xceiverClientManager != null && xceiverClient != null
+    if (xceiverClientFactory != null && xceiverClient != null
         && bufferPool != null && bufferPool.getSize() > 0
         && (!streamBufferFlushDelay ||
             writtenDataLength - totalDataFlushedLength >= streamBufferSize)) {
@@ -543,7 +543,7 @@ public class BlockOutputStream extends OutputStream {
 
   @Override
   public void close() throws IOException {
-    if (xceiverClientManager != null && xceiverClient != null
+    if (xceiverClientFactory != null && xceiverClient != null
         && bufferPool != null && bufferPool.getSize() > 0) {
       try {
         handleFlush(true);
@@ -604,10 +604,10 @@ public class BlockOutputStream extends OutputStream {
   }
 
   public void cleanup(boolean invalidateClient) {
-    if (xceiverClientManager != null) {
-      xceiverClientManager.releaseClient(xceiverClient, invalidateClient);
+    if (xceiverClientFactory != null) {
+      xceiverClientFactory.releaseClient(xceiverClient, invalidateClient);
     }
-    xceiverClientManager = null;
+    xceiverClientFactory = null;
     xceiverClient = null;
     commitWatcher.cleanup();
     if (bufferList !=  null) {

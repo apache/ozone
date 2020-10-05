@@ -17,20 +17,6 @@
  */
 package org.apache.hadoop.ozone.client.io;
 
-import com.google.common.annotations.VisibleForTesting;
-
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.hadoop.fs.FSExceptionMessages;
-import org.apache.hadoop.fs.Seekable;
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -39,6 +25,20 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import org.apache.hadoop.fs.FSExceptionMessages;
+import org.apache.hadoop.fs.Seekable;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.commons.collections.CollectionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Maintaining a list of BlockInputStream. Read based on offset.
@@ -82,21 +82,21 @@ public class KeyInputStream extends InputStream implements Seekable {
    * For each block in keyInfo, add a BlockInputStream to blockStreams.
    */
   public static LengthInputStream getFromOmKeyInfo(OmKeyInfo keyInfo,
-      XceiverClientManager xceiverClientManager,
+      XceiverClientFactory xceiverClientFactory,
       boolean verifyChecksum,  Function<OmKeyInfo, OmKeyInfo> retryFunction) {
     List<OmKeyLocationInfo> keyLocationInfos = keyInfo
         .getLatestVersionLocations().getBlocksLatestVersionOnly();
 
     KeyInputStream keyInputStream = new KeyInputStream();
     keyInputStream.initialize(keyInfo, keyLocationInfos,
-        xceiverClientManager, verifyChecksum, retryFunction);
+        xceiverClientFactory, verifyChecksum, retryFunction);
 
     return new LengthInputStream(keyInputStream, keyInputStream.length);
   }
 
   private synchronized void initialize(OmKeyInfo keyInfo,
       List<OmKeyLocationInfo> blockInfos,
-      XceiverClientManager xceiverClientManager,
+      XceiverClientFactory xceiverClientFactory,
       boolean verifyChecksum,  Function<OmKeyInfo, OmKeyInfo> retryFunction) {
     this.key = keyInfo.getKeyName();
     this.blockOffsets = new long[blockInfos.size()];
@@ -110,7 +110,7 @@ public class KeyInputStream extends InputStream implements Seekable {
 
       // We also pass in functional reference which is used to refresh the
       // pipeline info for a given OM Key location info.
-      addStream(omKeyLocationInfo, xceiverClientManager,
+      addStream(omKeyLocationInfo, xceiverClientFactory,
           verifyChecksum, keyLocationInfo -> {
             OmKeyInfo newKeyInfo = retryFunction.apply(keyInfo);
             BlockID blockID = keyLocationInfo.getBlockID();
@@ -140,12 +140,12 @@ public class KeyInputStream extends InputStream implements Seekable {
    * the block for the first time.
    */
   private synchronized void addStream(OmKeyLocationInfo blockInfo,
-      XceiverClientManager xceiverClientMngr,
+      XceiverClientFactory xceiverClientFactory,
       boolean verifyChecksum,
       Function<OmKeyLocationInfo, Pipeline> refreshPipelineFunction) {
     blockStreams.add(new BlockInputStream(blockInfo.getBlockID(),
         blockInfo.getLength(), blockInfo.getPipeline(), blockInfo.getToken(),
-        verifyChecksum, xceiverClientMngr,
+        verifyChecksum, xceiverClientFactory,
         blockID -> refreshPipelineFunction.apply(blockInfo)));
   }
 
