@@ -428,13 +428,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
             OmDirectoryInfo.class);
     checkTableStatus(dirTable, DIRECTORY_TABLE);
 
-    openFileTable = this.store.getTable(OPEN_FILE_TABLE, String.class,
-            OmKeyInfo.class);
-    checkTableStatus(dirTable, DIRECTORY_TABLE);
-
     fileTable = this.store.getTable(FILE_TABLE, String.class,
             OmKeyInfo.class);
     checkTableStatus(fileTable, FILE_TABLE);
+
+    openFileTable = this.store.getTable(OPEN_FILE_TABLE, String.class,
+            OmKeyInfo.class);
+    checkTableStatus(openFileTable, OPEN_FILE_TABLE);
 
     transactionInfoTable = this.store.getTable(TRANSACTION_INFO_TABLE,
         String.class, OMTransactionInfo.class);
