@@ -73,9 +73,16 @@ public final class TestDataUtil {
 
   public static void createKey(OzoneBucket bucket, String keyName,
       String content) throws IOException {
+    createKey(bucket, keyName, ReplicationFactor.ONE,
+        ReplicationType.STAND_ALONE, content);
+  }
+
+  public static void createKey(OzoneBucket bucket, String keyName,
+      ReplicationFactor repFactor, ReplicationType repType, String content)
+      throws IOException {
     try (OutputStream stream = bucket
-        .createKey(keyName, content.length(), ReplicationType.STAND_ALONE,
-            ReplicationFactor.ONE, new HashMap<>())) {
+        .createKey(keyName, content.length(), repType, repFactor,
+            new HashMap<>())) {
       stream.write(content.getBytes());
     }
   }
