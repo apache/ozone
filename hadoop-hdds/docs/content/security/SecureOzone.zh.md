@@ -3,6 +3,9 @@ title: "安全化 Ozone"
 date: "2019-April-03"
 summary: 简要介绍 Ozone 中的安全概念以及安全化 OM 和 SCM 的步骤。
 weight: 1
+menu:
+   main:
+      parent: 安全
 icon: tower
 ---
 <!---
