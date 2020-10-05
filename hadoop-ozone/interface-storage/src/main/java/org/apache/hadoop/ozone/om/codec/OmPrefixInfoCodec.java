@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.codec;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrefixInfo;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedPrefixInfo;
 
 import org.apache.hadoop.hdds.utils.db.Codec;
 
@@ -44,7 +44,8 @@ public class OmPrefixInfoCodec implements Codec<OmPrefixInfo> {
         .checkNotNull(rawData,
             "Null byte array can't converted to real object.");
     try {
-      return OmPrefixInfo.getFromProtobuf(PrefixInfo.parseFrom(rawData));
+      return OmPrefixInfo.getFromProtobuf(
+          PersistedPrefixInfo.parseFrom(rawData));
     } catch (InvalidProtocolBufferException e) {
       throw new IllegalArgumentException(
           "Can't encode the the raw data from the byte array", e);
