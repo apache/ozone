@@ -24,6 +24,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
 
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.apache.ratis.protocol.RaftGroup;
@@ -94,6 +95,34 @@ public class TestRatisUpgradeUtils {
         waitForAllTxnsApplied(stateMachine, raftGroup, raftServerProxy,
             10, 2,
             false));
+  }
+
+
+  @Test
+  public void testPurgeLogsAfterWait() throws IOException,
+      InterruptedException {
+
+    StateMachine stateMachine = mock(StateMachine.class);
+    RaftGroup raftGroup = RaftGroup.emptyGroup();
+    RaftServerProxy raftServerProxy = mock(RaftServerProxy.class);
+    RaftServerImpl raftServer = mock(RaftServerImpl.class);
+    ServerState serverState = mock(ServerState.class);
+    RaftLog raftLog = mock(RaftLog.class);
+
+    when(raftServerProxy.getImpl(
+        raftGroup.getGroupId())).thenReturn(raftServer);
+    when(raftServer.getState()).thenReturn(serverState);
+    when(serverState.getLog()).thenReturn(raftLog);
+    when(raftLog.getLastCommittedIndex()).thenReturn(1L);
+    when(raftLog.purge(1L)).thenReturn(
+        CompletableFuture.completedFuture(1L));
+    TermIndex termIndex = mock(TermIndex.class);
+    when(termIndex.getIndex()).thenReturn(1L);
+    when(stateMachine.getLastAppliedTermIndex()).thenReturn(termIndex);
+    when(stateMachine.takeSnapshot()).thenReturn(1L);
+
+    waitForAllTxnsApplied(stateMachine, raftGroup, raftServerProxy,
+        10, 2, true);
   }
 
 }

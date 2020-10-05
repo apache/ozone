@@ -445,10 +445,9 @@ public final class OzoneManagerRatisServer {
         OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP_DEFAULT);
 
     if (forUpgrade) {
-      LOG.info("Setting purge gap to 1.");
+      LOG.info("Setting purge gap to 1 for upgrade/downgrade preparation.");
       RaftServerConfigKeys.Log.setPurgeGap(properties, 1);
     } else {
-      LOG.info("Setting purge gap to 1000.");
       RaftServerConfigKeys.Log.setPurgeGap(properties, logPurgeGap);
     }
 
