@@ -2,6 +2,9 @@
 title: "Ozone Manager"
 date: "2017-09-14"
 weight: 2
+menu: 
+  main:
+     parent: 概念
 summary: Ozone Manager 是 Ozone 主要的命名空间服务，它管理了卷、桶和键的生命周期。
 ---
 <!---
