@@ -99,7 +99,7 @@ public class SimpleConfiguration extends SimpleConfigurationParent {
     return waitTime;
   }
 
-  public Class<? extends Object> getMyClass() {
+  public Class<?> getMyClass() {
     return myClass;
   }
 
