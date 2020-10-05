@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -145,8 +145,7 @@ public class TestReadRetries {
             ReplicationFactor.THREE, new HashMap<>());
     KeyOutputStream groupOutputStream =
         (KeyOutputStream) out.getOutputStream();
-    XceiverClientManager manager =
-        (XceiverClientManager) groupOutputStream.getXceiverClientFactory();
+    XceiverClientFactory factory = groupOutputStream.getXceiverClientFactory();
     out.write(value.getBytes());
     out.close();
     // First, confirm the key info from the client matches the info in OM.
@@ -178,7 +177,7 @@ public class TestReadRetries {
     DatanodeDetails datanodeDetails = datanodes.get(0);
     Assert.assertNotNull(datanodeDetails);
 
-    XceiverClientSpi clientSpi = manager.acquireClient(pipeline);
+    XceiverClientSpi clientSpi = factory.acquireClient(pipeline);
     Assert.assertTrue(clientSpi instanceof XceiverClientRatis);
     XceiverClientRatis ratisClient = (XceiverClientRatis)clientSpi;
 
@@ -206,7 +205,7 @@ public class TestReadRetries {
       // it should throw an ioException as none of the servers
       // are available
     }
-    manager.releaseClient(clientSpi, false);
+    factory.releaseClient(clientSpi, false);
   }
 
   private void readKey(OzoneBucket bucket, String keyName, String data)
