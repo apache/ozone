@@ -87,10 +87,10 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   public KeyValueContainer(KeyValueContainerData containerData,
       ConfigurationSource
       ozoneConfig) {
-    Preconditions.checkNotNull(containerData, "KeyValueContainerData cannot " +
-        "be null");
-    Preconditions.checkNotNull(ozoneConfig, "Ozone configuration cannot " +
-        "be null");
+    Preconditions.checkNotNull(containerData,
+            "KeyValueContainerData cannot be null");
+    Preconditions.checkNotNull(ozoneConfig,
+            "Ozone configuration cannot be null");
     this.config = ozoneConfig;
     this.containerData = containerData;
   }
@@ -126,8 +126,13 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
       //Create Metadata path chunks path and metadata db
       File dbFile = getContainerDBFile();
-      KeyValueContainerUtil.createContainerMetaData(containerMetaDataPath,
-          chunksPath, dbFile, config);
+
+      // This method is only called when creating new containers.
+      // Therefore, always use the newest schema version.
+      containerData.setSchemaVersion(OzoneConsts.SCHEMA_LATEST);
+      KeyValueContainerUtil.createContainerMetaData(containerID,
+              containerMetaDataPath, chunksPath, dbFile,
+              containerData.getSchemaVersion(), config);
 
       //Set containerData for the KeyValueContainer.
       containerData.setChunksPath(chunksPath.getPath());
@@ -379,7 +384,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   private void flushAndSyncDB() throws StorageContainerException {
     try {
       try (ReferenceCountedDB db = BlockUtils.getDB(containerData, config)) {
-        db.getStore().flushDB(true);
+        db.getStore().flushLog(true);
         LOG.info("Container {} is synced with bcsId {}.",
             containerData.getContainerID(),
             containerData.getBlockCommitSequenceId());
@@ -451,12 +456,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  public KeyValueBlockIterator blockIterator() throws IOException{
-    return new KeyValueBlockIterator(containerData.getContainerID(), new File(
-        containerData.getContainerPath()));
-  }
-
-  @Override
   public void importContainerData(InputStream input,
       ContainerPacker<KeyValueContainerData> packer) throws IOException {
     writeLock();
@@ -488,6 +487,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       containerData.setState(originalContainerData.getState());
       containerData
           .setContainerDBType(originalContainerData.getContainerDBType());
+      containerData.setSchemaVersion(originalContainerData.getSchemaVersion());
 
       //rewriting the yaml file with new checksum calculation.
       update(originalContainerData.getMetadata(), true);

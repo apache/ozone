@@ -551,6 +551,7 @@ public final class TestUtils {
         .setDatanodeDetails(datanodeDetails)
         .setOriginNodeId(originNodeId)
         .setSequenceId(sequenceId)
+        .setBytesUsed(100)
         .build();
   }
 

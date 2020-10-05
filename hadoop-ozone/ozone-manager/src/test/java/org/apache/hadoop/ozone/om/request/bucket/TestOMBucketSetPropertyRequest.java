@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.bucket;
 
 import java.util.UUID;
 
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -34,6 +35,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .SetBucketPropertyRequest;
 
+import static org.apache.hadoop.ozone.OzoneConsts.GB;
+
 /**
  * Tests OMBucketSetPropertyRequest class which handles OMSetBucketProperty
  * request.
@@ -46,7 +49,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     String bucketName = UUID.randomUUID().toString();
 
     OMRequest omRequest = createSetBucketPropertyRequest(volumeName,
-        bucketName, true);
+        bucketName, true, Long.MAX_VALUE);
 
     OMBucketSetPropertyRequest omBucketSetPropertyRequest =
         new OMBucketSetPropertyRequest(omRequest);
@@ -63,7 +66,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     String bucketName = UUID.randomUUID().toString();
 
     OMRequest omRequest = createSetBucketPropertyRequest(volumeName,
-        bucketName, true);
+        bucketName, true, Long.MAX_VALUE);
 
     // Create with default BucketInfo values
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -92,7 +95,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     String bucketName = UUID.randomUUID().toString();
 
     OMRequest omRequest = createSetBucketPropertyRequest(volumeName,
-        bucketName, true);
+        bucketName, true, Long.MAX_VALUE);
 
     OMBucketSetPropertyRequest omBucketSetPropertyRequest =
         new OMBucketSetPropertyRequest(omRequest);
@@ -110,13 +113,43 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
   }
 
   private OMRequest createSetBucketPropertyRequest(String volumeName,
-      String bucketName, boolean isVersionEnabled) {
+      String bucketName, boolean isVersionEnabled, long quotaInBytes) {
     return OMRequest.newBuilder().setSetBucketPropertyRequest(
         SetBucketPropertyRequest.newBuilder().setBucketArgs(
             BucketArgs.newBuilder().setBucketName(bucketName)
                 .setVolumeName(volumeName)
+                .setQuotaInBytes(quotaInBytes)
+                .setQuotaInCounts(1000L)
                 .setIsVersionEnabled(isVersionEnabled).build()))
         .setCmdType(OzoneManagerProtocolProtos.Type.SetBucketProperty)
         .setClientId(UUID.randomUUID().toString()).build();
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheWithQuota() throws Exception {
+
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    TestOMRequestUtils.addVolumeToDB(
+        volumeName, omMetadataManager, 10 * GB);
+    TestOMRequestUtils.addBucketToDB(
+        volumeName, bucketName, omMetadataManager, 8 * GB);
+    OMRequest omRequest = createSetBucketPropertyRequest(volumeName,
+        bucketName, true, 20 * GB);
+
+    OMBucketSetPropertyRequest omBucketSetPropertyRequest =
+        new OMBucketSetPropertyRequest(omRequest);
+    int countException = 0;
+    try {
+      OMClientResponse omClientResponse =
+          omBucketSetPropertyRequest.validateAndUpdateCache(ozoneManager, 1,
+              ozoneManagerDoubleBufferHelper);
+    } catch (IllegalArgumentException ex) {
+      countException++;
+      GenericTestUtils.assertExceptionContains(
+          "Total buckets quota in this volume should not be", ex);
+    }
+    Assert.assertEquals(1, countException);
   }
 }

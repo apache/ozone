@@ -26,6 +26,10 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -68,7 +72,7 @@ public class AbstractContainerReportHandler {
    * @throws IOException In case of any Exception while processing the report
    */
   protected void processContainerReplica(final DatanodeDetails datanodeDetails,
-                               final ContainerReplicaProto replicaProto)
+      final ContainerReplicaProto replicaProto, final EventPublisher publisher)
       throws IOException {
     final ContainerID containerId = ContainerID
         .valueof(replicaProto.getContainerID());
@@ -81,8 +85,10 @@ public class AbstractContainerReportHandler {
     // once we have introduced lock inside ContainerInfo.
     synchronized (containerManager.getContainer(containerId)) {
       updateContainerStats(datanodeDetails, containerId, replicaProto);
-      updateContainerState(datanodeDetails, containerId, replicaProto);
-      updateContainerReplica(datanodeDetails, containerId, replicaProto);
+      if (!updateContainerState(datanodeDetails, containerId, replicaProto,
+          publisher)) {
+        updateContainerReplica(datanodeDetails, containerId, replicaProto);
+      }
     }
   }
 
@@ -98,11 +104,10 @@ public class AbstractContainerReportHandler {
                                     final ContainerID containerId,
                                     final ContainerReplicaProto replicaProto)
       throws ContainerNotFoundException {
+    final ContainerInfo containerInfo = containerManager
+        .getContainer(containerId);
 
     if (isHealthy(replicaProto::getState)) {
-      final ContainerInfo containerInfo = containerManager
-          .getContainer(containerId);
-
       if (containerInfo.getSequenceId() <
           replicaProto.getBlockCommitSequenceId()) {
         containerInfo.updateSequenceId(
@@ -154,15 +159,18 @@ public class AbstractContainerReportHandler {
    * @param datanode Datanode from which the report is received
    * @param containerId ID of the container
    * @param replica ContainerReplica
+   * @boolean true - replica should be ignored in the next process
    * @throws IOException In case of Exception
    */
-  private void updateContainerState(final DatanodeDetails datanode,
+  private boolean updateContainerState(final DatanodeDetails datanode,
                                     final ContainerID containerId,
-                                    final ContainerReplicaProto replica)
+                                    final ContainerReplicaProto replica,
+                                    final EventPublisher publisher)
       throws IOException {
 
     final ContainerInfo container = containerManager
         .getContainer(containerId);
+    boolean ignored = false;
 
     switch (container.getState()) {
     case OPEN:
@@ -244,20 +252,29 @@ public class AbstractContainerReportHandler {
        */
       break;
     case DELETING:
-      throw new UnsupportedOperationException(
-          "Unsupported container state 'DELETING'.");
+      /*
+       * The container is under deleting. do nothing.
+       */
+      break;
     case DELETED:
-      throw new UnsupportedOperationException(
-          "Unsupported container state 'DELETED'.");
+      /*
+       * The container is deleted. delete the replica.
+       */
+      deleteReplica(containerId, datanode, publisher, "DELETED");
+      ignored = true;
+      break;
     default:
       break;
     }
+
+    return ignored;
   }
 
   private void updateContainerReplica(final DatanodeDetails datanodeDetails,
                                       final ContainerID containerId,
                                       final ContainerReplicaProto replicaProto)
       throws ContainerNotFoundException, ContainerReplicaNotFoundException {
+
     final ContainerReplica replica = ContainerReplica.newBuilder()
         .setContainerID(containerId)
         .setContainerState(replicaProto.getState())
@@ -297,4 +314,14 @@ public class AbstractContainerReportHandler {
     return containerManager;
   }
 
+  protected void deleteReplica(ContainerID containerID, DatanodeDetails dn,
+      EventPublisher publisher, String reason) {
+    final DeleteContainerCommand deleteCommand =
+        new DeleteContainerCommand(containerID.getId(), true);
+    final CommandForDatanode datanodeCommand = new CommandForDatanode<>(
+        dn.getUuid(), deleteCommand);
+    publisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
+    logger.info("Sending delete container command for " + reason +
+        " container {} to datanode {}", containerID.getId(), dn);
+  }
 }

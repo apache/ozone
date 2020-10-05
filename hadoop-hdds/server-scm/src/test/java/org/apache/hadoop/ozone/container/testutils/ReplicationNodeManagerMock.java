@@ -402,7 +402,17 @@ public class ReplicationNodeManagerMock implements NodeManager {
   }
 
   @Override
-  public int getNumHealthyVolumes(List<DatanodeDetails> dnList) {
+  public int minHealthyVolumeNum(List<DatanodeDetails> dnList) {
+    return 0;
+  }
+
+  @Override
+  public int pipelineLimit(DatanodeDetails dn) {
+    return 0;
+  }
+
+  @Override
+  public int minPipelineLimit(List<DatanodeDetails> dn) {
     return 0;
   }
 }

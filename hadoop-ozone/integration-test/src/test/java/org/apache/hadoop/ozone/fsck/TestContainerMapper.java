@@ -72,6 +72,9 @@ public class TestContainerMapper {
     dbPath = GenericTestUtils.getRandomizedTempPath();
     conf.set(OZONE_OM_DB_DIRS, dbPath);
     conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE, "100MB");
+    // By default, 2 pipelines are created. Setting the value to 6, will ensure
+    // each pipleine can have 3 containers open.
+    conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 6);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .setScmId(SCM_ID)

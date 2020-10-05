@@ -87,6 +87,7 @@ public class TestPipelinePlacementPolicy {
         false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
     conf = new OzoneConfiguration();
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, PIPELINE_LOAD_LIMIT);
+    nodeManager.setNumPipelinePerDatanode(PIPELINE_LOAD_LIMIT);
     stateManager = new PipelineStateManager();
     placementPolicy = new PipelinePlacementPolicy(
         nodeManager, stateManager, conf);
@@ -194,7 +195,8 @@ public class TestPipelinePlacementPolicy {
         nodeManager.addPipeline(pipeline);
         stateManager.addPipeline(pipeline);
       } catch (SCMException e) {
-        break;
+        throw e;
+        //break;
       }
     }
 

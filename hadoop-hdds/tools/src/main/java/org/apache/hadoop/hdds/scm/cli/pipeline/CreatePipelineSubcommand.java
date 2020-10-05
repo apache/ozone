@@ -38,15 +38,17 @@ import java.io.IOException;
 public class CreatePipelineSubcommand extends ScmSubcommand {
 
   @CommandLine.Option(
-      names = {"-t", "--replicationType"},
-      description = "Replication type (STAND_ALONE, RATIS)",
+      names = {"-t", "--replication-type", "--replicationType"},
+      description = "Replication type (STAND_ALONE, RATIS). Full name" +
+          " --replicationType will be removed in later versions.",
       defaultValue = "STAND_ALONE"
   )
   private HddsProtos.ReplicationType type;
 
   @CommandLine.Option(
-      names = {"-f", "--replicationFactor"},
-      description = "Replication factor (ONE, THREE)",
+      names = {"-f", "--replication-factor", "--replicationFactor"},
+      description = "Replication factor (ONE, THREE). Full name" +
+          " --replicationFactor will be removed in later versions.",
       defaultValue = "ONE"
   )
   private HddsProtos.ReplicationFactor factor;

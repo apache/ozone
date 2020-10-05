@@ -627,6 +627,39 @@ public class TestContainerReportHandler {
     assertEquals(11L, containerOne.getNumberOfKeys());
   }
 
+  @Test
+  public void testStaleReplicaOfDeletedContainer() throws NodeNotFoundException,
+      SCMException, ContainerNotFoundException {
+
+    final ContainerReportHandler reportHandler = new ContainerReportHandler(
+        nodeManager, containerManager);
+
+    final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
+        NodeStatus.inServiceHealthy()).iterator();
+    final DatanodeDetails datanodeOne = nodeIterator.next();
+    final ContainerInfo containerOne = getContainer(LifeCycleState.DELETED);
+
+    final Set<ContainerID> containerIDSet = Stream.of(
+        containerOne.containerID())
+        .collect(Collectors.toSet());
+
+    nodeManager.setContainers(datanodeOne, containerIDSet);
+    containerStateManager.loadContainer(containerOne);
+
+    // Expects the replica will be deleted.
+    final ContainerReportsProto containerReport = getContainerReportsProto(
+        containerOne.containerID(), ContainerReplicaProto.State.CLOSED,
+        datanodeOne.getUuidString());
+    final ContainerReportFromDatanode containerReportFromDatanode =
+        new ContainerReportFromDatanode(datanodeOne, containerReport);
+    reportHandler.onMessage(containerReportFromDatanode, publisher);
+
+    Mockito.verify(publisher, Mockito.times(1));
+
+    Assert.assertEquals(0, containerManager.getContainerReplicas(
+        containerOne.containerID()).size());
+  }
+
   private ContainerReportFromDatanode getContainerReportFromDatanode(
       ContainerID containerId, ContainerReplicaProto.State state,
       DatanodeDetails dn, long bytesUsed, long keyCount) {

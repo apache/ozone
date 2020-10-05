@@ -82,7 +82,7 @@ import org.slf4j.LoggerFactory;
 public class ReplicationManager
     implements MetricsSource, EventHandler<SafeModeStatus> {
 
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(ReplicationManager.class);
 
   public static final String METRICS_SOURCE_NAME = "SCMReplicationManager";
@@ -321,10 +321,35 @@ public class ReplicationManager
           action -> replicas.stream()
               .noneMatch(r -> r.getDatanodeDetails().equals(action.datanode)));
 
+      /*
+       * If container is under deleting and all it's replicas are deleted, then
+       * make the container as CLEANED, or resend the delete replica command if
+       * needed.
+       */
+      if (state == LifeCycleState.DELETING) {
+        handleContainerUnderDelete(container, replicas);
+        return;
+      }
+
       ContainerReplicaCount replicaSet =
           getContainerReplicaCount(container, replicas);
       ContainerPlacementStatus placementStatus = getPlacementStatus(
           replicas, container.getReplicationFactor().getNumber());
+
+      /*
+       * We don't have to take any action if the container is healthy.
+       *
+       * According to ReplicationMonitor container is considered healthy if
+       * the container is either in QUASI_CLOSED or in CLOSED state and has
+       * exact number of replicas in the same state.
+       */
+      if (isContainerEmpty(container, replicas)) {
+        /*
+         *  If container is empty, schedule task to delete the container.
+         */
+        deleteContainerReplicas(container, replicas);
+        return;
+      }
 
       /*
        * Check if the container is under replicated and take appropriate
@@ -421,6 +446,21 @@ public class ReplicationManager
   }
 
   /**
+   * Returns true if the container is empty and CLOSED.
+   *
+   * @param container Container to check
+   * @param replicas Set of ContainerReplicas
+   * @return true if the container is empty, false otherwise
+   */
+  private boolean isContainerEmpty(final ContainerInfo container,
+      final Set<ContainerReplica> replicas) {
+    return container.getState() == LifeCycleState.CLOSED &&
+        (container.getUsedBytes() == 0 && container.getNumberOfKeys() == 0) &&
+        replicas.stream().allMatch(r -> r.getState() == State.CLOSED &&
+            r.getBytesUsed() == 0 && r.getKeyCount() == 0);
+  }
+
+  /**
    * Given a ContainerID, lookup the ContainerInfo and then return a
    * ContainerReplicaCount object for the container.
    * @param containerID The ID of the container
@@ -497,6 +537,64 @@ public class ReplicationManager
         .distinct()
         .count();
     return uniqueQuasiClosedReplicaCount > (replicationFactor / 2);
+  }
+
+  /**
+   * Delete the container and its replicas.
+   *
+   * @param container ContainerInfo
+   * @param replicas Set of ContainerReplicas
+   */
+  private void deleteContainerReplicas(final ContainerInfo container,
+      final Set<ContainerReplica> replicas) throws IOException {
+    Preconditions.assertTrue(container.getState() ==
+        LifeCycleState.CLOSED);
+    Preconditions.assertTrue(container.getNumberOfKeys() == 0);
+    Preconditions.assertTrue(container.getUsedBytes() == 0);
+
+    replicas.stream().forEach(rp -> {
+      Preconditions.assertTrue(rp.getState() == State.CLOSED);
+      Preconditions.assertTrue(rp.getBytesUsed() == 0);
+      Preconditions.assertTrue(rp.getKeyCount() == 0);
+      sendDeleteCommand(container, rp.getDatanodeDetails(), false);
+    });
+    containerManager.updateContainerState(container.containerID(),
+        HddsProtos.LifeCycleEvent.DELETE);
+    LOG.debug("Deleting empty container {} replicas,", container.containerID());
+  }
+
+  /**
+   * Handle the container which is under delete.
+   *
+   * @param container ContainerInfo
+   * @param replicas Set of ContainerReplicas
+   */
+  private void handleContainerUnderDelete(final ContainerInfo container,
+      final Set<ContainerReplica> replicas) throws IOException {
+    if (replicas.size() == 0) {
+      containerManager.updateContainerState(container.containerID(),
+          HddsProtos.LifeCycleEvent.CLEANUP);
+      LOG.debug("Container {} state changes to DELETED",
+          container.containerID());
+    } else {
+      // Check whether to resend the delete replica command
+      final List<DatanodeDetails> deletionInFlight = inflightDeletion
+          .getOrDefault(container.containerID(), Collections.emptyList())
+          .stream()
+          .map(action -> action.datanode)
+          .collect(Collectors.toList());
+      Set<ContainerReplica> filteredReplicas = replicas.stream().filter(
+          r -> !deletionInFlight.contains(r.getDatanodeDetails()))
+          .collect(Collectors.toSet());
+      // Resend the delete command
+      if (filteredReplicas.size() > 0) {
+        filteredReplicas.stream().forEach(rp -> {
+          sendDeleteCommand(container, rp.getDatanodeDetails(), false);
+        });
+        LOG.debug("Resend delete Container {} command",
+            container.containerID());
+      }
+    }
   }
 
   /**

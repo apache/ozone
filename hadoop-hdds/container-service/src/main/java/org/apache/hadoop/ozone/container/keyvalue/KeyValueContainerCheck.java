@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import com.google.common.base.Preconditions;
-import com.google.common.primitives.Longs;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdfs.util.Canceler;
@@ -32,6 +31,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
+import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
@@ -232,8 +232,7 @@ public class KeyValueContainerCheck {
 
     try(ReferenceCountedDB db =
             BlockUtils.getDB(onDiskContainerData, checkConfig);
-        KeyValueBlockIterator kvIter = new KeyValueBlockIterator(containerID,
-            new File(onDiskContainerData.getContainerPath()))) {
+        BlockIterator<BlockData> kvIter = db.getStore().getBlockIterator()) {
 
       while(kvIter.hasNext()) {
         BlockData block = kvIter.nextBlock();
@@ -243,8 +242,11 @@ public class KeyValueContainerCheck {
 
           if (!chunkFile.exists()) {
             // concurrent mutation in Block DB? lookup the block again.
-            byte[] bdata = db.getStore().get(
-                Longs.toByteArray(block.getBlockID().getLocalID()));
+            String localBlockID =
+                    Long.toString(block.getBlockID().getLocalID());
+            BlockData bdata = db.getStore()
+                    .getBlockDataTable()
+                    .get(localBlockID);
             if (bdata != null) {
               throw new IOException("Missing chunk file "
                   + chunkFile.getAbsolutePath());

@@ -21,7 +21,7 @@ Test Timeout        5 minutes
 
 *** Test Cases ***
 Freon Randomkey Generator
-    ${result} =        Execute              ozone freon rk ${OM_HA_PARAM} --numOfVolumes=1 --numOfBuckets=1 --numOfKeys=1 --numOfThreads=1
+    ${result} =        Execute              ozone freon rk ${OM_HA_PARAM} --num-of-volumes=1 --num-of-buckets=1 --num-of-keys=1 --num-of-threads=1
                        Wait Until Keyword Succeeds      3min       10sec     Should contain   ${result}   Number of Keys added: 1
 
 Freon Ozone Key Generator
