@@ -25,6 +25,7 @@ import java.util.ListIterator;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -73,7 +74,8 @@ public class BlockOutputStreamEntryPool {
   private final ExcludeList excludeList;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
-  public BlockOutputStreamEntryPool(OzoneManagerProtocol omClient,
+  public BlockOutputStreamEntryPool(
+      OzoneManagerProtocol omClient,
       int chunkSize, String requestId, HddsProtos.ReplicationFactor factor,
       HddsProtos.ReplicationType type,
       int bufferSize, long bufferFlushSize,
@@ -81,7 +83,9 @@ public class BlockOutputStreamEntryPool {
       long size, long watchTimeout, ContainerProtos.ChecksumType checksumType,
       int bytesPerChecksum, String uploadID, int partNumber,
       boolean isMultipart, OmKeyInfo info,
-      XceiverClientFactory xceiverClientFactory, long openID) {
+      boolean unsafeByteBufferConversion,
+      XceiverClientFactory xceiverClientFactory, long openID
+  ) {
     streamEntries = new ArrayList<>();
     currentStreamIndex = 0;
     this.omClient = omClient;
@@ -122,7 +126,8 @@ public class BlockOutputStreamEntryPool {
     this.bufferPool =
         new BufferPool(streamBufferSize,
             (int) (streamBufferMaxSize / streamBufferSize),
-            xceiverClientFactory.byteBufferToByteStringConversion());
+            ByteStringConversion
+                .createByteBufferConversion(unsafeByteBufferConversion));
   }
 
   /**

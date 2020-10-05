@@ -18,19 +18,13 @@
 package org.apache.hadoop.hdds.scm;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.function.Function;
 
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 /**
  * Interface to provide XceiverClient when needed.
  */
 public interface XceiverClientFactory {
-
-  Function<ByteBuffer, ByteString> byteBufferToByteStringConversion();
 
   XceiverClientSpi acquireClient(Pipeline pipeline) throws IOException;
 

@@ -134,14 +134,16 @@ public class KeyOutputStream extends OutputStream {
       long bufferMaxSize, long size, long watchTimeout,
       ChecksumType checksumType, int bytesPerChecksum,
       String uploadID, int partNumber, boolean isMultipart,
-      int maxRetryCount, long retryInterval) {
+      int maxRetryCount, long retryInterval,
+      boolean unsafeByteBufferConversion) {
     OmKeyInfo info = handler.getKeyInfo();
     blockOutputStreamEntryPool =
         new BlockOutputStreamEntryPool(omClient, chunkSize, requestId, factor,
             type, bufferSize, bufferFlushSize, isBufferFlushDelay,
             bufferMaxSize, size,
             watchTimeout, checksumType, bytesPerChecksum, uploadID, partNumber,
-            isMultipart, info, xceiverClientManager, handler.getId());
+            isMultipart, info, unsafeByteBufferConversion,
+            xceiverClientManager, handler.getId());
     // Retrieve the file encryption key info, null if file is not in
     // encrypted bucket.
     this.feInfo = info.getFileEncryptionInfo();
@@ -560,6 +562,7 @@ public class KeyOutputStream extends OutputStream {
     private boolean isMultipartKey;
     private int maxRetryCount;
     private long retryInterval;
+    private boolean unsafeByteBufferConversion;
 
     public Builder setMultipartUploadID(String uploadID) {
       this.multipartUploadID = uploadID;
@@ -656,6 +659,11 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
+    public Builder enableUnsafeByteBufferConversion(boolean enabled) {
+      this.unsafeByteBufferConversion = enabled;
+      return this;
+    }
+
     public KeyOutputStream build() {
       return new KeyOutputStream(openHandler, xceiverManager, omClient,
           chunkSize, requestID, factor, type,
@@ -663,7 +671,7 @@ public class KeyOutputStream extends OutputStream {
           streamBufferMaxSize,
           blockSize, watchTimeout, checksumType,
           bytesPerChecksum, multipartUploadID, multipartNumber, isMultipartKey,
-          maxRetryCount, retryInterval);
+          maxRetryCount, retryInterval, unsafeByteBufferConversion);
     }
   }
 
