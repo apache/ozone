@@ -195,6 +195,13 @@ public interface MiniOzoneCluster {
   void restartOzoneManager() throws IOException;
 
   /**
+   * Restarts OzoneManager instance in 'Upgrade' Mode.
+   *
+   * @throws IOException
+   */
+  void restartOzoneManagerInUpgradeMode() throws IOException;
+
+  /**
    * Restarts Recon instance.
    */
   void restartReconServer() throws Exception;

@@ -315,6 +315,13 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     ozoneManager.restart();
   }
 
+
+  @Override
+  public void restartOzoneManagerInUpgradeMode() throws IOException {
+    ozoneManager.stop();
+    ozoneManager.restartInUpgradeMode();
+  }
+
   @Override
   public void restartReconServer() {
     stopRecon(reconServer);

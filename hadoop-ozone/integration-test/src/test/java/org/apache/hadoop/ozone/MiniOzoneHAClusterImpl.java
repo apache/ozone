@@ -206,6 +206,14 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     }
   }
 
+  @Override
+  public void restartOzoneManagerInUpgradeMode() throws IOException {
+    for (OzoneManager ozoneManager : ozoneManagers) {
+      ozoneManager.stop();
+      ozoneManager.restartInUpgradeMode();
+    }
+  }
+
   public void shutdownOzoneManager(OzoneManager ozoneManager) {
     LOG.info("Shutting down OzoneManager " + ozoneManager.getOMNodeId());
 

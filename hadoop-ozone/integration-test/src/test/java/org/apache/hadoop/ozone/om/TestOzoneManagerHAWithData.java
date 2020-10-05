@@ -20,6 +20,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -33,7 +34,11 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.server.impl.RaftServerProxy;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -51,6 +56,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRE
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PARTIAL_DELETE;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
 /**
@@ -646,6 +652,35 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
 
     validateListParts(ozoneBucket, keyName, uploadID, partsMap);
 
+  }
+
+  @Test
+  public void testApplyAllPendingTransactions() throws Exception {
+
+    createKeyTest(false);
+
+    MiniOzoneHAClusterImpl cluster = getCluster();
+    cluster.restartOzoneManagerInUpgradeMode();
+
+    for (OzoneManager om : cluster.getOzoneManagersList()) {
+      Assert.assertTrue(om.applyAllPendingTransactions());
+
+      // Verify Applied Index.
+      OzoneManagerRatisServer omRatisServer = om.getOmRatisServer();
+      OMMetadataManager metadataManager = om.getMetadataManager();
+      long appliedIndexFromRatis = omRatisServer.getOmStateMachine()
+          .getLastAppliedTermIndex().getIndex();
+      OMTransactionInfo omTransactionInfo =
+          OMTransactionInfo.readTransactionInfo(metadataManager);
+      long index = omTransactionInfo.getTermIndex().getIndex();
+      assertEquals(index, appliedIndexFromRatis);
+
+      RaftGroupId groupId = omRatisServer.getRaftGroup().getGroupId();
+      RaftServerProxy server = (RaftServerProxy) omRatisServer.getServer();
+      long snapshotIndex =
+          server.getImpl(groupId).getState().getLog().getSnapshotIndex();
+      assertEquals(index, snapshotIndex);
+    }
   }
 
   /**
