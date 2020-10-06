@@ -238,7 +238,8 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
       if (!pathComponents.hasNext()) {
         return lastKnownParentId;
       }
-      String dbNodeName = lastKnownParentId + "/" + nodeName;
+      String dbNodeName =
+              omMetadataManager.getOzonePathKey(lastKnownParentId, nodeName);
       omDirectoryInfo = omMetadataManager.
               getDirectoryTable().get(dbNodeName);
       if (omDirectoryInfo != null) {

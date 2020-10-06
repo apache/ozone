@@ -132,7 +132,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * |  directoryTable    | parentId/directoryName -> DirectoryInfo         |
    * |----------------------------------------------------------------------|
-   * |  fileTable         | parentId/fileName -> FileInfo                   |
+   * |  fileTable         | parentId/fileName/id -> FileInfo                |
+   * |----------------------------------------------------------------------|
+   * |  openFileTable     | parentId/fileName -> FileInfo                   |
    * |----------------------------------------------------------------------|
    * |  transactionInfoTable | #TRANSACTIONINFO -> OMTransactionInfo        |
    * |----------------------------------------------------------------------|
@@ -369,7 +371,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addCodec(S3SecretValue.class, new S3SecretValueCodec())
         .addCodec(OmPrefixInfo.class, new OmPrefixInfoCodec())
         .addCodec(OmDirectoryInfo.class, new OmDirectoryInfoCodec())
-
         .addCodec(OMTransactionInfo.class, new OMTransactionInfoCodec());
   }
 

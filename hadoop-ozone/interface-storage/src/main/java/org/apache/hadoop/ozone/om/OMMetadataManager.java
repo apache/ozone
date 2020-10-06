@@ -391,8 +391,8 @@ public interface OMMetadataManager {
   Set<String> listTableNames();
 
   /**
-   * Given a volume, bucket and a key, return the corresponding DB prefixKey
-   * key.
+   * Given parent object id and path component name, return the corresponding
+   * DB 'prefixKey' key.
    *
    * @param parentObjectId - parent object Id
    * @param pathComponentName   - path component name

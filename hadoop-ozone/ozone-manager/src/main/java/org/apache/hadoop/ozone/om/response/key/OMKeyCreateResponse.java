@@ -109,12 +109,20 @@ public class OMKeyCreateResponse extends OMClientResponse {
             omBucketInfo.getBucketName()), omBucketInfo);
   }
 
-  public long getOpenKeySessionID() {
+  protected long getOpenKeySessionID() {
     return openKeySessionID;
   }
 
-  public OmKeyInfo getOmKeyInfo() {
+  protected OmKeyInfo getOmKeyInfo() {
     return omKeyInfo;
+  }
+
+  protected OmVolumeArgs getOmVolumeArgs() {
+    return omVolumeArgs;
+  }
+
+  protected OmBucketInfo getOmBucketInfo() {
+    return omBucketInfo;
   }
 }
 

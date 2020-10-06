@@ -56,7 +56,7 @@ public class TestOzoneFileOps {
   public Timeout timeout = new Timeout(300000);
 
   private static final Logger LOG =
-          LoggerFactory.getLogger(TestOzoneDirectory.class);
+          LoggerFactory.getLogger(TestOzoneFileOps.class);
 
   private MiniOzoneCluster cluster;
   private FileSystem fs;
@@ -132,13 +132,12 @@ public class TestOzoneFileOps {
     }
     Assert.assertEquals("Unexpected directory table entries!", 0, count);
 
-    // verify entries in directory table
+    // verify entries in open key table
     TableIterator<String, ? extends
             Table.KeyValue<String, OmKeyInfo>> keysItr =
             omMgr.getOpenKeyTable().iterator();
     keysItr.seekToFirst();
 
-    // Assert.assertEquals("Unexpected directory table entries!", 2, count);
     while (keysItr.hasNext()) {
       count++;
       Table.KeyValue<String, OmKeyInfo> value = keysItr.next();

@@ -741,7 +741,7 @@ public final class TestOMRequestUtils {
   public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
       String keyName, HddsProtos.ReplicationType replicationType,
       HddsProtos.ReplicationFactor replicationFactor, long objectID,
-      long parentID, long creationTime) {
+      long parentID, long trxnLogIndex, long creationTime) {
     String fileName = OzoneFSUtils.getFileName(keyName);
     return new OmKeyInfo.Builder()
             .setVolumeName(volumeName)
@@ -755,7 +755,7 @@ public final class TestOMRequestUtils {
             .setReplicationType(replicationType)
             .setReplicationFactor(replicationFactor)
             .setObjectID(objectID)
-            .setUpdateID(objectID)
+            .setUpdateID(trxnLogIndex)
             .setParentObjectID(parentID)
             .setFileName(fileName)
             .build();
@@ -829,9 +829,9 @@ public final class TestOMRequestUtils {
     long bucketId = TestOMRequestUtils.getBucketId(volumeName, bucketName,
             omMetaMgr);
     String[] pathComponents = StringUtils.split(key, '/');
-    long objectId = bucketId + 100;
+    long objectId = bucketId + 10;
     long parentId = bucketId;
-    long txnID = 5000;
+    long txnID = 50;
     for (String pathElement : pathComponents) {
       OmDirectoryInfo omDirInfo =
               TestOMRequestUtils.createOmDirectoryInfo(pathElement, ++objectId,

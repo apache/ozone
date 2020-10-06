@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 import javax.annotation.Nonnull;
@@ -31,9 +32,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
+
 /**
- * Response for create file request layout version1.
+ * Response for create file request layout version V1.
  */
+@CleanupTableInfo(cleanupTables = OPEN_FILE_TABLE)
 public class OMFileCreateResponseV1 extends OMFileCreateResponse {
 
   private List<OmDirectoryInfo> parentDirInfos;
@@ -59,15 +63,14 @@ public class OMFileCreateResponseV1 extends OMFileCreateResponse {
      * XXX handle stale directory entries.
      */
     if (parentDirInfos != null) {
-      for (OmDirectoryInfo parentKeyInfo : parentDirInfos) {
-        String parentKey = omMetadataMgr.getOzonePathKey(
-                parentKeyInfo.getParentObjectID(), parentKeyInfo.getName());
+      for (OmDirectoryInfo parentDirInfo : parentDirInfos) {
+        String parentKey = parentDirInfo.getPath();
         if (LOG.isDebugEnabled()) {
           LOG.debug("putWithBatch adding parent : key {} info : {}", parentKey,
-                  parentKeyInfo);
+                  parentDirInfo);
         }
         omMetadataMgr.getDirectoryTable().putWithBatch(batchOp, parentKey,
-                parentKeyInfo);
+                parentDirInfo);
       }
     }
 
@@ -76,6 +79,15 @@ public class OMFileCreateResponseV1 extends OMFileCreateResponse {
             getOpenKeySessionID());
     omMetadataMgr.getOpenKeyTable().putWithBatch(batchOp, openKey,
             getOmKeyInfo());
+
+    // update volume usedBytes.
+    omMetadataMgr.getVolumeTable().putWithBatch(batchOp,
+            omMetadataMgr.getVolumeKey(getOmVolumeArgs().getVolume()),
+            getOmVolumeArgs());
+    // update bucket usedBytes.
+    omMetadataMgr.getBucketTable().putWithBatch(batchOp,
+            omMetadataMgr.getBucketKey(getOmVolumeArgs().getVolume(),
+                    getOmBucketInfo().getBucketName()), getOmBucketInfo());
   }
 
 }

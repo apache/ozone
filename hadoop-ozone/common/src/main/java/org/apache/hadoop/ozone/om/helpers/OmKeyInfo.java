@@ -25,9 +25,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocationList;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
@@ -302,6 +304,7 @@ public final class OmKeyInfo extends WithObjectID {
     private List<OzoneAcl> acls;
     private long objectID;
     private long updateID;
+    // not persisted to DB. FileName will be the last element in path keyName.
     private String fileName;
     private long parentObjectID;
 
@@ -500,6 +503,11 @@ public final class OmKeyInfo extends WithObjectID {
     if (keyInfo.hasUpdateID()) {
       builder.setUpdateID(keyInfo.getUpdateID());
     }
+    if (keyInfo.hasParentID()) {
+      builder.setParentObjectID(keyInfo.getParentID());
+    }
+    // not persisted to DB. FileName will be filtered out from keyName
+    builder.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
     return builder.build();
   }
 
@@ -513,6 +521,8 @@ public final class OmKeyInfo extends WithObjectID {
         ", creationTime='" + creationTime + '\'' +
         ", type='" + type + '\'' +
         ", factor='" + factor + '\'' +
+        ", objectID='" + objectID + '\'' +
+        ", parentID='" + parentObjectID + '\'' +
         '}';
   }
 
@@ -538,12 +548,13 @@ public final class OmKeyInfo extends WithObjectID {
         Objects.equals(metadata, omKeyInfo.metadata) &&
         Objects.equals(acls, omKeyInfo.acls) &&
         objectID == omKeyInfo.objectID &&
-        updateID == omKeyInfo.updateID;
+        updateID == omKeyInfo.updateID &&
+        parentObjectID == omKeyInfo.parentObjectID;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(volumeName, bucketName, keyName);
+    return Objects.hash(volumeName, bucketName, keyName, parentObjectID);
   }
 
   /**
@@ -588,5 +599,12 @@ public final class OmKeyInfo extends WithObjectID {
    */
   public void clearFileEncryptionInfo() {
     this.encInfo = null;
+  }
+
+  public String getPath() {
+    if (StringUtils.isBlank(getFileName())) {
+      return getKeyName();
+    }
+    return getParentObjectID() + OzoneConsts.OM_KEY_PREFIX + getFileName();
   }
 }

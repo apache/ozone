@@ -31,8 +31,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.*;
 /**
  * Response for CommitKey request layout version V1.
  */
-@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, KEY_TABLE,
-        OPEN_FILE_TABLE, FILE_TABLE})
+@CleanupTableInfo(cleanupTables = {OPEN_FILE_TABLE, FILE_TABLE})
 public class OMKeyCommitResponseV1 extends OMKeyCommitResponse {
 
   private OmKeyInfo omKeyInfo;

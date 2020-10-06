@@ -94,6 +94,7 @@ public class OMFileCreateRequestV1 extends OMFileCreateRequest {
     OmBucketInfo omBucketInfo = null;
     final List<OmKeyLocationInfo> locations = new ArrayList<>();
     List<OmDirectoryInfo> missingParentInfos;
+    int numKeysCreated = 0;
 
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
@@ -146,8 +147,12 @@ public class OMFileCreateRequestV1 extends OMFileCreateRequest {
       }
 
       // add all missing parents to dir table
-      missingParentInfos = OMDirectoryCreateRequestV1.getAllParentDirInfo(
-              ozoneManager, keyArgs, pathInfoV1, trxnLogIndex);
+      missingParentInfos =
+              OMDirectoryCreateRequestV1.getAllMissingParentDirInfo(
+                      ozoneManager, keyArgs, pathInfoV1, trxnLogIndex);
+
+      // total number of keys created.
+      numKeysCreated = missingParentInfos.size();
 
       // do open key
       OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
@@ -229,6 +234,7 @@ public class OMFileCreateRequestV1 extends OMFileCreateRequest {
 
     switch (result) {
     case SUCCESS:
+      omMetrics.incNumKeys(numKeysCreated);
       LOG.debug("File created. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);
       break;
