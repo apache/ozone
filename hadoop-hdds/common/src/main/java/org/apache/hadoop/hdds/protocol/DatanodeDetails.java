@@ -326,8 +326,6 @@ public class DatanodeDetails extends NodeImpl implements
       extendedBuilder.setBuildDate(getBuildDate());
     }
 
-    extendedBuilder.setSuggestedLeaderCount(getSuggestedLeaderCount());
-
     return extendedBuilder.build();
   }
 

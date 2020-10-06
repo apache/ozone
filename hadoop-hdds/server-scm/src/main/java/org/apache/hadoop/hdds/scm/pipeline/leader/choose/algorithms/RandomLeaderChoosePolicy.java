@@ -24,32 +24,19 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
 import java.util.List;
 
 /**
- * A {@link LeaderChoosePolicy} support choosing leader from datanode list.
+ * The random leader choose policy.
+ * Do not choose leader here, so that all nodes have the same priority
+ * and ratis elects leader without depending on priority.
  */
-public abstract class LeaderChoosePolicy {
+public class RandomLeaderChoosePolicy extends LeaderChoosePolicy {
 
-  private final NodeManager nodeManager;
-  private final PipelineStateManager pipelineStateManager;
-
-  public LeaderChoosePolicy(
+  public RandomLeaderChoosePolicy(
       NodeManager nodeManager, PipelineStateManager pipelineStateManager) {
-    this.nodeManager = nodeManager;
-    this.pipelineStateManager = pipelineStateManager;
+    super(nodeManager, pipelineStateManager);
   }
 
-  /**
-   * Given an initial list of datanodes, return one of the datanodes.
-   *
-   * @param dns list of datanodes.
-   * @return one of the datanodes.
-   */
-  public abstract DatanodeDetails chooseLeader(List<DatanodeDetails> dns);
-
-  protected NodeManager getNodeManager() {
-    return nodeManager;
-  }
-
-  protected PipelineStateManager getPipelineStateManager() {
-    return pipelineStateManager;
+  @Override
+  public DatanodeDetails chooseLeader(List<DatanodeDetails> dns) {
+    return null;
   }
 }

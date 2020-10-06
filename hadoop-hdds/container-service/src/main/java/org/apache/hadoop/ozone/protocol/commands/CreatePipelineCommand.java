@@ -38,6 +38,9 @@ import java.util.stream.Collectors;
 public class CreatePipelineCommand
     extends SCMCommand<CreatePipelineCommandProto> {
 
+  private static final Integer HIGH_PRIORITY = 1;
+  private static final Integer LOW_PRIORITY = 0;
+
   private final PipelineID pipelineID;
   private final ReplicationFactor factor;
   private final ReplicationType type;
@@ -53,8 +56,8 @@ public class CreatePipelineCommand
     this.type = type;
     this.nodelist = datanodeList;
     if (datanodeList.size() ==
-        XceiverServerRatis.DEFAULT_PRIORITY_LIST.size()) {
-      this.priorityList = XceiverServerRatis.DEFAULT_PRIORITY_LIST;
+        XceiverServerRatis.getDefaultPriorityList().size()) {
+      this.priorityList = XceiverServerRatis.getDefaultPriorityList();
     } else {
       this.priorityList =
           new ArrayList<>(Collections.nCopies(datanodeList.size(), 0));
@@ -64,13 +67,25 @@ public class CreatePipelineCommand
   public CreatePipelineCommand(final PipelineID pipelineID,
       final ReplicationType type, final ReplicationFactor factor,
       final List<DatanodeDetails> datanodeList,
-      final List<Integer> priorityList) {
+      final DatanodeDetails suggestedLeader) {
     super();
     this.pipelineID = pipelineID;
     this.factor = factor;
     this.type = type;
     this.nodelist = datanodeList;
-    this.priorityList = priorityList;
+    this.priorityList = new ArrayList<>();
+    initPriorityList(datanodeList, suggestedLeader);
+  }
+
+  private void initPriorityList(
+      List<DatanodeDetails> dns, DatanodeDetails suggestedLeader) {
+    for (DatanodeDetails dn : dns) {
+      if (dn.equals(suggestedLeader)) {
+        priorityList.add(HIGH_PRIORITY);
+      } else {
+        priorityList.add(LOW_PRIORITY);
+      }
+    }
   }
 
   public CreatePipelineCommand(long cmdId, final PipelineID pipelineID,

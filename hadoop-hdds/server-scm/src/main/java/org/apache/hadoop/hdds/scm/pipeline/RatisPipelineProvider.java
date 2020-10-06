@@ -19,7 +19,6 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -33,7 +32,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.LeaderChoosePolicy;
-import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.MinLeaderCountChoosePolicy;
+import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.LeaderChoosePolicyFactory;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
@@ -58,9 +57,6 @@ public class RatisPipelineProvider extends PipelineProvider {
   private int maxPipelinePerDatanode;
   private final LeaderChoosePolicy leaderChoosePolicy;
 
-  private static final Integer HIGH_PRIORITY = 1;
-  private static final Integer LOW_PRIORITY = 0;
-
   @VisibleForTesting
   public RatisPipelineProvider(NodeManager nodeManager,
       PipelineStateManager stateManager, ConfigurationSource conf,
@@ -77,10 +73,8 @@ public class RatisPipelineProvider extends PipelineProvider {
     this.maxPipelinePerDatanode = dnLimit == null ? 0 :
         Integer.parseInt(dnLimit);
     try {
-      leaderChoosePolicy = conf.getClass(
-          ScmConfigKeys.OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY,
-          MinLeaderCountChoosePolicy.class,
-          LeaderChoosePolicy.class).newInstance();
+      leaderChoosePolicy = LeaderChoosePolicyFactory
+          .getPolicy(conf, nodeManager, stateManager);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -119,20 +113,6 @@ public class RatisPipelineProvider extends PipelineProvider {
   public LeaderChoosePolicy getLeaderChoosePolicy() {
     return leaderChoosePolicy;
   }
-  private List<Integer> getPriorityList(
-      List<DatanodeDetails> dns, DatanodeDetails suggestedLeader) {
-    List<Integer> priorityList = new ArrayList<>();
-
-    for (DatanodeDetails dn : dns) {
-      if (dn.getUuid().equals(suggestedLeader.getUuid())) {
-        priorityList.add(HIGH_PRIORITY);
-      } else {
-        priorityList.add(LOW_PRIORITY);
-      }
-    }
-
-    return priorityList;
-  }
 
   @Override
   public synchronized Pipeline create(ReplicationFactor factor)
@@ -158,8 +138,7 @@ public class RatisPipelineProvider extends PipelineProvider {
       throw new IllegalStateException("Unknown factor: " + factor.name());
     }
 
-    DatanodeDetails suggestedLeader = leaderChoosePolicy.chooseLeader(
-        dns, getNodeManager(), getPipelineStateManager());
+    DatanodeDetails suggestedLeader = leaderChoosePolicy.chooseLeader(dns);
 
     Pipeline pipeline = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
@@ -167,15 +146,16 @@ public class RatisPipelineProvider extends PipelineProvider {
         .setType(ReplicationType.RATIS)
         .setFactor(factor)
         .setNodes(dns)
-        .setSuggestedLeaderId(suggestedLeader.getUuid())
+        .setSuggestedLeaderId(
+            suggestedLeader != null ? suggestedLeader.getUuid() : null)
         .build();
 
-    List<Integer> priorityList = getPriorityList(dns, suggestedLeader);
-
     // Send command to datanodes to create pipeline
-    final CreatePipelineCommand createCommand =
+    final CreatePipelineCommand createCommand = suggestedLeader != null ?
         new CreatePipelineCommand(pipeline.getId(), pipeline.getType(),
-            factor, dns, priorityList);
+            factor, dns, suggestedLeader) :
+        new CreatePipelineCommand(pipeline.getId(), pipeline.getType(),
+            factor, dns);
 
     dns.forEach(node -> {
       LOG.info("Sending CreatePipelineCommand for pipeline:{} to datanode:{}",

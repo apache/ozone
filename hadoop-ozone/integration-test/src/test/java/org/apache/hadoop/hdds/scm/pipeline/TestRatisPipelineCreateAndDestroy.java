@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Ignore;
@@ -36,10 +35,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
-import java.util.UUID;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
@@ -55,11 +50,10 @@ public class TestRatisPipelineCreateAndDestroy {
   private OzoneConfiguration conf = new OzoneConfiguration();
   private static PipelineManager pipelineManager;
 
-  public void init(int numDatanodes, int datanodePipelineLimit)
-      throws Exception {
+  public void init(int numDatanodes) throws Exception {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         GenericTestUtils.getRandomizedTempPath());
-    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, datanodePipelineLimit);
+    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 2);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
             .setNumDatanodes(numDatanodes)
@@ -81,7 +75,7 @@ public class TestRatisPipelineCreateAndDestroy {
   public void testAutomaticPipelineCreationOnPipelineDestroy()
       throws Exception {
     int numOfDatanodes = 6;
-    init(numOfDatanodes, 2);
+    init(numOfDatanodes);
     // make sure two pipelines are created
     waitForPipelines(2);
     Assert.assertEquals(numOfDatanodes, pipelineManager.getPipelines(
@@ -98,124 +92,11 @@ public class TestRatisPipelineCreateAndDestroy {
     waitForPipelines(2);
   }
 
-  private void checkLeaderBalance(int dnNum, int leaderNumOfEachDn)
-      throws Exception {
-    List<Pipeline> pipelines = pipelineManager
-        .getPipelines(HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN);
-
-    for (Pipeline pipeline : pipelines) {
-      LambdaTestUtils.await(30000, 500, () ->
-          pipeline.getLeaderId().equals(pipeline.getSuggestedLeaderId()));
-    }
-
-    Map<UUID, Integer> leaderCount = new HashMap<>();
-    for (Pipeline pipeline : pipelines) {
-      UUID leader = pipeline.getLeaderId();
-      if (!leaderCount.containsKey(leader)) {
-        leaderCount.put(leader, 0);
-      }
-
-      leaderCount.put(leader, leaderCount.get(leader) + 1);
-    }
-
-    Assert.assertTrue(leaderCount.size() == dnNum);
-    for (UUID key : leaderCount.keySet()) {
-      Assert.assertTrue(leaderCount.get(key) == leaderNumOfEachDn);
-    }
-  }
-
-  @Test(timeout = 360000)
-  public void testRestoreSuggestedLeader() throws Exception {
-    conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
-    int dnNum = 3;
-    int dnPipelineLimit = 3;
-    int leaderNumOfEachDn = dnPipelineLimit / dnNum;
-    int pipelineNum = 3;
-
-    init(dnNum, dnPipelineLimit);
-    // make sure two pipelines are created
-    waitForPipelines(pipelineNum);
-    // No Factor ONE pipeline is auto created.
-    Assert.assertEquals(0, pipelineManager.getPipelines(
-        HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE).size());
-
-    // pipelineNum pipelines in 3 datanodes,
-    // each datanode has leaderNumOfEachDn leaders after balance
-    checkLeaderBalance(dnNum, leaderNumOfEachDn);
-    List<Pipeline> pipelinesBeforeRestart =
-        cluster.getStorageContainerManager().getPipelineManager()
-            .getPipelines();
-
-    cluster.restartStorageContainerManager(true);
-
-    checkLeaderBalance(dnNum, leaderNumOfEachDn);
-    List<Pipeline> pipelinesAfterRestart =
-        cluster.getStorageContainerManager().getPipelineManager()
-            .getPipelines();
-
-    Assert.assertEquals(
-        pipelinesBeforeRestart.size(), pipelinesAfterRestart.size());
-
-    for (Pipeline p : pipelinesBeforeRestart) {
-      boolean equal = false;
-      for (Pipeline q : pipelinesAfterRestart) {
-        if (p.getId().equals(q.getId())
-            && p.getSuggestedLeaderId().equals(q.getSuggestedLeaderId())) {
-          equal = true;
-        }
-      }
-
-      Assert.assertTrue(equal);
-    }
-  }
-
-  @Test(timeout = 360000)
-  public void testPipelineLeaderBalance() throws Exception {
-    conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
-    int dnNum = 3;
-    int dnPipelineLimit = 3;
-    int leaderNumOfEachDn = dnPipelineLimit / dnNum;
-    int pipelineNum = 3;
-
-    init(dnNum, dnPipelineLimit);
-    // make sure two pipelines are created
-    waitForPipelines(pipelineNum);
-    // No Factor ONE pipeline is auto created.
-    Assert.assertEquals(0, pipelineManager.getPipelines(
-        HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE).size());
-
-    // pipelineNum pipelines in 3 datanodes,
-    // each datanode has leaderNumOfEachDn leaders after balance
-    checkLeaderBalance(dnNum, leaderNumOfEachDn);
-
-    Random r = new Random(0);
-    for (int i = 0; i < 10; i++) {
-      // destroy some pipelines, wait new pipelines created,
-      // then check leader balance
-
-      List<Pipeline> pipelines = pipelineManager
-          .getPipelines(HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN);
-
-      int destroyNum = r.nextInt(pipelines.size());
-      for (int k = 0; k <= destroyNum; k++) {
-        pipelineManager.finalizeAndDestroyPipeline(pipelines.get(k), false);
-      }
-
-      waitForPipelines(pipelineNum);
-
-      checkLeaderBalance(dnNum, leaderNumOfEachDn);
-    }
-  }
-
   @Test(timeout = 180000)
   public void testAutomaticPipelineCreationDisablingFactorONE()
       throws Exception {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
-    init(6, 2);
+    init(6);
     // make sure two pipelines are created
     waitForPipelines(2);
     // No Factor ONE pipeline is auto created.
@@ -238,7 +119,7 @@ public class TestRatisPipelineCreateAndDestroy {
   public void testPipelineCreationOnNodeRestart() throws Exception {
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL,
         5, TimeUnit.SECONDS);
-    init(3, 2);
+    init(3);
     // make sure a pipelines is created
     waitForPipelines(1);
     List<HddsDatanodeService> dns = new ArrayList<>(cluster.getHddsDatanodes());

@@ -127,7 +127,8 @@ public final class Pipeline {
   }
 
   /**
-   * Return the suggested leaderId with high priority of pipeline.
+   * Return the suggested leaderId which has a high priority among DNs of the
+   * pipeline.
    *
    * @return Suggested LeaderId
    */

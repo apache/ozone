@@ -619,9 +619,9 @@ public class SCMPipelineManager implements PipelineManager {
    * @throws IOException
    */
   protected void destroyPipeline(Pipeline pipeline) throws IOException {
+    pipelineFactory.close(pipeline.getType(), pipeline);
     // remove the pipeline from the pipeline manager
     removePipeline(pipeline.getId());
-    pipelineFactory.close(pipeline.getType(), pipeline);
     triggerPipelineCreation();
   }
 

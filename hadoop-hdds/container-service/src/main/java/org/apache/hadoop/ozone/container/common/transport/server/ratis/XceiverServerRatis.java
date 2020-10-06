@@ -116,7 +116,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private static final Logger LOG = LoggerFactory
       .getLogger(XceiverServerRatis.class);
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
-  public static final List<Integer> DEFAULT_PRIORITY_LIST =
+  private static final List<Integer> DEFAULT_PRIORITY_LIST =
       new ArrayList<>(
           Collections.nCopies(HddsProtos.ReplicationFactor.THREE_VALUE, 0));
 
@@ -716,8 +716,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   @Override
   public void addGroup(HddsProtos.PipelineID pipelineId,
       List<DatanodeDetails> peers) throws IOException {
-    if (peers.size() == DEFAULT_PRIORITY_LIST.size()) {
-      addGroup(pipelineId, peers, DEFAULT_PRIORITY_LIST);
+    if (peers.size() == getDefaultPriorityList().size()) {
+      addGroup(pipelineId, peers, getDefaultPriorityList());
     } else {
       addGroup(pipelineId, peers,
           new ArrayList<>(Collections.nCopies(peers.size(), 0)));
@@ -881,4 +881,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     return ImmutableList.copyOf(executors);
   }
 
+  /**
+   * @return list of default priority
+   */
+  public static List<Integer> getDefaultPriorityList() {
+    return DEFAULT_PRIORITY_LIST;
+  }
 }

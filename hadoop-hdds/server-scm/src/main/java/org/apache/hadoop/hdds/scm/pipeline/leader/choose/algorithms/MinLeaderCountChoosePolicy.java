@@ -23,6 +23,8 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.List;
@@ -33,13 +35,21 @@ import java.util.Set;
  * The minimum leader count choose policy that chooses leader
  * which has the minimum exist leader count.
  */
-public class MinLeaderCountChoosePolicy implements LeaderChoosePolicy {
+public class MinLeaderCountChoosePolicy extends LeaderChoosePolicy {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(MinLeaderCountChoosePolicy.class);
+
+  public MinLeaderCountChoosePolicy(
+      NodeManager nodeManager, PipelineStateManager pipelineStateManager) {
+    super(nodeManager, pipelineStateManager);
+  }
 
   @Override
-  public DatanodeDetails chooseLeader(List<DatanodeDetails> dns,
-      NodeManager nodeManager, PipelineStateManager pipelineStateManager) {
+  public DatanodeDetails chooseLeader(List<DatanodeDetails> dns) {
     Map<DatanodeDetails, Integer> suggestedLeaderCount =
-        getSuggestedLeaderCount(dns, nodeManager, pipelineStateManager);
+        getSuggestedLeaderCount(
+            dns, getNodeManager(), getPipelineStateManager());
     int minLeaderCount = Integer.MAX_VALUE;
     DatanodeDetails suggestedLeader = null;
 
