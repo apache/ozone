@@ -24,7 +24,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -37,7 +36,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Collection;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.List;
@@ -88,12 +86,6 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     Map<String, OmKeyInfo> deletedOpenKeys = new HashMap<>();
 
     try {
-      // Open keys are grouped by bucket, but there may be multiple buckets
-      // per volume. This maps volume name to volume args to track
-      // all volume updates for this request.
-      Map<String, OmVolumeArgs> modifiedVolumes = new HashMap<>();
-      OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
-
       for (OpenKeyBucket openKeyBucket: submittedOpenKeyBuckets) {
         // For each bucket where keys will be deleted from,
         // get its bucket lock and update the cache accordingly.
@@ -101,31 +93,10 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
             trxnLogIndex, openKeyBucket);
 
         deletedOpenKeys.putAll(deleted);
-
-        // If open keys were deleted from this bucket and its volume still
-        // exists, update the volume's byte usage in the cache.
-        if (!deleted.isEmpty()) {
-          String volumeName = openKeyBucket.getVolumeName();
-          // Returns volume args from the cache if the volume is present,
-          // null otherwise.
-          OmVolumeArgs volumeArgs = getVolumeInfo(metadataManager, volumeName);
-
-          // If this volume still exists, decrement bytes used based on open
-          // keys deleted.
-          // The volume args object being updated is a reference from the
-          // cache, so this serves as a cache update.
-          if (volumeArgs != null) {
-            // If we already encountered the volume, it was a reference to
-            // the same object from the cache, so this will update it.
-            modifiedVolumes.put(volumeName, volumeArgs);
-            subtractUsedBytes(volumeArgs, deleted.values());
-          }
-        }
       }
 
       omClientResponse = new OMOpenKeysDeleteResponse(omResponse.build(),
-          deletedOpenKeys, ozoneManager.isRatisEnabled(),
-          modifiedVolumes.values());
+          deletedOpenKeys, ozoneManager.isRatisEnabled());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -217,20 +188,5 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     }
 
     return deletedKeys;
-  }
-
-  /**
-   * Subtracts all bytes used by the blocks pointed to by {@code keyInfos}
-   * from {@code volumeArgs}.
-   */
-  private void subtractUsedBytes(OmVolumeArgs volumeArgs,
-      Collection<OmKeyInfo> keyInfos) {
-
-    long quotaReleased = keyInfos.stream()
-        .mapToLong(OMOpenKeysDeleteRequest::sumBlockLengths)
-        .sum();
-
-    // update usedBytes atomically.
-    volumeArgs.getUsedBytes().add(-quotaReleased);
   }
 }
