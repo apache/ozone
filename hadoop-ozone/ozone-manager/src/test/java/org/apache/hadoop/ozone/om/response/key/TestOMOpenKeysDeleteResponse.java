@@ -38,11 +38,11 @@ import java.util.UUID;
 public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
   private static final long KEY_LENGTH = 100;
 
-  @Test
   /**
    * Tests deleting a subset of keys from the open key table DB when the keys
    * have no associated block data.
    */
+  @Test
   public void testAddToDBBatchWithEmptyBlocks() throws Exception {
     Map<String, OmKeyInfo> keysToDelete = addOpenKeysToDB(volumeName, 3);
     Map<String, OmKeyInfo> keysToKeep = addOpenKeysToDB(volumeName, 3);
