@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.test.PathUtils;
@@ -61,6 +62,8 @@ import org.mockito.Mockito;
  * Test for different container placement policy.
  */
 public class TestContainerPlacement {
+  private static final int SOFTWARE_LAYOUT_VERSION = 1;
+  private static final int METADATA_LAYOUT_VERSION = 1;
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
@@ -105,8 +108,14 @@ public class TestContainerPlacement {
     SCMStorageConfig storageConfig = Mockito.mock(SCMStorageConfig.class);
     Mockito.when(storageConfig.getClusterID()).thenReturn("cluster1");
 
+    HDDSLayoutVersionManager versionManager =
+        Mockito.mock(HDDSLayoutVersionManager.class);
+    Mockito.when(versionManager.getMetadataLayoutVersion())
+        .thenReturn(METADATA_LAYOUT_VERSION);
+    Mockito.when(versionManager.getSoftwareLayoutVersion())
+        .thenReturn(SOFTWARE_LAYOUT_VERSION);
     SCMNodeManager nodeManager = new SCMNodeManager(config,
-        storageConfig, eventQueue, null);
+        storageConfig, eventQueue, null, versionManager);
     return nodeManager;
   }
 

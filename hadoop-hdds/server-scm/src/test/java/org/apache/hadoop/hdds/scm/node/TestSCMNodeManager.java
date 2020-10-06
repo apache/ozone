@@ -35,6 +35,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -49,6 +51,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -64,10 +67,13 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.errorNodeNotPermitted;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.success;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.TestUtils.getRandomPipelineReports;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 import org.junit.After;
 import org.junit.Assert;
@@ -167,6 +173,38 @@ public class TestSCMNodeManager {
       assertTrue("Heartbeat thread should have picked up the" +
               "scheduled heartbeats.",
           nodeManager.getAllNodes().size() == registeredNodes);
+    }
+  }
+
+  /**
+   * Tests that Node manager handles Layout versions correctly.
+   *
+   * @throws IOException
+   * @throws InterruptedException
+   * @throws TimeoutException
+   */
+  @Test
+  public void testScmLayoutOnRegister()
+      throws IOException, InterruptedException, AuthenticationException {
+
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      Integer nodeManagerSoftwareLayoutVersion =
+          nodeManager.getLayoutVersionManager().getSoftwareLayoutVersion();
+      LayoutVersionProto layoutInfoSuccess = LayoutVersionProto.newBuilder()
+          .setMetadataLayoutVersion(1)
+          .setSoftwareLayoutVersion(nodeManagerSoftwareLayoutVersion).build();
+      LayoutVersionProto layoutInfoFailure = LayoutVersionProto.newBuilder()
+          .setMetadataLayoutVersion(1)
+          .setSoftwareLayoutVersion(nodeManagerSoftwareLayoutVersion + 1)
+          .build();
+      RegisteredCommand rcmd = nodeManager.register(
+          MockDatanodeDetails.randomDatanodeDetails(), null,
+          getRandomPipelineReports(), layoutInfoSuccess);
+      assertTrue(rcmd.getError() == success);
+      rcmd = nodeManager.register(
+          MockDatanodeDetails.randomDatanodeDetails(), null,
+          getRandomPipelineReports(), layoutInfoFailure);
+      assertTrue(rcmd.getError() == errorNodeNotPermitted);
     }
   }
 
@@ -859,7 +897,8 @@ public class TestSCMNodeManager {
         String storagePath = testDir.getAbsolutePath() + "/" + dnId;
         StorageReportProto report = TestUtils
             .createStorageReport(dnId, storagePath, capacity, used, free, null);
-        nodeManager.register(dn, TestUtils.createNodeReport(report), null);
+        nodeManager.register(dn, TestUtils.createNodeReport(report), null,
+            null);
         nodeManager.processHeartbeat(dn);
       }
       //TODO: wait for EventQueue to be processed
@@ -910,7 +949,7 @@ public class TestSCMNodeManager {
                         used, free, null, failed));
         failed = !failed;
       }
-      nodeManager.register(dn, TestUtils.createNodeReport(reports), null);
+      nodeManager.register(dn, TestUtils.createNodeReport(reports), null, null);
       nodeManager.processHeartbeat(dn);
       //TODO: wait for EventQueue to be processed
       eventQueue.processAll(8000L);
@@ -1081,7 +1120,7 @@ public class TestSCMNodeManager {
 
       nodemanager
           .register(datanodeDetails, TestUtils.createNodeReport(report),
-                  TestUtils.getRandomPipelineReports());
+                  getRandomPipelineReports(), null);
       eq.fireEvent(DATANODE_COMMAND,
           new CommandForDatanode<>(datanodeDetails.getUuid(),
               new CloseContainerCommand(1L,
@@ -1169,7 +1208,7 @@ public class TestSCMNodeManager {
       for (int i = 0; i < nodeCount; i++) {
         DatanodeDetails node = createDatanodeDetails(
             UUID.randomUUID().toString(), hostNames[i], ipAddress[i], null);
-        nodeManager.register(node, null, null);
+        nodeManager.register(node, null, null, null);
         nodes[i] = node;
       }
 
@@ -1213,7 +1252,7 @@ public class TestSCMNodeManager {
       for (int i = 0; i < nodeCount; i++) {
         DatanodeDetails node = createDatanodeDetails(
             UUID.randomUUID().toString(), hostNames[i], ipAddress[i], null);
-        nodeManager.register(node, null, null);
+        nodeManager.register(node, null, null, null);
         nodes[i] = node;
       }
 
@@ -1263,7 +1302,7 @@ public class TestSCMNodeManager {
       for (int i = 0; i < nodeCount; i++) {
         DatanodeDetails node = createDatanodeDetails(
             UUID.randomUUID().toString(), hostNames[i], ipAddress[i], null);
-        nodeManager.register(node, null, null);
+        nodeManager.register(node, null, null, null);
       }
       // test get node
       Assert.assertEquals(0, nodeManager.getNodesByAddress(null).size());
