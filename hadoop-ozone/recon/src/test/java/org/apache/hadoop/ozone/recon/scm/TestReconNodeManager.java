@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -52,6 +53,8 @@ public class TestReconNodeManager {
 
   private OzoneConfiguration conf;
   private DBStore store;
+  private ReconStorageConfig reconStorageConfig;
+  private HDDSLayoutVersionManager versionManager;
 
   @Before
   public void setUp() throws Exception {
@@ -59,6 +62,8 @@ public class TestReconNodeManager {
     conf.set(OZONE_METADATA_DIRS,
         temporaryFolder.newFolder().getAbsolutePath());
     conf.set(OZONE_SCM_NAMES, "localhost");
+    reconStorageConfig = new ReconStorageConfig(conf);
+    versionManager = HDDSLayoutVersionManager.initialize(reconStorageConfig);
     store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
   }
 
@@ -75,7 +80,7 @@ public class TestReconNodeManager {
     Table<UUID, DatanodeDetails> nodeTable =
         ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
-        scmStorageConfig, eventQueue, clusterMap, nodeTable);
+        scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager);
     ReconNewNodeHandler reconNewNodeHandler =
         new ReconNewNodeHandler(reconNodeManager);
     assertTrue(reconNodeManager.getAllNodes().isEmpty());
@@ -84,7 +89,7 @@ public class TestReconNodeManager {
     String uuidString = datanodeDetails.getUuidString();
 
     // Register a random datanode.
-    reconNodeManager.register(datanodeDetails, null, null);
+    reconNodeManager.register(datanodeDetails, null, null, null);
     reconNewNodeHandler.onMessage(reconNodeManager.getNodeByUuid(uuidString),
         null);
 
@@ -95,7 +100,7 @@ public class TestReconNodeManager {
     eventQueue.close();
     reconNodeManager.close();
     reconNodeManager = new ReconNodeManager(conf, scmStorageConfig, eventQueue,
-        clusterMap, nodeTable);
+        clusterMap, nodeTable, versionManager);
 
     // Verify that the node information was persisted and loaded back.
     assertEquals(1, reconNodeManager.getAllNodes().size());

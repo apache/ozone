@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.SCMNodeMetrics;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 
 import static org.apache.hadoop.test.MetricsAsserts.assertGauge;
@@ -45,12 +46,15 @@ import org.junit.Assert;
 import static org.junit.Assert.assertEquals;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 /**
  * Test cases to verify the metrics exposed by SCMNodeManager.
  */
 public class TestSCMNodeMetrics {
 
+  private static final Integer METADATA_LAYOUT_VERSION = 1;
+  private static final Integer SOFTWARE_LAYOUT_VERSION = 1;
   private static SCMNodeManager nodeManager;
 
   private static DatanodeDetails registeredDatanode;
@@ -62,8 +66,14 @@ public class TestSCMNodeMetrics {
     EventQueue publisher = new EventQueue();
     SCMStorageConfig config =
         new SCMStorageConfig(NodeType.DATANODE, new File("/tmp"), "storage");
+    HDDSLayoutVersionManager versionManager =
+        Mockito.mock(HDDSLayoutVersionManager.class);
+    Mockito.when(versionManager.getMetadataLayoutVersion())
+        .thenReturn(METADATA_LAYOUT_VERSION);
+    Mockito.when(versionManager.getSoftwareLayoutVersion())
+        .thenReturn(SOFTWARE_LAYOUT_VERSION);
     nodeManager = new SCMNodeManager(source, config, publisher,
-        new NetworkTopologyImpl(source));
+        new NetworkTopologyImpl(source), versionManager);
 
     registeredDatanode = DatanodeDetails.newBuilder()
         .setHostName("localhost")
@@ -72,7 +82,7 @@ public class TestSCMNodeMetrics {
         .build();
 
     nodeManager.register(registeredDatanode, createNodeReport(),
-        PipelineReportsProto.newBuilder().build());
+        PipelineReportsProto.newBuilder().build(), null);
 
   }
 

@@ -64,7 +64,7 @@ public class TestSCMBlockProtocolServer {
     // add nodes to scm node manager
     nodeManager = scm.getScmNodeManager();
     for (int i = 0; i < nodeCount; i++) {
-      nodeManager.register(randomDatanodeDetails(), null, null);
+      nodeManager.register(randomDatanodeDetails(), null, null, null);
 
     }
     server = scm.getBlockProtocolServer();

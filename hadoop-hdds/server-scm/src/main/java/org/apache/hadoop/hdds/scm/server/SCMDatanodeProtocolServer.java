@@ -33,6 +33,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
@@ -207,9 +209,8 @@ public class SCMDatanodeProtocolServer implements
       NodeReportProto nodeReport,
       ContainerReportsProto containerReportsProto,
       PipelineReportsProto pipelineReportsProto,
-      StorageContainerDatanodeProtocolProtos.LayoutVersionProto layoutInfo)
+      LayoutVersionProto layoutInfo)
       throws IOException {
-    //TODO : DataNode-Upgrade: layoutinfo related processing.
     DatanodeDetails datanodeDetails = DatanodeDetails
         .getFromProtoBuf(extendedDatanodeDetailsProto);
     boolean auditSuccess = true;
@@ -218,7 +219,8 @@ public class SCMDatanodeProtocolServer implements
 
     // TODO : Return the list of Nodes that forms the SCM HA.
     RegisteredCommand registeredCommand = scm.getScmNodeManager()
-        .register(datanodeDetails, nodeReport, pipelineReportsProto);
+        .register(datanodeDetails, nodeReport, pipelineReportsProto,
+            layoutInfo);
     if (registeredCommand.getError()
         == SCMRegisteredResponseProto.ErrorCode.success) {
       eventPublisher.fireEvent(CONTAINER_REPORT,

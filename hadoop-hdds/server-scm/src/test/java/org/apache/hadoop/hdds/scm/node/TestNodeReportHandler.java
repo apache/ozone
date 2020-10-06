@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.Assert;
 import org.junit.Before;
@@ -48,6 +49,9 @@ public class TestNodeReportHandler implements EventPublisher {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestNodeReportHandler.class);
   private NodeReportHandler nodeReportHandler;
+  private HDDSLayoutVersionManager versionManager;
+  private static final Integer SOFTWARE_LAYOUT_VERSION = 1;
+  private static final Integer METADATA_LAYOUT_VERSION = 1;
   private SCMNodeManager nodeManager;
   private String storagePath = GenericTestUtils.getRandomizedTempPath()
       .concat("/" + UUID.randomUUID().toString());
@@ -58,8 +62,16 @@ public class TestNodeReportHandler implements EventPublisher {
     SCMStorageConfig storageConfig = Mockito.mock(SCMStorageConfig.class);
     Mockito.when(storageConfig.getClusterID()).thenReturn("cluster1");
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
+
+    this.versionManager =
+        Mockito.mock(HDDSLayoutVersionManager.class);
+    Mockito.when(versionManager.getMetadataLayoutVersion())
+        .thenReturn(METADATA_LAYOUT_VERSION);
+    Mockito.when(versionManager.getSoftwareLayoutVersion())
+        .thenReturn(SOFTWARE_LAYOUT_VERSION);
     nodeManager =
-        new SCMNodeManager(conf, storageConfig, new EventQueue(), clusterMap);
+        new SCMNodeManager(conf, storageConfig, new EventQueue(), clusterMap,
+            versionManager);
     nodeReportHandler = new NodeReportHandler(nodeManager);
   }
 
@@ -72,7 +84,8 @@ public class TestNodeReportHandler implements EventPublisher {
     SCMNodeMetric nodeMetric = nodeManager.getNodeStat(dn);
     Assert.assertNull(nodeMetric);
 
-    nodeManager.register(dn, getNodeReport(dn, storageOne).getReport(), null);
+    nodeManager.register(dn, getNodeReport(dn, storageOne).getReport(), null,
+        null);
     nodeMetric = nodeManager.getNodeStat(dn);
 
     Assert.assertTrue(nodeMetric.get().getCapacity().get() == 100);

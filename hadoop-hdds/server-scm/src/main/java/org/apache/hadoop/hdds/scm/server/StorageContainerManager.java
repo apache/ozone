@@ -93,6 +93,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
@@ -203,6 +204,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private NetworkTopology clusterMap;
   private PipelineChoosePolicy pipelineChoosePolicy;
 
+  private HDDSLayoutVersionManager scmLayoutVersionManager;
+
   /**
    * Creates a new StorageContainerManager. Configuration will be
    * updated with information on the actual listening addresses used
@@ -249,6 +252,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       throw new SCMException("SCM not initialized due to storage config " +
           "failure.", ResultCodes.SCM_NOT_INITIALIZED);
     }
+
+    scmLayoutVersionManager =
+        HDDSLayoutVersionManager.initialize(scmStorageConfig);
 
     /**
      * Important : This initialization sequence is assumed by some of our tests.
@@ -397,8 +403,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if(configurator.getScmNodeManager() != null) {
       scmNodeManager = configurator.getScmNodeManager();
     } else {
-      scmNodeManager = new SCMNodeManager(
-          conf, scmStorageConfig, eventQueue, clusterMap);
+      scmNodeManager = new SCMNodeManager(conf, scmStorageConfig, eventQueue,
+          clusterMap, scmLayoutVersionManager);
     }
 
     placementMetrics = SCMContainerPlacementMetrics.create();
@@ -1148,5 +1154,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public String getClusterId() {
     return getScmStorageConfig().getClusterID();
+  }
+
+  public HDDSLayoutVersionManager getLayoutVersionManager() {
+    return scmLayoutVersionManager;
   }
 }

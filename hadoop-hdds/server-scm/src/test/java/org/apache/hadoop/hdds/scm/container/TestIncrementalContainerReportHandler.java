@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -61,6 +62,9 @@ public class TestIncrementalContainerReportHandler {
   private ContainerManager containerManager;
   private ContainerStateManager containerStateManager;
   private EventPublisher publisher;
+  private static final Integer SOFTWARE_LAYOUT_VERSION = 1;
+  private static final Integer METADATA_LAYOUT_VERSION = 1;
+  private HDDSLayoutVersionManager versionManager;
 
   @Before
   public void setup() throws IOException {
@@ -73,8 +77,15 @@ public class TestIncrementalContainerReportHandler {
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
     SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
+    this.versionManager =
+        Mockito.mock(HDDSLayoutVersionManager.class);
+    Mockito.when(versionManager.getMetadataLayoutVersion())
+        .thenReturn(METADATA_LAYOUT_VERSION);
+    Mockito.when(versionManager.getSoftwareLayoutVersion())
+        .thenReturn(SOFTWARE_LAYOUT_VERSION);
     this.nodeManager =
-        new SCMNodeManager(conf, storageConfig, eventQueue, clusterMap);
+        new SCMNodeManager(conf, storageConfig, eventQueue, clusterMap,
+            versionManager);
 
     this.containerStateManager = new ContainerStateManager(conf);
     this.publisher = Mockito.mock(EventPublisher.class);
@@ -123,9 +134,9 @@ public class TestIncrementalContainerReportHandler {
     final DatanodeDetails datanodeOne = randomDatanodeDetails();
     final DatanodeDetails datanodeTwo = randomDatanodeDetails();
     final DatanodeDetails datanodeThree = randomDatanodeDetails();
-    nodeManager.register(datanodeOne, null, null);
-    nodeManager.register(datanodeTwo, null, null);
-    nodeManager.register(datanodeThree, null, null);
+    nodeManager.register(datanodeOne, null, null, null);
+    nodeManager.register(datanodeTwo, null, null, null);
+    nodeManager.register(datanodeThree, null, null, null);
     final Set<ContainerReplica> containerReplicas = getReplicas(
         container.containerID(),
         ContainerReplicaProto.State.CLOSING,
@@ -160,9 +171,9 @@ public class TestIncrementalContainerReportHandler {
     final DatanodeDetails datanodeOne = randomDatanodeDetails();
     final DatanodeDetails datanodeTwo = randomDatanodeDetails();
     final DatanodeDetails datanodeThree = randomDatanodeDetails();
-    nodeManager.register(datanodeOne, null, null);
-    nodeManager.register(datanodeTwo, null, null);
-    nodeManager.register(datanodeThree, null, null);
+    nodeManager.register(datanodeOne, null, null, null);
+    nodeManager.register(datanodeTwo, null, null, null);
+    nodeManager.register(datanodeThree, null, null, null);
     final Set<ContainerReplica> containerReplicas = getReplicas(
         container.containerID(),
         ContainerReplicaProto.State.CLOSING,
@@ -198,9 +209,9 @@ public class TestIncrementalContainerReportHandler {
     final DatanodeDetails datanodeOne = randomDatanodeDetails();
     final DatanodeDetails datanodeTwo = randomDatanodeDetails();
     final DatanodeDetails datanodeThree = randomDatanodeDetails();
-    nodeManager.register(datanodeOne, null, null);
-    nodeManager.register(datanodeTwo, null, null);
-    nodeManager.register(datanodeThree, null, null);
+    nodeManager.register(datanodeOne, null, null, null);
+    nodeManager.register(datanodeTwo, null, null, null);
+    nodeManager.register(datanodeThree, null, null, null);
     final Set<ContainerReplica> containerReplicas = getReplicas(
         container.containerID(),
         ContainerReplicaProto.State.CLOSING,
@@ -239,9 +250,9 @@ public class TestIncrementalContainerReportHandler {
     final DatanodeDetails datanodeOne = randomDatanodeDetails();
     final DatanodeDetails datanodeTwo = randomDatanodeDetails();
     final DatanodeDetails datanodeThree = randomDatanodeDetails();
-    nodeManager.register(datanodeOne, null, null);
-    nodeManager.register(datanodeTwo, null, null);
-    nodeManager.register(datanodeThree, null, null);
+    nodeManager.register(datanodeOne, null, null, null);
+    nodeManager.register(datanodeTwo, null, null, null);
+    nodeManager.register(datanodeThree, null, null, null);
     final Set<ContainerReplica> containerReplicas = getReplicas(
         container.containerID(),
         ContainerReplicaProto.State.CLOSED,
