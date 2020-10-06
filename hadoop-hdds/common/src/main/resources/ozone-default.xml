@@ -385,42 +385,9 @@
     <description>Connection timeout for Ozone client in milliseconds.
     </description>
   </property>
-  <property>
-    <name>ozone.client.stream.buffer.flush.delay</name>
-    <value>true</value>
-    <tag>OZONE, CLIENT</tag>
-    <description>
-      Default true, when call flush() and determine whether the data in the
-      current buffer is greater than ozone.client.stream.buffer.size, if
-      greater than then send buffer to the datanode. You can turn this off
-      by setting this configuration to false.
-    </description>
-  </property>
-  <property>
-    <name>ozone.client.stream.buffer.size</name>
-    <value>4MB</value>
-    <tag>OZONE, CLIENT</tag>
-    <description>The size of chunks the client will send to the server.
-    </description>
-  </property>
-  <property>
-    <name>ozone.client.stream.buffer.flush.size</name>
-    <value>16MB</value>
-    <tag>OZONE, CLIENT</tag>
-    <description>Size which determines at what buffer position a partial
-      flush will be initiated during write. It should be a multiple
-      of ozone.client.stream.buffer.size.
-    </description>
-  </property>
-  <property>
-    <name>ozone.client.stream.buffer.max.size</name>
-    <value>32MB</value>
-    <tag>OZONE, CLIENT</tag>
-    <description>Size which determines at what buffer position
-      write call be blocked till acknowledgement of the first partial flush
-      happens by all servers.
-    </description>
-  </property>
+
+
+
   <property>
     <name>ozone.client.max.retries</name>
     <value>5</value>

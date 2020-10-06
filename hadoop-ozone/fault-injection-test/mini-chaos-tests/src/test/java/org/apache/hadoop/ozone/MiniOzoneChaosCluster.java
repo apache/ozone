@@ -18,20 +18,22 @@
 
 package org.apache.hadoop.ozone;
 
+import java.io.IOException;
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.List;
-import java.util.HashSet;
 import java.util.ArrayList;
-import java.util.Set;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -42,11 +44,10 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
+
+import org.apache.commons.lang3.RandomUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.concurrent.TimeUnit;
 
 /**
  * This class causes random failures in the chaos cluster.
@@ -198,16 +199,17 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
     protected void initializeConfiguration() throws IOException {
       super.initializeConfiguration();
+
+      OzoneClientConfig clientConfig =new OzoneClientConfig();
+      clientConfig.setStreamBufferFlushSize(8 * 1024 * 1024);
+      clientConfig.setStreamBufferMaxSize(16 * 1024 * 1024);
+      clientConfig.setStreamBufferSize(4 * 1024);
+      conf.setFromObject(clientConfig);
+
       conf.setStorageSize(ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY,
           4, StorageUnit.KB);
       conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
           32, StorageUnit.KB);
-      conf.setStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_SIZE,
-          8, StorageUnit.KB);
-      conf.setStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_MAX_SIZE,
-          16, StorageUnit.KB);
-      conf.setStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_SIZE,
-          4, StorageUnit.KB);
       conf.setStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
           1, StorageUnit.MB);
       conf.setTimeDuration(ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT, 1000,
