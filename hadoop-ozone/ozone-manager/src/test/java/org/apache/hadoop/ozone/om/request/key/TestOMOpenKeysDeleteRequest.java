@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.key.OMOpenKeysDeleteRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.util.Time;
 import org.junit.Assert;
 import org.junit.Test;
 import com.google.common.base.Optional;
