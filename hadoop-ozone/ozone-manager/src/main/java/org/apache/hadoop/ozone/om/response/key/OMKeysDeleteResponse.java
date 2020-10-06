@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -41,9 +42,8 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
  * Response for DeleteKey request.
  */
 @CleanupTableInfo(cleanupTables = KEY_TABLE)
-public class OMKeysDeleteResponse extends OMClientResponse {
+public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
   private List<OmKeyInfo> omKeyInfoList;
-  private boolean isRatisEnabled;
   private long trxnLogIndex;
   private OmVolumeArgs omVolumeArgs;
   private OmBucketInfo omBucketInfo;
@@ -52,9 +52,8 @@ public class OMKeysDeleteResponse extends OMClientResponse {
       @Nonnull List<OmKeyInfo> keyDeleteList, long trxnLogIndex,
       boolean isRatisEnabled, @Nonnull OmVolumeArgs omVolumeArgs,
       @Nonnull OmBucketInfo omBucketInfo) {
-    super(omResponse);
+    super(omResponse, isRatisEnabled);
     this.omKeyInfoList = keyDeleteList;
-    this.isRatisEnabled = isRatisEnabled;
     this.trxnLogIndex = trxnLogIndex;
     this.omVolumeArgs = omVolumeArgs;
     this.omBucketInfo = omBucketInfo;
@@ -66,7 +65,6 @@ public class OMKeysDeleteResponse extends OMClientResponse {
    */
   public OMKeysDeleteResponse(@Nonnull OMResponse omResponse) {
     super(omResponse);
-    checkStatusNotOK();
   }
 
   public void checkAndUpdateDB(OMMetadataManager omMetadataManager,
@@ -80,10 +78,10 @@ public class OMKeysDeleteResponse extends OMClientResponse {
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
                            BatchOperation batchOperation) throws IOException {
-
     String volumeName = "";
     String bucketName = "";
     String keyName = "";
+    Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable();
     for (OmKeyInfo omKeyInfo : omKeyInfoList) {
       volumeName = omKeyInfo.getVolumeName();
       bucketName = omKeyInfo.getBucketName();
@@ -92,25 +90,8 @@ public class OMKeysDeleteResponse extends OMClientResponse {
       String deleteKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
           keyName);
 
-      omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
-          deleteKey);
-
-      // If a deleted key is put in the table where a key with the same
-      // name already exists, then the old deleted key information would
-      // be lost. To avoid this, first check if a key with same name
-      // exists. deletedTable in OM Metadata stores <KeyName,
-      // RepeatedOMKeyInfo>. The RepeatedOmKeyInfo is the structure that
-      // allows us to store a list of OmKeyInfo that can be tied to same
-      // key name. For a keyName if RepeatedOMKeyInfo structure is null,
-      // we create a new instance, if it is not null, then we simply add
-      // to the list and store this instance in deletedTable.
-      RepeatedOmKeyInfo repeatedOmKeyInfo =
-          omMetadataManager.getDeletedTable().get(deleteKey);
-      repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-          omKeyInfo, repeatedOmKeyInfo, trxnLogIndex,
-          isRatisEnabled);
-      omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-          deleteKey, repeatedOmKeyInfo);
+      addDeletionToBatch(omMetadataManager, batchOperation, keyTable,
+          deleteKey, omKeyInfo);
     }
 
     // update volume usedBytes.

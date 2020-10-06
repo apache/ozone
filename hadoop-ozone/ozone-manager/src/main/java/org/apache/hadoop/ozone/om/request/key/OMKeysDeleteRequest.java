@@ -167,12 +167,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
                 omKeyInfo.getKeyName())),
             new CacheValue<>(Optional.absent(), trxnLogIndex));
 
-        int keyFactor = omKeyInfo.getFactor().getNumber();
-        OmKeyLocationInfoGroup keyLocationGroup =
-            omKeyInfo.getLatestVersionLocations();
-        for(OmKeyLocationInfo locationInfo: keyLocationGroup.getLocationList()){
-          quotaReleased += locationInfo.getLength() * keyFactor;
-        }
+        quotaReleased += sumBlockLengths(omKeyInfo);
       }
       // update usedBytes atomically.
       omVolumeArgs.getUsedBytes().add(-quotaReleased);
