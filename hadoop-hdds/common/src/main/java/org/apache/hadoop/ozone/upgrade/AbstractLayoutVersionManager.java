@@ -41,6 +41,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   protected volatile boolean isInitialized = false;
 
   protected void init(int version, T[] lfs) throws IOException {
+
     if (!isInitialized) {
       metadataLayoutVersion = version;
       initializeFeatures(lfs);
@@ -55,7 +56,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
     }
   }
 
-  protected void initializeFeatures(T[] lfs) {
+  private void initializeFeatures(T[] lfs) {
     Arrays.stream(lfs).forEach(f -> {
       Preconditions.checkArgument(!featureMap.containsKey(f.name()));
       Preconditions.checkArgument(!features.containsKey(f.layoutVersion()));
@@ -73,17 +74,25 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   }
 
   public void finalized(T layoutFeature) {
-    if (layoutFeature.layoutVersion() > metadataLayoutVersion) {
+    if (layoutFeature.layoutVersion() == metadataLayoutVersion + 1) {
       metadataLayoutVersion = layoutFeature.layoutVersion();
     } else {
+      String msgStart = "";
+      if (layoutFeature.layoutVersion() < metadataLayoutVersion) {
+        msgStart = "Finalize attempt on a layoutFeature which has already "
+            + "been finalized.";
+      } else {
+        msgStart = "Finalize attempt on a layoutFeature that is newer than the"
+            + " next feature to be finalized.";
+      }
+
       throw new IllegalArgumentException(
-          "Finalize attempt on a layoutFeature which has already been "
-              + "finalized. Software Layout version: " + softwareLayoutVersion
+          msgStart + "Software Layout version: " + softwareLayoutVersion
               + " Feature Layout version: " + layoutFeature.layoutVersion());
     }
   }
 
-  protected boolean softwareIsBehindMetaData() {
+  private boolean softwareIsBehindMetaData() {
     return metadataLayoutVersion > softwareLayoutVersion;
   }
 

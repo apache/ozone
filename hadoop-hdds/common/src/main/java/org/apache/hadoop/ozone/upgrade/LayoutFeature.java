@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
+import java.io.IOException;
 import java.util.Optional;
 
 /**
@@ -40,6 +41,6 @@ public interface LayoutFeature {
    * @param <T>
    */
   interface UpgradeAction<T> {
-    void executeAction(T arg);
+    void executeAction(T arg) throws Exception;
   }
 }

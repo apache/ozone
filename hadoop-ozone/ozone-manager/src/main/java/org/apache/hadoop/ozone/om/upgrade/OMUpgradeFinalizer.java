@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.upgrade;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 
 import java.io.IOException;
@@ -30,14 +31,13 @@ import java.util.Queue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.*;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.UPDATE_LAYOUT_VERSION_FAILED;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.ALREADY_FINALIZED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 
 /**
  * UpgradeFinalizer implementation for the Ozone Manager service.
@@ -46,7 +46,6 @@ public class OMUpgradeFinalizer implements UpgradeFinalizer<OzoneManager> {
 
   private  static final OmUpgradeAction NOOP = a -> {};
 
-  private Status status = ALREADY_FINALIZED;
   private OMLayoutVersionManagerImpl versionManager;
   private String clientID;
 
@@ -55,9 +54,6 @@ public class OMUpgradeFinalizer implements UpgradeFinalizer<OzoneManager> {
 
   public OMUpgradeFinalizer(OMLayoutVersionManagerImpl versionManager) {
     this.versionManager = versionManager;
-    if (versionManager.needsFinalization()) {
-      status = FINALIZATION_REQUIRED;
-    }
   }
 
   @Override
@@ -91,7 +87,7 @@ public class OMUpgradeFinalizer implements UpgradeFinalizer<OzoneManager> {
     }
     assertClientId(upgradeClientID);
     List<String> returningMsgs = new ArrayList<>(msgs.size()+10);
-    status = isDone ? FINALIZATION_DONE : FINALIZATION_IN_PROGRESS;
+    Status status = isDone ? FINALIZATION_DONE : FINALIZATION_IN_PROGRESS;
     while (msgs.size() > 0) {
       returningMsgs.add(msgs.poll());
     }
@@ -168,7 +164,11 @@ public class OMUpgradeFinalizer implements UpgradeFinalizer<OzoneManager> {
       putFinalizationMarkIntoVersionFile(feature);
 
       emitStartingFinalizationActionMsg(feature.name());
-      action.executeAction(ozoneManager);
+      try {
+        action.executeAction(ozoneManager);
+      } catch (Exception e) {
+        logFinalizationFailureAndThrow(e, feature.name());
+      }
       emitFinishFinalizationActionMsg(feature.name());
 
       removeFinalizationMarkFromVersionFile(feature);
@@ -293,11 +293,16 @@ public class OMUpgradeFinalizer implements UpgradeFinalizer<OzoneManager> {
       msgs.offer(msg);
     }
 
+    private void logFinalizationFailureAndThrow(Exception e, String feature)
+        throws OMException {
+      String msg = "Error during finalization of " + feature + ".";
+      logAndThrow(e, msg, LAYOUT_FEATURE_FINALIZATION_FAILED);
+    }
+
     private void logLayoutVersionUpdateFailureAndThrow(IOException e)
         throws OMException {
       String msg = "Updating the LayoutVersion in the VERSION file failed.";
       logAndThrow(e, msg, UPDATE_LAYOUT_VERSION_FAILED);
-      return;
     }
 
     private void logUpgradeToLayoutVersionPersistingFailureAndThrow(
@@ -315,7 +320,7 @@ public class OMUpgradeFinalizer implements UpgradeFinalizer<OzoneManager> {
       logAndThrow(e, msg, REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED);
     }
 
-    private void logAndThrow(IOException e, String msg, ResultCodes resultCode)
+    private void logAndThrow(Exception e, String msg, ResultCodes resultCode)
         throws OMException {
       LOG.error(msg, e);
       throw new OMException(msg, e, resultCode);
