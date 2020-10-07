@@ -65,8 +65,8 @@ public class PrometheusServiceProviderImpl
 
     int connectionTimeout = (int) configuration.getTimeDuration(
         OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT,
-        OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS
-    );
+        OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT_DEFAULT,
+        TimeUnit.MILLISECONDS);
     int connectionRequestTimeout = (int) configuration.getTimeDuration(
         OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT,
         OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT,
