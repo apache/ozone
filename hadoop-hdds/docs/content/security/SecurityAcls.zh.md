@@ -2,6 +2,9 @@
 title: "Ozone 访问控制列表"
 date: "2019-April-03"
 weight: 6
+menu:
+   main:
+      parent: 安全
 summary: Ozone 原生的授权模块提供了不需要集成 Ranger 的访问控制列表（ACL）支持。
 icon: transfer
 ---

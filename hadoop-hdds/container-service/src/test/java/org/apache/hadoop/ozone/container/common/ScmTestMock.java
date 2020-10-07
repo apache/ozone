@@ -17,8 +17,9 @@
 package org.apache.hadoop.ozone.container.common;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos
+    .ExtendedDatanodeDetailsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -214,18 +215,21 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
   /**
    * Register Datanode.
    *
-   * @param datanodeDetailsProto DatanodDetailsProto.
+   * @param extendedDatanodeDetailsProto ExtendedDatanodDetailsProto.
    * @return SCM Command.
    */
   @Override
   public StorageContainerDatanodeProtocolProtos
       .SCMRegisteredResponseProto register(
-      DatanodeDetailsProto datanodeDetailsProto, NodeReportProto nodeReport,
+      ExtendedDatanodeDetailsProto extendedDatanodeDetailsProto,
+      NodeReportProto nodeReport,
       ContainerReportsProto containerReportsRequestProto,
       PipelineReportsProto pipelineReportsProto,
       LayoutVersionProto layoutInfo)
       throws IOException {
     rpcCount.incrementAndGet();
+    DatanodeDetailsProto datanodeDetailsProto =
+        extendedDatanodeDetailsProto.getDatanodeDetails();
     updateNodeReport(datanodeDetailsProto, nodeReport);
     updateContainerReport(containerReportsRequestProto, datanodeDetailsProto);
     sleepIfNeeded();

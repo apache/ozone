@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.server.events.EventHandler;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.StorageContainerNodeProtocol;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -214,5 +215,13 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    */
   NetworkTopology getClusterNetworkTopologyMap();
 
-  int getNumHealthyVolumes(List <DatanodeDetails> dnList);
+  int minHealthyVolumeNum(List <DatanodeDetails> dnList);
+
+  int pipelineLimit(DatanodeDetails dn);
+
+  int minPipelineLimit(List<DatanodeDetails> dn);
+
+  default HDDSLayoutVersionManager getLayoutVersionManager(){
+    return null;
+  }
 }

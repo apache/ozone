@@ -274,6 +274,29 @@ public final class TestOMRequestUtils {
   /**
    * Add volume creation entry to OM DB.
    * @param volumeName
+   * @param omMetadataManager
+   * @param quotaInBytes
+   * @throws Exception
+   */
+  public static void addVolumeToDB(String volumeName,
+      OMMetadataManager omMetadataManager, long quotaInBytes) throws Exception {
+    OmVolumeArgs omVolumeArgs =
+        OmVolumeArgs.newBuilder().setCreationTime(Time.now())
+            .setVolume(volumeName).setAdminName(volumeName)
+            .setOwnerName(volumeName).setQuotaInBytes(quotaInBytes)
+            .setQuotaInCounts(10000L).build();
+    omMetadataManager.getVolumeTable().put(
+        omMetadataManager.getVolumeKey(volumeName), omVolumeArgs);
+
+    // Add to cache.
+    omMetadataManager.getVolumeTable().addCacheEntry(
+        new CacheKey<>(omMetadataManager.getVolumeKey(volumeName)),
+        new CacheValue<>(Optional.of(omVolumeArgs), 1L));
+  }
+
+  /**
+   * Add volume creation entry to OM DB.
+   * @param volumeName
    * @param ownerName
    * @param omMetadataManager
    * @throws Exception
@@ -283,7 +306,8 @@ public final class TestOMRequestUtils {
     OmVolumeArgs omVolumeArgs =
         OmVolumeArgs.newBuilder().setCreationTime(Time.now())
             .setVolume(volumeName).setAdminName(ownerName)
-            .setOwnerName(ownerName).build();
+            .setOwnerName(ownerName).setQuotaInBytes(Long.MAX_VALUE)
+            .setQuotaInCounts(10000L).build();
     omMetadataManager.getVolumeTable().put(
         omMetadataManager.getVolumeKey(volumeName), omVolumeArgs);
 
@@ -306,6 +330,28 @@ public final class TestOMRequestUtils {
     OmBucketInfo omBucketInfo =
         OmBucketInfo.newBuilder().setVolumeName(volumeName)
             .setBucketName(bucketName).setCreationTime(Time.now()).build();
+
+    // Add to cache.
+    omMetadataManager.getBucketTable().addCacheEntry(
+        new CacheKey<>(omMetadataManager.getBucketKey(volumeName, bucketName)),
+        new CacheValue<>(Optional.of(omBucketInfo), 1L));
+  }
+
+  /**
+   * Add bucket creation entry to OM DB.
+   * @param volumeName
+   * @param bucketName
+   * @param omMetadataManager
+   * @param quotaInBytes
+   * @throws Exception
+   */
+  public static void addBucketToDB(String volumeName, String bucketName,
+      OMMetadataManager omMetadataManager, long quotaInBytes) throws Exception {
+
+    OmBucketInfo omBucketInfo =
+        OmBucketInfo.newBuilder().setVolumeName(volumeName)
+            .setBucketName(bucketName).setCreationTime(Time.now())
+            .setQuotaInBytes(quotaInBytes).build();
 
     // Add to cache.
     omMetadataManager.getBucketTable().addCacheEntry(
@@ -392,14 +438,17 @@ public final class TestOMRequestUtils {
   /**
    * Create OMRequest for set volume property request with quota set.
    * @param volumeName
-   * @param quota
+   * @param quotaInBytes
+   * @param quotaInCounts
    * @return OMRequest
    */
   public static OMRequest createSetVolumePropertyRequest(String volumeName,
-      long quota) {
+      long quotaInBytes, long quotaInCounts) {
     SetVolumePropertyRequest setVolumePropertyRequest =
         SetVolumePropertyRequest.newBuilder().setVolumeName(volumeName)
-            .setQuotaInBytes(quota).setModificationTime(Time.now()).build();
+            .setQuotaInBytes(quotaInBytes)
+            .setQuotaInCounts(quotaInCounts)
+            .setModificationTime(Time.now()).build();
 
     return OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
         .setCmdType(OzoneManagerProtocolProtos.Type.SetVolumeProperty)

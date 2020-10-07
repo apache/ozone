@@ -37,7 +37,7 @@ Check if Recon picks up container from OM
 *** Test Cases ***
 Generate Freon data
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
-                        Execute                             ozone freon rk --replicationType=RATIS --numOfVolumes 1 --numOfBuckets 1 --numOfKeys 10 --keySize 1025
+                        Execute                             ozone freon rk --replication-type=RATIS --num-of-volumes 1 --num-of-buckets 1 --num-of-keys 10 --key-size 1025
 
 Check if Recon picks up OM data
     Wait Until Keyword Succeeds     90sec      10sec        Check if Recon picks up container from OM

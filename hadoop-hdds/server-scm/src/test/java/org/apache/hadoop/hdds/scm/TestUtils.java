@@ -116,7 +116,7 @@ public final class TestUtils {
       SCMNodeManager nodeManager) {
     return getDatanodeDetails(
         nodeManager.register(MockDatanodeDetails.randomDatanodeDetails(), null,
-                getRandomPipelineReports()));
+                getRandomPipelineReports(), null));
   }
 
   /**
@@ -551,6 +551,7 @@ public final class TestUtils {
         .setDatanodeDetails(datanodeDetails)
         .setOriginNodeId(originNodeId)
         .setSequenceId(sequenceId)
+        .setBytesUsed(100)
         .build();
   }
 

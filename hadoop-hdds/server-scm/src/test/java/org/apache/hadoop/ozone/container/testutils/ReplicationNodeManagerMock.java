@@ -17,6 +17,9 @@
 package org.apache.hadoop.ozone.container.testutils;
 
 import com.google.common.base.Preconditions;
+
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -264,7 +267,8 @@ public class ReplicationNodeManagerMock implements NodeManager {
   @Override
   public RegisteredCommand register(DatanodeDetails dd,
                                     NodeReportProto nodeReport,
-                                    PipelineReportsProto pipelineReportsProto) {
+                                    PipelineReportsProto pipelineReportsProto,
+                                    LayoutVersionProto layoutInfo) {
     return null;
   }
 
@@ -345,7 +349,17 @@ public class ReplicationNodeManagerMock implements NodeManager {
   }
 
   @Override
-  public int getNumHealthyVolumes(List<DatanodeDetails> dnList) {
+  public int minHealthyVolumeNum(List<DatanodeDetails> dnList) {
+    return 0;
+  }
+
+  @Override
+  public int pipelineLimit(DatanodeDetails dn) {
+    return 0;
+  }
+
+  @Override
+  public int minPipelineLimit(List<DatanodeDetails> dn) {
     return 0;
   }
 }

@@ -19,7 +19,8 @@
 
 package org.apache.hadoop.ozone.recon.codec;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto.PARSER;
+import static org.apache.hadoop.hdds.protocol.proto
+    .HddsProtos.ExtendedDatanodeDetailsProto.PARSER;
 
 import java.io.IOException;
 
@@ -33,7 +34,7 @@ public class DatanodeDetailsCodec implements Codec<DatanodeDetails> {
 
   @Override
   public byte[] toPersistedFormat(DatanodeDetails object) throws IOException {
-    return object.getProtoBufMessage().toByteArray();
+    return object.getExtendedProtoBufMessage().toByteArray();
   }
 
   @Override

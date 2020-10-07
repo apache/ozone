@@ -38,6 +38,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/**
+ * {@link OMUpgradeFinalizer} tests.
+ */
 @RunWith(MockitoJUnitRunner.class)
 public class TestOMUpgradeFinalizer {
 
@@ -81,7 +84,7 @@ public class TestOMUpgradeFinalizer {
    */
   @Test
   public void testReportStatusResultsInFinalizationDone()
-    throws Exception {
+      throws Exception {
     Iterable<OMLayoutFeature> lfs = mockFeatures(3, "feature-3", "feature-4");
     setupVersionManagerMockToFinalize(lfs);
 
@@ -162,8 +165,11 @@ public class TestOMUpgradeFinalizer {
 
   @Test
   public void testFinalizationWithFailingUpgradeAction() throws Exception {
-    Optional<OmUpgradeAction> action =
-        Optional.of(ignore -> { throw new IOException("Fail."); });
+    Optional<OmUpgradeAction> action = Optional.of(
+        ignore -> {
+          throw new IOException("Fail.");
+        }
+    );
 
     OzoneManager om = mockOzoneManager(0);
     Iterable<OMLayoutFeature> lfs = mockFeatures("feature-1", "feature-2");
@@ -213,7 +219,9 @@ public class TestOMUpgradeFinalizer {
     return times(1);
   }
 
-  private void setupVersionManagerMockToFinalize(Iterable<OMLayoutFeature> lfs) {
+  private void setupVersionManagerMockToFinalize(
+      Iterable<OMLayoutFeature> lfs
+  ) {
     when(versionManager.needsFinalization()).thenReturn(true);
     when(versionManager.unfinalizedFeatures()).thenReturn(lfs);
   }
@@ -241,20 +249,21 @@ public class TestOMUpgradeFinalizer {
     return ret;
   }
 
-  int version = 0;
+  private int storedLayoutVersion = 0;
 
   private OzoneManager mockOzoneManager(int initialLayoutVersion) {
     OzoneManager mock = mock(OzoneManager.class);
     OMStorage st = mock(OMStorage.class);
-    version = initialLayoutVersion;
+    storedLayoutVersion = initialLayoutVersion;
 
     doAnswer(
         (Answer<Void>) inv -> {
-          version = inv.getArgument(0, Integer.class);
+          storedLayoutVersion = inv.getArgument(0, Integer.class);
           return null;
         }).when(st).setLayoutVersion(anyInt());
 
-    when(st.getLayoutVersion()).thenAnswer((Answer<Integer>) ignore -> version);
+    when(st.getLayoutVersion())
+        .thenAnswer((Answer<Integer>) ignore -> storedLayoutVersion);
 
     when(mock.getOmStorage()).thenReturn(st);
     return mock;

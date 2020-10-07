@@ -30,20 +30,20 @@ ${BUCKET}             generated
 
 Delete file with multi delete
                         Execute                    date > /tmp/testfile
-    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key multidelete/f1 --body /tmp/testfile
-    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key multidelete/f2 --body /tmp/testfile
-    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key multidelete/f3 --body /tmp/testfile
-    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix multidelete/
-                        Should contain             ${result}         multidelete/f1
-                        Should contain             ${result}         multidelete/f2
-                        Should contain             ${result}         multidelete/f3
+    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/multidelete/f1 --body /tmp/testfile
+    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/multidelete/f2 --body /tmp/testfile
+    ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/multidelete/f3 --body /tmp/testfile
+    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/multidelete/
+                        Should contain             ${result}         ${PREFIX}/multidelete/f1
+                        Should contain             ${result}         ${PREFIX}/multidelete/f2
+                        Should contain             ${result}         ${PREFIX}/multidelete/f3
                         Should contain             ${result}         STANDARD
                         Should not contain         ${result}         REDUCED_REDUNDANCY
-    ${result} =         Execute AWSS3APICli        delete-objects --bucket ${BUCKET} --delete 'Objects=[{Key=multidelete/f1},{Key=multidelete/f2},{Key=multidelete/f4}]'
+    ${result} =         Execute AWSS3APICli        delete-objects --bucket ${BUCKET} --delete 'Objects=[{Key=${PREFIX}/multidelete/f1},{Key=${PREFIX}/multidelete/f2},{Key=${PREFIX}/multidelete/f4}]'
                         Should not contain         ${result}         Error
-    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix multidelete/
-                        Should not contain         ${result}         multidelete/f1
-                        Should not contain         ${result}         multidelete/f2
-                        Should contain             ${result}         multidelete/f3
+    ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/multidelete/
+                        Should not contain         ${result}         ${PREFIX}/multidelete/f1
+                        Should not contain         ${result}         ${PREFIX}/multidelete/f2
+                        Should contain             ${result}         ${PREFIX}/multidelete/f3
                         Should contain             ${result}         STANDARD
                         Should not contain         ${result}         REDUCED_REDUNDANCY

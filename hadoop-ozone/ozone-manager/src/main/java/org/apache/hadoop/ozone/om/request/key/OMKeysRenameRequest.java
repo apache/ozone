@@ -110,7 +110,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
 
     try {
       ResolvedBucket bucket = ozoneManager.resolveBucketLink(
-          Pair.of(volumeName, bucketName));
+          Pair.of(volumeName, bucketName), this);
       bucket.audit(auditMap);
       volumeName = bucket.realVolume();
       bucketName = bucket.realBucket();

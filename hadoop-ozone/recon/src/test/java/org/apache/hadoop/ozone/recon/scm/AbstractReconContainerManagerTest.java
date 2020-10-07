@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -65,6 +66,9 @@ public class AbstractReconContainerManagerTest {
   private ReconPipelineManager pipelineManager;
   private ReconContainerManager containerManager;
   private DBStore store;
+  private HDDSLayoutVersionManager layoutVersionManager;
+  public static final int SOFTWARE_LAYOUT_VERSION = 1;
+  public static final int METADATA_LAYOUT_VERSION = 1;
 
   @Before
   public void setUp() throws Exception {
@@ -76,8 +80,14 @@ public class AbstractReconContainerManagerTest {
     scmStorageConfig = new ReconStorageConfig(conf);
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
+    layoutVersionManager = mock(HDDSLayoutVersionManager.class);
+    when(layoutVersionManager.getSoftwareLayoutVersion())
+        .thenReturn(SOFTWARE_LAYOUT_VERSION);
+    when(layoutVersionManager.getMetadataLayoutVersion())
+        .thenReturn(METADATA_LAYOUT_VERSION);
     NodeManager nodeManager =
-        new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
+        new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
+            layoutVersionManager);
     pipelineManager = new ReconPipelineManager(conf, nodeManager,
         ReconSCMDBDefinition.PIPELINES.getTable(store), eventQueue);
     containerManager = new ReconContainerManager(

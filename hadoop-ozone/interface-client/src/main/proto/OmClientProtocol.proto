@@ -321,10 +321,12 @@ enum Status {
 
     PARTIAL_RENAME = 65;
 
-    PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED = 66;
-    REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED = 67;
-    UPDATE_LAYOUT_VERSION_FAILED = 68;
-    LAYOUT_FEATURE_FINALIZATION_FAILED = 69;
+    QUOTA_EXCEEDED = 66;
+
+    PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED = 67;
+    REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED = 68;
+    UPDATE_LAYOUT_VERSION_FAILED = 69;
+    LAYOUT_FEATURE_FINALIZATION_FAILED = 70;
 }
 
 /**
@@ -370,6 +372,9 @@ message VolumeInfo {
     optional uint64 objectID = 8;
     optional uint64 updateID = 9;
     optional uint64 modificationTime = 10;
+    optional uint64 quotaInCounts = 11;
+    optional uint64 usedBytes = 12;
+
 }
 
 /**
@@ -428,6 +433,7 @@ message SetVolumePropertyRequest {
     optional string ownerName = 2;
     optional uint64 quotaInBytes = 3;
     optional uint64 modificationTime = 4;
+    optional uint64 quotaInCounts = 5;
 }
 
 message SetVolumePropertyResponse {
@@ -506,6 +512,9 @@ message BucketInfo {
     optional uint64 modificationTime = 11;
     optional string sourceVolume = 12;
     optional string sourceBucket = 13;
+    optional uint64 usedBytes = 14;
+    optional uint64 quotaInBytes = 15;
+    optional uint64 quotaInCounts = 16;
 }
 
 enum StorageTypeProto {
@@ -575,6 +584,8 @@ message BucketArgs {
     optional bool isVersionEnabled = 5;
     optional StorageTypeProto storageType = 6;
     repeated hadoop.hdds.KeyValue metadata = 7;
+    optional uint64 quotaInBytes = 8;
+    optional uint64 quotaInCounts = 9;
 }
 
 message PrefixInfo {

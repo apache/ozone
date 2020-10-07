@@ -61,7 +61,6 @@ public class TestOMVersionManager {
     assertTrue(omVersionManager.needsFinalization());
     OMUpgradeFinalizer finalizer = new OMUpgradeFinalizer(omVersionManager);
     finalizer.finalize("random", om);
-//    omVersionManager.doFinalize(mock(OzoneManager.class));
     assertFalse(omVersionManager.needsFinalization());
     assertEquals(2, omVersionManager.getMetadataLayoutVersion());
   }

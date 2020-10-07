@@ -96,7 +96,7 @@ public class DatanodeStateMachine implements Closeable {
 
   /**
    * Constructs a a datanode state machine.
-   *  @param datanodeDetails - DatanodeDetails used to identify a datanode
+   * @param datanodeDetails - DatanodeDetails used to identify a datanode
    * @param conf - Configuration.
    * @param certClient - Datanode Certificate client, required if security is
    *                     enabled
@@ -144,7 +144,7 @@ public class DatanodeStateMachine implements Closeable {
             dnConf.getReplicationMaxStreams());
 
     // When we add new handlers just adding a new handler here should do the
-     // trick.
+    // trick.
     commandDispatcher = CommandDispatcher.newBuilder()
         .addHandler(new CloseContainerCommandHandler())
         .addHandler(new DeleteBlocksCommandHandler(container.getContainerSet(),
@@ -240,7 +240,6 @@ public class DatanodeStateMachine implements Closeable {
         // Some one has sent interrupt signal, this could be because
         // 1. Trigger heartbeat immediately
         // 2. Shutdown has be initiated.
-        LOG.warn("Interrupt the execution.", e);
         Thread.currentThread().interrupt();
       } catch (Exception e) {
         LOG.error("Unable to finish the execution.", e);
@@ -252,7 +251,7 @@ public class DatanodeStateMachine implements Closeable {
           try {
             Thread.sleep(nextHB.get() - now);
           } catch (InterruptedException e) {
-            LOG.warn("Interrupt the execution.", e);
+            //triggerHeartbeat is called during the sleep
           }
         }
       }

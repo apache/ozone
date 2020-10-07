@@ -91,6 +91,7 @@ Create bucket with name
                          Should contain              ${result}         ${ENDPOINT_URL}/${bucket}
 
 Setup s3 tests
+    Run Keyword        Generate random prefix
     Run Keyword        Install aws cli
     Run Keyword if    '${OZONE_S3_SET_CREDENTIALS}' == 'true'    Setup v4 headers
     ${BUCKET} =        Run Keyword if                            '${BUCKET}' == 'generated'            Create bucket
@@ -109,3 +110,7 @@ Create link
     [arguments]       ${bucket}
     Execute           ozone sh bucket link o3://${OM_SERVICE_ID}/legacy/source-bucket o3://${OM_SERVICE_ID}/s3v/${bucket}
     [return]          ${bucket}
+
+Generate random prefix
+    ${random} =          Generate Random String  5  [NUMBERS]
+                         Set Suite Variable  ${PREFIX}  ${random}

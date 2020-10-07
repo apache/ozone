@@ -138,6 +138,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -146,6 +147,7 @@ import org.apache.hadoop.ozone.security.proto.SecurityProtos.CancelDelegationTok
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.GetDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -268,14 +270,18 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * Changes the Quota on a volume.
    *
    * @param volume - Name of the volume.
-   * @param quota - Quota in bytes.
+   * @param quotaInCounts - Volume quota in counts.
+   * @param quotaInBytes - Volume quota in bytes.
    * @throws IOException
    */
   @Override
-  public void setQuota(String volume, long quota) throws IOException {
+  public void setQuota(String volume, long quotaInCounts,
+      long quotaInBytes) throws IOException {
     SetVolumePropertyRequest.Builder req =
         SetVolumePropertyRequest.newBuilder();
-    req.setVolumeName(volume).setQuotaInBytes(quota);
+    req.setVolumeName(volume)
+       .setQuotaInBytes(quotaInBytes)
+       .setQuotaInCounts(quotaInCounts);
 
     OMRequest omRequest = createOMRequest(Type.SetVolumeProperty)
         .setSetVolumePropertyRequest(req)
@@ -1075,9 +1081,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public UpgradeFinalizer.StatusAndMessages finalizeUpgrade(
-      String upgradeClientID
-  ) throws IOException {
+  public StatusAndMessages finalizeUpgrade(String upgradeClientID)
+      throws IOException {
     FinalizeUpgradeRequest req = FinalizeUpgradeRequest.newBuilder()
         .setUpgradeClientId(upgradeClientID)
         .build();
@@ -1090,14 +1095,14 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         handleError(submitRequest(omRequest)).getFinalizeUpgradeResponse();
 
     UpgradeFinalizationStatus status = response.getStatus();
-    return new UpgradeFinalizer.StatusAndMessages(
+    return new StatusAndMessages(
         UpgradeFinalizer.Status.valueOf(status.getStatus().name()),
         status.getMessagesList()
     );
   }
 
   @Override
-  public UpgradeFinalizer.StatusAndMessages queryUpgradeFinalizationProgress(
+  public StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean takeover
   ) throws IOException {
     FinalizeUpgradeProgressRequest req = FinalizeUpgradeProgressRequest
@@ -1116,7 +1121,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     UpgradeFinalizationStatus status = response.getStatus();
 
-    return new UpgradeFinalizer.StatusAndMessages(
+    return new StatusAndMessages(
         UpgradeFinalizer.Status.valueOf(status.getStatus().name()),
         status.getMessagesList()
     );
@@ -1230,6 +1235,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
+        .setSortDatanodes(args.getSortDatanodes())
         .build();
     GetFileStatusRequest req =
         GetFileStatusRequest.newBuilder()
@@ -1443,6 +1449,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
         .setKeyName(args.getKeyName())
+        .setSortDatanodes(args.getSortDatanodes())
         .build();
     ListStatusRequest listStatusRequest =
         ListStatusRequest.newBuilder()

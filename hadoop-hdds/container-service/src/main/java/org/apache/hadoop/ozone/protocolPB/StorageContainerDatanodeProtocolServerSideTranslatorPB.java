@@ -51,7 +51,7 @@ public class StorageContainerDatanodeProtocolServerSideTranslatorPB
 
   private final StorageContainerDatanodeProtocol impl;
   private final OzoneProtocolMessageDispatcher<SCMDatanodeRequest,
-      SCMDatanodeResponse> dispatcher;
+      SCMDatanodeResponse, ProtocolMessageEnum> dispatcher;
 
   public StorageContainerDatanodeProtocolServerSideTranslatorPB(
       StorageContainerDatanodeProtocol impl,
@@ -73,9 +73,8 @@ public class StorageContainerDatanodeProtocolServerSideTranslatorPB
     if (request.hasDataNodeLayoutVersion()) {
       layoutInfo = request.getDataNodeLayoutVersion();
     }
-    return impl.register(request.getDatanodeDetails(), dnNodeReport,
+    return impl.register(request.getExtendedDatanodeDetails(), dnNodeReport,
         containerRequestProto, pipelineReport, layoutInfo);
-
   }
 
   @Override

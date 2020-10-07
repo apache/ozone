@@ -138,6 +138,7 @@ import org.apache.hadoop.ozone.om.ratis.OMRatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.snapshot.OzoneManagerSnapshotProvider;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManagerImpl;
@@ -1195,6 +1196,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metadataManager.start(configuration);
     startSecretManagerIfNecessary();
 
+
     if (certClient != null) {
       caCertPem = CertificateCodec.getPEMEncodedString(
           certClient.getCACertificate());
@@ -1803,29 +1805,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Changes the Quota on a volume.
    *
    * @param volume - Name of the volume.
-   * @param quota  - Quota in bytes.
+   * @param quotaInCounts - Volume quota in counts.
+   * @param quotaInBytes - Volume quota in bytes.
    * @throws IOException
    */
   @Override
-  public void setQuota(String volume, long quota) throws IOException {
-    if (isAclEnabled) {
-      checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.WRITE, volume,
-          null, null);
-    }
-
-    Map<String, String> auditMap = buildAuditMap(volume);
-    auditMap.put(OzoneConsts.QUOTA_IN_BYTES, String.valueOf(quota));
-    try {
-      metrics.incNumVolumeUpdates();
-      volumeManager.setQuota(volume, quota);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.SET_QUOTA,
-          auditMap));
-    } catch (Exception ex) {
-      metrics.incNumVolumeUpdateFails();
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(OMAction.SET_QUOTA,
-          auditMap, ex));
-      throw ex;
-    }
+  public void setQuota(String volume, long quotaInCounts,
+                       long quotaInBytes) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As this requests use a new approach");
   }
 
   /**
@@ -2872,7 +2860,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     try {
       metrics.incNumGetFileStatus();
-      return keyManager.getFileStatus(args);
+      return keyManager.getFileStatus(args, getClientAddress());
     } catch (IOException ex) {
       metrics.incNumGetFileStatusFails();
       auditSuccess = false;
@@ -2996,7 +2984,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     try {
       metrics.incNumListStatus();
-      return keyManager.listStatus(args, recursive, startKey, numEntries);
+      return keyManager.listStatus(args, recursive, startKey, numEntries,
+              getClientAddress());
     } catch (Exception ex) {
       metrics.incNumListStatusFails();
       auditSuccess = false;
@@ -3213,7 +3202,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       termIndex = installCheckpoint(leaderId, omDBCheckpoint);
     } catch (Exception ex) {
-      LOG.error("Failed to install snapshot from Leader OM: {}", ex);
+      LOG.error("Failed to install snapshot from Leader OM.", ex);
     }
     return termIndex;
   }
@@ -3557,9 +3546,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     jvmPauseMonitor.start();
   }
 
-  public ResolvedBucket resolveBucketLink(KeyArgs args) throws IOException {
+  public ResolvedBucket resolveBucketLink(KeyArgs args,
+      OMClientRequest omClientRequest) throws IOException {
     return resolveBucketLink(
-        Pair.of(args.getVolumeName(), args.getBucketName()));
+        Pair.of(args.getVolumeName(), args.getBucketName()), omClientRequest);
   }
 
   public ResolvedBucket resolveBucketLink(OmKeyArgs args)
@@ -3568,10 +3558,35 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         Pair.of(args.getVolumeName(), args.getBucketName()));
   }
 
+  public ResolvedBucket resolveBucketLink(Pair<String, String> requested,
+      OMClientRequest omClientRequest)
+      throws IOException {
+    Pair<String, String> resolved;
+    if (isAclEnabled) {
+      resolved = resolveBucketLink(requested, new HashSet<>(),
+              omClientRequest.createUGI(), omClientRequest.getRemoteAddress(),
+              omClientRequest.getHostName());
+    } else {
+      resolved = resolveBucketLink(requested, new HashSet<>(),
+          null, null, null);
+    }
+    return new ResolvedBucket(requested, resolved);
+  }
+
+
   public ResolvedBucket resolveBucketLink(Pair<String, String> requested)
       throws IOException {
-    Pair<String, String> resolved =
-        resolveBucketLink(requested, new HashSet<>());
+
+    Pair<String, String> resolved;
+    if (isAclEnabled) {
+      resolved = resolveBucketLink(requested, new HashSet<>(),
+              Server.getRemoteUser(),
+              Server.getRemoteIp(),
+              Server.getRemoteIp().getHostName());
+    } else {
+      resolved = resolveBucketLink(requested, new HashSet<>(),
+          null, null, null);
+    }
     return new ResolvedBucket(requested, resolved);
   }
 
@@ -3581,6 +3596,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @param volumeAndBucket the bucket to be resolved (if it is a link)
    * @param visited collects link buckets visited during the resolution to
    *   avoid infinite loops
+   * @param {@link UserGroupInformation}
+   * @param remoteAddress
+   * @param hostName
    * @return bucket location possibly updated with its actual volume and bucket
    *   after following bucket links
    * @throws IOException (most likely OMException) if ACL check fails, bucket is
@@ -3588,7 +3606,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   private Pair<String, String> resolveBucketLink(
       Pair<String, String> volumeAndBucket,
-      Set<Pair<String, String>> visited) throws IOException {
+      Set<Pair<String, String>> visited,
+      UserGroupInformation userGroupInformation,
+      InetAddress remoteAddress,
+      String hostName) throws IOException {
 
     String volumeName = volumeAndBucket.getLeft();
     String bucketName = volumeAndBucket.getRight();
@@ -3604,12 +3625,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (isAclEnabled) {
       checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.READ,
-          volumeName, bucketName, null);
+          volumeName, bucketName, null, userGroupInformation,
+          remoteAddress, hostName);
     }
 
     return resolveBucketLink(
         Pair.of(info.getSourceVolume(), info.getSourceBucket()),
-        visited);
+        visited, userGroupInformation, remoteAddress, hostName);
   }
 
   @VisibleForTesting
@@ -3690,7 +3712,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setModificationTime(time)
         .setOwnerName(userName)
         .setAdminName(userName)
-        .setQuotaInBytes(OzoneConsts.MAX_QUOTA_IN_BYTES);
+        .setQuotaInBytes(OzoneConsts.QUOTA_RESET);
 
     // Provide ACLType of ALL which is default acl rights for user and group.
     List<OzoneAcl> listOfAcls = new ArrayList<>();

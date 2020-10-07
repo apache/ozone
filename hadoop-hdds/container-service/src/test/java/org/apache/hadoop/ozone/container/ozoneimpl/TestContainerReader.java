@@ -18,12 +18,11 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import com.google.common.primitives.Longs;
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -51,8 +50,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import static org.apache.hadoop.ozone.OzoneConsts.DB_BLOCK_COUNT_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_PENDING_DELETE_BLOCK_COUNT_KEY;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -126,22 +123,22 @@ public class TestContainerReader {
         .getContainerData(), conf)) {
 
       for (int i = 0; i < count; i++) {
-        byte[] blkBytes = Longs.toByteArray(blockNames.get(i));
-        byte[] blkInfo = metadataStore.getStore().get(blkBytes);
+        Table<String, BlockData> blockDataTable =
+                metadataStore.getStore().getBlockDataTable();
 
-        byte[] deletingKeyBytes =
-            StringUtils.string2Bytes(OzoneConsts.DELETING_KEY_PREFIX +
-                blockNames.get(i));
+        String blk = Long.toString(blockNames.get(i));
+        BlockData blkInfo = blockDataTable.get(blk);
 
-        metadataStore.getStore().delete(blkBytes);
-        metadataStore.getStore().put(deletingKeyBytes, blkInfo);
+        blockDataTable.delete(blk);
+        blockDataTable.put(OzoneConsts.DELETING_KEY_PREFIX + blk, blkInfo);
       }
 
       if (setMetaData) {
         // Pending delete blocks are still counted towards the block count
         // and bytes used metadata values, so those do not change.
-        metadataStore.getStore().put(DB_PENDING_DELETE_BLOCK_COUNT_KEY,
-            Longs.toByteArray(count));
+        Table<String, Long> metadataTable =
+                metadataStore.getStore().getMetadataTable();
+        metadataTable.put(OzoneConsts.PENDING_DELETE_BLOCK_COUNT, (long)count);
       }
     }
 
@@ -163,21 +160,21 @@ public class TestContainerReader {
         blockData.addMetadata(OzoneConsts.OWNER,
             OzoneConsts.OZONE_SIMPLE_HDFS_USER);
         List<ContainerProtos.ChunkInfo> chunkList = new ArrayList<>();
-        ChunkInfo info = new ChunkInfo(String.format("%d.data.%d", blockID
-            .getLocalID(), 0), 0, blockLen);
+        long localBlockID = blockID.getLocalID();
+        ChunkInfo info = new ChunkInfo(String.format(
+                "%d.data.%d", localBlockID, 0), 0, blockLen);
         chunkList.add(info.getProtoBufMessage());
         blockData.setChunks(chunkList);
-        blkNames.add(blockID.getLocalID());
-        metadataStore.getStore().put(Longs.toByteArray(blockID.getLocalID()),
-            blockData
-                .getProtoBufMessage().toByteArray());
+        blkNames.add(localBlockID);
+        metadataStore.getStore().getBlockDataTable()
+                .put(Long.toString(localBlockID), blockData);
       }
 
       if (setMetaData) {
-        metadataStore.getStore().put(DB_BLOCK_COUNT_KEY,
-            Longs.toByteArray(blockCount));
-        metadataStore.getStore().put(OzoneConsts.DB_CONTAINER_BYTES_USED_KEY,
-            Longs.toByteArray(blockCount * blockLen));
+        metadataStore.getStore().getMetadataTable()
+                .put(OzoneConsts.BLOCK_COUNT, (long)blockCount);
+        metadataStore.getStore().getMetadataTable()
+                .put(OzoneConsts.CONTAINER_BYTES_USED, blockCount * blockLen);
       }
     }
 

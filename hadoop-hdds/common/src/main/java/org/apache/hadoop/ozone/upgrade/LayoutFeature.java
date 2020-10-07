@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
-import java.io.IOException;
 import java.util.Optional;
 
 /**

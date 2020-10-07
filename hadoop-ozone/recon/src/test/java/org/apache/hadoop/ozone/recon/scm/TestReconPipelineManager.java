@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineFactory.ReconPipelineProvider;
@@ -52,6 +53,8 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.mockito.Mockito;
+
 import static org.mockito.Mockito.mock;
 
 /**
@@ -59,12 +62,16 @@ import static org.mockito.Mockito.mock;
  */
 public class TestReconPipelineManager {
 
+  private static final Integer SOFTWARE_LAYOUT_VERSION = 1;
+  private static final Integer METADATA_LAYOUT_VERSION = 1;
+
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
   private OzoneConfiguration conf;
   private SCMStorageConfig scmStorageConfig;
   private DBStore store;
+  private HDDSLayoutVersionManager versionManager;
 
   @Before
   public void setup() throws IOException {
@@ -109,8 +116,16 @@ public class TestReconPipelineManager {
 
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
+
+    this.versionManager =
+        Mockito.mock(HDDSLayoutVersionManager.class);
+    Mockito.when(versionManager.getMetadataLayoutVersion())
+        .thenReturn(METADATA_LAYOUT_VERSION);
+    Mockito.when(versionManager.getSoftwareLayoutVersion())
+        .thenReturn(SOFTWARE_LAYOUT_VERSION);
     NodeManager nodeManager =
-        new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
+        new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
+            versionManager);
 
     try (ReconPipelineManager reconPipelineManager =
         new ReconPipelineManager(conf, nodeManager,
@@ -145,8 +160,15 @@ public class TestReconPipelineManager {
     Pipeline pipeline = getRandomPipeline();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
+    this.versionManager =
+        Mockito.mock(HDDSLayoutVersionManager.class);
+    Mockito.when(versionManager.getMetadataLayoutVersion())
+        .thenReturn(METADATA_LAYOUT_VERSION);
+    Mockito.when(versionManager.getSoftwareLayoutVersion())
+        .thenReturn(SOFTWARE_LAYOUT_VERSION);
     NodeManager nodeManager =
-        new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap);
+        new SCMNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
+            versionManager);
 
     ReconPipelineManager reconPipelineManager =
         new ReconPipelineManager(conf, nodeManager,

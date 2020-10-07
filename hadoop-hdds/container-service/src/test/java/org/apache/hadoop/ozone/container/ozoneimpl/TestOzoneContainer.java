@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 
 
 import com.google.common.base.Preconditions;
-import com.google.common.primitives.Longs;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -30,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -264,6 +264,9 @@ public class TestOzoneContainer {
     ReferenceCountedDB db = BlockUtils.getDB(container
         .getContainerData(), conf);
 
+    Table<String, Long> metadataTable = db.getStore().getMetadataTable();
+    Table<String, BlockData> blockDataTable = db.getStore().getBlockDataTable();
+
     for (int bi = 0; bi < blocks; bi++) {
       // Creating BlockData
       BlockID blockID = new BlockID(containerId, bi);
@@ -279,15 +282,12 @@ public class TestOzoneContainer {
         chunkList.add(info.getProtoBufMessage());
       }
       blockData.setChunks(chunkList);
-      db.getStore().put(Longs.toByteArray(blockID.getLocalID()),
-          blockData.getProtoBufMessage().toByteArray());
+      blockDataTable.put(Long.toString(blockID.getLocalID()), blockData);
     }
 
     // Set Block count and used bytes.
-    db.getStore().put(OzoneConsts.DB_BLOCK_COUNT_KEY,
-        Longs.toByteArray(blocks));
-    db.getStore().put(OzoneConsts.DB_CONTAINER_BYTES_USED_KEY,
-        Longs.toByteArray(usedBytes));
+    metadataTable.put(OzoneConsts.BLOCK_COUNT, (long)blocks);
+    metadataTable.put(OzoneConsts.CONTAINER_BYTES_USED, usedBytes);
 
     // remaining available capacity of the container
     return (freeBytes - usedBytes);

@@ -76,5 +76,4 @@ public final class HDDSLayoutVersionManager extends
       hddsLayoutVersionManager = null;
     }
   }
-
 }

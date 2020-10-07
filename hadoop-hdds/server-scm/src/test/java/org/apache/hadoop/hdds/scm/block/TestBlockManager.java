@@ -245,6 +245,7 @@ public class TestBlockManager {
   public void testBlockDistribution() throws Exception {
     int threadCount = numContainerPerOwnerInPipeline *
             numContainerPerOwnerInPipeline;
+    nodeManager.setNumPipelinePerDatanode(1);
     List<ExecutorService> executors = new ArrayList<>(threadCount);
     for (int i = 0; i < threadCount; i++) {
       executors.add(Executors.newSingleThreadExecutor());
@@ -304,6 +305,7 @@ public class TestBlockManager {
     int threadCount = numContainerPerOwnerInPipeline *
             numContainerPerOwnerInPipeline;
     nodeManager.setNumHealthyVolumes(numContainerPerOwnerInPipeline);
+    nodeManager.setNumPipelinePerDatanode(1);
     List<ExecutorService> executors = new ArrayList<>(threadCount);
     for (int i = 0; i < threadCount; i++) {
       executors.add(Executors.newSingleThreadExecutor());
@@ -359,6 +361,71 @@ public class TestBlockManager {
       allocatedBlockMap.values().stream().forEach(v -> {
         Assert.assertTrue(v.size() == 1);
       });
+    } catch (Exception e) {
+      Assert.fail("testAllocateBlockInParallel failed");
+    }
+  }
+
+  @Test
+  public void testBlockDistributionWithMultipleRaftLogDisks() throws Exception {
+    int threadCount = numContainerPerOwnerInPipeline *
+        numContainerPerOwnerInPipeline;
+    int numMetaDataVolumes = 2;
+    nodeManager.setNumHealthyVolumes(numContainerPerOwnerInPipeline);
+    nodeManager.setNumMetaDataVolumes(numMetaDataVolumes);
+    List<ExecutorService> executors = new ArrayList<>(threadCount);
+    for (int i = 0; i < threadCount; i++) {
+      executors.add(Executors.newSingleThreadExecutor());
+    }
+    pipelineManager.createPipeline(type, factor);
+    TestUtils.openAllRatisPipelines(pipelineManager);
+    Map<Long, List<AllocatedBlock>> allocatedBlockMap =
+        new ConcurrentHashMap<>();
+    List<CompletableFuture<AllocatedBlock>> futureList =
+        new ArrayList<>(threadCount);
+    for (int i = 0; i < threadCount; i++) {
+      final CompletableFuture<AllocatedBlock> future =
+          new CompletableFuture<>();
+      CompletableFuture.supplyAsync(() -> {
+        try {
+          List<AllocatedBlock> blockList;
+          AllocatedBlock block = blockManager
+              .allocateBlock(DEFAULT_BLOCK_SIZE, type, factor,
+                  OzoneConsts.OZONE,
+                  new ExcludeList());
+          long containerId = block.getBlockID().getContainerID();
+          if (!allocatedBlockMap.containsKey(containerId)) {
+            blockList = new ArrayList<>();
+          } else {
+            blockList = allocatedBlockMap.get(containerId);
+          }
+          blockList.add(block);
+          allocatedBlockMap.put(containerId, blockList);
+          future.complete(block);
+        } catch (IOException e) {
+          future.completeExceptionally(e);
+        }
+        return future;
+      }, executors.get(i));
+      futureList.add(future);
+    }
+    try {
+      CompletableFuture
+          .allOf(futureList.toArray(
+              new CompletableFuture[futureList.size()])).get();
+      Assert.assertTrue(
+          pipelineManager.getPipelines(type).size() == 1);
+      Pipeline pipeline = pipelineManager.getPipelines(type).get(0);
+      // the pipeline per raft log disk config is set to 1 by default
+      int numContainers = (int)Math.ceil((double)
+              (numContainerPerOwnerInPipeline *
+                  numContainerPerOwnerInPipeline)/numMetaDataVolumes);
+      Assert.assertTrue(numContainers == pipelineManager.
+          getNumberOfContainers(pipeline.getId()));
+      Assert.assertTrue(
+          allocatedBlockMap.size() == numContainers);
+      Assert.assertTrue(allocatedBlockMap.
+          values().size() == numContainers);
     } catch (Exception e) {
       Assert.fail("testAllocateBlockInParallel failed");
     }
@@ -434,6 +501,8 @@ public class TestBlockManager {
   @Test(timeout = 10000)
   public void testMultipleBlockAllocationWithClosedContainer()
       throws IOException, TimeoutException, InterruptedException {
+    nodeManager.setNumPipelinePerDatanode(1);
+    nodeManager.setNumHealthyVolumes(1);
     // create pipelines
     for (int i = 0;
          i < nodeManager.getNodes(HddsProtos.NodeState.HEALTHY).size() / factor

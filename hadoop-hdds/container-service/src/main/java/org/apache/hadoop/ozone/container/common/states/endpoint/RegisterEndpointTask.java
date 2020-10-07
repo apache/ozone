@@ -16,13 +16,15 @@
  */
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.success;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
-        .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
+    .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.ozone.container.common.statemachine
     .EndpointStateMachine;
 import org.apache.hadoop.hdds.protocol.proto
@@ -153,13 +155,15 @@ public final class RegisterEndpointTask implements
             datanodeContainerManager.getPipelineReport();
         // TODO : Add responses to the command Queue.
         SCMRegisteredResponseProto response = rpcEndPoint.getEndPoint()
-            .register(datanodeDetails.getProtoBufMessage(), nodeReport,
-                containerReport, pipelineReportsProto, layoutInfo);
+            .register(datanodeDetails.getExtendedProtoBufMessage(),
+            nodeReport, containerReport, pipelineReportsProto, layoutInfo);
         Preconditions.checkState(UUID.fromString(response.getDatanodeUUID())
                 .equals(datanodeDetails.getUuid()),
             "Unexpected datanode ID in the response.");
         Preconditions.checkState(!StringUtils.isBlank(response.getClusterID()),
             "Invalid cluster ID in the response.");
+        Preconditions.checkState(response.getErrorCode() == success,
+            "DataNode has higher Software Layout Version than SCM.");
         if (response.hasHostname() && response.hasIpAddress()) {
           datanodeDetails.setHostName(response.getHostname());
           datanodeDetails.setIpAddress(response.getIpAddress());

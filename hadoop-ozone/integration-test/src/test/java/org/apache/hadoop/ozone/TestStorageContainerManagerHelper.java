@@ -21,13 +21,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -38,7 +39,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.google.common.primitives.Longs;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.Rule;
 import org.junit.rules.Timeout;
@@ -99,13 +99,15 @@ public class TestStorageContainerManagerHelper {
     ReferenceCountedDB meta = getContainerMetadata(containerID);
     KeyPrefixFilter filter =
         new KeyPrefixFilter().addFilter(OzoneConsts.DELETING_KEY_PREFIX);
-    List<Map.Entry<byte[], byte[]>> kvs = meta.getStore()
+
+    List<? extends Table.KeyValue<String, BlockData>> kvs =
+        meta.getStore().getBlockDataTable()
         .getRangeKVs(null, Integer.MAX_VALUE, filter);
-    kvs.forEach(entry -> {
-      String key = StringUtils.bytes2String(entry.getKey());
+
+    for (Table.KeyValue<String, BlockData> entry : kvs) {
       pendingDeletionBlocks
-          .add(key.replace(OzoneConsts.DELETING_KEY_PREFIX, ""));
-    });
+              .add(entry.getKey().replace(OzoneConsts.DELETING_KEY_PREFIX, ""));
+    }
     meta.close();
     return pendingDeletionBlocks;
   }
@@ -122,12 +124,15 @@ public class TestStorageContainerManagerHelper {
   public List<Long> getAllBlocks(Long containeID) throws IOException {
     List<Long> allBlocks = Lists.newArrayList();
     ReferenceCountedDB meta = getContainerMetadata(containeID);
-    List<Map.Entry<byte[], byte[]>> kvs =
-        meta.getStore().getRangeKVs(null, Integer.MAX_VALUE,
-            MetadataKeyFilters.getNormalKeyFilter());
-    kvs.forEach(entry -> {
-      allBlocks.add(Longs.fromByteArray(entry.getKey()));
-    });
+
+    List<? extends Table.KeyValue<String, BlockData>> kvs =
+          meta.getStore().getBlockDataTable()
+          .getRangeKVs(null, Integer.MAX_VALUE,
+          MetadataKeyFilters.getUnprefixedKeyFilter());
+
+    for (Table.KeyValue<String, BlockData> entry : kvs) {
+      allBlocks.add(Long.valueOf(entry.getKey()));
+    }
     meta.close();
     return allBlocks;
   }

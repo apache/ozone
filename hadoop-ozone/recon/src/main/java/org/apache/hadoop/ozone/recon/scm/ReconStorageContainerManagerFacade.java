@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.scm.safemode.SafeModeManager;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.io.IOUtils;
@@ -87,6 +88,7 @@ public class ReconStorageContainerManagerFacade
   private Set<ReconScmTask> reconScmTasks = new HashSet<>();
   private SCMContainerPlacementMetrics placementMetrics;
   private PlacementPolicy containerPlacementPolicy;
+  private HDDSLayoutVersionManager scmLayoutVersionManager;
 
   @Inject
   public ReconStorageContainerManagerFacade(OzoneConfiguration conf,
@@ -102,9 +104,12 @@ public class ReconStorageContainerManagerFacade
     dbStore = DBStoreBuilder
         .createDBStore(ozoneConfiguration, new ReconSCMDBDefinition());
 
+    this.scmLayoutVersionManager = HDDSLayoutVersionManager
+        .initialize(this.scmStorageConfig);
     this.nodeManager =
         new ReconNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
-            ReconSCMDBDefinition.NODES.getTable(dbStore));
+            ReconSCMDBDefinition.NODES.getTable(dbStore),
+            this.scmLayoutVersionManager);
     placementMetrics = SCMContainerPlacementMetrics.create();
     this.containerPlacementPolicy =
         ContainerPlacementPolicyFactory.getPolicy(conf, nodeManager,

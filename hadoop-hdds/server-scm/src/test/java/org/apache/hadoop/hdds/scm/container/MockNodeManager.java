@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.container;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -68,6 +70,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
  * Test Helper for testing container Mapping.
  */
 public class MockNodeManager implements NodeManager {
+  public final static int NUM_PIPELINE_PER_METADATA_DISK = 2;
   private final static NodeData[] NODES = {
       new NodeData(10L * OzoneConsts.TB, OzoneConsts.GB),
       new NodeData(64L * OzoneConsts.TB, 100 * OzoneConsts.GB),
@@ -93,6 +96,8 @@ public class MockNodeManager implements NodeManager {
   private NetworkTopology clusterMap;
   private ConcurrentMap<String, Set<String>> dnsToUuidMap;
   private int numHealthyDisksPerDatanode;
+  private int numRaftLogDisksPerDatanode;
+  private int numPipelinePerDatanode;
 
   public MockNodeManager(NetworkTopologyImpl clusterMap,
                          List<DatanodeDetails> nodes,
@@ -109,20 +114,23 @@ public class MockNodeManager implements NodeManager {
     if (!nodes.isEmpty()) {
       for (int x = 0; x < nodes.size(); x++) {
         DatanodeDetails node = nodes.get(x);
-        register(node, null, null);
+        register(node, null, null, null);
         populateNodeMetric(node, x);
       }
     }
     if (initializeFakeNodes) {
       for (int x = 0; x < nodeCount; x++) {
         DatanodeDetails dd = MockDatanodeDetails.randomDatanodeDetails();
-        register(dd, null, null);
+        register(dd, null, null, null);
         populateNodeMetric(dd, x);
       }
     }
     safemode = false;
     this.commandMap = new HashMap<>();
     numHealthyDisksPerDatanode = 1;
+    numRaftLogDisksPerDatanode = 1;
+    numPipelinePerDatanode = numRaftLogDisksPerDatanode *
+        NUM_PIPELINE_PER_METADATA_DISK;
   }
 
   public MockNodeManager(boolean initializeFakeNodes, int nodeCount) {
@@ -441,7 +449,9 @@ public class MockNodeManager implements NodeManager {
    */
   @Override
   public RegisteredCommand register(DatanodeDetails datanodeDetails,
-      NodeReportProto nodeReport, PipelineReportsProto pipelineReportsProto) {
+                                    NodeReportProto nodeReport,
+                                    PipelineReportsProto pipelineReportsProto,
+                                    LayoutVersionProto layoutInfo) {
     try {
       node2ContainerMap.insertNewDatanode(datanodeDetails.getUuid(),
           Collections.emptySet());
@@ -585,12 +595,32 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public int getNumHealthyVolumes(List<DatanodeDetails> dnList) {
+  public int minHealthyVolumeNum(List<DatanodeDetails> dnList) {
     return numHealthyDisksPerDatanode;
+  }
+
+  @Override
+  public int pipelineLimit(DatanodeDetails dn) {
+    // by default 1 single node pipeline and 1 three node pipeline
+    return numPipelinePerDatanode;
+  }
+
+  @Override
+  public int minPipelineLimit(List<DatanodeDetails> dn) {
+    // by default 1 single node pipeline and 1 three node pipeline
+    return numPipelinePerDatanode;
+  }
+
+  public void setNumPipelinePerDatanode(int value) {
+    numPipelinePerDatanode = value;
   }
 
   public void setNumHealthyVolumes(int value) {
     numHealthyDisksPerDatanode = value;
+  }
+
+  public void setNumMetaDataVolumes(int value) {
+    numRaftLogDisksPerDatanode = value;
   }
 
   /**

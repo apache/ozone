@@ -28,14 +28,12 @@ import org.apache.commons.io.FileUtils;
 import org.apache.ratis.server.impl.RaftServerImpl;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.event.Level;
 
 /**
  * Test for OzoneClientKeyGenerator.
  */
-@Ignore("HDDS-3297")
 public class TestOzoneClientKeyGenerator {
 
   private String path;

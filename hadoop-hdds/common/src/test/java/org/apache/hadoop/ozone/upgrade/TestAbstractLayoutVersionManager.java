@@ -33,6 +33,7 @@ import org.junit.runner.RunWith;
 import org.mockito.Spy;
 import org.mockito.junit.MockitoJUnitRunner;
 
+
 /**
  * Test generic layout management init and APIs.
  */
@@ -109,7 +110,7 @@ public class TestAbstractLayoutVersionManager {
 
   @Test
   public void testFeatureFinalizationFailsIfTheFinalizedFeatureIsNotTheNext()
-    throws IOException {
+      throws IOException {
     exception.expect(IllegalArgumentException.class);
 
     LayoutFeature[] lfs = getTestLayoutFeatures(3);
