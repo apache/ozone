@@ -860,14 +860,14 @@
   <property>
     <name>ozone.scm.pipeline.leader-choose.policy</name>
     <value>
-      org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.MinLeaderCountChoosePolicy
+      org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.DefaultLeaderChoosePolicy
     </value>
     <tag>OZONE, SCM, PIPELINE</tag>
     <description>
       The policy used for choosing desired leader for pipeline creation.
-      There are two policies supporting now: RandomLeaderChoosePolicy, MinLeaderCountChoosePolicy.
-      org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.RandomLeaderChoosePolicy
-      implements a policy that choose leader randomly.
+      There are two policies supporting now: DefaultLeaderChoosePolicy, MinLeaderCountChoosePolicy.
+      org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.DefaultLeaderChoosePolicy
+      implements a policy that choose leader without depending on priority.
       org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.MinLeaderCountChoosePolicy
       implements a policy that choose leader which has the minimum exist leader count.
       In the future, we need to add policies which consider:

@@ -24,13 +24,13 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
 import java.util.List;
 
 /**
- * The random leader choose policy.
+ * The default leader choose policy.
  * Do not choose leader here, so that all nodes have the same priority
  * and ratis elects leader without depending on priority.
  */
-public class RandomLeaderChoosePolicy extends LeaderChoosePolicy {
+public class DefaultLeaderChoosePolicy extends LeaderChoosePolicy {
 
-  public RandomLeaderChoosePolicy(
+  public DefaultLeaderChoosePolicy(
       NodeManager nodeManager, PipelineStateManager pipelineStateManager) {
     super(nodeManager, pipelineStateManager);
   }

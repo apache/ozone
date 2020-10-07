@@ -102,6 +102,9 @@ public class TestLeaderChoosePolicy {
   @Test(timeout = 360000)
   public void testRestoreSuggestedLeader() throws Exception {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
+    conf.set(OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY,
+        "org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms" +
+            ".MinLeaderCountChoosePolicy");
     int dnNum = 3;
     int dnPipelineLimit = 3;
     int leaderNumOfEachDn = dnPipelineLimit / dnNum;
@@ -189,11 +192,11 @@ public class TestLeaderChoosePolicy {
   }
 
   @Test(timeout = 60000)
-  public void testRandomLeaderChoosePolicy() throws Exception {
+  public void testDefaultLeaderChoosePolicy() throws Exception {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
     conf.set(OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY,
         "org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms" +
-            ".RandomLeaderChoosePolicy");
+            ".DefaultLeaderChoosePolicy");
     int dnNum = 3;
     int dnPipelineLimit = 3;
     int pipelineNum = 3;

@@ -54,7 +54,7 @@ public class TestLeaderChoosePolicy {
         mock(EventPublisher.class));
     Assert.assertSame(
         ratisPipelineProvider.getLeaderChoosePolicy().getClass(),
-        MinLeaderCountChoosePolicy.class);
+        DefaultLeaderChoosePolicy.class);
   }
 
   @Test(expected = RuntimeException.class)
