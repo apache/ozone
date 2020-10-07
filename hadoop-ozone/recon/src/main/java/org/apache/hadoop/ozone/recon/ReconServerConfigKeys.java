@@ -63,28 +63,46 @@ public final class  ReconServerConfigKeys {
   public static final String OZONE_RECON_OM_SOCKET_TIMEOUT =
       "ozone.recon.om.socket.timeout";
   public static final String OZONE_RECON_OM_SOCKET_TIMEOUT_DEFAULT = "5s";
+  @Deprecated
+  public static final String RECON_OM_SOCKET_TIMEOUT =
+      "recon.om.socket.timeout";
 
   public static final String OZONE_RECON_OM_CONNECTION_TIMEOUT =
       "ozone.recon.om.connection.timeout";
   public static final String OZONE_RECON_OM_CONNECTION_TIMEOUT_DEFAULT = "5s";
+  @Deprecated
+  public static final String RECON_OM_CONNECTION_TIMEOUT =
+      "recon.om.connection.timeout";
 
   public static final String OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT =
       "ozone.recon.om.connection.request.timeout";
-
-  public static final String OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "5s";
+  public static final String OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT =
+      "5s";
+  @Deprecated
+  public static final String RECON_OM_CONNECTION_REQUEST_TIMEOUT =
+      "recon.om.connection.request.timeout";
 
   public static final String OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY =
       "ozone.recon.om.snapshot.task.initial.delay";
   public static final String
       OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT = "1m";
+  @Deprecated
+  public static final String RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY =
+      "recon.om.snapshot.task.initial.delay";
 
   public static final String OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY =
       "ozone.recon.om.snapshot.task.interval.delay";
   public static final String OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT
       = "10m";
+  @Deprecated
+  public static final String RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY =
+      "recon.om.snapshot.task.interval.delay";
 
   public static final String OZONE_RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM =
       "ozone.recon.om.snapshot.task.flush.param";
+  @Deprecated
+  public static final String RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM =
+      "recon.om.snapshot.task.flush.param";
 
   public static final String OZONE_RECON_TASK_THREAD_COUNT_KEY =
       "ozone.recon.task.thread.count";

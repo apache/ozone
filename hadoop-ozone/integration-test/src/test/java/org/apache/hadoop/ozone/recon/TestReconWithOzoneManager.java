@@ -89,14 +89,24 @@ public class TestReconWithOzoneManager {
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     int socketTimeout = (int) conf.getTimeDuration(
-        OZONE_RECON_OM_SOCKET_TIMEOUT, OZONE_RECON_OM_SOCKET_TIMEOUT_DEFAULT,
+        OZONE_RECON_OM_SOCKET_TIMEOUT,
+        conf.get(
+            ReconServerConfigKeys.RECON_OM_SOCKET_TIMEOUT,
+            OZONE_RECON_OM_SOCKET_TIMEOUT_DEFAULT),
         TimeUnit.MILLISECONDS);
     int connectionTimeout = (int) conf.getTimeDuration(
         OZONE_RECON_OM_CONNECTION_TIMEOUT,
-        OZONE_RECON_OM_CONNECTION_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
+        conf.get(
+            ReconServerConfigKeys.RECON_OM_CONNECTION_TIMEOUT,
+            OZONE_RECON_OM_CONNECTION_TIMEOUT_DEFAULT),
+        TimeUnit.MILLISECONDS);
     int connectionRequestTimeout = (int)conf.getTimeDuration(
         OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT,
-        OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
+        conf.get(
+            ReconServerConfigKeys.RECON_OM_CONNECTION_REQUEST_TIMEOUT,
+            OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT),
+        TimeUnit.MILLISECONDS
+    );
     RequestConfig config = RequestConfig.custom()
         .setConnectTimeout(socketTimeout)
         .setConnectionRequestTimeout(connectionTimeout)

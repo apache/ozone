@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort.Type;
+import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -122,10 +123,17 @@ public class OzoneManagerServiceProviderImpl
 
     int connectionTimeout = (int) configuration.getTimeDuration(
         OZONE_RECON_OM_CONNECTION_TIMEOUT,
-        OZONE_RECON_OM_CONNECTION_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
+        configuration.get(
+            ReconServerConfigKeys.RECON_OM_CONNECTION_TIMEOUT,
+            OZONE_RECON_OM_CONNECTION_TIMEOUT_DEFAULT),
+        TimeUnit.MILLISECONDS);
     int connectionRequestTimeout = (int)configuration.getTimeDuration(
         OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT,
-        OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
+        configuration.get(
+            ReconServerConfigKeys.RECON_OM_CONNECTION_REQUEST_TIMEOUT,
+            OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT),
+        TimeUnit.MILLISECONDS
+    );
 
     connectionFactory =
         URLConnectionFactory.newDefaultURLConnectionFactory(connectionTimeout,
@@ -151,7 +159,11 @@ public class OzoneManagerServiceProviderImpl
     }
 
     boolean flushParam = configuration.getBoolean(
-        OZONE_RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM, false);
+        OZONE_RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM,
+        configuration.getBoolean(
+            ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM,
+            false)
+    );
 
     if (flushParam) {
       omDBSnapshotUrl += "?" + OZONE_DB_CHECKPOINT_REQUEST_FLUSH + "=true";
@@ -206,11 +218,15 @@ public class OzoneManagerServiceProviderImpl
     reconTaskController.start();
     long initialDelay = configuration.getTimeDuration(
         OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY,
-        OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT,
+        configuration.get(
+            ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY,
+            OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT),
         TimeUnit.MILLISECONDS);
     long interval = configuration.getTimeDuration(
         OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY,
-        OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT,
+        configuration.get(
+            ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY,
+            OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT),
         TimeUnit.MILLISECONDS);
     scheduler.scheduleWithFixedDelay(() -> {
       try {
