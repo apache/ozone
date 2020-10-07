@@ -34,10 +34,6 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.*;
 @CleanupTableInfo(cleanupTables = {OPEN_FILE_TABLE, FILE_TABLE})
 public class OMKeyCommitResponseV1 extends OMKeyCommitResponse {
 
-  private OmKeyInfo omKeyInfo;
-  private String ozoneKeyName;
-  private String openKeyName;
-
   public OMKeyCommitResponseV1(@Nonnull OMResponse omResponse,
                                @Nonnull OmKeyInfo omKeyInfo,
                                String ozoneKeyName, String openKeyName,
@@ -45,9 +41,6 @@ public class OMKeyCommitResponseV1 extends OMKeyCommitResponse {
                                @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse, omKeyInfo, ozoneKeyName, openKeyName, omVolumeArgs,
             omBucketInfo);
-    this.omKeyInfo = omKeyInfo;
-    this.ozoneKeyName = ozoneKeyName;
-    this.openKeyName = openKeyName;
   }
 
   /**

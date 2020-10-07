@@ -132,9 +132,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * |  directoryTable    | parentId/directoryName -> DirectoryInfo         |
    * |----------------------------------------------------------------------|
-   * |  fileTable         | parentId/fileName/id -> FileInfo                |
+   * |  fileTable         | parentId/fileName -> KeyInfo                |
    * |----------------------------------------------------------------------|
-   * |  openFileTable     | parentId/fileName -> FileInfo                   |
+   * |  openFileTable     | parentId/fileName/id -> KeyInfo                   |
    * |----------------------------------------------------------------------|
    * |  transactionInfoTable | #TRANSACTIONINFO -> OMTransactionInfo        |
    * |----------------------------------------------------------------------|

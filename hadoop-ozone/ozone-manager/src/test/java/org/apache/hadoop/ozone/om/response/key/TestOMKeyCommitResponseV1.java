@@ -16,59 +16,53 @@
  * limitations under the License.
  */
 
-
-package org.apache.hadoop.ozone.om.request.key;
+package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
-
-import java.io.IOException;
-
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
+import org.junit.Assert;
 
 /**
- * Class tests OMKeyCommitRequestV1 class layout version V1.
+ * Tests OMKeyCommitResponse layout version V1.
  */
-public class TestOMKeyCommitRequestV1 extends TestOMKeyCommitRequest {
+public class TestOMKeyCommitResponseV1 extends TestOMKeyCommitResponse {
 
-  private long parentID = Long.MIN_VALUE;
-
-  private long getBucketID() throws java.io.IOException {
-    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo omBucketInfo =
-            omMetadataManager.getBucketTable().get(bucketKey);
-    if(omBucketInfo!= null){
-      return omBucketInfo.getObjectID();
-    }
-    // bucket doesn't exists in DB
-    return Long.MIN_VALUE;
+  @NotNull
+  protected OMKeyCommitResponse getOmKeyCommitResponse(
+          OmVolumeArgs omVolumeArgs, OmKeyInfo omKeyInfo,
+          OzoneManagerProtocolProtos.OMResponse omResponse, String openKey,
+          String ozoneKey) {
+    Assert.assertNotNull(omBucketInfo);
+    return new OMKeyCommitResponseV1(
+            omResponse, omKeyInfo, ozoneKey, openKey, omVolumeArgs,
+            omBucketInfo);
   }
 
+  @NotNull
   @Override
-  protected String getOzonePathKey() throws IOException {
-    long bucketID = getBucketID();
-    String fileName = OzoneFSUtils.getFileName(keyName);
-    return omMetadataManager.getOzonePathKey(bucketID, fileName);
+  protected OmKeyInfo getOmKeyInfo() {
+    Assert.assertNotNull(omBucketInfo);
+    return TestOMRequestUtils.createOmKeyInfo(volumeName,
+            omBucketInfo.getBucketName(), keyName, replicationType,
+            replicationFactor,
+            omBucketInfo.getObjectID() + 1,
+            omBucketInfo.getObjectID(), 100, Time.now());
   }
 
+  @NotNull
   @Override
-  protected String addKeyToOpenKeyTable() throws Exception {
-    // need to initialize parentID
-    if (getParentDir() == null) {
-      parentID = getBucketID();
-    } else {
-      parentID = TestOMRequestUtils.addParentsToDirTable(volumeName,
-              bucketName, getParentDir(), omMetadataManager);
-    }
-    long objectId = 100;
+  protected void addKeyToOpenKeyTable() throws Exception {
+    Assert.assertNotNull(omBucketInfo);
+    long parentID = omBucketInfo.getObjectID();
+    long objectId = parentID + 10;
 
     OmKeyInfo omKeyInfoV1 =
             TestOMRequestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
@@ -79,21 +73,30 @@ public class TestOMKeyCommitRequestV1 extends TestOMKeyCommitRequest {
     String fileName = OzoneFSUtils.getFileName(keyName);
     TestOMRequestUtils.addFileToKeyTable(true, false,
             fileName, omKeyInfoV1, clientID, txnLogId, omMetadataManager);
+  }
 
-    return omMetadataManager.getOzonePathKey(parentID, fileName);
+  @NotNull
+  @Override
+  protected String getOpenKeyName() {
+    Assert.assertNotNull(omBucketInfo);
+    return omMetadataManager.getOpenFileName(
+            omBucketInfo.getObjectID(), keyName, clientID);
+  }
+
+  @NotNull
+  @Override
+  protected String getOzoneKey() {
+    Assert.assertNotNull(omBucketInfo);
+    return omMetadataManager.getOzonePathKey(omBucketInfo.getObjectID(),
+            keyName);
   }
 
   @NotNull
   @Override
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration config = super.getOzoneConfiguration();
-    config.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
+    config.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     config.set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, "V1");
     return config;
-  }
-
-  @NotNull
-  protected OMKeyCommitRequest getOmKeyCommitRequest(OMRequest omRequest) {
-    return new OMKeyCommitRequestV1(omRequest);
   }
 }

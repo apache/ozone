@@ -142,7 +142,6 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     // Check open table whether key is added or not.
 
     omKeyInfo = verifyPathInOpenKeyTable(keyName, id, true);
-    Assert.assertNotNull(omKeyInfo);
 
     List< OmKeyLocationInfo > omKeyLocationInfoList =
         omKeyInfo.getLatestVersionLocations().getLocationList();

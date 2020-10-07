@@ -50,7 +50,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
  */
 public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
-  protected String parentDir;
+  private String parentDir;
 
   @Test
   public void testPreExecute() throws Exception {
@@ -294,6 +294,10 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
       keyLocations.add(keyLocation);
     }
     return keyLocations;
+  }
+
+  protected String getParentDir() {
+    return parentDir;
   }
 
   @NotNull

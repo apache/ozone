@@ -21,11 +21,11 @@ package org.apache.hadoop.ozone.om.response.key;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.util.Time;
+import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .CreateKeyResponse;
@@ -41,15 +41,14 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
   @Test
   public void testAddToDBBatch() throws Exception {
 
-    OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
-        bucketName, keyName, replicationType, replicationFactor);
-
     OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
         .setOwnerName(keyName).setAdminName(keyName)
         .setVolume(volumeName).setCreationTime(Time.now()).build();
-    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+    omBucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
         .setCreationTime(Time.now()).build();
+
+    OmKeyInfo omKeyInfo = getOmKeyInfo();
 
     OMResponse omResponse = OMResponse.newBuilder().setCreateKeyResponse(
                 CreateKeyResponse.getDefaultInstance())
@@ -58,11 +57,11 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
             .build();
 
     OMKeyCreateResponse omKeyCreateResponse =
-        new OMKeyCreateResponse(omResponse, omKeyInfo, null, clientID,
-            omVolumeArgs, omBucketInfo);
+            getOmKeyCreateResponse(omKeyInfo, omVolumeArgs, omBucketInfo,
+                    omResponse);
 
-    String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
-        keyName, clientID);
+    String openKey = getOpenKeyName();
+
     Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(openKey));
     omKeyCreateResponse.addToDBBatch(omMetadataManager, batchOperation);
 
@@ -74,15 +73,15 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
 
   @Test
   public void testAddToDBBatchWithErrorResponse() throws Exception {
-    OmKeyInfo omKeyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
-        bucketName, keyName, replicationType, replicationFactor);
 
     OmVolumeArgs omVolumeArgs = OmVolumeArgs.newBuilder()
         .setOwnerName(keyName).setAdminName(keyName)
         .setVolume(volumeName).setCreationTime(Time.now()).build();
-    OmBucketInfo omBucketInfo = OmBucketInfo.newBuilder()
+    omBucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
         .setCreationTime(Time.now()).build();
+
+    OmKeyInfo omKeyInfo = getOmKeyInfo();
 
     OMResponse omResponse = OMResponse.newBuilder().setCreateKeyResponse(
         CreateKeyResponse.getDefaultInstance())
@@ -91,12 +90,11 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
         .build();
 
     OMKeyCreateResponse omKeyCreateResponse =
-        new OMKeyCreateResponse(omResponse, omKeyInfo, null, clientID,
-            omVolumeArgs, omBucketInfo);
+            getOmKeyCreateResponse(omKeyInfo, omVolumeArgs, omBucketInfo,
+                    omResponse);
 
     // Before calling addToDBBatch
-    String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
-        keyName, clientID);
+    String openKey = getOpenKeyName();
     Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(openKey));
 
     omKeyCreateResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
@@ -107,5 +105,13 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
     // As omResponse is error it is a no-op.
     Assert.assertFalse(omMetadataManager.getOpenKeyTable().isExist(openKey));
 
+  }
+
+  @NotNull
+  protected OMKeyCreateResponse getOmKeyCreateResponse(OmKeyInfo keyInfo,
+    OmVolumeArgs volumeArgs, OmBucketInfo bucketInfo, OMResponse response) {
+
+    return new OMKeyCreateResponse(response, keyInfo, null, clientID,
+            volumeArgs, bucketInfo);
   }
 }

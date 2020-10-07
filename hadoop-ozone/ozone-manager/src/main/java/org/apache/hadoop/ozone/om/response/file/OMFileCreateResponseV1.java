@@ -54,7 +54,7 @@ public class OMFileCreateResponseV1 extends OMFileCreateResponse {
   }
 
   @Override
-  protected void addToDBBatch(OMMetadataManager omMetadataMgr,
+  public void addToDBBatch(OMMetadataManager omMetadataMgr,
                               BatchOperation batchOp) throws IOException {
 
     /**

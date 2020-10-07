@@ -253,4 +253,33 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
     return omClientResponse;
   }
+
+  protected void processResult(CommitKeyRequest commitKeyRequest,
+                               String volumeName, String bucketName,
+                               String keyName, OMMetrics omMetrics,
+                               IOException exception, OmKeyInfo omKeyInfo,
+                               Result result) {
+    switch (result) {
+    case SUCCESS:
+      // As when we commit the key, then it is visible in ozone, so we should
+      // increment here.
+      // As key also can have multiple versions, we need to increment keys
+      // only if version is 0. Currently we have not complete support of
+      // versioning of keys. So, this can be revisited later.
+      if (omKeyInfo.getKeyLocationVersions().size() == 1) {
+        omMetrics.incNumKeys();
+      }
+      LOG.debug("Key committed. Volume:{}, Bucket:{}, Key:{}", volumeName,
+              bucketName, keyName);
+      break;
+    case FAILURE:
+      LOG.error("Key commit failed. Volume:{}, Bucket:{}, Key:{}. Exception:{}",
+              volumeName, bucketName, keyName, exception);
+      omMetrics.incNumKeyCommitFails();
+      break;
+    default:
+      LOG.error("Unrecognized Result for OMKeyCommitRequest: {}",
+              commitKeyRequest);
+    }
+  }
 }

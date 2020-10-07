@@ -27,13 +27,21 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.*;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponseV1;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.*;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,10 +55,11 @@ import java.util.List;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
- * Handles CommitKey request.
+ * Handles CommitKey request layout version V1
  */
 public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
 
@@ -115,7 +124,7 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
       }
 
       bucketLockAcquired =
-              omMetadataManager.getLock().acquireLock(BUCKET_LOCK,
+              omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
                       volumeName, bucketName);
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
@@ -124,7 +133,7 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
       omBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
       long bucketId = omBucketInfo.getObjectID();
       long parentID = getParentID(bucketId, pathComponents, keyName,
-              omMetadataManager);
+              omMetadataManager, ozoneManager);
       String dbFileKey = omMetadataManager.getOzonePathKey(parentID, fileName);
       dbOpenFileKey = omMetadataManager.getOpenFileName(parentID, fileName,
               commitKeyRequest.getClientID());
@@ -166,7 +175,7 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
       omVolumeArgs.getUsedBytes().add(correctedSpace);
       omBucketInfo.getUsedBytes().add(correctedSpace);
 
-      omClientResponse = new OMKeyCommitResponse(omResponse.build(),
+      omClientResponse = new OMKeyCommitResponseV1(omResponse.build(),
               omKeyInfo, dbFileKey, dbOpenFileKey, omVolumeArgs, omBucketInfo);
 
       result = Result.SUCCESS;
@@ -180,7 +189,7 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
               omDoubleBufferHelper);
 
       if(bucketLockAcquired) {
-        omMetadataManager.getLock().releaseLock(BUCKET_LOCK, volumeName,
+        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
                 bucketName);
       }
     }
@@ -188,30 +197,30 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
     auditLog(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
             exception, getOmRequest().getUserInfo()));
 
-    switch (result) {
-    case SUCCESS:
-      // As when we commit the key, then it is visible in ozone, so we should
-      // increment here.
-      // As key also can have multiple versions, we need to increment keys
-      // only if version is 0. Currently we have not complete support of
-      // versioning of keys. So, this can be revisited later.
-      if (omKeyInfo.getKeyLocationVersions().size() == 1) {
-        omMetrics.incNumKeys();
-      }
-      LOG.debug("Key committed. Volume:{}, Bucket:{}, Key:{}", volumeName,
-              bucketName, keyName);
-      break;
-    case FAILURE:
-      LOG.error("Key commit failed. Volume:{}, Bucket:{}, Key:{}. Exception:{}",
-              volumeName, bucketName, keyName, exception);
-      omMetrics.incNumKeyCommitFails();
-      break;
-    default:
-      LOG.error("Unrecognized Result for OMKeyCommitRequest: {}",
-              commitKeyRequest);
-    }
+    processResult(commitKeyRequest, volumeName, bucketName, keyName, omMetrics,
+            exception, omKeyInfo, result);
 
     return omClientResponse;
+  }
+
+
+  /**
+   * Check for directory exists with same name, if it exists throw error.
+   *
+   * @param keyName                  key name
+   * @param ozoneManager             Ozone Manager
+   * @param reachedLastPathComponent true if the path component is a fileName
+   * @throws IOException if directory exists with same name
+   */
+  private void checkDirectoryAlreadyExists(String keyName,
+                                           OzoneManager ozoneManager,
+                                           boolean reachedLastPathComponent)
+          throws IOException {
+    // Reached last component, which would be a file. Returns its parentID.
+    if (reachedLastPathComponent && ozoneManager.getEnableFileSystemPaths()) {
+        throw new OMException("Can not create file: " + keyName +
+                " as there is already directory in the given path", NOT_A_FILE);
+    }
   }
 
   /**
@@ -225,36 +234,42 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
    * @throws IOException DB failure or parent not exists in DirectoryTable
    */
   private long getParentID(long bucketId, Iterator<Path> pathComponents,
-                                        String keyName,
-                                        OMMetadataManager omMetadataManager)
+                           String keyName, OMMetadataManager omMetadataManager,
+                           OzoneManager ozoneManager)
           throws IOException {
 
     long lastKnownParentId = bucketId;
-    boolean parentFound = true; // default bucketID as parent
-    OmDirectoryInfo omDirectoryInfo = null;
+
+    // If no sub-dirs then bucketID is the root/parent.
+    if(!pathComponents.hasNext()){
+      return bucketId;
+    }
+
+    OmDirectoryInfo omDirectoryInfo;
     while (pathComponents.hasNext()) {
       String nodeName = pathComponents.next().toString();
-      // Reached last component, which would be a file. Returns its parentID.
-      if (!pathComponents.hasNext()) {
-        return lastKnownParentId;
-      }
+      boolean reachedLastPathComponent = !pathComponents.hasNext();
       String dbNodeName =
               omMetadataManager.getOzonePathKey(lastKnownParentId, nodeName);
+
       omDirectoryInfo = omMetadataManager.
               getDirectoryTable().get(dbNodeName);
       if (omDirectoryInfo != null) {
+        checkDirectoryAlreadyExists(keyName, ozoneManager,
+                reachedLastPathComponent);
         lastKnownParentId = omDirectoryInfo.getObjectID();
       } else {
-        parentFound = false;
+        // One of the sub-dir doesn't exists in DB. Immediate parent should
+        // exists for committing the key, otherwise will fail the operation.
+        if (!reachedLastPathComponent) {
+          throw new OMException("Failed to commit key, as parent directory of "
+                  + keyName + " entry is not found in DirectoryTable",
+                  KEY_NOT_FOUND);
+        }
         break;
       }
     }
 
-    if (!parentFound) {
-      throw new OMException("Failed to commit key, as parent directory of "
-              + keyName + " entry is not found in DirectoryTable",
-              KEY_NOT_FOUND);
-    }
     return lastKnownParentId;
   }
 }

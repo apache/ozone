@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.ozone;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -35,7 +36,11 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.util.StringUtils;
-import org.junit.*;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Assert;
+import org.junit.Rule;
+import org.junit.Test;
 import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,8 +108,8 @@ public class TestOzoneFileOps {
     // Op 1. create dir -> /d1/d2/d3/d4/
     Path parent = new Path("/d1/d2/");
     Path file = new Path(parent, "file1");
-    fs.create(file);
-    ArrayList<String> openFileKeys = new ArrayList<>();
+    FSDataOutputStream outputStream = fs.create(file);
+    String openFileKey = "";
 
     OMMetadataManager omMgr = cluster.getOzoneManager().getMetadataManager();
     OmBucketInfo omBucketInfo = omMgr.getBucketTable().get(
@@ -116,7 +121,7 @@ public class TestOzoneFileOps {
             dirKeys, omMgr);
     long d2ObjectID = verifyDirKey(d1ObjectID, "d2", "/d1/d2", dirKeys,
             omMgr);
-    openFileKeys.add(d2ObjectID + OzoneConsts.OM_KEY_PREFIX + file.getName());
+    openFileKey = d2ObjectID + OzoneConsts.OM_KEY_PREFIX + file.getName();
 
     // verify entries in directory table
     TableIterator<String, ? extends
@@ -141,9 +146,18 @@ public class TestOzoneFileOps {
     while (keysItr.hasNext()) {
       count++;
       Table.KeyValue<String, OmKeyInfo> value = keysItr.next();
-      verifyOpenKeyFormat(value.getKey(), openFileKeys);
+      verifyOpenKeyFormat(value.getKey(), openFileKey);
     }
     Assert.assertEquals("Unexpected file table entries!", 1, count);
+
+    // trigger CommitKeyRequest
+    outputStream.close();
+
+    Assert.assertTrue("Failed to commit the open file:" + openFileKey,
+            omMgr.getOpenKeyTable().isEmpty());
+
+    OmKeyInfo omKeyInfo = omMgr.getKeyTable().get(openFileKey);
+    Assert.assertNotNull("Invalid Key!", omKeyInfo);
   }
 
 
@@ -168,13 +182,13 @@ public class TestOzoneFileOps {
    * openFileKeys list.
    *
    * @param key          table keyName
-   * @param openFileKeys expected keyName
+   * @param openFileKey expected keyName
    */
-  private void verifyOpenKeyFormat(String key, ArrayList<String> openFileKeys) {
+  private void verifyOpenKeyFormat(String key, String openFileKey) {
     String[] keyParts = StringUtils.split(key,
             OzoneConsts.OM_KEY_PREFIX.charAt(0));
     Assert.assertEquals("Invalid KeyName:" + key, 3, keyParts.length);
-    String[] expectedOpenFileParts = StringUtils.split(openFileKeys.get(0),
+    String[] expectedOpenFileParts = StringUtils.split(openFileKey,
             OzoneConsts.OM_KEY_PREFIX.charAt(0));
     Assert.assertEquals("ParentId/Key:" + expectedOpenFileParts[0]
                     + " doesn't exists in openFileTable!",

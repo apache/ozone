@@ -72,7 +72,7 @@ public class OMKeyCreateResponse extends OMClientResponse {
   }
 
   @Override
-  protected void addToDBBatch(OMMetadataManager omMetadataManager,
+  public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
     /**
