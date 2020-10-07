@@ -28,8 +28,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.protocol.proto
     .OzoneManagerProtocolProtos.OzoneAclInfo;
-import org.apache.hadoop.ozone.protocol.proto
-    .OzoneManagerProtocolProtos.UserVolumeInfo;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -41,6 +39,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,11 +70,12 @@ public class VolumeManagerImpl implements VolumeManager {
   }
 
   // Helpers to add and delete volume from user list
-  private UserVolumeInfo addVolumeToOwnerList(String volume, String owner)
-      throws IOException {
+  private PersistedUserVolumeInfo addVolumeToOwnerList(
+      String volume, String owner) throws IOException {
     // Get the volume list
     String dbUserKey = metadataManager.getUserKey(owner);
-    UserVolumeInfo volumeList = metadataManager.getUserTable().get(dbUserKey);
+    PersistedUserVolumeInfo volumeList =
+        metadataManager.getUserTable().get(dbUserKey);
     List<String> prevVolList = new ArrayList<>();
     if (volumeList != null) {
       prevVolList.addAll(volumeList.getVolumeNamesList());
@@ -90,16 +90,17 @@ public class VolumeManagerImpl implements VolumeManager {
 
     // Add the new volume to the list
     prevVolList.add(volume);
-    UserVolumeInfo newVolList = UserVolumeInfo.newBuilder()
+    PersistedUserVolumeInfo newVolList = PersistedUserVolumeInfo.newBuilder()
         .addAllVolumeNames(prevVolList).build();
 
     return newVolList;
   }
 
-  private UserVolumeInfo delVolumeFromOwnerList(String volume, String owner)
-      throws IOException {
+  private PersistedUserVolumeInfo delVolumeFromOwnerList(
+      String volume, String owner) throws IOException {
     // Get the volume list
-    UserVolumeInfo volumeList = metadataManager.getUserTable().get(owner);
+    PersistedUserVolumeInfo volumeList =
+        metadataManager.getUserTable().get(owner);
     List<String> prevVolList = new ArrayList<>();
     if (volumeList != null) {
       prevVolList.addAll(volumeList.getVolumeNamesList());
@@ -110,7 +111,7 @@ public class VolumeManagerImpl implements VolumeManager {
 
     // Remove the volume from the list
     prevVolList.remove(volume);
-    UserVolumeInfo newVolList = UserVolumeInfo.newBuilder()
+    PersistedUserVolumeInfo newVolList = PersistedUserVolumeInfo.newBuilder()
         .addAllVolumeNames(prevVolList).build();
     return newVolList;
   }
@@ -142,8 +143,8 @@ public class VolumeManagerImpl implements VolumeManager {
         throw new OMException(ResultCodes.VOLUME_ALREADY_EXISTS);
       }
 
-      UserVolumeInfo volumeList = addVolumeToOwnerList(omVolumeArgs.getVolume(),
-          omVolumeArgs.getOwnerName());
+      PersistedUserVolumeInfo volumeList = addVolumeToOwnerList(
+          omVolumeArgs.getVolume(), omVolumeArgs.getOwnerName());
 
       // Set creation time
       omVolumeArgs.setCreationTime(System.currentTimeMillis());
@@ -171,7 +172,7 @@ public class VolumeManagerImpl implements VolumeManager {
   }
 
   private void createVolumeCommitToDB(OmVolumeArgs omVolumeArgs,
-      UserVolumeInfo volumeList, String dbVolumeKey, String dbUserKey)
+      PersistedUserVolumeInfo volumeList, String dbVolumeKey, String dbUserKey)
       throws IOException {
     try (BatchOperation batch = metadataManager.getStore()
         .initBatchOperation()) {
@@ -220,11 +221,11 @@ public class VolumeManagerImpl implements VolumeManager {
 
       acquiredUsersLock = metadataManager.getLock().acquireMultiUserLock(owner,
           originalOwner);
-      UserVolumeInfo oldOwnerVolumeList = delVolumeFromOwnerList(volume,
-          originalOwner);
+      PersistedUserVolumeInfo oldOwnerVolumeList =
+          delVolumeFromOwnerList(volume, originalOwner);
 
       String newOwner =  metadataManager.getUserKey(owner);
-      UserVolumeInfo newOwnerVolumeList = addVolumeToOwnerList(volume,
+      PersistedUserVolumeInfo newOwnerVolumeList = addVolumeToOwnerList(volume,
           newOwner);
 
       volumeArgs.setOwnerName(owner);
@@ -244,9 +245,9 @@ public class VolumeManagerImpl implements VolumeManager {
     }
   }
 
-  private void setOwnerCommitToDB(UserVolumeInfo oldOwnerVolumeList,
-      UserVolumeInfo newOwnerVolumeList, OmVolumeArgs newOwnerVolumeArgs,
-      String oldOwner) throws IOException {
+  private void setOwnerCommitToDB(PersistedUserVolumeInfo oldOwnerVolumeList,
+      PersistedUserVolumeInfo newOwnerVolumeList,
+      OmVolumeArgs newOwnerVolumeArgs, String oldOwner) throws IOException {
     try (BatchOperation batch = metadataManager.getStore()
         .initBatchOperation()) {
       if (oldOwnerVolumeList.getVolumeNamesList().size() == 0) {
@@ -330,7 +331,7 @@ public class VolumeManagerImpl implements VolumeManager {
       Preconditions.checkState(volume.equals(volumeArgs.getVolume()));
       // delete the volume from the owner list
       // as well as delete the volume entry
-      UserVolumeInfo newVolumeList = delVolumeFromOwnerList(volume,
+      PersistedUserVolumeInfo newVolumeList = delVolumeFromOwnerList(volume,
           volumeArgs.getOwnerName());
 
 
@@ -350,7 +351,7 @@ public class VolumeManagerImpl implements VolumeManager {
   }
 
 
-  private void deleteVolumeCommitToDB(UserVolumeInfo newVolumeList,
+  private void deleteVolumeCommitToDB(PersistedUserVolumeInfo newVolumeList,
       String volume, String owner) throws IOException {
     try (BatchOperation batch = metadataManager.getStore()
         .initBatchOperation()) {

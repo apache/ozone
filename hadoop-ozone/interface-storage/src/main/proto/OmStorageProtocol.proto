@@ -58,3 +58,9 @@ message PersistedPrefixInfo {
   optional uint64 objectID = 4;
   optional uint64 updateID = 5;
 }
+
+message PersistedUserVolumeInfo {
+  repeated string volumeNames = 1;
+  optional uint64 objectID = 2;
+  optional uint64 updateID = 3;
+}
