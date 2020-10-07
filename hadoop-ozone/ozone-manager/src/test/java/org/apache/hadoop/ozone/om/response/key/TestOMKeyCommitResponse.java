@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 /**
  * Tests OMKeyCommitResponse.
  */
+@SuppressWarnings("visibilitymodifier")
 public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
   protected OmBucketInfo omBucketInfo;
@@ -127,6 +128,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
   @NotNull
   protected String getOzoneKey() {
+    Assert.assertNotNull(omBucketInfo);
     return omMetadataManager.getOzoneKey(volumeName,
             omBucketInfo.getBucketName(), keyName);
   }
@@ -136,7 +138,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
           OmVolumeArgs omVolumeArgs, OmKeyInfo omKeyInfo,
           OzoneManagerProtocolProtos.OMResponse omResponse, String openKey,
           String ozoneKey) {
-
+    Assert.assertNotNull(omBucketInfo);
     return new OMKeyCommitResponse(
             omResponse, omKeyInfo, ozoneKey, openKey, omVolumeArgs,
             omBucketInfo);

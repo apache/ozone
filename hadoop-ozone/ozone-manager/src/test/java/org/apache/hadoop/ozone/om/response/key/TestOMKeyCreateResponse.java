@@ -109,7 +109,7 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
 
   @NotNull
   protected OMKeyCreateResponse getOmKeyCreateResponse(OmKeyInfo keyInfo,
-    OmVolumeArgs volumeArgs, OmBucketInfo bucketInfo, OMResponse response) {
+      OmVolumeArgs volumeArgs, OmBucketInfo bucketInfo, OMResponse response) {
 
     return new OMKeyCreateResponse(response, keyInfo, null, clientID,
             volumeArgs, bucketInfo);

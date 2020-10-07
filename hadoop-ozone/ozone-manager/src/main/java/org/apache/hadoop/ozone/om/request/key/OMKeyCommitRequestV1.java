@@ -59,7 +59,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
- * Handles CommitKey request layout version V1
+ * Handles CommitKey request layout version V1.
  */
 public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
 
@@ -218,8 +218,8 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
           throws IOException {
     // Reached last component, which would be a file. Returns its parentID.
     if (reachedLastPathComponent && ozoneManager.getEnableFileSystemPaths()) {
-        throw new OMException("Can not create file: " + keyName +
-                " as there is already directory in the given path", NOT_A_FILE);
+      throw new OMException("Can not create file: " + keyName +
+              " as there is already directory in the given path", NOT_A_FILE);
     }
   }
 

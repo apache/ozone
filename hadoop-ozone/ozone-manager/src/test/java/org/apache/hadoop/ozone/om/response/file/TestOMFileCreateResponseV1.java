@@ -58,7 +58,7 @@ public class TestOMFileCreateResponseV1 extends TestOMKeyCreateResponse {
   @NotNull
   @Override
   protected OMKeyCreateResponse getOmKeyCreateResponse(OmKeyInfo keyInfo,
-    OmVolumeArgs volumeArgs, OmBucketInfo bucketInfo, OMResponse response) {
+      OmVolumeArgs volumeArgs, OmBucketInfo bucketInfo, OMResponse response) {
 
     return new OMFileCreateResponseV1(response, keyInfo, null, clientID,
             volumeArgs, bucketInfo);

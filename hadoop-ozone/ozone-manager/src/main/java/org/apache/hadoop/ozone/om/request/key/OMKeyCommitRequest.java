@@ -228,32 +228,25 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     auditLog(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
           exception, getOmRequest().getUserInfo()));
 
-    switch (result) {
-    case SUCCESS:
-      // As when we commit the key, then it is visible in ozone, so we should
-      // increment here.
-      // As key also can have multiple versions, we need to increment keys
-      // only if version is 0. Currently we have not complete support of
-      // versioning of keys. So, this can be revisited later.
-      if (omKeyInfo.getKeyLocationVersions().size() == 1) {
-        omMetrics.incNumKeys();
-      }
-      LOG.debug("Key committed. Volume:{}, Bucket:{}, Key:{}", volumeName,
-          bucketName, keyName);
-      break;
-    case FAILURE:
-      LOG.error("Key commit failed. Volume:{}, Bucket:{}, Key:{}.",
-          volumeName, bucketName, keyName, exception);
-      omMetrics.incNumKeyCommitFails();
-      break;
-    default:
-      LOG.error("Unrecognized Result for OMKeyCommitRequest: {}",
-          commitKeyRequest);
-    }
+    processResult(commitKeyRequest, volumeName, bucketName, keyName, omMetrics,
+            exception, omKeyInfo, result);
 
     return omClientResponse;
   }
 
+  /**
+   * Process result of om request execution.
+   *
+   * @param commitKeyRequest commit key request
+   * @param volumeName       volume name
+   * @param bucketName       bucket name
+   * @param keyName          key name
+   * @param omMetrics        om metrics
+   * @param exception        exception trace
+   * @param omKeyInfo        omKeyInfo
+   * @param result           stores the result of the execution
+   */
+  @SuppressWarnings("parameternumber")
   protected void processResult(CommitKeyRequest commitKeyRequest,
                                String volumeName, String bucketName,
                                String keyName, OMMetrics omMetrics,

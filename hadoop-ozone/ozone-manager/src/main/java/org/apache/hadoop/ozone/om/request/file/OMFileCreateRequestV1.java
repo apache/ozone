@@ -26,13 +26,22 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.*;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponse;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponseV1;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.*;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
@@ -46,7 +55,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.*;
 
 /**
  * Handles create file request layout version1.
@@ -140,10 +148,11 @@ public class OMFileCreateRequestV1 extends OMFileCreateRequest {
       }
 
       // check if the file or directory already existed in OM
-      checkPathAlreadyExists(keyName, isOverWrite, pathInfoV1);
+      checkDirectoryResult(keyName, isOverWrite,
+              pathInfoV1.getDirectoryResult());
 
       if (!isRecursive) {
-        checkAllParentsExist(ozoneManager, keyArgs, pathInfoV1);
+        checkAllParentsExist(keyArgs, pathInfoV1);
       }
 
       // add all missing parents to dir table
@@ -248,42 +257,5 @@ public class OMFileCreateRequestV1 extends OMFileCreateRequest {
     }
 
     return omClientResponse;
-  }
-
-  private void checkPathAlreadyExists(String keyName, boolean isOverWrite,
-                                      OMFileRequest.OMPathInfoV1 omPathInfo)
-          throws OMException {
-
-    OMFileRequest.OMDirectoryResult omPathResult =
-            omPathInfo.getDirectoryResult();
-    // Check if a file or directory exists with same key name.
-    if (omPathResult == FILE_EXISTS) {
-      if (!isOverWrite) {
-        throw new OMException("File " + keyName + " already exists",
-                OMException.ResultCodes.FILE_ALREADY_EXISTS);
-      }
-    } else if (omPathResult == DIRECTORY_EXISTS) {
-      throw new OMException("Can not write to directory: " + keyName,
-              OMException.ResultCodes.NOT_A_FILE);
-    } else if (omPathResult == FILE_EXISTS_IN_GIVENPATH) {
-      throw new OMException(
-              "Can not create file: " + keyName + " as there " +
-                      "is already file in the given path",
-              OMException.ResultCodes.NOT_A_FILE);
-    }
-  }
-
-  private void checkAllParentsExist(OzoneManager ozoneManager,
-                                    KeyArgs keyArgs,
-                                    OMFileRequest.OMPathInfoV1 pathInfo)
-          throws IOException {
-    String keyName = keyArgs.getKeyName();
-
-    // if immediate parent exists, assume higher level directories exist.
-    if (!pathInfo.directParentExists()) {
-      throw new OMException("Cannot create file : " + keyName
-              + " as parent directory : " + pathInfo.getMissingParents()
-              + " doesn't exists", OMException.ResultCodes.DIRECTORY_NOT_FOUND);
-    }
   }
 }
