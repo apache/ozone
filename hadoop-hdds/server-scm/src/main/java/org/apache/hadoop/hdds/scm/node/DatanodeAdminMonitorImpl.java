@@ -87,12 +87,9 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
    * queued and added to the workflow after a defined interval.
    *
    * @param dn         The datanode to move into an admin state
-   * @param endInHours For nodes going into maintenance, the number of hours
-   *                   from now for maintenance to automatically end. Ignored
-   *                   for decommissioning nodes.
    */
   @Override
-  public synchronized void startMonitoring(DatanodeDetails dn, int endInHours) {
+  public synchronized void startMonitoring(DatanodeDetails dn) {
     cancelledNodes.remove(dn);
     pendingNodes.add(dn);
   }
