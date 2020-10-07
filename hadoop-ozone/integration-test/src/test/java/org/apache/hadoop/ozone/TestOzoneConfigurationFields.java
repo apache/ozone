@@ -71,6 +71,12 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         ReconServerConfigKeys.OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT,
         ReconServerConfigKeys
             .OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT,
+        ReconServerConfigKeys.RECON_OM_SOCKET_TIMEOUT,
+        ReconServerConfigKeys.RECON_OM_CONNECTION_TIMEOUT,
+        ReconServerConfigKeys.RECON_OM_CONNECTION_REQUEST_TIMEOUT,
+        ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY,
+        ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY,
+        ReconServerConfigKeys.RECON_OM_SNAPSHOT_TASK_FLUSH_PARAM,
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY
         // TODO HDDS-2856
     ));
