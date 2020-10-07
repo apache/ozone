@@ -22,6 +22,7 @@ import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -947,8 +948,9 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public List<String> getExpiredOpenKeys(int count) throws IOException {
-    return metadataManager.getExpiredOpenKeys(count);
+  public List<String> getExpiredOpenKeys(long expireThreshold,
+      TimeUnit unit, int count) throws IOException {
+    return metadataManager.getExpiredOpenKeys(expireThreshold, unit, count);
   }
 
   @Override
