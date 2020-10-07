@@ -307,8 +307,7 @@ public class TestDecommissionAndMaintenance {
    * @throws IOException
    */
   private void generateData(int keyCount, String keyPrefix,
-                            ReplicationFactor repFactor, ReplicationType repType)
-      throws IOException {
+      ReplicationFactor repFactor, ReplicationType repType) throws IOException {
     for (int i=0; i<keyCount; i++) {
       TestDataUtil.createKey(bucket, keyPrefix + i, repFactor, repType,
           "this is the content");
@@ -350,7 +349,7 @@ public class TestDecommissionAndMaintenance {
   }
 
   /**
-   * Select any DN hosting a replica from the Replica Set
+   * Select any DN hosting a replica from the Replica Set.
    * @param replicas The set of ContainerReplica
    * @return Any datanode associated one of the replicas
    */
@@ -364,7 +363,7 @@ public class TestDecommissionAndMaintenance {
 
   /**
    * Given a Datanode, return a string consisting of the hostname and one of its
-   * ports in the for host:post
+   * ports in the for host:post.
    * @param dn Datanode for which to retrieve the host:post string
    * @return host:port for the given DN.
    */
