@@ -211,7 +211,6 @@ public class SCMDatanodeProtocolServer implements
       PipelineReportsProto pipelineReportsProto,
       LayoutVersionProto layoutInfo)
       throws IOException {
-    //TODO : DataNode-Upgrade: layoutinfo related processing.
     DatanodeDetails datanodeDetails = DatanodeDetails
         .getFromProtoBuf(extendedDatanodeDetailsProto);
     boolean auditSuccess = true;

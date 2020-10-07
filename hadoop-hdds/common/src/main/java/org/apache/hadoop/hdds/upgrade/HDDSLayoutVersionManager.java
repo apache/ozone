@@ -33,7 +33,7 @@ import com.google.common.annotations.VisibleForTesting;
  * and DataNodes.
  */
 @SuppressWarnings("FinalClass")
-public final class HDDSLayoutVersionManager extends
+public class HDDSLayoutVersionManager extends
     AbstractLayoutVersionManager<HDDSLayoutFeature> {
 
   private static HDDSLayoutVersionManager hddsLayoutVersionManager;
