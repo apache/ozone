@@ -294,9 +294,9 @@
             <exclude>src/test/resources/ssl/*</exclude>
             <exclude>src/main/compose/ozonesecure/docker-image/runner/build/apache-rat-0.12/README-CLI.txt</exclude>
             <exclude>src/main/compose/ozonesecure/docker-image/runner/build/apache-rat-0.12/README-ANT.txt</exclude>
-            <exclude>webapps/static/angular-1.7.9.min.js</exclude>
+            <exclude>webapps/static/angular-1.8.0.min.js</exclude>
             <exclude>webapps/static/angular-nvd3-1.0.9.min.js</exclude>
-            <exclude>webapps/static/angular-route-1.7.9.min.js</exclude>
+            <exclude>webapps/static/angular-route-1.8.0.min.js</exclude>
             <exclude>webapps/static/bootstrap-3.4.1/**</exclude>
             <exclude>webapps/static/d3-3.5.17.min.js</exclude>
             <exclude>webapps/static/jquery-3.5.1.min.js</exclude>
