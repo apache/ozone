@@ -154,10 +154,6 @@ public final class OmKeyInfo extends WithObjectID {
     return fileName;
   }
 
-  public void setParentObjectID(long parentObjectID) {
-    this.parentObjectID = parentObjectID;
-  }
-
   public long getParentObjectID() {
     return parentObjectID;
   }
@@ -571,8 +567,10 @@ public final class OmKeyInfo extends WithObjectID {
         .setReplicationType(type)
         .setReplicationFactor(factor)
         .setFileEncryptionInfo(encInfo)
-        .setObjectID(objectID).setUpdateID(updateID);
-
+        .setObjectID(objectID)
+        .setUpdateID(updateID)
+        .setParentObjectID(parentObjectID)
+        .setFileName(fileName);
 
     keyLocationVersions.forEach(keyLocationVersion ->
         builder.addOmKeyLocationInfoGroup(

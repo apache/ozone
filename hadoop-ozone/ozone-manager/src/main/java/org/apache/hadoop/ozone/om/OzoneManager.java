@@ -1144,6 +1144,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     //  upgrade HDDS-3698 story reaches consensus.
     getOMLayoutVersion();
 
+    OzoneManagerRatisUtils.setEnableFileSystemPaths(getEnableFileSystemPaths());
+
     metadataManager.start(configuration);
     startSecretManagerIfNecessary();
 

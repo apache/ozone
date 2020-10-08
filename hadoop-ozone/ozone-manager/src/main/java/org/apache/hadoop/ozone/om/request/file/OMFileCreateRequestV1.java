@@ -19,8 +19,6 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import com.google.common.base.Optional;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -141,10 +139,8 @@ public class OMFileCreateRequestV1 extends OMFileCreateRequest {
         String dbFileKey = omMetadataManager.getOzonePathKey(
                 pathInfoV1.getLastKnownParentId(),
                 pathInfoV1.getLeafNodeName());
-        dbFileInfo = omMetadataManager.getKeyTable().get(dbFileKey);
-        if (dbFileInfo != null) {
-          ozoneManager.getKeyManager().refresh(dbFileInfo);
-        }
+        dbFileInfo = OMFileRequest.getOmKeyInfoFromFileTable(false,
+                omMetadataManager, dbFileKey, keyName);
       }
 
       // check if the file or directory already existed in OM
@@ -196,9 +192,9 @@ public class OMFileCreateRequestV1 extends OMFileCreateRequest {
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
-      omMetadataManager.getOpenKeyTable().addCacheEntry(
-          new CacheKey<>(dbOpenFileName),
-          new CacheValue<>(Optional.of(omFileInfo), trxnLogIndex));
+      OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
+              dbOpenFileName, omFileInfo, pathInfoV1.getLeafNodeName(),
+              trxnLogIndex);
 
       // Add cache entries for the prefix directories.
       // Skip adding for the file key itself, until Key Commit.

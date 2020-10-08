@@ -18,13 +18,18 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 import javax.annotation.Nonnull;
+
+import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.*;
 
@@ -50,5 +55,26 @@ public class OMKeyCommitResponseV1 extends OMKeyCommitResponse {
   public OMKeyCommitResponseV1(@Nonnull OMResponse omResponse) {
     super(omResponse);
     checkStatusNotOK();
+  }
+
+  @Override
+  public void addToDBBatch(OMMetadataManager omMetadataManager,
+                           BatchOperation batchOperation) throws IOException {
+
+    // Delete from OpenKey table
+    omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
+            getOpenKeyName());
+
+    OMFileRequest.addToFileTable(omMetadataManager, batchOperation,
+            getOmKeyInfo());
+
+    // update volume usedBytes.
+    omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
+            omMetadataManager.getVolumeKey(getOmVolumeArgs().getVolume()),
+            getOmVolumeArgs());
+    // update bucket usedBytes.
+    omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+            omMetadataManager.getBucketKey(getOmVolumeArgs().getVolume(),
+                    getOmBucketInfo().getBucketName()), getOmBucketInfo());
   }
 }

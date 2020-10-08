@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -74,11 +75,8 @@ public class OMFileCreateResponseV1 extends OMFileCreateResponse {
       }
     }
 
-    String openKey = omMetadataMgr.getOpenFileName(
-            getOmKeyInfo().getParentObjectID(), getOmKeyInfo().getFileName(),
+    OMFileRequest.addToOpenFileTable(omMetadataMgr, batchOp, getOmKeyInfo(),
             getOpenKeySessionID());
-    omMetadataMgr.getOpenKeyTable().putWithBatch(batchOp, openKey,
-            getOmKeyInfo());
 
     // update volume usedBytes.
     omMetadataMgr.getVolumeTable().putWithBatch(batchOp,

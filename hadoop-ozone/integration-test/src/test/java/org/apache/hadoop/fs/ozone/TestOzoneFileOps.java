@@ -147,6 +147,7 @@ public class TestOzoneFileOps {
       count++;
       Table.KeyValue<String, OmKeyInfo> value = keysItr.next();
       verifyOpenKeyFormat(value.getKey(), openFileKey);
+      verifyOMFileInfoFormat(value.getValue(), file.getName(), d2ObjectID);
     }
     Assert.assertEquals("Unexpected file table entries!", 1, count);
 
@@ -158,8 +159,19 @@ public class TestOzoneFileOps {
 
     OmKeyInfo omKeyInfo = omMgr.getKeyTable().get(openFileKey);
     Assert.assertNotNull("Invalid Key!", omKeyInfo);
+    verifyOMFileInfoFormat(omKeyInfo, file.getName(), d2ObjectID);
   }
 
+  private void verifyOMFileInfoFormat(OmKeyInfo omKeyInfo, String fileName,
+                                      long parentID) {
+    Assert.assertEquals("Wrong keyName", fileName,
+            omKeyInfo.getKeyName());
+    Assert.assertEquals("Wrong parentID", parentID,
+            omKeyInfo.getParentObjectID());
+    String dbKey = parentID + OzoneConsts.OM_KEY_PREFIX + fileName;
+    Assert.assertEquals("Wrong path format", dbKey,
+            omKeyInfo.getPath());
+  }
 
   /**
    * Verify key name format and the DB key existence in the expected dirKeys
@@ -200,7 +212,7 @@ public class TestOzoneFileOps {
   long verifyDirKey(long parentId, String dirKey, String absolutePath,
                     ArrayList<String> dirKeys, OMMetadataManager omMgr)
           throws Exception {
-    String dbKey = parentId + "/" + dirKey;
+    String dbKey = parentId + OzoneConsts.OM_KEY_PREFIX + dirKey;
     dirKeys.add(dbKey);
     OmDirectoryInfo dirInfo = omMgr.getDirectoryTable().get(dbKey);
     Assert.assertNotNull("Failed to find " + absolutePath +

@@ -26,7 +26,9 @@ import java.util.List;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -36,6 +38,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -427,7 +430,7 @@ public final class OMFileRequest {
   /**
    * Adding directory info to the Table cache.
    *
-   * @param omMetadataManager  OM Metdata Manager
+   * @param omMetadataManager  OM Metadata Manager
    * @param dirInfo            directory info
    * @param missingParentInfos list of the parents to be added to DB
    * @param trxnLogIndex       transaction log index
@@ -451,6 +454,147 @@ public final class OMFileRequest {
                       dirInfo.get().getName())),
               new CacheValue<>(dirInfo, trxnLogIndex));
     }
+  }
+
+  /**
+   * Adding Key info to the openFile Table cache.
+   *
+   * @param omMetadataManager OM Metadata Manager
+   * @param dbOpenFileName    open file name key
+   * @param omFileInfo        key info
+   * @param fileName          file name
+   * @param trxnLogIndex      transaction log index
+   */
+  public static void addOpenFileTableCacheEntry(
+          OMMetadataManager omMetadataManager, String dbOpenFileName,
+          @Nullable OmKeyInfo omFileInfo, String fileName, long trxnLogIndex) {
+
+    Optional<OmKeyInfo> keyInfoOptional = Optional.absent();
+    if (omFileInfo != null) {
+      // New key format for the openFileTable.
+      // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
+      // keyName field stores only the leaf node name, which is 'file1'.
+      OmKeyInfo dbOmFileInfo = omFileInfo.copyObject();
+      if (StringUtils.isNotBlank(fileName)) {
+        dbOmFileInfo.setKeyName(fileName);
+      }
+      keyInfoOptional = Optional.of(dbOmFileInfo);
+    }
+
+    omMetadataManager.getOpenKeyTable().addCacheEntry(
+            new CacheKey<>(dbOpenFileName),
+            new CacheValue<>(keyInfoOptional, trxnLogIndex));
+  }
+
+  /**
+   * Adding Key info to the file table cache.
+   *
+   * @param omMetadataManager OM Metadata Manager
+   * @param dbFileKey         file name key
+   * @param omFileInfo        key info
+   * @param fileName          file name
+   * @param trxnLogIndex      transaction log index
+   */
+  public static void addFileTableCacheEntry(
+          OMMetadataManager omMetadataManager, String dbFileKey,
+          OmKeyInfo omFileInfo, String fileName, long trxnLogIndex) {
+
+    // New key format for the openFileTable.
+    // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
+    // keyName field stores only the leaf node name, which is 'file1'.
+    OmKeyInfo dbOmFileInfo = omFileInfo.copyObject();
+    if (StringUtils.isNotBlank(fileName)) {
+      dbOmFileInfo.setKeyName(fileName);
+    }
+
+    omMetadataManager.getKeyTable().addCacheEntry(
+            new CacheKey<>(dbFileKey),
+            new CacheValue<>(Optional.of(dbOmFileInfo), trxnLogIndex));
+  }
+
+  /**
+   * Adding omKeyInfo to open file table.
+   *
+   * @param omMetadataMgr    OM Metadata Manager
+   * @param batchOp          batch of db operations
+   * @param omFileInfo       omKeyInfo
+   * @param openKeySessionID clientID
+   * @throws IOException DB failure
+   */
+  public static void addToOpenFileTable(OMMetadataManager omMetadataMgr,
+                                        BatchOperation batchOp,
+                                        OmKeyInfo omFileInfo,
+                                        long openKeySessionID)
+          throws IOException {
+
+    String dbOpenFileKey = omMetadataMgr.getOpenFileName(
+            omFileInfo.getParentObjectID(), omFileInfo.getFileName(),
+            openKeySessionID);
+
+    OmKeyInfo dbOmFileInfo = omFileInfo.copyObject();
+    String fileName = omFileInfo.getFileName();
+    if (StringUtils.isNotBlank(fileName)) {
+      dbOmFileInfo.setKeyName(fileName);
+    }
+    omMetadataMgr.getOpenKeyTable().putWithBatch(batchOp, dbOpenFileKey,
+            dbOmFileInfo);
+  }
+
+  /**
+   * Adding omKeyInfo to file table.
+   *
+   * @param omMetadataMgr
+   * @param batchOp
+   * @param omFileInfo
+   * @throws IOException
+   */
+  public static void addToFileTable(OMMetadataManager omMetadataMgr,
+                                    BatchOperation batchOp,
+                                    OmKeyInfo omFileInfo)
+          throws IOException {
+
+    String dbFileKey = omMetadataMgr.getOzonePathKey(
+            omFileInfo.getParentObjectID(), omFileInfo.getFileName());
+
+    OmKeyInfo dbOmFileInfo = omFileInfo.copyObject();
+    String fileName = omFileInfo.getFileName();
+    if (StringUtils.isNotBlank(fileName)) {
+      dbOmFileInfo.setKeyName(fileName);
+    }
+    omMetadataMgr.getKeyTable().putWithBatch(batchOp,
+            dbFileKey, dbOmFileInfo);
+  }
+
+  /**
+   * Gets om key info from open key table if openFileTable flag is true,
+   * otherwise get it from key table.
+   *
+   * @param openFileTable if true add KeyInfo to openFileTable, otherwise to
+   *                      fileTable
+   * @param omMetadataMgr OM Metadata Manager
+   * @param dbOpenFileKey open file kaye name in DB
+   * @param keyName       key name
+   * @return om key info
+   * @throws IOException DB failure
+   */
+  public static OmKeyInfo getOmKeyInfoFromFileTable(boolean openFileTable,
+      OMMetadataManager omMetadataMgr, String dbOpenFileKey, String keyName)
+          throws IOException {
+
+    OmKeyInfo dbOmKeyInfo;
+    if (openFileTable) {
+      dbOmKeyInfo = omMetadataMgr.getOpenKeyTable().get(dbOpenFileKey);
+    } else {
+      dbOmKeyInfo = omMetadataMgr.getKeyTable().get(dbOpenFileKey);
+    }
+
+    // DB OMKeyInfo will store fileName into keyName field. This function is
+    // to set user given keyName into the OmKeyInfo object.
+    if (dbOmKeyInfo != null) {
+      dbOmKeyInfo.setFileName(dbOmKeyInfo.getKeyName());
+      dbOmKeyInfo.setKeyName(keyName);
+    }
+    return dbOmKeyInfo;
   }
 
 }

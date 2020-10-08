@@ -18,9 +18,6 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import com.google.common.base.Optional;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -34,6 +31,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponseV1;
@@ -138,7 +136,8 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
       dbOpenFileKey = omMetadataManager.getOpenFileName(parentID, fileName,
               commitKeyRequest.getClientID());
 
-      omKeyInfo = omMetadataManager.getOpenKeyTable().get(dbOpenFileKey);
+      omKeyInfo = OMFileRequest.getOmKeyInfoFromFileTable(true,
+              omMetadataManager, dbOpenFileKey, keyName);
       if (omKeyInfo == null) {
         throw new OMException("Failed to commit key, as " + dbOpenFileKey +
                 "entry is not found in the OpenKey table", KEY_NOT_FOUND);
@@ -154,13 +153,11 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // Add to cache of open key table and key table.
-      omMetadataManager.getOpenKeyTable().addCacheEntry(
-              new CacheKey<>(dbFileKey),
-              new CacheValue<>(Optional.absent(), trxnLogIndex));
+      OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, dbFileKey,
+              null, fileName, trxnLogIndex);
 
-      omMetadataManager.getKeyTable().addCacheEntry(
-              new CacheKey<>(dbFileKey),
-              new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+      OMFileRequest.addFileTableCacheEntry(omMetadataManager, dbFileKey,
+              omKeyInfo, fileName, trxnLogIndex);
 
       long scmBlockSize = ozoneManager.getScmBlockSize();
       int factor = omKeyInfo.getFactor().getNumber();
