@@ -263,9 +263,9 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
             <exclude>**/report.html</exclude>
             <exclude>.gitattributes</exclude>
             <exclude>.idea/**</exclude>
-            <exclude>src/main/resources/webapps/static/angular-1.7.9.min.js</exclude>
+            <exclude>src/main/resources/webapps/static/angular-1.8.0.min.js</exclude>
             <exclude>src/main/resources/webapps/static/angular-nvd3-1.0.9.min.js</exclude>
-            <exclude>src/main/resources/webapps/static/angular-route-1.7.9.min.js</exclude>
+            <exclude>src/main/resources/webapps/static/angular-route-1.8.0.min.js</exclude>
             <exclude>src/main/resources/webapps/static/d3-3.5.17.min.js</exclude>
             <exclude>src/main/resources/webapps/static/nvd3-1.8.5.min.css.map</exclude>
             <exclude>src/main/resources/webapps/static/nvd3-1.8.5.min.css</exclude>
