@@ -39,7 +39,6 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.util.Collection;
 import java.util.List;
 
 /**
@@ -75,19 +74,19 @@ public class ChunkInputStream extends InputStream implements Seekable {
   // position. Once the chunk is read, this variable is reset.
   private long chunkPosition = -1;
 
-  private final Collection<Token<? extends TokenIdentifier>> tokens;
+  private final Token<? extends TokenIdentifier> token;
 
   private static final int EOF = -1;
 
   ChunkInputStream(ChunkInfo chunkInfo, BlockID blockId,
       XceiverClientSpi xceiverClient, boolean verifyChecksum,
-      Collection<Token<? extends TokenIdentifier>> tokens) {
+      Token<? extends TokenIdentifier> token) {
     this.chunkInfo = chunkInfo;
     this.length = chunkInfo.getLen();
     this.blockID = blockId;
     this.xceiverClient = xceiverClient;
     this.verifyChecksum = verifyChecksum;
-    this.tokens = tokens;
+    this.token = token;
   }
 
   public synchronized long getRemaining() throws IOException {
@@ -339,7 +338,7 @@ public class ChunkInputStream extends InputStream implements Seekable {
       validators.add(validator);
 
       readChunkResponse = ContainerProtocolCalls.readChunk(xceiverClient,
-          readChunkInfo, blockID, validators, tokens);
+          readChunkInfo, blockID, validators, token);
 
     } catch (IOException e) {
       if (e instanceof StorageContainerException) {

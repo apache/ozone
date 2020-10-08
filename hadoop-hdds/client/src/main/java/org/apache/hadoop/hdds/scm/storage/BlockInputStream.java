@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
@@ -33,7 +32,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
-import org.apache.hadoop.security.token.TokenIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +40,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.function.Function;
 
@@ -98,7 +95,6 @@ public class BlockInputStream extends InputStream implements Seekable {
   private int chunkIndexOfPrevPosition;
 
   private Function<BlockID, Pipeline> refreshPipelineFunction;
-  private Collection<Token<? extends TokenIdentifier>> tokens;
 
   public BlockInputStream(BlockID blockId, long blockLen, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
@@ -193,14 +189,10 @@ public class BlockInputStream extends InputStream implements Seekable {
             blockID.getContainerID());
       }
 
-      if (token != null) {
-        UserGroupInformation.getCurrentUser().addToken(token);
-      }
-      tokens = UserGroupInformation.getCurrentUser().getTokens();
       DatanodeBlockID datanodeBlockID = blockID
           .getDatanodeBlockIDProtobuf();
       GetBlockResponseProto response = ContainerProtocolCalls
-          .getBlock(xceiverClient, datanodeBlockID, tokens);
+          .getBlock(xceiverClient, datanodeBlockID, token);
 
       chunks = response.getBlockData().getChunksList();
       success = true;
@@ -220,7 +212,7 @@ public class BlockInputStream extends InputStream implements Seekable {
    */
   protected synchronized void addStream(ChunkInfo chunkInfo) {
     chunkStreams.add(new ChunkInputStream(chunkInfo, blockID,
-        xceiverClient, verifyChecksum, tokens));
+        xceiverClient, verifyChecksum, token));
   }
 
   public synchronized long getRemaining() throws IOException {

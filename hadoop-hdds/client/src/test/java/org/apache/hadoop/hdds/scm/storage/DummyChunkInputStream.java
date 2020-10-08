@@ -26,8 +26,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
-import static java.util.Collections.emptyList;
-
 /**
  * A dummy ChunkInputStream to mock read chunk calls to DN.
  */
@@ -44,7 +42,7 @@ public class DummyChunkInputStream extends ChunkInputStream {
       XceiverClientSpi xceiverClient,
       boolean verifyChecksum,
       byte[] data) {
-    super(chunkInfo, blockId, xceiverClient, verifyChecksum, emptyList());
+    super(chunkInfo, blockId, xceiverClient, verifyChecksum, null);
     this.chunkData = data;
   }
 

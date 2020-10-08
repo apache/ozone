@@ -39,7 +39,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
-import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
@@ -51,8 +50,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.keys.KeyHandler;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.Token;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
@@ -121,7 +118,6 @@ public class ChunkKeyHandler extends KeyHandler implements
       ContainerChunkInfo containerChunkInfo = new ContainerChunkInfo();
       long containerId = keyLocation.getContainerID();
       chunkPaths.clear();
-      Token<OzoneBlockTokenIdentifier> token = keyLocation.getToken();
       Pipeline pipeline = keyLocation.getPipeline();
       if (pipeline.getType() != HddsProtos.ReplicationType.STAND_ALONE) {
         pipeline = Pipeline.newBuilder(pipeline)
@@ -131,17 +127,14 @@ public class ChunkKeyHandler extends KeyHandler implements
               .acquireClientForReadData(pipeline);
       // Datanode is queried to get chunk information.Thus querying the
       // OM,SCM and datanode helps us get chunk location information
-      if (token != null) {
-        UserGroupInformation.getCurrentUser().addToken(token);
-      }
       ContainerProtos.DatanodeBlockID datanodeBlockID = keyLocation.getBlockID()
               .getDatanodeBlockIDProtobuf();
       // doing a getBlock on all nodes
       HashMap<DatanodeDetails, ContainerProtos.GetBlockResponseProto>
               responses = null;
       try {
-        responses = ContainerProtocolCalls
-                .getBlockFromAllNodes(xceiverClient, datanodeBlockID);
+        responses = ContainerProtocolCalls.getBlockFromAllNodes(
+            xceiverClient, datanodeBlockID, keyLocation.getToken());
       } catch (InterruptedException e) {
         LOG.error("Execution interrupted due to " + e);
       }
