@@ -99,7 +99,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       if (ozoneManager.getAclsEnabled()) {
         checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.DELETE,
-            volumeName, bucketName, null, null);
+            volumeName, bucketName, null);
       }
 
       // acquire lock

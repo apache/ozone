@@ -121,7 +121,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
       if (ozoneManager.getAclsEnabled()) {
         checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE, volume,
-            null, null, null);
+            null, null);
       }
 
       acquireVolumeLock = omMetadataManager.getLock().acquireWriteLock(

@@ -411,7 +411,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     if (ozoneManager.getAclsEnabled()) {
       checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
           OzoneObj.StoreType.OZONE, aclType,
-          volume, bucket, key, null);
+          volume, bucket, key);
     }
   }
 
@@ -432,7 +432,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       throws IOException {
     if (ozoneManager.getAclsEnabled()) {
       checkAcls(ozoneManager, resourceType, OzoneObj.StoreType.OZONE, aclType,
-          volume, bucket, key, null);
+          volume, bucket, key);
     }
   }
 

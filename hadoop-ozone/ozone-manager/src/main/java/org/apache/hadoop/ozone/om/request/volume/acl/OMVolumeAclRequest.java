@@ -78,7 +78,7 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
       if (ozoneManager.getAclsEnabled()) {
         checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-            volume, null, null, null);
+            volume, null, null);
       }
       lockAcquired = omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume);

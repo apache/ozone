@@ -91,7 +91,7 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
       if (ozoneManager.getAclsEnabled()) {
         checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.DELETE, volume,
-            null, null, null);
+            null, null);
       }
 
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(

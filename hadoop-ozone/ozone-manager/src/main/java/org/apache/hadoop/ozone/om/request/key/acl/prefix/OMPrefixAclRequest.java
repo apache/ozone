@@ -83,7 +83,7 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
       if (ozoneManager.getAclsEnabled()) {
         checkAcls(ozoneManager, OzoneObj.ResourceType.PREFIX,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-            volume, bucket, key, null);
+            volume, bucket, key);
       }
 
       lockAcquired =

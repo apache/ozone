@@ -146,18 +146,15 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @param vol
    * @param bucket
    * @param key
-   * @param ownerName - only used for createVolume, null otherwise.
    * @throws IOException
    */
   @SuppressWarnings("parameternumber")
   public void checkAcls(OzoneManager ozoneManager,
       OzoneObj.ResourceType resType,
       OzoneObj.StoreType storeType, IAccessAuthorizer.ACLType aclType,
-      String vol, String bucket, String key,
-      String ownerName) throws IOException {
+      String vol, String bucket, String key) throws IOException {
     ozoneManager.checkAcls(resType, storeType, aclType, vol, bucket, key,
-        createUGI(), getRemoteAddress(), getHostName(), true,
-        ownerName);
+        createUGI(), getRemoteAddress(), getHostName(), true);
   }
 
   /**

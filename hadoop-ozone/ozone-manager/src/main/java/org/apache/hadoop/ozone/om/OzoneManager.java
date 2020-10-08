@@ -1595,7 +1595,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       metrics.incNumVolumeCreates();
       if (isAclEnabled) {
         checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.CREATE,
-            args.getVolume(), null, null, args.getOwnerName());
+            args.getVolume(), null, null);
       }
       volumeManager.createVolume(args);
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMAction.CREATE_VOLUME,
@@ -1620,17 +1620,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @param vol     - name of volume
    * @param bucket  - bucket name
    * @param key     - key
-   * @param ownerName - volume owner name which should have full permission.
    * @throws OMException ResultCodes.PERMISSION_DENIED if permission denied.
    */
   private void checkAcls(ResourceType resType, StoreType store,
-      ACLType acl, String vol, String bucket, String key,
-      String ownerName) throws OMException {
+      ACLType acl, String vol, String bucket, String key)
+      throws OMException {
     checkAcls(resType, store, acl, vol, bucket, key,
         ProtobufRpcEngine.Server.getRemoteUser(),
         ProtobufRpcEngine.Server.getRemoteIp(),
         ProtobufRpcEngine.Server.getRemoteIp().getHostName(),
-        true, ownerName);
+        true);
   }
 
   /**
@@ -1645,8 +1644,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           UserGroupInformation.createRemoteUser(userName),
           ProtobufRpcEngine.Server.getRemoteIp(),
           ProtobufRpcEngine.Server.getRemoteIp().getHostName(),
-          false, null);
+          false);
     } catch (OMException ex) {
+      // Should not trigger exception here at all
       return false;
     }
   }
@@ -1686,13 +1686,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public boolean checkAcls(ResourceType resType, StoreType storeType,
       ACLType aclType, String vol, String bucket, String key,
       UserGroupInformation ugi, InetAddress remoteAddress, String hostName,
-      boolean throwIfPermissionDenied, String ownerName)
+      boolean throwIfPermissionDenied)
       throws OMException {
-    String volOwnerName = ownerName;
+    String volOwnerName = null;
+    boolean isVolumeCreate = false;
+    if (resType == ResourceType.VOLUME && aclType == ACLType.CREATE) {
+      isVolumeCreate = true;
+    }
     // In the case of ROOT "/", we send null as owner name.
     // OzoneNativeAuthorizer has as special handling to avoid NPE
     // TODO: send the OM login user as the owner of non-exist "/" volume.
-    if ((ownerName == null && !vol.equals(OzoneConsts.OZONE_ROOT))) {
+    if (!vol.equals(OzoneConsts.OZONE_ROOT) && !isVolumeCreate) {
       volOwnerName = getVolumeOwner(metadataManager, vol);
     }
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
@@ -1742,7 +1746,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public boolean setOwner(String volume, String owner) throws IOException {
     if (isAclEnabled) {
       checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.WRITE_ACL, volume,
-          null, null, null);
+          null, null);
     }
     Map<String, String> auditMap = buildAuditMap(volume);
     auditMap.put(OzoneConsts.OWNER, owner);
@@ -1790,7 +1794,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
     if (isAclEnabled) {
       checkAcls(ResourceType.VOLUME, StoreType.OZONE,
-          ACLType.READ, volume, null, null, null);
+          ACLType.READ, volume, null, null);
     }
     boolean auditSuccess = true;
     Map<String, String> auditMap = buildAuditMap(volume);
@@ -1824,7 +1828,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public OmVolumeArgs getVolumeInfo(String volume) throws IOException {
     if (isAclEnabled) {
       checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.READ, volume,
-          null, null, null);
+          null, null);
     }
 
     boolean auditSuccess = true;
@@ -1857,7 +1861,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       if (isAclEnabled) {
         checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.DELETE, volume,
-            null, null, null);
+            null, null);
       }
       metrics.incNumVolumeDeletes();
       volumeManager.deleteVolume(volume);
@@ -1959,7 +1963,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         // Only admin can list all volumes when disallowed in config
         if (isAclEnabled) {
           checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.LIST,
-              OzoneConsts.OZONE_ROOT, null, null, null);
+              OzoneConsts.OZONE_ROOT, null, null);
         }
       }
       return volumeManager.listVolumes(null, prefix, prevKey, maxKeys);
@@ -1988,7 +1992,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       if (isAclEnabled) {
         checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.CREATE,
-            bucketInfo.getVolumeName(), bucketInfo.getBucketName(), null, null);
+            bucketInfo.getVolumeName(), bucketInfo.getBucketName(), null);
       }
       metrics.incNumBucketCreates();
       bucketManager.createBucket(bucketInfo);
@@ -2012,7 +2016,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
     if (isAclEnabled) {
       checkAcls(ResourceType.VOLUME, StoreType.OZONE, ACLType.LIST, volumeName,
-          null, null, null);
+          null, null);
     }
     boolean auditSuccess = true;
     Map<String, String> auditMap = buildAuditMap(volumeName);
@@ -2051,7 +2055,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
     if (isAclEnabled) {
       checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.READ, volume,
-          bucket, null, null);
+          bucket, null);
     }
     boolean auditSuccess = true;
     Map<String, String> auditMap = buildAuditMap(volume);
@@ -2088,14 +2092,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (isAclEnabled) {
       try {
         checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.WRITE,
-            bucket.realVolume(), bucket.realBucket(), args.getKeyName(), null);
+            bucket.realVolume(), bucket.realBucket(), args.getKeyName());
       } catch (OMException ex) {
         // For new keys key checkAccess call will fail as key doesn't exist.
         // Check user access for bucket.
         if (ex.getResult().equals(KEY_NOT_FOUND)) {
           checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.WRITE,
-              bucket.realVolume(), bucket.realBucket(), args.getKeyName(),
-              null);
+              bucket.realVolume(), bucket.realBucket(), args.getKeyName());
         } else {
           throw ex;
         }
@@ -2132,14 +2135,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (isAclEnabled) {
       try {
         checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.WRITE,
-            bucket.realVolume(), bucket.realBucket(), args.getKeyName(), null);
+            bucket.realVolume(), bucket.realBucket(), args.getKeyName());
       } catch (OMException ex) {
         // For new keys key checkAccess call will fail as key doesn't exist.
         // Check user access for bucket.
         if (ex.getResult().equals(KEY_NOT_FOUND)) {
           checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.WRITE,
-              bucket.realVolume(), bucket.realBucket(), args.getKeyName(),
-              null);
+              bucket.realVolume(), bucket.realBucket(), args.getKeyName());
         } else {
           throw ex;
         }
@@ -2182,15 +2184,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (isAclEnabled) {
       try {
         checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.WRITE,
-            bucket.realVolume(), bucket.realBucket(), args.getKeyName(),
-            null);
+            bucket.realVolume(), bucket.realBucket(), args.getKeyName());
       } catch (OMException ex) {
         // For new keys key checkAccess call will fail as key doesn't exist.
         // Check user access for bucket.
         if (ex.getResult().equals(KEY_NOT_FOUND)) {
           checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.WRITE,
-              bucket.realVolume(), bucket.realBucket(), args.getKeyName(),
-              null);
+              bucket.realVolume(), bucket.realBucket(), args.getKeyName());
         } else {
           throw ex;
         }
@@ -2233,7 +2233,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (isAclEnabled) {
       checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
-          bucket.realVolume(), bucket.realBucket(), args.getKeyName(), null);
+          bucket.realVolume(), bucket.realBucket(), args.getKeyName());
     }
 
     boolean auditSuccess = true;
@@ -2274,7 +2274,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (isAclEnabled) {
       checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.WRITE,
-          bucket.realVolume(), bucket.realBucket(), args.getKeyName(), null);
+          bucket.realVolume(), bucket.realBucket(), args.getKeyName());
     }
 
     Map<String, String> auditMap = bucket.audit(args.toAuditMap());
@@ -2310,7 +2310,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
       if (isAclEnabled) {
         checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.DELETE,
-            bucket.realVolume(), bucket.realBucket(), args.getKeyName(), null);
+            bucket.realVolume(), bucket.realBucket(), args.getKeyName());
       }
 
       metrics.incNumKeyDeletes();
@@ -2346,7 +2346,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (isAclEnabled) {
       checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
-          bucket.realVolume(), bucket.realBucket(), keyPrefix, null);
+          bucket.realVolume(), bucket.realBucket(), keyPrefix);
     }
 
     boolean auditSuccess = true;
@@ -2382,7 +2382,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (isAclEnabled) {
       checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST,
-          volumeName, bucketName, keyPrefix, null);
+          volumeName, bucketName, keyPrefix);
     }
 
     boolean auditSuccess = true;
@@ -2421,7 +2421,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
     if (isAclEnabled) {
       checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.WRITE,
-          args.getVolumeName(), args.getBucketName(), null, null);
+          args.getVolumeName(), args.getBucketName(), null);
     }
     try {
       metrics.incNumBucketUpdates();
@@ -2447,7 +2447,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void deleteBucket(String volume, String bucket) throws IOException {
     if (isAclEnabled) {
       checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.WRITE, volume,
-          bucket, null, null);
+          bucket, null);
     }
     Map<String, String> auditMap = buildAuditMap(volume);
     auditMap.put(OzoneConsts.BUCKET, bucket);
@@ -2892,7 +2892,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (isAclEnabled) {
       checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
-          bucket.realVolume(), bucket.realBucket(), args.getKeyName(), null);
+          bucket.realVolume(), bucket.realBucket(), args.getKeyName());
     }
 
     boolean auditSuccess = true;
@@ -2925,7 +2925,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     if (isAclEnabled) {
       checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ,
-          bucket.realVolume(), bucket.realBucket(), args.getKeyName(), null);
+          bucket.realVolume(), bucket.realBucket(), args.getKeyName());
     }
 
     boolean auditSuccess = true;
@@ -2982,7 +2982,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       if (isAclEnabled) {
         checkAcls(obj.getResourceType(), obj.getStoreType(), ACLType.WRITE_ACL,
-            obj.getVolumeName(), obj.getBucketName(), obj.getKeyName(), null);
+            obj.getVolumeName(), obj.getBucketName(), obj.getKeyName());
       }
       switch (obj.getResourceType()) {
       case VOLUME:
@@ -3023,7 +3023,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       if (isAclEnabled) {
         checkAcls(obj.getResourceType(), obj.getStoreType(), ACLType.WRITE_ACL,
-            obj.getVolumeName(), obj.getBucketName(), obj.getKeyName(), null);
+            obj.getVolumeName(), obj.getBucketName(), obj.getKeyName());
       }
       switch (obj.getResourceType()) {
       case VOLUME:
@@ -3065,7 +3065,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       if (isAclEnabled) {
         checkAcls(obj.getResourceType(), obj.getStoreType(), ACLType.WRITE_ACL,
-            obj.getVolumeName(), obj.getBucketName(), obj.getKeyName(), null);
+            obj.getVolumeName(), obj.getBucketName(), obj.getKeyName());
       }
       switch (obj.getResourceType()) {
       case VOLUME:
@@ -3104,7 +3104,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       if (isAclEnabled) {
         checkAcls(obj.getResourceType(), obj.getStoreType(), ACLType.READ_ACL,
-            obj.getVolumeName(), obj.getBucketName(), obj.getKeyName(), null);
+            obj.getVolumeName(), obj.getBucketName(), obj.getKeyName());
       }
       switch (obj.getResourceType()) {
       case VOLUME:
@@ -3576,7 +3576,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (isAclEnabled) {
       checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.READ,
           volumeName, bucketName, null, userGroupInformation,
-          remoteAddress, hostName, true, null);
+          remoteAddress, hostName, true);
     }
 
     return resolveBucketLink(
