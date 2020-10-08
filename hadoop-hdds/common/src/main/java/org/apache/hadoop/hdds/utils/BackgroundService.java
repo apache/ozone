@@ -52,6 +52,12 @@ public abstract class BackgroundService {
   private final PeriodicalTask service;
 
   public BackgroundService(String serviceName, long interval,
+      TimeUnit unit, int threadPoolSize) {
+    // Set service timeout to 0 to disable.
+    this(serviceName, interval, unit, threadPoolSize, 0);
+  }
+
+  public BackgroundService(String serviceName, long interval,
       TimeUnit unit, int threadPoolSize, long serviceTimeout) {
     this.interval = interval;
     this.unit = unit;
@@ -117,7 +123,8 @@ public abstract class BackgroundService {
             LOG.warn("Background task execution failed", e);
           } finally {
             long endTime = System.nanoTime();
-            if (endTime - startTime > serviceTimeoutInNanos) {
+            if (serviceTimeoutInNanos > 0 &&
+                endTime - startTime > serviceTimeoutInNanos) {
               LOG.warn("{} Background task execution took {}ns > {}ns(timeout)",
                   serviceName, endTime - startTime, serviceTimeoutInNanos);
             }

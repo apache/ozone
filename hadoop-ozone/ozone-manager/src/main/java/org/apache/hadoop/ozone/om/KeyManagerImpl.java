@@ -262,11 +262,10 @@ public class KeyManagerImpl implements KeyManager {
           TimeDuration.valueOf(serviceIntervalDuration, serviceIntervalUnit)
               .toLong(TimeUnit.MILLISECONDS);
 
-      // TODO: Get timeout duration.
-      long serviceTimeout = 0;
-
+      // No timeout duration for open key cleanup. The OM RPC call will time
+      // out after 15 minutes.
       openKeyCleanupService = new OpenKeyCleanupService(ozoneManager, this,
-          serviceInterval, serviceTimeout, configuration);
+          serviceInterval, configuration);
       openKeyCleanupService.start();
     }
   }
