@@ -204,6 +204,11 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    */
   BackgroundService getDeletingService();
 
+  /**
+   * Returns the instance of Open Key Deleting Service.
+   * @return Background service.
+   */
+  BackgroundService getOpenKeyCleanupService();
 
   /**
    * Initiate multipart upload for the specified key.

@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -125,6 +126,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BL
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OPEN_KEY_CLEANUP_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
@@ -165,6 +168,7 @@ public class KeyManagerImpl implements KeyManager {
   private final boolean grpcBlockTokenEnabled;
 
   private BackgroundService keyDeletingService;
+  private BackgroundService openKeyCleanupService;
 
   private final KeyProviderCryptoExtension kmsProvider;
   private final PrefixManager prefixManager;
@@ -244,6 +248,27 @@ public class KeyManagerImpl implements KeyManager {
           serviceTimeout, configuration);
       keyDeletingService.start();
     }
+
+    if (openKeyCleanupService == null) {
+      TimeUnit serviceIntervalUnit =
+          OMConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT.getUnit();
+
+      long serviceIntervalDuration = configuration.getTimeDuration(
+          OZONE_OPEN_KEY_CLEANUP_SERVICE_INTERVAL,
+          OZONE_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_DEFAULT.getDuration(),
+          serviceIntervalUnit);
+
+      long serviceInterval =
+          TimeDuration.valueOf(serviceIntervalDuration, serviceIntervalUnit)
+              .toLong(TimeUnit.MILLISECONDS);
+
+      // TODO: Get timeout duration.
+      long serviceTimeout = 0;
+
+      openKeyCleanupService = new OpenKeyCleanupService(ozoneManager, this,
+          serviceInterval, serviceTimeout, configuration);
+      openKeyCleanupService.start();
+    }
   }
 
   KeyProviderCryptoExtension getKMSProvider() {
@@ -255,6 +280,11 @@ public class KeyManagerImpl implements KeyManager {
     if (keyDeletingService != null) {
       keyDeletingService.shutdown();
       keyDeletingService = null;
+    }
+
+    if (openKeyCleanupService != null) {
+      openKeyCleanupService.shutdown();
+      openKeyCleanupService = null;
     }
   }
 
@@ -963,6 +993,11 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public BackgroundService getDeletingService() {
     return keyDeletingService;
+  }
+
+  @Override
+  public BackgroundService getOpenKeyCleanupService() {
+    return openKeyCleanupService;
   }
 
   @Override
