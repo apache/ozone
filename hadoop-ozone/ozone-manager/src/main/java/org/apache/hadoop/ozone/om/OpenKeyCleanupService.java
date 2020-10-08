@@ -45,6 +45,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.util.Preconditions;
+import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,35 +64,36 @@ public class OpenKeyCleanupService extends BackgroundService {
   private final static int KEY_DELETING_CORE_POOL_SIZE = 1;
 
   private final OzoneManager ozoneManager;
-  private final KeyManager manager;
+  private final KeyManager keyManager;
   private final ClientId clientId = ClientId.randomId();
-  private final long expireThreshold;
-  private final TimeUnit expireThresholdUnit;
+  private final TimeDuration expireThreshold;
   private final int cleanupLimitPerTask;
-  private final AtomicLong deletedOpenKeyCount;
+  private final AtomicLong submittedOpenKeyCount;
   private final AtomicLong runCount;
 
-  OpenKeyCleanupService(OzoneManager ozoneManager, KeyManager manager,
+  OpenKeyCleanupService(OzoneManager ozoneManager, KeyManager keyManager,
       long serviceInterval, long serviceTimeout, ConfigurationSource conf) {
 
     super("OpenKeyCleanupService", serviceInterval, TimeUnit.MILLISECONDS,
         KEY_DELETING_CORE_POOL_SIZE, serviceTimeout);
     this.ozoneManager = ozoneManager;
-    this.manager = manager;
+    this.keyManager = keyManager;
 
-    this.expireThresholdUnit =
+    TimeUnit expireUnit =
         OMConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT.getUnit();
 
-    this.expireThreshold = conf.getTimeDuration(
+    long expireDuration = conf.getTimeDuration(
         OMConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD,
         OMConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT.getDuration(),
-        this.expireThresholdUnit);
+        expireUnit);
+
+    this.expireThreshold = TimeDuration.valueOf(expireDuration, expireUnit);
 
     this.cleanupLimitPerTask = conf.getInt(
         OMConfigKeys.OZONE_OPEN_KEY_CLEANUP_LIMIT_PER_TASK,
         OMConfigKeys.OZONE_OPEN_KEY_CLEANUP_LIMIT_PER_TASK_DEFAULT);
 
-    this.deletedOpenKeyCount = new AtomicLong(0);
+    this.submittedOpenKeyCount = new AtomicLong(0);
     this.runCount = new AtomicLong(0);
   }
 
@@ -106,13 +108,16 @@ public class OpenKeyCleanupService extends BackgroundService {
   }
 
   /**
-   * Returns the number of keys deleted by the background service.
+   * Returns the number of open keys that were submitted for deletion by this
+   * service. If these keys were committed from the open key table between
+   * being submitted for deletion and the actual delete operation, they will
+   * not be deleted.
    *
    * @return Long count.
    */
   @VisibleForTesting
-  public AtomicLong getDeletedOpenKeyCount() {
-    return deletedOpenKeyCount;
+  public AtomicLong getSubmittedOpenKeyCount() {
+    return submittedOpenKeyCount;
   }
 
   @Override
@@ -145,15 +150,15 @@ public class OpenKeyCleanupService extends BackgroundService {
 
         try {
           long startTime = Time.monotonicNow();
-          List<String> expiredOpenKeys = manager.getExpiredOpenKeys(
-              expireThreshold, expireThresholdUnit, cleanupLimitPerTask);
+          List<String> expiredOpenKeys = keyManager.getExpiredOpenKeys(
+              expireThreshold, cleanupLimitPerTask);
 
           if (expiredOpenKeys != null && !expiredOpenKeys.isEmpty()) {
             submitOpenKeysDeleteRequest(expiredOpenKeys);
             LOG.debug("Number of expired keys submitted for deletion: {}, " +
                     "elapsed time: {}ms",
                  expiredOpenKeys.size(), Time.monotonicNow() - startTime);
-            deletedOpenKeyCount.addAndGet(expiredOpenKeys.size());
+            submittedOpenKeyCount.addAndGet(expiredOpenKeys.size());
           }
         } catch (IOException e) {
           LOG.error("Error while running delete keys background task. Will " +
@@ -164,24 +169,27 @@ public class OpenKeyCleanupService extends BackgroundService {
       return EmptyTaskResult.newResult();
     }
 
-    public int submitOpenKeysDeleteRequest(List<String> expiredOpenKeys) {
+    /**
+     * Submits a Ratis request to move the keys in {@code expiredOpenKeys}
+     * out of the open key table and into the delete table.
+     */
+    public void submitOpenKeysDeleteRequest(List<String> expiredOpenKeys) {
       Map<Pair<String, String>, List<OpenKey>> openKeysPerBucket =
           new HashMap<>();
 
-      int deletedCount = 0;
       for (String keyName: expiredOpenKeys) {
-        // Separate volume, bucket, key name, and client ID.
+        // Separate volume, bucket, key name, and client ID, and add to the
+        // bucket grouping map.
         addToMap(openKeysPerBucket, keyName);
         LOG.debug("Open Key {} has been marked as expired and is being " +
             "submitted for deletion", keyName);
-        deletedCount++;
       }
 
       DeleteOpenKeysRequest.Builder requestBuilder =
           DeleteOpenKeysRequest.newBuilder();
 
       // Add keys to open key delete request by bucket.
-      for (Map.Entry<Pair<String, String>, List<OpenKey>> entry :
+      for (Map.Entry<Pair<String, String>, List<OpenKey>> entry:
           openKeysPerBucket.entrySet()) {
 
         Pair<String, String> volumeBucketPair = entry.getKey();
@@ -201,31 +209,32 @@ public class OpenKeyCleanupService extends BackgroundService {
 
       try {
         ozoneManager.getOmServerProtocol().submitRequest(null, omRequest);
-      } catch (ServiceException e) {
-        LOG.error("Open key delete request failed. Will retry at next run.");
-        return 0;
+      } catch (ServiceException ex) {
+        LOG.error("Open key delete request failed. Will retry at next run.",
+            ex);
       }
-
-      return deletedCount;
     }
   }
 
   /**
-   * Parse Volume and Bucket Name from ObjectKey and add it to given map of
-   * keys to be purged per bucket.
+   * Separates {@code openKeyName} into its volume, bucket, key, and client ID.
+   * Creates an {@link OpenKey} object from {@code openKeyName}'s key and
+   * client ID, and maps {@code openKeyName}'s volume and bucket to this
+   * {@link OpenKey}.
    */
-  private void addToMap(Map<Pair<String, String>, List<OpenKey>> map,
-                        String openKeyName) {
+  private void addToMap(Map<Pair<String, String>, List<OpenKey>>
+      openKeysPerBucket, String openKeyName) {
     // Parse volume and bucket name
     String[] split = openKeyName.split(OM_KEY_PREFIX);
-    Preconditions.assertTrue(split.length == 5, "Unable to separate volume, " +
-            "bucket, key, and client ID from open key {}.", openKeyName);
 
     // First element of the split is an empty string since the key begins
     // with the separator.
+    Preconditions.assertTrue(split.length == 5, "Unable to separate volume, " +
+            "bucket, key, and client ID from open key {}.", openKeyName);
+
     Pair<String, String> volumeBucketPair = Pair.of(split[1], split[2]);
-    if (!map.containsKey(volumeBucketPair)) {
-      map.put(volumeBucketPair, new ArrayList<>());
+    if (!openKeysPerBucket.containsKey(volumeBucketPair)) {
+      openKeysPerBucket.put(volumeBucketPair, new ArrayList<>());
     }
 
     try {
@@ -233,7 +242,7 @@ public class OpenKeyCleanupService extends BackgroundService {
           .setName(split[3])
           .setClientID(Long.parseLong(split[4]))
           .build();
-      map.get(volumeBucketPair).add(openKey);
+      openKeysPerBucket.get(volumeBucketPair).add(openKey);
     } catch (NumberFormatException ex) {
       // If the client ID cannot be parsed correctly, do not add the key to
       // the map.
