@@ -71,7 +71,9 @@
     <!--<module name="FileLength">-->
     <module name="FileTabCharacter"/>
 
-    <module name="LineLength"/>
+    <module name="LineLength">
+        <property name="fileExtensions" value="java"/>
+    </module>
     <module name="TreeWalker">
 
         <module name="SuppressWarningsHolder"/>

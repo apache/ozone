@@ -273,8 +273,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     SetVolumePropertyRequest.Builder req =
         SetVolumePropertyRequest.newBuilder();
     req.setVolumeName(volume)
-       .setQuotaInBytes(quotaInBytes)
-       .setQuotaInCounts(quotaInCounts);
+        .setQuotaInBytes(quotaInBytes)
+        .setQuotaInCounts(quotaInCounts);
 
     OMRequest omRequest = createOMRequest(Type.SetVolumeProperty)
         .setSetVolumePropertyRequest(req)
