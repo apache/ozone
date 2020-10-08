@@ -137,7 +137,7 @@ public class RpcClient implements ClientProtocol {
   private Text dtService;
   private final boolean topologyAwareReadEnabled;
   private final boolean checkKeyNameEnabled;
-  private OzoneClientConfig clientConfig;
+  private final OzoneClientConfig clientConfig;
 
   /**
    * Creates RpcClient instance with the given configuration.
@@ -155,6 +155,8 @@ public class RpcClient implements ClientProtocol {
     OzoneAclConfig aclConfig = this.conf.getObject(OzoneAclConfig.class);
     this.userRights = aclConfig.getUserDefaultRights();
     this.groupRights = aclConfig.getGroupDefaultRights();
+
+    this.clientConfig = conf.getObject(OzoneClientConfig.class);
 
     OmTransport omTransport = OmTransportFactory.create(conf, ugi, omServiceId);
 
@@ -936,6 +938,7 @@ public class RpcClient implements ClientProtocol {
             .setMultipartNumber(partNumber)
             .setMultipartUploadID(uploadID)
             .setIsMultipartKey(true)
+            .setConfig(clientConfig)
             .build();
     keyOutputStream.addPreallocateBlocks(
         openKey.getKeyInfo().getLatestVersionLocations(),
@@ -1232,6 +1235,7 @@ public class RpcClient implements ClientProtocol {
             .setRequestID(requestId)
             .setType(HddsProtos.ReplicationType.valueOf(type.toString()))
             .setFactor(HddsProtos.ReplicationFactor.valueOf(factor.getValue()))
+            .setConfig(clientConfig)
             .build();
     keyOutputStream
         .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),

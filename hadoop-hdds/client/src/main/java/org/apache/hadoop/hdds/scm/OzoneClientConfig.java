@@ -67,7 +67,7 @@ public class OzoneClientConfig {
       defaultValue = "CRC32",
       description = "",
       tags = ConfigTag.CLIENT)
-  private ChecksumType checksumType = ChecksumType.CRC32;
+  private String checksumType = ChecksumType.CRC32.name();
 
   @Config(key = "bytes.per.checksum",
       defaultValue = "1MB",
@@ -158,11 +158,11 @@ public class OzoneClientConfig {
   }
 
   public ChecksumType getChecksumType() {
-    return checksumType;
+    return ChecksumType.valueOf(checksumType);
   }
 
   public void setChecksumType(ChecksumType checksumType) {
-    this.checksumType = checksumType;
+    this.checksumType = checksumType.name();
   }
 
   public int getBytesPerChecksum() {
