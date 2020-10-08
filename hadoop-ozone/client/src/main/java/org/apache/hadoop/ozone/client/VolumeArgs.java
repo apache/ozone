@@ -33,7 +33,7 @@ public final class VolumeArgs {
 
   private final String admin;
   private final String owner;
-  private final String quotaInBytes;
+  private final long quotaInBytes;
   private final long quotaInCounts;
   private final List<OzoneAcl> acls;
   private Map<String, String> metadata;
@@ -49,7 +49,7 @@ public final class VolumeArgs {
    */
   private VolumeArgs(String admin,
       String owner,
-      String quotaInBytes,
+      long quotaInBytes,
       long quotaInCounts,
       List<OzoneAcl> acls,
       Map<String, String> metadata) {
@@ -81,7 +81,7 @@ public final class VolumeArgs {
    * Returns Volume Quota in bytes.
    * @return quotaInBytes.
    */
-  public String getQuotaInBytes() {
+  public long getQuotaInBytes() {
     return quotaInBytes;
   }
 
@@ -120,7 +120,7 @@ public final class VolumeArgs {
   public static class Builder {
     private String adminName;
     private String ownerName;
-    private String quotaInBytes;
+    private long quotaInBytes;
     private long quotaInCounts;
     private List<OzoneAcl> listOfAcls;
     private Map<String, String> metadata = new HashMap<>();
@@ -136,7 +136,7 @@ public final class VolumeArgs {
       return this;
     }
 
-    public VolumeArgs.Builder setQuotaInBytes(String quota) {
+    public VolumeArgs.Builder setQuotaInBytes(long quota) {
       this.quotaInBytes = quota;
       return this;
     }

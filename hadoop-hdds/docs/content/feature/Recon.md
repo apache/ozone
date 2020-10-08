@@ -28,4 +28,20 @@ Recon is the Web UI and analytics service for Ozone. It's an optional component,
 Recon collects all the data from an Ozone cluster and **store** them in a SQL database for further analyses.
 
  1. Ozone Manager data is downloaded in the background by an async process. A RocksDB snapshots are created on OM side periodically, and the incremental data is copied to Recon and processed.
- 2. Datanodes can send Heartbeats not just to SCM but Recon. Recon can be a read-only listener of the Heartbeats and updates the local database based on the received information.   
+ 2. Datanodes can send Heartbeats not just to SCM but Recon. Recon can be a read-only listener of the Heartbeats and updates the local database based on the received information.
+
+Once Recon is configured, we are ready to start the service.
+
+{{< highlight bash >}}
+ozone --daemon start recon
+{{< /highlight >}}
+
+## Notable configurations
+
+key | default | description
+----|---------|------------
+ozone.recon.http-address | 0.0.0.0:9888 | The address and the base port where the Recon web UI will listen on.
+ozone.recon.address | 0.0.0.0:9891 | RPC address of the Recon.
+ozone.recon.db.dir | none | Directory where the Recon Server stores its metadata.
+ozone.recon.om.db.dir | none | Directory where the Recon Server stores its OM snapshot DB.
+ozone.recon.om.snapshot.task.interval.delay | 10m | Interval in MINUTES by Recon to request OM DB Snapshot.

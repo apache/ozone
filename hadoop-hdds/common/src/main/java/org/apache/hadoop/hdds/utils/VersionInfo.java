@@ -17,15 +17,16 @@
  */
 package org.apache.hadoop.hdds.utils;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
+
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.ThreadUtil;
-import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Properties;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class returns build information about Hadoop components.

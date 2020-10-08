@@ -19,21 +19,20 @@ package org.apache.hadoop.ozone.client.io;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Collection;
+import java.util.Collections;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ChecksumType;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
-import java.util.Collection;
-import java.util.Collections;
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * Helper class used inside {@link BlockOutputStream}.
@@ -43,7 +42,7 @@ public final class BlockOutputStreamEntry extends OutputStream {
   private OutputStream outputStream;
   private BlockID blockID;
   private final String key;
-  private final XceiverClientManager xceiverClientManager;
+  private final XceiverClientFactory xceiverClientManager;
   private final Pipeline pipeline;
   private final ChecksumType checksumType;
   private final int bytesPerChecksum;
@@ -63,7 +62,7 @@ public final class BlockOutputStreamEntry extends OutputStream {
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   private BlockOutputStreamEntry(BlockID blockID, String key,
-      XceiverClientManager xceiverClientManager,
+      XceiverClientFactory xceiverClientManager,
       Pipeline pipeline, String requestId, int chunkSize,
       long length, int streamBufferSize, long streamBufferFlushSize,
       boolean streamBufferFlushDelay, long streamBufferMaxSize,
@@ -211,7 +210,7 @@ public final class BlockOutputStreamEntry extends OutputStream {
 
     private BlockID blockID;
     private String key;
-    private XceiverClientManager xceiverClientManager;
+    private XceiverClientFactory xceiverClientManager;
     private Pipeline pipeline;
     private String requestId;
     private int chunkSize;
@@ -246,7 +245,8 @@ public final class BlockOutputStreamEntry extends OutputStream {
       return this;
     }
 
-    public Builder setXceiverClientManager(XceiverClientManager
+    public Builder setXceiverClientManager(
+        XceiverClientFactory
         xClientManager) {
       this.xceiverClientManager = xClientManager;
       return this;
@@ -329,7 +329,7 @@ public final class BlockOutputStreamEntry extends OutputStream {
     return key;
   }
 
-  public XceiverClientManager getXceiverClientManager() {
+  public XceiverClientFactory getXceiverClientManager() {
     return xceiverClientManager;
   }
 

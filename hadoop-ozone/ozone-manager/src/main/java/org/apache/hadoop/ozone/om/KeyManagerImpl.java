@@ -94,6 +94,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -165,6 +166,8 @@ public class KeyManagerImpl implements KeyManager {
   private final KeyProviderCryptoExtension kmsProvider;
   private final PrefixManager prefixManager;
 
+  private final boolean enableFileSystemPaths;
+
 
   @VisibleForTesting
   public KeyManagerImpl(ScmBlockLocationProtocol scmBlockClient,
@@ -208,6 +211,9 @@ public class KeyManagerImpl implements KeyManager {
     this.listTrashKeysMax = conf.getInt(
       OZONE_CLIENT_LIST_TRASH_KEYS_MAX,
       OZONE_CLIENT_LIST_TRASH_KEYS_MAX_DEFAULT);
+    this.enableFileSystemPaths =
+        conf.getBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+            OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
 
     this.ozoneManager = om;
     this.omId = omId;
@@ -645,7 +651,8 @@ public class KeyManagerImpl implements KeyManager {
     Preconditions.checkNotNull(args);
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
-    String keyName = args.getKeyName();
+    String keyName = OMClientRequest.validateAndNormalizeKey(
+        enableFileSystemPaths, args.getKeyName());
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     OmKeyInfo value = null;

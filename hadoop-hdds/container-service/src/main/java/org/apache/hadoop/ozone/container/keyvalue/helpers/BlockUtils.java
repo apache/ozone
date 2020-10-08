@@ -62,7 +62,7 @@ public final class BlockUtils {
     try {
       return cache.getDB(containerData.getContainerID(), containerData
           .getContainerDBType(), containerData.getDbFile().getAbsolutePath(),
-          conf);
+              containerData.getSchemaVersion(), conf);
     } catch (IOException ex) {
       String message = String.format("Error opening DB. Container:%s " +
           "ContainerPath:%s", containerData.getContainerID(), containerData
