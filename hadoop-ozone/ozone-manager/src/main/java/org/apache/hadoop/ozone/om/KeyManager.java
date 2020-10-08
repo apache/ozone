@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.fs.OzoneManagerFS;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.ratis.util.TimeDuration;
 
 import java.io.IOException;
 import java.time.temporal.ChronoUnit;
@@ -184,28 +185,12 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   List<BlockGroup> getPendingDeletionKeys(int count) throws IOException;
 
   /**
-   * Returns the names of up to {@code count} open keys that are older than
-   * the configured expiration age.
-   *
-   *
-   * @param expireThresholdSeconds
-   * @param count The maximum number of expired open keys to return.
-   * @return a list of {@link String} representing the names of expired
-   * open keys.
+   * Returns the names of up to {@code count} open keys whose time since
+   * creation is larger than {@code expireThreshold}.
    * @throws IOException
    */
-  List<String> getExpiredOpenKeys(long expireThreshold, TimeUnit unit,
-      int count) throws IOException;
-
-  /**
-   * Deletes a expired open key by its name. Called when a hanging key has been
-   * lingering for too long. Once called, the open key entries gets removed
-   * from OM mdata data.
-   *
-   * @param objectKeyName object key name with #open# prefix.
-   * @throws IOException if specified key doesn't exist or other I/O errors.
-   */
-  void deleteExpiredOpenKey(String objectKeyName) throws IOException;
+  List<String> getExpiredOpenKeys(TimeDuration expireThreshold, int count)
+      throws IOException;
 
   /**
    * Returns the metadataManager.

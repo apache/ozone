@@ -137,6 +137,8 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLU
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.util.Time.monotonicNow;
+
+import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -948,15 +950,9 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   @Override
-  public List<String> getExpiredOpenKeys(long expireThreshold,
-      TimeUnit unit, int count) throws IOException {
-    return metadataManager.getExpiredOpenKeys(expireThreshold, unit, count);
-  }
-
-  @Override
-  public void deleteExpiredOpenKey(String objectKeyName) throws IOException {
-    Preconditions.checkNotNull(objectKeyName);
-    // TODO: Fix this in later patches.
+  public List<String> getExpiredOpenKeys(TimeDuration expireThreshold,
+      int count) throws IOException {
+    return metadataManager.getExpiredOpenKeys(expireThreshold, count);
   }
 
   @Override

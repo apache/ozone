@@ -83,6 +83,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 import org.apache.ratis.util.ExitUtils;
+import org.apache.ratis.util.TimeDuration;
 import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -988,14 +989,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public List<String> getExpiredOpenKeys(long expireThreshold, TimeUnit unit,
-      int count) throws IOException {
+  public List<String> getExpiredOpenKeys(TimeDuration expireThreshold,
+                                         int count) throws IOException {
     // Only check for expired keys in the open key table, not its cache.
     // If a key expires while it is in the cache, it will be cleaned
     // up after the cache is flushed.
-    final Duration expirationDuration =
-            Duration.ofMillis(unit.toMillis(expireThreshold));
-
     List<String> expiredKeys = Lists.newArrayList();
 
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
@@ -1006,10 +1004,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         String openKey = openKeyValue.getKey();
         OmKeyInfo openKeyInfo = openKeyValue.getValue();
 
-        Duration openKeyAge = Duration.between(
-            Instant.ofEpochMilli(openKeyInfo.getCreationTime()), Instant.now());
+        long openKeyAgeMillis =
+            Instant.now().toEpochMilli() - openKeyInfo.getCreationTime();
 
-        if (openKeyAge.compareTo(expirationDuration) >= 0) {
+        TimeDuration openKeyAge = TimeDuration.valueOf(openKeyAgeMillis,
+            TimeUnit.MILLISECONDS);
+
+        if (openKeyAge.compareTo(expireThreshold) >= 0) {
           expiredKeys.add(openKey);
         }
       }
