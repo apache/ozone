@@ -88,7 +88,7 @@ public final class OzoneManagerRatisUtils {
 
   // TODO: Temporary workaround for OM upgrade path and will be replaced once
   //  upgrade HDDS-3698 story reaches consensus.
-  private static boolean omLayoutVersionV1 = true;
+  private static boolean omLayoutVersionV1 = false;
 
   private OzoneManagerRatisUtils() {
   }
