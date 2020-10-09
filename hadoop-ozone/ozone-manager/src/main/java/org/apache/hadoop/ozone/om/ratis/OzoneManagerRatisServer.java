@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.ipc.ProtobufRpcEngine.Server;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -143,8 +144,9 @@ public final class OzoneManagerRatisServer {
    * ratis server.
    */
   private RaftClientRequest createWriteRaftClientRequest(OMRequest omRequest) {
-    return new RaftClientRequest(clientId, server.getId(), raftGroupId,
-        nextCallId(),
+    return new RaftClientRequest(
+        ClientId.valueOf(UUID.nameUUIDFromBytes(Server.getClientId())),
+        server.getId(), raftGroupId, Server.getCallId(),
         Message.valueOf(OMRatisHelper.convertRequestToByteString(omRequest)),
         RaftClientRequest.writeRequestType(), null);
   }
@@ -337,6 +339,11 @@ public final class OzoneManagerRatisServer {
 
   public RaftGroup getRaftGroup() {
     return this.raftGroup;
+  }
+
+  @VisibleForTesting
+  public RaftServer getServer() {
+    return server;
   }
 
   /**

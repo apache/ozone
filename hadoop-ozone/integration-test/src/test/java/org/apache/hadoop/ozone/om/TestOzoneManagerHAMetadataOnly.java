@@ -30,9 +30,21 @@ import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
+import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.request.volume.OMVolumeCreateRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateVolumeRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.log4j.Logger;
+import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.RaftClientReply;
+import org.apache.ratis.protocol.RaftClientRequest;
+import org.apache.ratis.server.RaftServer;
 import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -48,6 +60,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.Iterator;
+import java.util.UUID;
 
 import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
@@ -346,6 +359,69 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     Assert.assertNotNull(mBeanInfo);
     Object flushCount = mBeanServer.getAttribute(oname, "Count");
     Assert.assertTrue((long) flushCount >= 0);
+  }
+
+  @Test
+  public void testOMRetryCache() throws Exception {
+    ObjectStore objectStore = getObjectStore();
+    objectStore.createVolume(UUID.randomUUID().toString());
+
+
+    OMFailoverProxyProvider omFailoverProxyProvider = OmFailoverProxyUtil
+        .getFailoverProxyProvider(objectStore.getClientProxy());
+
+    String currentLeaderNodeId = omFailoverProxyProvider
+        .getCurrentProxyOMNodeId();
+
+    OzoneManagerRatisServer ozoneManagerRatisServer =
+        getCluster().getOzoneManager(currentLeaderNodeId).getOmRatisServer();
+
+    RaftServer raftServer = ozoneManagerRatisServer.getServer();
+
+    ClientId clientId = ClientId.randomId();
+    long callId = 2000L;
+    String userName = UserGroupInformation.getCurrentUser().getUserName();
+    String volumeName = UUID.randomUUID().toString();
+
+
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+        .captureLogs(OMVolumeCreateRequest.getLogger());
+    OMRequest omRequest =
+        OMRequest.newBuilder().setCreateVolumeRequest(
+            CreateVolumeRequest.newBuilder().setVolumeInfo(
+                VolumeInfo.newBuilder().setOwnerName(userName)
+                    .setAdminName(userName).setVolume(volumeName).build())
+                .build()).setClientId(UUID.randomUUID().toString())
+            .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume).build();
+
+    RaftClientReply raftClientReply =
+        raftServer.submitClientRequest(new RaftClientRequest(clientId,
+         raftServer.getId(), ozoneManagerRatisServer.getRaftGroup()
+         .getGroupId(), callId,
+        Message.valueOf(OMRatisHelper.convertRequestToByteString(omRequest)),
+        RaftClientRequest.writeRequestType(), null));
+
+    Assert.assertTrue(raftClientReply.isSuccess());
+
+    Assert.assertTrue(logCapturer.getOutput().contains("created volume:"
+        + volumeName));
+
+    logCapturer.clearOutput();
+
+    raftClientReply =
+        raftServer.submitClientRequest(new RaftClientRequest(clientId,
+            raftServer.getId(), ozoneManagerRatisServer.getRaftGroup()
+            .getGroupId(), callId, Message.valueOf(
+                OMRatisHelper.convertRequestToByteString(omRequest)),
+            RaftClientRequest.writeRequestType(), null));
+
+    Assert.assertTrue(raftClientReply.isSuccess());
+
+    // As second time with same client id and call id, this request should
+    // not be executed ratis server should return from cache.
+    Assert.assertFalse(logCapturer.getOutput().contains("created volume:"
+        + volumeName));
+
   }
 
   private void validateVolumesList(String userName,
