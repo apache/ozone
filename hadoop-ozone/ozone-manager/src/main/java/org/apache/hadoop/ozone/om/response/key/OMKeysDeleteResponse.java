@@ -41,7 +41,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 @CleanupTableInfo(cleanupTables = KEY_TABLE)
 public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
   private List<OmKeyInfo> omKeyInfoList;
-  private long trxnLogIndex;
   private OmVolumeArgs omVolumeArgs;
   private OmBucketInfo omBucketInfo;
 
@@ -51,7 +50,6 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
       @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse, isRatisEnabled);
     this.omKeyInfoList = keyDeleteList;
-    this.trxnLogIndex = trxnLogIndex;
     this.omVolumeArgs = omVolumeArgs;
     this.omBucketInfo = omBucketInfo;
   }
