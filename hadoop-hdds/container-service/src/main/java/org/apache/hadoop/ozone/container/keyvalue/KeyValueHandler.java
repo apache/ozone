@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -127,14 +128,21 @@ public class KeyValueHandler extends Handler {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-    maxContainerSize = (long)config.getStorageSize(
+    maxContainerSize = (long) config.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-            ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
     // this handler lock is used for synchronizing createContainer Requests,
     // so using a fair lock here.
     containerCreationLock = new AutoCloseableLock(new ReentrantLock(true));
+
+    boolean isUnsafeByteBufferConversionEnabled =
+        conf.getBoolean(
+            OzoneConfigKeys.OZONE_UNSAFEBYTEOPERATIONS_ENABLED,
+            OzoneConfigKeys.OZONE_UNSAFEBYTEOPERATIONS_ENABLED_DEFAULT);
+
     byteBufferToByteString =
-        ByteStringConversion.createByteBufferConversion(conf);
+        ByteStringConversion
+            .createByteBufferConversion(isUnsafeByteBufferConversionEnabled);
   }
 
   @VisibleForTesting

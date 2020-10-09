@@ -822,6 +822,13 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.pipeline.per.metadata.disk</name>
+    <value>2</value>
+    <tag>OZONE, SCM, PIPELINE</tag>
+    <description>Number of pipelines to be created per raft log disk.
+    </description>
+  </property>
+  <property>
   <name>ozone.datanode.pipeline.limit</name>
   <value>2</value>
   <tag>OZONE, SCM, PIPELINE</tag>
@@ -2315,7 +2322,7 @@
   </description>
 </property>
   <property>
-    <name>recon.om.connection.request.timeout</name>
+    <name>ozone.recon.om.connection.request.timeout</name>
     <value>5000</value>
     <tag>OZONE, RECON, OM</tag>
     <description>
@@ -2324,7 +2331,7 @@
     </description>
   </property>
   <property>
-    <name>recon.om.connection.timeout</name>
+    <name>ozone.recon.om.connection.timeout</name>
     <value>5s</value>
     <tag>OZONE, RECON, OM</tag>
     <description>
@@ -2333,7 +2340,7 @@
     </description>
   </property>
   <property>
-    <name>recon.om.socket.timeout</name>
+    <name>ozone.recon.om.socket.timeout</name>
     <value>5s</value>
     <tag>OZONE, RECON, OM</tag>
     <description>
@@ -2342,7 +2349,7 @@
     </description>
   </property>
   <property>
-    <name>recon.om.snapshot.task.initial.delay</name>
+    <name>ozone.recon.om.snapshot.task.initial.delay</name>
     <value>1m</value>
     <tag>OZONE, RECON, OM</tag>
     <description>
@@ -2350,7 +2357,7 @@
     </description>
   </property>
   <property>
-    <name>recon.om.snapshot.task.interval.delay</name>
+    <name>ozone.recon.om.snapshot.task.interval.delay</name>
     <value>10m</value>
     <tag>OZONE, RECON, OM</tag>
     <description>
@@ -2358,7 +2365,7 @@
     </description>
   </property>
   <property>
-    <name>recon.om.snapshot.task.flush.param</name>
+    <name>ozone.recon.om.snapshot.task.flush.param</name>
     <value>false</value>
     <tag>OZONE, RECON, OM</tag>
     <description>

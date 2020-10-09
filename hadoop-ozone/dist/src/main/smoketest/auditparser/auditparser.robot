@@ -33,7 +33,7 @@ Set username
 
 *** Test Cases ***
 Initiating freon to generate data
-    ${result} =        Execute              ozone freon randomkeys --numOfVolumes 5 --numOfBuckets 5 --numOfKeys 5 --numOfThreads 1
+    ${result} =        Execute              ozone freon randomkeys --num-of-volumes 5 --num-of-buckets 5 --num-of-keys 5 --num-of-threads 1
                        Wait Until Keyword Succeeds      3min       10sec     Should contain   ${result}   Number of Keys added: 125
                        Should Not Contain               ${result}  ERROR
 

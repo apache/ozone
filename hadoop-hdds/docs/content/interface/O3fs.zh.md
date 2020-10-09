@@ -2,6 +2,9 @@
 title: Ozone 文件系统
 date: 2017-09-14
 weight: 2
+menu:
+   main:
+      parent: "编程接口"
 summary: Hadoop 文件系统兼容使得任何使用类 HDFS 接口的应用无需任何修改就可以在 Ozone 上工作，比如基于 Apache Spark、YARN 和 Hive 等框架的应用。
 ---
 <!---
