@@ -113,7 +113,7 @@ public class TestGetCommittedBlockLengthAndPutKey {
             .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk());
     client.sendCommand(putKeyRequest);
     response = ContainerProtocolCalls
-        .getCommittedBlockLength(client, blockID);
+        .getCommittedBlockLength(client, blockID, null);
     // make sure the block ids in the request and response are same.
     Assert.assertTrue(
         BlockID.getFromProtobuf(response.getBlockID()).equals(blockID));
@@ -137,7 +137,7 @@ public class TestGetCommittedBlockLengthAndPutKey {
     try {
       // There is no block written inside the container. The request should
       // fail.
-      ContainerProtocolCalls.getCommittedBlockLength(client, blockID);
+      ContainerProtocolCalls.getCommittedBlockLength(client, blockID, null);
       Assert.fail("Expected exception not thrown");
     } catch (StorageContainerException sce) {
       Assert.assertTrue(sce.getMessage().contains("Unable to find the block"));
