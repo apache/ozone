@@ -62,65 +62,17 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   private final ClientId clientId = ClientId.randomId();
   private final AtomicLong callId = new AtomicLong();
 
-
   // TODO: Refactor and remove ConfigurationSource and use only
   //  SCMHAConfiguration.
   SCMRatisServerImpl(final SCMHAConfiguration haConf,
                      final ConfigurationSource conf)
       throws IOException {
-    // If the SCM group starts from OZONE_SCM_NAMES, its raft peers
-    // should locate on different nodes, and use the same port to
-    // communicate with each other.
-    //
-    // Assume ozone.scm.names is "ip0,ip1,ip2", scm with ip0 identifies
-    // its RaftPeerId as scm0, scm with ip1 identifies its RaftPeerId
-    // as scm1, scm with ip2 identifies its RaftPeerId as scm2. After
-    // startup, they will communicate with each other via
-    // ozone.scm.ha.ratis.bind.port, and form a raft group with
-    // groupID "SCM-HA-Service".
-    List<String> scmHosts =
-        Arrays.stream(conf.getTrimmedStrings(ScmConfigKeys.OZONE_SCM_NAMES))
-            .map(scmName -> HddsUtils.getHostName(scmName).get())
-            .collect(Collectors.toList());
-
     this.address = haConf.getRatisBindAddress();
-    InetAddress localHost = InetAddress.getLocalHost();
 
-    int selfIndex = -1;
-    RaftPeerId selfPeerId = null;
-    final List<RaftPeer> raftPeers = new ArrayList<>();
-
-    for (int i = 0; i < scmHosts.size(); ++i) {
-      String scmNodeId = "scm" + i;
-      RaftPeerId scmPeerId = RaftPeerId.getRaftPeerId(scmNodeId);
-
-      String scmHost = scmHosts.get(i);
-      if (InetAddress.getByName(scmHost).equals(localHost)) {
-        selfIndex = i;
-        selfPeerId = scmPeerId;
-      }
-
-      raftPeers.add(new RaftPeer(
-          scmPeerId, scmHost + ":" + address.getPort()));
-    }
-
-    if (selfIndex == -1) {
-      String errorMessage = "localhost " +  localHost
-          + " does not exist in ozone.scm.names "
-          + conf.get(ScmConfigKeys.OZONE_SCM_NAMES);
-      throw new IOException(errorMessage);
-    }
-
-    LOG.info("SCMRatisServer started, " +
-        "localHost: {}, OZONE_SCM_NAMES: {}, selfIndex: {}",
-        localHost, conf.get(ScmConfigKeys.OZONE_SCM_NAMES), selfIndex);
-
-    this.raftPeerId = selfPeerId;
-
-    final String scmServiceId = "SCM-HA-Service";
-    this.raftGroupId = RaftGroupId.valueOf(
-        UUID.nameUUIDFromBytes(scmServiceId.getBytes(StandardCharsets.UTF_8)));
-    this.raftGroup = RaftGroup.valueOf(raftGroupId, raftPeers);
+    SCMHAGroupBuilder scmHAGroupBuilder = new SCMHAGroupBuilder(haConf, conf);
+    this.raftPeerId = scmHAGroupBuilder.getPeerId();
+    this.raftGroupId = scmHAGroupBuilder.getRaftGroupId();
+    this.raftGroup = scmHAGroupBuilder.getRaftGroup();
 
     final RaftProperties serverProperties = RatisUtil
         .newRaftProperties(haConf, conf);
@@ -177,5 +129,96 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   @Override
   public List<RaftPeer> getRaftPeers() {
     return Collections.singletonList(new RaftPeer(raftPeerId));
+  }
+
+
+  /**
+   * If the SCM group starts from {@link ScmConfigKeys#OZONE_SCM_NAMES},
+   * its raft peers should locate on different nodes, and use the same port
+   * to communicate with each other.
+   *
+   * Each of the raft peer figures out its {@link RaftPeerId} by computing
+   * its position in {@link ScmConfigKeys#OZONE_SCM_NAMES}.
+   *
+   * Assume {@link ScmConfigKeys#OZONE_SCM_NAMES} is "ip0,ip1,ip2",
+   * scm with ip0 identifies its {@link RaftPeerId} as scm0,
+   * scm with ip1 identifies its {@link RaftPeerId} as scm1,
+   * scm with ip2 identifies its {@link RaftPeerId} as scm2.
+   *
+   * After startup, they will form a {@link RaftGroup} with groupID
+   * "SCM-HA-Service", and communicate with each other via
+   * ozone.scm.ha.ratis.bind.port.
+   */
+  private static class SCMHAGroupBuilder {
+    private final static String SCM_SERVICE_ID = "SCM-HA-Service";
+
+    private final RaftGroupId raftGroupId;
+    private final RaftGroup raftGroup;
+    private RaftPeerId selfPeerId;
+
+    /**
+     * @return raft group
+     */
+    public RaftGroup getRaftGroup() {
+      return raftGroup;
+    }
+
+    /**
+     * @return raft group id
+     */
+    public RaftGroupId getRaftGroupId() {
+      return raftGroupId;
+    }
+
+    /**
+     * @return raft peer id
+     */
+    public RaftPeerId getPeerId() {
+      return selfPeerId;
+    }
+
+    SCMHAGroupBuilder(final SCMHAConfiguration haConf,
+                      final ConfigurationSource conf) throws IOException {
+      // fetch port
+      int port = haConf.getRatisBindAddress().getPort();
+
+      // fetch localhost
+      InetAddress localHost = InetAddress.getLocalHost();
+
+      // fetch hosts from ozone.scm.names
+      List<String> hosts =
+          Arrays.stream(conf.getTrimmedStrings(ScmConfigKeys.OZONE_SCM_NAMES))
+              .map(scmName -> HddsUtils.getHostName(scmName).get())
+              .collect(Collectors.toList());
+
+      final List<RaftPeer> raftPeers = new ArrayList<>();
+      for (int i = 0; i < hosts.size(); ++i) {
+        String nodeId = "scm" + i;
+        RaftPeerId peerId = RaftPeerId.getRaftPeerId(nodeId);
+
+        String host = hosts.get(i);
+        if (InetAddress.getByName(host).equals(localHost)) {
+          selfPeerId = peerId;
+        }
+
+        raftPeers.add(new RaftPeer(peerId, host + ":" + port));
+      }
+
+      if (selfPeerId == null) {
+        String errorMessage = "localhost " +  localHost
+            + " does not exist in ozone.scm.names "
+            + conf.get(ScmConfigKeys.OZONE_SCM_NAMES);
+        throw new IOException(errorMessage);
+      }
+
+      LOG.info("Build a RaftGroup for SCMHA, " +
+              "localHost: {}, OZONE_SCM_NAMES: {}, selfPeerId: {}",
+          localHost, conf.get(ScmConfigKeys.OZONE_SCM_NAMES), selfPeerId);
+
+      raftGroupId = RaftGroupId.valueOf(UUID.nameUUIDFromBytes(
+          SCM_SERVICE_ID.getBytes(StandardCharsets.UTF_8)));
+
+      raftGroup = RaftGroup.valueOf(raftGroupId, raftPeers);
+    }
   }
 }
