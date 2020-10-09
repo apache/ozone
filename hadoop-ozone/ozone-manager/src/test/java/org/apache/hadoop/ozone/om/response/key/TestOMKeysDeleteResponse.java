@@ -85,7 +85,7 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
         .setCreationTime(Time.now()).build();
 
     OMClientResponse omKeysDeleteResponse = new OMKeysDeleteResponse(
-        omResponse, omKeyInfoList, 10L, true,
+        omResponse, omKeyInfoList, true,
         omVolumeArgs, omBucketInfo);
 
     omKeysDeleteResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
@@ -121,7 +121,7 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
         .setCreationTime(Time.now()).build();
 
     OMClientResponse omKeysDeleteResponse = new OMKeysDeleteResponse(
-        omResponse, omKeyInfoList, 10L, true,
+        omResponse, omKeyInfoList, true,
         omVolumeArgs, omBucketInfo);
 
     omKeysDeleteResponse.checkAndUpdateDB(omMetadataManager, batchOperation);

@@ -46,7 +46,7 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
   private OmBucketInfo omBucketInfo;
 
   public OMKeysDeleteResponse(@Nonnull OMResponse omResponse,
-      @Nonnull List<OmKeyInfo> keyDeleteList, long trxnLogIndex,
+      @Nonnull List<OmKeyInfo> keyDeleteList,
       boolean isRatisEnabled, @Nonnull OmVolumeArgs omVolumeArgs,
       @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse, isRatisEnabled);

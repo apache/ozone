@@ -165,6 +165,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
                 omKeyInfo.getKeyName())),
             new CacheValue<>(Optional.absent(), trxnLogIndex));
 
+        omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
         quotaReleased += sumBlockLengths(omKeyInfo);
       }
       // update usedBytes atomically.
@@ -175,7 +176,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           .setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
               .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys))
           .setStatus(deleteStatus ? OK : PARTIAL_DELETE)
-          .setSuccess(deleteStatus).build(), omKeyInfoList, trxnLogIndex,
+          .setSuccess(deleteStatus).build(), omKeyInfoList,
           ozoneManager.isRatisEnabled(), omVolumeArgs, omBucketInfo);
 
       result = Result.SUCCESS;

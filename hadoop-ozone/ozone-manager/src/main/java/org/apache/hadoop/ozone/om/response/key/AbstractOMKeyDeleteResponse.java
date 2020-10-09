@@ -75,23 +75,6 @@ public abstract class AbstractOMKeyDeleteResponse extends OMClientResponse {
       String keyName,
       OmKeyInfo omKeyInfo) throws IOException {
 
-    addDeletionToBatch(omMetadataManager, batchOperation, fromTable, keyName,
-        omKeyInfo, omKeyInfo.getUpdateID());
-  }
-
-  /**
-   * Adds the operation of deleting the {@code keyName omKeyInfo} pair from
-   * {@code fromTable} to the batch operation {@code batchOperation}. The
-   * batch operation is not committed, so no changes are persisted to disk.
-   */
-  protected void addDeletionToBatch(
-      OMMetadataManager omMetadataManager,
-      BatchOperation batchOperation,
-      Table<String, ?> fromTable,
-      String keyName,
-      OmKeyInfo omKeyInfo,
-      long trxnLogIndex) throws IOException {
-
     // For OmResponse with failure, this should do nothing. This method is
     // not called in failure scenario in OM code.
     fromTable.deleteWithBatch(batchOperation, keyName);
@@ -110,7 +93,7 @@ public abstract class AbstractOMKeyDeleteResponse extends OMClientResponse {
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           omMetadataManager.getDeletedTable().get(keyName);
       repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-          omKeyInfo, repeatedOmKeyInfo, trxnLogIndex,
+          omKeyInfo, repeatedOmKeyInfo, omKeyInfo.getUpdateID(),
           isRatisEnabled);
       omMetadataManager.getDeletedTable().putWithBatch(
           batchOperation, keyName, repeatedOmKeyInfo);
