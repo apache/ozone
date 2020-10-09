@@ -385,17 +385,6 @@
     <description>Connection timeout for Ozone client in milliseconds.
     </description>
   </property>
-
-
-
-  <property>
-    <name>ozone.client.max.retries</name>
-    <value>5</value>
-    <tag>OZONE, CLIENT</tag>
-    <description>Maximum number of retries by Ozone Client on encountering
-      exception while writing a key.
-    </description>
-  </property>
   <property>
     <name>ozone.client.retry.interval</name>
     <value>0ms</value>

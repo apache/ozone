@@ -108,6 +108,10 @@ public class BlockOutputStreamEntryPool {
     xceiverClientFactory = null;
     config =
         new OzoneConfiguration().getObject(OzoneClientConfig.class);
+    config.setStreamBufferSize(0);
+    config.setStreamBufferMaxSize(0);
+    config.setStreamBufferFlushSize(0);
+    config.setStreamBufferFlushDelay(false);
     requestID = null;
     int chunkSize = 0;
     bufferPool = new BufferPool(chunkSize, 1);

@@ -100,9 +100,9 @@ public class TestBlockOutputStreamCorrectness {
 
     OzoneClientConfig config = new OzoneClientConfig();
     config.setStreamBufferSize(4 * 1024 * 1024);
-    config.setStreamBufferMaxSize(16 * 1024 * 1024);
+    config.setStreamBufferMaxSize(32 * 1024 * 1024);
     config.setStreamBufferFlushDelay(true);
-    config.setStreamBufferMaxSize(2 * 1024 * 1024);
+    config.setStreamBufferFlushSize(16 * 1024 * 1024);
     config.setChecksumType(ChecksumType.NONE);
     config.setBytesPerChecksum(256 * 1024);
 
@@ -112,7 +112,7 @@ public class TestBlockOutputStreamCorrectness {
         pipeline,
         bufferPool,
         config
-      );
+    );
     return outputStream;
   }
 

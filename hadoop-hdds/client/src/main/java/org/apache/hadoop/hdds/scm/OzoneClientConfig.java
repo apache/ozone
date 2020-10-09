@@ -51,9 +51,10 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private long streamBufferMaxSize = 32 * 1024 * 1024;
 
-  @Config(key = "ozone.client.max.retries",
+  @Config(key = "max.retries",
       defaultValue = "5",
-      description = "",
+      description = "Maximum number of retries by Ozone Client on "
+          + "encountering exception while writing a key",
       tags = ConfigTag.CLIENT)
   private int maxRetryCount = 5;
 
