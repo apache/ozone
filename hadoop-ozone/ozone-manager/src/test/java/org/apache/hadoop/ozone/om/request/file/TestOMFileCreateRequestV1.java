@@ -33,8 +33,6 @@ import org.junit.Test;
 
 import java.util.UUID;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
-
 /**
  * Tests OMFileCreateRequest layout version V1.
  */
@@ -184,7 +182,6 @@ public class TestOMFileCreateRequestV1 extends TestOMFileCreateRequest {
   @Override
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration config = super.getOzoneConfiguration();
-    config.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     config.set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, "V1");
     return config;
   }

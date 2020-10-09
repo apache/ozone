@@ -68,7 +68,6 @@ public class TestOMFileCreateResponseV1 extends TestOMKeyCreateResponse {
   @Override
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration config = super.getOzoneConfiguration();
-    config.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     config.set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, "V1");
     return config;
   }

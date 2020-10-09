@@ -86,8 +86,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRE
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT;
 
 import org.apache.ratis.util.ExitUtils;
 import org.eclipse.jetty.util.StringUtil;
@@ -174,7 +172,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table dirTable;
   private Table fileTable;
   private Table openFileTable;
-  private boolean enableFSPaths;
   private Table transactionInfoTable;
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
@@ -196,9 +193,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     // For test purpose only
     ignorePipelineinKey = conf.getBoolean(
         "ozone.om.ignore.pipeline", Boolean.TRUE);
-
-    setEnableFileSystemPaths(conf);
-
     start(conf);
   }
 
@@ -210,7 +204,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     this.lock = new OzoneManagerLock(conf);
     this.openKeyExpireThresholdMS =
         OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT;
-    setEnableFileSystemPaths(conf);
   }
 
   @Override
@@ -234,7 +227,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public Table<String, OmKeyInfo> getKeyTable() {
-    if (enableFSPaths && OzoneManagerRatisUtils.isOmLayoutVersionV1()) {
+    if (OzoneManagerRatisUtils.isOmLayoutVersionV1()) {
       return fileTable;
     }
     return keyTable;
@@ -247,7 +240,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   @Override
   public Table<String, OmKeyInfo> getOpenKeyTable() {
-    if (enableFSPaths && OzoneManagerRatisUtils.isOmLayoutVersionV1()) {
+    if (OzoneManagerRatisUtils.isOmLayoutVersionV1()) {
       return openFileTable;
     }
     return openKeyTable;
@@ -1200,16 +1193,5 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     openKey.append(OM_KEY_PREFIX).append(fileName);
     openKey.append(OM_KEY_PREFIX).append(id);
     return openKey.toString();
-  }
-
-  /**
-   * Sets enabling FS semantics for the paths.
-   *
-   * @param conf ozone configuration
-   */
-  @VisibleForTesting
-  public void setEnableFileSystemPaths(OzoneConfiguration conf) {
-    enableFSPaths = conf.getBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-            OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
   }
 }

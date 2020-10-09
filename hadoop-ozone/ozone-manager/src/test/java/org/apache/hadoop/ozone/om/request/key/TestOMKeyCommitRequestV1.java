@@ -32,8 +32,6 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
-
 /**
  * Class tests OMKeyCommitRequestV1 class layout version V1.
  */
@@ -87,7 +85,6 @@ public class TestOMKeyCommitRequestV1 extends TestOMKeyCommitRequest {
   @Override
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration config = super.getOzoneConfiguration();
-    config.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     config.set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, "V1");
     return config;
   }
