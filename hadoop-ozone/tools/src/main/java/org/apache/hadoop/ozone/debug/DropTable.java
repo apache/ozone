@@ -62,7 +62,14 @@ public class DropTable implements Callable<Void>, SubcommandWithParent {
           break;
         }
       }
-      rocksDB.dropColumnFamily(toBeDeletedCf);
+      if (toBeDeletedCf == null) {
+        System.err.println(tableName + " is not in a column family in DB "
+            + parent.getDbPath());
+      } else {
+        System.out.println(tableName + " will be deleted from DB "
+            + parent.getDbPath());
+        rocksDB.dropColumnFamily(toBeDeletedCf);
+      }
     }
     return null;
   }
