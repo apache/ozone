@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.apache.ratis.util.TimeDuration;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -535,13 +536,16 @@ public class TestOmMetadataManager {
     final long clientID = 1000L;
     // To create expired keys, they will be assigned a creation time twice as
     // old as the minimum expiration time.
-    TimeUnit expirationUnit =
+    TimeUnit expireUnit =
         OMConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT.getUnit();
 
     long expireThreshold = ozoneConfiguration.getTimeDuration(
         OMConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD,
         OMConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT.getDuration(),
-        expirationUnit);
+        expireUnit);
+
+    TimeDuration expireDuration = TimeDuration.valueOf(expireThreshold,
+        expireUnit);
 
     final long expiredAgeMillis =
             Instant.now().minus(expireThreshold * 2,
@@ -576,7 +580,7 @@ public class TestOmMetadataManager {
 
     // Test retrieving fewer expired keys than actually exist.
     List<String> someExpiredKeys =
-            omMetadataManager.getExpiredOpenKeys(expireThreshold,
+            omMetadataManager.getExpiredOpenKeys(expireDuration,
                 numExpiredOpenKeys - 1);
 
     Assert.assertEquals(numExpiredOpenKeys - 1, someExpiredKeys.size());
@@ -586,7 +590,7 @@ public class TestOmMetadataManager {
 
     // Test attempting to retrieving more expired keys than actually exist.
     List<String> allExpiredKeys =
-            omMetadataManager.getExpiredOpenKeys(expireThreshold,
+            omMetadataManager.getExpiredOpenKeys(expireDuration,
                 numExpiredOpenKeys + 1);
 
     Assert.assertEquals(numExpiredOpenKeys, allExpiredKeys.size());
@@ -596,7 +600,7 @@ public class TestOmMetadataManager {
 
     // Test retrieving exact amount of expired keys that exist.
     allExpiredKeys =
-            omMetadataManager.getExpiredOpenKeys(expireThreshold,
+            omMetadataManager.getExpiredOpenKeys(expireDuration,
                 numExpiredOpenKeys);
 
     Assert.assertEquals(numExpiredOpenKeys, allExpiredKeys.size());
