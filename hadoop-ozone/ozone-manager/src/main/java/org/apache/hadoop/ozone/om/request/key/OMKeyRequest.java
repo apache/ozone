@@ -556,6 +556,27 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
+   * Check bucket quota in bytes.
+   * @param omBucketInfo
+   * @param allocateSize
+   * @throws IOException
+   */
+  protected void checkBucketQuotaInBytes(OmBucketInfo omBucketInfo,
+      long allocateSize) throws IOException {
+    if (omBucketInfo.getQuotaInBytes() > OzoneConsts.QUOTA_RESET) {
+      long usedBytes = omBucketInfo.getUsedBytes().sum();
+      long quotaInBytes = omBucketInfo.getQuotaInBytes();
+      if (quotaInBytes - usedBytes < allocateSize) {
+        throw new OMException("The DiskSpace quota of bucket:"
+            + omBucketInfo.getBucketName() + "exceeded: quotaInBytes: "
+            + quotaInBytes + " Bytes but diskspace consumed: " + (usedBytes
+            + allocateSize) + " Bytes.",
+            OMException.ResultCodes.QUOTA_EXCEEDED);
+      }
+    }
+  }
+
+  /**
    * Check directory exists. If exists return true, else false.
    * @param volumeName
    * @param bucketName
