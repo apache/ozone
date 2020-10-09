@@ -70,6 +70,8 @@ message SCMBlockLocationResponse {
 
   optional string leaderOMNodeId = 6;
 
+  optional string leaderSCMNodeId = 7;
+
   optional AllocateScmBlockResponseProto       allocateScmBlockResponse   = 11;
   optional DeleteScmKeyBlocksResponseProto     deleteScmKeyBlocksResponse = 12;
   optional hadoop.hdds.GetScmInfoResponseProto getScmInfoResponse         = 13;
@@ -114,6 +116,7 @@ enum Status {
   FAILED_TO_INIT_CONTAINER_PLACEMENT_POLICY = 26;
   FAILED_TO_ALLOCATE_ENOUGH_BLOCKS = 27;
   INTERNAL_ERROR = 29;
+  SCM_NOT_LEADER = 30;
 }
 
 /**
