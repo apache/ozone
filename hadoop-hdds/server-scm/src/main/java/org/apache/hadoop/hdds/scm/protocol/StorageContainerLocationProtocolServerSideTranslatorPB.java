@@ -73,6 +73,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
+import org.apache.hadoop.hdds.scm.server.SCMClientProtocolServer;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 
@@ -121,9 +122,22 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             protocolMetrics, LOG);
   }
 
+  private boolean isLeader() throws ServiceException {
+    if (!(impl instanceof SCMClientProtocolServer)) {
+      throw new ServiceException("Should be SCMClientProtocolServer");
+    } else {
+      return ((SCMClientProtocolServer) impl).getScm().checkLeader();
+    }
+  }
+
   @Override
   public ScmContainerLocationResponse submitRequest(RpcController controller,
       ScmContainerLocationRequest request) throws ServiceException {
+    if (!isLeader()) {
+      return ScmContainerLocationResponse.newBuilder()
+              .setCmdType(request.getCmdType()).setTraceID(request.getTraceID())
+              .setSuccess(false).setStatus(Status.SCM_NOT_LEADER).build();
+    }
     return dispatcher
         .processRequest(request, this::processRequest, request.getCmdType(),
             request.getTraceID());
