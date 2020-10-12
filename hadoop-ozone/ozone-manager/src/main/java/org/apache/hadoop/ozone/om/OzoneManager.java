@@ -1629,7 +1629,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         ProtobufRpcEngine.Server.getRemoteUser(),
         ProtobufRpcEngine.Server.getRemoteIp(),
         ProtobufRpcEngine.Server.getRemoteIp().getHostName(),
-        true);
+        true, getVolumeOwner(vol, acl));
   }
 
   /**
@@ -1644,27 +1644,34 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           UserGroupInformation.createRemoteUser(userName),
           ProtobufRpcEngine.Server.getRemoteIp(),
           ProtobufRpcEngine.Server.getRemoteIp().getHostName(),
-          false);
+          false, getVolumeOwner(vol, acl));
     } catch (OMException ex) {
       // Should not trigger exception here at all
       return false;
     }
   }
 
-  private String getVolumeOwner(OMMetadataManager metadataMgr,
-      String volume) throws OMException {
-    Boolean lockAcquired = metadataMgr.getLock().acquireReadLock(
+  public String getVolumeOwner(String vol, ACLType type) throws OMException {
+    String volOwnerName = null;
+    if (!vol.equals(OzoneConsts.OZONE_ROOT) && (type != ACLType.CREATE)) {
+      volOwnerName = getVolumeOwner(vol);
+    }
+    return volOwnerName;
+  }
+
+  private String getVolumeOwner(String volume) throws OMException {
+    Boolean lockAcquired = metadataManager.getLock().acquireReadLock(
         VOLUME_LOCK, volume);
-    String dbVolumeKey = metadataMgr.getVolumeKey(volume);
+    String dbVolumeKey = metadataManager.getVolumeKey(volume);
     OmVolumeArgs volumeArgs = null;
     try {
-      volumeArgs = metadataMgr.getVolumeTable().get(dbVolumeKey);
+      volumeArgs = metadataManager.getVolumeTable().get(dbVolumeKey);
     } catch (IOException ioe) {
       throw new OMException("Volume " + volume + " is not found",
           OMException.ResultCodes.VOLUME_NOT_FOUND);
     } finally {
       if (lockAcquired) {
-        metadataMgr.getLock().releaseReadLock(VOLUME_LOCK, volume);
+        metadataManager.getLock().releaseReadLock(VOLUME_LOCK, volume);
       }
     }
     if (volumeArgs != null) {
@@ -1686,19 +1693,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public boolean checkAcls(ResourceType resType, StoreType storeType,
       ACLType aclType, String vol, String bucket, String key,
       UserGroupInformation ugi, InetAddress remoteAddress, String hostName,
-      boolean throwIfPermissionDenied)
+      boolean throwIfPermissionDenied, String volumeOwner)
       throws OMException {
-    String volOwnerName = null;
-    boolean isVolumeCreate = false;
-    if (resType == ResourceType.VOLUME && aclType == ACLType.CREATE) {
-      isVolumeCreate = true;
-    }
-    // In the case of ROOT "/", we send null as owner name.
-    // OzoneNativeAuthorizer has as special handling to avoid NPE
-    // TODO: send the OM login user as the owner of non-exist "/" volume.
-    if (!vol.equals(OzoneConsts.OZONE_ROOT) && !isVolumeCreate) {
-      volOwnerName = getVolumeOwner(metadataManager, vol);
-    }
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder()
         .setResType(resType)
         .setStoreType(storeType)
@@ -1711,7 +1707,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .setHost(hostName)
         .setAclType(ACLIdentityType.USER)
         .setAclRights(aclType)
-        .setOwnerName(volOwnerName)
+        .setOwnerName(volumeOwner)
         .build();
     if (!accessAuthorizer.checkAccess(obj, context)) {
       if (throwIfPermissionDenied) {
@@ -3574,9 +3570,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     if (isAclEnabled) {
-      checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.READ,
+      final ACLType type = ACLType.READ;
+      checkAcls(ResourceType.BUCKET, StoreType.OZONE, type,
           volumeName, bucketName, null, userGroupInformation,
-          remoteAddress, hostName, true);
+          remoteAddress, hostName, true,
+          getVolumeOwner(volumeName, type));
     }
 
     return resolveBucketLink(
