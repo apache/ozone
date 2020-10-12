@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -196,16 +195,14 @@ public class BlockManagerImpl implements BlockManager {
                 + container.getContainerData().getContainerID() + " bcsId is "
                 + containerBCSId + ".", UNKNOWN_BCSID);
       }
-      byte[] kData = getBlockByID(db, blockID);
-      ContainerProtos.BlockData blockData =
-          ContainerProtos.BlockData.parseFrom(kData);
+      BlockData blockData = getBlockByID(db, blockID);
       long id = blockData.getBlockID().getBlockCommitSequenceId();
       if (id < bcsId) {
         throw new StorageContainerException(
             "bcsId " + bcsId + " mismatches with existing block Id "
                 + id + " for block " + blockID + ".", BCSID_MISMATCH);
       }
-      return BlockData.getFromProtoBuf(blockData);
+      return blockData;
     }
   }
 
@@ -226,9 +223,7 @@ public class BlockManagerImpl implements BlockManager {
       // This is a post condition that acts as a hint to the user.
       // Should never fail.
       Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
-      byte[] kData = getBlockByID(db, blockID);
-      ContainerProtos.BlockData blockData =
-          ContainerProtos.BlockData.parseFrom(kData);
+      BlockData blockData = getBlockByID(db, blockID);
       return blockData.getSize();
     }
   }
@@ -325,7 +320,7 @@ public class BlockManagerImpl implements BlockManager {
     BlockUtils.shutdownCache(ContainerCache.getInstance(config));
   }
 
-  private byte[] getBlockByID(ReferenceCountedDB db, BlockID blockID)
+  private BlockData getBlockByID(ReferenceCountedDB db, BlockID blockID)
       throws IOException {
     String blockKey = Long.toString(blockID.getLocalID());
 
@@ -335,6 +330,6 @@ public class BlockManagerImpl implements BlockManager {
           NO_SUCH_BLOCK);
     }
 
-    return blockData.getProtoBufMessage().toByteArray();
+    return blockData;
   }
 }
