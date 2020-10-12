@@ -845,6 +845,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     try {
+      LOG.info("Stopping the Datanode Admin Monitor.");
+      scmDecommissionManager.stop();
+    } catch (Exception ex) {
+      LOG.error("The Datanode Admin Monitor failed to stop", ex);
+    }
+
+    try {
       LOG.info("Stopping Lease Manager of the command watchers");
       commandWatcherLeaseManager.shutdown();
     } catch (Exception ex) {
