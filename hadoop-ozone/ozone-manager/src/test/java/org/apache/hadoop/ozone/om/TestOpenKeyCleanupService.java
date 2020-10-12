@@ -58,15 +58,13 @@ public class TestOpenKeyCleanupService {
     conf.setTimeDuration(OMConfigKeys.OZONE_OPEN_KEY_CLEANUP_SERVICE_INTERVAL,
         serviceInterval.getDuration(), serviceInterval.getUnit());
 
-    TimeUnit expireUnit =
-        OMConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT.getUnit();
-
     long expireDuration = conf.getTimeDuration(
         OMConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD,
         OMConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT.getDuration(),
-        expireUnit);
+        TimeUnit.MILLISECONDS);
 
-    expireThreshold = TimeDuration.valueOf(expireDuration, expireUnit);
+    expireThreshold =
+        TimeDuration.valueOf(expireDuration, TimeUnit.MILLISECONDS);
 
     metadataManager = new OmMetadataManagerImpl(conf);
 
@@ -80,12 +78,11 @@ public class TestOpenKeyCleanupService {
 
   @Test
   public void testOpenKeysWithoutBlockData() throws Exception {
-    final int numBlocks = 3;
     final int numExpiredKeys = 5;
     final int numUnexpiredKeys = 5;
 
     createOpenKeys(numUnexpiredKeys);
-    createExpiredOpenKeys(numExpiredKeys, numBlocks);
+    createExpiredOpenKeys(numExpiredKeys);
 
     runService();
 
@@ -123,9 +120,6 @@ public class TestOpenKeyCleanupService {
 
   @Test
   public void testWithNoOpenKeys() throws Exception {
-    Assert.assertEquals(0, getAllOpenKeys().size());
-    Assert.assertEquals(0, getAllPendingDeleteKeys().size());
-
     // Make sure service runs without errors.
     runService();
 
@@ -146,8 +140,7 @@ public class TestOpenKeyCleanupService {
     Assert.assertEquals(taskLimit * numServiceRuns,
         getAllPendingDeleteKeys().size());
     // All remaining keys should still be present in the open key table.
-    Assert.assertEquals(taskLimit,
-        getAllExpiredOpenKeys().size());
+    Assert.assertEquals(taskLimit, getAllExpiredOpenKeys().size());
   }
 
   private List<String> getAllExpiredOpenKeys() throws Exception {

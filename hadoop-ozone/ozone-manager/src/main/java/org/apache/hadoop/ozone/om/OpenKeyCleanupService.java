@@ -79,15 +79,13 @@ public class OpenKeyCleanupService extends BackgroundService {
     this.ozoneManager = ozoneManager;
     this.keyManager = keyManager;
 
-    TimeUnit expireUnit =
-        OMConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT.getUnit();
-
     long expireDuration = conf.getTimeDuration(
         OMConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD,
         OMConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT.getDuration(),
-        expireUnit);
+        TimeUnit.MILLISECONDS);
 
-    this.expireThreshold = TimeDuration.valueOf(expireDuration, expireUnit);
+    this.expireThreshold =
+        TimeDuration.valueOf(expireDuration, TimeUnit.MILLISECONDS);
 
     this.cleanupLimitPerTask = conf.getInt(
         OMConfigKeys.OZONE_OPEN_KEY_CLEANUP_LIMIT_PER_TASK,

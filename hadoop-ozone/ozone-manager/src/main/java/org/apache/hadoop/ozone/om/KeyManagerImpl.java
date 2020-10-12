@@ -250,17 +250,10 @@ public class KeyManagerImpl implements KeyManager {
     }
 
     if (openKeyCleanupService == null) {
-      TimeUnit serviceIntervalUnit =
-          OMConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT.getUnit();
-
-      long serviceIntervalDuration = configuration.getTimeDuration(
+      long serviceInterval = configuration.getTimeDuration(
           OZONE_OPEN_KEY_CLEANUP_SERVICE_INTERVAL,
           OZONE_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_DEFAULT.getDuration(),
-          serviceIntervalUnit);
-
-      long serviceInterval =
-          TimeDuration.valueOf(serviceIntervalDuration, serviceIntervalUnit)
-              .toLong(TimeUnit.MILLISECONDS);
+          TimeUnit.MILLISECONDS);
 
       // No timeout duration for open key cleanup. The OM RPC call will time
       // out after 15 minutes.
