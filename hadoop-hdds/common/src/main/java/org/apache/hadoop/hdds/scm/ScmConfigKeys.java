@@ -340,7 +340,7 @@ public final class ScmConfigKeys {
       "ozone.scm.pipeline.creation.auto.factor.one";
 
   public static final boolean
-      OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE_DEFAULT = true;
+      OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE_DEFAULT = false;
 
   public static final String OZONE_SCM_BLOCK_DELETION_MAX_RETRY =
       "ozone.scm.block.deletion.max.retry";
