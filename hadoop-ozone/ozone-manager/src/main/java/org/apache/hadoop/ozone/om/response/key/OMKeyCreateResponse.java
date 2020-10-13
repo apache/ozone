@@ -72,7 +72,7 @@ public class OMKeyCreateResponse extends OMClientResponse {
   }
 
   @Override
-  protected void addToDBBatch(OMMetadataManager omMetadataManager,
+  public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
 
     /**
@@ -107,6 +107,22 @@ public class OMKeyCreateResponse extends OMClientResponse {
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
         omMetadataManager.getBucketKey(omVolumeArgs.getVolume(),
             omBucketInfo.getBucketName()), omBucketInfo);
+  }
+
+  protected long getOpenKeySessionID() {
+    return openKeySessionID;
+  }
+
+  protected OmKeyInfo getOmKeyInfo() {
+    return omKeyInfo;
+  }
+
+  protected OmVolumeArgs getOmVolumeArgs() {
+    return omVolumeArgs;
+  }
+
+  protected OmBucketInfo getOmBucketInfo() {
+    return omBucketInfo;
   }
 }
 
