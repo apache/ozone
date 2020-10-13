@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType;
 
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
+import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -813,5 +814,114 @@ public final class TestOMRequestUtils {
     omMetadataManager.getVolumeTable().addCacheEntry(
         new CacheKey<>(dbVolumeKey),
         new CacheValue<>(Optional.of(omVolumeArgs), 1L));
+  }
+
+  /**
+   * Create OmKeyInfo.
+   */
+  @SuppressWarnings("parameterNumber")
+  public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
+      String keyName, HddsProtos.ReplicationType replicationType,
+      HddsProtos.ReplicationFactor replicationFactor, long objectID,
+      long parentID, long trxnLogIndex, long creationTime) {
+    String fileName = OzoneFSUtils.getFileName(keyName);
+    return new OmKeyInfo.Builder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyName)
+            .setOmKeyLocationInfos(Collections.singletonList(
+                    new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+            .setCreationTime(creationTime)
+            .setModificationTime(Time.now())
+            .setDataSize(1000L)
+            .setReplicationType(replicationType)
+            .setReplicationFactor(replicationFactor)
+            .setObjectID(objectID)
+            .setUpdateID(trxnLogIndex)
+            .setParentObjectID(parentID)
+            .setFileName(fileName)
+            .build();
+  }
+
+
+  /**
+   * Add key entry to KeyTable. if openKeyTable flag is true, add's entries
+   * to openKeyTable, else add's it to keyTable.
+   *
+   * @throws Exception DB failure
+   */
+  public static void addFileToKeyTable(boolean openKeyTable,
+                                       boolean addToCache, String fileName,
+                                       OmKeyInfo omKeyInfo,
+                                       long clientID, long trxnLogIndex,
+                                       OMMetadataManager omMetadataManager)
+          throws Exception {
+    if (openKeyTable) {
+      String ozoneKey = omMetadataManager.getOpenFileName(
+              omKeyInfo.getParentObjectID(), fileName, clientID);
+      if (addToCache) {
+        omMetadataManager.getOpenKeyTable().addCacheEntry(
+                new CacheKey<>(ozoneKey),
+                new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+      }
+      omMetadataManager.getOpenKeyTable().put(ozoneKey, omKeyInfo);
+    } else {
+      String ozoneKey = omMetadataManager.getOzonePathKey(
+              omKeyInfo.getParentObjectID(), fileName);
+      if (addToCache) {
+        omMetadataManager.getKeyTable().addCacheEntry(new CacheKey<>(ozoneKey),
+                new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
+      }
+      omMetadataManager.getKeyTable().put(ozoneKey, omKeyInfo);
+    }
+  }
+
+  /**
+   * Gets bucketId from OM metadata manager.
+   *
+   * @param volumeName        volume name
+   * @param bucketName        bucket name
+   * @param omMetadataManager metadata manager
+   * @return bucket Id
+   * @throws Exception DB failure
+   */
+  public static long getBucketId(String volumeName, String bucketName,
+                                 OMMetadataManager omMetadataManager)
+          throws Exception {
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+            omMetadataManager.getBucketTable().get(bucketKey);
+    return omBucketInfo.getObjectID();
+  }
+
+  /**
+   * Add path components to the directory table and returns last directory's
+   * object id.
+   *
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @param key        key name
+   * @param omMetaMgr  metdata manager
+   * @return last directory object id
+   * @throws Exception
+   */
+  public static long addParentsToDirTable(String volumeName, String bucketName,
+                                    String key, OMMetadataManager omMetaMgr)
+          throws Exception {
+    long bucketId = TestOMRequestUtils.getBucketId(volumeName, bucketName,
+            omMetaMgr);
+    String[] pathComponents = StringUtils.split(key, '/');
+    long objectId = bucketId + 10;
+    long parentId = bucketId;
+    long txnID = 50;
+    for (String pathElement : pathComponents) {
+      OmDirectoryInfo omDirInfo =
+              TestOMRequestUtils.createOmDirectoryInfo(pathElement, ++objectId,
+                      parentId);
+      TestOMRequestUtils.addDirKeyToDirTable(true, omDirInfo,
+              txnID, omMetaMgr);
+      parentId = omDirInfo.getObjectID();
+    }
+    return parentId;
   }
 }
