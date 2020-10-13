@@ -18,80 +18,60 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
-import java.io.IOException;
 import javax.annotation.Nonnull;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
+import java.io.IOException;
+
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 
 /**
- * Response for CommitKey request.
+ * Response for CommitKey request layout version V1.
  */
-@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, KEY_TABLE})
-public class OMKeyCommitResponse extends OMClientResponse {
+@CleanupTableInfo(cleanupTables = {OPEN_FILE_TABLE, FILE_TABLE})
+public class OMKeyCommitResponseV1 extends OMKeyCommitResponse {
 
-  private OmKeyInfo omKeyInfo;
-  private String ozoneKeyName;
-  private String openKeyName;
-  private OmBucketInfo omBucketInfo;
-
-  public OMKeyCommitResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo, String ozoneKeyName, String openKeyName,
-      @Nonnull OmBucketInfo omBucketInfo) {
-    super(omResponse);
-    this.omKeyInfo = omKeyInfo;
-    this.ozoneKeyName = ozoneKeyName;
-    this.openKeyName = openKeyName;
-    this.omBucketInfo = omBucketInfo;
+  public OMKeyCommitResponseV1(@Nonnull OMResponse omResponse,
+                               @Nonnull OmKeyInfo omKeyInfo,
+                               String ozoneKeyName, String openKeyName,
+                               @Nonnull OmVolumeArgs omVolumeArgs,
+                               @Nonnull OmBucketInfo omBucketInfo) {
+    super(omResponse, omKeyInfo, ozoneKeyName, openKeyName,
+            omBucketInfo);
   }
 
   /**
    * For when the request is not successful.
    * For a successful request, the other constructor should be used.
    */
-  public OMKeyCommitResponse(@Nonnull OMResponse omResponse) {
+  public OMKeyCommitResponseV1(@Nonnull OMResponse omResponse) {
     super(omResponse);
     checkStatusNotOK();
   }
 
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
-      BatchOperation batchOperation) throws IOException {
+                           BatchOperation batchOperation) throws IOException {
 
     // Delete from OpenKey table
     omMetadataManager.getOpenKeyTable().deleteWithBatch(batchOperation,
-        openKeyName);
+            getOpenKeyName());
 
-    omMetadataManager.getKeyTable().putWithBatch(batchOperation, ozoneKeyName,
-        omKeyInfo);
+    OMFileRequest.addToFileTable(omMetadataManager, batchOperation,
+            getOmKeyInfo());
 
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-        omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
-            omBucketInfo.getBucketName()), omBucketInfo);
-  }
-
-  protected String getOpenKeyName() {
-    return openKeyName;
-  }
-
-  protected OmKeyInfo getOmKeyInfo() {
-    return omKeyInfo;
-  }
-
-  protected OmBucketInfo getOmBucketInfo() {
-    return omBucketInfo;
-  }
-
-  protected String getOzoneKeyName() {
-    return ozoneKeyName;
+            omMetadataManager.getBucketKey(getOmBucketInfo().getVolumeName(),
+                    getOmBucketInfo().getBucketName()), getOmBucketInfo());
   }
 }
