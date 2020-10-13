@@ -134,8 +134,9 @@ public class TestLayoutVersionInstanceFactory {
     assertTrue(val instanceof MockClassV1);
 
     // Finalize the layout version.
+    LayoutFeature toFeature = getMockFeatureWithVersion(3);
+    factory.finalizeFeature(toFeature);
     lvm = getMockLvm(3, 3);
-    factory.onFinalize(lvm);
 
     val = factory.get(lvm, getKey("key", null));
     assertTrue(val instanceof MockClassV2);
@@ -144,6 +145,12 @@ public class TestLayoutVersionInstanceFactory {
 
     val = factory.get(lvm, getKey("key2", null));
     assertTrue(val instanceof MockClassV2);
+  }
+
+  private LayoutFeature getMockFeatureWithVersion(int layoutVersion) {
+    LayoutFeature feature = mock(LayoutFeature.class);
+    when(feature.layoutVersion()).thenReturn(layoutVersion);
+    return feature;
   }
 
   private LayoutVersionManager getMockLvm(int mlv, int slv) {

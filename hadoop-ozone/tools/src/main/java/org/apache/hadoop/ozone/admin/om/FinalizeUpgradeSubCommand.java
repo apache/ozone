@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.admin.om;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpgradeFinalizationStatus;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -78,16 +78,16 @@ public class FinalizeUpgradeSubCommand implements Callable<Void> {
         parent.createOmClient(omServiceId, omHost, forceHA);
     String upgradeClientID = "Upgrade-Client-" + UUID.randomUUID().toString();
     try {
-      UpgradeFinalizationStatus status =
+      UpgradeFinalizer.StatusAndMessages finalizationResponse =
           client.finalizeUpgrade(upgradeClientID);
-      if (isFinalized(status)){
+      if (isFinalized(finalizationResponse.status())){
         System.out.println("Upgrade has already been finalized.");
         emitExitMsg();
         return null;
-      } else if (!isStarting(status)){
+      } else if (!isStarting(finalizationResponse.status())){
         System.err.println("Invalid response from Ozone Manager.");
         System.err.println(
-            "Current finalization status is: " + status.getStatus()
+            "Current finalization status is: " + finalizationResponse.status()
         );
         throw new IOException("Exiting...");
       }
@@ -159,19 +159,19 @@ public class FinalizeUpgradeSubCommand implements Callable<Void> {
         Thread.sleep(500);
         // do not check for exceptions, if one happens during monitoring we
         // should report it and exit.
-        UpgradeFinalizationStatus status =
+        UpgradeFinalizer.StatusAndMessages progress =
             client.queryUpgradeFinalizationProgress(upgradeClientID, force);
         // this can happen after trying to takeover the request after the fact
         // when there is already nothing to take over.
-        if (isFinalized(status)) {
+        if (isFinalized(progress.status())) {
           System.out.println("Finalization already finished.");
           emitExitMsg();
           return null;
         }
-        if (isInprogress(status) || isDone(status)) {
-          status.getMessagesList().stream().forEachOrdered(System.out::println);
+        if (isInprogress(progress.status()) || isDone(progress.status())) {
+          progress.msgs().stream().forEachOrdered(System.out::println);
         }
-        if (isDone(status)) {
+        if (isDone(progress.status())) {
           emitExitMsg();
           finished = true;
         }
@@ -184,24 +184,20 @@ public class FinalizeUpgradeSubCommand implements Callable<Void> {
     System.out.println("Exiting...");
   }
 
-  private static boolean isFinalized(UpgradeFinalizationStatus status) {
-    return status.getStatus()
-        .equals(UpgradeFinalizationStatus.Status.ALREADY_FINALIZED);
+  private static boolean isFinalized(UpgradeFinalizer.Status status) {
+    return status.equals(UpgradeFinalizer.Status.ALREADY_FINALIZED);
   }
 
-  private static boolean isDone(UpgradeFinalizationStatus status) {
-    return status.getStatus()
-        .equals(UpgradeFinalizationStatus.Status.FINALIZATION_DONE);
+  private static boolean isDone(UpgradeFinalizer.Status status) {
+    return status.equals(UpgradeFinalizer.Status.FINALIZATION_DONE);
   }
 
-  private static boolean isInprogress(UpgradeFinalizationStatus status) {
-    return status.getStatus()
-        .equals(UpgradeFinalizationStatus.Status.FINALIZATION_IN_PROGRESS);
+  private static boolean isInprogress(UpgradeFinalizer.Status status) {
+    return status.equals(UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS);
   }
 
-  private static boolean isStarting(UpgradeFinalizationStatus status) {
-    return status.getStatus()
-        .equals(UpgradeFinalizationStatus.Status.STARTING_FINALIZATION);
+  private static boolean isStarting(UpgradeFinalizer.Status status) {
+    return status.equals(UpgradeFinalizer.Status.STARTING_FINALIZATION);
   }
 
   private static void emitGeneralErrorMsg() {

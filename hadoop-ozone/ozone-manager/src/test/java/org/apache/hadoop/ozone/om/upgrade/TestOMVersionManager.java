@@ -52,11 +52,15 @@ public class TestOMVersionManager {
     when(omStorage.getLayoutVersion()).thenReturn(0);
     OMLayoutVersionManagerImpl omVersionManager =
         OMLayoutVersionManagerImpl.initialize(omStorage);
+    OzoneManager om = mock(OzoneManager.class);
+    when(om.getOmStorage()).thenReturn(omStorage);
+
     assertTrue(omVersionManager.isAllowed(INITIAL_VERSION));
     assertFalse(omVersionManager.isAllowed(CREATE_EC));
     assertEquals(0, omVersionManager.getMetadataLayoutVersion());
     assertTrue(omVersionManager.needsFinalization());
-    omVersionManager.doFinalize(mock(OzoneManager.class));
+    OMUpgradeFinalizer finalizer = new OMUpgradeFinalizer(omVersionManager);
+    finalizer.finalize("random", om);
     assertFalse(omVersionManager.needsFinalization());
     assertEquals(2, omVersionManager.getMetadataLayoutVersion());
   }

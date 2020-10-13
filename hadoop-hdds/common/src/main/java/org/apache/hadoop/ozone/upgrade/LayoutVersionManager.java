@@ -61,4 +61,6 @@ public interface LayoutVersionManager {
    * @return LayoutFeature instance.
    */
   LayoutFeature getFeature(String name);
+
+  Iterable<? extends LayoutFeature> unfinalizedFeatures();
 }

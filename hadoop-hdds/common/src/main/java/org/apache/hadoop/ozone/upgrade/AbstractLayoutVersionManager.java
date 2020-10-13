@@ -21,10 +21,9 @@ package org.apache.hadoop.ozone.upgrade;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
-import java.util.Optional;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
 
@@ -32,22 +31,23 @@ import com.google.common.base.Preconditions;
  * Layout Version Manager containing generic method implementations.
  */
 @SuppressWarnings("visibilitymodifier")
-public abstract class AbstractLayoutVersionManager implements
-    LayoutVersionManager {
+public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
+    implements LayoutVersionManager {
 
   protected int metadataLayoutVersion; // MLV.
   protected int softwareLayoutVersion; // SLV.
-  protected TreeMap<Integer, LayoutFeature> features = new TreeMap<>();
-  protected Map<String, LayoutFeature> featureMap = new HashMap<>();
+  protected TreeMap<Integer, T> features = new TreeMap<>();
+  protected Map<String, T> featureMap = new HashMap<>();
   protected volatile boolean isInitialized = false;
 
-  protected void init(int version, LayoutFeature[] lfs) throws IOException {
+  protected void init(int version, T[] lfs) throws IOException {
+
     if (!isInitialized) {
       metadataLayoutVersion = version;
       initializeFeatures(lfs);
       softwareLayoutVersion = features.lastKey();
       isInitialized = true;
-      if (metadataLayoutVersion > softwareLayoutVersion) {
+      if (softwareIsBehindMetaData()) {
         throw new IOException(
             String.format("Cannot initialize VersionManager. Metadata " +
                     "layout version (%d) > software layout version (%d)",
@@ -56,7 +56,7 @@ public abstract class AbstractLayoutVersionManager implements
     }
   }
 
-  protected void initializeFeatures(LayoutFeature[] lfs) {
+  private void initializeFeatures(T[] lfs) {
     Arrays.stream(lfs).forEach(f -> {
       Preconditions.checkArgument(!featureMap.containsKey(f.name()));
       Preconditions.checkArgument(!features.containsKey(f.layoutVersion()));
@@ -65,53 +65,74 @@ public abstract class AbstractLayoutVersionManager implements
     });
   }
 
-  public int getMetadataLayoutVersion() {
-    return metadataLayoutVersion;
-  }
-
-  public int getSoftwareLayoutVersion() {
-    return softwareLayoutVersion;
-  }
-
-  public boolean needsFinalization() {
-    return metadataLayoutVersion < softwareLayoutVersion;
-  }
-
-  public boolean isAllowed(LayoutFeature layoutFeature) {
-    return layoutFeature.layoutVersion() <= metadataLayoutVersion;
-  }
-
-  public boolean isAllowed(String featureName) {
-    return featureMap.containsKey(featureName) &&
-        isAllowed(featureMap.get(featureName));
-  }
-
-  public LayoutFeature getFeature(String name) {
-    return featureMap.get(name);
-  }
-
-  public void doFinalize(Object param) {
-    if (needsFinalization()){
-      Iterator<Map.Entry<Integer, LayoutFeature>> iterator = features
-          .tailMap(metadataLayoutVersion + 1).entrySet().iterator();
-      while (iterator.hasNext()) {
-        Map.Entry<Integer, LayoutFeature> f = iterator.next();
-        Optional<? extends LayoutFeature.UpgradeAction> upgradeAction =
-            f.getValue().onFinalizeAction();
-        upgradeAction.ifPresent(action -> action.executeAction(param));
-        // ToDo : Handle shutdown while iterating case (resume from last
-        //  feature).
-        metadataLayoutVersion = f.getKey();
-      }
-      // ToDo : Persist new MLV.
-    }
-  }
-
   protected void reset() {
     metadataLayoutVersion = 0;
     softwareLayoutVersion = 0;
     featureMap.clear();
     features.clear();
     isInitialized = false;
+  }
+
+  public void finalized(T layoutFeature) {
+    if (layoutFeature.layoutVersion() == metadataLayoutVersion + 1) {
+      metadataLayoutVersion = layoutFeature.layoutVersion();
+    } else {
+      String msgStart = "";
+      if (layoutFeature.layoutVersion() < metadataLayoutVersion) {
+        msgStart = "Finalize attempt on a layoutFeature which has already "
+            + "been finalized.";
+      } else {
+        msgStart = "Finalize attempt on a layoutFeature that is newer than the"
+            + " next feature to be finalized.";
+      }
+
+      throw new IllegalArgumentException(
+          msgStart + "Software Layout version: " + softwareLayoutVersion
+              + " Feature Layout version: " + layoutFeature.layoutVersion());
+    }
+  }
+
+  private boolean softwareIsBehindMetaData() {
+    return metadataLayoutVersion > softwareLayoutVersion;
+  }
+
+  @Override
+  public int getMetadataLayoutVersion() {
+    return metadataLayoutVersion;
+  }
+
+  @Override
+  public int getSoftwareLayoutVersion() {
+    return softwareLayoutVersion;
+  }
+
+  @Override
+  public boolean needsFinalization() {
+    return metadataLayoutVersion < softwareLayoutVersion;
+  }
+
+  @Override
+  public boolean isAllowed(LayoutFeature layoutFeature) {
+    return layoutFeature.layoutVersion() <= metadataLayoutVersion;
+  }
+
+  @Override
+  public boolean isAllowed(String featureName) {
+    return featureMap.containsKey(featureName) &&
+        isAllowed(featureMap.get(featureName));
+  }
+
+  @Override
+  public T getFeature(String name) {
+    return featureMap.get(name);
+  }
+
+  @Override
+  public Iterable<T> unfinalizedFeatures() {
+    return features
+        .tailMap(metadataLayoutVersion + 1)
+        .values()
+        .stream()
+        .collect(Collectors.toList());
   }
 }

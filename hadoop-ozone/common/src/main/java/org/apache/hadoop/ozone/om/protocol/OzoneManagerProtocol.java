@@ -49,9 +49,9 @@ import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSelector;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.token.TokenInfo;
 
@@ -341,9 +341,7 @@ public interface OzoneManagerProtocol
    * @throws OMException
    *            when finalization is already in progress.
    */
-  UpgradeFinalizationStatus finalizeUpgrade(
-      String upgradeClientID
-  ) throws IOException;
+  StatusAndMessages finalizeUpgrade(String upgradeClientID) throws IOException;
 
   /**
    * Queries the current status of finalization.
@@ -364,15 +362,15 @@ public interface OzoneManagerProtocol
    *    unless the request is forced by a new client, in which case the new
    *    client takes over the old client and the old client should exit.
    *
+   * @param takeover set force takeover of output monitoring
    * @param upgradeClientID String identifier of the upgrade finalizer client
-   * @param force set force takeover of output monitoring
    * @return the finalization status and status messages.
    * @throws IOException
    *            if there was a problem during the query
    * @throws OMException
    *            if finalization is needed but not yet started
    */
-  UpgradeFinalizationStatus queryUpgradeFinalizationProgress(
+  StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean takeover
   ) throws IOException;
 
