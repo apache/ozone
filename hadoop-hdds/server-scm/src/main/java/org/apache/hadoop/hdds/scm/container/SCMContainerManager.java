@@ -51,6 +51,8 @@ import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_FIND_CONTAINER;
+
 /**
  * ContainerManager class contains the mapping from a name to a pipeline
  * mapping. This is used by SCM when allocating new locations and when
@@ -322,7 +324,7 @@ public class SCMContainerManager implements ContainerManager {
       throw new SCMException(
           "Failed to delete container " + containerID + ", reason : " +
               "container doesn't exist.",
-          SCMException.ResultCodes.FAILED_TO_FIND_CONTAINER);
+          FAILED_TO_FIND_CONTAINER);
     } finally {
       lock.unlock();
     }
@@ -378,7 +380,7 @@ public class SCMContainerManager implements ContainerManager {
           "Failed to update container state"
               + containerID
               + ", reason : container doesn't exist.",
-          SCMException.ResultCodes.FAILED_TO_FIND_CONTAINER);
+          FAILED_TO_FIND_CONTAINER);
     } finally {
       lock.unlock();
     }
@@ -397,33 +399,29 @@ public class SCMContainerManager implements ContainerManager {
     if (deleteTransactionMap == null) {
       return;
     }
-    org.apache.hadoop.hdds.utils.db.BatchOperation batchOperation =
-        batchHandler.initBatchOperation();
-    lock.lock();
-    try {
-      for (Map.Entry<Long, Long> entry : deleteTransactionMap.entrySet()) {
+    try(org.apache.hadoop.hdds.utils.db.BatchOperation batchOperation =
+        batchHandler.initBatchOperation()) {
+      lock.lock();
+      for (Map.Entry< Long, Long > entry : deleteTransactionMap.entrySet()) {
         long containerID = entry.getKey();
-
         ContainerID containerIdObject = new ContainerID(containerID);
         ContainerInfo containerInfo =
             containerStore.get(containerIdObject);
         ContainerInfo containerInfoInMem = containerStateManager
             .getContainer(containerIdObject);
         if (containerInfo == null || containerInfoInMem == null) {
-          throw new SCMException(
-              "Failed to increment number of deleted blocks for container "
-                  + containerID + ", reason : " + "container doesn't exist.",
-              SCMException.ResultCodes.FAILED_TO_FIND_CONTAINER);
+          throw new SCMException("Failed to increment number of deleted blocks " +
+              "for container " + containerID + ", reason : " + "container " +
+              "doesn't exist.", FAILED_TO_FIND_CONTAINER);
         }
         containerInfo.updateDeleteTransactionId(entry.getValue());
         containerInfo.setNumberOfKeys(containerInfoInMem.getNumberOfKeys());
         containerInfo.setUsedBytes(containerInfoInMem.getUsedBytes());
-        containerStore
-            .putWithBatch(batchOperation, containerIdObject, containerInfo);
+        containerStore.putWithBatch(batchOperation, containerIdObject,
+            containerInfo);
       }
       batchHandler.commitBatchOperation(batchOperation);
-      containerStateManager
-          .updateDeleteTransactionId(deleteTransactionMap);
+      containerStateManager.updateDeleteTransactionId(deleteTransactionMap);
     } finally {
       lock.unlock();
     }

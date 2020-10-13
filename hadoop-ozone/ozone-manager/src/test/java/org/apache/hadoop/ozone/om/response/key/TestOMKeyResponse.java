@@ -70,6 +70,9 @@ public class TestOMKeyResponse {
   @After
   public void stop() {
     Mockito.framework().clearInlineMocks();
+    if (batchOperation != null) {
+      batchOperation.close();
+    }
   }
 
 }
