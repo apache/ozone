@@ -233,6 +233,30 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     auditLog(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
           exception, getOmRequest().getUserInfo()));
 
+    processResult(commitKeyRequest, volumeName, bucketName, keyName, omMetrics,
+            exception, omKeyInfo, result);
+
+    return omClientResponse;
+  }
+
+  /**
+   * Process result of om request execution.
+   *
+   * @param commitKeyRequest commit key request
+   * @param volumeName       volume name
+   * @param bucketName       bucket name
+   * @param keyName          key name
+   * @param omMetrics        om metrics
+   * @param exception        exception trace
+   * @param omKeyInfo        omKeyInfo
+   * @param result           stores the result of the execution
+   */
+  @SuppressWarnings("parameternumber")
+  protected void processResult(CommitKeyRequest commitKeyRequest,
+                               String volumeName, String bucketName,
+                               String keyName, OMMetrics omMetrics,
+                               IOException exception, OmKeyInfo omKeyInfo,
+                               Result result) {
     switch (result) {
     case SUCCESS:
       // As when we commit the key, then it is visible in ozone, so we should
@@ -244,18 +268,16 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         omMetrics.incNumKeys();
       }
       LOG.debug("Key committed. Volume:{}, Bucket:{}, Key:{}", volumeName,
-          bucketName, keyName);
+              bucketName, keyName);
       break;
     case FAILURE:
-      LOG.error("Key commit failed. Volume:{}, Bucket:{}, Key:{}.",
-          volumeName, bucketName, keyName, exception);
+      LOG.error("Key commit failed. Volume:{}, Bucket:{}, Key:{}. Exception:{}",
+              volumeName, bucketName, keyName, exception);
       omMetrics.incNumKeyCommitFails();
       break;
     default:
       LOG.error("Unrecognized Result for OMKeyCommitRequest: {}",
-          commitKeyRequest);
+              commitKeyRequest);
     }
-
-    return omClientResponse;
   }
 }
