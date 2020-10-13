@@ -35,6 +35,9 @@ import org.apache.hadoop.ozone.upgrade.LayoutVersionInstanceFactory;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.VersionFactoryKey;
 import org.reflections.Reflections;
+import org.reflections.scanners.SubTypesScanner;
+import org.reflections.util.ClasspathHelper;
+import org.reflections.util.ConfigurationBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,6 +53,8 @@ public final class OMLayoutVersionManagerImpl
   private static final Logger LOG =
       LoggerFactory.getLogger(OMLayoutVersionManagerImpl.class);
 
+  private static final String OM_REQUEST_CLASS_PACKAGE =
+      "org.apache.hadoop.ozone.om.request";
   private static OMLayoutVersionManagerImpl omVersionManager;
   private LayoutVersionInstanceFactory<Class<? extends OMClientRequest>>
       requestFactory;
@@ -119,11 +124,14 @@ public final class OMLayoutVersionManagerImpl
   }
 
   private void registerOzoneManagerRequests() {
-    Reflections reflections = new Reflections(
-        "org.apache.hadoop.ozone.om.request");
-    Set<Class<? extends OMClientRequest>> subTypes =
-        reflections.getSubTypesOf(OMClientRequest.class);
     try {
+      Reflections reflections = new Reflections(new ConfigurationBuilder()
+          .setUrls(ClasspathHelper.forPackage(OM_REQUEST_CLASS_PACKAGE))
+          .setScanners(new SubTypesScanner())
+          .setExpandSuperTypes(false));
+
+      Set<Class<? extends OMClientRequest>> subTypes =
+          reflections.getSubTypesOf(OMClientRequest.class);
       for (Class<? extends OMClientRequest> requestClass : subTypes) {
         if (Modifier.isAbstract(requestClass.getModifiers())) {
           continue;
