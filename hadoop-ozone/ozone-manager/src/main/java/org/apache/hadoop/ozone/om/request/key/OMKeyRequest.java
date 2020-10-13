@@ -32,6 +32,7 @@ import java.util.Map;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.PrefixManager;
@@ -596,7 +597,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
-   * Return volume info for the specified volume.
+   * Return volume info for the specified volume. If the volume does not
+   * exist, returns {@code null}.
    * @param omMetadataManager
    * @param volume
    * @return OmVolumeArgs
@@ -604,9 +606,34 @@ public abstract class OMKeyRequest extends OMClientRequest {
    */
   protected OmVolumeArgs getVolumeInfo(OMMetadataManager omMetadataManager,
       String volume) {
-    return omMetadataManager.getVolumeTable().getCacheValue(
-        new CacheKey<>(omMetadataManager.getVolumeKey(volume)))
-        .getCacheValue();
+
+    OmVolumeArgs volumeArgs = null;
+
+    CacheValue<OmVolumeArgs> value =
+        omMetadataManager.getVolumeTable().getCacheValue(
+        new CacheKey<>(omMetadataManager.getVolumeKey(volume)));
+
+    if (value != null) {
+      volumeArgs = value.getCacheValue();
+    }
+
+    return volumeArgs;
+  }
+
+  /**
+   * @return the number of bytes used by blocks pointed to by {@code omKeyInfo}.
+   */
+  protected static long sumBlockLengths(OmKeyInfo omKeyInfo) {
+    long bytesUsed = 0;
+    int keyFactor = omKeyInfo.getFactor().getNumber();
+    OmKeyLocationInfoGroup keyLocationGroup =
+        omKeyInfo.getLatestVersionLocations();
+
+    for(OmKeyLocationInfo locationInfo: keyLocationGroup.getLocationList()) {
+      bytesUsed += locationInfo.getLength() * keyFactor;
+    }
+
+    return bytesUsed;
   }
 
   /**
