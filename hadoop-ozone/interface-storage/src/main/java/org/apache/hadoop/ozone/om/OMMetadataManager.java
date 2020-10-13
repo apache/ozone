@@ -407,12 +407,23 @@ public interface OMMetadataManager extends DBStoreHAManager {
       getKeyIterator();
 
   /**
-   * Given a volume, bucket and a key, return the corresponding DB prefixKey
-   * key.
+   * Given parent object id and path component name, return the corresponding
+   * DB 'prefixKey' key.
    *
    * @param parentObjectId - parent object Id
    * @param pathComponentName   - path component name
    * @return DB directory key as String.
    */
   String getOzonePathKey(long parentObjectId, String pathComponentName);
+
+  /**
+   * Returns DB key name of an open file in OM metadata store. Should be
+   * #open# prefix followed by actual leaf node name.
+   *
+   * @param parentObjectId - parent object Id
+   * @param fileName       - file name
+   * @param id             - client id for this open request
+   * @return DB directory key as String.
+   */
+  String getOpenFileName(long parentObjectId, String fileName, long id);
 }

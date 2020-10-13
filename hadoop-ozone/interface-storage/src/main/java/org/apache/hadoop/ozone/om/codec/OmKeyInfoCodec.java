@@ -32,6 +32,14 @@ import static org.apache.hadoop.ozone.ClientVersions.CURRENT_VERSION;
 
 /**
  * Codec to encode OmKeyInfo as byte array.
+ *
+ * <p>
+ * If the layout version "ozone.om.layout.version" is V1 and
+ * "ozone.om.enable.filesystem.paths" is TRUE. Then, DB stores only the leaf
+ * node name into the 'keyName' field.
+ * <p>
+ * For example, the user given key path is '/a/b/c/d/e/file1', then in DB
+ * 'keyName' field stores only the leaf node name, which is 'file1'.
  */
 public class OmKeyInfoCodec implements Codec<OmKeyInfo> {
   private static final Logger LOG =
