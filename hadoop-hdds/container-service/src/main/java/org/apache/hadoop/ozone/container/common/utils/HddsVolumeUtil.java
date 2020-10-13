@@ -213,7 +213,9 @@ public final class HddsVolumeUtil {
       // The hdds root dir should always have 2 files. One is Version file
       // and other is SCM directory.
       logger.error("The hdds root dir {} should always have 2 files. " +
-              "One is Version file and other is SCM directory.",
+              "One is Version file and other is SCM directory. " +
+              "Please remove any other extra files from the directory " +
+              "so that DataNode startup can proceed.",
               hddsRoot.getAbsolutePath());
       return false;
     }
