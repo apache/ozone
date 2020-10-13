@@ -171,15 +171,15 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         quotaReleased += sumBlockLengths(omKeyInfo);
       }
       // update usedBytes atomically.
-      omVolumeArgs.getUsedBytes().add(-quotaReleased);
-      omBucketInfo.getUsedBytes().add(-quotaReleased);
+      omBucketInfo.incrUsedBytes(-quotaReleased);
+      OmBucketInfo copyBucketInfo = omBucketInfo.copyObject();
 
       omClientResponse = new OMKeysDeleteResponse(omResponse
           .setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
               .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys))
           .setStatus(deleteStatus ? OK : PARTIAL_DELETE)
           .setSuccess(deleteStatus).build(), omKeyInfoList,
-          ozoneManager.isRatisEnabled(), omVolumeArgs, omBucketInfo);
+          ozoneManager.isRatisEnabled(), omVolumeArgs, copyBucketInfo);
 
       result = Result.SUCCESS;
 

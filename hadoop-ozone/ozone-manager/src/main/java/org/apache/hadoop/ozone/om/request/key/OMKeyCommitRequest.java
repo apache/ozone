@@ -158,7 +158,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
-      // Check for directory exists with same name, if it exists throw error. 
+      // Check for directory exists with same name, if it exists throw error.
       if (ozoneManager.getEnableFileSystemPaths()) {
         if (checkDirectoryAlreadyExists(volumeName, bucketName, keyName,
             omMetadataManager)) {
@@ -166,7 +166,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
               " as there is already directory in the given path", NOT_A_FILE);
         }
       }
-
 
       omKeyInfo = omMetadataManager.getOpenKeyTable().get(dbOpenKey);
       if (omKeyInfo == null) {
@@ -203,11 +202,11 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // be subtracted.
       long correctedSpace = omKeyInfo.getDataSize() * factor -
           locationInfoList.size() * scmBlockSize * factor;
-      omVolumeArgs.getUsedBytes().add(correctedSpace);
-      omBucketInfo.getUsedBytes().add(correctedSpace);
+      omBucketInfo.incrUsedBytes(correctedSpace);
+      OmBucketInfo copyBucketInfo = omBucketInfo.copyObject();
 
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
-          omKeyInfo, dbOzoneKey, dbOpenKey, omVolumeArgs, omBucketInfo);
+          omKeyInfo, dbOzoneKey, dbOpenKey, omVolumeArgs, copyBucketInfo);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

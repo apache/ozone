@@ -118,6 +118,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     Result result = null;
     OmVolumeArgs omVolumeArgs = null;
     OmBucketInfo omBucketInfo = null;
+    OmBucketInfo copyBucketInfo = null;
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
       volumeName = keyArgs.getVolumeName();
@@ -222,8 +223,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       // be subtracted.
       long correctedSpace = omKeyInfo.getDataSize() * factor -
           keyArgs.getKeyLocationsList().size() * scmBlockSize * factor;
-      omVolumeArgs.getUsedBytes().add(correctedSpace);
-      omBucketInfo.getUsedBytes().add(correctedSpace);
+      omBucketInfo.incrUsedBytes(correctedSpace);
+      copyBucketInfo = omBucketInfo.copyObject();
 
       omResponse.setCommitMultiPartUploadResponse(
           MultipartCommitUploadPartResponse.newBuilder()
@@ -231,7 +232,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       omClientResponse = new S3MultipartUploadCommitPartResponse(
           omResponse.build(), multipartKey, openKey,
           multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
-          ozoneManager.isRatisEnabled(), omVolumeArgs, omBucketInfo);
+          ozoneManager.isRatisEnabled(), omVolumeArgs, copyBucketInfo);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -240,7 +241,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       omClientResponse = new S3MultipartUploadCommitPartResponse(
           createErrorOMResponse(omResponse, exception), multipartKey, openKey,
           multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
-          ozoneManager.isRatisEnabled(), omVolumeArgs, omBucketInfo);
+          ozoneManager.isRatisEnabled(), omVolumeArgs, copyBucketInfo);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);

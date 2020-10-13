@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import java.util.ArrayList;
 import java.util.BitSet;
-import java.util.concurrent.atomic.LongAdder;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -80,7 +79,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
 
   private final String sourceBucket;
 
-  private final LongAdder usedBytes = new LongAdder();
+  private long usedBytes;
 
   private long quotaInBytes;
   private long quotaInCounts;
@@ -132,7 +131,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
     this.bekInfo = bekInfo;
     this.sourceVolume = sourceVolume;
     this.sourceBucket = sourceBucket;
-    this.usedBytes.add(usedBytes);
+    this.usedBytes = usedBytes;
     this.quotaInBytes = quotaInBytes;
     this.quotaInCounts = quotaInCounts;
   }
@@ -241,9 +240,14 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
   }
 
 
-  public LongAdder getUsedBytes() {
+  public long getUsedBytes() {
     return usedBytes;
   }
+
+  public void incrUsedBytes(long bytes) {
+    this.usedBytes = this.usedBytes + bytes;
+  }
+
   public long getQuotaInBytes() {
     return quotaInBytes;
   }
@@ -324,7 +328,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setSourceBucket(sourceBucket)
         .setAcls(acls)
         .addAllMetadata(metadata)
-        .setUsedBytes(usedBytes.sum())
+        .setUsedBytes(usedBytes)
         .setQuotaInBytes(quotaInBytes)
         .setQuotaInCounts(quotaInCounts);
   }
@@ -489,7 +493,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         .setModificationTime(modificationTime)
         .setObjectID(objectID)
         .setUpdateID(updateID)
-        .setUsedBytes(usedBytes.sum())
+        .setUsedBytes(usedBytes)
         .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
         .setQuotaInBytes(quotaInBytes)
         .setQuotaInCounts(quotaInCounts);
@@ -557,7 +561,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         ", isVersionEnabled='" + isVersionEnabled + "'" +
         ", storageType='" + storageType + "'" +
         ", creationTime='" + creationTime + "'" +
-        ", usedBytes='" + usedBytes.sum() + "'" +
+        ", usedBytes='" + usedBytes + "'" +
         ", quotaInBytes='" + quotaInBytes + "'" +
         ", quotaInCounts='" + quotaInCounts + '\'' +
         sourceInfo +
@@ -582,7 +586,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         storageType == that.storageType &&
         objectID == that.objectID &&
         updateID == that.updateID &&
-        usedBytes.sum() == that.usedBytes.sum() &&
+        usedBytes == that.usedBytes &&
         Objects.equals(sourceVolume, that.sourceVolume) &&
         Objects.equals(sourceBucket, that.sourceBucket) &&
         Objects.equals(metadata, that.metadata) &&
@@ -609,7 +613,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable {
         ", objectID=" + objectID +
         ", updateID=" + updateID +
         ", metadata=" + metadata +
-        ", usedBytes=" + usedBytes.sum() +
+        ", usedBytes=" + usedBytes +
         ", quotaInBytes=" + quotaInBytes +
         ", quotaInCounts=" + quotaInCounts +
         '}';

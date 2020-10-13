@@ -148,8 +148,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
       long quotaReleased = sumBlockLengths(omKeyInfo);
       // update usedBytes atomically.
-      omVolumeArgs.getUsedBytes().add(-quotaReleased);
-      omBucketInfo.getUsedBytes().add(-quotaReleased);
+      omBucketInfo.incrUsedBytes(-quotaReleased);
+      OmBucketInfo copyBucketInfo = omBucketInfo.copyObject();
 
       // No need to add cache entries to delete table. As delete table will
       // be used by DeleteKeyService only, not used for any client response
@@ -158,7 +158,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
       omClientResponse = new OMKeyDeleteResponse(omResponse
           .setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
-          omKeyInfo, ozoneManager.isRatisEnabled(), omVolumeArgs, omBucketInfo);
+          omKeyInfo, ozoneManager.isRatisEnabled(), omVolumeArgs,
+          copyBucketInfo);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
