@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.file;
 import java.util.List;
 import java.util.UUID;
 
+import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -55,8 +56,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
         HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,
         false, false);
 
-    OMFileCreateRequest omFileCreateRequest =
-        new OMFileCreateRequest(omRequest);
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
 
     OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
     Assert.assertNotEquals(omRequest, modifiedOmRequest);
@@ -96,8 +96,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
         HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,
         false, false);
 
-    OMFileCreateRequest omFileCreateRequest = new OMFileCreateRequest(
-        omRequest);
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
 
     OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
     Assert.assertNotEquals(omRequest, modifiedOmRequest);
@@ -121,21 +120,17 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
 
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
-    OMFileCreateRequest omFileCreateRequest = new OMFileCreateRequest(
-        omRequest);
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
 
     OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
 
     long id = modifiedOmRequest.getCreateFileRequest().getClientID();
 
-    String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
-        keyName, id);
-
     // Before calling
-    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    OmKeyInfo omKeyInfo = verifyPathInOpenKeyTable(keyName, id, false);
     Assert.assertNull(omKeyInfo);
 
-    omFileCreateRequest = new OMFileCreateRequest(modifiedOmRequest);
+    omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
 
     OMClientResponse omFileCreateResponse =
         omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -146,8 +141,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
 
     // Check open table whether key is added or not.
 
-    omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
-    Assert.assertNotNull(omKeyInfo);
+    omKeyInfo = verifyPathInOpenKeyTable(keyName, id, true);
 
     List< OmKeyLocationInfo > omKeyLocationInfoList =
         omKeyInfo.getLatestVersionLocations().getLocationList();
@@ -179,12 +173,11 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
         HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,
             false, true);
 
-    OMFileCreateRequest omFileCreateRequest = new OMFileCreateRequest(
-        omRequest);
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
 
     OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
 
-    omFileCreateRequest = new OMFileCreateRequest(modifiedOmRequest);
+    omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
 
     OMClientResponse omFileCreateResponse =
         omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -200,13 +193,11 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
         false, true);
 
     TestOMRequestUtils.addVolumeToDB(volumeName, omMetadataManager);
-    OMFileCreateRequest omFileCreateRequest = new OMFileCreateRequest(
-        omRequest);
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
 
     OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
 
-    omFileCreateRequest = new OMFileCreateRequest(modifiedOmRequest);
-
+    omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
 
     OMClientResponse omFileCreateResponse =
         omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -311,8 +302,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     testNonRecursivePath(key, false, false, true);
   }
 
-
-  private void testNonRecursivePath(String key,
+  protected void testNonRecursivePath(String key,
       boolean overWrite, boolean recursive, boolean fail) throws Exception {
     OMRequest omRequest = createFileRequest(volumeName, bucketName, key,
         HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,
@@ -320,12 +310,11 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
 
     TestOMRequestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
-    OMFileCreateRequest omFileCreateRequest = new OMFileCreateRequest(
-        omRequest);
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
 
     OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
 
-    omFileCreateRequest = new OMFileCreateRequest(modifiedOmRequest);
+    omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
 
     OMClientResponse omFileCreateResponse =
         omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
@@ -341,10 +330,9 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
       Assert.assertTrue(omFileCreateResponse.getOMResponse().getSuccess());
       long id = modifiedOmRequest.getCreateFileRequest().getClientID();
 
-      String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
-          key, id);
-      OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
-      Assert.assertNotNull(omKeyInfo);
+      verifyKeyNameInCreateFileResponse(key, omFileCreateResponse);
+
+      OmKeyInfo omKeyInfo = verifyPathInOpenKeyTable(key, id, true);
 
       List< OmKeyLocationInfo > omKeyLocationInfoList =
           omKeyInfo.getLatestVersionLocations().getLocationList();
@@ -368,6 +356,14 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     }
   }
 
+  private void verifyKeyNameInCreateFileResponse(String key,
+      OMClientResponse omFileCreateResponse) {
+    OzoneManagerProtocolProtos.CreateFileResponse createFileResponse =
+            omFileCreateResponse.getOMResponse().getCreateFileResponse();
+    String actualFileName = createFileResponse.getKeyInfo().getKeyName();
+    Assert.assertEquals("Incorrect keyName", key, actualFileName);
+  }
+
   /**
    * Create OMRequest which encapsulates OMFileCreateRequest.
    * @param volumeName
@@ -377,7 +373,8 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
    * @param replicationType
    * @return OMRequest
    */
-  private OMRequest createFileRequest(
+  @NotNull
+  protected OMRequest createFileRequest(
       String volumeName, String bucketName, String keyName,
       HddsProtos.ReplicationFactor replicationFactor,
       HddsProtos.ReplicationType replicationType, boolean overWrite,
@@ -399,4 +396,38 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
         .setCreateFileRequest(createFileRequest).build();
 
   }
+
+  /**
+   * Verify path in open key table. Also, it returns OMKeyInfo for the given
+   * key path.
+   *
+   * @param key      key name
+   * @param id       client id
+   * @param doAssert if true then do assertion, otherwise it just skip.
+   * @return om key info for the given key path.
+   * @throws Exception DB failure
+   */
+  protected OmKeyInfo verifyPathInOpenKeyTable(String key, long id,
+                                               boolean doAssert)
+          throws Exception {
+    String openKey = omMetadataManager.getOpenKey(volumeName, bucketName,
+            key, id);
+    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable().get(openKey);
+    if (doAssert) {
+      Assert.assertNotNull("Failed to find key in OpenKeyTable", omKeyInfo);
+    }
+    return omKeyInfo;
+  }
+
+  /**
+   * Gets OMFileCreateRequest reference.
+   *
+   * @param omRequest om request
+   * @return OMFileCreateRequest reference
+   */
+  @NotNull
+  protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest){
+    return new OMFileCreateRequest(omRequest);
+  }
+
 }
