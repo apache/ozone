@@ -156,8 +156,9 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
       OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager, dbFileKey,
               null, fileName, trxnLogIndex);
 
-      OMFileRequest.addFileTableCacheEntry(omMetadataManager, dbFileKey,
-              omKeyInfo, fileName, trxnLogIndex);
+      OmKeyInfo dbOmFileInfo =
+              OMFileRequest.addFileTableCacheEntry(omMetadataManager, dbFileKey,
+                      omKeyInfo, fileName, trxnLogIndex);
 
       long scmBlockSize = ozoneManager.getScmBlockSize();
       int factor = omKeyInfo.getFactor().getNumber();
@@ -173,7 +174,8 @@ public class OMKeyCommitRequestV1 extends OMKeyCommitRequest {
       omBucketInfo.getUsedBytes().add(correctedSpace);
 
       omClientResponse = new OMKeyCommitResponseV1(omResponse.build(),
-              omKeyInfo, dbFileKey, dbOpenFileKey, omVolumeArgs, omBucketInfo);
+              dbOmFileInfo, dbFileKey, dbOpenFileKey, omVolumeArgs,
+              omBucketInfo);
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

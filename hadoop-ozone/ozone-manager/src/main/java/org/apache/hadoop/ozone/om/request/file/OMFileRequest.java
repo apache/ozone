@@ -464,17 +464,19 @@ public final class OMFileRequest {
    * @param omFileInfo        key info
    * @param fileName          file name
    * @param trxnLogIndex      transaction log index
+   * @return dbOmFileInfo, which keeps leaf node name in keyName field
    */
-  public static void addOpenFileTableCacheEntry(
+  public static OmKeyInfo addOpenFileTableCacheEntry(
           OMMetadataManager omMetadataManager, String dbOpenFileName,
           @Nullable OmKeyInfo omFileInfo, String fileName, long trxnLogIndex) {
 
     Optional<OmKeyInfo> keyInfoOptional = Optional.absent();
+    OmKeyInfo dbOmFileInfo = null;
     if (omFileInfo != null) {
       // New key format for the openFileTable.
       // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
       // keyName field stores only the leaf node name, which is 'file1'.
-      OmKeyInfo dbOmFileInfo = omFileInfo.copyObject();
+      dbOmFileInfo = omFileInfo.copyObject();
       if (StringUtils.isNotBlank(fileName)) {
         dbOmFileInfo.setKeyName(fileName);
       }
@@ -484,6 +486,7 @@ public final class OMFileRequest {
     omMetadataManager.getOpenKeyTable().addCacheEntry(
             new CacheKey<>(dbOpenFileName),
             new CacheValue<>(keyInfoOptional, trxnLogIndex));
+    return dbOmFileInfo;
   }
 
   /**
@@ -494,8 +497,9 @@ public final class OMFileRequest {
    * @param omFileInfo        key info
    * @param fileName          file name
    * @param trxnLogIndex      transaction log index
+   * @return dbOmFileInfo, which keeps leaf node name in keyName field
    */
-  public static void addFileTableCacheEntry(
+  public static OmKeyInfo addFileTableCacheEntry(
           OMMetadataManager omMetadataManager, String dbFileKey,
           OmKeyInfo omFileInfo, String fileName, long trxnLogIndex) {
 
@@ -510,6 +514,7 @@ public final class OMFileRequest {
     omMetadataManager.getKeyTable().addCacheEntry(
             new CacheKey<>(dbFileKey),
             new CacheValue<>(Optional.of(dbOmFileInfo), trxnLogIndex));
+    return dbOmFileInfo;
   }
 
   /**
@@ -531,13 +536,8 @@ public final class OMFileRequest {
             omFileInfo.getParentObjectID(), omFileInfo.getFileName(),
             openKeySessionID);
 
-    OmKeyInfo dbOmFileInfo = omFileInfo.copyObject();
-    String fileName = omFileInfo.getFileName();
-    if (StringUtils.isNotBlank(fileName)) {
-      dbOmFileInfo.setKeyName(fileName);
-    }
     omMetadataMgr.getOpenKeyTable().putWithBatch(batchOp, dbOpenFileKey,
-            dbOmFileInfo);
+            omFileInfo);
   }
 
   /**
@@ -556,13 +556,8 @@ public final class OMFileRequest {
     String dbFileKey = omMetadataMgr.getOzonePathKey(
             omFileInfo.getParentObjectID(), omFileInfo.getFileName());
 
-    OmKeyInfo dbOmFileInfo = omFileInfo.copyObject();
-    String fileName = omFileInfo.getFileName();
-    if (StringUtils.isNotBlank(fileName)) {
-      dbOmFileInfo.setKeyName(fileName);
-    }
     omMetadataMgr.getKeyTable().putWithBatch(batchOp,
-            dbFileKey, dbOmFileInfo);
+            dbFileKey, omFileInfo);
   }
 
   /**

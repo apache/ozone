@@ -31,7 +31,8 @@ import javax.annotation.Nonnull;
 
 import java.io.IOException;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.*;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 
 /**
  * Response for CommitKey request layout version V1.
