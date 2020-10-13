@@ -20,6 +20,10 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
+import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -49,11 +53,13 @@ public class TestOMKeyResponse {
   protected String keyName;
   protected HddsProtos.ReplicationFactor replicationFactor;
   protected HddsProtos.ReplicationType replicationType;
+  protected OmBucketInfo omBucketInfo;
   protected long clientID;
+  protected long txnLogId = 100000L;
 
   @Before
   public void setup() throws Exception {
-    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    OzoneConfiguration ozoneConfiguration = getOzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.newFolder().getAbsolutePath());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
@@ -65,6 +71,23 @@ public class TestOMKeyResponse {
     replicationFactor = HddsProtos.ReplicationFactor.ONE;
     replicationType = HddsProtos.ReplicationType.RATIS;
     clientID = 1000L;
+  }
+
+  @NotNull
+  protected String getOpenKeyName() {
+    return omMetadataManager.getOpenKey(volumeName, bucketName, keyName,
+            clientID);
+  }
+
+  @NotNull
+  protected OmKeyInfo getOmKeyInfo() {
+    return TestOMRequestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+            replicationType, replicationFactor);
+  }
+
+  @NotNull
+  protected OzoneConfiguration getOzoneConfiguration() {
+    return new OzoneConfiguration();
   }
 
   @After
