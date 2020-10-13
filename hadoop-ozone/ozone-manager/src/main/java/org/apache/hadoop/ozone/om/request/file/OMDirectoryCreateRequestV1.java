@@ -147,8 +147,10 @@ public class OMDirectoryCreateRequestV1 extends OMDirectoryCreateRequest {
           omDirectoryResult == NONE) {
 
         // prepare all missing parents
-        missingParentInfos = OMDirectoryCreateRequestV1.getAllParentDirInfo(
-                ozoneManager, keyArgs, omPathInfo, trxnLogIndex);
+        missingParentInfos =
+                OMDirectoryCreateRequestV1.getAllMissingParentDirInfo(
+                        ozoneManager, keyArgs, omPathInfo, trxnLogIndex);
+
         // prepare leafNode dir
         OmDirectoryInfo dirInfo = createDirectoryInfoWithACL(
                 omPathInfo.getLeafNodeName(),
@@ -229,14 +231,15 @@ public class OMDirectoryCreateRequestV1 extends OMDirectoryCreateRequest {
 
   /**
    * Construct OmDirectoryInfo for every parent directory in missing list.
-   * @param ozoneManager
-   * @param keyArgs
-   * @param pathInfo list of parent directories to be created and its ACLs
-   * @param trxnLogIndex
-   * @return
-   * @throws IOException
+   *
+   * @param ozoneManager Ozone Manager
+   * @param keyArgs      key arguments
+   * @param pathInfo     list of parent directories to be created and its ACLs
+   * @param trxnLogIndex transaction log index id
+   * @return list of missing parent directories
+   * @throws IOException DB failure
    */
-  public static List<OmDirectoryInfo> getAllParentDirInfo(
+  public static List<OmDirectoryInfo> getAllMissingParentDirInfo(
           OzoneManager ozoneManager, KeyArgs keyArgs,
           OMFileRequest.OMPathInfoV1 pathInfo, long trxnLogIndex)
           throws IOException {
