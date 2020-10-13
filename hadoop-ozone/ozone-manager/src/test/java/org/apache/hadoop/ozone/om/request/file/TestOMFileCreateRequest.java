@@ -330,6 +330,8 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
       Assert.assertTrue(omFileCreateResponse.getOMResponse().getSuccess());
       long id = modifiedOmRequest.getCreateFileRequest().getClientID();
 
+      verifyKeyNameInCreateFileResponse(key, omFileCreateResponse);
+
       OmKeyInfo omKeyInfo = verifyPathInOpenKeyTable(key, id, true);
 
       List< OmKeyLocationInfo > omKeyLocationInfoList =
@@ -352,6 +354,14 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
       Assert.assertEquals(keyLocation.getBlockID().getContainerBlockID()
           .getLocalID(), omKeyLocationInfo.getLocalID());
     }
+  }
+
+  private void verifyKeyNameInCreateFileResponse(String key,
+      OMClientResponse omFileCreateResponse) {
+    OzoneManagerProtocolProtos.CreateFileResponse createFileResponse =
+            omFileCreateResponse.getOMResponse().getCreateFileResponse();
+    String actualFileName = createFileResponse.getKeyInfo().getKeyName();
+    Assert.assertEquals("Incorrect keyName", key, actualFileName);
   }
 
   /**

@@ -26,6 +26,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Test;
@@ -91,6 +92,8 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     omKeyInfo = omMetadataManager.getKeyTable().get(ozoneKey);
 
     Assert.assertNotNull(omKeyInfo);
+    // DB keyInfo format
+    verifyKeyName(omKeyInfo);
 
     // Check modification time
 
@@ -106,7 +109,6 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
     Assert.assertEquals(locationInfoListFromCommitKeyRequest,
         omKeyInfo.getLatestVersionLocations().getLocationList());
-
   }
 
   @Test
@@ -317,5 +319,13 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
   @NotNull
   protected OMKeyCommitRequest getOmKeyCommitRequest(OMRequest omRequest) {
     return new OMKeyCommitRequest(omRequest);
+  }
+
+  protected void verifyKeyName(OmKeyInfo omKeyInfo) {
+    Assert.assertEquals("Incorrect KeyName", keyName,
+            omKeyInfo.getKeyName());
+    String fileName = OzoneFSUtils.getFileName(keyName);
+    Assert.assertEquals("Incorrect FileName", fileName,
+            omKeyInfo.getFileName());
   }
 }

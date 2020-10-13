@@ -26,7 +26,6 @@ import java.util.List;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -466,27 +465,22 @@ public final class OMFileRequest {
    * @param trxnLogIndex      transaction log index
    * @return dbOmFileInfo, which keeps leaf node name in keyName field
    */
-  public static OmKeyInfo addOpenFileTableCacheEntry(
+  public static void addOpenFileTableCacheEntry(
           OMMetadataManager omMetadataManager, String dbOpenFileName,
           @Nullable OmKeyInfo omFileInfo, String fileName, long trxnLogIndex) {
 
     Optional<OmKeyInfo> keyInfoOptional = Optional.absent();
-    OmKeyInfo dbOmFileInfo = null;
     if (omFileInfo != null) {
       // New key format for the openFileTable.
       // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
       // keyName field stores only the leaf node name, which is 'file1'.
-      dbOmFileInfo = omFileInfo.copyObject();
-      if (StringUtils.isNotBlank(fileName)) {
-        dbOmFileInfo.setKeyName(fileName);
-      }
-      keyInfoOptional = Optional.of(dbOmFileInfo);
+      omFileInfo.setKeyName(fileName);
+      keyInfoOptional = Optional.of(omFileInfo);
     }
 
     omMetadataManager.getOpenKeyTable().addCacheEntry(
             new CacheKey<>(dbOpenFileName),
             new CacheValue<>(keyInfoOptional, trxnLogIndex));
-    return dbOmFileInfo;
   }
 
   /**
@@ -499,22 +493,18 @@ public final class OMFileRequest {
    * @param trxnLogIndex      transaction log index
    * @return dbOmFileInfo, which keeps leaf node name in keyName field
    */
-  public static OmKeyInfo addFileTableCacheEntry(
+  public static void addFileTableCacheEntry(
           OMMetadataManager omMetadataManager, String dbFileKey,
           OmKeyInfo omFileInfo, String fileName, long trxnLogIndex) {
 
-    // New key format for the openFileTable.
+    // New key format for the fileTable.
     // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
     // keyName field stores only the leaf node name, which is 'file1'.
-    OmKeyInfo dbOmFileInfo = omFileInfo.copyObject();
-    if (StringUtils.isNotBlank(fileName)) {
-      dbOmFileInfo.setKeyName(fileName);
-    }
+    omFileInfo.setKeyName(fileName);
 
     omMetadataManager.getKeyTable().addCacheEntry(
             new CacheKey<>(dbFileKey),
-            new CacheValue<>(Optional.of(dbOmFileInfo), trxnLogIndex));
-    return dbOmFileInfo;
+            new CacheValue<>(Optional.of(omFileInfo), trxnLogIndex));
   }
 
   /**
@@ -583,10 +573,11 @@ public final class OMFileRequest {
       dbOmKeyInfo = omMetadataMgr.getKeyTable().get(dbOpenFileKey);
     }
 
-    // DB OMKeyInfo will store fileName into keyName field. This function is
-    // to set user given keyName into the OmKeyInfo object.
+    // DB OMKeyInfo will store only fileName into keyName field. This
+    // function is to set user given keyName into the OmKeyInfo object.
+    // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
+    // keyName field stores only the leaf node name, which is 'file1'.
     if (dbOmKeyInfo != null) {
-      dbOmKeyInfo.setFileName(dbOmKeyInfo.getKeyName());
       dbOmKeyInfo.setKeyName(keyName);
     }
     return dbOmKeyInfo;

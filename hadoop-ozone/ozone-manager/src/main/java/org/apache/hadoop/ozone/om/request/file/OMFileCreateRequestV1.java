@@ -192,10 +192,9 @@ public class OMFileCreateRequestV1 extends OMFileCreateRequest {
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
       // bucket gets deleted.
-      OmKeyInfo dbOmFileInfo =
-              OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-                      dbOpenFileName, omFileInfo, pathInfoV1.getLeafNodeName(),
-                      trxnLogIndex);
+      OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
+              dbOpenFileName, omFileInfo, pathInfoV1.getLeafNodeName(),
+              trxnLogIndex);
 
       // Add cache entries for the prefix directories.
       // Skip adding for the file key itself, until Key Commit.
@@ -207,14 +206,15 @@ public class OMFileCreateRequestV1 extends OMFileCreateRequest {
       omVolumeArgs.getUsedBytes().add(preAllocatedSpace);
       omBucketInfo.getUsedBytes().add(preAllocatedSpace);
 
-      // Prepare response
+      // Prepare response. Sets user given full key name in the 'keyName'
+      // attribute in response object.
       omResponse.setCreateFileResponse(CreateFileResponse.newBuilder()
-          .setKeyInfo(omFileInfo.getProtobuf())
+          .setKeyInfo(omFileInfo.getProtobuf(keyName))
           .setID(clientID)
           .setOpenVersion(openVersion).build())
           .setCmdType(Type.CreateFile);
       omClientResponse = new OMFileCreateResponseV1(omResponse.build(),
-              dbOmFileInfo, missingParentInfos, clientID, omVolumeArgs,
+              omFileInfo, missingParentInfos, clientID, omVolumeArgs,
               omBucketInfo);
 
       result = Result.SUCCESS;

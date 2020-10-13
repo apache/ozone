@@ -433,11 +433,32 @@ public final class OmKeyInfo extends WithObjectID {
   }
 
   /**
+   * For network transmit.
+   *
+   * @param fullKeyName the user given full key name
+   * @return key info with the user given full key name
+   */
+  public KeyInfo getProtobuf(String fullKeyName) {
+    return getProtobuf(false, fullKeyName);
+  }
+
+  /**
    *
    * @param ignorePipeline true for persist to DB, false for network transmit.
    * @return
    */
   public KeyInfo getProtobuf(boolean ignorePipeline) {
+    return getProtobuf(ignorePipeline, null);
+  }
+
+  /**
+   * Gets KeyInfo with the user given key name.
+   *
+   * @param ignorePipeline   ignore pipeline flag
+   * @param fullKeyName user given key name
+   * @return key info object
+   */
+  private KeyInfo getProtobuf(boolean ignorePipeline, String fullKeyName) {
     long latestVersion = keyLocationVersions.size() == 0 ? -1 :
         keyLocationVersions.get(keyLocationVersions.size() - 1).getVersion();
 
@@ -449,7 +470,6 @@ public final class OmKeyInfo extends WithObjectID {
     KeyInfo.Builder kb = KeyInfo.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setKeyName(keyName)
         .setDataSize(dataSize)
         .setFactor(factor)
         .setType(type)
@@ -462,6 +482,11 @@ public final class OmKeyInfo extends WithObjectID {
         .setObjectID(objectID)
         .setUpdateID(updateID)
         .setParentID(parentObjectID);
+    if (StringUtils.isNotBlank(fullKeyName)) {
+      kb.setKeyName(fullKeyName);
+    } else {
+      kb.setKeyName(keyName);
+    }
     if (encInfo != null) {
       kb.setFileEncryptionInfo(OMPBHelper.convert(encInfo));
     }
