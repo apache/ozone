@@ -122,7 +122,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
     private HddsProtos.NodeOperationalState operationalState;
     private HddsProtos.NodeState healthState;
 
-    public DatanodeWithAttributes(DatanodeDetails dn,
+    DatanodeWithAttributes(DatanodeDetails dn,
         HddsProtos.NodeOperationalState opState,
         HddsProtos.NodeState healthState) {
       this.datanodeDetails = dn;
