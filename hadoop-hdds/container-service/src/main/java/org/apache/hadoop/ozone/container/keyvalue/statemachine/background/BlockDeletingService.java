@@ -316,8 +316,8 @@ public class BlockDeletingService extends BackgroundService {
               deleteBlockCount);
 
 
-          // update count of pending deletion blocks and block count in in-memory
-          // container status.
+          // update count of pending deletion blocks and block count in
+          // in-memory container status.
           containerData.decrPendingDeletionBlocks(deleteBlockCount);
           containerData.decrKeyCount(deleteBlockCount);
         }

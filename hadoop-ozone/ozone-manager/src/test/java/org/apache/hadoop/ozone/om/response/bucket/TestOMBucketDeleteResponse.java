@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.response.bucket;
 
 import java.util.UUID;
 
-import org.checkerframework.checker.units.qual.A;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;

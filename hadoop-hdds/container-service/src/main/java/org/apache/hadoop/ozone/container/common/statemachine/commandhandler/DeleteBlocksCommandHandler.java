@@ -272,8 +272,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
                 OzoneConsts.DELETE_TRANSACTION_KEY, delTX.getTxID());
           }
 
-          long pendingDeleteBlocks = containerData.getNumPendingDeletionBlocks() +
-              newDeletionBlocks;
+          long pendingDeleteBlocks =
+              containerData.getNumPendingDeletionBlocks() + newDeletionBlocks;
           metadataTable.putWithBatch(batchOperation,
               OzoneConsts.PENDING_DELETE_BLOCK_COUNT, pendingDeleteBlocks);
 
