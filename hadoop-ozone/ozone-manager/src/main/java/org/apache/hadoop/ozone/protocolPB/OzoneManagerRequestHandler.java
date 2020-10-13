@@ -50,6 +50,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Allocat
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetFileStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
@@ -75,6 +77,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Service
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
 import com.google.common.collect.Lists;
@@ -93,6 +96,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
 
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -204,6 +208,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             getAcl(request.getGetAclRequest());
         responseBuilder.setGetAclResponse(getAclResponse);
         break;
+      case FinalizeUpgradeProgress:
+        FinalizeUpgradeProgressResponse upgradeProgressResponse =
+            reportUpgradeProgress(request.getFinalizeUpgradeProgressRequest());
+        responseBuilder
+            .setFinalizeUpgradeProgressResponse(upgradeProgressResponse);
+        break;
       default:
         responseBuilder.setSuccess(false);
         responseBuilder.setMessage("Unrecognized Command Type: " + cmdType);
@@ -263,6 +273,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   // Convert and exception to corresponding status code
+
   protected Status exceptionToResponseStatus(IOException ex) {
     if (ex instanceof OMException) {
       return Status.values()[((OMException) ex).getResult().ordinal()];
@@ -273,7 +284,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       return Status.INTERNAL_ERROR;
     }
   }
-
   /**
    * Validates that the incoming OM request has required parameters.
    * TODO: Add more validation checks before writing the request to Ratis log.
@@ -589,6 +599,28 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       listStatusResponseBuilder.addStatuses(status.getProtobuf());
     }
     return listStatusResponseBuilder.build();
+  }
+
+  private FinalizeUpgradeProgressResponse reportUpgradeProgress(
+      FinalizeUpgradeProgressRequest request) throws IOException {
+    String upgradeClientId = request.getUpgradeClientId();
+    boolean takeover = request.getTakeover();
+
+    StatusAndMessages progress =
+        impl.queryUpgradeFinalizationProgress(upgradeClientId, takeover);
+
+    UpgradeFinalizationStatus.Status protoStatus =
+        UpgradeFinalizationStatus.Status.valueOf(progress.status().name());
+
+    UpgradeFinalizationStatus response =
+        UpgradeFinalizationStatus.newBuilder()
+            .setStatus(protoStatus)
+            .addAllMessages(progress.msgs())
+            .build();
+
+    return FinalizeUpgradeProgressResponse.newBuilder()
+        .setStatus(response)
+        .build();
   }
 
   protected OzoneManager getOzoneManager() {

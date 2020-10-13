@@ -121,6 +121,18 @@ public abstract class Storage {
     return storageInfo.getLayoutVersion();
   }
 
+  public void setLayoutVersion(int version) {
+    storageInfo.setLayoutVersion(version);
+  }
+
+  public void setUpgradeToLayoutVersion(int version) {
+    storageInfo.setUpgradingToLayoutVersion(version);
+  }
+
+  public void unsetUpgradeToLayoutVersion() {
+    storageInfo.unsetUpgradingToLayoutVersion();
+  }
+
   /**
    * Retrieves the storageInfo instance to read/write the common
    * version file properties.

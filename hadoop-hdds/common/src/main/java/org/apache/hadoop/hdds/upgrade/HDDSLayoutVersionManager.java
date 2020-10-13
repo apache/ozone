@@ -34,7 +34,7 @@ import com.google.common.annotations.VisibleForTesting;
  */
 @SuppressWarnings("FinalClass")
 public class HDDSLayoutVersionManager extends
-    AbstractLayoutVersionManager {
+    AbstractLayoutVersionManager<HDDSLayoutFeature> {
 
   private static HDDSLayoutVersionManager hddsLayoutVersionManager;
 

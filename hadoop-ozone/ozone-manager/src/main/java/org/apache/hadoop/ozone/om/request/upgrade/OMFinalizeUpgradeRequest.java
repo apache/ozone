@@ -30,6 +30,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Finaliz
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpgradeFinalizationStatus;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +51,6 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
   public OMClientResponse validateAndUpdateCache(
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
-    LOG.info("Finalization's validateAndUpdateCache called and started.");
     LOG.trace("Request: {}", getOmRequest());
     OMResponse.Builder responseBuilder =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
@@ -63,11 +63,20 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
 
       String upgradeClientID = request.getUpgradeClientId();
 
-      UpgradeFinalizationStatus status =
+      StatusAndMessages omStatus =
           ozoneManager.finalizeUpgrade(upgradeClientID);
 
+      UpgradeFinalizationStatus.Status protoStatus =
+          UpgradeFinalizationStatus.Status.valueOf(omStatus.status().name());
+      UpgradeFinalizationStatus responseStatus =
+          UpgradeFinalizationStatus.newBuilder()
+              .setStatus(protoStatus)
+              .build();
+
       FinalizeUpgradeResponse omResponse =
-          FinalizeUpgradeResponse.newBuilder().setStatus(status).build();
+          FinalizeUpgradeResponse.newBuilder()
+              .setStatus(responseStatus)
+              .build();
       responseBuilder.setFinalizeUpgradeResponse(omResponse);
       response = new OMFinalizeUpgradeResponse(responseBuilder.build());
       LOG.trace("Returning response: {}", response);

@@ -20,51 +20,138 @@ package org.apache.hadoop.ozone.upgrade;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.util.Iterator;
 
-import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
+import org.junit.runner.RunWith;
+import org.mockito.Spy;
+import org.mockito.junit.MockitoJUnitRunner;
+
 
 /**
  * Test generic layout management init and APIs.
  */
+@RunWith(MockitoJUnitRunner.class)
 public class TestAbstractLayoutVersionManager {
 
-  private AbstractLayoutVersionManager versionManager =
-      new MockVersionManager();
+  @Spy
+  private AbstractLayoutVersionManager<LayoutFeature> versionManager;
 
-  @Before
-  public void setUp() {
-    versionManager.reset();
+  @Rule
+  public ExpectedException exception = ExpectedException.none();
+
+  @Test
+  public void testInitializationWithFeaturesToBeFinalized() throws  Exception {
+    versionManager.init(1, getTestLayoutFeatures(3));
+
+    assertEquals(3, versionManager.features.size());
+    assertEquals(3, versionManager.featureMap.size());
+
+    assertEquals(1, versionManager.getMetadataLayoutVersion());
+    assertEquals(3, versionManager.getSoftwareLayoutVersion());
+
+    assertTrue(versionManager.needsFinalization());
+
+    Iterator<LayoutFeature> it =
+        versionManager.unfinalizedFeatures().iterator();
+    assertNotNull(it.next());
+    assertNotNull(it.next());
   }
 
   @Test
-  public void testInit() {
-    try {
-      versionManager.init(1,
-          getTestLayoutFeatures(2));
-      assertEquals(2, versionManager.features.size());
-      assertEquals(2, versionManager.featureMap.size());
-      assertEquals(1, versionManager.getMetadataLayoutVersion());
-      assertEquals(2, versionManager.getSoftwareLayoutVersion());
-      assertTrue(versionManager.needsFinalization());
-    } catch (IOException e) {
-      // We don't expect it to throw IOException.
-      assertTrue(false);
-    }
+  public void testInitializationWithUpToDateMetadataVersion() throws Exception {
+    versionManager.init(2, getTestLayoutFeatures(2));
+
+    assertEquals(2, versionManager.features.size());
+    assertEquals(2, versionManager.featureMap.size());
+
+    assertEquals(2, versionManager.getMetadataLayoutVersion());
+    assertEquals(2, versionManager.getSoftwareLayoutVersion());
+
+    assertFalse(versionManager.needsFinalization());
+    assertFalse(versionManager.unfinalizedFeatures().iterator().hasNext());
   }
 
   @Test
-  public void testNeedsFinalization() {
-    try {
-      versionManager.init(2, getTestLayoutFeatures(2));
-      assertFalse(versionManager.needsFinalization());
-    } catch (IOException e) {
-      // We don't expect it to throw IOException.
-      assertTrue(false);
-    }
+  public void testInitFailsIfNotEnoughLayoutFeaturesForVersion()
+      throws Exception {
+    exception.expect(IOException.class);
+    exception.expectMessage("Cannot initialize VersionManager.");
+
+    versionManager.init(3, getTestLayoutFeatures(2));
+  }
+
+  @Test
+  public void testFeatureFinalization() throws Exception {
+    LayoutFeature[] lfs = getTestLayoutFeatures(3);
+    versionManager.init(1, lfs);
+
+    versionManager.finalized(lfs[1]);
+
+    assertEquals(3, versionManager.features.size());
+    assertEquals(3, versionManager.featureMap.size());
+
+    assertEquals(2, versionManager.getMetadataLayoutVersion());
+    assertEquals(3, versionManager.getSoftwareLayoutVersion());
+
+    assertTrue(versionManager.needsFinalization());
+
+    Iterator<LayoutFeature> it =
+        versionManager.unfinalizedFeatures().iterator();
+    assertNotNull(it.next());
+    assertFalse(it.hasNext());
+  }
+
+  @Test
+  public void testFeatureFinalizationFailsIfTheFinalizedFeatureIsNotTheNext()
+      throws IOException {
+    exception.expect(IllegalArgumentException.class);
+
+    LayoutFeature[] lfs = getTestLayoutFeatures(3);
+    versionManager.init(1, lfs);
+
+    versionManager.finalized(lfs[2]);
+  }
+
+  @Test
+  public void testFeatureFinalizationFailsIfFeatureIsAlreadyFinalized()
+      throws IOException {
+    exception.expect(IllegalArgumentException.class);
+
+    LayoutFeature[] lfs = getTestLayoutFeatures(3);
+    versionManager.init(1, lfs);
+
+    versionManager.finalized(lfs[0]);
+  }
+
+  @Test
+  public void testUnfinalizedFeaturesAreNotAllowed() throws Exception {
+    LayoutFeature[] lfs = getTestLayoutFeatures(3);
+    versionManager.init(1, lfs);
+
+    assertTrue(versionManager.isAllowed(lfs[0].name()));
+    assertTrue(versionManager.isAllowed(lfs[0]));
+
+    assertFalse(versionManager.isAllowed(lfs[1].name()));
+    assertFalse(versionManager.isAllowed(lfs[1]));
+    assertFalse(versionManager.isAllowed(lfs[2].name()));
+    assertFalse(versionManager.isAllowed(lfs[2]));
+
+    versionManager.finalized(lfs[1]);
+
+    assertTrue(versionManager.isAllowed(lfs[0].name()));
+    assertTrue(versionManager.isAllowed(lfs[0]));
+    assertTrue(versionManager.isAllowed(lfs[1].name()));
+    assertTrue(versionManager.isAllowed(lfs[1]));
+
+    assertFalse(versionManager.isAllowed(lfs[2].name()));
+    assertFalse(versionManager.isAllowed(lfs[2]));
   }
 
   private LayoutFeature[] getTestLayoutFeatures(int num) {
@@ -92,6 +179,4 @@ public class TestAbstractLayoutVersionManager {
     return lfs;
   }
 
-  static class MockVersionManager extends AbstractLayoutVersionManager {
-  }
 }
