@@ -35,9 +35,11 @@ import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketSetAclRequest;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestV1;
 import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
+import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequestV1;
 import org.apache.hadoop.ozone.om.request.key.OMKeysDeleteRequest;
 import org.apache.hadoop.ozone.om.request.key.OMAllocateBlockRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequestV1;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyDeleteRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
@@ -86,7 +88,7 @@ public final class OzoneManagerRatisUtils {
 
   // TODO: Temporary workaround for OM upgrade path and will be replaced once
   //  upgrade HDDS-3698 story reaches consensus.
-  private static boolean omLayoutVersionV1 = true;
+  private static boolean omLayoutVersionV1 = false;
 
   private OzoneManagerRatisUtils() {
   }
@@ -138,6 +140,9 @@ public final class OzoneManagerRatisUtils {
     case CreateKey:
       return new OMKeyCreateRequest(omRequest);
     case CommitKey:
+      if (omLayoutVersionV1) {
+        return new OMKeyCommitRequestV1(omRequest);
+      }
       return new OMKeyCommitRequest(omRequest);
     case DeleteKey:
       return new OMKeyDeleteRequest(omRequest);
@@ -153,6 +158,9 @@ public final class OzoneManagerRatisUtils {
       }
       return new OMDirectoryCreateRequest(omRequest);
     case CreateFile:
+      if (omLayoutVersionV1) {
+        return new OMFileCreateRequestV1(omRequest);
+      }
       return new OMFileCreateRequest(omRequest);
     case PurgeKeys:
       return new OMKeyPurgeRequest(omRequest);
@@ -326,4 +334,13 @@ public final class OzoneManagerRatisUtils {
 
     return true;
   }
+
+  /**
+   * Returns layout version flag represents V1.
+   * @return
+   */
+  public static boolean isOmLayoutVersionV1() {
+    return omLayoutVersionV1;
+  }
+
 }

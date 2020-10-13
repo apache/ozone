@@ -774,6 +774,7 @@ message KeyInfo {
     repeated OzoneAclInfo acls = 13;
     optional uint64 objectID = 14;
     optional uint64 updateID = 15;
+    optional uint64 parentID = 16;
 }
 
 message DirectoryInfo {
