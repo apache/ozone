@@ -72,7 +72,7 @@ public final class TestDataUtil {
   }
 
   public static void createKey(OzoneBucket bucket, String keyName,
-      String content) throws IOException {
+                               String content) throws IOException {
     createKey(bucket, keyName, ReplicationFactor.ONE,
         ReplicationType.STAND_ALONE, content);
   }

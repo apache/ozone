@@ -18,24 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
-import com.google.common.annotations.VisibleForTesting;
-
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.fs.Seekable;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
-import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -43,6 +25,24 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
+
+import org.apache.hadoop.fs.Seekable;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.security.token.Token;
+
+import com.google.common.annotations.VisibleForTesting;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * An {@link InputStream} called from KeyInputStream to read a block from the
@@ -62,7 +62,7 @@ public class BlockInputStream extends InputStream implements Seekable {
   private Pipeline pipeline;
   private final Token<OzoneBlockTokenIdentifier> token;
   private final boolean verifyChecksum;
-  private XceiverClientManager xceiverClientManager;
+  private XceiverClientFactory xceiverClientFactory;
   private XceiverClientSpi xceiverClient;
   private boolean initialized = false;
 
@@ -99,23 +99,24 @@ public class BlockInputStream extends InputStream implements Seekable {
 
   public BlockInputStream(BlockID blockId, long blockLen, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
-      XceiverClientManager xceiverClientManager,
+      XceiverClientFactory xceiverClientFctry,
       Function<BlockID, Pipeline> refreshPipelineFunction) {
     this.blockID = blockId;
     this.length = blockLen;
     this.pipeline = pipeline;
     this.token = token;
     this.verifyChecksum = verifyChecksum;
-    this.xceiverClientManager = xceiverClientManager;
+    this.xceiverClientFactory = xceiverClientFctry;
     this.refreshPipelineFunction = refreshPipelineFunction;
   }
 
   public BlockInputStream(BlockID blockId, long blockLen, Pipeline pipeline,
                           Token<OzoneBlockTokenIdentifier> token,
                           boolean verifyChecksum,
-                          XceiverClientManager xceiverClientManager) {
+                          XceiverClientManager xceiverClientFactory
+  ) {
     this(blockId, blockLen, pipeline, token, verifyChecksum,
-        xceiverClientManager, null);
+        xceiverClientFactory, null);
   }
   /**
    * Initialize the BlockInputStream. Get the BlockData (list of chunks) from
@@ -181,7 +182,7 @@ public class BlockInputStream extends InputStream implements Seekable {
       pipeline = Pipeline.newBuilder(pipeline)
           .setType(HddsProtos.ReplicationType.STAND_ALONE).build();
     }
-    xceiverClient = xceiverClientManager.acquireClientForReadData(pipeline);
+    xceiverClient =  xceiverClientFactory.acquireClientForReadData(pipeline);
     boolean success = false;
     List<ChunkInfo> chunks;
     try {
@@ -190,19 +191,16 @@ public class BlockInputStream extends InputStream implements Seekable {
             blockID.getContainerID());
       }
 
-      if (token != null) {
-        UserGroupInformation.getCurrentUser().addToken(token);
-      }
       DatanodeBlockID datanodeBlockID = blockID
           .getDatanodeBlockIDProtobuf();
       GetBlockResponseProto response = ContainerProtocolCalls
-          .getBlock(xceiverClient, datanodeBlockID);
+          .getBlock(xceiverClient, datanodeBlockID, token);
 
       chunks = response.getBlockData().getChunksList();
       success = true;
     } finally {
       if (!success) {
-        xceiverClientManager.releaseClientForReadData(xceiverClient, false);
+        xceiverClientFactory.releaseClientForReadData(xceiverClient, false);
       }
     }
 
@@ -216,7 +214,7 @@ public class BlockInputStream extends InputStream implements Seekable {
    */
   protected synchronized void addStream(ChunkInfo chunkInfo) {
     chunkStreams.add(new ChunkInputStream(chunkInfo, blockID,
-        xceiverClient, verifyChecksum));
+        xceiverClient, verifyChecksum, token));
   }
 
   public synchronized long getRemaining() throws IOException {
@@ -378,9 +376,9 @@ public class BlockInputStream extends InputStream implements Seekable {
 
   @Override
   public synchronized void close() {
-    if (xceiverClientManager != null && xceiverClient != null) {
-      xceiverClientManager.releaseClient(xceiverClient, false);
-      xceiverClientManager = null;
+    if (xceiverClientFactory != null && xceiverClient != null) {
+      xceiverClientFactory.releaseClient(xceiverClient, false);
+      xceiverClientFactory = null;
       xceiverClient = null;
     }
   }

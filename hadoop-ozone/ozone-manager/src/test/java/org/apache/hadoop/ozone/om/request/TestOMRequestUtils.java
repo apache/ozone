@@ -26,12 +26,16 @@ import java.util.List;
 import java.util.UUID;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -201,20 +205,28 @@ public final class TestOMRequestUtils {
             keyName)), new CacheValue<>(Optional.of(omKeyInfo), 1L));
   }
 
-  private OmKeyInfo createKeyInfo(String volumeName, String bucketName,
-      String keyName, HddsProtos.ReplicationType replicationType,
-      HddsProtos.ReplicationFactor replicationFactor) {
-    return new OmKeyInfo.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-        .setCreationTime(Time.now())
-        .setModificationTime(Time.now())
-        .setDataSize(1000L)
-        .setReplicationType(replicationType)
-        .setReplicationFactor(replicationFactor).build();
+  /**
+   * Adds one block to {@code keyInfo} with the provided size and offset.
+   */
+  public static void addKeyLocationInfo(
+      OmKeyInfo keyInfo, long offset, long keyLength) throws IOException {
+
+    Pipeline pipeline = Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setType(keyInfo.getType())
+        .setFactor(keyInfo.getFactor())
+        .setNodes(new ArrayList<>())
+        .build();
+
+    OmKeyLocationInfo locationInfo = new OmKeyLocationInfo.Builder()
+          .setBlockID(new BlockID(100L, 1000L))
+          .setOffset(offset)
+          .setLength(keyLength)
+          .setPipeline(pipeline)
+          .build();
+
+    keyInfo.appendNewBlocks(Collections.singletonList(locationInfo), false);
   }
 
   /**

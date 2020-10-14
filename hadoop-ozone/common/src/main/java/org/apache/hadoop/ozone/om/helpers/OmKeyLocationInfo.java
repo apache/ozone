@@ -148,11 +148,7 @@ public final class OmKeyLocationInfo {
     }
 
     public OmKeyLocationInfo build() {
-      if (token == null) {
-        return new OmKeyLocationInfo(blockID, pipeline, length, offset);
-      } else {
-        return new OmKeyLocationInfo(blockID, pipeline, length, offset, token);
-      }
+      return new OmKeyLocationInfo(blockID, pipeline, length, offset, token);
     }
   }
 
