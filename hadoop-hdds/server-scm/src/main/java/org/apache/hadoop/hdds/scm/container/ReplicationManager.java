@@ -746,8 +746,9 @@ public class ReplicationManager
         if (excess > 0) {
           sendDeleteCommand(container, r.getDatanodeDetails(), true);
           excess -= 1;
+        } else {
+          break;
         }
-        break;
       }
       // After removing all unhealthy replicas, if the container is still over
       // replicated then we need to check if it is already mis-replicated.
