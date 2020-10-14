@@ -124,31 +124,32 @@ public class BlockManagerImpl implements BlockManager {
         return data.getSize();
       }
       // update the blockData as well as BlockCommitSequenceId here
-      BatchOperation batch = db.getStore().getBatchHandler()
-              .initBatchOperation();
-      db.getStore().getBlockDataTable().putWithBatch(
-              batch, Long.toString(data.getLocalID()), data);
-      db.getStore().getMetadataTable().putWithBatch(
-              batch, OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID, bcsId);
-
-      // Set Bytes used, this bytes used will be updated for every write and
-      // only get committed for every put block. In this way, when datanode
-      // is up, for computation of disk space by container only committed
-      // block length is used, And also on restart the blocks committed to DB
-      // is only used to compute the bytes used. This is done to keep the
-      // current behavior and avoid DB write during write chunk operation.
-      db.getStore().getMetadataTable().putWithBatch(
-              batch, OzoneConsts.CONTAINER_BYTES_USED,
-              container.getContainerData().getBytesUsed());
-
-      // Set Block Count for a container.
-      if (incrKeyCount) {
+      try(BatchOperation batch = db.getStore().getBatchHandler()
+              .initBatchOperation()) {
+        db.getStore().getBlockDataTable().putWithBatch(
+            batch, Long.toString(data.getLocalID()), data);
         db.getStore().getMetadataTable().putWithBatch(
-                batch, OzoneConsts.BLOCK_COUNT,
-                container.getContainerData().getKeyCount() + 1);
-      }
+            batch, OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID, bcsId);
 
-      db.getStore().getBatchHandler().commitBatchOperation(batch);
+        // Set Bytes used, this bytes used will be updated for every write and
+        // only get committed for every put block. In this way, when datanode
+        // is up, for computation of disk space by container only committed
+        // block length is used, And also on restart the blocks committed to DB
+        // is only used to compute the bytes used. This is done to keep the
+        // current behavior and avoid DB write during write chunk operation.
+        db.getStore().getMetadataTable().putWithBatch(
+            batch, OzoneConsts.CONTAINER_BYTES_USED,
+            container.getContainerData().getBytesUsed());
+
+        // Set Block Count for a container.
+        if (incrKeyCount) {
+          db.getStore().getMetadataTable().putWithBatch(
+              batch, OzoneConsts.BLOCK_COUNT,
+              container.getContainerData().getKeyCount() + 1);
+        }
+
+        db.getStore().getBatchHandler().commitBatchOperation(batch);
+      }
 
       container.updateBlockCommitSequenceId(bcsId);
       // Increment block count finally here for in-memory.
@@ -258,17 +259,18 @@ public class BlockManagerImpl implements BlockManager {
       getBlockByID(db, blockID);
 
       // Update DB to delete block and set block count and bytes used.
-      BatchOperation batch = db.getStore().getBatchHandler()
-              .initBatchOperation();
-      String localID = Long.toString(blockID.getLocalID());
-      db.getStore().getBlockDataTable().deleteWithBatch(batch, localID);
-      // Update DB to delete block and set block count.
-      // No need to set bytes used here, as bytes used is taken care during
-      // delete chunk.
-      long blockCount = container.getContainerData().getKeyCount() - 1;
-      db.getStore().getMetadataTable()
-              .putWithBatch(batch, OzoneConsts.BLOCK_COUNT, blockCount);
-      db.getStore().getBatchHandler().commitBatchOperation(batch);
+      try(BatchOperation batch = db.getStore().getBatchHandler()
+              .initBatchOperation()) {
+        String localID = Long.toString(blockID.getLocalID());
+        db.getStore().getBlockDataTable().deleteWithBatch(batch, localID);
+        // Update DB to delete block and set block count.
+        // No need to set bytes used here, as bytes used is taken care during
+        // delete chunk.
+        long blockCount = container.getContainerData().getKeyCount() - 1;
+        db.getStore().getMetadataTable()
+            .putWithBatch(batch, OzoneConsts.BLOCK_COUNT, blockCount);
+        db.getStore().getBatchHandler().commitBatchOperation(batch);
+      }
 
       // Decrement block count here
       container.getContainerData().decrKeyCount();
