@@ -25,7 +25,8 @@ import java.util.ListIterator;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.ByteStringConversion;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
@@ -36,12 +37,11 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class manages the stream entries list and handles block allocation
@@ -56,7 +56,7 @@ public class BlockOutputStreamEntryPool {
   private int currentStreamIndex;
   private final OzoneManagerProtocol omClient;
   private final OmKeyArgs keyArgs;
-  private final XceiverClientManager xceiverClientManager;
+  private final XceiverClientFactory xceiverClientFactory;
   private final int chunkSize;
   private final String requestID;
   private final int streamBufferSize;
@@ -73,7 +73,8 @@ public class BlockOutputStreamEntryPool {
   private final ExcludeList excludeList;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
-  public BlockOutputStreamEntryPool(OzoneManagerProtocol omClient,
+  public BlockOutputStreamEntryPool(
+      OzoneManagerProtocol omClient,
       int chunkSize, String requestId, HddsProtos.ReplicationFactor factor,
       HddsProtos.ReplicationType type,
       int bufferSize, long bufferFlushSize,
@@ -81,7 +82,9 @@ public class BlockOutputStreamEntryPool {
       long size, long watchTimeout, ContainerProtos.ChecksumType checksumType,
       int bytesPerChecksum, String uploadID, int partNumber,
       boolean isMultipart, OmKeyInfo info,
-      XceiverClientManager xceiverClientManager, long openID) {
+      boolean unsafeByteBufferConversion,
+      XceiverClientFactory xceiverClientFactory, long openID
+  ) {
     streamEntries = new ArrayList<>();
     currentStreamIndex = 0;
     this.omClient = omClient;
@@ -90,7 +93,7 @@ public class BlockOutputStreamEntryPool {
         .setType(type).setFactor(factor).setDataSize(info.getDataSize())
         .setIsMultipartKey(isMultipart).setMultipartUploadID(uploadID)
         .setMultipartUploadPartNumber(partNumber).build();
-    this.xceiverClientManager = xceiverClientManager;
+    this.xceiverClientFactory = xceiverClientFactory;
     this.chunkSize = chunkSize;
     this.requestID = requestId;
     this.streamBufferSize = bufferSize;
@@ -122,7 +125,8 @@ public class BlockOutputStreamEntryPool {
     this.bufferPool =
         new BufferPool(streamBufferSize,
             (int) (streamBufferMaxSize / streamBufferSize),
-            xceiverClientManager.byteBufferToByteStringConversion());
+            ByteStringConversion
+                .createByteBufferConversion(unsafeByteBufferConversion));
   }
 
   /**
@@ -135,7 +139,7 @@ public class BlockOutputStreamEntryPool {
     streamEntries = new ArrayList<>();
     omClient = null;
     keyArgs = null;
-    xceiverClientManager = null;
+    xceiverClientFactory = null;
     chunkSize = 0;
     requestID = null;
     streamBufferSize = 0;
@@ -177,15 +181,13 @@ public class BlockOutputStreamEntryPool {
     }
   }
 
-  private void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo)
-      throws IOException {
+  private void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo) {
     Preconditions.checkNotNull(subKeyInfo.getPipeline());
-    UserGroupInformation.getCurrentUser().addToken(subKeyInfo.getToken());
     BlockOutputStreamEntry.Builder builder =
         new BlockOutputStreamEntry.Builder()
             .setBlockID(subKeyInfo.getBlockID())
             .setKey(keyArgs.getKeyName())
-            .setXceiverClientManager(xceiverClientManager)
+            .setXceiverClientManager(xceiverClientFactory)
             .setPipeline(subKeyInfo.getPipeline())
             .setRequestId(requestID)
             .setChunkSize(chunkSize)
@@ -257,8 +259,8 @@ public class BlockOutputStreamEntryPool {
     return streamEntries;
   }
 
-  XceiverClientManager getXceiverClientManager() {
-    return xceiverClientManager;
+  XceiverClientFactory getXceiverClientFactory() {
+    return xceiverClientFactory;
   }
 
   String getKeyName() {

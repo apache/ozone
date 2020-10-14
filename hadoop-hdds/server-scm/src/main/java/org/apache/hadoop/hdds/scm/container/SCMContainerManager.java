@@ -107,6 +107,14 @@ public class SCMContainerManager implements ContainerManager {
     scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
   }
 
+  private int getOpenContainerCountPerPipeline(Pipeline pipeline) {
+    int minContainerCountPerDn = numContainerPerVolume *
+        pipelineManager.minHealthyVolumeNum(pipeline);
+    int minPipelineCountPerDn = pipelineManager.minPipelineLimit(pipeline);
+    return (int) Math.ceil(
+        ((double) minContainerCountPerDn / minPipelineCountPerDn));
+  }
+
   private void loadExistingContainers() throws IOException {
 
     TableIterator<ContainerID, ? extends KeyValue<ContainerID, ContainerInfo>>
@@ -348,9 +356,15 @@ public class SCMContainerManager implements ContainerManager {
       if (!skipPipelineToContainerRemove) {
         if (oldState == LifeCycleState.OPEN &&
             newState != LifeCycleState.OPEN) {
-          pipelineManager
-              .removeContainerFromPipeline(container.getPipelineID(),
-                  containerID);
+          try {
+            pipelineManager
+                .removeContainerFromPipeline(container.getPipelineID(),
+                    containerID);
+          } catch (PipelineNotFoundException e) {
+            LOG.warn("Unable to remove container {} from pipeline {} " +
+                " as the pipeline no longer exists",
+                containerID, container.getPipelineID());
+          }
         }
       }
       if (newState == LifeCycleState.DELETED) {
@@ -440,8 +454,7 @@ public class SCMContainerManager implements ContainerManager {
       synchronized (pipeline) {
         containerIDs = getContainersForOwner(pipeline, owner);
 
-        if (containerIDs.size() < numContainerPerVolume * pipelineManager.
-                getNumHealthyVolumes(pipeline)) {
+        if (containerIDs.size() < getOpenContainerCountPerPipeline(pipeline)) {
           containerInfo =
                   containerStateManager.allocateContainer(
                           pipelineManager, owner, pipeline);

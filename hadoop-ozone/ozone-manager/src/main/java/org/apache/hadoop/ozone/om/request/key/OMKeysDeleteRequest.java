@@ -29,8 +29,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -167,12 +165,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
                 omKeyInfo.getKeyName())),
             new CacheValue<>(Optional.absent(), trxnLogIndex));
 
-        int keyFactor = omKeyInfo.getFactor().getNumber();
-        OmKeyLocationInfoGroup keyLocationGroup =
-            omKeyInfo.getLatestVersionLocations();
-        for(OmKeyLocationInfo locationInfo: keyLocationGroup.getLocationList()){
-          quotaReleased += locationInfo.getLength() * keyFactor;
-        }
+        omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+        quotaReleased += sumBlockLengths(omKeyInfo);
       }
       // update usedBytes atomically.
       omVolumeArgs.getUsedBytes().add(-quotaReleased);
@@ -182,7 +176,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           .setDeleteKeysResponse(DeleteKeysResponse.newBuilder()
               .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys))
           .setStatus(deleteStatus ? OK : PARTIAL_DELETE)
-          .setSuccess(deleteStatus).build(), omKeyInfoList, trxnLogIndex,
+          .setSuccess(deleteStatus).build(), omKeyInfoList,
           ozoneManager.isRatisEnabled(), omVolumeArgs, omBucketInfo);
 
       result = Result.SUCCESS;

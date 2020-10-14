@@ -872,7 +872,7 @@ public class TestSCMNodeManager {
           .getScmUsed().get());
       assertEquals(remaining * nodeCount, (long) nodeManager.getStats()
           .getRemaining().get());
-      assertEquals(1, nodeManager.getNumHealthyVolumes(dnList));
+      assertEquals(1, nodeManager.minHealthyVolumeNum(dnList));
       dnList.clear();
     }
   }
@@ -917,7 +917,7 @@ public class TestSCMNodeManager {
 
       assertEquals(1, nodeManager.getNodeCount(HEALTHY));
       assertEquals(volumeCount / 2,
-              nodeManager.getNumHealthyVolumes(dnList));
+              nodeManager.minHealthyVolumeNum(dnList));
       dnList.clear();
     }
   }
