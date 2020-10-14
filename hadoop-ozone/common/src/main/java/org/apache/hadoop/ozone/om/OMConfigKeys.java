@@ -99,7 +99,7 @@ public final class OMConfigKeys {
       TimeDuration.valueOf(24, TimeUnit.HOURS);
 
   public static final String OZONE_OPEN_KEY_CLEANUP_LIMIT_PER_TASK =
-      "ozone.open.key.expire.threshold";
+      "ozone.open.key.cleanup.limit.per.task";
   public static final int OZONE_OPEN_KEY_CLEANUP_LIMIT_PER_TASK_DEFAULT = 100;
 
   public static final String OZONE_OM_METRICS_SAVE_INTERVAL =
