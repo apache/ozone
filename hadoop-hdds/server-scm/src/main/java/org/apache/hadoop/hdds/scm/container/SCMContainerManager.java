@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
@@ -399,9 +400,8 @@ public class SCMContainerManager implements ContainerManager {
     if (deleteTransactionMap == null) {
       return;
     }
-    try(org.apache.hadoop.hdds.utils.db.BatchOperation batchOperation =
-        batchHandler.initBatchOperation()) {
-      lock.lock();
+    lock.lock();
+    try(BatchOperation batchOperation = batchHandler.initBatchOperation()) {
       for (Map.Entry< Long, Long > entry : deleteTransactionMap.entrySet()) {
         long containerID = entry.getKey();
         ContainerID containerIdObject = new ContainerID(containerID);
