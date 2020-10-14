@@ -598,25 +598,21 @@ public class ObjectEndpoint extends EndpointBase {
           IOUtils.copy(body, ozoneOutputStream);
         }
       } finally {
-        IOUtils.closeQuietly(ozoneOutputStream);
+        if (ozoneOutputStream != null) {
+          ozoneOutputStream.close();          
+        }
       }
 
       OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
           ozoneOutputStream.getCommitUploadPartInfo();
-      if (omMultipartCommitUploadPartInfo != null) {
-        String eTag = omMultipartCommitUploadPartInfo.getPartName();
+      String eTag = omMultipartCommitUploadPartInfo.getPartName();
 
-        if (copyHeader != null) {
-          return Response.ok(new CopyPartResult(eTag)).build();
-        } else {
-          return Response.ok().header("ETag",
-              eTag).build();
-        }
+      if (copyHeader != null) {
+        return Response.ok(new CopyPartResult(eTag)).build();
       } else {
-        throw S3ErrorTable.newError(NO_SUCH_UPLOAD,
-            uploadID);
+        return Response.ok().header("ETag",
+            eTag).build();
       }
-
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw S3ErrorTable.newError(NO_SUCH_UPLOAD,
