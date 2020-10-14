@@ -123,6 +123,8 @@ public class NodeEndpoint {
           .withUUid(datanode.getUuidString())
           .withVersion(datanode.getVersion())
           .withSetupTime(datanode.getSetupTime())
+          .withRevision(datanode.getRevision())
+          .withBuildDate(datanode.getBuildDate())
           .build());
     });
 

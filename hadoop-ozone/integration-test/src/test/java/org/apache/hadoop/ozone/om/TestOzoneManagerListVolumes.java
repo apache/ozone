@@ -203,14 +203,16 @@ public class TestOzoneManagerListVolumes {
     UserGroupInformation.setLoginUser(user1);
     checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume5"),
         true);
+
+    // Add "s3v" created default by OM.
     checkUser(cluster, adminUser, Arrays.asList("volume1", "volume2", "volume3",
-        "volume4", "volume5"), true);
+        "volume4", "volume5", "s3v"), true);
 
     UserGroupInformation.setLoginUser(user2);
     checkUser(cluster, user1, Arrays.asList("volume1", "volume4", "volume5"),
         true);
     checkUser(cluster, adminUser, Arrays.asList("volume1", "volume2", "volume3",
-        "volume4", "volume5"), true);
+        "volume4", "volume5", "s3v"), true);
 
     stopCluster(cluster);
   }
@@ -229,8 +231,9 @@ public class TestOzoneManagerListVolumes {
     UserGroupInformation.setLoginUser(user1);
     checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume5"),
         false);
+    // Add "s3v" created default by OM.
     checkUser(cluster, adminUser, Arrays.asList("volume1", "volume2", "volume3",
-        "volume4", "volume5"), false);
+        "volume4", "volume5", "s3v"), false);
 
     // While admin should be able to list volumes just fine.
     UserGroupInformation.setLoginUser(adminUser);
@@ -250,8 +253,10 @@ public class TestOzoneManagerListVolumes {
         true);
     checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume5"),
         true);
+
+    // Add "s3v" created default by OM.
     checkUser(cluster, adminUser, Arrays.asList("volume1", "volume2", "volume3",
-        "volume4", "volume5"), true);
+        "volume4", "volume5", "s3v"), true);
     stopCluster(cluster);
   }
 
@@ -268,8 +273,9 @@ public class TestOzoneManagerListVolumes {
     checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume5"),
         false);
     UserGroupInformation.setLoginUser(adminUser);
-    checkUser(cluster, adminUser, Arrays.asList("volume1", "volume2", "volume3",
-        "volume4", "volume5"), true);
+    // Add "s3v" created default by OM.
+    checkUser(cluster, adminUser, Arrays.asList("volume1", "volume2",
+        "volume3", "volume4", "volume5", "s3v"), true);
     stopCluster(cluster);
   }
 

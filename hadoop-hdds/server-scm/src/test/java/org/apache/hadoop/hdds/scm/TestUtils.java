@@ -222,20 +222,26 @@ public final class TestUtils {
         StorageTypeProto.DISK);
   }
 
-  /**
-   * Creates storage report with the given information.
-   *
-   * @param nodeId    datanode id
-   * @param path      storage dir
-   * @param capacity  storage size
-   * @param used      space used
-   * @param remaining space remaining
-   * @param type      type of storage
-   *
-   * @return StorageReportProto
-   */
   public static StorageReportProto createStorageReport(UUID nodeId, String path,
-      long capacity, long used, long remaining, StorageTypeProto type) {
+       long capacity, long used, long remaining, StorageTypeProto type) {
+    return createStorageReport(nodeId, path, capacity, used, remaining,
+            type, false);
+  }
+    /**
+     * Creates storage report with the given information.
+     *
+     * @param nodeId    datanode id
+     * @param path      storage dir
+     * @param capacity  storage size
+     * @param used      space used
+     * @param remaining space remaining
+     * @param type      type of storage
+     *
+     * @return StorageReportProto
+     */
+  public static StorageReportProto createStorageReport(UUID nodeId, String path,
+      long capacity, long used, long remaining, StorageTypeProto type,
+                                                       boolean failed) {
     Preconditions.checkNotNull(nodeId);
     Preconditions.checkNotNull(path);
     StorageReportProto.Builder srb = StorageReportProto.newBuilder();
@@ -243,6 +249,7 @@ public final class TestUtils {
         .setStorageLocation(path)
         .setCapacity(capacity)
         .setScmUsed(used)
+        .setFailed(failed)
         .setRemaining(remaining);
     StorageTypeProto storageTypeProto =
         type == null ? StorageTypeProto.DISK : type;
@@ -544,7 +551,21 @@ public final class TestUtils {
         .setDatanodeDetails(datanodeDetails)
         .setOriginNodeId(originNodeId)
         .setSequenceId(sequenceId)
+        .setBytesUsed(100)
         .build();
   }
 
+  public static Pipeline getRandomPipeline() {
+    List<DatanodeDetails> nodes = new ArrayList<>();
+    nodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    nodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    nodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    return Pipeline.newBuilder()
+        .setFactor(HddsProtos.ReplicationFactor.THREE)
+        .setId(PipelineID.randomId())
+        .setNodes(nodes)
+        .setState(Pipeline.PipelineState.OPEN)
+        .setType(HddsProtos.ReplicationType.RATIS)
+        .build();
+  }
 }

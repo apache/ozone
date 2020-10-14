@@ -66,7 +66,7 @@ public class SCMContainerManager implements ContainerManager {
 
   private final ContainerStateManager containerStateManager;
 
-  private final int numContainerPerOwnerInPipeline;
+  private final int numContainerPerVolume;
 
   private final SCMContainerManagerMetrics scmContainerManagerMetrics;
 
@@ -98,13 +98,21 @@ public class SCMContainerManager implements ContainerManager {
     this.lock = new ReentrantLock();
     this.pipelineManager = pipelineManager;
     this.containerStateManager = new ContainerStateManager(conf);
-    this.numContainerPerOwnerInPipeline = conf
+    this.numContainerPerVolume = conf
         .getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
             ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
 
     loadExistingContainers();
 
     scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
+  }
+
+  private int getOpenContainerCountPerPipeline(Pipeline pipeline) {
+    int minContainerCountPerDn = numContainerPerVolume *
+        pipelineManager.minHealthyVolumeNum(pipeline);
+    int minPipelineCountPerDn = pipelineManager.minPipelineLimit(pipeline);
+    return (int) Math.ceil(
+        ((double) minContainerCountPerDn / minPipelineCountPerDn));
   }
 
   private void loadExistingContainers() throws IOException {
@@ -348,12 +356,22 @@ public class SCMContainerManager implements ContainerManager {
       if (!skipPipelineToContainerRemove) {
         if (oldState == LifeCycleState.OPEN &&
             newState != LifeCycleState.OPEN) {
-          pipelineManager
-              .removeContainerFromPipeline(container.getPipelineID(),
-                  containerID);
+          try {
+            pipelineManager
+                .removeContainerFromPipeline(container.getPipelineID(),
+                    containerID);
+          } catch (PipelineNotFoundException e) {
+            LOG.warn("Unable to remove container {} from pipeline {} " +
+                " as the pipeline no longer exists",
+                containerID, container.getPipelineID());
+          }
         }
       }
-      containerStore.put(containerID, container);
+      if (newState == LifeCycleState.DELETED) {
+        containerStore.delete(containerID);
+      } else {
+        containerStore.put(containerID, container);
+      }
       return newState;
     } catch (ContainerNotFoundException cnfe) {
       throw new SCMException(
@@ -389,13 +407,17 @@ public class SCMContainerManager implements ContainerManager {
         ContainerID containerIdObject = new ContainerID(containerID);
         ContainerInfo containerInfo =
             containerStore.get(containerIdObject);
-        if (containerInfo == null) {
+        ContainerInfo containerInfoInMem = containerStateManager
+            .getContainer(containerIdObject);
+        if (containerInfo == null || containerInfoInMem == null) {
           throw new SCMException(
               "Failed to increment number of deleted blocks for container "
                   + containerID + ", reason : " + "container doesn't exist.",
               SCMException.ResultCodes.FAILED_TO_FIND_CONTAINER);
         }
         containerInfo.updateDeleteTransactionId(entry.getValue());
+        containerInfo.setNumberOfKeys(containerInfoInMem.getNumberOfKeys());
+        containerInfo.setUsedBytes(containerInfoInMem.getUsedBytes());
         containerStore
             .putWithBatch(batchOperation, containerIdObject, containerInfo);
       }
@@ -432,7 +454,7 @@ public class SCMContainerManager implements ContainerManager {
       synchronized (pipeline) {
         containerIDs = getContainersForOwner(pipeline, owner);
 
-        if (containerIDs.size() < numContainerPerOwnerInPipeline) {
+        if (containerIDs.size() < getOpenContainerCountPerPipeline(pipeline)) {
           containerInfo =
                   containerStateManager.allocateContainer(
                           pipelineManager, owner, pipeline);
@@ -458,7 +480,7 @@ public class SCMContainerManager implements ContainerManager {
         return containerInfo;
       }
     } catch (Exception e) {
-      LOG.warn("Container allocation failed for pipeline={} requiredSize={} {}",
+      LOG.warn("Container allocation failed for pipeline={} requiredSize={}.",
               pipeline, sizeRequired, e);
       return null;
     }
@@ -514,7 +536,7 @@ public class SCMContainerManager implements ContainerManager {
           containerIDIterator.remove();
         }
       } catch (ContainerNotFoundException e) {
-        LOG.error("Could not find container info for container id={} {}", cid,
+        LOG.error("Could not find container info for container id={}.", cid,
             e);
         containerIDIterator.remove();
       }

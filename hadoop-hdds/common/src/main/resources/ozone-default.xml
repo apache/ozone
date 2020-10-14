@@ -38,6 +38,16 @@
     </description>
   </property>
   <property>
+    <name>ozone.container.cache.lock.stripes</name>
+    <value>1024</value>
+    <tag>PERFORMANCE, CONTAINER, STORAGE</tag>
+    <description>Container DB open is an exclusive operation. We use a stripe
+      lock to guarantee that different threads can open different container DBs
+      concurrently, while for one container DB, only one thread can open it at
+      the same time. This setting controls the lock stripes.
+    </description>
+  </property>
+  <property>
     <name>dfs.container.ipc</name>
     <value>9859</value>
     <tag>OZONE, CONTAINER, MANAGEMENT</tag>
@@ -808,7 +818,14 @@
     <name>ozone.scm.pipeline.owner.container.count</name>
     <value>3</value>
     <tag>OZONE, SCM, PIPELINE</tag>
-    <description>Number of containers per owner in a pipeline.
+    <description>Number of containers per owner per disk in a pipeline.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.pipeline.per.metadata.disk</name>
+    <value>2</value>
+    <tag>OZONE, SCM, PIPELINE</tag>
+    <description>Number of pipelines to be created per raft log disk.
     </description>
   </property>
   <property>
@@ -965,6 +982,16 @@
     <tag>OZONE, MANAGEMENT</tag>
     <description>
       Timeout value for the RPC from Datanode to SCM.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.heartbeat.rpc-retry-count</name>
+    <value>15</value>
+    <tag>OZONE, MANAGEMENT</tag>
+    <description>
+      Retry count for the RPC from Datanode to SCM. The rpc-retry-interval
+      is 1s. Make sure rpc-retry-count * (rpc-timeout + rpc-retry-interval)
+      is less than hdds.heartbeat.interval.
     </description>
   </property>
   <property>
@@ -2295,7 +2322,7 @@
   </description>
 </property>
   <property>
-    <name>recon.om.connection.request.timeout</name>
+    <name>ozone.recon.om.connection.request.timeout</name>
     <value>5000</value>
     <tag>OZONE, RECON, OM</tag>
     <description>
@@ -2304,7 +2331,7 @@
     </description>
   </property>
   <property>
-    <name>recon.om.connection.timeout</name>
+    <name>ozone.recon.om.connection.timeout</name>
     <value>5s</value>
     <tag>OZONE, RECON, OM</tag>
     <description>
@@ -2313,7 +2340,7 @@
     </description>
   </property>
   <property>
-    <name>recon.om.socket.timeout</name>
+    <name>ozone.recon.om.socket.timeout</name>
     <value>5s</value>
     <tag>OZONE, RECON, OM</tag>
     <description>
@@ -2322,7 +2349,7 @@
     </description>
   </property>
   <property>
-    <name>recon.om.snapshot.task.initial.delay</name>
+    <name>ozone.recon.om.snapshot.task.initial.delay</name>
     <value>1m</value>
     <tag>OZONE, RECON, OM</tag>
     <description>
@@ -2330,7 +2357,7 @@
     </description>
   </property>
   <property>
-    <name>recon.om.snapshot.task.interval.delay</name>
+    <name>ozone.recon.om.snapshot.task.interval.delay</name>
     <value>10m</value>
     <tag>OZONE, RECON, OM</tag>
     <description>
@@ -2338,7 +2365,7 @@
     </description>
   </property>
   <property>
-    <name>recon.om.snapshot.task.flush.param</name>
+    <name>ozone.recon.om.snapshot.task.flush.param</name>
     <value>false</value>
     <tag>OZONE, RECON, OM</tag>
     <description>
@@ -2419,6 +2446,14 @@
     <value>ssl-server.xml</value>
     <description>Resource file from which ssl server keystore
       information will be extracted
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.client.buffer.size</name>
+    <tag>OZONE, S3GATEWAY</tag>
+    <value>4KB</value>
+    <description>
+      The size of the buffer which is for read block. (4KB by default).
     </description>
   </property>
   <property>

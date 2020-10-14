@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.PKIProfiles.DefaultProfile;
@@ -29,6 +30,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificates.utils.SelfSignedCertificate;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -54,6 +56,7 @@ import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.*;
+import static org.apache.hadoop.hdds.security.x509.exceptions.CertificateException.ErrorCode.CSR_ERROR;
 
 /**
  * The default CertificateServer used by SCM. This has no dependencies on any
@@ -459,18 +462,33 @@ public class DefaultCAServer implements CertificateServer {
     LocalDateTime temp = LocalDateTime.of(beginDate, LocalTime.MIDNIGHT);
     LocalDate endDate =
         temp.plus(securityConfig.getMaxCertificateDuration()).toLocalDate();
-    X509CertificateHolder selfSignedCertificate =
-        SelfSignedCertificate
-            .newBuilder()
-            .setSubject(this.subject)
-            .setScmID(this.scmID)
-            .setClusterID(this.clusterID)
-            .setBeginDate(beginDate)
-            .setEndDate(endDate)
-            .makeCA()
-            .setConfiguration(securityConfig.getConfiguration())
-            .setKey(key)
-            .build();
+    SelfSignedCertificate.Builder builder = SelfSignedCertificate.newBuilder()
+        .setSubject(this.subject)
+        .setScmID(this.scmID)
+        .setClusterID(this.clusterID)
+        .setBeginDate(beginDate)
+        .setEndDate(endDate)
+        .makeCA()
+        .setConfiguration(securityConfig.getConfiguration())
+        .setKey(key);
+
+    try {
+      DomainValidator validator = DomainValidator.getInstance();
+      // Add all valid ips.
+      OzoneSecurityUtil.getValidInetsForCurrentHost().forEach(
+          ip -> {
+            builder.addIpAddress(ip.getHostAddress());
+            if(validator.isValid(ip.getCanonicalHostName())) {
+              builder.addDnsName(ip.getCanonicalHostName());
+            }
+          });
+    } catch (IOException e) {
+      throw new org.apache.hadoop.hdds.security.x509
+          .exceptions.CertificateException(
+              "Error while adding ip to CA self signed certificate", e,
+          CSR_ERROR);
+    }
+    X509CertificateHolder selfSignedCertificate = builder.build();
 
     CertificateCodec certCodec =
         new CertificateCodec(config, componentName);

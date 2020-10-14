@@ -174,6 +174,7 @@ public class SCMBlockProtocolServer implements
       String owner, ExcludeList excludeList) throws IOException {
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("size", String.valueOf(size));
+    auditMap.put("num", String.valueOf(num));
     auditMap.put("type", type.name());
     auditMap.put("factor", factor.name());
     auditMap.put("owner", owner);
@@ -217,8 +218,10 @@ public class SCMBlockProtocolServer implements
   @Override
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
       List<BlockGroup> keyBlocksInfoList) throws IOException {
-    LOG.info("SCM is informed by OM to delete {} blocks", keyBlocksInfoList
-        .size());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("SCM is informed by OM to delete {} blocks",
+          keyBlocksInfoList.size());
+    }
     List<DeleteBlockGroupResult> results = new ArrayList<>();
     Map<String, String> auditMap = Maps.newHashMap();
     for (BlockGroup keyBlocks : keyBlocksInfoList) {

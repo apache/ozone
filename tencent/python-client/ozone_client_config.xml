@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ozone_config>
+   <property>
+     <entry ozone.s3g.endpoint='http://localhost:9878'/>
+     <entry ozone.s3g.endpoint='http://127.0.0.1:9878'/>
+   </property>
+</ozone_config>

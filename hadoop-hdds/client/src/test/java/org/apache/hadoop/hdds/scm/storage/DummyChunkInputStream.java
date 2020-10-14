@@ -42,7 +42,7 @@ public class DummyChunkInputStream extends ChunkInputStream {
       XceiverClientSpi xceiverClient,
       boolean verifyChecksum,
       byte[] data) {
-    super(chunkInfo, blockId, xceiverClient, verifyChecksum);
+    super(chunkInfo, blockId, xceiverClient, verifyChecksum, null);
     this.chunkData = data;
   }
 

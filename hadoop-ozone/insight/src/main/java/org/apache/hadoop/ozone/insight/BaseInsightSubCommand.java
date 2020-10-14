@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.insight.Component.Type;
+import org.apache.hadoop.ozone.insight.datanode.DatanodeDispatcherInsight;
 import org.apache.hadoop.ozone.insight.datanode.RatisInsight;
 import org.apache.hadoop.ozone.insight.om.KeyManagerInsight;
 import org.apache.hadoop.ozone.insight.om.OmProtocolInsight;
@@ -33,6 +34,7 @@ import org.apache.hadoop.ozone.insight.scm.NodeManagerInsight;
 import org.apache.hadoop.ozone.insight.scm.ReplicaManagerInsight;
 import org.apache.hadoop.ozone.insight.scm.ScmProtocolBlockLocationInsight;
 import org.apache.hadoop.ozone.insight.scm.ScmProtocolContainerLocationInsight;
+import org.apache.hadoop.ozone.insight.scm.ScmProtocolDatanodeInsight;
 import org.apache.hadoop.ozone.insight.scm.ScmProtocolSecurityInsight;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 
@@ -91,6 +93,8 @@ public class BaseInsightSubCommand {
     insights.put("scm.event-queue", new EventQueueInsight());
     insights.put("scm.protocol.block-location",
         new ScmProtocolBlockLocationInsight());
+    insights.put("scm.protocol.heartbeat",
+        new ScmProtocolDatanodeInsight());
     insights.put("scm.protocol.container-location",
         new ScmProtocolContainerLocationInsight());
     insights.put("scm.protocol.security",
@@ -98,6 +102,8 @@ public class BaseInsightSubCommand {
     insights.put("om.key-manager", new KeyManagerInsight());
     insights.put("om.protocol.client", new OmProtocolInsight());
     insights.put("datanode.pipeline", new RatisInsight(configuration));
+    insights.put("datanode.dispatcher",
+        new DatanodeDispatcherInsight(configuration));
 
     return insights;
   }

@@ -34,7 +34,7 @@ spec:
       containers:
         - name: freon
           image: "@docker.image@"
-          args: ["ozone","freon", "rk", "--factor=THREE", "--replicationType=RATIS"]
+          args: ["ozone","freon", "rk", "--factor=THREE", "--replication-type=RATIS"]
           envFrom:
             - configMapRef:
                 name: config

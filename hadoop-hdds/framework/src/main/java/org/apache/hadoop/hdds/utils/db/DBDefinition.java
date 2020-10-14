@@ -18,8 +18,15 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.util.Arrays;
+import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * Simple interface to provide information to create a DBStore..
@@ -39,8 +46,40 @@ public interface DBDefinition {
   String getLocationConfigKey();
 
   /**
-   * Create a new DB store instance based on the configuration.
+   * @param conf The configuration for the DB.
+   * @return The parent directory for this definition's .db file.
+   */
+  default File getDBLocation(ConfigurationSource conf) {
+    return ServerUtils.getDirectoryFromConfig(conf,
+            getLocationConfigKey(), getName());
+  }
+
+  /**
+   * @return The column families present in the DB.
    */
   DBColumnFamilyDefinition[] getColumnFamilies();
 
+  /**
+   * Get the key type class for the given table.
+   * @param table table name
+   * @return the class of key type of the given table wrapped in an
+   * {@link Optional}
+   */
+  default Optional<Class> getKeyType(String table) {
+    return Arrays.stream(getColumnFamilies()).filter(cf -> cf.getName().equals(
+        table)).map((Function<DBColumnFamilyDefinition, Class>)
+        DBColumnFamilyDefinition::getKeyType).findAny();
+  }
+
+  /**
+   * Get the value type class for the given table.
+   * @param table table name
+   * @return the class of value type of the given table wrapped in an
+   * {@link Optional}
+   */
+  default Optional<Class> getValueType(String table) {
+    return Arrays.stream(getColumnFamilies()).filter(cf -> cf.getName().equals(
+        table)).map((Function<DBColumnFamilyDefinition, Class>)
+        DBColumnFamilyDefinition::getValueType).findAny();
+  }
 }

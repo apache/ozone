@@ -37,25 +37,54 @@ create_results_dir() {
   chmod ogu+w "$RESULT_DIR"
 }
 
+## @description find all the test.sh scripts in the immediate child dirs
+find_tests(){
+  if [[ -n "${OZONE_ACCEPTANCE_SUITE}" ]]; then
+     tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$" | sort)
 
-## @description wait until safemode exit (or 180 seconds)
+     # 'misc' is default suite, add untagged tests, too
+    if [[ "misc" == "${OZONE_ACCEPTANCE_SUITE}" ]]; then
+       untagged="$(find . -mindepth 2 -maxdepth 2 -name test.sh | xargs grep -L "^#suite:")"
+       if [[ -n "${untagged}" ]]; then
+         tests=$(echo ${tests} ${untagged} | xargs -n1 | sort)
+       fi
+     fi
+
+    if [[ -z "${tests}" ]]; then
+       echo "No tests found for suite ${OZONE_ACCEPTANCE_SUITE}"
+       exit 1
+  fi
+  else
+    tests=$(find . -mindepth 2 -maxdepth 2 -name test.sh | grep "${OZONE_TEST_SELECTOR:-""}" | sort)
+  fi
+  echo $tests
+}
+
+## @description wait until safemode exit (or 240 seconds)
 wait_for_safemode_exit(){
   # version-dependent
-  : ${OZONE_ADMIN_COMMAND:=admin}
+  : ${OZONE_SAFEMODE_STATUS_COMMAND:=ozone admin safemode status --verbose}
 
   #Reset the timer
   SECONDS=0
+  timeout_threshold=240
+  if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
+     timeout_threshold=600
+  fi
 
-  #Don't give it up until 180 seconds
-  while [[ $SECONDS -lt 180 ]]; do
+  #Don't give it up until timeout
+  while [[ $SECONDS -lt $timeout_threshold ]]; do
+
 
      #This line checks the safemode status in scm
-     local command="ozone ${OZONE_ADMIN_COMMAND} safemode status"
+     local command="${OZONE_SAFEMODE_STATUS_COMMAND}"
      if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
          status=$(docker-compose exec -T scm bash -c "kinit -k HTTP/scm@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab && $command" || true)
      else
          status=$(docker-compose exec -T scm bash -c "$command")
      fi
+
+     echo "SECONDS: $SECONDS"
 
      echo $status
      if [[ "$status" ]]; then
@@ -114,9 +143,11 @@ execute_robot_test(){
   OUTPUT_PATH="$RESULT_DIR_INSIDE/${OUTPUT_FILE}"
   # shellcheck disable=SC2068
   docker-compose exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
-    && docker-compose exec -T "$CONTAINER" robot -v OM_SERVICE_ID:"${OM_SERVICE_ID}" -v SECURITY_ENABLED:"${SECURITY_ENABLED}" -v OM_HA_PARAM:"${OM_HA_PARAM}" -v KEY_NAME:"${OZONE_BUCKET_KEY_NAME}" ${ARGUMENTS[@]} --log NONE -N "$TEST_NAME" --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" "$SMOKETEST_DIR_INSIDE/$TEST"
+    && docker-compose exec -T "$CONTAINER" robot -v OM_SERVICE_ID:"${OM_SERVICE_ID}" -v SECURITY_ENABLED:"${SECURITY_ENABLED}" -v OM_HA_PARAM:"${OM_HA_PARAM}" -v KEY_NAME:"${OZONE_BUCKET_KEY_NAME}" ${ARGUMENTS[@]} --log NONE --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" "$SMOKETEST_DIR_INSIDE/$TEST"
   local -i rc=$?
 
+
+  export COLUMNS=500 #defaul width of docker-compose terminal output is too narrow(80)
   FULL_CONTAINER_NAME=$(docker-compose ps | grep "_${CONTAINER}_" | head -n 1 | awk '{print $1}')
   docker cp "$FULL_CONTAINER_NAME:$OUTPUT_PATH" "$RESULT_DIR/"
 
@@ -224,4 +255,40 @@ generate_report(){
      echo "Robot framework is not installed, the reports can be generated (sudo pip install robotframework)."
      exit 1
   fi
+}
+
+## @description  Copy results of a single test environment to the "all tests" dir.
+copy_results() {
+  local test_dir="$1"
+  local all_result_dir="$2"
+
+  local result_dir="${test_dir}/result"
+  local test_dir_name=$(basename ${test_dir})
+  if [[ -n "$(find "${result_dir}" -name "*.xml")" ]]; then
+    rebot --nostatusrc -N "${test_dir_name}" -o "${all_result_dir}/${test_dir_name}.xml" "${result_dir}/*.xml"
+  fi
+
+  cp "${result_dir}"/docker-*.log "${all_result_dir}"/
+  if [[ -n "$(find "${result_dir}" -name "*.out")" ]]; then
+    cp "${result_dir}"/*.out* "${all_result_dir}"/
+  fi
+}
+
+run_test_script() {
+  local d="$1"
+
+  echo "Executing test in ${d}"
+
+  #required to read the .env file from the right location
+  cd "${d}" || return
+
+  ret=0
+  if ! ./test.sh; then
+    ret=1
+    echo "ERROR: Test execution of ${d} is FAILED!!!!"
+  fi
+
+  cd - > /dev/null
+
+  return ${ret}
 }

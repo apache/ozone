@@ -2,6 +2,9 @@
 title: "Ozone Manager"
 date: "2017-09-14"
 weight: 2
+menu: 
+  main:
+     parent: 概念
 summary: Ozone Manager 是 Ozone 主要的命名空间服务，它管理了卷、桶和键的生命周期。
 ---
 <!---
@@ -20,6 +23,12 @@ summary: Ozone Manager 是 Ozone 主要的命名空间服务，它管理了卷�
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
+
+<div class="alert alert-warning">
+
+注意：本页面翻译的信息可能滞后，最新的信息请参看英文版的相关页面。
+
+</div>
 
 Ozone Manager（OM）管理 Ozone 的命名空间。
 

@@ -17,12 +17,6 @@
  */
 package org.apache.hadoop.ozone.common;
 
-import org.apache.hadoop.hdds.utils.MockGatheringChannel;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.junit.Assert;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -32,6 +26,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ThreadLocalRandom;
+
+import org.apache.hadoop.hdds.utils.MockGatheringChannel;
+
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.junit.Assert;
+import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 
 /**
  * Test {@link ChunkBuffer} implementations.
@@ -71,7 +72,8 @@ public class TestChunkBuffer {
   private static void runTestIncrementalChunkBuffer(int increment, int n) {
     final byte[] expected = new byte[n];
     ThreadLocalRandom.current().nextBytes(expected);
-    runTestImpl(expected, increment, ChunkBuffer.allocate(n, increment));
+    runTestImpl(expected, increment,
+        new IncrementalChunkBuffer(n, increment, false));
   }
 
   @Test(timeout = 1_000)

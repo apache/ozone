@@ -46,7 +46,6 @@ import static org.junit.Assert.assertTrue;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -57,7 +56,6 @@ import org.slf4j.event.Level;
 /**
  * Tests the Ratis snaphsots feature in OM.
  */
-@Ignore("HDDS-3966")
 public class TestOMRatisSnapshots {
 
   private MiniOzoneHAClusterImpl cluster = null;

@@ -49,7 +49,8 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.ratis.protocol.StateMachineException;
+import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.storage.FileInfo;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 
@@ -123,8 +124,8 @@ public class TestContainerStateMachineFailures {
 
     RatisClientConfig ratisClientConfig =
         conf.getObject(RatisClientConfig.class);
-    ratisClientConfig.setWriteRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(10));
-    ratisClientConfig.setWatchRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(10));
+    ratisClientConfig.setWriteRequestTimeout(Duration.ofSeconds(10));
+    ratisClientConfig.setWatchRequestTimeout(Duration.ofSeconds(10));
     conf.setFromObject(ratisClientConfig);
 
     DatanodeRatisServerConfig ratisServerConfig =
@@ -135,8 +136,8 @@ public class TestContainerStateMachineFailures {
 
     RatisClientConfig.RaftConfig raftClientConfig =
         conf.getObject(RatisClientConfig.RaftConfig.class);
-    raftClientConfig.setRpcRequestTimeout(TimeUnit.SECONDS.toMillis(3));
-    raftClientConfig.setRpcWatchRequestTimeout(TimeUnit.SECONDS.toMillis(10));
+    raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
+    raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(10));
     conf.setFromObject(raftClientConfig);
 
     conf.setLong(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
@@ -379,9 +380,20 @@ public class TestContainerStateMachineFailures {
     } catch (IOException ioe) {
       Assert.assertTrue(ioe instanceof StateMachineException);
     }
-    // Make sure the latest snapshot is same as the previous one
-    FileInfo latestSnapshot = storage.findLatestSnapshot().getFile();
-    Assert.assertTrue(snapshot.getPath().equals(latestSnapshot.getPath()));
+
+    if (snapshot.getPath().toFile().exists()) {
+      // Make sure the latest snapshot is same as the previous one
+      try {
+        FileInfo latestSnapshot = storage.findLatestSnapshot().getFile();
+        Assert.assertTrue(snapshot.getPath().equals(latestSnapshot.getPath()));
+      } catch (Throwable e) {
+        Assert.assertFalse(snapshot.getPath().toFile().exists());
+      }
+    }
+    
+    // when remove pipeline, group dir including snapshot will be deleted
+    LambdaTestUtils.await(5000, 500,
+        () -> (!snapshot.getPath().toFile().exists()));
   }
 
   @Test

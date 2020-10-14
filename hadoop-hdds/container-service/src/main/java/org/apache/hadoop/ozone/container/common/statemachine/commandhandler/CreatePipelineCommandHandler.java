@@ -37,7 +37,7 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Time;
 
 import org.apache.ratis.client.RaftClient;
-import org.apache.ratis.protocol.AlreadyExistsException;
+import org.apache.ratis.protocol.exceptions.AlreadyExistsException;
 import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
@@ -98,7 +98,8 @@ public class CreatePipelineCommandHandler implements CommandHandler {
             d -> !d.getUuid().equals(dn.getUuid()))
             .forEach(d -> {
               final RaftPeer peer = RatisHelper.toRaftPeer(d);
-              try (RaftClient client = RatisHelper.newRaftClient(peer, conf)) {
+              try (RaftClient client = RatisHelper.newRaftClient(peer, conf,
+                  ozoneContainer.getTlsClientConfig())) {
                 client.groupAdd(group, peer.getId());
               } catch (AlreadyExistsException ae) {
                 // do not log

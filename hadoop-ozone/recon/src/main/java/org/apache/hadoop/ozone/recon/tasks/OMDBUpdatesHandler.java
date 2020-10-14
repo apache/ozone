@@ -18,9 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.DELETE;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.UPDATE;
@@ -29,13 +26,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
-import org.apache.ratis.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.WriteBatch;
 import org.slf4j.Logger;
@@ -53,16 +49,17 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
   private CodecRegistry codecRegistry;
   private OMMetadataManager omMetadataManager;
   private List<OMDBUpdateEvent> omdbUpdateEvents = new ArrayList<>();
+  private OMDBDefinition omdbDefinition;
 
   public OMDBUpdatesHandler(OMMetadataManager metadataManager) {
     omMetadataManager = metadataManager;
     tablesNames = metadataManager.getStore().getTableNames();
     codecRegistry = metadataManager.getStore().getCodecRegistry();
+    omdbDefinition = new OMDBDefinition();
   }
 
   @Override
-  public void put(int cfIndex, byte[] keyBytes, byte[] valueBytes) throws
-      RocksDBException {
+  public void put(int cfIndex, byte[] keyBytes, byte[] valueBytes) {
     try {
       processEvent(cfIndex, keyBytes, valueBytes,
           OMDBUpdateEvent.OMDBUpdateAction.PUT);
@@ -72,7 +69,7 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
   }
 
   @Override
-  public void delete(int cfIndex, byte[] keyBytes) throws RocksDBException {
+  public void delete(int cfIndex, byte[] keyBytes) {
     try {
       processEvent(cfIndex, keyBytes, null,
           OMDBUpdateEvent.OMDBUpdateAction.DELETE);
@@ -93,41 +90,44 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
       valueBytes, OMDBUpdateEvent.OMDBUpdateAction action)
       throws IOException {
     String tableName = tablesNames.get(cfIndex);
-    Class<String> keyType = getKeyType();
-    Class valueType = getValueType(tableName);
-    if (valueType != null) {
+    Optional<Class> keyType = omdbDefinition.getKeyType(tableName);
+    Optional<Class> valueType = omdbDefinition.getValueType(tableName);
+    if (keyType.isPresent() && valueType.isPresent()) {
       OMDBUpdateEvent.OMUpdateEventBuilder builder =
           new OMDBUpdateEvent.OMUpdateEventBuilder<>();
       builder.setTable(tableName);
       builder.setAction(action);
-
-      String key = codecRegistry.asObject(keyBytes, keyType);
+      String key = (String) codecRegistry.asObject(keyBytes, keyType.get());
       builder.setKey(key);
 
+      // Put new
+      // Put existing --> Update
+      // Delete existing
+      // Delete non-existing
+      Table table = omMetadataManager.getTable(tableName);
+      // Recon does not add entries to cache and it is safer to always use
+      // getSkipCache in Recon.
+      Object oldValue = table.getSkipCache(key);
       if (action == PUT) {
-        Object value = codecRegistry.asObject(valueBytes, valueType);
+        Object value = codecRegistry.asObject(valueBytes, valueType.get());
         builder.setValue(value);
-        // If a PUT key operation happens on an existing Key, it is tagged
+        // If a PUT operation happens on an existing Key, it is tagged
         // as an "UPDATE" event.
-        if (tableName.equalsIgnoreCase(KEY_TABLE)) {
-          if (omMetadataManager.getKeyTable().isExist(key)) {
-            OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(key);
-            builder.setOldValue(omKeyInfo);
-            builder.setAction(UPDATE);
-          }
+        if (oldValue != null) {
+          builder.setOldValue(oldValue);
+          builder.setAction(UPDATE);
         }
       } else if (action.equals(DELETE)) {
-        // When you delete a Key, we add the old OmKeyInfo to the event so that
+        // When you delete a Key, we add the old value to the event so that
         // a downstream task can use it.
-        if (tableName.equalsIgnoreCase(KEY_TABLE)) {
-          OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable().get(key);
-          builder.setValue(omKeyInfo);
-        }
+        builder.setValue(oldValue);
       }
 
       OMDBUpdateEvent event = builder.build();
-      LOG.debug("Generated OM update Event for table : " + event.getTable()
-          + ", Key = " + event.getKey() + ", action = " + event.getAction());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(String.format("Generated OM update Event for table : %s, " +
+            "action = %s", tableName, action));
+      }
       if (omdbUpdateEvents.contains(event)) {
         // If the same event is part of this batch, the last one only holds.
         // For example, if there are 2 PUT key1 events, then the first one
@@ -135,6 +135,13 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
         omdbUpdateEvents.remove(event);
       }
       omdbUpdateEvents.add(event);
+    } else {
+      // key type or value type cannot be determined for this table.
+      // log a warn message and ignore the update.
+      if (LOG.isWarnEnabled()) {
+        LOG.warn(String.format("KeyType or ValueType could not be determined" +
+            " for table %s. Ignoring the event.", tableName));
+      }
     }
   }
 
@@ -262,35 +269,10 @@ public class OMDBUpdatesHandler extends WriteBatch.Handler {
   }
 
   /**
-   * Return Key type class for a given table name.
-   * @param name table name.
-   * @return String.class by default.
-   */
-  private Class<String> getKeyType() {
-    return String.class;
-  }
-
-  /**
-   * Return Value type class for a given table.
-   * @param name table name
-   * @return Value type based on table name.
-   */
-  @VisibleForTesting
-  protected Class getValueType(String name) {
-    switch (name) {
-    case KEY_TABLE : return OmKeyInfo.class;
-    case VOLUME_TABLE : return OmVolumeArgs.class;
-    case BUCKET_TABLE : return OmBucketInfo.class;
-    default: return null;
-    }
-  }
-
-  /**
    * Get List of events.
    * @return List of events.
    */
   public List<OMDBUpdateEvent> getEvents() {
     return omdbUpdateEvents;
   }
-
 }

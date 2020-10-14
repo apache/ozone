@@ -30,6 +30,11 @@ ${OM_SERVICE_LIST_URL}       http://om:9874/serviceList
 ${SCM_URL}       http://scm:9876
 ${RECON_URL}       http://recon:9888
 
+${SCM_CONF_URL}     http://scm:9876/conf
+${SCM_JMX_URL}      http://scm:9876/jmx
+${SCM_STACKS_URL}   http://scm:9876/stacks
+
+
 *** Keywords ***
 Verify SPNEGO enabled URL
     [arguments]                      ${url}
@@ -46,7 +51,7 @@ Verify SPNEGO enabled URL
 *** Test Cases ***
 Generate Freon data
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
-                        Execute                             ozone freon rk --replicationType=RATIS --numOfVolumes 1 --numOfBuckets 1 --numOfKeys 2 --keySize 1025
+                        Execute                             ozone freon rk --replication-type=RATIS --num-of-volumes 1 --num-of-buckets 1 --num-of-keys 2 --key-size 1025
 
 Test OM portal
     Verify SPNEGO enabled URL       ${OM_URL}
@@ -59,6 +64,15 @@ Test OM Service List
 
 Test SCM portal
     Verify SPNEGO enabled URL       ${SCM_URL}
+
+Test SCM conf
+    Verify SPNEGO enabled URL       ${SCM_CONF_URL}
+
+Test SCM jmx
+    Verify SPNEGO enabled URL       ${SCM_JMX_URL}
+
+Test SCM stacks
+    Verify SPNEGO enabled URL       ${SCM_STACKS_URL}
 
 Test Recon portal
     Verify SPNEGO enabled URL       ${RECON_URL}

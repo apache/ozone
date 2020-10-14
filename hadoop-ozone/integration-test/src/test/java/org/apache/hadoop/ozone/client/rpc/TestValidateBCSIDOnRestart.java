@@ -17,9 +17,7 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-import com.google.common.primitives.Longs;
 import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
@@ -108,8 +106,8 @@ public class TestValidateBCSIDOnRestart {
 
     RatisClientConfig ratisClientConfig =
         conf.getObject(RatisClientConfig.class);
-    ratisClientConfig.setWriteRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(10));
-    ratisClientConfig.setWatchRequestTimeoutInMs(TimeUnit.SECONDS.toMillis(10));
+    ratisClientConfig.setWriteRequestTimeout(Duration.ofSeconds(10));
+    ratisClientConfig.setWatchRequestTimeout(Duration.ofSeconds(10));
     conf.setFromObject(ratisClientConfig);
 
     DatanodeRatisServerConfig ratisServerConfig =
@@ -120,8 +118,8 @@ public class TestValidateBCSIDOnRestart {
 
     RatisClientConfig.RaftConfig raftClientConfig =
         conf.getObject(RatisClientConfig.RaftConfig.class);
-    raftClientConfig.setRpcRequestTimeout(TimeUnit.SECONDS.toMillis(3));
-    raftClientConfig.setRpcWatchRequestTimeout(TimeUnit.SECONDS.toMillis(10));
+    raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
+    raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(10));
     conf.setFromObject(raftClientConfig);
 
     cluster =
@@ -231,13 +229,11 @@ public class TestValidateBCSIDOnRestart {
     keyValueContainerData = (KeyValueContainerData) containerData;
     ReferenceCountedDB db = BlockUtils.
             getDB(keyValueContainerData, conf);
-    byte[] blockCommitSequenceIdKey =
-            StringUtils.
-                    string2Bytes(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID_PREFIX);
 
     // modify the bcsid for the container in the ROCKS DB thereby inducing
     // corruption
-    db.getStore().put(blockCommitSequenceIdKey, Longs.toByteArray(0));
+    db.getStore().getMetadataTable()
+            .put(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID, 0L);
     db.decrementReference();
     // after the restart, there will be a mismatch in BCSID of what is recorded
     // in the and what is there in RockSDB and hence the container would be

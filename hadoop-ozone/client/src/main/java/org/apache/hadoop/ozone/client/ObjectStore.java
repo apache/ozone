@@ -253,6 +253,9 @@ public class ObjectStore {
 
     @Override
     public boolean hasNext() {
+      // IMPORTANT: Without this logic, remote iteration will not work.
+      // Removing this will break the listVolume call if we try to
+      // list more than 1000 (ozone.client.list.cache ) volumes.
       if (!currentIterator.hasNext() && currentValue != null) {
         currentIterator = getNextListOfVolumes(currentValue.getName())
             .iterator();

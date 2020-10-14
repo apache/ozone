@@ -3,6 +3,9 @@ title: "Securing Ozone"
 date: "2019-April-03"
 summary: Overview of Ozone security concepts and steps to secure Ozone Manager and SCM.
 weight: 1
+menu:
+   main:
+      parent: Security
 icon: tower
 ---
 <!---

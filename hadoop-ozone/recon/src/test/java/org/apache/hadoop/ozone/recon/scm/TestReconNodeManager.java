@@ -26,12 +26,17 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -46,6 +51,7 @@ public class TestReconNodeManager {
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
   private OzoneConfiguration conf;
+  private DBStore store;
 
   @Before
   public void setUp() throws Exception {
@@ -53,6 +59,12 @@ public class TestReconNodeManager {
     conf.set(OZONE_METADATA_DIRS,
         temporaryFolder.newFolder().getAbsolutePath());
     conf.set(OZONE_SCM_NAMES, "localhost");
+    store = DBStoreBuilder.createDBStore(conf, new ReconSCMDBDefinition());
+  }
+
+  @After
+  public void tearDown() throws Exception {
+    store.close();
   }
 
   @Test
@@ -60,8 +72,10 @@ public class TestReconNodeManager {
     ReconStorageConfig scmStorageConfig = new ReconStorageConfig(conf);
     EventQueue eventQueue = new EventQueue();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
+    Table<UUID, DatanodeDetails> nodeTable =
+        ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
-        scmStorageConfig, eventQueue, clusterMap);
+        scmStorageConfig, eventQueue, clusterMap, nodeTable);
     ReconNewNodeHandler reconNewNodeHandler =
         new ReconNewNodeHandler(reconNodeManager);
     assertTrue(reconNodeManager.getAllNodes().isEmpty());
@@ -80,8 +94,8 @@ public class TestReconNodeManager {
     // Close the DB, and recreate the instance of Recon Node Manager.
     eventQueue.close();
     reconNodeManager.close();
-    reconNodeManager = new ReconNodeManager(conf,
-        scmStorageConfig, eventQueue, clusterMap);
+    reconNodeManager = new ReconNodeManager(conf, scmStorageConfig, eventQueue,
+        clusterMap, nodeTable);
 
     // Verify that the node information was persisted and loaded back.
     assertEquals(1, reconNodeManager.getAllNodes().size());

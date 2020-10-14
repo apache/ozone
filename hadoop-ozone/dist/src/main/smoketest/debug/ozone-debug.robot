@@ -23,14 +23,14 @@ Suite Setup         Write key
 
 *** Keywords ***
 Write key
-    Execute             ozone sh volume create o3://om/vol1 --quota 100TB
+    Execute             ozone sh volume create o3://om/vol1 --space-quota 100TB --count-quota 100
     Execute             ozone sh bucket create o3://om/vol1/bucket1
     Execute             ozone sh key put o3://om/vol1/bucket1/debugKey /opt/hadoop/NOTICE.txt
 
 *** Test Cases ***
 Test ozone debug
-    ${result} =     Execute             ozone debug chunkinfo o3://om/vol1/bucket1/debugKey | jq -r '.[]'
+    ${result} =     Execute             ozone debug chunkinfo o3://om/vol1/bucket1/debugKey | jq -r '.KeyLocations[0][0].Locations'
                     Should contain      ${result}       files
-    ${result} =     Execute             ozone debug chunkinfo o3://om/vol1/bucket1/debugKey | jq -r '.[].files[0]'
+    ${result} =     Execute             ozone debug chunkinfo o3://om/vol1/bucket1/debugKey | jq -r '.KeyLocations[0][0].Locations.files[0]'
                     File Should Exist   ${result}
 

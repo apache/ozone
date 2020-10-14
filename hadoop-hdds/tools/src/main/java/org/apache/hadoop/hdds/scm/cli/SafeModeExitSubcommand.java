@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.cli;
 
-import java.util.concurrent.Callable;
+import java.io.IOException;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.ParentCommand;
 
 /**
  * This is the handler that process safe mode exit command.
@@ -35,23 +34,16 @@ import picocli.CommandLine.ParentCommand;
     description = "Force SCM out of safe mode",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class SafeModeExitSubcommand implements Callable<Void> {
+public class SafeModeExitSubcommand extends ScmSubcommand {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SafeModeExitSubcommand.class);
 
-  @ParentCommand
-  private SafeModeCommands parent;
-
   @Override
-  public Void call() throws Exception {
-    try (ScmClient scmClient = parent.getParent().createScmClient()) {
-
-      boolean execReturn = scmClient.forceExitSafeMode();
-      if(execReturn){
-        LOG.info("SCM exit safe mode successfully.");
-      }
-      return null;
+  public void execute(ScmClient scmClient) throws IOException {
+    boolean execReturn = scmClient.forceExitSafeMode();
+    if(execReturn){
+      LOG.info("SCM exit safe mode successfully.");
     }
   }
 }

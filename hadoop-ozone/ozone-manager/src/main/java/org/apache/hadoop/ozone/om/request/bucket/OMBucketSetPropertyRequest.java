@@ -19,11 +19,14 @@
 package org.apache.hadoop.ozone.om.request.bucket;
 
 import java.io.IOException;
+import java.util.List;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
@@ -150,6 +153,22 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
             .setIsVersionEnabled(dbBucketInfo.getIsVersionEnabled());
       }
 
+      //Check quotaInBytes and quotaInCounts to update
+      String volumeKey = omMetadataManager.getVolumeKey(volumeName);
+      OmVolumeArgs omVolumeArgs = omMetadataManager.getVolumeTable()
+          .get(volumeKey);
+      if (checkQuotaBytesValid(omMetadataManager, omVolumeArgs, omBucketArgs,
+          volumeKey)) {
+        bucketInfoBuilder.setQuotaInBytes(omBucketArgs.getQuotaInBytes());
+      } else {
+        bucketInfoBuilder.setQuotaInBytes(dbBucketInfo.getQuotaInBytes());
+      }
+      if (checkQuotaCountsValid(omVolumeArgs, omBucketArgs)) {
+        bucketInfoBuilder.setQuotaInCounts(omBucketArgs.getQuotaInCounts());
+      } else {
+        bucketInfoBuilder.setQuotaInCounts(dbBucketInfo.getQuotaInCounts());
+      }
+
       bucketInfoBuilder.setCreationTime(dbBucketInfo.getCreationTime());
 
       // Set acls from dbBucketInfo if it has any.
@@ -205,5 +224,50 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       omMetrics.incNumBucketUpdateFails();
       return omClientResponse;
     }
+  }
+
+  public boolean checkQuotaBytesValid(OMMetadataManager metadataManager,
+      OmVolumeArgs omVolumeArgs, OmBucketArgs omBucketArgs, String volumeKey)
+      throws IOException {
+    long quotaInBytes = omBucketArgs.getQuotaInBytes();
+
+    if (quotaInBytes == 0) {
+      return false;
+    }
+
+    long totalBucketQuota = 0;
+    long volumeQuotaInBytes = omVolumeArgs.getQuotaInBytes();
+
+    if (quotaInBytes > OzoneConsts.QUOTA_RESET) {
+      totalBucketQuota = quotaInBytes;
+    }
+    List<OmBucketInfo> bucketList = metadataManager.listBuckets(
+        omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE);
+    for(OmBucketInfo bucketInfo : bucketList) {
+      long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
+      if(nextQuotaInBytes > OzoneConsts.QUOTA_RESET &&
+          !omBucketArgs.getBucketName().equals(bucketInfo.getBucketName())) {
+        totalBucketQuota += nextQuotaInBytes;
+      }
+    }
+
+    if(volumeQuotaInBytes < totalBucketQuota &&
+        volumeQuotaInBytes != OzoneConsts.QUOTA_RESET) {
+      throw new IllegalArgumentException("Total buckets quota in this volume " +
+          "should not be greater than volume quota : the total space quota is" +
+          " set to:" + totalBucketQuota + ". But the volume space quota is:" +
+          volumeQuotaInBytes);
+    }
+    return true;
+  }
+
+  public boolean checkQuotaCountsValid(OmVolumeArgs omVolumeArgs,
+      OmBucketArgs omBucketArgs) {
+    long quotaInCounts = omBucketArgs.getQuotaInCounts();
+
+    if ((quotaInCounts <= 0 && quotaInCounts != OzoneConsts.QUOTA_RESET)) {
+      return false;
+    }
+    return true;
   }
 }

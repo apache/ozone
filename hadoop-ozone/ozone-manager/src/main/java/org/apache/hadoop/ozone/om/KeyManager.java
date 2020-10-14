@@ -182,14 +182,15 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   List<BlockGroup> getPendingDeletionKeys(int count) throws IOException;
 
   /**
-   * Returns a list of all still open key info. Which contains the info about
-   * the key name and all its associated block IDs. A pending open key has
-   * prefix #open# in OM DB.
+   * Returns the names of up to {@code count} open keys that are older than
+   * the configured expiration age.
    *
-   * @return a list of {@link BlockGroup} representing keys and blocks.
+   * @param count The maximum number of expired open keys to return.
+   * @return a list of {@link String} representing the names of expired
+   * open keys.
    * @throws IOException
    */
-  List<BlockGroup> getExpiredOpenKeys() throws IOException;
+  List<String> getExpiredOpenKeys(int count) throws IOException;
 
   /**
    * Deletes a expired open key by its name. Called when a hanging key has been
@@ -266,4 +267,10 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
   OmMultipartUploadListParts listParts(String volumeName, String bucketName,
       String keyName, String uploadID, int partNumberMarker,
       int maxParts)  throws IOException;
+
+  /**
+   * Refresh the key block location information by get latest info from SCM.
+   * @param key
+   */
+  void refresh(OmKeyInfo key) throws IOException;
 }

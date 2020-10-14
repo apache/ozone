@@ -61,6 +61,7 @@ import io.opentracing.util.GlobalTracer;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import org.apache.ratis.protocol.ClientId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -302,6 +303,16 @@ public class BaseFreonGenerator {
   }
 
   /**
+   * Print out reports with the given message.
+   */
+  public void print(String msg){
+    Consumer<String> print = freonCommand.isInteractive()
+            ? System.out::println
+            : LOG::info;
+    print.accept(msg);
+  }
+
+  /**
    * Create the OM RPC client to use it for testing.
    */
   public OzoneManagerProtocolClientSideTranslatorPB createOmClient(
@@ -310,6 +321,17 @@ public class BaseFreonGenerator {
     RPC.setProtocolEngine(conf, OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
     String clientId = ClientId.randomId().toString();
+
+    if (omServiceID == null) {
+
+      //if only one serviceId is configured, use that
+      final String[] configuredServiceIds =
+          conf.getTrimmedStrings(OZONE_OM_SERVICE_IDS_KEY);
+      if (configuredServiceIds.length == 1) {
+        omServiceID = configuredServiceIds[0];
+      }
+    }
+
     OmTransport transport = OmTransportFactory.create(conf, ugi, omServiceID);
     return new OzoneManagerProtocolClientSideTranslatorPB(transport, clientId);
   }

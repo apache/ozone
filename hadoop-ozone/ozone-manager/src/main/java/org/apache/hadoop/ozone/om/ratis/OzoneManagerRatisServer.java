@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.ipc.ProtobufRpcEngine.Server;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -62,16 +63,16 @@ import org.apache.ratis.proto.RaftProtos.RoleInfoProto;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.GroupInfoReply;
 import org.apache.ratis.protocol.GroupInfoRequest;
-import org.apache.ratis.protocol.LeaderNotReadyException;
+import org.apache.ratis.protocol.exceptions.LeaderNotReadyException;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.protocol.Message;
-import org.apache.ratis.protocol.NotLeaderException;
 import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
-import org.apache.ratis.protocol.StateMachineException;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServer;
@@ -143,8 +144,9 @@ public final class OzoneManagerRatisServer {
    * ratis server.
    */
   private RaftClientRequest createWriteRaftClientRequest(OMRequest omRequest) {
-    return new RaftClientRequest(clientId, server.getId(), raftGroupId,
-        nextCallId(),
+    return new RaftClientRequest(
+        ClientId.valueOf(UUID.nameUUIDFromBytes(Server.getClientId())),
+        server.getId(), raftGroupId, Server.getCallId(),
         Message.valueOf(OMRatisHelper.convertRequestToByteString(omRequest)),
         RaftClientRequest.writeRequestType(), null);
   }
@@ -339,6 +341,11 @@ public final class OzoneManagerRatisServer {
     return this.raftGroup;
   }
 
+  @VisibleForTesting
+  public RaftServer getServer() {
+    return server;
+  }
+
   /**
    * Initializes and returns OzoneManager StateMachine.
    */
@@ -407,6 +414,7 @@ public final class OzoneManagerRatisServer {
         StorageUnit.BYTES);
     RaftServerConfigKeys.Log.setSegmentSizeMax(properties,
         SizeInBytes.valueOf(raftSegmentSize));
+    RaftServerConfigKeys.Log.setPurgeUptoSnapshotIndex(properties, true);
 
     // Set RAFT segment pre-allocated size
     final int raftSegmentPreallocatedSize = (int) conf.getStorageSize(

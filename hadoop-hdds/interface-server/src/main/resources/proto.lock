@@ -1,0 +1,1786 @@
+{
+  "definitions": [
+    {
+      "protopath": "ScmServerDatanodeHeartbeatProtocol.proto",
+      "def": {
+        "enums": [
+          {
+            "name": "Type",
+            "enum_fields": [
+              {
+                "name": "GetVersion",
+                "integer": 1
+              },
+              {
+                "name": "Register",
+                "integer": 2
+              },
+              {
+                "name": "SendHeartbeat",
+                "integer": 3
+              }
+            ]
+          },
+          {
+            "name": "Status",
+            "enum_fields": [
+              {
+                "name": "OK",
+                "integer": 1
+              },
+              {
+                "name": "ERROR",
+                "integer": 2
+              }
+            ]
+          },
+          {
+            "name": "SCMRegisteredResponseProto.ErrorCode",
+            "enum_fields": [
+              {
+                "name": "success",
+                "integer": 1
+              },
+              {
+                "name": "errorNodeNotPermitted",
+                "integer": 2
+              }
+            ]
+          },
+          {
+            "name": "StorageTypeProto",
+            "enum_fields": [
+              {
+                "name": "DISK",
+                "integer": 1
+              },
+              {
+                "name": "SSD",
+                "integer": 2
+              },
+              {
+                "name": "ARCHIVE",
+                "integer": 3
+              },
+              {
+                "name": "RAM_DISK",
+                "integer": 4
+              },
+              {
+                "name": "PROVIDED",
+                "integer": 5
+              }
+            ]
+          },
+          {
+            "name": "ContainerReplicaProto.State",
+            "enum_fields": [
+              {
+                "name": "OPEN",
+                "integer": 1
+              },
+              {
+                "name": "CLOSING",
+                "integer": 2
+              },
+              {
+                "name": "QUASI_CLOSED",
+                "integer": 3
+              },
+              {
+                "name": "CLOSED",
+                "integer": 4
+              },
+              {
+                "name": "UNHEALTHY",
+                "integer": 5
+              },
+              {
+                "name": "INVALID",
+                "integer": 6
+              },
+              {
+                "name": "DELETED",
+                "integer": 7
+              }
+            ]
+          },
+          {
+            "name": "CommandStatus.Status",
+            "enum_fields": [
+              {
+                "name": "PENDING",
+                "integer": 1
+              },
+              {
+                "name": "EXECUTED",
+                "integer": 2
+              },
+              {
+                "name": "FAILED",
+                "integer": 3
+              }
+            ]
+          },
+          {
+            "name": "ContainerAction.Action",
+            "enum_fields": [
+              {
+                "name": "CLOSE",
+                "integer": 1
+              }
+            ]
+          },
+          {
+            "name": "ContainerAction.Reason",
+            "enum_fields": [
+              {
+                "name": "CONTAINER_FULL",
+                "integer": 1
+              },
+              {
+                "name": "CONTAINER_UNHEALTHY",
+                "integer": 2
+              }
+            ]
+          },
+          {
+            "name": "ClosePipelineInfo.Reason",
+            "enum_fields": [
+              {
+                "name": "PIPELINE_FAILED",
+                "integer": 1
+              },
+              {
+                "name": "PIPELINE_LOG_FAILED",
+                "integer": 2
+              },
+              {
+                "name": "STATEMACHINE_TRANSACTION_FAILED",
+                "integer": 3
+              }
+            ]
+          },
+          {
+            "name": "PipelineAction.Action",
+            "enum_fields": [
+              {
+                "name": "CLOSE",
+                "integer": 1
+              }
+            ]
+          },
+          {
+            "name": "SCMCommandProto.Type",
+            "enum_fields": [
+              {
+                "name": "reregisterCommand",
+                "integer": 1
+              },
+              {
+                "name": "deleteBlocksCommand",
+                "integer": 2
+              },
+              {
+                "name": "closeContainerCommand",
+                "integer": 3
+              },
+              {
+                "name": "deleteContainerCommand",
+                "integer": 4
+              },
+              {
+                "name": "replicateContainerCommand",
+                "integer": 5
+              },
+              {
+                "name": "createPipelineCommand",
+                "integer": 6
+              },
+              {
+                "name": "closePipelineCommand",
+                "integer": 7
+              }
+            ]
+          }
+        ],
+        "messages": [
+          {
+            "name": "SCMDatanodeRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "cmdType",
+                "type": "Type"
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "getVersionRequest",
+                "type": "SCMVersionRequestProto"
+              },
+              {
+                "id": 4,
+                "name": "registerRequest",
+                "type": "SCMRegisterRequestProto"
+              },
+              {
+                "id": 5,
+                "name": "sendHeartbeatRequest",
+                "type": "SCMHeartbeatRequestProto"
+              }
+            ]
+          },
+          {
+            "name": "SCMDatanodeResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "cmdType",
+                "type": "Type"
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "success",
+                "type": "bool",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "true"
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "name": "message",
+                "type": "string"
+              },
+              {
+                "id": 5,
+                "name": "status",
+                "type": "Status"
+              },
+              {
+                "id": 6,
+                "name": "getVersionResponse",
+                "type": "SCMVersionResponseProto"
+              },
+              {
+                "id": 7,
+                "name": "registerResponse",
+                "type": "SCMRegisteredResponseProto"
+              },
+              {
+                "id": 8,
+                "name": "sendHeartbeatResponse",
+                "type": "SCMHeartbeatResponseProto"
+              }
+            ]
+          },
+          {
+            "name": "SCMVersionRequestProto"
+          },
+          {
+            "name": "SCMVersionResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "softwareVersion",
+                "type": "uint32"
+              },
+              {
+                "id": 2,
+                "name": "keys",
+                "type": "hadoop.hdds.KeyValue",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "SCMRegisterRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "extendedDatanodeDetails",
+                "type": "ExtendedDatanodeDetailsProto"
+              },
+              {
+                "id": 2,
+                "name": "nodeReport",
+                "type": "NodeReportProto"
+              },
+              {
+                "id": 3,
+                "name": "containerReport",
+                "type": "ContainerReportsProto"
+              },
+              {
+                "id": 4,
+                "name": "pipelineReports",
+                "type": "PipelineReportsProto"
+              }
+            ]
+          },
+          {
+            "name": "SCMRegisteredResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "errorCode",
+                "type": "ErrorCode"
+              },
+              {
+                "id": 2,
+                "name": "datanodeUUID",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "clusterID",
+                "type": "string"
+              },
+              {
+                "id": 4,
+                "name": "addressList",
+                "type": "SCMNodeAddressList"
+              },
+              {
+                "id": 5,
+                "name": "hostname",
+                "type": "string"
+              },
+              {
+                "id": 6,
+                "name": "ipAddress",
+                "type": "string"
+              },
+              {
+                "id": 7,
+                "name": "networkName",
+                "type": "string"
+              },
+              {
+                "id": 8,
+                "name": "networkLocation",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "SCMHeartbeatRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "datanodeDetails",
+                "type": "DatanodeDetailsProto"
+              },
+              {
+                "id": 2,
+                "name": "nodeReport",
+                "type": "NodeReportProto"
+              },
+              {
+                "id": 3,
+                "name": "containerReport",
+                "type": "ContainerReportsProto"
+              },
+              {
+                "id": 4,
+                "name": "incrementalContainerReport",
+                "type": "IncrementalContainerReportProto",
+                "is_repeated": true
+              },
+              {
+                "id": 5,
+                "name": "commandStatusReports",
+                "type": "CommandStatusReportsProto",
+                "is_repeated": true
+              },
+              {
+                "id": 6,
+                "name": "containerActions",
+                "type": "ContainerActionsProto"
+              },
+              {
+                "id": 7,
+                "name": "pipelineActions",
+                "type": "PipelineActionsProto"
+              },
+              {
+                "id": 8,
+                "name": "pipelineReports",
+                "type": "PipelineReportsProto"
+              }
+            ]
+          },
+          {
+            "name": "SCMHeartbeatResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "datanodeUUID",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "commands",
+                "type": "SCMCommandProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "SCMNodeAddressList",
+            "fields": [
+              {
+                "id": 1,
+                "name": "addressList",
+                "type": "string",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "NodeReportProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "storageReport",
+                "type": "StorageReportProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "StorageReportProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "storageUuid",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "storageLocation",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "capacity",
+                "type": "uint64",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "0"
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "name": "scmUsed",
+                "type": "uint64",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "0"
+                  }
+                ]
+              },
+              {
+                "id": 5,
+                "name": "remaining",
+                "type": "uint64",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "0"
+                  }
+                ]
+              },
+              {
+                "id": 6,
+                "name": "storageType",
+                "type": "StorageTypeProto",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "DISK"
+                  }
+                ]
+              },
+              {
+                "id": 7,
+                "name": "failed",
+                "type": "bool",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "false"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "ContainerReportsProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "reports",
+                "type": "ContainerReplicaProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "IncrementalContainerReportProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "report",
+                "type": "ContainerReplicaProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerReplicaProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64"
+              },
+              {
+                "id": 2,
+                "name": "state",
+                "type": "State"
+              },
+              {
+                "id": 3,
+                "name": "size",
+                "type": "int64"
+              },
+              {
+                "id": 4,
+                "name": "used",
+                "type": "int64"
+              },
+              {
+                "id": 5,
+                "name": "keyCount",
+                "type": "int64"
+              },
+              {
+                "id": 6,
+                "name": "readCount",
+                "type": "int64"
+              },
+              {
+                "id": 7,
+                "name": "writeCount",
+                "type": "int64"
+              },
+              {
+                "id": 8,
+                "name": "readBytes",
+                "type": "int64"
+              },
+              {
+                "id": 9,
+                "name": "writeBytes",
+                "type": "int64"
+              },
+              {
+                "id": 10,
+                "name": "finalhash",
+                "type": "string"
+              },
+              {
+                "id": 11,
+                "name": "deleteTransactionId",
+                "type": "int64"
+              },
+              {
+                "id": 12,
+                "name": "blockCommitSequenceId",
+                "type": "uint64"
+              },
+              {
+                "id": 13,
+                "name": "originNodeId",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "CommandStatusReportsProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "cmdStatus",
+                "type": "CommandStatus",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "CommandStatus",
+            "fields": [
+              {
+                "id": 1,
+                "name": "cmdId",
+                "type": "int64"
+              },
+              {
+                "id": 2,
+                "name": "status",
+                "type": "Status",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "PENDING"
+                  }
+                ]
+              },
+              {
+                "id": 3,
+                "name": "type",
+                "type": "SCMCommandProto.Type"
+              },
+              {
+                "id": 4,
+                "name": "msg",
+                "type": "string"
+              },
+              {
+                "id": 5,
+                "name": "blockDeletionAck",
+                "type": "ContainerBlocksDeletionACKProto"
+              }
+            ]
+          },
+          {
+            "name": "ContainerActionsProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerActions",
+                "type": "ContainerAction",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "ContainerAction",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64"
+              },
+              {
+                "id": 2,
+                "name": "action",
+                "type": "Action"
+              },
+              {
+                "id": 3,
+                "name": "reason",
+                "type": "Reason"
+              }
+            ]
+          },
+          {
+            "name": "PipelineReport",
+            "fields": [
+              {
+                "id": 1,
+                "name": "pipelineID",
+                "type": "PipelineID"
+              },
+              {
+                "id": 2,
+                "name": "isLeader",
+                "type": "bool"
+              },
+              {
+                "id": 3,
+                "name": "bytesWritten",
+                "type": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "PipelineReportsProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "pipelineReport",
+                "type": "PipelineReport",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "PipelineActionsProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "pipelineActions",
+                "type": "PipelineAction",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "ClosePipelineInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "pipelineID",
+                "type": "PipelineID"
+              },
+              {
+                "id": 3,
+                "name": "reason",
+                "type": "Reason"
+              },
+              {
+                "id": 4,
+                "name": "detailedReason",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "PipelineAction",
+            "fields": [
+              {
+                "id": 1,
+                "name": "action",
+                "type": "Action"
+              },
+              {
+                "id": 2,
+                "name": "closePipeline",
+                "type": "ClosePipelineInfo"
+              }
+            ]
+          },
+          {
+            "name": "SCMCommandProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "commandType",
+                "type": "Type"
+              },
+              {
+                "id": 2,
+                "name": "reregisterCommandProto",
+                "type": "ReregisterCommandProto"
+              },
+              {
+                "id": 3,
+                "name": "deleteBlocksCommandProto",
+                "type": "DeleteBlocksCommandProto"
+              },
+              {
+                "id": 4,
+                "name": "closeContainerCommandProto",
+                "type": "CloseContainerCommandProto"
+              },
+              {
+                "id": 5,
+                "name": "deleteContainerCommandProto",
+                "type": "DeleteContainerCommandProto"
+              },
+              {
+                "id": 6,
+                "name": "replicateContainerCommandProto",
+                "type": "ReplicateContainerCommandProto"
+              },
+              {
+                "id": 7,
+                "name": "createPipelineCommandProto",
+                "type": "CreatePipelineCommandProto"
+              },
+              {
+                "id": 8,
+                "name": "closePipelineCommandProto",
+                "type": "ClosePipelineCommandProto"
+              }
+            ]
+          },
+          {
+            "name": "ReregisterCommandProto"
+          },
+          {
+            "name": "DeleteBlocksCommandProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "deletedBlocksTransactions",
+                "type": "DeletedBlocksTransaction",
+                "is_repeated": true
+              },
+              {
+                "id": 3,
+                "name": "cmdId",
+                "type": "int64"
+              }
+            ]
+          },
+          {
+            "name": "DeletedBlocksTransaction",
+            "fields": [
+              {
+                "id": 1,
+                "name": "txID",
+                "type": "int64"
+              },
+              {
+                "id": 2,
+                "name": "containerID",
+                "type": "int64"
+              },
+              {
+                "id": 3,
+                "name": "localID",
+                "type": "int64",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "count",
+                "type": "int32"
+              }
+            ]
+          },
+          {
+            "name": "ContainerBlocksDeletionACKProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "results",
+                "type": "DeleteBlockTransactionResult",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "dnId",
+                "type": "string"
+              }
+            ],
+            "messages": [
+              {
+                "name": "DeleteBlockTransactionResult",
+                "fields": [
+                  {
+                    "id": 1,
+                    "name": "txID",
+                    "type": "int64"
+                  },
+                  {
+                    "id": 2,
+                    "name": "containerID",
+                    "type": "int64"
+                  },
+                  {
+                    "id": 3,
+                    "name": "success",
+                    "type": "bool"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "CloseContainerCommandProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64"
+              },
+              {
+                "id": 2,
+                "name": "pipelineID",
+                "type": "PipelineID"
+              },
+              {
+                "id": 3,
+                "name": "cmdId",
+                "type": "int64"
+              },
+              {
+                "id": 4,
+                "name": "force",
+                "type": "bool",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "false"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "DeleteContainerCommandProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64"
+              },
+              {
+                "id": 2,
+                "name": "cmdId",
+                "type": "int64"
+              },
+              {
+                "id": 3,
+                "name": "force",
+                "type": "bool",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "false"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "ReplicateContainerCommandProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64"
+              },
+              {
+                "id": 2,
+                "name": "sources",
+                "type": "DatanodeDetailsProto",
+                "is_repeated": true
+              },
+              {
+                "id": 3,
+                "name": "cmdId",
+                "type": "int64"
+              }
+            ]
+          },
+          {
+            "name": "CreatePipelineCommandProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "pipelineID",
+                "type": "PipelineID"
+              },
+              {
+                "id": 2,
+                "name": "type",
+                "type": "ReplicationType"
+              },
+              {
+                "id": 3,
+                "name": "factor",
+                "type": "ReplicationFactor"
+              },
+              {
+                "id": 4,
+                "name": "datanode",
+                "type": "DatanodeDetailsProto",
+                "is_repeated": true
+              },
+              {
+                "id": 5,
+                "name": "cmdId",
+                "type": "int64"
+              }
+            ]
+          },
+          {
+            "name": "ClosePipelineCommandProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "pipelineID",
+                "type": "PipelineID"
+              },
+              {
+                "id": 2,
+                "name": "cmdId",
+                "type": "int64"
+              }
+            ]
+          }
+        ],
+        "services": [
+          {
+            "name": "StorageContainerDatanodeProtocolService",
+            "rpcs": [
+              {
+                "name": "submitRequest",
+                "in_type": "SCMDatanodeRequest",
+                "out_type": "SCMDatanodeResponse"
+              }
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "path": "hdds.proto"
+          }
+        ],
+        "package": {
+          "name": "hadoop.hdds"
+        },
+        "options": [
+          {
+            "name": "java_package",
+            "value": "org.apache.hadoop.hdds.protocol.proto"
+          },
+          {
+            "name": "java_outer_classname",
+            "value": "StorageContainerDatanodeProtocolProtos"
+          },
+          {
+            "name": "java_generic_services",
+            "value": "true"
+          },
+          {
+            "name": "java_generate_equals_and_hash",
+            "value": "true"
+          }
+        ]
+      }
+    },
+    {
+      "protopath": "ScmServerProtocol.proto",
+      "def": {
+        "enums": [
+          {
+            "name": "Type",
+            "enum_fields": [
+              {
+                "name": "AllocateScmBlock",
+                "integer": 11
+              },
+              {
+                "name": "DeleteScmKeyBlocks",
+                "integer": 12
+              },
+              {
+                "name": "GetScmInfo",
+                "integer": 13
+              },
+              {
+                "name": "SortDatanodes",
+                "integer": 14
+              }
+            ]
+          },
+          {
+            "name": "Status",
+            "enum_fields": [
+              {
+                "name": "OK",
+                "integer": 1
+              },
+              {
+                "name": "FAILED_TO_LOAD_NODEPOOL",
+                "integer": 2
+              },
+              {
+                "name": "FAILED_TO_FIND_NODE_IN_POOL",
+                "integer": 3
+              },
+              {
+                "name": "FAILED_TO_FIND_HEALTHY_NODES",
+                "integer": 4
+              },
+              {
+                "name": "FAILED_TO_FIND_NODES_WITH_SPACE",
+                "integer": 5
+              },
+              {
+                "name": "FAILED_TO_FIND_SUITABLE_NODE",
+                "integer": 6
+              },
+              {
+                "name": "INVALID_CAPACITY",
+                "integer": 7
+              },
+              {
+                "name": "INVALID_BLOCK_SIZE",
+                "integer": 8
+              },
+              {
+                "name": "SAFE_MODE_EXCEPTION",
+                "integer": 9
+              },
+              {
+                "name": "FAILED_TO_LOAD_OPEN_CONTAINER",
+                "integer": 10
+              },
+              {
+                "name": "FAILED_TO_ALLOCATE_CONTAINER",
+                "integer": 11
+              },
+              {
+                "name": "FAILED_TO_CHANGE_CONTAINER_STATE",
+                "integer": 12
+              },
+              {
+                "name": "FAILED_TO_CHANGE_PIPELINE_STATE",
+                "integer": 13
+              },
+              {
+                "name": "CONTAINER_EXISTS",
+                "integer": 14
+              },
+              {
+                "name": "FAILED_TO_FIND_CONTAINER",
+                "integer": 15
+              },
+              {
+                "name": "FAILED_TO_FIND_CONTAINER_WITH_SPACE",
+                "integer": 16
+              },
+              {
+                "name": "BLOCK_EXISTS",
+                "integer": 17
+              },
+              {
+                "name": "FAILED_TO_FIND_BLOCK",
+                "integer": 18
+              },
+              {
+                "name": "IO_EXCEPTION",
+                "integer": 19
+              },
+              {
+                "name": "UNEXPECTED_CONTAINER_STATE",
+                "integer": 20
+              },
+              {
+                "name": "SCM_NOT_INITIALIZED",
+                "integer": 21
+              },
+              {
+                "name": "DUPLICATE_DATANODE",
+                "integer": 22
+              },
+              {
+                "name": "NO_SUCH_DATANODE",
+                "integer": 23
+              },
+              {
+                "name": "NO_REPLICA_FOUND",
+                "integer": 24
+              },
+              {
+                "name": "FAILED_TO_FIND_ACTIVE_PIPELINE",
+                "integer": 25
+              },
+              {
+                "name": "FAILED_TO_INIT_CONTAINER_PLACEMENT_POLICY",
+                "integer": 26
+              },
+              {
+                "name": "FAILED_TO_ALLOCATE_ENOUGH_BLOCKS",
+                "integer": 27
+              },
+              {
+                "name": "INTERNAL_ERROR",
+                "integer": 29
+              }
+            ]
+          },
+          {
+            "name": "DeleteScmBlockResult.Result",
+            "enum_fields": [
+              {
+                "name": "success",
+                "integer": 1
+              },
+              {
+                "name": "safeMode",
+                "integer": 2
+              },
+              {
+                "name": "errorNotFound",
+                "integer": 3
+              },
+              {
+                "name": "unknownFailure",
+                "integer": 4
+              }
+            ]
+          }
+        ],
+        "messages": [
+          {
+            "name": "SCMBlockLocationRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "cmdType",
+                "type": "Type"
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "userInfo",
+                "type": "UserInfo"
+              },
+              {
+                "id": 11,
+                "name": "allocateScmBlockRequest",
+                "type": "AllocateScmBlockRequestProto"
+              },
+              {
+                "id": 12,
+                "name": "deleteScmKeyBlocksRequest",
+                "type": "DeleteScmKeyBlocksRequestProto"
+              },
+              {
+                "id": 13,
+                "name": "getScmInfoRequest",
+                "type": "hadoop.hdds.GetScmInfoRequestProto"
+              },
+              {
+                "id": 14,
+                "name": "sortDatanodesRequest",
+                "type": "SortDatanodesRequestProto"
+              }
+            ]
+          },
+          {
+            "name": "SCMBlockLocationResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "cmdType",
+                "type": "Type"
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "success",
+                "type": "bool",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "true"
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "name": "message",
+                "type": "string"
+              },
+              {
+                "id": 5,
+                "name": "status",
+                "type": "Status"
+              },
+              {
+                "id": 6,
+                "name": "leaderOMNodeId",
+                "type": "string"
+              },
+              {
+                "id": 11,
+                "name": "allocateScmBlockResponse",
+                "type": "AllocateScmBlockResponseProto"
+              },
+              {
+                "id": 12,
+                "name": "deleteScmKeyBlocksResponse",
+                "type": "DeleteScmKeyBlocksResponseProto"
+              },
+              {
+                "id": 13,
+                "name": "getScmInfoResponse",
+                "type": "hadoop.hdds.GetScmInfoResponseProto"
+              },
+              {
+                "id": 14,
+                "name": "sortDatanodesResponse",
+                "type": "SortDatanodesResponseProto"
+              }
+            ]
+          },
+          {
+            "name": "UserInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "userName",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "remoteAddress",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "AllocateScmBlockRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "size",
+                "type": "uint64"
+              },
+              {
+                "id": 2,
+                "name": "numBlocks",
+                "type": "uint32"
+              },
+              {
+                "id": 3,
+                "name": "type",
+                "type": "ReplicationType"
+              },
+              {
+                "id": 4,
+                "name": "factor",
+                "type": "hadoop.hdds.ReplicationFactor"
+              },
+              {
+                "id": 5,
+                "name": "owner",
+                "type": "string"
+              },
+              {
+                "id": 7,
+                "name": "excludeList",
+                "type": "ExcludeListProto"
+              }
+            ]
+          },
+          {
+            "name": "DeleteScmKeyBlocksRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyBlocks",
+                "type": "KeyBlocks",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "KeyBlocks",
+            "fields": [
+              {
+                "id": 1,
+                "name": "key",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "blocks",
+                "type": "BlockID",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "DeleteScmKeyBlocksResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "results",
+                "type": "DeleteKeyBlocksResultProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "DeleteKeyBlocksResultProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "objectKey",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "blockResults",
+                "type": "DeleteScmBlockResult",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "DeleteScmBlockResult",
+            "fields": [
+              {
+                "id": 1,
+                "name": "result",
+                "type": "Result"
+              },
+              {
+                "id": 2,
+                "name": "blockID",
+                "type": "BlockID"
+              }
+            ]
+          },
+          {
+            "name": "AllocateBlockResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerBlockID",
+                "type": "ContainerBlockID"
+              },
+              {
+                "id": 2,
+                "name": "pipeline",
+                "type": "hadoop.hdds.Pipeline"
+              }
+            ]
+          },
+          {
+            "name": "AllocateScmBlockResponseProto",
+            "fields": [
+              {
+                "id": 3,
+                "name": "blocks",
+                "type": "AllocateBlockResponse",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "SortDatanodesRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "client",
+                "type": "string"
+              },
+              {
+                "id": 2,
+                "name": "nodeNetworkName",
+                "type": "string",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "SortDatanodesResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "node",
+                "type": "DatanodeDetailsProto",
+                "is_repeated": true
+              }
+            ]
+          }
+        ],
+        "services": [
+          {
+            "name": "ScmBlockLocationProtocolService",
+            "rpcs": [
+              {
+                "name": "send",
+                "in_type": "SCMBlockLocationRequest",
+                "out_type": "SCMBlockLocationResponse"
+              }
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "path": "hdds.proto"
+          }
+        ],
+        "package": {
+          "name": "hadoop.hdds.block"
+        },
+        "options": [
+          {
+            "name": "java_package",
+            "value": "org.apache.hadoop.hdds.protocol.proto"
+          },
+          {
+            "name": "java_outer_classname",
+            "value": "ScmBlockLocationProtocolProtos"
+          },
+          {
+            "name": "java_generic_services",
+            "value": "true"
+          },
+          {
+            "name": "java_generate_equals_and_hash",
+            "value": "true"
+          }
+        ]
+      }
+    },
+    {
+      "protopath": "ScmServerSecurityProtocol.proto",
+      "def": {
+        "enums": [
+          {
+            "name": "Type",
+            "enum_fields": [
+              {
+                "name": "GetDataNodeCertificate",
+                "integer": 1
+              },
+              {
+                "name": "GetOMCertificate",
+                "integer": 2
+              },
+              {
+                "name": "GetCertificate",
+                "integer": 3
+              },
+              {
+                "name": "GetCACertificate",
+                "integer": 4
+              }
+            ]
+          },
+          {
+            "name": "Status",
+            "enum_fields": [
+              {
+                "name": "OK",
+                "integer": 1
+              }
+            ]
+          },
+          {
+            "name": "SCMGetCertResponseProto.ResponseCode",
+            "enum_fields": [
+              {
+                "name": "success",
+                "integer": 1
+              },
+              {
+                "name": "authenticationFailed",
+                "integer": 2
+              },
+              {
+                "name": "invalidCSR",
+                "integer": 3
+              }
+            ]
+          }
+        ],
+        "messages": [
+          {
+            "name": "SCMSecurityRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "cmdType",
+                "type": "Type"
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "getDataNodeCertRequest",
+                "type": "SCMGetDataNodeCertRequestProto"
+              },
+              {
+                "id": 4,
+                "name": "getOMCertRequest",
+                "type": "SCMGetOMCertRequestProto"
+              },
+              {
+                "id": 5,
+                "name": "getCertificateRequest",
+                "type": "SCMGetCertificateRequestProto"
+              },
+              {
+                "id": 6,
+                "name": "getCACertificateRequest",
+                "type": "SCMGetCACertificateRequestProto"
+              }
+            ]
+          },
+          {
+            "name": "SCMSecurityResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "cmdType",
+                "type": "Type"
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "success",
+                "type": "bool",
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "true"
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "name": "message",
+                "type": "string"
+              },
+              {
+                "id": 5,
+                "name": "status",
+                "type": "Status"
+              },
+              {
+                "id": 6,
+                "name": "getCertResponseProto",
+                "type": "SCMGetCertResponseProto"
+              }
+            ]
+          },
+          {
+            "name": "SCMGetDataNodeCertRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "datanodeDetails",
+                "type": "DatanodeDetailsProto"
+              },
+              {
+                "id": 2,
+                "name": "CSR",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "SCMGetOMCertRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "omDetails",
+                "type": "OzoneManagerDetailsProto"
+              },
+              {
+                "id": 2,
+                "name": "CSR",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "SCMGetCertificateRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "certSerialId",
+                "type": "string"
+              }
+            ]
+          },
+          {
+            "name": "SCMGetCACertificateRequestProto"
+          },
+          {
+            "name": "SCMGetCertResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "responseCode",
+                "type": "ResponseCode"
+              },
+              {
+                "id": 2,
+                "name": "x509Certificate",
+                "type": "string"
+              },
+              {
+                "id": 3,
+                "name": "x509CACertificate",
+                "type": "string"
+              }
+            ]
+          }
+        ],
+        "services": [
+          {
+            "name": "SCMSecurityProtocolService",
+            "rpcs": [
+              {
+                "name": "submitRequest",
+                "in_type": "SCMSecurityRequest",
+                "out_type": "SCMSecurityResponse"
+              }
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "path": "hdds.proto"
+          }
+        ],
+        "package": {
+          "name": "hadoop.hdds.security"
+        },
+        "options": [
+          {
+            "name": "java_package",
+            "value": "org.apache.hadoop.hdds.protocol.proto"
+          },
+          {
+            "name": "java_outer_classname",
+            "value": "SCMSecurityProtocolProtos"
+          },
+          {
+            "name": "java_generic_services",
+            "value": "true"
+          },
+          {
+            "name": "java_generate_equals_and_hash",
+            "value": "true"
+          }
+        ]
+      }
+    }
+  ]
+}

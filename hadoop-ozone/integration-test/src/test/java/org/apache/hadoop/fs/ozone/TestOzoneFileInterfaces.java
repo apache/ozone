@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -97,7 +98,8 @@ public class TestOzoneFileInterfaces {
    */
   @Parameters
   public static Collection<Object[]> data() {
-    return Arrays.asList(new Object[][] {{false, true}, {true, false}});
+    return Arrays.asList(new Object[][] {{false, true, true},
+        {true, false, false}});
   }
 
   private boolean setDefaultFs;
@@ -118,10 +120,13 @@ public class TestOzoneFileInterfaces {
 
   private OMMetrics omMetrics;
 
+  private boolean enableFileSystemPaths;
+
   public TestOzoneFileInterfaces(boolean setDefaultFs,
-      boolean useAbsolutePath) {
+      boolean useAbsolutePath, boolean enabledFileSystemPaths) {
     this.setDefaultFs = setDefaultFs;
     this.useAbsolutePath = useAbsolutePath;
+    this.enableFileSystemPaths = enabledFileSystemPaths;
     GlobalStorageStatistics.INSTANCE.reset();
   }
 
@@ -131,6 +136,8 @@ public class TestOzoneFileInterfaces {
     bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
 
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+        enableFileSystemPaths);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
@@ -350,15 +357,18 @@ public class TestOzoneFileInterfaces {
     String dirPath = RandomStringUtils.randomAlphanumeric(5);
     Path path = createPath("/" + dirPath);
     paths.add(path);
+
+    long mkdirs = statistics.getLong(
+        StorageStatistics.CommonStatisticNames.OP_MKDIRS);
     assertTrue("Makedirs returned with false for the path " + path,
         fs.mkdirs(path));
+    assertCounter(++mkdirs, StorageStatistics.CommonStatisticNames.OP_MKDIRS);
 
     long listObjects = statistics.getLong(Statistic.OBJECTS_LIST.getSymbol());
     long omListStatus = omMetrics.getNumListStatus();
     FileStatus[] statusList = fs.listStatus(createPath("/"));
     assertEquals(1, statusList.length);
-    assertEquals(++listObjects,
-        statistics.getLong(Statistic.OBJECTS_LIST.getSymbol()).longValue());
+    assertCounter(++listObjects, Statistic.OBJECTS_LIST.getSymbol());
     assertEquals(++omListStatus, omMetrics.getNumListStatus());
     assertEquals(fs.getFileStatus(path), statusList[0]);
 
@@ -367,11 +377,11 @@ public class TestOzoneFileInterfaces {
     paths.add(path);
     assertTrue("Makedirs returned with false for the path " + path,
         fs.mkdirs(path));
+    assertCounter(++mkdirs, StorageStatistics.CommonStatisticNames.OP_MKDIRS);
 
     statusList = fs.listStatus(createPath("/"));
     assertEquals(2, statusList.length);
-    assertEquals(++listObjects,
-        statistics.getLong(Statistic.OBJECTS_LIST.getSymbol()).longValue());
+    assertCounter(++listObjects, Statistic.OBJECTS_LIST.getSymbol());
     assertEquals(++omListStatus, omMetrics.getNumListStatus());
     for (Path p : paths) {
       assertTrue(Arrays.asList(statusList).contains(fs.getFileStatus(p)));
@@ -520,5 +530,9 @@ public class TestOzoneFileInterfaces {
     assertEquals(0, status.getLen());
 
     return status;
+  }
+
+  private void assertCounter(long value, String key) {
+    assertEquals(value, statistics.getLong(key).longValue());
   }
 }

@@ -109,8 +109,8 @@ public class SCMBlockDeletingService extends BackgroundService {
     DatanodeDetails dnDetails = deletionStatusList.getDatanodeDetails();
     for (PendingDeleteStatusList.PendingDeleteStatus deletionStatus :
         deletionStatusList.getPendingDeleteStatuses()) {
-      LOG.info(
-          "Block deletion txnID mismatch in datanode {} for containerID {}."
+      LOG.debug(
+          "Block deletion txnID lagging in datanode {} for containerID {}."
               + " Datanode delete txnID: {}, SCM txnID: {}",
           dnDetails.getUuid(), deletionStatus.getContainerId(),
           deletionStatus.getDnDeleteTransactionId(),
@@ -118,8 +118,7 @@ public class SCMBlockDeletingService extends BackgroundService {
     }
   }
 
-  private class DeletedBlockTransactionScanner
-      implements BackgroundTask<EmptyTaskResult> {
+  private class DeletedBlockTransactionScanner implements BackgroundTask {
 
     @Override
     public int getPriority() {

@@ -22,18 +22,21 @@ weight: 30
 {{< requirements >}}
  * Java 1.8
  * Maven
- * Protoc (2.5)
 {{< /requirements >}}
 
-<div class="alert alert-info" role="alert">This is a guide on how to build the ozone sources.  If you are <font
+<div class="alert alert-info" role="alert">
+
+This is a guide on how to build the ozone sources.  If you are <font
 color="red">not</font>
-planning to build sources yourself, you can safely skip this page.</div>
+planning to build sources yourself, you can safely skip this page.
+
+</div>
 
 If you are a Hadoop ninja, and wise in the ways of Apache, you already know
 that a real Apache release is a source release.
 
-If you want to build from sources, Please untar the source tarball and run
-the ozone build command. This instruction assumes that you have all the
+If you want to build from sources, Please untar the source tarball (or clone the latest code 
+from the [git repository](https://github.com/apache/hadoop-ozone)) and run the ozone build command. This instruction assumes that you have all the
 dependencies to build Hadoop on your build machine. If you need instructions
 on how to build Hadoop, please look at the Apache Hadoop Website.
 
@@ -41,28 +44,27 @@ on how to build Hadoop, please look at the Apache Hadoop Website.
 mvn clean package -DskipTests=true
 ```
 
-This will build an ozone-\<version\>.tar.gz in your `hadoop-ozone/dist/target` directory.
+This will build an `ozone-\<version\>` directory in your `hadoop-ozone/dist/target` directory.
 
 You can copy this tarball and use this instead of binary artifacts that are
 provided along with the official release.
 
+To create tar file distribution, use the `-Pdist` profile:
+
+```bash
+mvn clean package -DskipTests=true -Pdist
+```
+
+## How to run Ozone from build
+
+When you have the new distribution, you can start a local cluster [with docker-compose]({{< ref "start/RunningViaDocker.md">}}).
+
+```bash
+cd hadoop-ozone/dist/target/ozone-X.X.X...
+cd compose/ozone
+docker-compose up -d
+```
+
 ## How to test the build
 
-You can run the acceptance tests in the hadoop-ozone directory to make sure
-that  your build is functional. To launch the acceptance tests, please follow
- the instructions in the **README.md** in the `smoketest` directory.
-
-```bash
-cd smoketest
-./test.sh
-```
-
- You can also execute only a minimal subset of the tests:
-
-```bash
-cd smoketest
-./test.sh --env ozone basic
-```
-
-Acceptance tests will start a small ozone cluster and verify that ozone shell and ozone file
- system is fully functional.
+`compose` subfolder contains multiple type of example setup (secure, non-secure, HA, Yarn). They can be tested with the help of [robotframework](http://robotframework.org/) with executing `test.sh` in any of the directories.

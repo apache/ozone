@@ -369,6 +369,10 @@ message ChunkInfo {
   required ChecksumData checksumData =5;
 }
 
+message ChunkInfoList {
+    repeated ChunkInfo chunks = 1;
+}
+
 message ChecksumData {
   required ChecksumType type = 1;
   required uint32 bytesPerChecksum = 2;

@@ -63,17 +63,17 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
     Connection conn = dataSource.getConnection();
     dslContext = DSL.using(conn);
     if (!TABLE_EXISTS_CHECK.test(conn, FILE_COUNT_BY_SIZE_TABLE_NAME)) {
-      createFileSizeCountTable(conn);
+      createFileSizeCountTable();
     }
     if (!TABLE_EXISTS_CHECK.test(conn, CLUSTER_GROWTH_DAILY_TABLE_NAME)) {
-      createClusterGrowthTable(conn);
+      createClusterGrowthTable();
     }
   }
 
-  private void createClusterGrowthTable(Connection conn) {
+  private void createClusterGrowthTable() {
     dslContext.createTableIfNotExists(CLUSTER_GROWTH_DAILY_TABLE_NAME)
-        .column("timestamp", SQLDataType.TIMESTAMP)
-        .column("datanode_id", SQLDataType.INTEGER)
+        .column("timestamp", SQLDataType.TIMESTAMP.nullable(false))
+        .column("datanode_id", SQLDataType.INTEGER.nullable(false))
         .column("datanode_host", SQLDataType.VARCHAR(1024))
         .column("rack_id", SQLDataType.VARCHAR(1024))
         .column("available_size", SQLDataType.BIGINT)
@@ -85,17 +85,22 @@ public class UtilizationSchemaDefinition implements ReconSchemaDefinition {
         .execute();
   }
 
-  private void createFileSizeCountTable(Connection conn) {
+  private void createFileSizeCountTable() {
     dslContext.createTableIfNotExists(FILE_COUNT_BY_SIZE_TABLE_NAME)
-        .column("volume", SQLDataType.VARCHAR(64))
-        .column("bucket", SQLDataType.VARCHAR(64))
-        .column("file_size", SQLDataType.BIGINT)
+        .column("volume", SQLDataType.VARCHAR(64).nullable(false))
+        .column("bucket", SQLDataType.VARCHAR(64).nullable(false))
+        .column("file_size", SQLDataType.BIGINT.nullable(false))
         .column("count", SQLDataType.BIGINT)
         .constraint(DSL.constraint("pk_volume_bucket_file_size")
             .primaryKey("volume", "bucket", "file_size"))
         .execute();
   }
 
+  /**
+   * Returns the DSL context.
+   *
+   * @return dslContext
+   */
   public DSLContext getDSLContext() {
     return dslContext;
   }

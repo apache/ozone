@@ -21,7 +21,10 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Collection;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -30,10 +33,10 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 
+import com.google.common.annotations.VisibleForTesting;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_HTTP_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RPC_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
-
 import org.apache.http.client.utils.URIBuilder;
 
 /**
@@ -42,6 +45,7 @@ import org.apache.http.client.utils.URIBuilder;
 public class OzoneAddress {
 
   private static final int DEFAULT_OZONE_PORT = 50070;
+
   private static final String EMPTY_HOST = "___DEFAULT___";
 
   private URI ozoneURI;
@@ -85,7 +89,32 @@ public class OzoneAddress {
 
   }
 
-  public OzoneClient createClient(OzoneConfiguration conf)
+  @VisibleForTesting
+  protected OzoneClient createRpcClient(ConfigurationSource conf)
+      throws IOException {
+    return OzoneClientFactory.getRpcClient(conf);
+  }
+
+  @VisibleForTesting
+  protected OzoneClient createRpcClientFromHostPort(
+      String host,
+      int port,
+      MutableConfigurationSource conf
+  )
+      throws IOException {
+    return OzoneClientFactory.getRpcClient(ozoneURI.getHost(), port, conf);
+  }
+
+  @VisibleForTesting
+  protected OzoneClient createRpcClientFromServiceId(
+      String serviceId,
+      MutableConfigurationSource conf
+  )
+      throws IOException {
+    return OzoneClientFactory.getRpcClient(serviceId, conf);
+  }
+
+  public OzoneClient createClient(MutableConfigurationSource conf)
       throws IOException, OzoneClientException {
     OzoneClient client;
     String scheme = ozoneURI.getScheme();
@@ -96,50 +125,62 @@ public class OzoneAddress {
       throw new UnsupportedOperationException(
           "REST schema is not supported any more. Please use AWS S3 protocol "
               + "if you need REST interface.");
-    } else if (scheme.equals(OZONE_RPC_SCHEME)) {
-      if (ozoneURI.getHost() != null && !ozoneURI.getAuthority()
-          .equals(EMPTY_HOST)) {
-        if (OmUtils.isOmHAServiceId(conf, ozoneURI.getHost())) {
-          // When host is an HA service ID
-          if (ozoneURI.getPort() != -1) {
-            throw new OzoneClientException(
-                "Port " + ozoneURI.getPort() + " specified in URI but host '"
-                    + ozoneURI.getHost() + "' is a logical (HA) OzoneManager "
-                    + "and does not use port information.");
-          }
-          client = OzoneClientFactory.getRpcClient(ozoneURI.getHost(), conf);
-        } else if (ozoneURI.getPort() == -1) {
-          client = OzoneClientFactory.getRpcClient(ozoneURI.getHost(),
-              OmUtils.getOmRpcPort(conf), conf);
-        } else {
-          client = OzoneClientFactory
-              .getRpcClient(ozoneURI.getHost(), ozoneURI.getPort(), conf);
-        }
-      } else {
-        // When host is not specified
-        if (OmUtils.isServiceIdsDefined(conf)) {
-          throw new OzoneClientException("Service ID or host name must not"
-              + " be omitted when ozone.om.service.ids is defined.");
-        }
-        client = OzoneClientFactory.getRpcClient(conf);
-      }
-    } else {
+    } else if (!scheme.equals(OZONE_RPC_SCHEME)) {
       throw new OzoneClientException(
-          "Invalid URI, unknown protocol scheme: " + scheme);
+          "Invalid URI, unknown protocol scheme: " + scheme + ". Use "
+              + OZONE_RPC_SCHEME + ":// as the scheme");
     }
+
+    if (ozoneURI.getHost() != null && !ozoneURI.getAuthority()
+        .equals(EMPTY_HOST)) {
+      if (OmUtils.isOmHAServiceId(conf, ozoneURI.getHost())) {
+        // When host is an HA service ID
+        if (ozoneURI.getPort() != -1) {
+          throw new OzoneClientException(
+              "Port " + ozoneURI.getPort() + " specified in URI but host '"
+                  + ozoneURI.getHost() + "' is a logical (HA) OzoneManager "
+                  + "and does not use port information.");
+        }
+        client = createRpcClient(conf);
+      } else if (ozoneURI.getPort() == -1) {
+        client = createRpcClientFromHostPort(ozoneURI.getHost(),
+            OmUtils.getOmRpcPort(conf), conf);
+      } else {
+        client = createRpcClientFromHostPort(ozoneURI.getHost(),
+            ozoneURI.getPort(), conf);
+      }
+    } else {// When host is not specified
+
+      Collection<String> omServiceIds = conf.getTrimmedStringCollection(
+          OZONE_OM_SERVICE_IDS_KEY);
+
+      if (omServiceIds.size() > 1) {
+        throw new OzoneClientException("Service ID or host name must not"
+            + " be omitted when multiple ozone.om.service.ids is defined.");
+      } else if (omServiceIds.size() == 1) {
+        client = createRpcClientFromServiceId(omServiceIds.iterator().next(),
+            conf);
+      } else {
+        client = createRpcClient(conf);
+      }
+    }
+
     return client;
   }
 
   /**
    * Create OzoneClient for S3Commands.
+   *
    * @param conf
    * @param omServiceID
    * @return OzoneClient
    * @throws IOException
    * @throws OzoneClientException
    */
-  public OzoneClient  createClientForS3Commands(OzoneConfiguration conf,
-      String omServiceID)
+  public OzoneClient createClientForS3Commands(
+      OzoneConfiguration conf,
+      String omServiceID
+  )
       throws IOException, OzoneClientException {
     if (omServiceID != null) {
       // OM HA cluster

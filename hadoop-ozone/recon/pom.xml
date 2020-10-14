@@ -18,7 +18,7 @@
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-ozone</artifactId>
-    <version>0.6.0-SNAPSHOT</version>
+    <version>1.1.0-SNAPSHOT</version>
   </parent>
   <name>Apache Hadoop Ozone Recon</name>
   <modelVersion>4.0.0</modelVersion>
@@ -110,6 +110,7 @@
             </goals>
             <configuration>
               <arguments>pnpm config set store-dir ~/.pnpm-store</arguments>
+              <npmInheritsProxyConfigFromMaven>false</npmInheritsProxyConfigFromMaven>
             </configuration>
           </execution>
           <execution>
@@ -119,6 +120,7 @@
             </goals>
             <configuration>
               <arguments>pnpm install</arguments>
+              <npmInheritsProxyConfigFromMaven>false</npmInheritsProxyConfigFromMaven>
             </configuration>
           </execution>
           <execution>
@@ -128,6 +130,7 @@
             </goals>
             <configuration>
               <arguments>pnpm run build</arguments>
+              <npmInheritsProxyConfigFromMaven>false</npmInheritsProxyConfigFromMaven>
             </configuration>
           </execution>
         </executions>

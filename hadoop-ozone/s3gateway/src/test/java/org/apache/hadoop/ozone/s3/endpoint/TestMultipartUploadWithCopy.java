@@ -99,16 +99,19 @@ public class TestMultipartUploadWithCopy {
 
     // Upload parts
     String content = "Multipart Upload 1";
-    int partNumber = 1;
 
-    Part part1 = uploadPart(KEY, uploadID, partNumber, content);
+    Part part1 = uploadPart(KEY, uploadID, 1, content);
     partsList.add(part1);
 
-    partNumber = 2;
     Part part2 =
-        uploadPartWithCopy(KEY, uploadID, partNumber,
+        uploadPartWithCopy(KEY, uploadID, 2,
             OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, null);
     partsList.add(part2);
+
+    Part part3 =
+        uploadPartWithCopy(KEY, uploadID, 3,
+            OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY, "bytes=0-3");
+    partsList.add(part3);
 
     // complete multipart upload
     CompleteMultipartUploadRequest completeMultipartUploadRequest = new
@@ -122,7 +125,9 @@ public class TestMultipartUploadWithCopy {
         CLIENT.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET);
     try (InputStream is = bucket.readKey(KEY)) {
       String keyContent = new Scanner(is).useDelimiter("\\A").next();
-      Assert.assertEquals(content + EXISTING_KEY_CONTENT, keyContent);
+      Assert.assertEquals(
+          content + EXISTING_KEY_CONTENT + EXISTING_KEY_CONTENT.substring(0, 4),
+          keyContent);
     }
   }
 
