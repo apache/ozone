@@ -35,7 +35,6 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -350,35 +349,11 @@ public class SCMNodeManager implements NodeManager {
             datanodeDetails.toString());
       }
     }
-    registerInitialDatanodeOpState(datanodeDetails);
 
     return RegisteredCommand.newBuilder().setErrorCode(ErrorCode.success)
         .setDatanode(datanodeDetails)
         .setClusterID(this.scmStorageConfig.getClusterID())
         .build();
-  }
-
-  /**
-   * When a node registers with SCM, the operational state stored on the
-   * datanode is the source of truth. Therefore, if the datanode reports
-   * anything other than IN_SERVICE on registration, the state in SCM should be
-   * updated to reflect the datanode state.
-   * @param dn
-   */
-  private void registerInitialDatanodeOpState(DatanodeDetails dn) {
-    try {
-      HddsProtos.NodeOperationalState dnOpState = dn.getPersistedOpState();
-      if (dnOpState != NodeOperationalState.IN_SERVICE) {
-        LOG.info("Updating nodeOperationalState on registration as the " +
-            "datanode has a persisted state of {} and expiry of {}",
-            dnOpState, dn.getPersistedOpStateExpiryEpochSec());
-        setNodeOperationalState(dn, dnOpState,
-            dn.getPersistedOpStateExpiryEpochSec());
-      }
-    } catch (NodeNotFoundException e) {
-      LOG.error("Unable to find the node when setting the operational state",
-          e);
-    }
   }
 
   /**

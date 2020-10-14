@@ -476,6 +476,9 @@ public class DatanodeDetails extends NodeImpl implements
       this.setupTime = details.getSetupTime();
       this.revision = details.getRevision();
       this.buildDate = details.getBuildDate();
+      this.persistedOpState = details.getPersistedOpState();
+      this.persistedOpStateExpiryEpochSec =
+          details.getPersistedOpStateExpiryEpochSec();
       return this;
     }
 

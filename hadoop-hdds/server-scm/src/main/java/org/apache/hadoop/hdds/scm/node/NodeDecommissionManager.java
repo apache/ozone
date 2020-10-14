@@ -233,6 +233,22 @@ public class NodeDecommissionManager {
     }
   }
 
+  /**
+   * If a SCM is restarted, then upon re-registration the datanode will already
+   * be in DECOMMISSIONING or ENTERING_MAINTENANCE state. In that case, it
+   * needs to be added back into the monitor to track its progress.
+   * @param dn Datanode to add back to tracking.
+   * @throws NodeNotFoundException
+   */
+  public synchronized void continueAdminForNode(DatanodeDetails dn)
+      throws NodeNotFoundException {
+    NodeOperationalState opState = getNodeStatus(dn).getOperationalState();
+    if (opState == NodeOperationalState.DECOMMISSIONING
+        || opState == NodeOperationalState.ENTERING_MAINTENANCE) {
+      monitor.startMonitoring(dn, 0);
+    }
+  }
+
   public synchronized void startDecommission(DatanodeDetails dn)
       throws NodeNotFoundException, InvalidNodeStateException {
     NodeStatus nodeStatus = getNodeStatus(dn);

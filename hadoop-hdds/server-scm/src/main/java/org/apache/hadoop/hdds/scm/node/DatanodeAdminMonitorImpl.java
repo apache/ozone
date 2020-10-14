@@ -294,6 +294,9 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
             "in containerManager", cid, dn);
       }
     }
+    LOG.info("{} has {} sufficientlyReplicated, {} underReplicated and {} " +
+        "unhealthy containers",
+        dn, sufficientlyReplicated, underReplicated, unhealthy);
     return underReplicated == 0 && unhealthy == 0;
   }
 
