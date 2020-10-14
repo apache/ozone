@@ -82,7 +82,7 @@ public class OzoneClientProducer {
       if (OzoneSecurityUtil.isSecurityEnabled(config)) {
         LOG.debug("Creating s3 auth info for client.");
         try {
-
+          validateAccessId(awsAccessId);
           OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
           identifier.setTokenType(S3AUTHINFO);
           identifier.setStrToSign(signatureParser.getStringToSign());
@@ -113,6 +113,13 @@ public class OzoneClientProducer {
     } else {
       // As in HA case, we need to pass om service ID.
       return OzoneClientFactory.getRpcClient(omServiceID, ozoneConfiguration);
+    }
+  }
+
+  // ONLY validate aws access id when needed.
+  private void validateAccessId(String awsAccessId) throws Exception {
+    if (awsAccessId == null || awsAccessId.equals("")) {
+      throw S3_AUTHINFO_CREATION_ERROR;
     }
   }
 

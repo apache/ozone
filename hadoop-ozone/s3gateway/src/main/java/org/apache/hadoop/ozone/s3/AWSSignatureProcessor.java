@@ -42,6 +42,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.header.AuthorizationHeaderV2;
 import org.apache.hadoop.ozone.s3.header.AuthorizationHeaderV4;
@@ -108,23 +109,29 @@ public class AWSSignatureProcessor implements SignatureProcessor {
 
     this.method = context.getMethod();
     String authHeader = headers.get(AUTHORIZATION_HEADER);
-    String[] split = authHeader.split(" ");
-    if (split[0].equals(AuthorizationHeaderV2.IDENTIFIER)) {
-      if (v2Header == null) {
-        v2Header = new AuthorizationHeaderV2(authHeader);
+    if (authHeader != null) {
+      String[] split = authHeader.split(" ");
+      if (split[0].equals(AuthorizationHeaderV2.IDENTIFIER)) {
+        if (v2Header == null) {
+          v2Header = new AuthorizationHeaderV2(authHeader);
+        }
+      } else {
+        if (v4Header == null) {
+          v4Header = new AuthorizationHeaderV4(authHeader);
+        }
+        parse();
       }
-    } else {
-      if (v4Header == null) {
-        v4Header = new AuthorizationHeaderV4(authHeader);
-      }
-      parse();
+    } else { // no auth header
+      v4Header = null;
+      v2Header = null;
     }
   }
 
 
-  public void parse() throws Exception {
-    StringBuilder strToSign = new StringBuilder();
+  private void parse() throws Exception {
+    Preconditions.checkNotNull(v4Header);
 
+    StringBuilder strToSign = new StringBuilder();
     // According to AWS sigv4 documentation, authorization header should be
     // in following format.
     // Authorization: algorithm Credential=access key ID/credential scope,
@@ -167,7 +174,9 @@ public class AWSSignatureProcessor implements SignatureProcessor {
   }
 
   @VisibleForTesting
-  public String buildCanonicalRequest() throws OS3Exception {
+  protected String buildCanonicalRequest() throws OS3Exception {
+    Preconditions.checkNotNull(v4Header);
+
     Iterable<String> parts = split("/", uri);
     List<String> encParts = new ArrayList<>();
     for (String p : parts) {
