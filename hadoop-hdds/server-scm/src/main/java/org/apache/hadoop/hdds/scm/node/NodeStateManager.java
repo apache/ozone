@@ -239,9 +239,30 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   public void addNode(DatanodeDetails datanodeDetails)
       throws NodeAlreadyExistsException {
-    nodeStateMap.addNode(datanodeDetails, new NodeStatus(
-        NodeOperationalState.IN_SERVICE, nodeHealthSM.getInitialState()));
+    NodeStatus newNodeStatus = newNodeStatus(datanodeDetails);
+    nodeStateMap.addNode(datanodeDetails, newNodeStatus);
     eventPublisher.fireEvent(SCMEvents.NEW_NODE, datanodeDetails);
+  }
+
+  /**
+   * When a node registers with SCM, the operational state stored on the
+   * datanode is the source of truth. Therefore, if the datanode reports
+   * anything other than IN_SERVICE on registration, the state in SCM should be
+   * updated to reflect the datanode state.
+   * @param dn DatanodeDetails reported by the datanode
+   */
+  private NodeStatus newNodeStatus(DatanodeDetails dn) {
+    HddsProtos.NodeOperationalState dnOpState = dn.getPersistedOpState();
+    if (dnOpState != NodeOperationalState.IN_SERVICE) {
+      LOG.info("Updating nodeOperationalState on registration as the " +
+              "datanode has a persisted state of {} and expiry of {}",
+          dnOpState, dn.getPersistedOpStateExpiryEpochSec());
+      return new NodeStatus(dnOpState, nodeHealthSM.getInitialState(),
+          dn.getPersistedOpStateExpiryEpochSec());
+    } else {
+      return new NodeStatus(
+          NodeOperationalState.IN_SERVICE, nodeHealthSM.getInitialState());
+    }
   }
 
   /**
