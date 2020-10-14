@@ -51,8 +51,6 @@ public class NewNodeHandler implements EventHandler<DatanodeDetails> {
   public void onMessage(DatanodeDetails datanodeDetails,
       EventPublisher publisher) {
     pipelineManager.triggerPipelineCreation();
-    HddsProtos.NodeOperationalState opState
-        = datanodeDetails.getPersistedOpState();
     if (datanodeDetails.getPersistedOpState()
         != HddsProtos.NodeOperationalState.IN_SERVICE) {
       try {
