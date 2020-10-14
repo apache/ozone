@@ -598,9 +598,12 @@ public class ObjectEndpoint extends EndpointBase {
           IOUtils.copy(body, ozoneOutputStream);
         }
       } finally {
-        IOUtils.closeQuietly(ozoneOutputStream);
+        if (ozoneOutputStream != null) {
+          ozoneOutputStream.close();
+        }
       }
 
+      assert ozoneOutputStream != null;
       OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
           ozoneOutputStream.getCommitUploadPartInfo();
       String eTag = omMultipartCommitUploadPartInfo.getPartName();
