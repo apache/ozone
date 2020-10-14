@@ -564,6 +564,7 @@ public class ObjectEndpoint extends EndpointBase {
 
       OmMultipartCommitUploadPartInfo omMultipartCommitUploadPartInfo =
           ozoneOutputStream.getCommitUploadPartInfo();
+      String eTag = omMultipartCommitUploadPartInfo.getPartName();
 
       if (copyHeader != null) {
         return Response.ok(new CopyPartResult(eTag)).build();
