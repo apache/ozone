@@ -25,6 +25,7 @@ import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
@@ -70,6 +71,14 @@ public class TestS3MultipartResponse {
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
+
+  @After
+  public void tearDown() {
+    if (batchOperation != null) {
+      batchOperation.close();
+    }
+  }
+
 
 
   public S3InitiateMultipartUploadResponse createS3InitiateMPUResponse(
