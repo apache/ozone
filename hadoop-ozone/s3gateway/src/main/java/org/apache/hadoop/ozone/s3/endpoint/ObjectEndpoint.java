@@ -600,6 +600,8 @@ public class ObjectEndpoint extends EndpointBase {
       } finally {
         if (ozoneOutputStream != null) {
           ozoneOutputStream.close();          
+        } else {
+          throw S3ErrorTable.newError(NO_SUCH_UPLOAD, uploadID);
         }
       }
 
