@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.util.Random;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
@@ -92,6 +93,7 @@ public class TestOpenKeyCleanupService {
   public void testOpenKeysWithoutBlockData() throws Exception {
     createOpenKeys(taskLimit);
     createExpiredOpenKeys(taskLimit);
+    Assert.assertEquals(taskLimit * 2, getAllOpenKeys().size());
 
     runService();
 
@@ -107,6 +109,7 @@ public class TestOpenKeyCleanupService {
 
     createOpenKeys(taskLimit);
     createExpiredOpenKeys(taskLimit, numBlocks);
+    Assert.assertEquals(taskLimit * 2, getAllOpenKeys().size());
 
     runService();
 
@@ -117,6 +120,7 @@ public class TestOpenKeyCleanupService {
   @Test
   public void testWithNoExpiredOpenKeys() throws Exception {
     createOpenKeys(taskLimit);
+    Assert.assertEquals(taskLimit, getAllOpenKeys().size());
     runService();
 
     // Tables should be unchanged since no keys are expired.
@@ -126,6 +130,7 @@ public class TestOpenKeyCleanupService {
 
   @Test
   public void testWithNoOpenKeys() throws Exception {
+    Assert.assertEquals(0, getAllOpenKeys().size());
     // Make sure service runs without errors.
     runService();
 
@@ -143,6 +148,8 @@ public class TestOpenKeyCleanupService {
     final int numKeys = taskLimit * (numServiceRuns + 1);
 
     createExpiredOpenKeys(numKeys, numBlocks);
+    Assert.assertEquals(numKeys, getAllOpenKeys().size());
+
     runService(numServiceRuns);
 
     // Two service runs should have reached their task limit.
@@ -159,6 +166,7 @@ public class TestOpenKeyCleanupService {
     // Open keys created from a non-existent volume and bucket.
     createExpiredOpenKeys(DEFAULT_VOLUME + "2", DEFAULT_BUCKET + "2",
         taskLimit, numBlocks);
+    Assert.assertEquals(taskLimit, getAllOpenKeys().size());
 
     runService();
 
@@ -181,6 +189,7 @@ public class TestOpenKeyCleanupService {
     // Open keys created from a non-existent volume and bucket.
     createExpiredOpenKeys(DEFAULT_VOLUME + "2", DEFAULT_BUCKET + "2",
         numKeysPerBucket, numBlocks);
+    Assert.assertEquals(numKeysPerBucket * 3, getAllOpenKeys().size());
 
     runService(numServiceRuns);
 
@@ -195,8 +204,16 @@ public class TestOpenKeyCleanupService {
   }
 
   private List<String> getAllOpenKeys() throws Exception {
-    TimeDuration longTime = TimeDuration.valueOf(Long.MAX_VALUE, TimeUnit.DAYS);
-    return keyManager.getExpiredOpenKeys(longTime, Integer.MAX_VALUE);
+    List<String> keys = new ArrayList<>();
+    List<? extends Table.KeyValue<String, OmKeyInfo>> keyPairs =
+        metadataManager.getOpenKeyTable().getRangeKVs(null,
+        Integer.MAX_VALUE);
+
+    for (Table.KeyValue<String, OmKeyInfo> keyPair : keyPairs) {
+      keys.add(keyPair.getKey());
+    }
+
+    return keys;
   }
 
   private List<String> getAllPendingDeleteKeys() throws Exception {
