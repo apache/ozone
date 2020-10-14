@@ -61,6 +61,7 @@ enum Type {
   AllocateBlock = 37;
   DeleteKeys = 38;
   RenameKeys = 39;
+  DeleteOpenKeys = 40;
 
   InitiateMultiPartUpload = 45;
   CommitMultiPartUpload = 46;
@@ -128,6 +129,7 @@ message OMRequest {
   optional AllocateBlockRequest             allocateBlockRequest           = 37;
   optional DeleteKeysRequest                deleteKeysRequest              = 38;
   optional RenameKeysRequest                renameKeysRequest              = 39;
+  optional DeleteOpenKeysRequest            deleteOpenKeysRequest          = 40;
 
   optional MultipartInfoInitiateRequest     initiateMultiPartUploadRequest = 45;
   optional MultipartCommitUploadPartRequest commitMultiPartUploadRequest   = 46;
@@ -927,6 +929,21 @@ message PurgeKeysRequest {
 
 message PurgeKeysResponse {
 
+}
+
+message DeleteOpenKeysRequest {
+  repeated OpenKeyBucket openKeysPerBucket = 1;
+}
+
+message OpenKeyBucket {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  repeated OpenKey keys = 3;
+}
+
+message OpenKey {
+  required string name = 1;
+  required uint64 clientID = 2;
 }
 
 message OMTokenProto {

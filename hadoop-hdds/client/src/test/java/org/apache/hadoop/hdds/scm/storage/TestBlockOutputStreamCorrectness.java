@@ -107,7 +107,7 @@ public class TestBlockOutputStreamCorrectness {
         32 * 1024 * 1024,
         bufferPool,
         ChecksumType.NONE,
-        256 * 1024);
+        256 * 1024, null);
     return outputStream;
   }
 

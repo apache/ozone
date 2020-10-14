@@ -42,7 +42,7 @@ public class BufferPool {
 
   public BufferPool(int bufferSize, int capacity) {
     this(bufferSize, capacity,
-        ByteStringConversion.createByteBufferConversion(null));
+        ByteStringConversion.createByteBufferConversion(false));
   }
 
   public BufferPool(int bufferSize, int capacity,
