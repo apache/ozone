@@ -235,7 +235,7 @@ public class LeaseManager<T> {
           }
         } catch (InterruptedException e) {
           // This means a new lease is added to activeLeases.
-          LOG.error("Execution was interrupted ", e);
+          LOG.debug("Execution was interrupted ", e);
           Thread.currentThread().interrupt();
         }
       }

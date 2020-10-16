@@ -130,9 +130,7 @@ public class DeletedBlockLogImpl
         DeletedBlocksTransaction block =
             scmMetadataStore.getDeletedBlocksTXTable().get(txID);
         if (block == null) {
-          // Should we make this an error ? How can we not find the deleted
-          // TXID?
-          LOG.warn("Deleted TXID {} not found.", txID);
+          LOG.debug("Deleted TXID {} not found.", txID);
           continue;
         }
         DeletedBlocksTransaction.Builder builder = block.toBuilder();
