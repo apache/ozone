@@ -64,6 +64,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import org.apache.hadoop.test.LambdaTestUtils;
+import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Rule;
@@ -100,17 +101,18 @@ public class TestOzoneFileSystem {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystem.class);
 
-  private boolean enabledFileSystemPaths;
+  protected boolean enabledFileSystemPaths;
 
-  private MiniOzoneCluster cluster;
-  private FileSystem fs;
-  private OzoneFileSystem o3fs;
-  private String volumeName;
-  private String bucketName;
-  private int rootItemCount;
-  private Trash trash;
+  protected MiniOzoneCluster cluster;
+  protected FileSystem fs;
+  protected OzoneFileSystem o3fs;
+  protected String volumeName;
+  protected String bucketName;
+  protected int rootItemCount;
+  protected Trash trash;
 
   public void testCreateFileShouldCheckExistenceOfDirWithSameName()
+
       throws Exception {
     /*
      * Op 1. create file -> /d1/d2/d3/d4/key2
@@ -153,6 +155,28 @@ public class TestOzoneFileSystem {
     try (FSDataOutputStream outputStream2 = fs.create(file3, false)) {
       fail("Should throw FileAlreadyExistsException");
     } catch (FileAlreadyExistsException fae) {
+      // ignore as its expected
+    }
+
+    // Directory
+    FileStatus fileStatus = fs.getFileStatus(parent);
+    assertEquals("FileStatus did not return the directory",
+            "/d1/d2/d3/d4", fileStatus.getPath().toUri().getPath());
+    assertTrue("FileStatus did not return the directory",
+            fileStatus.isDirectory());
+
+    // invalid sub directory
+    try{
+      fs.getFileStatus(new Path("/d1/d2/d3/d4/key3/invalid"));
+      fail("Should throw FileNotFoundException");
+    } catch (FileNotFoundException fnfe) {
+      // ignore as its expected
+    }
+    // invalid file name
+    try{
+      fs.getFileStatus(new Path("/d1/d2/d3/d4/invalidkey"));
+      fail("Should throw FileNotFoundException");
+    } catch (FileNotFoundException fnfe) {
       // ignore as its expected
     }
 
@@ -249,12 +273,10 @@ public class TestOzoneFileSystem {
     }
   }
 
-  private void setupOzoneFileSystem()
+  protected void setupOzoneFileSystem()
       throws IOException, TimeoutException, InterruptedException {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-        enabledFileSystemPaths);
+    OzoneConfiguration conf = getOzoneConfig();
+    //conf.set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, "V1");
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
@@ -276,7 +298,16 @@ public class TestOzoneFileSystem {
     trash = new Trash(conf);
   }
 
-  private void testOzoneFsServiceLoader() throws IOException {
+  @NotNull
+  protected OzoneConfiguration getOzoneConfig() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+            enabledFileSystemPaths);
+    return conf;
+  }
+
+  protected void testOzoneFsServiceLoader() throws IOException {
     assertEquals(
         FileSystem.getFileSystemClass(OzoneConsts.OZONE_URI_SCHEME, null),
         OzoneFileSystem.class);
@@ -441,7 +472,7 @@ public class TestOzoneFileSystem {
 
   }
 
-  private void testListStatus() throws Exception {
+  protected void testListStatus() throws Exception {
     Path parent = new Path("/testListStatus");
     Path file1 = new Path(parent, "key1");
     Path file2 = new Path(parent, "key2");
@@ -489,7 +520,7 @@ public class TestOzoneFileSystem {
   /**
    * Tests listStatus operation on root directory.
    */
-  private void testListStatusOnRoot() throws Exception {
+  protected void testListStatusOnRoot() throws Exception {
     Path root = new Path("/");
     Path dir1 = new Path(root, "dir1");
     Path dir12 = new Path(dir1, "dir12");
@@ -516,7 +547,7 @@ public class TestOzoneFileSystem {
   /**
    * Tests listStatus operation on root directory.
    */
-  private void testListStatusOnLargeDirectory() throws Exception {
+  protected void testListStatusOnLargeDirectory() throws Exception {
     Path root = new Path("/");
     Set<String> paths = new TreeSet<>();
     int numDirs = 5111;
@@ -540,7 +571,7 @@ public class TestOzoneFileSystem {
   /**
    * Tests listStatus on a path with subdirs.
    */
-  private void testListStatusOnSubDirs() throws Exception {
+  protected void testListStatusOnSubDirs() throws Exception {
     // Create the following key structure
     //      /dir1/dir11/dir111
     //      /dir1/dir12
@@ -653,7 +684,7 @@ public class TestOzoneFileSystem {
     GenericTestUtils.assertExceptionContains("KEY_NOT_FOUND", ex);
   }
 
-  private void testGetDirectoryModificationTime()
+  protected void testGetDirectoryModificationTime()
       throws IOException, InterruptedException {
     Path mdir1 = new Path("/mdir1");
     Path mdir11 = new Path(mdir1, "mdir11");

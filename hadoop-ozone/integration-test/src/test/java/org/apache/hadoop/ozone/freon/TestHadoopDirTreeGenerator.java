@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.ratis.server.impl.RaftServerImpl;
 import org.apache.ratis.server.raftlog.RaftLog;
@@ -74,13 +75,17 @@ public class TestHadoopDirTreeGenerator {
    * @throws IOException
    */
   private void startCluster() throws Exception {
-    conf = new OzoneConfiguration();
+    conf = getOzoneConfiguration();
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     cluster.waitForClusterToBeReady();
     cluster.waitTobeOutOfSafeMode();
 
     store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
+  }
+
+  protected OzoneConfiguration getOzoneConfiguration() {
+    return new OzoneConfiguration();
   }
 
   @Test
