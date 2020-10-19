@@ -245,7 +245,7 @@ public class NodeDecommissionManager {
     NodeOperationalState opState = getNodeStatus(dn).getOperationalState();
     if (opState == NodeOperationalState.DECOMMISSIONING
         || opState == NodeOperationalState.ENTERING_MAINTENANCE) {
-      monitor.startMonitoring(dn, 0);
+      monitor.startMonitoring(dn);
     }
   }
 
@@ -257,7 +257,7 @@ public class NodeDecommissionManager {
       LOG.info("Starting Decommission for node {}", dn);
       nodeManager.setNodeOperationalState(
           dn, NodeOperationalState.DECOMMISSIONING);
-      monitor.startMonitoring(dn, 0);
+      monitor.startMonitoring(dn);
     } else if (nodeStatus.isDecommission()) {
       LOG.info("Start Decommission called on node {} in state {}. Nothing to "+
           "do.", dn, opState);
@@ -339,7 +339,7 @@ public class NodeDecommissionManager {
     if (opState == NodeOperationalState.IN_SERVICE) {
       nodeManager.setNodeOperationalState(
           dn, NodeOperationalState.ENTERING_MAINTENANCE, maintenanceEnd);
-      monitor.startMonitoring(dn, endInHours);
+      monitor.startMonitoring(dn);
       LOG.info("Starting Maintenance for node {}", dn);
     } else if (nodeStatus.isMaintenance()) {
       LOG.info("Starting Maintenance called on node {} with state {}. "+
