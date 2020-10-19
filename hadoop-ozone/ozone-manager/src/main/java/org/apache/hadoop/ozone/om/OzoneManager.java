@@ -3601,15 +3601,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
 
       // Commit to DB.
-      BatchOperation batchOperation =
-          metadataManager.getStore().initBatchOperation();
+      try(BatchOperation batchOperation =
+          metadataManager.getStore().initBatchOperation()) {
+        metadataManager.getVolumeTable().putWithBatch(batchOperation,
+            dbVolumeKey, omVolumeArgs);
 
-      metadataManager.getVolumeTable().putWithBatch(batchOperation, dbVolumeKey,
-          omVolumeArgs);
-      metadataManager.getUserTable().putWithBatch(batchOperation, dbUserKey,
-          userVolumeInfo);
+        metadataManager.getUserTable().putWithBatch(batchOperation, dbUserKey,
+            userVolumeInfo);
 
-      metadataManager.getStore().commitBatchOperation(batchOperation);
+        metadataManager.getStore().commitBatchOperation(batchOperation);
+      }
 
       // Add to cache.
       metadataManager.getVolumeTable().addCacheEntry(

@@ -375,30 +375,27 @@ public class TestDeletedBlockLog {
         transactions.getDatanodeTransactions(dnId1.getUuid()).size());
 
     int size = transactions.getDatanodeTransactions(dnId2.getUuid()).size();
-    // add duplicated container in dnID2, this should be failed.
+    // add two transactions for same container in dnID2
     DeletedBlocksTransaction.Builder builder =
         DeletedBlocksTransaction.newBuilder();
     builder.setTxID(11);
     builder.setContainerID(containerID);
     builder.setCount(0);
-    transactions.addTransaction(builder.build(),
-        null);
+    Assert.assertTrue(transactions.addTransaction(builder.build(), null));
 
-    // The number of TX in dnID2 should not be changed.
-    Assert.assertEquals(size,
+    // Total number of transactions reaches the maximum value
+    Assert.assertEquals(size + 1,
         transactions.getDatanodeTransactions(dnId2.getUuid()).size());
+    Assert.assertTrue(transactions.isFull());
 
-    // Add new TX in dnID2, then dnID2 will reach maximum value.
     containerID = RandomUtils.nextLong();
     builder = DeletedBlocksTransaction.newBuilder();
     builder.setTxID(12);
     builder.setContainerID(containerID);
     builder.setCount(0);
     mockContainerInfo(containerID, dnId2);
-    transactions.addTransaction(builder.build(),
-        null);
-    // Since all node are full, then transactions is full.
-    Assert.assertTrue(transactions.isFull());
+    // No more txns can be added as maximum number of transactions are reached
+    Assert.assertFalse(transactions.addTransaction(builder.build(), null));
   }
 
   private void mockContainerInfo(long containerID, DatanodeDetails dd)

@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.protocol.proto
 import org.apache.hadoop.hdds.protocol.proto
         .StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import java.io.IOException;
-import java.util.Collection;
 import java.util.List;
 
 /** A server endpoint that acts as the communication layer for Ozone
@@ -68,9 +67,16 @@ public interface XceiverServerSpi {
    * Join a new pipeline.
    */
   default void addGroup(HddsProtos.PipelineID pipelineId,
-      Collection<DatanodeDetails> peers) throws IOException {
+      List<DatanodeDetails> peers) throws IOException {
   }
 
+  /**
+   * Join a new pipeline with priority.
+   */
+  default void addGroup(HddsProtos.PipelineID pipelineId,
+      List<DatanodeDetails> peers,
+      List<Integer> priorityList) throws IOException {
+  }
 
   /**
    * Exit a pipeline.
