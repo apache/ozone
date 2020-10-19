@@ -85,14 +85,14 @@ public class TestDatanodeAdminMonitor {
   @Test
   public void testNodeCanBeQueuedAndCancelled() {
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
-    monitor.startMonitoring(dn, 0);
+    monitor.startMonitoring(dn);
     assertEquals(1, monitor.getPendingCount());
 
     monitor.stopMonitoring(dn);
     assertEquals(0, monitor.getPendingCount());
     assertEquals(1, monitor.getCancelledCount());
 
-    monitor.startMonitoring(dn, 0);
+    monitor.startMonitoring(dn);
     assertEquals(1, monitor.getPendingCount());
     assertEquals(0, monitor.getCancelledCount());
   }
@@ -112,7 +112,7 @@ public class TestDatanodeAdminMonitor {
     // Ensure the node has some pipelines
     nodeManager.setPipelines(dn1, 2);
     // Add the node to the monitor
-    monitor.startMonitoring(dn1, 0);
+    monitor.startMonitoring(dn1);
     monitor.run();
     // Ensure a StartAdmin event was fired
     eventQueue.processAll(20000);
@@ -152,7 +152,7 @@ public class TestDatanodeAdminMonitor {
     // Add the node to the monitor. By default we have zero pipelines and
     // zero containers in the test setup, so the node should immediately
     // transition to COMPLETED state
-    monitor.startMonitoring(dn1, 0);
+    monitor.startMonitoring(dn1);
     monitor.run();
     assertEquals(0, monitor.getTrackedNodeCount());
     NodeStatus newStatus = nodeManager.getNodeStatus(dn1);
@@ -179,7 +179,7 @@ public class TestDatanodeAdminMonitor {
 
     // Run the monitor for the first time and the node will transition to
     // REPLICATE_CONTAINERS as there are no pipelines to close.
-    monitor.startMonitoring(dn1, 0);
+    monitor.startMonitoring(dn1);
     monitor.run();
     DatanodeDetails node = getFirstTrackedNode();
     assertEquals(1, monitor.getTrackedNodeCount());
@@ -225,7 +225,7 @@ public class TestDatanodeAdminMonitor {
 
     // Add the node to the monitor, it should have 3 under-replicated containers
     // after the first run
-    monitor.startMonitoring(dn1, 0);
+    monitor.startMonitoring(dn1);
     monitor.run();
     assertEquals(1, monitor.getTrackedNodeCount());
     DatanodeDetails node = getFirstTrackedNode();
@@ -258,7 +258,7 @@ public class TestDatanodeAdminMonitor {
 
     // Add the node to the monitor, it should have 3 under-replicated containers
     // after the first run
-    monitor.startMonitoring(dn1, 0);
+    monitor.startMonitoring(dn1);
     monitor.run();
     assertEquals(1, monitor.getTrackedNodeCount());
     DatanodeDetails node = getFirstTrackedNode();
@@ -286,7 +286,7 @@ public class TestDatanodeAdminMonitor {
 
     // Add the node to the monitor, it should transiting to
     // IN_MAINTENANCE as there are no containers to replicate.
-    monitor.startMonitoring(dn1, 1);
+    monitor.startMonitoring(dn1);
     monitor.run();
     assertEquals(1, monitor.getTrackedNodeCount());
     DatanodeDetails node = getFirstTrackedNode();
@@ -317,7 +317,7 @@ public class TestDatanodeAdminMonitor {
     // Ensure the node has some pipelines
     nodeManager.setPipelines(dn1, 2);
     // Add the node to the monitor
-    monitor.startMonitoring(dn1, 1);
+    monitor.startMonitoring(dn1);
     monitor.run();
     DatanodeDetails node = getFirstTrackedNode();
     assertEquals(1, monitor.getTrackedNodeCount());
@@ -351,7 +351,7 @@ public class TestDatanodeAdminMonitor {
     // Add the node to the monitor, it should transiting to
     // REPLICATE_CONTAINERS as the containers are under-replicated for
     // maintenance.
-    monitor.startMonitoring(dn1, 1);
+    monitor.startMonitoring(dn1);
     monitor.run();
     assertEquals(1, monitor.getTrackedNodeCount());
     DatanodeDetails node = getFirstTrackedNode();
@@ -375,7 +375,7 @@ public class TestDatanodeAdminMonitor {
 
     // Add the node to the monitor, it should transiting to
     // AWAIT_MAINTENANCE_END as there are no under-replicated containers.
-    monitor.startMonitoring(dn1, 1);
+    monitor.startMonitoring(dn1);
     monitor.run();
     assertEquals(1, monitor.getTrackedNodeCount());
     DatanodeDetails node = getFirstTrackedNode();
@@ -402,7 +402,7 @@ public class TestDatanodeAdminMonitor {
 
     // Add the node to the monitor, it should transiting to
     // AWAIT_MAINTENANCE_END as there are no under-replicated containers.
-    monitor.startMonitoring(dn1, 1);
+    monitor.startMonitoring(dn1);
     monitor.run();
     assertEquals(1, monitor.getTrackedNodeCount());
     DatanodeDetails node = getFirstTrackedNode();
