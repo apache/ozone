@@ -63,12 +63,12 @@ public class OMBucketAddAclRequest extends OMBucketAclRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     long modificationTime = Time.now();
-    OzoneManagerProtocolProtos.AddAclRequest addAclRequest =
+    OzoneManagerProtocolProtos.AddAclRequest.Builder addAclRequestBuilder =
         getOmRequest().getAddAclRequest().toBuilder()
-            .setModificationTime(modificationTime).build();
+            .setModificationTime(modificationTime);
 
     return getOmRequest().toBuilder()
-        .setAddAclRequest(addAclRequest.toBuilder())
+        .setAddAclRequest(addAclRequestBuilder)
         .setUserInfo(getUserInfo())
         .build();
   }
