@@ -380,6 +380,7 @@ message CreatePipelineCommandProto {
   required ReplicationFactor factor = 3;
   repeated DatanodeDetailsProto datanode = 4;
   required int64 cmdId = 5;
+  repeated int32 priority = 6;
 }
 
 /**

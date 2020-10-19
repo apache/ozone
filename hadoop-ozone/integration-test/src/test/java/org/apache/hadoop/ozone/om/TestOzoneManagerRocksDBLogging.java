@@ -42,7 +42,7 @@ public class TestOzoneManagerRocksDBLogging {
   private RocksDBConfiguration dbConf;
 
   @Rule
-  public Timeout timeout = new Timeout(60000);
+  public Timeout timeout = new Timeout(100000);
 
   private static GenericTestUtils.LogCapturer logCapturer =
       GenericTestUtils.LogCapturer.captureLogs(DBStoreBuilder.ROCKS_DB_LOGGER);

@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -115,6 +116,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private static final Logger LOG = LoggerFactory
       .getLogger(XceiverServerRatis.class);
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
+  private static final List<Integer> DEFAULT_PRIORITY_LIST =
+      new ArrayList<>(
+          Collections.nCopies(HddsProtos.ReplicationFactor.THREE_VALUE, 0));
 
   private static long nextCallId() {
     return CALL_ID_COUNTER.getAndIncrement() & Long.MAX_VALUE;
@@ -711,10 +715,23 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   @Override
   public void addGroup(HddsProtos.PipelineID pipelineId,
-      Collection<DatanodeDetails> peers) throws IOException {
+      List<DatanodeDetails> peers) throws IOException {
+    if (peers.size() == getDefaultPriorityList().size()) {
+      addGroup(pipelineId, peers, getDefaultPriorityList());
+    } else {
+      addGroup(pipelineId, peers,
+          new ArrayList<>(Collections.nCopies(peers.size(), 0)));
+    }
+  }
+
+  @Override
+  public void addGroup(HddsProtos.PipelineID pipelineId,
+      List<DatanodeDetails> peers,
+      List<Integer> priorityList) throws IOException {
     final PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineId);
     final RaftGroupId groupId = RaftGroupId.valueOf(pipelineID.getId());
-    final RaftGroup group = RatisHelper.newRaftGroup(groupId, peers);
+    final RaftGroup group =
+        RatisHelper.newRaftGroup(groupId, peers, priorityList);
     GroupManagementRequest request = GroupManagementRequest.newAdd(
         clientId, server.getId(), nextCallId(), group);
 
@@ -864,4 +881,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     return ImmutableList.copyOf(executors);
   }
 
+  /**
+   * @return list of default priority
+   */
+  public static List<Integer> getDefaultPriorityList() {
+    return DEFAULT_PRIORITY_LIST;
+  }
 }

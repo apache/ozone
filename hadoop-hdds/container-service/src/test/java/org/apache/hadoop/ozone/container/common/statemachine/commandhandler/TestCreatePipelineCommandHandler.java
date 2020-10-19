@@ -48,7 +48,9 @@ import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -113,8 +115,11 @@ public class TestCreatePipelineCommandHandler {
     commandHandler.handle(command, ozoneContainer, stateContext,
         connectionManager);
 
+    List<Integer> priorityList =
+        new ArrayList<>(Collections.nCopies(datanodes.size(), 0));
+
     Mockito.verify(writeChanel, Mockito.times(1))
-        .addGroup(pipelineID.getProtobuf(), datanodes);
+        .addGroup(pipelineID.getProtobuf(), datanodes, priorityList);
 
     Mockito.verify(raftClient, Mockito.times(2))
         .groupAdd(Mockito.any(RaftGroup.class), Mockito.any(RaftPeerId.class));

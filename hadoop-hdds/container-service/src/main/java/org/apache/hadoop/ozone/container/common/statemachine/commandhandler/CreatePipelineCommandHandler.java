@@ -17,8 +17,8 @@
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import java.io.IOException;
-import java.util.Collection;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -82,18 +82,20 @@ public class CreatePipelineCommandHandler implements CommandHandler {
     final CreatePipelineCommandProto createCommand =
         ((CreatePipelineCommand)command).getProto();
     final HddsProtos.PipelineID pipelineID = createCommand.getPipelineID();
-    final Collection<DatanodeDetails> peers =
+    final List<DatanodeDetails> peers =
         createCommand.getDatanodeList().stream()
             .map(DatanodeDetails::getFromProtoBuf)
             .collect(Collectors.toList());
+    final List<Integer> priorityList = createCommand.getPriorityList();
 
     try {
       XceiverServerSpi server = ozoneContainer.getWriteChannel();
       if (!server.isExist(pipelineID)) {
         final RaftGroupId groupId = RaftGroupId.valueOf(
             PipelineID.getFromProtobuf(pipelineID).getId());
-        final RaftGroup group = RatisHelper.newRaftGroup(groupId, peers);
-        server.addGroup(pipelineID, peers);
+        final RaftGroup group =
+            RatisHelper.newRaftGroup(groupId, peers, priorityList);
+        server.addGroup(pipelineID, peers, priorityList);
         peers.stream().filter(
             d -> !d.getUuid().equals(dn.getUuid()))
             .forEach(d -> {
