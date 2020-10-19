@@ -23,12 +23,14 @@ import java.time.Instant;
 import java.util.Random;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.ratis.util.TimeDuration;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -60,10 +62,11 @@ public class TestOpenKeyCleanupService {
   private static final String DEFAULT_VOLUME = "volume";
   private static final String DEFAULT_BUCKET = "bucket";
 
-  private OMMetadataManager metadataManager;
-  private KeyManager keyManager;
   private OzoneConfiguration conf;
+  private KeyManager keyManager;
   private OpenKeyCleanupService service;
+  private  OMMetadataManager metadataManager;
+  private MiniOzoneCluster cluster;
 
   @Before
   public void setup() throws Exception {
@@ -76,24 +79,35 @@ public class TestOpenKeyCleanupService {
     conf.setTimeDuration(OMConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD,
         expireThreshold.getDuration(), expireThreshold.getUnit());
 
-    metadataManager = new OmMetadataManagerImpl(conf);
+    cluster = MiniOzoneCluster.newBuilder(conf).build();
+    cluster.waitForClusterToBeReady();
 
-    keyManager = new KeyManagerImpl(
-            new ScmBlockLocationTestingClient(null, null, 0),
-            metadataManager, conf, UUID.randomUUID().toString(), null);
-    keyManager.start(conf);
-
+    OzoneManager omLeader = cluster.getOMLeader();
+    keyManager = omLeader.getKeyManager();
     service = (OpenKeyCleanupService) keyManager.getOpenKeyCleanupService();
+    metadataManager = omLeader.getMetadataManager();
+
+    // Stop all OMs so no services are run until we trigger them.
+    cluster.stop();
 
     TestOMRequestUtils.addVolumeToDB(DEFAULT_VOLUME, metadataManager);
     TestOMRequestUtils.addBucketToDB(DEFAULT_VOLUME, DEFAULT_BUCKET, metadataManager);
+  }
+
+  @After
+  public void teardown() {
+    if (cluster != null) {
+      cluster.shutdown();
+    }
   }
 
   @Test
   public void testOpenKeysWithoutBlockData() throws Exception {
     createOpenKeys(taskLimit);
     createExpiredOpenKeys(taskLimit);
+
     Assert.assertEquals(taskLimit * 2, getAllOpenKeys().size());
+    Assert.assertEquals(taskLimit, getAllExpiredOpenKeys().size());
 
     runService();
 
@@ -236,9 +250,13 @@ public class TestOpenKeyCleanupService {
     int serviceIntervalMillis =
         serviceInterval.toIntExact(TimeUnit.MILLISECONDS);
 
+    cluster.restartOzoneManager();
+
     GenericTestUtils.waitFor(
         () -> service.getRunCount().get() >= numRuns,
         serviceIntervalMillis, serviceIntervalMillis * 10);
+
+    cluster.stop();
   }
 
   private void createExpiredOpenKeys(int numKeys) throws Exception {
