@@ -75,7 +75,8 @@ public class TestCloseContainerEventHandler {
     nodeManager = new MockNodeManager(true, 10);
     eventQueue = new EventQueue();
     scmMetadataStore = new SCMMetadataStoreImpl(configuration);
-    configuration.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, true);
+    configuration.setBoolean(
+            ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, true);
     pipelineManager =
         new SCMPipelineManager(configuration, nodeManager,
             scmMetadataStore.getPipelineTable(), eventQueue);

@@ -34,5 +34,6 @@ OZONE-SITE.XML_ozone.scm.client.address=scm
 OZONE-SITE.XML_ozone.replication=3
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_hdds.profiler.endpoint.enabled=true
+OZONE-SITE.XML_ozone.scm.pipeline.creation.auto.factor.one=true
 
 no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1
