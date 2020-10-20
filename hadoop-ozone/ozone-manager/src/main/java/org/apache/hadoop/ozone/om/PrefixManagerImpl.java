@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om;
 
 import com.google.common.base.Strings;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -315,7 +316,8 @@ public class PrefixManagerImpl implements PrefixManager {
           new OmPrefixInfo.Builder()
           .setName(ozoneObj.getPath());
       if (transactionLogIndex > 0) {
-        prefixInfoBuilder.setObjectID(transactionLogIndex);
+        prefixInfoBuilder.setObjectID(OmUtils.getObjectIdFromTxId(
+            metadataManager.getOmEpoch(), transactionLogIndex));
         prefixInfoBuilder.setUpdateID(transactionLogIndex);
       }
       prefixInfo = prefixInfoBuilder.build();
@@ -365,7 +367,8 @@ public class PrefixManagerImpl implements PrefixManager {
           new OmPrefixInfo.Builder()
               .setName(ozoneObj.getPath());
       if (transactionLogIndex > 0) {
-        prefixInfoBuilder.setObjectID(transactionLogIndex);
+        prefixInfoBuilder.setObjectID(OmUtils.getObjectIdFromTxId(
+            metadataManager.getOmEpoch(), transactionLogIndex));
         prefixInfoBuilder.setUpdateID(transactionLogIndex);
       }
       prefixInfo = prefixInfoBuilder.build();

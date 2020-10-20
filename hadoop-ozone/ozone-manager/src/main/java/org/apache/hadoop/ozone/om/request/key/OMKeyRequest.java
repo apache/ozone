@@ -46,7 +46,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
-import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -250,9 +249,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nullable FileEncryptionInfo encInfo,
       @Nonnull PrefixManager prefixManager,
       @Nullable OmBucketInfo omBucketInfo,
-        long transactionLogIndex) {
-    long objectID = OMFileRequest.getObjIDFromTxId(transactionLogIndex);
-
+      long transactionLogIndex, long objectID) {
     return new OmKeyInfo.Builder()
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
@@ -323,12 +320,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nullable FileEncryptionInfo encInfo,
       @Nonnull PrefixManager prefixManager,
       @Nullable OmBucketInfo omBucketInfo,
-      long transactionLogIndex, boolean isRatisEnabled)
+      long transactionLogIndex,
+      @Nonnull long objectID,
+      boolean isRatisEnabled)
       throws IOException {
     if (keyArgs.getIsMultipartKey()) {
       return prepareMultipartKeyInfo(omMetadataManager, keyArgs,
           size, locations, encInfo, prefixManager, omBucketInfo,
-          transactionLogIndex);
+          transactionLogIndex, objectID);
       //TODO args.getMetadata
     }
     if (dbKeyInfo != null) {
@@ -350,7 +349,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // Blocks will be appended as version 0.
     return createKeyInfo(keyArgs, locations, keyArgs.getFactor(),
         keyArgs.getType(), keyArgs.getDataSize(), encInfo, prefixManager,
-        omBucketInfo, transactionLogIndex);
+        omBucketInfo, transactionLogIndex, objectID);
   }
 
   /**
@@ -365,7 +364,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nonnull KeyArgs args, long size,
       @Nonnull List<OmKeyLocationInfo> locations,
       FileEncryptionInfo encInfo,  @Nonnull PrefixManager prefixManager,
-      @Nullable OmBucketInfo omBucketInfo, @Nonnull long transactionLogIndex)
+      @Nullable OmBucketInfo omBucketInfo, @Nonnull long transactionLogIndex,
+      @Nonnull long objectId)
       throws IOException {
     HddsProtos.ReplicationFactor factor;
     HddsProtos.ReplicationType type;
@@ -394,7 +394,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // For this upload part we don't need to check in KeyTable. As this
     // is not an actual key, it is a part of the key.
     return createKeyInfo(args, locations, factor, type, size, encInfo,
-        prefixManager, omBucketInfo, transactionLogIndex);
+        prefixManager, omBucketInfo, transactionLogIndex, objectId);
   }
 
   /**

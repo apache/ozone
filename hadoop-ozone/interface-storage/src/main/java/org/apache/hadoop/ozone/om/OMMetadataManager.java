@@ -73,6 +73,11 @@ public interface OMMetadataManager {
   OzoneManagerLock getLock();
 
   /**
+   * Returns the epoch associated with current OM process.
+   */
+  long getOmEpoch();
+
+  /**
    * Given a volume return the corresponding DB key.
    *
    * @param volume - Volume name

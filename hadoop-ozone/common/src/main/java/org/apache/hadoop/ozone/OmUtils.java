@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
 import java.io.File;
 import java.io.IOException;
@@ -75,6 +77,17 @@ public final class OmUtils {
   public static final Logger LOG = LoggerFactory.getLogger(OmUtils.class);
   private static final SecureRandom SRAND = new SecureRandom();
   private static byte[] randomBytes = new byte[32];
+
+  private static final long TRANSACTION_ID_SHIFT = 8;
+  // from the 64 bits of ObjectID (long variable), 2 bits are reserved for
+  // epoch and 8 bits for recursive directory creation, if required. This
+  // leaves 54 bits for the transaction ID. Also, the last transaction ID is
+  // reserved for creating S3G volume on OM start {@link
+  // OzoneManager#addS3GVolumeToDB()}.
+  public static final long EPOCH_ID_SHIFT = 62; // 64 - 2
+  public static final long MAX_TRXN_ID = (long) (Math.pow(2, 54) - 2);
+  public static final int EPOCH_WHEN_RATIS_NOT_ENABLED = 1;
+  public static final int EPOCH_WHEN_RATIS_ENABLED = 2;
 
   private OmUtils() {
   }
@@ -360,8 +373,6 @@ public final class OmUtils {
     }
   }
 
-
-
   /**
    * If a OM conf is only set with key suffixed with OM Node ID, return the
    * set value.
@@ -522,6 +533,48 @@ public final class OmUtils {
     } else {
       return null;
     }
+  }
+
+  public static int getOMEpoch(boolean isRatisEnabled) {
+    return isRatisEnabled ? EPOCH_WHEN_RATIS_ENABLED :
+        EPOCH_WHEN_RATIS_NOT_ENABLED;
+  }
+
+  /**
+   * Get the valid base object id given the transaction id.
+   * @param epoch a 2 bit epoch number. The 2 most significant bits of the
+   *              object will be set to this epoch.
+   * @param id of the transaction. This value cannot exceed 2^54 - 1 as
+   *           out of the 64 bits for a long, 2 are reserved for the epoch
+   *           and 8 for recursive directory creation.
+   * @return base object id allocated against the transaction
+   */
+  public static long getObjectIdFromTxId(long epoch, long id) {
+    Preconditions.checkArgument(id <= MAX_TRXN_ID, "TransactionID " +
+        "exceeds max limit of " + MAX_TRXN_ID);
+    return addEpochToObjectId(epoch, id);
+  }
+
+  /**
+   * Note - This function should not be called directly. It is directly called
+   * only from OzoneManager#addS3GVolumeToDB() which is a one time operation
+   * when OM is started first time to add S3G volume. In call other cases,
+   * getObjectIdFromTxId() should be called to append epoch to objectID.
+   */
+  public static long addEpochToObjectId(long epoch, long id) {
+    long lsb54 = id << TRANSACTION_ID_SHIFT;
+    long msb2 = epoch << EPOCH_ID_SHIFT;
+
+    return msb2 | lsb54;
+  }
+
+  /**
+   * Given an objectId, unset the 2 most significant bits to get the
+   * corresponding transaction index.
+   */
+  @VisibleForTesting
+  public static long getTxIdFromObjectId(long objectId) {
+    return ((Long.MAX_VALUE >> 2) & objectId) >> 8;
   }
 
   /**
