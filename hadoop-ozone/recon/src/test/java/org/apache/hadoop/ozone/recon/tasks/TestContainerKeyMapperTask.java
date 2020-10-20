@@ -291,7 +291,7 @@ public class TestContainerKeyMapperTask {
     when(tableMock.getName()).thenReturn("keyTable");
     when(omMetadataManagerMock.getKeyTable()).thenReturn(tableMock);
     when(omServiceProviderMock.getOMMetadataManagerInstance())
-      .thenReturn(omMetadataManagerMock);
+        .thenReturn(omMetadataManagerMock);
     return omServiceProviderMock;
   }
 }
