@@ -36,12 +36,15 @@ public class VolumeIOStats {
   private @Metric MutableCounterLong writeOpCount;
   private @Metric MutableCounterLong readTime;
   private @Metric MutableCounterLong writeTime;
-  private MetricsRegistry registry;
 
+  @Deprecated
   public VolumeIOStats() {
     init();
   }
 
+  /**
+   * @param identifier Usually path to volume root, e.g. /data/hdds
+   */
   public VolumeIOStats(String identifier) {
     this.sourceName += '-' + identifier;
     init();
@@ -50,7 +53,6 @@ public class VolumeIOStats {
   public void init() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.register(sourceName, "Volume I/O Statistics", this);
-    this.registry = new MetricsRegistry(sourceName);
   }
 
   public void unregister() {
