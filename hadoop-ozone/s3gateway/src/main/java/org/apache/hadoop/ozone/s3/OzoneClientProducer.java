@@ -36,6 +36,7 @@ import org.apache.hadoop.security.token.Token;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 import static org.apache.hadoop.ozone.s3.SignatureProcessor.UTF_8;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,9 +81,15 @@ public class OzoneClientProducer {
       UserGroupInformation remoteUser =
           UserGroupInformation.createRemoteUser(awsAccessId);
       if (OzoneSecurityUtil.isSecurityEnabled(config)) {
-        LOG.debug("Creating s3 auth info for client.");
         try {
           validateAccessId(awsAccessId);
+        } catch (OS3Exception ex) {
+          LOG.error("Malformed s3 header.", ex);
+          throw ex;
+        }
+        
+        LOG.debug("Creating s3 auth info for client.");
+        try {
           OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
           identifier.setTokenType(S3AUTHINFO);
           identifier.setStrToSign(signatureParser.getStringToSign());
@@ -98,10 +105,9 @@ public class OzoneClientProducer {
               omService);
           remoteUser.addToken(token);
         } catch (OS3Exception | URISyntaxException ex) {
-          LOG.error("S3 auth info creation failed.");
+          LOG.error("S3 auth info creation failed.", ex);
           throw S3_AUTHINFO_CREATION_ERROR;
         }
-
       }
       UserGroupInformation.setLoginUser(remoteUser);
     } catch (Exception e) {
@@ -119,7 +125,7 @@ public class OzoneClientProducer {
   // ONLY validate aws access id when needed.
   private void validateAccessId(String awsAccessId) throws Exception {
     if (awsAccessId == null || awsAccessId.equals("")) {
-      throw S3_AUTHINFO_CREATION_ERROR;
+      throw MALFORMED_HEADER;
     }
   }
 
