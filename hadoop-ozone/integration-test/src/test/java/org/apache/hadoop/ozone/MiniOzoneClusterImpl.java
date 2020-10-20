@@ -610,7 +610,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT,
           pipelineNumLimit >= DEFAULT_PIPELIME_LIMIT ?
               pipelineNumLimit : DEFAULT_PIPELIME_LIMIT);
-      conf.setIfUnset(ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, "true");
+      conf.setIfUnset(ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
+              "true");
       configureTrace();
     }
 
