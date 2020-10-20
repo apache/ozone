@@ -350,9 +350,9 @@ public class TestOzoneFSWithObjectStoreCreate {
     LinkedList<String> keys = new LinkedList<>();
     keys.add("dir1/");
     keys.add("dir1/dir2/");
-    keys.add(OmUtils.normalizeKey(key1));
-    keys.add(OmUtils.normalizeKey(key2));
-    keys.add(OmUtils.normalizeKey(key3));
+    keys.add(OmUtils.normalizeKey(key1, false));
+    keys.add(OmUtils.normalizeKey(key2, false));
+    keys.add(OmUtils.normalizeKey(key3, false));
 
     int length = 10;
     byte[] input = new byte[length];
@@ -388,7 +388,7 @@ public class TestOzoneFSWithObjectStoreCreate {
 
     // Iterator with  normalized key as previous key.
     ozoneKeyIterator = ozoneBucket.listKeys(null,
-        OmUtils.normalizeKey(key1));
+        OmUtils.normalizeKey(key1, false));
 
     checkKeyList(ozoneKeyIterator, keys);
   }

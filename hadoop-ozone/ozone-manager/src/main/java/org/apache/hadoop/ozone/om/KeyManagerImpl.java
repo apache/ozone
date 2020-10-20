@@ -921,29 +921,15 @@ public class KeyManagerImpl implements KeyManager {
     // snapshot of the data, so we don't need these locks at a higher level
     // when we iterate.
 
-    startKey = normalizeListKeyPath(startKey);
-    keyPrefix = normalizeListKeyPath(keyPrefix);
+    if (enableFileSystemPaths) {
+      startKey = OmUtils.normalizeKey(startKey, true);
+      keyPrefix = OmUtils.normalizeKey(keyPrefix, true);
+    }
 
     List<OmKeyInfo> keyList = metadataManager.listKeys(volumeName, bucketName,
         startKey, keyPrefix, maxKeys);
     refreshPipeline(keyList);
     return keyList;
-  }
-
-  private String normalizeListKeyPath(String keyPath) {
-
-    String normalizeKeyPath = keyPath;
-    if (enableFileSystemPaths) {
-      // For empty strings do nothing.
-      if (StringUtils.isBlank(keyPath)) {
-        return keyPath;
-      }
-      normalizeKeyPath = OmUtils.normalizeKey(keyPath);
-      if (keyPath.endsWith(OM_KEY_PREFIX)) {
-        normalizeKeyPath = normalizeKeyPath + OM_KEY_PREFIX;
-      }
-    }
-    return normalizeKeyPath;
   }
 
   @Override

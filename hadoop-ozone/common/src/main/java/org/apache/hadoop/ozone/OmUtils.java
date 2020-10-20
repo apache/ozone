@@ -611,21 +611,35 @@ public final class OmUtils {
    * Normalize the key name. This method used {@link Path#normalize()} to
    * normalize the key name.
    * @param keyName
+   * @param preserveTrailingSlash - if True preserves trailing slash, else
+   * does not preserve.
    * @return normalized key name.
    */
   @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
-  public static String normalizeKey(String keyName) {
-    String normalizedKeyName;
-    if (keyName.startsWith(OM_KEY_PREFIX)) {
-      normalizedKeyName = Paths.get(keyName).toUri().normalize().getPath();
-    } else {
-      normalizedKeyName = Paths.get(OM_KEY_PREFIX, keyName).toUri()
-          .normalize().getPath();
+  public static String normalizeKey(String keyName,
+      boolean preserveTrailingSlash) {
+    // For empty strings do nothing, just return the same.
+    // Reason to check here is the Paths method fail with NPE.
+    if (!StringUtils.isBlank(keyName)) {
+      String normalizedKeyName;
+      if (keyName.startsWith(OM_KEY_PREFIX)) {
+        normalizedKeyName = Paths.get(keyName).toUri().normalize().getPath();
+      } else {
+        normalizedKeyName = Paths.get(OM_KEY_PREFIX, keyName).toUri()
+            .normalize().getPath();
+      }
+      if (!keyName.equals(normalizedKeyName)) {
+        LOG.debug("Normalized key {} to {} ", keyName,
+            normalizedKeyName.substring(1));
+      }
+      if (preserveTrailingSlash) {
+        if (keyName.endsWith("/")) {
+          return normalizedKeyName.substring(1) + "/";
+        }
+      }
+      return normalizedKeyName.substring(1);
     }
-    if (!keyName.equals(normalizedKeyName)) {
-      LOG.debug("Normalized key {} to {} ", keyName,
-          normalizedKeyName.substring(1));
-    }
-    return normalizedKeyName.substring(1);
+
+    return keyName;
   }
 }

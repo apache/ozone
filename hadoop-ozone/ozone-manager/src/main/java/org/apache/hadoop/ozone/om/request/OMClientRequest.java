@@ -299,7 +299,7 @@ public abstract class OMClientRequest implements RequestAuditor {
 
   public static String validateAndNormalizeKey(String keyName)
       throws OMException {
-    String normalizedKeyName = OmUtils.normalizeKey(keyName);
+    String normalizedKeyName = OmUtils.normalizeKey(keyName, false);
     return isValidKeyPath(normalizedKeyName);
   }
 
