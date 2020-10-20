@@ -329,6 +329,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmAdminUsernames.add(scmUsername);
     }
 
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
+            true);
     datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this,
         eventQueue);
     blockProtocolServer = new SCMBlockProtocolServer(conf, this);
@@ -602,6 +604,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       BlockingService instance,
       int handlerCount)
       throws IOException {
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
+            true);
     RPC.Server rpcServer =
         new RPC.Builder(conf)
             .setProtocol(protocol)
