@@ -204,6 +204,10 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BL
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TRASH_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TRASH_DELETING_SERVICE_INTERVAL_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TRASH_DELETING_SERVICE_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TRASH_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
@@ -324,6 +328,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private boolean isNativeAuthorizerEnabled;
 
   private ExitManager exitManager;
+
+  private TrashDeletingService trashDeletingService;
 
   private enum State {
     INITIALIZED,
@@ -1174,7 +1180,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     omRpcServer.start();
     isOmRpcServerRunning = true;
-
+    startTrashDeletingService();
     registerMXBean();
 
     startJVMPauseMonitor();
@@ -1219,6 +1225,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omRatisServer.start();
     }
 
+
+
     omRpcServer = getRpcServer(configuration);
 
     try {
@@ -1228,15 +1236,32 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // Allow OM to start as Http Server failure is not fatal.
       LOG.error("OM HttpServer failed to start.", ex);
     }
-
     omRpcServer.start();
+
     isOmRpcServerRunning = true;
+
+    startTrashDeletingService();
 
     registerMXBean();
 
     startJVMPauseMonitor();
     setStartTime();
     omState = State.RUNNING;
+  }
+
+  private void startTrashDeletingService() {
+    if (trashDeletingService == null) {
+      long serviceTimeout = configuration.getTimeDuration(
+              OZONE_TRASH_DELETING_SERVICE_TIMEOUT,
+              OZONE_TRASH_DELETING_SERVICE_TIMEOUT_DEFAULT,
+              TimeUnit.MILLISECONDS);
+      long trashDeletionInterval = configuration.getTimeDuration(
+              OZONE_TRASH_DELETING_SERVICE_INTERVAL,
+              OZONE_TRASH_DELETING_SERVICE_INTERVAL_DEFAULT,
+              TimeUnit.MILLISECONDS);
+      trashDeletingService = new TrashDeletingService(trashDeletionInterval, serviceTimeout, this);
+      trashDeletingService.start();
+    }
   }
 
   /**

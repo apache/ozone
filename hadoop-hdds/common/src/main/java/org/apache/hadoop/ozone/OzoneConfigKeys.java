@@ -197,6 +197,12 @@ public final class OzoneConfigKeys {
   public static final String OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT
       = "60s";
 
+  public static final String OZONE_TRASH_DELETING_SERVICE_INTERVAL =
+          "ozone.trash.deleting.service.interval";
+  public static final String OZONE_TRASH_DELETING_SERVICE_INTERVAL_DEFAULT
+          = "60s";
+
+
   /**
    * The interval of open key clean service.
    */
@@ -218,6 +224,11 @@ public final class OzoneConfigKeys {
       "ozone.block.deleting.service.timeout";
   public static final String OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT
       = "300s"; // 300s for default
+
+  public static final String OZONE_TRASH_DELETING_SERVICE_TIMEOUT =
+          "ozone.trash.deleting.service.timeout";
+  public static final String OZONE_TRASH_DELETING_SERVICE_TIMEOUT_DEFAULT
+          = "300s"; // 300s for default
 
   public static final String OZONE_KEY_PREALLOCATION_BLOCKS_MAX =
       "ozone.key.preallocation.max.blocks";

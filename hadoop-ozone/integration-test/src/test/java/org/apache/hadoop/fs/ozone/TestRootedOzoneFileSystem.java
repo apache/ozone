@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.ozone;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -41,12 +42,14 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.TrashDeletingService;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.checkerframework.checker.units.qual.C;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -70,10 +73,11 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
+import static org.apache.hadoop.fs.FileSystem.LOG;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.*;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
@@ -1102,13 +1106,13 @@ public class TestRootedOzoneFileSystem {
   }
 
   /**
-   * Check that no files are actually moved to trash since it is disabled by
+   * Check that  files are moved to trash since it is enabled by
    * fs.rename(src, dst, options).
    */
   @Test
-  public void testRenameToTrashDisabled() throws IOException {
+  public void testRenameToTrashEnabled() throws IOException {
     // Create a file
-    String testKeyName = "testKey1";
+    String testKeyName = "testKey2";
     Path path = new Path(bucketPath, testKeyName);
     try (FSDataOutputStream stream = fs.create(path)) {
       stream.write(1);
@@ -1122,12 +1126,12 @@ public class TestRootedOzoneFileSystem {
     Path trashRoot = new Path(bucketPath, TRASH_PREFIX);
     Path userTrash = new Path(trashRoot, username);
     Path userTrashCurrent = new Path(userTrash, "Current");
-    Path trashPath = new Path(userTrashCurrent, testKeyName);
-
+    String key = path.toString().substring(1);
+    Path trashPath = new Path(userTrashCurrent, key);
     // Trash Current directory should still have been created.
     Assert.assertTrue(ofs.exists(userTrashCurrent));
-    // Check under trash, the key should be deleted instead
-    Assert.assertFalse(ofs.exists(trashPath));
+    // Check under trash, the key should be present
+    Assert.assertTrue(ofs.exists(trashPath));
 
     // Cleanup
     ofs.delete(trashRoot, true);
@@ -1169,5 +1173,51 @@ public class TestRootedOzoneFileSystem {
     // This will return false.
     Boolean falseResult = fs.delete(parent, true);
     assertFalse(falseResult);
+  }
+
+  /**
+   * @throws Exception
+   * 1.Move a Key to Trash
+   * 2.Start TrashDeletingService
+   * 3.Verify that the TrashDeletingService purges the key after minimum set TrashInterval of 1 min.
+   */
+  @Test
+  public void testTrashDeletingService() throws Exception {
+    String testKeyName = "keyToBeDeleted";
+    Path path = new Path(bucketPath, testKeyName);
+    try (FSDataOutputStream stream = fs.create(path)) {
+      stream.write(1);
+    }
+    // Call moveToTrash. We can't call protected fs.rename() directly
+    trash.moveToTrash(path);
+    TrashDeletingService trashDeletingService = new
+            TrashDeletingService(60,300,cluster.getOzoneManager());
+    conf.setLong(FS_TRASH_INTERVAL_KEY,1);
+    trashDeletingService.setFsConf(conf);
+    trashDeletingService.start();
+
+
+    // Construct paths
+    String username = UserGroupInformation.getCurrentUser().getShortUserName();
+    Path trashRoot = new Path(bucketPath, TRASH_PREFIX);
+    Path userTrash = new Path(trashRoot, username);
+    Path userTrashCurrent = new Path(userTrash, "Current");
+    String key = path.toString().substring(1);
+    Path trashPath = new Path(userTrashCurrent, key);
+
+    // Wait until the TrashDeletingService purges the key
+    GenericTestUtils.waitFor(()-> {
+      try {
+        return !ofs.exists(trashPath);
+      } catch (IOException e) {
+        LOG.error("Delete from Trash Failed");
+        Assert.fail();
+        return false;
+      }
+    },1000,180000);
+
+    // Cleanup
+    ofs.delete(trashRoot, true);
+
   }
 }
