@@ -400,12 +400,18 @@ public class HddsVolume
     if (volumeInfo != null) {
       volumeInfo.shutdownUsageThread();
     }
+    if (volumeIOStats != null) {
+      volumeIOStats.unregister();
+    }
   }
 
   public void shutdown() {
     this.state = VolumeState.NON_EXISTENT;
     if (volumeInfo != null) {
       volumeInfo.shutdownUsageThread();
+    }
+    if (volumeIOStats != null) {
+      volumeIOStats.unregister();
     }
   }
 

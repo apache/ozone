@@ -28,7 +28,7 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
  * This class is used to track Volume IO stats for each HDDS Volume.
  */
 public class VolumeIOStats {
-  private String name = VolumeIOStats.class.getSimpleName();
+  private String sourceName = VolumeIOStats.class.getSimpleName();
 
   private @Metric MutableCounterLong readBytes;
   private @Metric MutableCounterLong readOpCount;
@@ -43,16 +43,21 @@ public class VolumeIOStats {
   }
 
   public VolumeIOStats(String identifier) {
-    this.name += '-' + identifier;
+    this.sourceName += '-' + identifier;
     init();
   }
 
   public void init() {
-    DefaultMetricsSystem.initialize(name);
+    DefaultMetricsSystem.initialize(sourceName);
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.register(name, "Volume I/O Statistics", this);
+    ms.register(sourceName, "Volume I/O Statistics", this);
 
-    this.registry = new MetricsRegistry(name);
+    this.registry = new MetricsRegistry(sourceName);
+  }
+
+  public void unregister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(sourceName);
   }
 
   /**
