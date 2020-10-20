@@ -20,18 +20,15 @@
 package org.apache.hadoop.ozone.om;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.Random;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.common.BlockGroup;
-import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.ratis.util.TimeDuration;
 import org.junit.After;
@@ -41,8 +38,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -52,14 +49,14 @@ public class TestOpenKeyCleanupService {
   public TemporaryFolder folder = new TemporaryFolder();
 
   // Lower service interval to speed up testing.
-  private static final TimeDuration serviceInterval = TimeDuration.valueOf(100,
-      TimeUnit.MILLISECONDS);
+  private static final TimeDuration SERVICE_INTERVAL = TimeDuration.valueOf(24,
+      TimeUnit.HOURS);
   // High expiration time used so keys without modified creation time will not
   // expire during the test.
-  private static final TimeDuration expireThreshold = TimeDuration.valueOf(24,
+  private static final TimeDuration EXPIRE_THRESHOLD = TimeDuration.valueOf(24,
       TimeUnit.HOURS);
   // Maximum number of keys to be cleaned up per run of the service.
-  private static final int taskLimit = 10;
+  private static final int TASK_LIMIT = 10;
 
   // Volume and bucket created and added to the DB that will hold open keys
   // created by this test unless tests specify otherwise.
@@ -79,9 +76,10 @@ public class TestOpenKeyCleanupService {
 
     // Set custom configurations for testing.
     conf.setTimeDuration(OMConfigKeys.OZONE_OPEN_KEY_CLEANUP_SERVICE_INTERVAL,
-        serviceInterval.getDuration(), serviceInterval.getUnit());
+        SERVICE_INTERVAL.getDuration(), SERVICE_INTERVAL.getUnit());
     conf.setTimeDuration(OMConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD,
-        expireThreshold.getDuration(), expireThreshold.getUnit());
+        EXPIRE_THRESHOLD.getDuration(), EXPIRE_THRESHOLD.getUnit());
+    conf.setInt(OMConfigKeys.OZONE_OPEN_KEY_CLEANUP_LIMIT_PER_TASK, TASK_LIMIT);
 
     cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
@@ -91,26 +89,8 @@ public class TestOpenKeyCleanupService {
     service = (OpenKeyCleanupService) keyManager.getOpenKeyCleanupService();
     metadataManager = omLeader.getMetadataManager();
 
-//    OmVolumeArgs volumeArgs = OmVolumeArgs.newBuilder()
-//        .setVolume(DEFAULT_VOLUME)
-//        .setAdminName("foo")
-//        .setOwnerName("foo")
-//        .build();
-//    OmBucketInfo bucketArgs = OmBucketInfo.newBuilder()
-//        .setVolumeName(DEFAULT_VOLUME)
-//        .setBucketName(DEFAULT_BUCKET)
-//        .setAcls(new ArrayList<>())
-//        .setIsVersionEnabled(true)
-//        .setStorageType(StorageType.DEFAULT)
-//        .build();
-//
-//    omLeader.createVolume(volumeArgs);
-//    omLeader.createBucket(bucketArgs);
-
     TestOMRequestUtils.addVolumeToDB(DEFAULT_VOLUME, metadataManager);
     TestOMRequestUtils.addBucketToDB(DEFAULT_VOLUME, DEFAULT_BUCKET, metadataManager);
-
-    cluster.stop();
   }
 
   @After
@@ -123,13 +103,13 @@ public class TestOpenKeyCleanupService {
   @Test
   public void testOpenKeysWithoutBlockData() throws Exception {
     // Setup test and verify the setup.
-    List<String> originalOpenKeys = createOpenKeys(taskLimit);
+    Set<String> originalOpenKeys = createOpenKeys(TASK_LIMIT);
     Assert.assertEquals(originalOpenKeys, getAllOpenKeys());
-    Assert.assertEquals(taskLimit, originalOpenKeys.size());
+    Assert.assertEquals(TASK_LIMIT, originalOpenKeys.size());
 
-    List<String> originalExpiredKeys = createExpiredOpenKeys(taskLimit);
+    Set<String> originalExpiredKeys = createExpiredOpenKeys(TASK_LIMIT);
     Assert.assertEquals(originalExpiredKeys, getAllExpiredOpenKeys());
-    Assert.assertEquals(taskLimit, originalExpiredKeys.size());
+    Assert.assertEquals(TASK_LIMIT, originalExpiredKeys.size());
 
     Assert.assertEquals(0, getAllPendingDeleteKeys().size());
 
@@ -139,7 +119,7 @@ public class TestOpenKeyCleanupService {
     // being put in the delete table.
     Assert.assertEquals(0, getAllPendingDeleteKeys().size());
 
-    Assert.assertEquals(taskLimit, getAllOpenKeys().size());
+    Assert.assertEquals(TASK_LIMIT, getAllOpenKeys().size());
     Assert.assertEquals(originalOpenKeys, getAllOpenKeys());
   }
 
@@ -148,14 +128,14 @@ public class TestOpenKeyCleanupService {
     final int numBlocks = 3;
 
     // Setup test and verify the setup.
-    List<String> originalOpenKeys = createOpenKeys(taskLimit);
+    Set<String> originalOpenKeys = createOpenKeys(TASK_LIMIT);
     Assert.assertEquals(originalOpenKeys, getAllOpenKeys());
-    Assert.assertEquals(taskLimit, originalOpenKeys.size());
+    Assert.assertEquals(TASK_LIMIT, originalOpenKeys.size());
 
-    List<String> originalExpiredKeys = createExpiredOpenKeys(taskLimit,
+    Set<String> originalExpiredKeys = createExpiredOpenKeys(TASK_LIMIT,
         numBlocks);
     Assert.assertEquals(originalExpiredKeys, getAllExpiredOpenKeys());
-    Assert.assertEquals(taskLimit, originalExpiredKeys.size());
+    Assert.assertEquals(TASK_LIMIT, originalExpiredKeys.size());
 
     Assert.assertEquals(0, getAllPendingDeleteKeys().size());
 
@@ -167,10 +147,10 @@ public class TestOpenKeyCleanupService {
 
   @Test
   public void testWithNoExpiredOpenKeys() throws Exception {
-    List<String> originalOpenKeys = createOpenKeys(taskLimit);
+    Set<String> originalOpenKeys = createOpenKeys(TASK_LIMIT);
 
     // Verify test setup.
-    Assert.assertEquals(taskLimit, originalOpenKeys.size());
+    Assert.assertEquals(TASK_LIMIT, originalOpenKeys.size());
     Assert.assertEquals(getAllOpenKeys(), originalOpenKeys);
     Assert.assertEquals(0, getAllPendingDeleteKeys().size());
 
@@ -201,9 +181,9 @@ public class TestOpenKeyCleanupService {
     final int numBlocks = 3;
     // Create more keys than the service will clean up in the allowed number
     // of runs.
-    final int numKeys = taskLimit * (numServiceRuns + 1);
+    final int numKeys = TASK_LIMIT * (numServiceRuns + 1);
 
-    List<String> originalExpiredKeys = createExpiredOpenKeys(numKeys, numBlocks);
+    Set<String> originalExpiredKeys = createExpiredOpenKeys(numKeys, numBlocks);
 
     // Verify test setup.
     Assert.assertEquals(numKeys, originalExpiredKeys.size());
@@ -216,17 +196,17 @@ public class TestOpenKeyCleanupService {
     // So for multiple runs that will not delete all keys, we can only
     // check that the correct key counts were deleted, and that the deleted
     // keys are a subset of the originally created keys.
-    List<String> pendingDeleteKeys = getAllPendingDeleteKeys();
-    List<String> expiredKeys = getAllExpiredOpenKeys();
+    Set<String> pendingDeleteKeys = getAllPendingDeleteKeys();
+    Set<String> expiredKeys = getAllExpiredOpenKeys();
 
     Assert.assertTrue(originalExpiredKeys.containsAll(pendingDeleteKeys));
     Assert.assertTrue(originalExpiredKeys.containsAll(expiredKeys));
 
     // Two service runs should have reached their task limit.
-    Assert.assertEquals(taskLimit * numServiceRuns,
-        getAllPendingDeleteKeys().size());
+    Assert.assertEquals(TASK_LIMIT * numServiceRuns,
+        pendingDeleteKeys.size());
     // All remaining keys should still be present in the open key table.
-    Assert.assertEquals(taskLimit, getAllExpiredOpenKeys().size());
+    Assert.assertEquals(TASK_LIMIT, expiredKeys.size());
   }
 
   @Test
@@ -234,11 +214,11 @@ public class TestOpenKeyCleanupService {
     int numBlocks = 3;
 
     // Open keys created from a non-existent volume and bucket.
-    List<String> originalExpiredKeys = createExpiredOpenKeys(DEFAULT_VOLUME + "2",
-        DEFAULT_BUCKET + "2", taskLimit, numBlocks);
+    Set<String> originalExpiredKeys = createExpiredOpenKeys(DEFAULT_VOLUME +
+            "2", DEFAULT_BUCKET + "2", TASK_LIMIT, numBlocks);
 
     // Verify test setup.
-    Assert.assertEquals(taskLimit, originalExpiredKeys.size());
+    Assert.assertEquals(TASK_LIMIT, originalExpiredKeys.size());
     Assert.assertEquals(getAllExpiredOpenKeys(), originalExpiredKeys);
     Assert.assertEquals(0, getAllPendingDeleteKeys().size());
 
@@ -251,11 +231,11 @@ public class TestOpenKeyCleanupService {
 
   @Test
   public void testWithMultipleVolumesAndBuckets() throws Exception {
-    int numKeysPerBucket = taskLimit;
+    int numKeysPerBucket = TASK_LIMIT;
     int numBlocks = 3;
     int numServiceRuns = 3;
 
-    List<String> allCreatedKeys = new ArrayList<>();
+    Set<String> allCreatedKeys = new HashSet<>();
 
     // Open keys created from the default volume and bucket.
     allCreatedKeys.addAll(
@@ -282,12 +262,13 @@ public class TestOpenKeyCleanupService {
     Assert.assertEquals(0, getAllExpiredOpenKeys().size());
   }
 
-  private List<String> getAllExpiredOpenKeys() throws Exception {
-    return keyManager.getExpiredOpenKeys(expireThreshold, Integer.MAX_VALUE);
+  private Set<String> getAllExpiredOpenKeys() throws Exception {
+    return new HashSet<>(keyManager.getExpiredOpenKeys(EXPIRE_THRESHOLD,
+        Integer.MAX_VALUE));
   }
 
-  private List<String> getAllOpenKeys() throws Exception {
-    List<String> keys = new ArrayList<>();
+  private Set<String> getAllOpenKeys() throws Exception {
+    Set<String> keys = new HashSet<>();
     List<? extends Table.KeyValue<String, OmKeyInfo>> keyPairs =
         metadataManager.getOpenKeyTable().getRangeKVs(null,
         Integer.MAX_VALUE);
@@ -299,11 +280,11 @@ public class TestOpenKeyCleanupService {
     return keys;
   }
 
-  private List<String> getAllPendingDeleteKeys() throws Exception {
+  private Set<String> getAllPendingDeleteKeys() throws Exception {
     List<BlockGroup> blocks =
         keyManager.getPendingDeletionKeys(Integer.MAX_VALUE);
 
-    List<String> keyNames = new ArrayList<>();
+    Set<String> keyNames = new HashSet<>();
     for (BlockGroup block : blocks) {
       keyNames.add(block.getGroupID());
     }
@@ -317,9 +298,7 @@ public class TestOpenKeyCleanupService {
 
   private void runService(int numRuns) throws Exception {
     int serviceIntervalMillis =
-        serviceInterval.toIntExact(TimeUnit.MILLISECONDS);
-
-    cluster.restartOzoneManager();
+        SERVICE_INTERVAL.toIntExact(TimeUnit.MILLISECONDS);
 
     for (int i = 0; i < numRuns; i++) {
       service.getTasks().poll().call();
@@ -327,40 +306,38 @@ public class TestOpenKeyCleanupService {
 //    GenericTestUtils.waitFor(
 //        () -> service.getRunCount().get() >= numRuns,
 //        serviceIntervalMillis, serviceIntervalMillis * 10);
-
-    cluster.stop();
   }
 
-  private List<String> createExpiredOpenKeys(int numKeys) throws Exception {
+  private Set<String> createExpiredOpenKeys(int numKeys) throws Exception {
     return createOpenKeys(DEFAULT_VOLUME, DEFAULT_BUCKET, numKeys, 0, true);
   }
 
-  private List<String> createExpiredOpenKeys(int numKeys, int numBlocks)
+  private Set<String> createExpiredOpenKeys(int numKeys, int numBlocks)
       throws Exception {
     return createOpenKeys(DEFAULT_VOLUME, DEFAULT_BUCKET, numKeys, numBlocks,
         true);
   }
 
-  private List<String> createExpiredOpenKeys(String volume, String bucket,
+  private Set<String> createExpiredOpenKeys(String volume, String bucket,
       int numKeys, int numBlocks) throws Exception {
     return createOpenKeys(volume, bucket, numKeys, numBlocks, true);
   }
 
-  private List<String> createOpenKeys(int numKeys) throws Exception {
+  private Set<String> createOpenKeys(int numKeys) throws Exception {
     return createOpenKeys(DEFAULT_VOLUME, DEFAULT_BUCKET, numKeys, 0, false);
   }
 
-  private List<String> createOpenKeys(String volume, String bucket, int numKeys,
+  private Set<String> createOpenKeys(String volume, String bucket, int numKeys,
       int numBlocks, boolean expired) throws Exception {
 
-    List<String> openKeys = new ArrayList<>();
+    Set<String> openKeys = new HashSet<>();
     long creationTime = Instant.now().toEpochMilli();
 
     // Simulate expired keys by creating them with age twice that of the
     // expiration age.
     if (expired) {
       long ageMillis =
-          expireThreshold.add(expireThreshold).toLong(TimeUnit.MILLISECONDS);
+          EXPIRE_THRESHOLD.add(EXPIRE_THRESHOLD).toLong(TimeUnit.MILLISECONDS);
       creationTime -= ageMillis;
     }
 
