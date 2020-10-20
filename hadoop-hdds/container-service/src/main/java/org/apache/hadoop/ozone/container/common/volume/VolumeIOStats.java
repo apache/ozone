@@ -48,10 +48,8 @@ public class VolumeIOStats {
   }
 
   public void init() {
-    DefaultMetricsSystem.initialize(sourceName);
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.register(sourceName, "Volume I/O Statistics", this);
-
     this.registry = new MetricsRegistry(sourceName);
   }
 
