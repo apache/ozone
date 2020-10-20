@@ -206,7 +206,7 @@ public class TestOzoneFileSystem {
     }
   }
 
-  @Test(timeout = 600_000)
+  @Test(timeout = 300_000)
   public void testFileSystem() throws Exception {
     setupOzoneFileSystem();
 
