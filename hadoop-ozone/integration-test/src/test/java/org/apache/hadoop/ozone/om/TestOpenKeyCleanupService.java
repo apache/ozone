@@ -19,21 +19,20 @@
 
 package org.apache.hadoop.ozone.om;
 
-import java.security.cert.CollectionCertStoreParameters;
 import java.time.Instant;
-import java.util.Collection;
 import java.util.Random;
 
-import com.google.common.collect.Lists;
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
-import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.ratis.util.TimeDuration;
 import org.junit.After;
 import org.junit.Assert;
@@ -87,16 +86,31 @@ public class TestOpenKeyCleanupService {
     cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
 
-    OzoneManager omLeader = cluster.getOMLeader();
+    OzoneManager omLeader = cluster.getOzoneManager();
     keyManager = omLeader.getKeyManager();
     service = (OpenKeyCleanupService) keyManager.getOpenKeyCleanupService();
     metadataManager = omLeader.getMetadataManager();
 
-    // Stop all OMs so no services are run until we trigger them.
-    cluster.stop();
+//    OmVolumeArgs volumeArgs = OmVolumeArgs.newBuilder()
+//        .setVolume(DEFAULT_VOLUME)
+//        .setAdminName("foo")
+//        .setOwnerName("foo")
+//        .build();
+//    OmBucketInfo bucketArgs = OmBucketInfo.newBuilder()
+//        .setVolumeName(DEFAULT_VOLUME)
+//        .setBucketName(DEFAULT_BUCKET)
+//        .setAcls(new ArrayList<>())
+//        .setIsVersionEnabled(true)
+//        .setStorageType(StorageType.DEFAULT)
+//        .build();
+//
+//    omLeader.createVolume(volumeArgs);
+//    omLeader.createBucket(bucketArgs);
 
     TestOMRequestUtils.addVolumeToDB(DEFAULT_VOLUME, metadataManager);
     TestOMRequestUtils.addBucketToDB(DEFAULT_VOLUME, DEFAULT_BUCKET, metadataManager);
+
+    cluster.stop();
   }
 
   @After
