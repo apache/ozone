@@ -177,7 +177,7 @@ public class TestContainerMetrics {
       // Check VolumeIOStats metrics
       HddsVolume hddsVolume = volumeSet.getVolumesList().get(0);
       MetricsRecordBuilder volumeIOMetrics =
-          getMetrics(hddsVolume.getVolumeIOStats().sourceName);
+          getMetrics(hddsVolume.getVolumeIOStats().getMetricsSourceName());
       assertCounter("ReadBytes", 1024L, volumeIOMetrics);
       assertCounter("ReadOpCount", 1L, volumeIOMetrics);
       assertCounter("WriteBytes", 1024L, volumeIOMetrics);
