@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.metrics;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.assertQuantileGauges;
+import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 
 import com.google.common.collect.Maps;
@@ -48,6 +49,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -171,6 +173,18 @@ public class TestContainerMetrics {
       String sec = interval + "s";
       Thread.sleep((interval + 1) * 1000);
       assertQuantileGauges("WriteChunkNanos" + sec, containerMetrics);
+
+      // Check VolumeIOStats metrics
+      HddsVolume hddsVolume = volumeSet.getVolumesList().get(0);
+      MetricsRecordBuilder volumeIOMetrics =
+          getMetrics(hddsVolume.getVolumeIOStats().getMetricsSourceName());
+      assertCounter("ReadBytes", 1024L, volumeIOMetrics);
+      assertCounter("ReadOpCount", 1L, volumeIOMetrics);
+      assertCounter("WriteBytes", 1024L, volumeIOMetrics);
+      assertCounter("WriteOpCount", 1L, volumeIOMetrics);
+      // ReadTime and WriteTime vary from run to run, only checking non-zero
+      Assert.assertNotEquals(0L, getLongCounter("ReadTime", volumeIOMetrics));
+      Assert.assertNotEquals(0L, getLongCounter("WriteTime", volumeIOMetrics));
     } finally {
       if (client != null) {
         client.close();
