@@ -996,7 +996,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     List<String> expiredKeys = Lists.newArrayList();
 
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-                 keyValueTableIterator = getOpenKeyTable().iterator()) {
+        keyValueTableIterator = getOpenKeyTable().iterator()) {
 
       while (keyValueTableIterator.hasNext() && expiredKeys.size() < count) {
         KeyValue<String, OmKeyInfo> openKeyValue = keyValueTableIterator.next();
