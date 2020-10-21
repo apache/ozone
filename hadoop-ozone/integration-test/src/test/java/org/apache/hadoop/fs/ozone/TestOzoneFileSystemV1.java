@@ -55,7 +55,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 
 /**
- * Ozone file system tests that are not covered by contract tests.
+ * Ozone file system tests that are not covered by contract tests,
+ * layout version V1.
  *
  * Note: When adding new test(s), please append it in testFileSystem() to
  * avoid test run time regression.
@@ -91,34 +92,34 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
               outputStream);
     }
     Path d1 = new Path("/d1");
-    Path d1_key1 = new Path(d1, "key1");
-    try (FSDataOutputStream outputStream = fs.create(d1_key1, false)) {
-      assertNotNull("Should be able to create file: " + d1_key1,
+    Path dir1Key1 = new Path(d1, "key1");
+    try (FSDataOutputStream outputStream = fs.create(dir1Key1, false)) {
+      assertNotNull("Should be able to create file: " + dir1Key1,
               outputStream);
     }
     Path d2 = new Path("/d2");
-    Path d2_key1 = new Path(d2, "key1");
-    try (FSDataOutputStream outputStream = fs.create(d2_key1, false)) {
-      assertNotNull("Should be able to create file: " + d2_key1,
+    Path dir2Key1 = new Path(d2, "key1");
+    try (FSDataOutputStream outputStream = fs.create(dir2Key1, false)) {
+      assertNotNull("Should be able to create file: " + dir2Key1,
               outputStream);
     }
-    Path d1_d2 = new Path("/d1/d2/");
-    Path d1_d2_key1 = new Path(d1_d2, "key1");
-    try (FSDataOutputStream outputStream = fs.create(d1_d2_key1, false)) {
-      assertNotNull("Should be able to create file: " + d1_d2_key1,
+    Path dir1Dir2 = new Path("/d1/d2/");
+    Path dir1Dir2Key1 = new Path(dir1Dir2, "key1");
+    try (FSDataOutputStream outputStream = fs.create(dir1Dir2Key1, false)) {
+      assertNotNull("Should be able to create file: " + dir1Dir2Key1,
               outputStream);
     }
-    Path d1_key2 = new Path(d1, "key2");
-    try (FSDataOutputStream outputStream = fs.create(d1_key2, false)) {
-      assertNotNull("Should be able to create file: " + d1_key2,
+    Path d1Key2 = new Path(d1, "key2");
+    try (FSDataOutputStream outputStream = fs.create(d1Key2, false)) {
+      assertNotNull("Should be able to create file: " + d1Key2,
               outputStream);
     }
 
-    Path d1_d3 = new Path("/d1/d3/");
-    Path d1_d4 = new Path("/d1/d4/");
+    Path dir1Dir3 = new Path("/d1/d3/");
+    Path dir1Dir4 = new Path("/d1/d4/");
 
-    fs.mkdirs(d1_d3);
-    fs.mkdirs(d1_d4);
+    fs.mkdirs(dir1Dir3);
+    fs.mkdirs(dir1Dir4);
 
     // Root Directory
     FileStatus[] fileStatusList = fs.listStatus(new Path("/"));
@@ -188,6 +189,7 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
       fail("Should throw FileNotFoundException");
     } catch (FileNotFoundException fnfe) {
       // ignore as its expected
+
     }
   }
 
@@ -198,9 +200,10 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
      * Op 3. create dir -> /key2
      * Op 4. create dir -> /d1/d2/d1/d2/key1
      */
-    Path d1_d1_d2_key1 = new Path("/d1/d1/d2/key1");
-    try (FSDataOutputStream outputStream = fs.create(d1_d1_d2_key1, false)) {
-      assertNotNull("Should be able to create file: " + d1_d1_d2_key1,
+    Path dir1Dir1Dir2Key1 = new Path("/d1/d1/d2/key1");
+    try (FSDataOutputStream outputStream = fs.create(dir1Dir1Dir2Key1,
+            false)) {
+      assertNotNull("Should be able to create file: " + dir1Dir1Dir2Key1,
               outputStream);
     }
     Path key1 = new Path("/key1");
@@ -213,19 +216,20 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
       assertNotNull("Should be able to create file: key2",
               outputStream);
     }
-    Path d1_d2_d1_d2_key1 = new Path("/d1/d2/d1/d2/key1");
-    try (FSDataOutputStream outputStream = fs.create(d1_d2_d1_d2_key1, false)) {
-      assertNotNull("Should be able to create file: " + d1_d2_d1_d2_key1,
-              outputStream);
+    Path dir1Dir2Dir1Dir2Key1 = new Path("/d1/d2/d1/d2/key1");
+    try (FSDataOutputStream outputStream = fs.create(dir1Dir2Dir1Dir2Key1,
+            false)) {
+      assertNotNull("Should be able to create file: "
+              + dir1Dir2Dir1Dir2Key1, outputStream);
     }
     RemoteIterator<LocatedFileStatus> fileStatusItr = fs.listFiles(new Path(
             "/"), true);
     String uriPrefix = "o3fs://" + bucketName + "." + volumeName;
     ArrayList<String> expectedPaths = new ArrayList<>();
-    expectedPaths.add(uriPrefix + d1_d1_d2_key1.toString());
+    expectedPaths.add(uriPrefix + dir1Dir1Dir2Key1.toString());
     expectedPaths.add(uriPrefix + key1.toString());
     expectedPaths.add(uriPrefix + key2.toString());
-    expectedPaths.add(uriPrefix + d1_d2_d1_d2_key1.toString());
+    expectedPaths.add(uriPrefix + dir1Dir2Dir1Dir2Key1.toString());
     int expectedFilesCount = expectedPaths.size();
     int actualCount = 0;
     while (fileStatusItr.hasNext()) {
@@ -328,7 +332,8 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
     Assert.assertTrue("DirTable is not empty",
             metadataMgr.getDirectoryTable().isEmpty());
 
-    Assert.assertFalse(metadataMgr.getDirectoryTable().cacheIterator().hasNext());
+    Assert.assertFalse(metadataMgr.getDirectoryTable().cacheIterator()
+            .hasNext());
 
     TableIterator<String, ? extends
             Table.KeyValue<String, OmKeyInfo>> keyTableIterator =

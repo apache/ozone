@@ -656,7 +656,7 @@ public final class OMFileRequest {
    * @param volumeName volume name
    * @param bucketName bucket name
    * @param dirInfo    directory info
-   * @param keyName    usewr given key name
+   * @param keyName    user given key name
    * @return OmKeyInfo object
    */
   @NotNull

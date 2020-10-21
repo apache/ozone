@@ -101,14 +101,22 @@ public class TestOzoneFileSystem {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystem.class);
 
+  @SuppressWarnings("checkstyle:VisibilityModifier")
   protected boolean enabledFileSystemPaths;
 
+  @SuppressWarnings("checkstyle:VisibilityModifier")
   protected MiniOzoneCluster cluster;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
   protected FileSystem fs;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
   protected OzoneFileSystem o3fs;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
   protected String volumeName;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
   protected String bucketName;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
   protected int rootItemCount;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
   protected Trash trash;
 
   public void testCreateFileShouldCheckExistenceOfDirWithSameName()
@@ -276,7 +284,6 @@ public class TestOzoneFileSystem {
   protected void setupOzoneFileSystem()
       throws IOException, TimeoutException, InterruptedException {
     OzoneConfiguration conf = getOzoneConfig();
-    //conf.set(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, "V1");
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();

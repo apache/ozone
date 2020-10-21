@@ -122,6 +122,7 @@ public class TestOzoneFileInterfaces {
 
   private OMMetrics omMetrics;
 
+  @SuppressWarnings("checkstyle:VisibilityModifier")
   protected boolean enableFileSystemPaths;
 
   public TestOzoneFileInterfaces(boolean setDefaultFs,
