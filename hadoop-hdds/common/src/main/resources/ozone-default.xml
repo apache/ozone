@@ -1184,23 +1184,36 @@
   </property>
 
   <property>
-    <name>ozone.open.key.cleanup.service.interval.seconds</name>
-    <value>86400</value>
+    <name>ozone.open.key.cleanup.service.interval</name>
+    <value>24hr</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
     <description>
-      A background job periodically checks open key entries and delete the expired ones. This entry controls the
-      interval of this cleanup check.
+      A background job that periodically checks open key entries and marks
+      expired open keys for deletion. This entry controls the interval of this
+      cleanup check.
     </description>
   </property>
 
   <property>
     <name>ozone.open.key.expire.threshold</name>
-    <value>86400</value>
+    <value>24hr</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
     <description>
       Controls how long an open key operation is considered active. Specifically, if a key
       has been open longer than the value of this config entry, that open key is considered as
-      expired (e.g. due to client crash). Default to 24 hours.
+      expired (e.g. due to client crash).
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.open.key.cleanup.limit.per.task</name>
+    <value>100</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      The maximum number of open keys to be identified as expired and marked
+      for deletion by one run of the open key cleanup service on the OM.
+      This property is used to throttle the actual number of open key deletions
+      on the OM.
     </description>
   </property>
 
