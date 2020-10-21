@@ -823,6 +823,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       OzoneConfiguration conf) {
     SCMContainerLocationFailoverProxyProvider proxyProvider =
         new SCMContainerLocationFailoverProxyProvider(conf);
+
     StorageContainerLocationProtocol scmContainerClient =
         TracingUtil.createProxy(
             new StorageContainerLocationProtocolClientSideTranslatorPB(
