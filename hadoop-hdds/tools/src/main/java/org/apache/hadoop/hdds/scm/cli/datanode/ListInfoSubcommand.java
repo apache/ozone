@@ -60,30 +60,34 @@ public class ListInfoSubcommand extends ScmSubcommand {
     if (Strings.isNullOrEmpty(ipaddress) && Strings.isNullOrEmpty(uuid)) {
       getAllNodes(scmClient).forEach(this::printDatanodeInfo);
     } else {
-      Stream<DatanodeDetails> allNodes = getAllNodes(scmClient).stream();
+      Stream<DatanodeWithAttributes> allNodes = getAllNodes(scmClient).stream();
       if (!Strings.isNullOrEmpty(ipaddress)) {
-        allNodes = allNodes.filter(p -> p.getIpAddress()
+        allNodes = allNodes.filter(p -> p.getDatanodeDetails().getIpAddress()
             .compareToIgnoreCase(ipaddress) == 0);
       }
       if (!Strings.isNullOrEmpty(uuid)) {
-        allNodes = allNodes.filter(p -> p.getUuid().toString().equals(uuid));
+        allNodes = allNodes.filter(p ->
+            p.getDatanodeDetails().toString().equals(uuid));
       }
       allNodes.forEach(this::printDatanodeInfo);
     }
   }
 
-  private List<DatanodeDetails> getAllNodes(ScmClient scmClient)
+  private List<DatanodeWithAttributes> getAllNodes(ScmClient scmClient)
       throws IOException {
     List<HddsProtos.Node> nodes = scmClient.queryNode(null,
         HddsProtos.NodeState.HEALTHY, HddsProtos.QueryScope.CLUSTER, "");
 
     return nodes.stream()
-        .map(p -> DatanodeDetails.getFromProtoBuf(p.getNodeID()))
+        .map(p -> new DatanodeWithAttributes(
+            DatanodeDetails.getFromProtoBuf(p.getNodeID()),
+            p.getNodeOperationalStates(0), p.getNodeStates(0)))
         .collect(Collectors.toList());
   }
 
-  private void printDatanodeInfo(DatanodeDetails datanode) {
+  private void printDatanodeInfo(DatanodeWithAttributes dna) {
     StringBuilder pipelineListInfo = new StringBuilder();
+    DatanodeDetails datanode = dna.getDatanodeDetails();
     int relatedPipelineNum = 0;
     if (!pipelines.isEmpty()) {
       List<Pipeline> relatedPipelines = pipelines.stream().filter(
@@ -108,6 +112,34 @@ public class ListInfoSubcommand extends ScmSubcommand {
     System.out.println("Datanode: " + datanode.getUuid().toString() +
         " (" + datanode.getNetworkLocation() + "/" + datanode.getIpAddress()
         + "/" + datanode.getHostName() + "/" + relatedPipelineNum +
-        " pipelines) \n" + "Related pipelines: \n" + pipelineListInfo);
+        " pipelines)");
+    System.out.println("Operational State: " + dna.getOpState());
+    System.out.println("Related pipelines: \n" + pipelineListInfo);
+  }
+
+  private static class DatanodeWithAttributes {
+    private DatanodeDetails datanodeDetails;
+    private HddsProtos.NodeOperationalState operationalState;
+    private HddsProtos.NodeState healthState;
+
+    DatanodeWithAttributes(DatanodeDetails dn,
+        HddsProtos.NodeOperationalState opState,
+        HddsProtos.NodeState healthState) {
+      this.datanodeDetails = dn;
+      this.operationalState = opState;
+      this.healthState = healthState;
+    }
+
+    public DatanodeDetails getDatanodeDetails() {
+      return datanodeDetails;
+    }
+
+    public HddsProtos.NodeOperationalState getOpState() {
+      return operationalState;
+    }
+
+    public HddsProtos.NodeState getHealthState() {
+      return healthState;
+    }
   }
 }
