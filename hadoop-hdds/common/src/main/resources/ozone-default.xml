@@ -1185,7 +1185,7 @@
 
   <property>
     <name>ozone.open.key.cleanup.service.interval</name>
-    <value>24hr</value>
+    <value>24h</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
     <description>
       A background job that periodically checks open key entries and marks
@@ -1196,7 +1196,7 @@
 
   <property>
     <name>ozone.open.key.expire.threshold</name>
-    <value>24hr</value>
+    <value>24h</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
     <description>
       Controls how long an open key operation is considered active. Specifically, if a key
