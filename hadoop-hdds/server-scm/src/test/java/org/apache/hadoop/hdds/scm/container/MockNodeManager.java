@@ -360,6 +360,18 @@ public class MockNodeManager implements NodeManager {
   }
 
   /**
+   * Empty implementation for processLayoutVersionReport.
+   *
+   * @param dnUuid
+   * @param layoutReport
+   */
+  @Override
+  public void processLayoutVersionReport(DatanodeDetails dnUuid,
+                                         LayoutVersionProto layoutReport) {
+    // do nothing
+  }
+
+  /**
    * Update set of containers available on a datanode.
    * @param uuid - DatanodeID
    * @param containerIds - Set of containerIDs

@@ -21,6 +21,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -101,6 +102,11 @@ public final class SCMDatanodeHeartbeatDispatcher {
       commands = nodeManager.getCommandQueue(dnID);
 
     } else {
+      if (heartbeat.hasDataNodeLayoutVersion()) {
+        LOG.debug("Processing DataNode Layout Report.");
+        nodeManager.processLayoutVersionReport(datanodeDetails,
+            heartbeat.getDataNodeLayoutVersion());
+      }
 
       // should we dispatch heartbeat through eventPublisher?
       commands = nodeManager.processHeartbeat(datanodeDetails);
@@ -210,6 +216,18 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     public NodeReportFromDatanode(DatanodeDetails datanodeDetails,
         NodeReportProto report) {
+      super(datanodeDetails, report);
+    }
+  }
+
+  /**
+   * Layout report event payload with origin.
+   */
+  public static class LayoutReportFromDatanode
+      extends ReportFromDatanode<LayoutVersionProto> {
+
+    public LayoutReportFromDatanode(DatanodeDetails datanodeDetails,
+                                  LayoutVersionProto report) {
       super(datanodeDetails, report);
     }
   }

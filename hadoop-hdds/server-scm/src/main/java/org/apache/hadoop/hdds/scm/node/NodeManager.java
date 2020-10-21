@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -183,6 +184,16 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    */
   void processNodeReport(DatanodeDetails datanodeDetails,
                          NodeReportProto nodeReport);
+
+  /**
+   * Process Node LayoutVersion report.
+   *
+   * @param datanodeDetails
+   * @param layoutReport
+   */
+  void processLayoutVersionReport(DatanodeDetails datanodeDetails,
+                         LayoutVersionProto layoutReport);
+
 
   /**
    * Get list of SCMCommands in the Command Queue for a particular Datanode.
