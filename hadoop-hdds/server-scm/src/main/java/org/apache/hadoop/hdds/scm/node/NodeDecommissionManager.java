@@ -244,7 +244,8 @@ public class NodeDecommissionManager {
       throws NodeNotFoundException {
     NodeOperationalState opState = getNodeStatus(dn).getOperationalState();
     if (opState == NodeOperationalState.DECOMMISSIONING
-        || opState == NodeOperationalState.ENTERING_MAINTENANCE) {
+        || opState == NodeOperationalState.ENTERING_MAINTENANCE
+        || opState == NodeOperationalState.IN_MAINTENANCE) {
       monitor.startMonitoring(dn);
     }
   }
@@ -348,6 +349,15 @@ public class NodeDecommissionManager {
       LOG.error("Cannot start maintenance on node {} in state {}", dn, opState);
       throw new InvalidNodeStateException("Cannot start maintenance on node "+
           dn +" in state "+ opState);
+    }
+  }
+
+  /**
+   *  Stops the decommission monitor from running when SCM is shutdown.
+   */
+  public void stop() {
+    if (executor != null) {
+      executor.shutdown();
     }
   }
 

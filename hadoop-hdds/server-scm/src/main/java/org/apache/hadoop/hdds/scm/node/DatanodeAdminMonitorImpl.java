@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
-import com.google.common.annotations.VisibleForTesting;
-
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -108,6 +106,16 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   }
 
   /**
+   * Get the set of nodes which are currently tracked in the decommissioned
+   * and maintenance workflow.
+   * @return An unmodifiable set of the tracked nodes.
+   */
+  @Override
+  public synchronized Set<DatanodeDetails> getTrackedNodes() {
+    return Collections.unmodifiableSet(trackedNodes);
+  }
+
+  /**
    * Run an iteration of the monitor. This is the main run loop, and performs
    * the following checks:
    * <p>
@@ -146,11 +154,6 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
   public int getTrackedNodeCount() {
     return trackedNodes.size();
-  }
-
-  @VisibleForTesting
-  public Set<DatanodeDetails> getTrackedNodes() {
-    return trackedNodes;
   }
 
   private void processCancelledNodes() {
