@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;

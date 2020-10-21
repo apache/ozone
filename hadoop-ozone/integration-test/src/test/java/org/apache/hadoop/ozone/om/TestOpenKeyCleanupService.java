@@ -44,6 +44,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Integration tests for the open key cleanup service on OM.
+ */
 public class TestOpenKeyCleanupService {
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -52,12 +55,12 @@ public class TestOpenKeyCleanupService {
   // service manually between setting up the DB and checking the results.
   // Increase service interval of key deleting service to ensure it does not
   // run during the tests, interfering with results.
-  private static final TimeDuration TESTING_SERVICE_INTERVAL = TimeDuration.valueOf(24,
-      TimeUnit.HOURS);
+  private static final TimeDuration TESTING_SERVICE_INTERVAL =
+      TimeDuration.valueOf(24, TimeUnit.HOURS);
   // High expiration time used so keys without modified creation time will not
   // expire during the test.
-  private static final TimeDuration TESTING_EXPIRE_THRESHOLD = TimeDuration.valueOf(24,
-      TimeUnit.HOURS);
+  private static final TimeDuration TESTING_EXPIRE_THRESHOLD =
+      TimeDuration.valueOf(24, TimeUnit.HOURS);
   // Maximum number of keys to be cleaned up per run of the service.
   private static final int TESTING_TASK_LIMIT = 10;
 
@@ -83,13 +86,16 @@ public class TestOpenKeyCleanupService {
 
     // Make sure key deletion does not run during the tests.
     conf.setTimeDuration(OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
-        TESTING_SERVICE_INTERVAL.getDuration(), TESTING_SERVICE_INTERVAL.getUnit());
+        TESTING_SERVICE_INTERVAL.getDuration(),
+        TESTING_SERVICE_INTERVAL.getUnit());
     // Set open key cleanup configurations.
     conf.setTimeDuration(OMConfigKeys.OZONE_OPEN_KEY_CLEANUP_SERVICE_INTERVAL,
-        openKeyCleanupServiceInterval.getDuration(), openKeyCleanupServiceInterval.getUnit());
+        openKeyCleanupServiceInterval.getDuration(),
+        openKeyCleanupServiceInterval.getUnit());
     conf.setTimeDuration(OMConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD,
         openKeyExpireThreshold.getDuration(), openKeyExpireThreshold.getUnit());
-    conf.setInt(OMConfigKeys.OZONE_OPEN_KEY_CLEANUP_LIMIT_PER_TASK, TESTING_TASK_LIMIT);
+    conf.setInt(OMConfigKeys.OZONE_OPEN_KEY_CLEANUP_LIMIT_PER_TASK,
+        TESTING_TASK_LIMIT);
 
     cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
@@ -100,7 +106,8 @@ public class TestOpenKeyCleanupService {
     metadataManager = omLeader.getMetadataManager();
 
     TestOMRequestUtils.addVolumeToDB(DEFAULT_VOLUME, metadataManager);
-    TestOMRequestUtils.addBucketToDB(DEFAULT_VOLUME, DEFAULT_BUCKET, metadataManager);
+    TestOMRequestUtils.addBucketToDB(DEFAULT_VOLUME, DEFAULT_BUCKET,
+        metadataManager);
   }
 
   @After

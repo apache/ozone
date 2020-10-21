@@ -161,8 +161,8 @@ public final class OzoneManagerRatisUtils {
       return new S3GetSecretRequest(omRequest);
     case RecoverTrash:
       return new OMTrashRecoverRequest(omRequest);
-     case DeleteOpenKeys:
-       return new OMOpenKeysDeleteRequest(omRequest);
+    case DeleteOpenKeys:
+      return new OMOpenKeysDeleteRequest(omRequest);
     default:
       throw new IllegalStateException("Unrecognized write command " +
           "type request" + cmdType);

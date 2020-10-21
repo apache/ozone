@@ -90,8 +90,9 @@ public final class OMConfigKeys {
   // TODO: Refine open key cleanup default values.
   public static final String OZONE_OPEN_KEY_CLEANUP_SERVICE_INTERVAL =
       "ozone.open.key.cleanup.service.interval";
-  public static final TimeDuration OZONE_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_DEFAULT
-      = TimeDuration.valueOf(24, TimeUnit.HOURS);
+  public static final TimeDuration
+      OZONE_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_DEFAULT =
+      TimeDuration.valueOf(24, TimeUnit.HOURS);
 
   public static final String OZONE_OPEN_KEY_EXPIRE_THRESHOLD =
       "ozone.open.key.expire.threshold";

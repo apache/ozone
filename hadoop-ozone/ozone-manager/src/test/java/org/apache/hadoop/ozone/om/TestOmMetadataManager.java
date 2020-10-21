@@ -544,14 +544,14 @@ public class TestOmMetadataManager {
         OMConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_DEFAULT.getDuration(),
         expireUnit);
 
-    // HACK: expire threshold is always returned in seconds for some reason.
     TimeDuration expireDuration = TimeDuration.valueOf(expireThreshold,
-          TimeUnit.SECONDS);
-//        expireUnit);
+        expireUnit);
+
+    long expireThresholdMillis = expireDuration.toLong(TimeUnit.MILLISECONDS);
 
     final long expiredAgeMillis =
-            Instant.now().minus(expireThreshold * 2,
-                    ChronoUnit.SECONDS).toEpochMilli();
+            Instant.now().minus(expireThresholdMillis * 2,
+                    ChronoUnit.MILLIS).toEpochMilli();
 
     // Add expired keys to open key table.
     // The method under test does not check for expired open keys in the

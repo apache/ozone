@@ -36,9 +36,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.ratis.util.TimeDuration;
 
 import java.io.IOException;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Handles key level commands.
