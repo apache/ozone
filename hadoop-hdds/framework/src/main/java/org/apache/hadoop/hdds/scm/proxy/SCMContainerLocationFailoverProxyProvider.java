@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
@@ -105,7 +104,7 @@ public class SCMContainerLocationFailoverProxyProvider implements
           ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY)
           .orElse(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT);
       for (String scmAddress : scmAddressList) {
-        LOG.info("SCM Address for proxy is {}", scmAddress);
+        LOG.debug("SCM Address for proxy is {}", scmAddress);
 
         Optional<String> hostname = getHostName(scmAddress);
         if (hostname.isPresent()) {
@@ -262,7 +261,7 @@ public class SCMContainerLocationFailoverProxyProvider implements
       InetSocketAddress scmAddress) throws IOException {
     Configuration hadoopConf =
         LegacyHadoopConfigurationSource.asHadoopConfiguration(conf);
-    RPC.setProtocolEngine(hadoopConf, StorageContainerLocationProtocol.class,
+    RPC.setProtocolEngine(hadoopConf, StorageContainerLocationProtocolPB.class,
         ProtobufRpcEngine.class);
     return RPC.getProxy(
         StorageContainerLocationProtocolPB.class,
