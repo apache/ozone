@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 
+import java.util.Set;
+
 /**
  * Interface used by the DatanodeAdminMonitor, which can be used to
  * decommission or recommission nodes and take them in and out of maintenance.
@@ -27,5 +29,6 @@ public interface DatanodeAdminMonitor extends Runnable {
 
   void startMonitoring(DatanodeDetails dn);
   void stopMonitoring(DatanodeDetails dn);
+  Set<DatanodeDetails> getTrackedNodes();
 
 }
