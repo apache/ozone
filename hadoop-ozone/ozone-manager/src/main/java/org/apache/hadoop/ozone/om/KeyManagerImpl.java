@@ -1773,7 +1773,7 @@ public class KeyManagerImpl implements KeyManager {
 
     if (OzoneManagerRatisUtils.isOmLayoutVersionV1()) {
       return getOzoneFileStatusV1(volumeName, bucketName, keyName,
-              args.getSortDatanodes(), clientAddress, true);
+              args.getSortDatanodes(), clientAddress, false);
     }
     return getOzoneFileStatus(volumeName, bucketName, keyName,
             args.getRefreshPipeline(), args.getSortDatanodes(), clientAddress);
@@ -1842,7 +1842,7 @@ public class KeyManagerImpl implements KeyManager {
 
   private OzoneFileStatus getOzoneFileStatusV1(String volumeName,
       String bucketName, String keyName, boolean sortDatanodes,
-      String clientAddress, boolean skipNonExistsKeyCheck) throws IOException {
+      String clientAddress, boolean skipFileNotFoundError) throws IOException {
     OzoneFileStatus fileStatus = null;
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
             bucketName);
@@ -1859,9 +1859,11 @@ public class KeyManagerImpl implements KeyManager {
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
               bucketName);
+    }
 
+    if (fileStatus != null) {
       // if the key is a file then do refresh pipeline info in OM by asking SCM
-      if (fileStatus != null && fileStatus.isFile()) {
+      if (fileStatus.isFile()) {
 
         OmKeyInfo fileKeyInfo = fileStatus.getKeyInfo();
 
@@ -1874,6 +1876,8 @@ public class KeyManagerImpl implements KeyManager {
           sortDatanodeInPipeline(fileKeyInfo, clientAddress);
         }
         return new OzoneFileStatus(fileKeyInfo, scmBlockSize, false);
+      } else {
+        return fileStatus;
       }
     }
 
@@ -1885,7 +1889,7 @@ public class KeyManagerImpl implements KeyManager {
     }
 
     // don't throw exception if this flag is true.
-    if (skipNonExistsKeyCheck) {
+    if (skipFileNotFoundError) {
       return fileStatus;
     }
 
@@ -2352,7 +2356,7 @@ public class KeyManagerImpl implements KeyManager {
          */
         // TODO: recursive flag=true will be handled in HDDS-4360 jira.
         OzoneFileStatus fileStatusInfo = getOzoneFileStatusV1(volumeName,
-                bucketName, startKey, false, null, false);
+                bucketName, startKey, false, null, true);
 
         if (fileStatusInfo != null) {
           prefixKeyInDB = fileStatusInfo.getKeyInfo().getParentObjectID();
