@@ -31,7 +31,7 @@ icon: user
 ## 客户端用法
 ### Storage space级别配额
  Storage space级别配额允许使用 KB（k），MB（m），GB（g），TB（t）， PB（p）等单位。表示将使用多少个存储空间。
-#### Volume Storage Space level quota
+#### Volume Space quota用法
 ```shell
 bin/ozone sh volume create --space-quota 5m /volume1
 ```
@@ -42,7 +42,7 @@ bin/ozone sh volume setquota --space-quota 10g /volume1
 ```
  此行为将volume1的配额更改为10GB。
 
-#### Bucket Storage Space level quota
+#### Bucket Space quota 用法
 ```shell
 bin/ozone sh bucket create --space-quota 5m /volume1/bucket1
 ```
