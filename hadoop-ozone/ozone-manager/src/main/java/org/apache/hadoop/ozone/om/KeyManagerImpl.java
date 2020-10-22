@@ -1773,7 +1773,7 @@ public class KeyManagerImpl implements KeyManager {
 
     if (OzoneManagerRatisUtils.isOmLayoutVersionV1()) {
       return getOzoneFileStatusV1(volumeName, bucketName, keyName,
-              args.getSortDatanodes(), clientAddress);
+              args.getSortDatanodes(), clientAddress, true);
     }
     return getOzoneFileStatus(volumeName, bucketName, keyName,
             args.getRefreshPipeline(), args.getSortDatanodes(), clientAddress);
@@ -1841,11 +1841,8 @@ public class KeyManagerImpl implements KeyManager {
 
 
   private OzoneFileStatus getOzoneFileStatusV1(String volumeName,
-                                             String bucketName,
-                                             String keyName,
-                                             boolean sortDatanodes,
-                                             String clientAddress)
-          throws IOException {
+      String bucketName, String keyName, boolean sortDatanodes,
+      String clientAddress, boolean skipNonExistsKeyCheck) throws IOException {
     OzoneFileStatus fileStatus = null;
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
             bucketName);
@@ -1859,10 +1856,6 @@ public class KeyManagerImpl implements KeyManager {
       fileStatus = OMFileRequest.getOMKeyInfoIfExists(metadataManager,
               volumeName, bucketName, keyName, scmBlockSize);
 
-      // Check if the key is a directory or a file(leaf node).
-      if (fileStatus != null) {
-        return fileStatus;
-      }
     } finally {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
               bucketName);
@@ -1884,12 +1877,18 @@ public class KeyManagerImpl implements KeyManager {
       }
     }
 
-    // Key is not found, throws exception
+    // Key not found.
     if (LOG.isDebugEnabled()) {
       LOG.debug("Unable to get file status for the key: volume: {}, bucket:" +
                       " {}, key: {}, with error: No such file exists.",
               volumeName, bucketName, keyName);
     }
+
+    // don't throw exception if this flag is true.
+    if (skipNonExistsKeyCheck) {
+      return fileStatus;
+    }
+
     throw new OMException("Unable to get file status: volume: " +
             volumeName + " bucket: " + bucketName + " key: " + keyName,
             FILE_NOT_FOUND);
@@ -2327,6 +2326,7 @@ public class KeyManagerImpl implements KeyManager {
         seekFileInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
         seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
 
+        // TODO: recursive flag=true will be handled in HDDS-4360 jira.
         // Order of seek -> (1)Seek dirs in dirTable (2)Seek files in fileTable
         // 1. Seek the given key in key table.
         countEntries = getFilesFromDirectory(fileStatusList, seekFileInDB,
@@ -2352,7 +2352,7 @@ public class KeyManagerImpl implements KeyManager {
          */
         // TODO: recursive flag=true will be handled in HDDS-4360 jira.
         OzoneFileStatus fileStatusInfo = getOzoneFileStatusV1(volumeName,
-                bucketName, startKey, false, null);
+                bucketName, startKey, false, null, false);
 
         if (fileStatusInfo != null) {
           prefixKeyInDB = fileStatusInfo.getKeyInfo().getParentObjectID();
@@ -2377,7 +2377,8 @@ public class KeyManagerImpl implements KeyManager {
 
             // Seek the given key in key table.
             countEntries = getFilesFromDirectory(fileStatusList, seekFileInDB,
-                    prefixPath, prefixKeyInDB, startKey, countEntries, numEntries);
+                    prefixPath, prefixKeyInDB, startKey, countEntries,
+                    numEntries);
             // Seek the given key in dir table.
             getDirectories(recursive, startKey, numEntries, fileStatusList,
                     volumeName, bucketName, seekDirInDB,
@@ -2385,6 +2386,7 @@ public class KeyManagerImpl implements KeyManager {
           }
         } else {
           // No key exists for the given startKey.
+          // TODO: HDDS-4364: startKey can be a non-existed key
           return Collections.emptyList();
         }
       }
@@ -2410,6 +2412,7 @@ public class KeyManagerImpl implements KeyManager {
     return fileStatusFinalList;
   }
 
+  @SuppressWarnings("parameternumber")
   protected int getDirectories(boolean recursive, String startKey,
       long numEntries, Set<OzoneFileStatus> fileStatusList,
       String volumeName, String bucketName, String seekDirInDB,
@@ -2431,9 +2434,8 @@ public class KeyManagerImpl implements KeyManager {
         break;
       }
 
-      if (recursive) {
-        // TODO: recursive list will be handled in HDDS-4360 jira.
-      } else {
+      // TODO: recursive list will be handled in HDDS-4360 jira.
+      if (!recursive) {
         String dirName = OMFileRequest.getAbsolutePath(prefixPath,
                 dirInfo.getName());
         OmKeyInfo omKeyInfo = OMFileRequest.getOmKeyInfo(volumeName,
@@ -2470,7 +2472,7 @@ public class KeyManagerImpl implements KeyManager {
       String fullKeyPath = OMFileRequest.getAbsolutePath(prefixKeyPath,
               keyInfo.getKeyName());
       keyInfo.setKeyName(fullKeyPath);
-      fileStatusList.add(new OzoneFileStatus(keyInfo, scmBlockSize,false));
+      fileStatusList.add(new OzoneFileStatus(keyInfo, scmBlockSize, false));
       countEntries++;
       iterator.next(); // move to next entry in the table
     }
@@ -2484,6 +2486,7 @@ public class KeyManagerImpl implements KeyManager {
   /**
    * Helper function for listStatus to find key in FileTableCache.
    */
+  @SuppressWarnings("parameternumber")
   private void listStatusFindFilesInTableCache(
           Set<OzoneFileStatus> fileStatusList, Table<String,
           OmKeyInfo> keyTable, long prefixKeyInDB, String seekKeyInDB,
@@ -2535,6 +2538,7 @@ public class KeyManagerImpl implements KeyManager {
   /**
    * Helper function for listStatus to find key in DirTableCache.
    */
+  @SuppressWarnings("parameternumber")
   private void listStatusFindDirsInTableCache(
           Set<OzoneFileStatus> fileStatusList, Table<String,
           OmDirectoryInfo> dirTable, long prefixKeyInDB, String seekKeyInDB,
