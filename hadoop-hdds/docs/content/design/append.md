@@ -38,11 +38,17 @@ When Append occurs, determine if the container for the last block is closed. If 
                                                                                                                                                                               
 ### Request process：
 ![avatar](doc-image/append.png)
+
 1.Client executes append key operation to OM
+
 2.OM checks if the key is in appendTable; if so, the key is being called by another client append. Cannot be appended at this point. If not, add the key to the Append Table.
+
 3. Check whether the last block of the key belongs to a closed container, if so, apply to SCM for a new block, if so, use the current block directly.
+
 4. The output stream object that OM returns to Client a Block
+
 5. Client writes data to this output stream. The Block output stream object internally invokes the send request command operation to write the actual Chunk file
+
 6. Client closes, commitKey is called, keyTable is updated, and key is removed from appendTable.
 
 ### OM
