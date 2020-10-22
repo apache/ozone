@@ -1667,8 +1667,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       volumeArgs = metadataManager.getVolumeTable().get(dbVolumeKey);
     } catch (IOException ioe) {
-      throw new OMException("Volume " + volume + " is not found",
-          OMException.ResultCodes.VOLUME_NOT_FOUND);
+      if (ioe instanceof OMException) {
+        throw (OMException)ioe;
+      } else {
+        throw new OMException("getVolumeOwner for Volume " + volume + " failed",
+            ResultCodes.INTERNAL_ERROR);
+      }
     } finally {
       if (lockAcquired) {
         metadataManager.getLock().releaseReadLock(VOLUME_LOCK, volume);
