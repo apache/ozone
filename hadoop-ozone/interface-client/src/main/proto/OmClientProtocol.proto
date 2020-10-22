@@ -802,6 +802,15 @@ message CreateFileRequest {
     optional uint64 clientID = 4;
 }
 
+message AppendFileRequest {
+    required KeyArgs keyArgs = 1;
+    optional uint64 clientID = 4;
+}
+message AppendKeyRequest {
+    required KeyArgs keyArgs = 1;
+    optional uint64 clientID = 4;
+}
+
 message CreateFileResponse {
 
     optional KeyInfo keyInfo = 1;
