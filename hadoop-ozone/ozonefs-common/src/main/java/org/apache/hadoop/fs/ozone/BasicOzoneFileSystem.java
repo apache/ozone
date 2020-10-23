@@ -426,7 +426,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       // if doesn't have TO_TRASH option, just pass the call to super
       super.rename(src, dst, options);
     } else {
-      rename(src,dst);
+      rename(src, dst);
     }
   }
 

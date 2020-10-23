@@ -41,7 +41,6 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.TrashDeletingService;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
@@ -1176,11 +1175,10 @@ public class TestRootedOzoneFileSystem {
   /**
    * @throws Exception
    * 1.Move a Key to Trash
-   * 2.Start TrashDeletingService
-   * 3.Verify that the TrashDeletingService purges the key after minimum set TrashInterval of 1 min.
+   * 2.Verify that the key gets deleted by the trash emptier.
    */
   @Test
-  public void testTrashDeletingService() throws Exception {
+  public void testTrash() throws Exception {
     String testKeyName = "keyToBeDeleted";
     Path path = new Path(bucketPath, testKeyName);
     try (FSDataOutputStream stream = fs.create(path)) {
@@ -1188,12 +1186,6 @@ public class TestRootedOzoneFileSystem {
     }
     // Call moveToTrash. We can't call protected fs.rename() directly
     trash.moveToTrash(path);
-    TrashDeletingService trashDeletingService = new
-            TrashDeletingService(60,300,cluster.getOzoneManager());
-    conf.setLong(FS_TRASH_INTERVAL_KEY,1);
-    trashDeletingService.setFsConf(conf);
-    trashDeletingService.start();
-
 
     // Construct paths
     String username = UserGroupInformation.getCurrentUser().getShortUserName();
@@ -1203,16 +1195,16 @@ public class TestRootedOzoneFileSystem {
     String key = path.toString().substring(1);
     Path trashPath = new Path(userTrashCurrent, key);
 
-    // Wait until the TrashDeletingService purges the key
+    // Wait until the TrashEmptier purges the key
     GenericTestUtils.waitFor(()-> {
       try {
         return !ofs.exists(trashPath);
       } catch (IOException e) {
         LOG.error("Delete from Trash Failed");
-        Assert.fail();
+        Assert.fail("Delete from Trash Failed");
         return false;
       }
-    },1000,180000);
+    }, 1000, 180000);
 
     // Cleanup
     ofs.delete(trashRoot, true);

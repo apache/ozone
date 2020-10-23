@@ -30,6 +30,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.KeyPair;
 import java.security.PrivateKey;
+import java.security.PrivilegedExceptionAction;
 import java.security.PublicKey;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
@@ -48,11 +49,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -185,6 +189,8 @@ import com.google.protobuf.ProtocolMessageEnum;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_DEFAULT;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForBlockClients;
@@ -204,10 +210,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BL
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TRASH_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TRASH_DELETING_SERVICE_INTERVAL_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TRASH_DELETING_SERVICE_TIMEOUT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TRASH_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
@@ -329,8 +331,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private ExitManager exitManager;
 
-  private TrashDeletingService trashDeletingService;
-
   private enum State {
     INITIALIZED,
     RUNNING,
@@ -339,6 +339,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   // Used in MiniOzoneCluster testing
   private State omState;
+
+  private Thread emptier;
 
   private OzoneManager(OzoneConfiguration conf) throws IOException,
       AuthenticationException {
@@ -1180,7 +1182,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     omRpcServer.start();
     isOmRpcServerRunning = true;
-    startTrashDeletingService();
+    startTrashEmptier(configuration);
     registerMXBean();
 
     startJVMPauseMonitor();
@@ -1240,7 +1242,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     isOmRpcServerRunning = true;
 
-    startTrashDeletingService();
+    startTrashEmptier(configuration);
 
     registerMXBean();
 
@@ -1249,19 +1251,42 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omState = State.RUNNING;
   }
 
-  private void startTrashDeletingService() {
-    if (trashDeletingService == null) {
-      long serviceTimeout = configuration.getTimeDuration(
-              OZONE_TRASH_DELETING_SERVICE_TIMEOUT,
-              OZONE_TRASH_DELETING_SERVICE_TIMEOUT_DEFAULT,
-              TimeUnit.MILLISECONDS);
-      long trashDeletionInterval = configuration.getTimeDuration(
-              OZONE_TRASH_DELETING_SERVICE_INTERVAL,
-              OZONE_TRASH_DELETING_SERVICE_INTERVAL_DEFAULT,
-              TimeUnit.MILLISECONDS);
-      trashDeletingService = new TrashDeletingService(trashDeletionInterval, serviceTimeout, this);
-      trashDeletingService.start();
+
+  /**
+   * @param conf
+   * @throws IOException
+   * Starts a Trash Emptier thread that does an fs.trashRoots and performs
+   * checkpointing & deletion
+   */
+  private void startTrashEmptier(Configuration conf) throws IOException {
+    long trashInterval =
+            conf.getLong(FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT);
+    if (trashInterval == 0) {
+      return;
+    } else if (trashInterval < 0) {
+      throw new IOException("Cannot start trash emptier with negative interval."
+              + " Set " + FS_TRASH_INTERVAL_KEY + " to a positive value.");
     }
+
+    // configuration for the FS instance that  points to a root OFS uri.
+    // This will ensure that it will cover all volumes and buckets
+    Configuration fsconf = new Configuration();
+    String rootPath = String.format("%s://%s/",
+            OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
+
+    fsconf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    FileSystem fs = SecurityUtil.doAsLoginUser(
+            new PrivilegedExceptionAction<FileSystem>() {
+          @Override
+          public FileSystem run() throws IOException {
+            return FileSystem.get(fsconf);
+          }
+        });
+
+    this.emptier = new Thread(new Trash(fs, conf).
+      getEmptier(), "Trash Emptier");
+    this.emptier.setDaemon(true);
+    this.emptier.start();
   }
 
   /**
@@ -1344,6 +1369,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       stopSecretManager();
       if (httpServer != null) {
         httpServer.stop();
+      }
+      if (this.emptier != null) {
+        emptier.interrupt();
+        emptier = null;
       }
       metadataManager.stop();
       metrics.unRegister();

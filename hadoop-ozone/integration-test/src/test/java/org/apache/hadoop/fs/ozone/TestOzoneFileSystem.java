@@ -748,7 +748,8 @@ public class TestOzoneFileSystem {
   }
 
   /**
-   * Check that files are moved to trash since fs.rename(src,dst,options) is enabled
+   * Check that files are moved to trash.
+   * since fs.rename(src,dst,options) is enabled.
    */
   public void testRenameToTrashEnabled() throws Exception {
     // Create a file
