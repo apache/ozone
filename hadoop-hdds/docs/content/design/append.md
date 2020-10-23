@@ -77,6 +77,8 @@ When the client reads the key, the client gets blocks of the key from OM, includ
 To write, we need to get the BlockOutputStream of the current block, close it when it's full, and then allocate a new block. Until the client calls the close method.
 We can reuse most of the existing read and write logic throughout the client.
 
+### Truncate when Append
+Truncate mean ozone client can allow removing data from the tail of a file. So if Client1 truncates the file but datanode has not truncated blockN -> Client2 appends some content to the tail of blockN -> Datanode truncates blockN, then error happens. To avoid this, truncate will add a new flag in OmKeyLocationInfo, i.e. toBeTruncated, to mark the block need to be truncated in the future. When Client2 appends, Client2 finds blockN with toBeTruncated flag, Client2 will allocate a new block, and append the content to the new block.
 
 ## Read and write Multi client
 ### Case 1
