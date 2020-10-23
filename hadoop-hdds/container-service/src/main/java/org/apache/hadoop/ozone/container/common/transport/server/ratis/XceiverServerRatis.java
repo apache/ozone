@@ -163,6 +163,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     this.containerController = containerController;
     this.raftPeerId = RatisHelper.toRaftPeerId(dd);
     chunkExecutors = createChunkExecutors(conf);
+    nodeFailureTimeoutMs =
+            conf.getObject(DatanodeRatisServerConfig.class)
+                    .getFollowerSlownessTimeout();
 
     RaftServer.Builder builder =
         RaftServer.newBuilder().setServerId(raftPeerId)
@@ -199,9 +202,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
     TimeUnit timeUnit;
     long duration;
-
-    // set the node failure timeout
-    setNodeFailureTimeout(properties);
 
     // set the configs enable and set the stateMachineData sync timeout
     RaftServerConfigKeys.Log.StateMachineData.setSync(properties, true);
@@ -314,13 +314,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     RatisHelper.createRaftServerProperties(conf, properties);
 
     return properties;
-  }
-
-  private void setNodeFailureTimeout(RaftProperties properties) {
-    nodeFailureTimeoutMs =
-        conf.getObject(DatanodeRatisServerConfig.class)
-            .getFollowerSlownessTimeout();
-
   }
 
   private void setRatisLeaderElectionTimeout(RaftProperties properties) {
