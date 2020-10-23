@@ -39,9 +39,9 @@ When Append occurs, determine if the container for the last block is closed. If 
 ### Request process：
 ![avatar](doc-image/append.png)
 
- 1.Client executes append key operation to OM
+ 1. Client executes append key operation to OM
 
- 2.OM checks if the key is in appendTable; if so, the key is being called by another client append. we cannot append this key at this point. If not, add the key to appendTable.
+ 2. OM checks if the key is in appendTable; if so, the key is being called by another client append. we cannot append this key at this point. If not, add the key to appendTable.
 
  3. Check whether the last block of the key belongs to a closed container, if so, apply to SCM allocate a new block, if not, use the current block directly.
 
