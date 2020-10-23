@@ -161,7 +161,7 @@ public class SCMBlockDeletingService extends BackgroundService {
               transactions.getDatanodeTransactionMap().size(),
               Time.monotonicNow() - startTime);
         } catch (IOException e) {
-          // We may tolerant a number of failures for sometime
+          // We may tolerate a number of failures for sometime
           // but if it continues to fail, at some point we need to raise
           // an exception and probably fail the SCM ? At present, it simply
           // continues to retry the scanning.
