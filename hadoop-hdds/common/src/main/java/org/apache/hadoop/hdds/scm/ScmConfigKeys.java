@@ -321,6 +321,9 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT =
       "ozone.scm.pipeline.allocated.timeout";
 
+  public static final String OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY =
+      "ozone.scm.pipeline.leader-choose.policy";
+
   public static final String OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT =
       "5m";
 

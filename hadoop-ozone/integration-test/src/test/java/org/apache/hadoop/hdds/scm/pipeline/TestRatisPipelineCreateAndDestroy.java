@@ -170,6 +170,6 @@ public class TestRatisPipelineCreateAndDestroy {
     GenericTestUtils.waitFor(() -> pipelineManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE, Pipeline.PipelineState.OPEN)
-        .size() >= numPipelines, 100, 40000);
+        .size() >= numPipelines, 100, 60000);
   }
 }
