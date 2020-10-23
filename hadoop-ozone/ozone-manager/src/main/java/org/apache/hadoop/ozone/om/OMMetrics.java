@@ -56,6 +56,7 @@ public class OMMetrics {
   private @Metric MutableCounterLong numKeyLookup;
   private @Metric MutableCounterLong numKeyRenames;
   private @Metric MutableCounterLong numKeyDeletes;
+  private @Metric MutableCounterLong numKeyTruncates;
   private @Metric MutableCounterLong numBucketLists;
   private @Metric MutableCounterLong numKeyLists;
   private @Metric MutableCounterLong numTrashKeyLists;
@@ -91,6 +92,7 @@ public class OMMetrics {
   private @Metric MutableCounterLong numKeyLookupFails;
   private @Metric MutableCounterLong numKeyRenameFails;
   private @Metric MutableCounterLong numKeyDeleteFails;
+  private @Metric MutableCounterLong numKeyTruncateFails;
   private @Metric MutableCounterLong numBucketListFails;
   private @Metric MutableCounterLong numKeyListFails;
   private @Metric MutableCounterLong numTrashKeyListFails;
@@ -491,6 +493,15 @@ public class OMMetrics {
     numKeyDeletes.incr();
   }
 
+  public void incNumKeyTruncates() {
+    numKeyOps.incr();
+    numKeyTruncates.incr();
+  }
+
+  public void incNumKeyTruncateFails() {
+    numKeyTruncateFails.incr();
+  }
+
   public void incNumKeyCommits() {
     numKeyOps.incr();
     numKeyCommits.incr();
@@ -711,8 +722,18 @@ public class OMMetrics {
   }
 
   @VisibleForTesting
+  public long getNumKeyTruncates() {
+    return numKeyTruncates.value();
+  }
+
+  @VisibleForTesting
   public long getNumKeyDeletesFails() {
     return numKeyDeleteFails.value();
+  }
+
+  @VisibleForTesting
+  public long getNumKeyTruncatesFails() {
+    return numKeyTruncateFails.value();
   }
 
   @VisibleForTesting

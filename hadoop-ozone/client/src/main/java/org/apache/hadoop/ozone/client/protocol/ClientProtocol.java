@@ -295,6 +295,17 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
+   * Truncates an existing key.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyName Name of the Key
+   * @param newLength New length of the key after truncate.
+   * @throws IOException
+   */
+  void truncateKey(String volumeName, String bucketName, String keyName,
+      long newLength) throws IOException;
+
+  /**
    * Deletes keys through the list.
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket

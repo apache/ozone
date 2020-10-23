@@ -73,9 +73,17 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
  * Helper class to test OMClientRequest classes.
  */
 public final class TestOMRequestUtils {
+  private static final long DATA_SIZE = 1000L;
 
   private TestOMRequestUtils() {
     //Do nothing
+  }
+
+  /**
+   * Get data size of the key.
+   */
+  public static long getDataSize() {
+    return DATA_SIZE;
   }
 
   /**
@@ -264,7 +272,7 @@ public final class TestOMRequestUtils {
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
         .setCreationTime(creationTime)
         .setModificationTime(Time.now())
-        .setDataSize(1000L)
+        .setDataSize(getDataSize())
         .setReplicationType(replicationType)
         .setReplicationFactor(replicationFactor)
         .setObjectID(objectID)

@@ -794,6 +794,22 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public void truncateKey(
+      String volumeName, String bucketName, String keyName, long newLength)
+      throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    Preconditions.checkNotNull(keyName);
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setNewLength(newLength)
+        .build();
+    ozoneManagerClient.truncateKey(keyArgs);
+  }
+
+  @Override
   public void deleteKeys(
           String volumeName, String bucketName, List<String> keyNameList)
           throws IOException {

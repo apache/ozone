@@ -247,6 +247,14 @@ public interface OzoneManagerProtocol
   void deleteKeys(OmDeleteKeys deleteKeys) throws IOException;
 
   /**
+   * Truncates an existing key.
+   *
+   * @param args the args of the key.
+   * @throws IOException
+   */
+  void truncateKey(OmKeyArgs args) throws IOException;
+
+  /**
    * Deletes an existing empty bucket from volume.
    * @param volume - Name of the volume.
    * @param bucket - Name of the bucket.

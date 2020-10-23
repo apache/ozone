@@ -62,6 +62,7 @@ enum Type {
   DeleteKeys = 38;
   RenameKeys = 39;
   DeleteOpenKeys = 40;
+  TruncateKey = 41;
 
   InitiateMultiPartUpload = 45;
   CommitMultiPartUpload = 46;
@@ -130,6 +131,7 @@ message OMRequest {
   optional DeleteKeysRequest                deleteKeysRequest              = 38;
   optional RenameKeysRequest                renameKeysRequest              = 39;
   optional DeleteOpenKeysRequest            deleteOpenKeysRequest          = 40;
+  optional TruncateKeyRequest               truncateKeyRequest             = 41;
 
   optional MultipartInfoInitiateRequest     initiateMultiPartUploadRequest = 45;
   optional MultipartCommitUploadPartRequest commitMultiPartUploadRequest   = 46;
@@ -203,6 +205,7 @@ message OMResponse {
   optional AllocateBlockResponse             allocateBlockResponse         = 37;
   optional DeleteKeysResponse                deleteKeysResponse            = 38;
   optional RenameKeysResponse                renameKeysResponse            = 39;
+  optional TruncateKeyResponse               truncateKeyResponse           = 40;
 
   optional MultipartInfoInitiateResponse   initiateMultiPartUploadResponse = 45;
   optional MultipartCommitUploadPartResponse commitMultiPartUploadResponse = 46;
@@ -317,6 +320,8 @@ enum Status {
     PARTIAL_RENAME = 65;
 
     QUOTA_EXCEEDED = 66;
+
+    INVALID_TRUNCATE_NEW_LENGTH = 67;
 
 }
 
@@ -725,6 +730,7 @@ message KeyArgs {
 
     // This will be set by leader OM in HA and update the original request.
     optional FileEncryptionInfoProto fileEncryptionInfo = 15;
+    optional uint64 newLength = 16;
 }
 
 message KeyLocation {
@@ -889,6 +895,14 @@ message RenameKeyResponse{
 
 message DeleteKeyRequest {
     required KeyArgs keyArgs = 1;
+}
+
+message TruncateKeyRequest {
+    required KeyArgs keyArgs = 1;
+}
+
+message TruncateKeyResponse {
+
 }
 
 message DeleteKeysRequest {

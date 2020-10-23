@@ -116,6 +116,7 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_TRUNCATE_NEW_LENGTH;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PARTIAL_RENAME;
@@ -3498,5 +3499,35 @@ public abstract class TestOzoneRpcClientAbstract {
       Assert.assertFalse(
           deletedKeyMetadata.containsKey(OzoneConsts.GDPR_ALGORITHM));
     }
+  }
+
+  @Test
+  public void testTruncateKey()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+    String value = "sample value";
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    createTestKey(bucket, keyName, value);
+
+    String leftValue = "sample";
+    bucket.truncateKey(keyName, leftValue.length());
+    OzoneKey key = bucket.getKey(keyName);
+    Assert.assertEquals(keyName, key.getName());
+    OzoneInputStream is = bucket.readKey(keyName);
+    byte[] newValue = new byte[value.getBytes().length];
+    Assert.assertEquals(is.read(newValue), leftValue.length());
+    Assert.assertEquals(leftValue,
+        (new String(newValue)).substring(0, leftValue.length()));
+
+    OzoneTestUtils.expectOmException(INVALID_TRUNCATE_NEW_LENGTH,
+        () -> bucket.truncateKey(keyName, value.length()));
+
+    OzoneTestUtils.expectOmException(KEY_NOT_FOUND,
+        () -> bucket.truncateKey("nonExistedKey", value.length()));
   }
 }

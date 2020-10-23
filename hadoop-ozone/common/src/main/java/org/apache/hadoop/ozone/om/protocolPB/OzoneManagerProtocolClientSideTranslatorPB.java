@@ -134,6 +134,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TruncateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
@@ -773,6 +774,30 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     handleError(submitRequest(omRequest));
 
+  }
+
+  /**
+   * Truncates an existing key.
+   *
+   * @param args the args of the key.
+   * @throws IOException
+   */
+  @Override
+  public void truncateKey(OmKeyArgs args) throws IOException {
+    TruncateKeyRequest.Builder req = TruncateKeyRequest.newBuilder();
+    KeyArgs keyArgs = KeyArgs.newBuilder()
+        .setVolumeName(args.getVolumeName())
+        .setBucketName(args.getBucketName())
+        .setKeyName(args.getKeyName())
+        .setNewLength(args.getNewLength())
+        .build();
+    req.setKeyArgs(keyArgs);
+
+    OMRequest omRequest = createOMRequest(Type.TruncateKey)
+        .setTruncateKeyRequest(req)
+        .build();
+
+    handleError(submitRequest(omRequest));
   }
 
   /**

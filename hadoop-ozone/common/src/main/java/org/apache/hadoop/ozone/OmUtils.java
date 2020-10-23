@@ -272,6 +272,7 @@ public final class OmUtils {
     case PurgeKeys:
     case RecoverTrash:
     case DeleteOpenKeys:
+    case TruncateKey:
       return false;
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);

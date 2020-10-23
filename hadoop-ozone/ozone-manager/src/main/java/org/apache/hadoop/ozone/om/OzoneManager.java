@@ -2300,6 +2300,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
+   * Truncates an existing key.
+   *
+   * @param args - attributes of the key.
+   * @throws IOException
+   */
+  @Override
+  public void truncateKey(OmKeyArgs args) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented. As truncate requests use a new approach");
+  }
+
+  /**
    * Deletes an existing key.
    *
    * @param deleteKeys - List of keys to be deleted from volume and a bucket.

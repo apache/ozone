@@ -31,6 +31,7 @@ public enum OMAction implements AuditAction {
   DELETE_VOLUME,
   DELETE_BUCKET,
   DELETE_KEY,
+  TRUNCATE_KEY,
   RENAME_KEY,
   RENAME_KEYS,
   SET_OWNER,

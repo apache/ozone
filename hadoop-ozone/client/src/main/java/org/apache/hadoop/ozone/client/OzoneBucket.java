@@ -546,6 +546,16 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Truncates key in the bucket.
+   * @param key Name of the key to be truncated.
+   * @param newLength New length of the key after truncate.
+   * @throws IOException
+   */
+  public void truncateKey(String key, long newLength) throws IOException {
+    proxy.truncateKey(volumeName, name, key, newLength);
+  }
+
+  /**
    * Deletes the given list of keys from the bucket.
    * @param keyList List of the key name to be deleted.
    * @throws IOException
