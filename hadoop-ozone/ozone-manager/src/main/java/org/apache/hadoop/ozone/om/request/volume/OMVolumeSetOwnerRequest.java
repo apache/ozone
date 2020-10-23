@@ -133,7 +133,7 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
         omResponse.setStatus(OzoneManagerProtocolProtos.Status.OK)
           .setMessage(
             "Volume '" + volume + "' owner is already '" + newOwner + "'.")
-          .setSuccess(false);
+            .setSuccess(false);
         omResponse.setSetVolumePropertyResponse(
             SetVolumePropertyResponse.newBuilder().setResponse(false).build());
         omClientResponse = new OMVolumeSetOwnerResponse(omResponse.build());

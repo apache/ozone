@@ -858,6 +858,24 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.pipeline.leader-choose.policy</name>
+    <value>
+      org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.DefaultLeaderChoosePolicy
+    </value>
+    <tag>OZONE, SCM, PIPELINE</tag>
+    <description>
+      The policy used for choosing desired leader for pipeline creation.
+      There are two policies supporting now: DefaultLeaderChoosePolicy, MinLeaderCountChoosePolicy.
+      org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.DefaultLeaderChoosePolicy
+      implements a policy that choose leader without depending on priority.
+      org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.MinLeaderCountChoosePolicy
+      implements a policy that choose leader which has the minimum exist leader count.
+      In the future, we need to add policies which consider:
+      1. resource, the datanode with the most abundant cpu and memory can be made the leader
+      2. topology, the datanode nearest to the client can be made the leader
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.container.size</name>
     <value>5GB</value>
     <tag>OZONE, PERFORMANCE, MANAGEMENT</tag>

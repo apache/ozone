@@ -82,30 +82,20 @@ public class DatanodeDeletedBlockTransactions {
   }
 
   private boolean addTransactionToDN(UUID dnID, DeletedBlocksTransaction tx) {
-    if (transactions.containsKey(dnID)) {
-      List<DeletedBlocksTransaction> txs = transactions.get(dnID);
-      if (txs != null && txs.size() < maximumAllowedTXNum) {
-        boolean hasContained = false;
-        for (DeletedBlocksTransaction t : txs) {
-          if (t.getContainerID() == tx.getContainerID()) {
-            hasContained = true;
-            break;
-          }
-        }
-
-        if (!hasContained) {
-          txs.add(tx);
-          currentTXNum++;
-          return true;
-        }
-      }
-    } else {
+    List<DeletedBlocksTransaction> txs = transactions.get(dnID);
+    if (txs == null || txs.size() < maximumAllowedTXNum) {
       currentTXNum++;
-      transactions.put(dnID, tx);
+      if (txs == null) {
+        transactions.put(dnID, tx);
+      } else {
+        txs.add(tx);
+      }
+      if (SCMBlockDeletingService.LOG.isDebugEnabled()) {
+        SCMBlockDeletingService.LOG
+            .debug("Transaction added: {} <- TX({})", dnID, tx.getTxID());
+      }
       return true;
     }
-    SCMBlockDeletingService.LOG
-        .debug("Transaction added: {} <- TX({})", dnID, tx.getTxID());
     return false;
   }
 

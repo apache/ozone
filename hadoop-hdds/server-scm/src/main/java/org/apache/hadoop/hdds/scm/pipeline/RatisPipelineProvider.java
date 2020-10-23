@@ -31,11 +31,14 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
+import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.LeaderChoosePolicy;
+import org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.LeaderChoosePolicyFactory;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 
+import org.apache.ratis.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,8 +55,10 @@ public class RatisPipelineProvider extends PipelineProvider {
   private final PipelinePlacementPolicy placementPolicy;
   private int pipelineNumberLimit;
   private int maxPipelinePerDatanode;
+  private final LeaderChoosePolicy leaderChoosePolicy;
 
-  RatisPipelineProvider(NodeManager nodeManager,
+  @VisibleForTesting
+  public RatisPipelineProvider(NodeManager nodeManager,
       PipelineStateManager stateManager, ConfigurationSource conf,
       EventPublisher eventPublisher) {
     super(nodeManager, stateManager);
@@ -67,6 +72,12 @@ public class RatisPipelineProvider extends PipelineProvider {
     String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
     this.maxPipelinePerDatanode = dnLimit == null ? 0 :
         Integer.parseInt(dnLimit);
+    try {
+      leaderChoosePolicy = LeaderChoosePolicyFactory
+          .getPolicy(conf, nodeManager, stateManager);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private boolean exceedPipelineNumberLimit(ReplicationFactor factor) {
@@ -98,8 +109,14 @@ public class RatisPipelineProvider extends PipelineProvider {
     return false;
   }
 
+  @VisibleForTesting
+  public LeaderChoosePolicy getLeaderChoosePolicy() {
+    return leaderChoosePolicy;
+  }
+
   @Override
-  public Pipeline create(ReplicationFactor factor) throws IOException {
+  public synchronized Pipeline create(ReplicationFactor factor)
+      throws IOException {
     if (exceedPipelineNumberLimit(factor)) {
       throw new SCMException("Ratis pipeline number meets the limit: " +
           pipelineNumberLimit + " factor : " +
@@ -121,16 +138,22 @@ public class RatisPipelineProvider extends PipelineProvider {
       throw new IllegalStateException("Unknown factor: " + factor.name());
     }
 
+    DatanodeDetails suggestedLeader = leaderChoosePolicy.chooseLeader(dns);
+
     Pipeline pipeline = Pipeline.newBuilder()
         .setId(PipelineID.randomId())
         .setState(PipelineState.ALLOCATED)
         .setType(ReplicationType.RATIS)
         .setFactor(factor)
         .setNodes(dns)
+        .setSuggestedLeaderId(
+            suggestedLeader != null ? suggestedLeader.getUuid() : null)
         .build();
 
     // Send command to datanodes to create pipeline
-    final CreatePipelineCommand createCommand =
+    final CreatePipelineCommand createCommand = suggestedLeader != null ?
+        new CreatePipelineCommand(pipeline.getId(), pipeline.getType(),
+            factor, dns, suggestedLeader) :
         new CreatePipelineCommand(pipeline.getId(), pipeline.getType(),
             factor, dns);
 

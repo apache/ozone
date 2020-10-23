@@ -165,7 +165,7 @@ public class HddsVolume
       this.state = VolumeState.NOT_INITIALIZED;
       this.clusterID = b.clusterID;
       this.datanodeUuid = b.datanodeUuid;
-      this.volumeIOStats = new VolumeIOStats();
+      this.volumeIOStats = new VolumeIOStats(b.volumeRootStr);
 
       volumeInfo = new VolumeInfo.Builder(b.volumeRootStr, b.conf)
           .storageType(b.storageType)
@@ -400,12 +400,18 @@ public class HddsVolume
     if (volumeInfo != null) {
       volumeInfo.shutdownUsageThread();
     }
+    if (volumeIOStats != null) {
+      volumeIOStats.unregister();
+    }
   }
 
   public void shutdown() {
     this.state = VolumeState.NON_EXISTENT;
     if (volumeInfo != null) {
       volumeInfo.shutdownUsageThread();
+    }
+    if (volumeIOStats != null) {
+      volumeIOStats.unregister();
     }
   }
 

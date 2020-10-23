@@ -106,6 +106,7 @@ public class TestOzoneConfiguration {
     ozoneConfig.setBoolean("test.scm.client.enabled", true);
     ozoneConfig.setInt("test.scm.client.port", 5555);
     ozoneConfig.setTimeDuration("test.scm.client.wait", 10, TimeUnit.MINUTES);
+    ozoneConfig.set("test.scm.client.class", Integer.class.getName());
 
     SimpleConfiguration configuration =
         ozoneConfig.getObject(SimpleConfiguration.class);
@@ -115,6 +116,7 @@ public class TestOzoneConfiguration {
     Assert.assertTrue(configuration.isEnabled());
     Assert.assertEquals(5555, configuration.getPort());
     Assert.assertEquals(600, configuration.getWaitTime());
+    Assert.assertEquals(Integer.class, configuration.getMyClass());
   }
 
   @Test
@@ -126,6 +128,7 @@ public class TestOzoneConfiguration {
 
     Assert.assertTrue(configuration.isEnabled());
     Assert.assertEquals(9878, configuration.getPort());
+    Assert.assertEquals(Object.class, configuration.getMyClass());
   }
 
   @Test
@@ -137,6 +140,7 @@ public class TestOzoneConfiguration {
     object.setEnabled(true);
     object.setPort(5555);
     object.setWaitTime(600);
+    object.setMyClass(this.getClass());
 
     OzoneConfiguration subject = new OzoneConfiguration();
 
@@ -154,6 +158,8 @@ public class TestOzoneConfiguration {
         subject.getInt("test.scm.client.port", 0));
     Assert.assertEquals(TimeUnit.SECONDS.toMinutes(object.getWaitTime()),
         subject.getTimeDuration("test.scm.client.wait", 0, TimeUnit.MINUTES));
+    Assert.assertEquals(this.getClass(),
+        subject.getClass("test.scm.client.class", null));
   }
 
   @Test
@@ -207,7 +213,6 @@ public class TestOzoneConfiguration {
 
     ozoneConfiguration.getObject(SimpleConfiguration.class);
   }
-
 
   private void appendProperty(BufferedWriter out, String name, String val)
       throws IOException {

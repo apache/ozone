@@ -295,29 +295,32 @@ public class BlockDeletingService extends BackgroundService {
 
         // Once files are deleted... replace deleting entries with deleted
         // entries
-        BatchOperation batch = meta.getStore().getBatchHandler()
-                .initBatchOperation();
-        Table<String, ChunkInfoList> deletedBlocksTable =
-                meta.getStore().getDeletedBlocksTable();
-        for (String entry: succeedBlocks) {
-          List<ContainerProtos.ChunkInfo> chunkList =
-                  blockDataTable.get(entry).getChunks();
-          String blockId = entry.substring(
-                      OzoneConsts.DELETING_KEY_PREFIX.length());
+        try(BatchOperation batch = meta.getStore().getBatchHandler()
+                .initBatchOperation()) {
+          Table< String, ChunkInfoList > deletedBlocksTable =
+              meta.getStore().getDeletedBlocksTable();
+          for (String entry : succeedBlocks) {
+            List< ContainerProtos.ChunkInfo > chunkList =
+                blockDataTable.get(entry).getChunks();
+            String blockId = entry.substring(
+                OzoneConsts.DELETING_KEY_PREFIX.length());
 
-          deletedBlocksTable.putWithBatch(
-                  batch, blockId,
-                  new ChunkInfoList(chunkList));
-          blockDataTable.deleteWithBatch(batch, entry);
+            deletedBlocksTable.putWithBatch(
+                batch, blockId,
+                new ChunkInfoList(chunkList));
+            blockDataTable.deleteWithBatch(batch, entry);
+          }
+
+          int deleteBlockCount = succeedBlocks.size();
+          containerData.updateAndCommitDBCounters(meta, batch,
+              deleteBlockCount);
+
+
+          // update count of pending deletion blocks and block count in
+          // in-memory container status.
+          containerData.decrPendingDeletionBlocks(deleteBlockCount);
+          containerData.decrKeyCount(deleteBlockCount);
         }
-
-        int deleteBlockCount = succeedBlocks.size();
-        containerData.updateAndCommitDBCounters(meta, batch, deleteBlockCount);
-
-        // update count of pending deletion blocks and block count in in-memory
-        // container status.
-        containerData.decrPendingDeletionBlocks(deleteBlockCount);
-        containerData.decrKeyCount(deleteBlockCount);
 
         if (!succeedBlocks.isEmpty()) {
           LOG.info("Container: {}, deleted blocks: {}, task elapsed time: {}ms",
