@@ -33,28 +33,35 @@ icon: user
  Storage space级别配额允许使用 KB（k），MB（m），GB（g），TB（t）， PB（p）等单位。表示将使用多少个存储空间。
 #### Volume Space quota用法
 ```shell
-bin/ozone sh volume create --space-quota 5m /volume1
+bin/ozone sh volume create --space-quota 5MB /volume1
 ```
  这意味着将volume1的存储空间设置为5MB
 
 ```shell
-bin/ozone sh volume setquota --space-quota 10g /volume1
+bin/ozone sh volume setquota --space-quota 10GB /volume1
 ```
  此行为将volume1的配额更改为10GB。
 
 #### Bucket Space quota 用法
 ```shell
-bin/ozone sh bucket create --space-quota 5m /volume1/bucket1
+bin/ozone sh bucket create --space-quota 5MB /volume1/bucket1
 ```
  这意味着bucket1允许我们使用5MB的存储空间。
 
 ```shell
-bin/ozone sh bucket setquota  --space-quota 10g /volume1/bucket1 
+bin/ozone sh bucket setquota  --space-quota 10GB /volume1/bucket1 
 ```
  该行为将bucket1的配额更改为10GB
 
 一个bucket配额 不应大于其Volume的配额。让我们看一个例子，如果我们有一个10MB的Volume，并在该Volume下创建5个Bucket，配额为5MB，则总配额为25MB。在这种情况下，创建存储桶将始终成功，我们会在数据真正写入时检查bucket和volume的quota。每次写入需要检查当前bucket的是否超上限，当前总的volume使用量是否超上限。
+
 #### 清除Volume1的配额, Bucket清除命令与此类似
 ```shell
 bin/ozone sh volume clrquota --space-quota /volume1
 ```
+#### 查看volume和bucket的quota值以及usedBytes
+```shell
+bin/ozone sh volume info /volume1
+bin/ozone sh bucket info /volume1/bucket1
+```
+我们能够在volume和bucket的info中查看quota及usedBytes的值

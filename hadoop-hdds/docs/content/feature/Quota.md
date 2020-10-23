@@ -35,27 +35,27 @@ Administrators should be able to define how much storage space a Volume or Bucke
 
 ## Client usage
 ### Storage Space level quota
-Storage space level quotas allow the use of units such as KB (k), MB (m), GB (g), TB (t), PB (p), etc. Represents how many storage Spaces will be used.
+Storage space level quotas allow the use of units such as KB (k), MB (m), GB (g), TB (t), PB (p), etc. Represents how much storage Spaces will be used.
 
 #### Volume Storage Space level quota
 ```shell
-bin/ozone sh volume create --space-quota 5m /volume1
+bin/ozone sh volume create --space-quota 5MB /volume1
 ```
 This means setting the storage space of Volume1 to 5MB
 
 ```shell
-bin/ozone sh volume setquota --space-quota 10g /volume1
+bin/ozone sh volume setquota --space-quota 10GB /volume1
 ```
 This behavior changes the quota of Volume1 to 10GB.
 
 #### Bucket Storage Space level quota
 ```shell
-bin/ozone sh bucket create --space-quota 5m /volume1/bucket1
+bin/ozone sh bucket create --space-quota 5MB /volume1/bucket1
 ```
 That means bucket1 allows us to use 5MB of storage.
 
 ```shell
-bin/ozone sh bucket setquota  --space-quota 10g /volume1/bucket1 
+bin/ozone sh bucket setquota  --space-quota 10GB /volume1/bucket1 
 ```
 This behavior changes the quota for Bucket1 to 10GB
 
@@ -65,3 +65,10 @@ A bucket quota should not be greater than its Volume quota. Let's look at an exa
 ```shell
 bin/ozone sh volume clrquota --space-quota /volume1
 ```
+
+#### Check quota and usedBytes for volume and bucket
+```shell
+bin/ozone sh volume info /volume1
+bin/ozone sh bucket info /volume1/bucket1
+```
+We can get the quota value and usedBytes in the info of volume and bucket.
