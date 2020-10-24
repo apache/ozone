@@ -49,12 +49,12 @@ public class OMKeySetAclRequest extends OMKeyAclRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     long modificationTime = Time.now();
-    OzoneManagerProtocolProtos.SetAclRequest setAclRequest =
+    OzoneManagerProtocolProtos.SetAclRequest.Builder setAclRequestBuilder =
         getOmRequest().getSetAclRequest().toBuilder()
-            .setModificationTime(modificationTime).build();
+            .setModificationTime(modificationTime);
 
     return getOmRequest().toBuilder()
-        .setSetAclRequest(setAclRequest.toBuilder())
+        .setSetAclRequest(setAclRequestBuilder)
         .setUserInfo(getUserInfo())
         .build();
   }
