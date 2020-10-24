@@ -79,13 +79,37 @@ public class TestContainerManagerImpl {
 
   @Test
   public void testAllocateContainer() throws Exception {
-    Assert.assertTrue(containerManager.getContainerIDs().isEmpty());
+    Assert.assertTrue(
+        containerManager.listContainers(null, Integer.MAX_VALUE).isEmpty());
     final ContainerInfo container = containerManager.allocateContainer(
         HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.THREE, "admin");
-    Assert.assertEquals(1, containerManager.getContainerIDs().size());
+    Assert.assertEquals(1,
+        containerManager.listContainers(null, Integer.MAX_VALUE).size());
     Assert.assertNotNull(containerManager.getContainer(
         container.containerID()));
+  }
+
+  @Test
+  public void testUpdateContainerState() throws Exception {
+    final ContainerInfo container = containerManager.allocateContainer(
+        HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.THREE, "admin");
+    final ContainerID cid = container.containerID();
+    Assert.assertEquals(HddsProtos.LifeCycleState.OPEN,
+        containerManager.getContainer(cid).getState());
+    containerManager.updateContainerState(cid,
+        HddsProtos.LifeCycleEvent.FINALIZE);
+    Assert.assertEquals(HddsProtos.LifeCycleState.CLOSING,
+        containerManager.getContainer(cid).getState());
+    containerManager.updateContainerState(cid,
+        HddsProtos.LifeCycleEvent.QUASI_CLOSE);
+    Assert.assertEquals(HddsProtos.LifeCycleState.QUASI_CLOSED,
+        containerManager.getContainer(cid).getState());
+    containerManager.updateContainerState(cid,
+        HddsProtos.LifeCycleEvent.FORCE_CLOSE);
+    Assert.assertEquals(HddsProtos.LifeCycleState.CLOSED,
+        containerManager.getContainer(cid).getState());
   }
 
 }

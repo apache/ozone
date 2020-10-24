@@ -62,7 +62,7 @@ public class TestReconIncrementalContainerReportHandler
   @Test
   public void testProcessICR() throws IOException, NodeNotFoundException {
 
-    ContainerID containerID = new ContainerID(100L);
+    ContainerID containerID = ContainerID.valueOf(100L);
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
     IncrementalContainerReportFromDatanode reportMock =
         mock(IncrementalContainerReportFromDatanode.class);

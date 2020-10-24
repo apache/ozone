@@ -18,20 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.container.states;
 
-import com.google.common.base.Preconditions;
-
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
-import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.Set;
 import java.util.Collections;
 import java.util.Map;
@@ -41,8 +27,20 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes
-    .CONTAINER_EXISTS;
+import com.google.common.base.Preconditions;
+
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes
     .FAILED_TO_CHANGE_CONTAINER_STATE;
 
@@ -76,6 +74,8 @@ import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes
  * select a container that belongs to user1, with Ratis replication which can
  * make 3 copies of data. The fact that we will look for open containers by
  * default and if we cannot find them we will add new containers.
+ *
+ * All the calls are idempotent.
  */
 public class ContainerStateMap {
   private static final Logger LOG =
@@ -95,6 +95,7 @@ public class ContainerStateMap {
   // Container State Map lock should be held before calling into
   // Update ContainerAttributes. The consistency of ContainerAttributes is
   // protected by this lock.
+  // Can we remove this lock?
   private final ReadWriteLock lock;
 
   /**
@@ -120,56 +121,57 @@ public class ContainerStateMap {
   public void addContainer(final ContainerInfo info)
       throws SCMException {
     Preconditions.checkNotNull(info, "Container Info cannot be null");
-    Preconditions.checkArgument(info.getReplicationFactor().getNumber() > 0,
-        "ExpectedReplicaCount should be greater than 0");
-
     lock.writeLock().lock();
     try {
       final ContainerID id = info.containerID();
-      if (containerMap.putIfAbsent(id, info) != null) {
-        LOG.debug("Duplicate container ID detected. {}", id);
-        throw new
-            SCMException("Duplicate container ID detected.",
-            CONTAINER_EXISTS);
+      if (!contains(id)) {
+        containerMap.put(id, info);
+        lifeCycleStateMap.insert(info.getState(), id);
+        ownerMap.insert(info.getOwner(), id);
+        factorMap.insert(info.getReplicationFactor(), id);
+        typeMap.insert(info.getReplicationType(), id);
+        replicaMap.put(id, ConcurrentHashMap.newKeySet());
+
+        // Flush the cache of this container type, will be added later when
+        // get container queries are executed.
+        flushCache(info);
+        LOG.trace("Container {} added to ContainerStateMap.", id);
       }
-
-      lifeCycleStateMap.insert(info.getState(), id);
-      ownerMap.insert(info.getOwner(), id);
-      factorMap.insert(info.getReplicationFactor(), id);
-      typeMap.insert(info.getReplicationType(), id);
-      replicaMap.put(id, ConcurrentHashMap.newKeySet());
-
-      // Flush the cache of this container type, will be added later when
-      // get container queries are executed.
-      flushCache(info);
-      LOG.trace("Created container with {} successfully.", id);
     } finally {
       lock.writeLock().unlock();
+    }
+  }
+
+  public boolean contains(final ContainerID id) {
+    lock.readLock().lock();
+    try {
+      return containerMap.containsKey(id);
+    } finally {
+      lock.readLock().unlock();
     }
   }
 
   /**
    * Removes a Container Entry from ContainerStateMap.
    *
-   * @param containerID - ContainerID
-   * @throws SCMException - throws if create failed.
+   * @param id - ContainerID
    */
-  public void removeContainer(final ContainerID containerID)
-      throws ContainerNotFoundException {
-    Preconditions.checkNotNull(containerID, "ContainerID cannot be null");
+  public void removeContainer(final ContainerID id) {
+    Preconditions.checkNotNull(id, "ContainerID cannot be null");
     lock.writeLock().lock();
     try {
-      checkIfContainerExist(containerID);
-      // Should we revert back to the original state if any of the below
-      // remove operation fails?
-      final ContainerInfo info = containerMap.remove(containerID);
-      lifeCycleStateMap.remove(info.getState(), containerID);
-      ownerMap.remove(info.getOwner(), containerID);
-      factorMap.remove(info.getReplicationFactor(), containerID);
-      typeMap.remove(info.getReplicationType(), containerID);
-      // Flush the cache of this container type.
-      flushCache(info);
-      LOG.trace("Removed container with {} successfully.", containerID);
+      if (contains(id)) {
+        // Should we revert back to the original state if any of the below
+        // remove operation fails?
+        final ContainerInfo info = containerMap.remove(id);
+        lifeCycleStateMap.remove(info.getState(), id);
+        ownerMap.remove(info.getOwner(), id);
+        factorMap.remove(info.getReplicationFactor(), id);
+        typeMap.remove(info.getReplicationType(), id);
+        // Flush the cache of this container type.
+        flushCache(info);
+        LOG.trace("Container {} removed from ContainerStateMap.", id);
+      }
     } finally {
       lock.writeLock().unlock();
     }
@@ -179,13 +181,11 @@ public class ContainerStateMap {
    * Returns the latest state of Container from SCM's Container State Map.
    *
    * @param containerID - ContainerID
-   * @return container info, if found.
+   * @return container info, if found else null.
    */
-  public ContainerInfo getContainerInfo(final ContainerID containerID)
-      throws ContainerNotFoundException {
+  public ContainerInfo getContainerInfo(final ContainerID containerID) {
     lock.readLock().lock();
     try {
-      checkIfContainerExist(containerID);
       return containerMap.get(containerID);
     } finally {
       lock.readLock().unlock();
@@ -194,19 +194,18 @@ public class ContainerStateMap {
 
   /**
    * Returns the latest list of DataNodes where replica for given containerId
-   * exist. Throws an SCMException if no entry is found for given containerId.
+   * exist.
    *
    * @param containerID
    * @return Set<DatanodeDetails>
    */
   public Set<ContainerReplica> getContainerReplicas(
-      final ContainerID containerID) throws ContainerNotFoundException {
+      final ContainerID containerID) {
     Preconditions.checkNotNull(containerID);
     lock.readLock().lock();
     try {
-      checkIfContainerExist(containerID);
-      return Collections
-          .unmodifiableSet(replicaMap.get(containerID));
+      final Set<ContainerReplica> replicas = replicaMap.get(containerID);
+      return replicas == null ? null : Collections.unmodifiableSet(replicas);
     } finally {
       lock.readLock().unlock();
     }
@@ -221,14 +220,15 @@ public class ContainerStateMap {
    * @param replica
    */
   public void updateContainerReplica(final ContainerID containerID,
-      final ContainerReplica replica) throws ContainerNotFoundException {
+      final ContainerReplica replica) {
     Preconditions.checkNotNull(containerID);
     lock.writeLock().lock();
     try {
-      checkIfContainerExist(containerID);
-      Set<ContainerReplica> replicas = replicaMap.get(containerID);
-      replicas.remove(replica);
-      replicas.add(replica);
+      if (contains(containerID)) {
+        final Set<ContainerReplica> replicas = replicaMap.get(containerID);
+        replicas.remove(replica);
+        replicas.add(replica);
+      }
     } finally {
       lock.writeLock().unlock();
     }
@@ -242,18 +242,13 @@ public class ContainerStateMap {
    * @return True of dataNode is removed successfully else false.
    */
   public void removeContainerReplica(final ContainerID containerID,
-      final ContainerReplica replica)
-      throws ContainerNotFoundException, ContainerReplicaNotFoundException {
+      final ContainerReplica replica) {
     Preconditions.checkNotNull(containerID);
     Preconditions.checkNotNull(replica);
-
     lock.writeLock().lock();
     try {
-      checkIfContainerExist(containerID);
-      if(!replicaMap.get(containerID).remove(replica)) {
-        throw new ContainerReplicaNotFoundException(
-            "Container #"
-                + containerID.getId() + ", replica: " + replica);
+      if (contains(containerID)) {
+        replicaMap.get(containerID).remove(replica);
       }
     } finally {
       lock.writeLock().unlock();
@@ -264,15 +259,16 @@ public class ContainerStateMap {
    * Just update the container State.
    * @param info ContainerInfo.
    */
-  public void updateContainerInfo(final ContainerInfo info)
-      throws ContainerNotFoundException {
+  public void updateContainerInfo(final ContainerInfo info) {
+    Preconditions.checkNotNull(info);
+    final ContainerID id = info.containerID();
     lock.writeLock().lock();
     try {
-      Preconditions.checkNotNull(info);
-      checkIfContainerExist(info.containerID());
-      final ContainerInfo currentInfo = containerMap.get(info.containerID());
-      flushCache(info, currentInfo);
-      containerMap.put(info.containerID(), info);
+      if (contains(id)) {
+        final ContainerInfo currentInfo = containerMap.get(id);
+        flushCache(info, currentInfo);
+        containerMap.put(id, info);
+      }
     } finally {
       lock.writeLock().unlock();
     }
@@ -287,12 +283,16 @@ public class ContainerStateMap {
    * @throws SCMException - in case of failure.
    */
   public void updateState(ContainerID containerID, LifeCycleState currentState,
-      LifeCycleState newState) throws SCMException, ContainerNotFoundException {
+      LifeCycleState newState) throws SCMException {
     Preconditions.checkNotNull(currentState);
     Preconditions.checkNotNull(newState);
     lock.writeLock().lock();
     try {
-      checkIfContainerExist(containerID);
+      if (!contains(containerID)) {
+        return;
+      }
+
+      // TODO: Simplify this logic.
       final ContainerInfo currentInfo = containerMap.get(containerID);
       try {
         currentInfo.setState(newState);
@@ -340,7 +340,12 @@ public class ContainerStateMap {
   }
 
   public Set<ContainerID> getAllContainerIDs() {
-    return Collections.unmodifiableSet(containerMap.keySet());
+    lock.readLock().lock();
+    try {
+      return Collections.unmodifiableSet(containerMap.keySet());
+    } finally {
+      lock.readLock().unlock();
+    }
   }
 
   /**
@@ -532,15 +537,6 @@ public class ContainerStateMap {
           containerInfo.getReplicationFactor(),
           containerInfo.getReplicationType());
       resultCache.remove(key);
-    }
-  }
-
-  // TODO: Move container not found exception to upper layer.
-  private void checkIfContainerExist(ContainerID containerID)
-      throws ContainerNotFoundException {
-    if (!containerMap.containsKey(containerID)) {
-      throw new ContainerNotFoundException("Container with id #" +
-          containerID.getId() + " not found.");
     }
   }
 

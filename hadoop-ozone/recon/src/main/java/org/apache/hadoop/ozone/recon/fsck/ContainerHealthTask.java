@@ -97,7 +97,7 @@ public class ContainerHealthTask extends ReconScmTask {
   private ContainerHealthStatus setCurrentContainer(long recordId)
       throws ContainerNotFoundException {
     ContainerInfo container =
-        containerManager.getContainer(new ContainerID(recordId));
+        containerManager.getContainer(ContainerID.valueOf(recordId));
     Set<ContainerReplica> replicas =
         containerManager.getContainerReplicas(container.containerID());
     return new ContainerHealthStatus(container, replicas, placementPolicy);

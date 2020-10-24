@@ -24,12 +24,12 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.base.Preconditions;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
@@ -47,15 +47,32 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.statemachine.StateMachine;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.FINALIZE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.QUASI_CLOSE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.CLOSE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.FORCE_CLOSE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.DELETE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.CLEANUP;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETED;
+
 /**
  * Default implementation of ContainerStateManager. This implementation
  * holds the Container States in-memory which is backed by a persistent store.
  * The persistent store is always kept in sync with the in-memory state changes.
+ *
+ * This class is NOT thread safe. All the calls are idempotent.
  */
 public final class ContainerStateManagerImpl
     implements ContainerStateManagerV2 {
@@ -70,13 +87,6 @@ public final class ContainerStateManagerImpl
    * Configured container size.
    */
   private final long containerSize;
-
-  /**
-   * The container ID sequence which is used to create new container.
-   * This will be removed once we have a Distributed Sequence ID Generator.
-   */
-  @Deprecated
-  private final AtomicLong nextContainerID;
 
   /**
    * In-memory representation of Container States.
@@ -121,7 +131,6 @@ public final class ContainerStateManagerImpl
     this.containerStore = containerStore;
     this.stateMachine = newStateMachine();
     this.containerSize = getConfiguredContainerSize(conf);
-    this.nextContainerID = new AtomicLong(1L);
     this.containers = new ContainerStateMap();
     this.lastUsedMap = new ConcurrentHashMap<>();
 
@@ -138,38 +147,43 @@ public final class ContainerStateManagerImpl
     final Set<LifeCycleState> finalStates = new HashSet<>();
 
     // These are the steady states of a container.
-    finalStates.add(LifeCycleState.OPEN);
-    finalStates.add(LifeCycleState.CLOSED);
-    finalStates.add(LifeCycleState.DELETED);
+    finalStates.add(CLOSED);
+    finalStates.add(DELETED);
 
     final StateMachine<LifeCycleState, LifeCycleEvent> containerLifecycleSM =
-        new StateMachine<>(LifeCycleState.OPEN, finalStates);
+        new StateMachine<>(OPEN, finalStates);
 
-    containerLifecycleSM.addTransition(LifeCycleState.OPEN,
-        LifeCycleState.CLOSING,
-        LifeCycleEvent.FINALIZE);
+    containerLifecycleSM.addTransition(OPEN, CLOSING, FINALIZE);
+    containerLifecycleSM.addTransition(CLOSING, QUASI_CLOSED, QUASI_CLOSE);
+    containerLifecycleSM.addTransition(CLOSING, CLOSED, CLOSE);
+    containerLifecycleSM.addTransition(QUASI_CLOSED, CLOSED, FORCE_CLOSE);
+    containerLifecycleSM.addTransition(CLOSED, DELETING, DELETE);
+    containerLifecycleSM.addTransition(DELETING, DELETED, CLEANUP);
 
-    containerLifecycleSM.addTransition(LifeCycleState.CLOSING,
-        LifeCycleState.QUASI_CLOSED,
-        LifeCycleEvent.QUASI_CLOSE);
-
-    containerLifecycleSM.addTransition(LifeCycleState.CLOSING,
-        LifeCycleState.CLOSED,
-        LifeCycleEvent.CLOSE);
-
-    containerLifecycleSM.addTransition(LifeCycleState.QUASI_CLOSED,
-        LifeCycleState.CLOSED,
-        LifeCycleEvent.FORCE_CLOSE);
-
-    containerLifecycleSM.addTransition(LifeCycleState.CLOSED,
-        LifeCycleState.DELETING,
-        LifeCycleEvent.DELETE);
-
-    containerLifecycleSM.addTransition(LifeCycleState.DELETING,
-        LifeCycleState.DELETED,
-        LifeCycleEvent.CLEANUP);
+    /* The following set of transitions are to make state machine
+     * transition idempotent.
+     */
+    makeStateTransitionIdempotent(containerLifecycleSM, FINALIZE,
+        CLOSING, QUASI_CLOSED, CLOSED, DELETING, DELETED);
+    makeStateTransitionIdempotent(containerLifecycleSM, QUASI_CLOSE,
+        QUASI_CLOSED, CLOSED, DELETING, DELETED);
+    makeStateTransitionIdempotent(containerLifecycleSM, CLOSE,
+        CLOSED, DELETING, DELETED);
+    makeStateTransitionIdempotent(containerLifecycleSM, FORCE_CLOSE,
+        CLOSED, DELETING, DELETED);
+    makeStateTransitionIdempotent(containerLifecycleSM, DELETE,
+        DELETING, DELETED);
+    makeStateTransitionIdempotent(containerLifecycleSM, CLEANUP, DELETED);
 
     return containerLifecycleSM;
+  }
+
+  private void makeStateTransitionIdempotent(
+      final StateMachine<LifeCycleState, LifeCycleEvent> sm,
+      final LifeCycleEvent event, final LifeCycleState... states) {
+    for (LifeCycleState state : states) {
+      sm.addTransition(state, state, event);
+    }
   }
 
   /**
@@ -197,26 +211,24 @@ public final class ContainerStateManagerImpl
       final ContainerInfo container = iterator.next().getValue();
       Preconditions.checkNotNull(container);
       containers.addContainer(container);
-      nextContainerID.set(Long.max(container.containerID().getId(),
-          nextContainerID.get()));
       if (container.getState() == LifeCycleState.OPEN) {
         try {
           pipelineManager.addContainerToPipeline(container.getPipelineID(),
-              ContainerID.valueof(container.getContainerID()));
+              container.containerID());
         } catch (PipelineNotFoundException ex) {
           LOG.warn("Found container {} which is in OPEN state with " +
                   "pipeline {} that does not exist. Marking container for " +
                   "closing.", container, container.getPipelineID());
-          updateContainerState(container.containerID(),
-              LifeCycleEvent.FINALIZE);
+          try {
+            updateContainerState(container.containerID().getProtobuf(),
+                LifeCycleEvent.FINALIZE);
+          } catch (InvalidStateTransitionException e) {
+            // This cannot happen.
+            LOG.warn("Unable to finalize Container {}.", container);
+          }
         }
       }
     }
-  }
-
-  @Override
-  public ContainerID getNextContainerID() {
-    return ContainerID.valueof(nextContainerID.get());
   }
 
   @Override
@@ -230,15 +242,9 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
-  public ContainerInfo getContainer(final ContainerID containerID)
-      throws ContainerNotFoundException {
-    return containers.getContainerInfo(containerID);
-  }
-
-  @Override
-  public Set<ContainerReplica> getContainerReplicas(
-      final ContainerID containerID) throws ContainerNotFoundException {
-    return containers.getContainerReplicas(containerID);
+  public ContainerInfo getContainer(final HddsProtos.ContainerID id) {
+    return containers.getContainerInfo(
+        ContainerID.getFromProtobuf(id));
   }
 
   @Override
@@ -254,32 +260,63 @@ public final class ContainerStateManagerImpl
     final ContainerID containerID = container.containerID();
     final PipelineID pipelineID = container.getPipelineID();
 
-    /*
-     * TODO:
-     *  Check if the container already exist in in ContainerStateManager.
-     *  This optimization can be done after moving ContainerNotFoundException
-     *  from ContainerStateMap to ContainerManagerImpl.
-     */
-
-    containerStore.put(containerID, container);
-    containers.addContainer(container);
-    pipelineManager.addContainerToPipeline(pipelineID, containerID);
-    nextContainerID.incrementAndGet();
+    if (!containers.contains(containerID)) {
+      containerStore.put(containerID, container);
+      try {
+        containers.addContainer(container);
+        pipelineManager.addContainerToPipeline(pipelineID, containerID);
+      } catch (Exception ex) {
+        containers.removeContainer(containerID);
+        containerStore.delete(containerID);
+        throw ex;
+      }
+    }
   }
 
-  void updateContainerState(final ContainerID containerID,
-                            final LifeCycleEvent event)
-      throws IOException {
-    throw new UnsupportedOperationException("Not yet implemented!");
+  @Override
+  public boolean contains(final HddsProtos.ContainerID id) {
+    // TODO: Remove the protobuf conversion after fixing ContainerStateMap.
+    return containers.contains(ContainerID.getFromProtobuf(id));
+  }
+
+  public void updateContainerState(final HddsProtos.ContainerID containerID,
+                                   final LifeCycleEvent event)
+      throws IOException, InvalidStateTransitionException {
+    // TODO: Remove the protobuf conversion after fixing ContainerStateMap.
+    final ContainerID id = ContainerID.getFromProtobuf(containerID);
+    if (containers.contains(id)) {
+      final ContainerInfo info = containers.getContainerInfo(id);
+      final LifeCycleState oldState = info.getState();
+      final LifeCycleState newState = stateMachine.getNextState(
+          info.getState(), event);
+      if (newState.getNumber() > oldState.getNumber()) {
+        containers.updateState(id, info.getState(), newState);
+      }
+    }
   }
 
 
-  void updateContainerReplica(final ContainerID containerID,
-                              final ContainerReplica replica)
-      throws ContainerNotFoundException {
-    containers.updateContainerReplica(containerID, replica);
+  @Override
+  public Set<ContainerReplica> getContainerReplicas(
+      final HddsProtos.ContainerID id) {
+    return containers.getContainerReplicas(
+        ContainerID.getFromProtobuf(id));
   }
 
+  @Override
+  public void updateContainerReplica(final HddsProtos.ContainerID id,
+                                     final ContainerReplica replica) {
+    containers.updateContainerReplica(ContainerID.getFromProtobuf(id),
+        replica);
+  }
+
+  @Override
+  public void removeContainerReplica(final HddsProtos.ContainerID id,
+                                     final ContainerReplica replica) {
+    containers.removeContainerReplica(ContainerID.getFromProtobuf(id),
+        replica);
+
+  }
 
   void updateDeleteTransactionId(
       final Map<ContainerID, Long> deleteTransactionMap) {
@@ -291,23 +328,14 @@ public final class ContainerStateManagerImpl
     throw new UnsupportedOperationException("Not yet implemented!");
   }
 
-
   NavigableSet<ContainerID> getMatchingContainerIDs(final String owner,
       final ReplicationType type, final ReplicationFactor factor,
       final LifeCycleState state) {
     throw new UnsupportedOperationException("Not yet implemented!");
   }
 
-  void removeContainerReplica(final ContainerID containerID,
-                              final ContainerReplica replica)
-      throws ContainerNotFoundException, ContainerReplicaNotFoundException {
-    throw new UnsupportedOperationException("Not yet implemented!");
-  }
-
-
-  void removeContainer(final ContainerID containerID)
-      throws ContainerNotFoundException {
-    throw new UnsupportedOperationException("Not yet implemented!");
+  public void removeContainer(final HddsProtos.ContainerID id) {
+    containers.removeContainer(ContainerID.getFromProtobuf(id));
   }
 
   @Override

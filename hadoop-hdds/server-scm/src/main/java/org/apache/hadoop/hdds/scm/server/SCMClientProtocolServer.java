@@ -203,7 +203,7 @@ public class SCMClientProtocolServer implements
     getScm().checkAdminAccess(remoteUser);
     try {
       return scm.getContainerManager()
-          .getContainer(ContainerID.valueof(containerID));
+          .getContainer(ContainerID.valueOf(containerID));
     } catch (IOException ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
@@ -222,7 +222,7 @@ public class SCMClientProtocolServer implements
 
   private ContainerWithPipeline getContainerWithPipelineCommon(
       long containerID) throws IOException {
-    final ContainerID cid = ContainerID.valueof(containerID);
+    final ContainerID cid = ContainerID.valueOf(containerID);
     final ContainerInfo container = scm.getContainerManager()
         .getContainer(cid);
 
@@ -268,13 +268,13 @@ public class SCMClientProtocolServer implements
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
           SCMAction.GET_CONTAINER_WITH_PIPELINE,
           Collections.singletonMap("containerID",
-          ContainerID.valueof(containerID).toString())));
+          ContainerID.valueOf(containerID).toString())));
       return cp;
     } catch (IOException ex) {
       AUDIT.logReadFailure(buildAuditMessageForFailure(
           SCMAction.GET_CONTAINER_WITH_PIPELINE,
           Collections.singletonMap("containerID",
-              ContainerID.valueof(containerID).toString()), ex));
+              ContainerID.valueOf(containerID).toString()), ex));
       throw ex;
     }
   }
@@ -291,13 +291,13 @@ public class SCMClientProtocolServer implements
       try {
         ContainerWithPipeline cp = getContainerWithPipelineCommon(containerID);
         cpList.add(cp);
-        strContainerIDs.append(ContainerID.valueof(containerID).toString());
+        strContainerIDs.append(ContainerID.valueOf(containerID).toString());
         strContainerIDs.append(",");
       } catch (IOException ex) {
         AUDIT.logReadFailure(buildAuditMessageForFailure(
             SCMAction.GET_CONTAINER_WITH_PIPELINE_BATCH,
             Collections.singletonMap("containerID",
-                ContainerID.valueof(containerID).toString()), ex));
+                ContainerID.valueOf(containerID).toString()), ex));
         throw ex;
       }
     }
@@ -337,7 +337,7 @@ public class SCMClientProtocolServer implements
       // "null" is assigned, so that its handled in the
       // scm.getContainerManager().listContainer method
       final ContainerID containerId = startContainerID != 0 ? ContainerID
-          .valueof(startContainerID) : null;
+          .valueOf(startContainerID) : null;
       return scm.getContainerManager().
           listContainer(containerId, count);
     } catch (Exception ex) {
@@ -364,7 +364,7 @@ public class SCMClientProtocolServer implements
     try {
       getScm().checkAdminAccess(remoteUser);
       scm.getContainerManager().deleteContainer(
-          ContainerID.valueof(containerID));
+          ContainerID.valueOf(containerID));
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logWriteFailure(
@@ -407,7 +407,7 @@ public class SCMClientProtocolServer implements
     auditMap.put("remoteUser", remoteUser);
     try {
       scm.checkAdminAccess(remoteUser);
-      final ContainerID cid = ContainerID.valueof(containerID);
+      final ContainerID cid = ContainerID.valueOf(containerID);
       final HddsProtos.LifeCycleState state = scm.getContainerManager()
           .getContainer(cid).getState();
       if (!state.equals(HddsProtos.LifeCycleState.OPEN)) {
@@ -415,7 +415,7 @@ public class SCMClientProtocolServer implements
             ResultCodes.UNEXPECTED_CONTAINER_STATE);
       }
       scm.getEventQueue().fireEvent(SCMEvents.CLOSE_CONTAINER,
-          ContainerID.valueof(containerID));
+          ContainerID.valueOf(containerID));
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
           SCMAction.CLOSE_CONTAINER, auditMap));
     } catch (Exception ex) {

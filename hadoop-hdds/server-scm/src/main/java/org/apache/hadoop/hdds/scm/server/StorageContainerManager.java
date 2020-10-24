@@ -774,7 +774,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public ContainerInfo getContainerInfo(long containerID) throws
       IOException {
-    return containerManager.getContainer(ContainerID.valueof(containerID));
+    return containerManager.getContainer(ContainerID.valueOf(containerID));
   }
 
   /**

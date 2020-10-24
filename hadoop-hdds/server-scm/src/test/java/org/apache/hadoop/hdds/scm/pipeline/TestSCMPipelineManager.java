@@ -183,7 +183,7 @@ public class TestSCMPipelineManager {
             HddsProtos.ReplicationFactor.THREE);
     pipelineManager.openPipeline(pipeline.getId());
     pipelineManager
-        .addContainerToPipeline(pipeline.getId(), ContainerID.valueof(1));
+        .addContainerToPipeline(pipeline.getId(), ContainerID.valueOf(1));
     pipelineManager.closePipeline(pipeline, false);
     pipelineManager.close();
 
@@ -428,7 +428,7 @@ public class TestSCMPipelineManager {
     final PipelineID pid = pipeline.getId();
 
     pipelineManager.openPipeline(pid);
-    pipelineManager.addContainerToPipeline(pid, ContainerID.valueof(1));
+    pipelineManager.addContainerToPipeline(pid, ContainerID.valueOf(1));
 
     Assert.assertTrue(pipelineManager
         .getPipelines(HddsProtos.ReplicationType.RATIS,

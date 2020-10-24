@@ -38,11 +38,11 @@ public class ContainerIDCodec implements Codec<ContainerID> {
 
   @Override
   public ContainerID fromPersistedFormat(byte[] rawData) throws IOException {
-    return new ContainerID(longCodec.fromPersistedFormat(rawData));
+    return ContainerID.valueOf(longCodec.fromPersistedFormat(rawData));
   }
 
   @Override
   public ContainerID copyObject(ContainerID object) {
-    return new ContainerID(object.getId());
+    return ContainerID.valueOf(object.getId());
   }
 }

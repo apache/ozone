@@ -252,7 +252,7 @@ public class TestDeleteContainerHandler {
         cluster.getOzoneManager().lookupKey(keyArgs).getKeyLocationVersions()
             .get(0).getBlocksLatestVersionOnly().get(0);
 
-    return ContainerID.valueof(
+    return ContainerID.valueOf(
         omKeyLocationInfo.getContainerID());
   }
 

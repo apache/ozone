@@ -126,7 +126,7 @@ public class TestCloseContainerEventHandler {
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
         .captureLogs(CloseContainerEventHandler.LOG);
     eventQueue.fireEvent(CLOSE_CONTAINER,
-        new ContainerID(Math.abs(RandomUtils.nextInt())));
+        ContainerID.valueOf(Math.abs(RandomUtils.nextInt())));
     eventQueue.processAll(1000);
     Assert.assertTrue(logCapturer.getOutput()
         .contains("Close container Event triggered for container"));
@@ -138,7 +138,7 @@ public class TestCloseContainerEventHandler {
     GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
         .captureLogs(CloseContainerEventHandler.LOG);
     eventQueue.fireEvent(CLOSE_CONTAINER,
-        new ContainerID(id));
+        ContainerID.valueOf(id));
     eventQueue.processAll(1000);
     Assert.assertTrue(logCapturer.getOutput()
         .contains("Failed to close the container"));

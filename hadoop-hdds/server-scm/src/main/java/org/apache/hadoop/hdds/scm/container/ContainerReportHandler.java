@@ -120,7 +120,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
 
       final Set<ContainerID> containersInDn = replicas.parallelStream()
           .map(ContainerReplicaProto::getContainerID)
-          .map(ContainerID::valueof).collect(Collectors.toSet());
+          .map(ContainerID::valueOf).collect(Collectors.toSet());
 
       final Set<ContainerID> missingReplicas = new HashSet<>(containersInSCM);
       missingReplicas.removeAll(containersInDn);
@@ -167,7 +167,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
         } else if (unknownContainerHandleAction.equals(
             UNKNOWN_CONTAINER_ACTION_DELETE)) {
           final ContainerID containerId = ContainerID
-              .valueof(replicaProto.getContainerID());
+              .valueOf(replicaProto.getContainerID());
           deleteReplica(containerId, datanodeDetails, publisher, "unknown");
         }
       } catch (IOException e) {
@@ -221,7 +221,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
     for (ContainerReplicaProto replica : replicas) {
       try {
         final ContainerInfo containerInfo = containerManager.getContainer(
-            ContainerID.valueof(replica.getContainerID()));
+            ContainerID.valueOf(replica.getContainerID()));
         if (containerInfo.getDeleteTransactionId() >
             replica.getDeleteTransactionId()) {
           pendingDeleteStatusList.addPendingDeleteStatus(

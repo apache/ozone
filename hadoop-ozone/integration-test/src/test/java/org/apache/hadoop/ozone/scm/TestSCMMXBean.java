@@ -159,16 +159,18 @@ public class TestSCMMXBean {
       if (i % 2 == 0) {
         containerID = containerInfoList.get(i).getContainerID();
         scmContainerManager.updateContainerState(
-            new ContainerID(containerID), HddsProtos.LifeCycleEvent.FINALIZE);
-        assertEquals(scmContainerManager.getContainer(new ContainerID(
+            ContainerID.valueOf(containerID),
+            HddsProtos.LifeCycleEvent.FINALIZE);
+        assertEquals(scmContainerManager.getContainer(ContainerID.valueOf(
             containerID)).getState(), HddsProtos.LifeCycleState.CLOSING);
       } else {
         containerID = containerInfoList.get(i).getContainerID();
         scmContainerManager.updateContainerState(
-            new ContainerID(containerID), HddsProtos.LifeCycleEvent.FINALIZE);
+            ContainerID.valueOf(containerID),
+            HddsProtos.LifeCycleEvent.FINALIZE);
         scmContainerManager.updateContainerState(
-            new ContainerID(containerID), HddsProtos.LifeCycleEvent.CLOSE);
-        assertEquals(scmContainerManager.getContainer(new ContainerID(
+            ContainerID.valueOf(containerID), HddsProtos.LifeCycleEvent.CLOSE);
+        assertEquals(scmContainerManager.getContainer(ContainerID.valueOf(
             containerID)).getState(), HddsProtos.LifeCycleState.CLOSED);
       }
 

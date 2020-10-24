@@ -59,7 +59,7 @@ public class DatanodeDeletedBlockTransactions {
       Set<UUID> dnsWithTransactionCommitted) {
     try {
       boolean success = false;
-      final ContainerID id = ContainerID.valueof(tx.getContainerID());
+      final ContainerID id = ContainerID.valueOf(tx.getContainerID());
       final ContainerInfo container = containerManager.getContainer(id);
       final Set<ContainerReplica> replicas = containerManager
           .getContainerReplicas(id);

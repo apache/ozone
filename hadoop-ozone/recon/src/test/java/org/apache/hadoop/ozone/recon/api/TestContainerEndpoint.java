@@ -98,7 +98,7 @@ public class TestContainerEndpoint {
   private boolean isSetupDone = false;
   private ContainerSchemaManager containerSchemaManager;
   private ReconOMMetadataManager reconOMMetadataManager;
-  private ContainerID containerID = new ContainerID(1L);
+  private ContainerID containerID = ContainerID.valueOf(1L);
   private PipelineID pipelineID;
   private long keyCount = 5L;
 

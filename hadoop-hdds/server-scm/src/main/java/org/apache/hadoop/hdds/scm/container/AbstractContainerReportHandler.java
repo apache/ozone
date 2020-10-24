@@ -75,7 +75,7 @@ public class AbstractContainerReportHandler {
       final ContainerReplicaProto replicaProto, final EventPublisher publisher)
       throws IOException {
     final ContainerID containerId = ContainerID
-        .valueof(replicaProto.getContainerID());
+        .valueOf(replicaProto.getContainerID());
 
     if (logger.isDebugEnabled()) {
       logger.debug("Processing replica of container {} from datanode {}",
