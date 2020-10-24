@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.ratis.protocol.NotLeaderException;
 import org.apache.ratis.protocol.RaftGroupMemberId;
@@ -143,6 +145,15 @@ public class SCMHAManagerImpl implements SCMHAManager {
   @Override
   public void shutdown() throws IOException {
     ratisServer.stop();
+  }
+
+  @Override
+  public List<String> getRatisRoles() {
+    return getRatisServer()
+            .getRaftPeers()
+            .stream()
+            .map(peer -> peer.getAddress() == null ? "" : peer.getAddress())
+            .collect(Collectors.toList());
   }
 
   /**
