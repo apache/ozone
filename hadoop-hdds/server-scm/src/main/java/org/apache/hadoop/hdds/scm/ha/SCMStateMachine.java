@@ -54,7 +54,7 @@ public class SCMStateMachine extends BaseStateMachine {
         new CompletableFuture<>();
     try {
       final SCMRatisRequest request = SCMRatisRequest.decode(
-          trx.getClientRequest().getMessage());
+          Message.valueOf(trx.getStateMachineLogEntry().getLogData()));
       applyTransactionFuture.complete(process(request));
     } catch (Exception ex) {
       applyTransactionFuture.completeExceptionally(ex);
