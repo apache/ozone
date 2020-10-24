@@ -169,7 +169,7 @@ public class TestReadRetries {
         .assertEquals(value.getBytes().length, keyLocations.get(0).getLength());
 
     ContainerInfo container = cluster.getStorageContainerManager()
-        .getContainerManager().getContainer(ContainerID.valueof(containerID));
+        .getContainerManager().getContainer(ContainerID.valueOf(containerID));
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
     List<DatanodeDetails> datanodes = pipeline.getNodes();

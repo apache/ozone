@@ -410,13 +410,14 @@ public class TestDeletedBlockLog {
             .build();
 
     ContainerInfo.Builder builder = new ContainerInfo.Builder();
-    builder.setPipelineID(pipeline.getId())
+    builder.setContainerID(containerID)
+        .setPipelineID(pipeline.getId())
         .setReplicationType(pipeline.getType())
         .setReplicationFactor(pipeline.getFactor());
 
     ContainerInfo containerInfo = builder.build();
     Mockito.doReturn(containerInfo).when(containerManager)
-        .getContainer(ContainerID.valueof(containerID));
+        .getContainer(ContainerID.valueOf(containerID));
 
     final Set<ContainerReplica> replicaSet = dns.stream()
         .map(datanodeDetails -> ContainerReplica.newBuilder()
@@ -426,7 +427,7 @@ public class TestDeletedBlockLog {
             .build())
         .collect(Collectors.toSet());
     when(containerManager.getContainerReplicas(
-        ContainerID.valueof(containerID)))
+        ContainerID.valueOf(containerID)))
         .thenReturn(replicaSet);
   }
 }

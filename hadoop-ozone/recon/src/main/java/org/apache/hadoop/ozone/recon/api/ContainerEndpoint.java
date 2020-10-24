@@ -246,7 +246,7 @@ public class ContainerEndpoint {
           long containerID = container.getContainerId();
           try {
             ContainerInfo containerInfo =
-                containerManager.getContainer(new ContainerID(containerID));
+                containerManager.getContainer(ContainerID.valueOf(containerID));
             long keyCount = containerInfo.getNumberOfKeys();
             UUID pipelineID = containerInfo.getPipelineID().getId();
 
@@ -307,7 +307,7 @@ public class ContainerEndpoint {
       for (UnhealthyContainers c : containers) {
         long containerID = c.getContainerId();
         ContainerInfo containerInfo =
-            containerManager.getContainer(new ContainerID(containerID));
+            containerManager.getContainer(ContainerID.valueOf(containerID));
         long keyCount = containerInfo.getNumberOfKeys();
         UUID pipelineID = containerInfo.getPipelineID().getId();
         List<ContainerHistory> datanodes =

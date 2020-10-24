@@ -193,19 +193,19 @@ public class TestDeadNodeHandler {
     deadNodeHandler.onMessage(datanode1, publisher);
 
     Set<ContainerReplica> container1Replicas = containerManager
-        .getContainerReplicas(new ContainerID(container1.getContainerID()));
+        .getContainerReplicas(ContainerID.valueOf(container1.getContainerID()));
     Assert.assertEquals(1, container1Replicas.size());
     Assert.assertEquals(datanode2,
         container1Replicas.iterator().next().getDatanodeDetails());
 
     Set<ContainerReplica> container2Replicas = containerManager
-        .getContainerReplicas(new ContainerID(container2.getContainerID()));
+        .getContainerReplicas(ContainerID.valueOf(container2.getContainerID()));
     Assert.assertEquals(1, container2Replicas.size());
     Assert.assertEquals(datanode2,
         container2Replicas.iterator().next().getDatanodeDetails());
 
     Set<ContainerReplica> container3Replicas = containerManager
-            .getContainerReplicas(new ContainerID(container3.getContainerID()));
+            .getContainerReplicas(container3.containerID());
     Assert.assertEquals(1, container3Replicas.size());
     Assert.assertEquals(datanode3,
         container3Replicas.iterator().next().getDatanodeDetails());
@@ -216,7 +216,7 @@ public class TestDeadNodeHandler {
       throws ContainerNotFoundException {
     for (DatanodeDetails datanode : datanodes) {
       contManager.updateContainerReplica(
-          new ContainerID(container.getContainerID()),
+          ContainerID.valueOf(container.getContainerID()),
           ContainerReplica.newBuilder()
               .setContainerState(ContainerReplicaProto.State.OPEN)
               .setContainerID(container.containerID())
@@ -236,7 +236,7 @@ public class TestDeadNodeHandler {
     nodeManager
         .setContainers(datanode,
             Arrays.stream(containers)
-                .map(container -> new ContainerID(container.getContainerID()))
+                .map(ContainerInfo::containerID)
                 .collect(Collectors.toSet()));
   }
 

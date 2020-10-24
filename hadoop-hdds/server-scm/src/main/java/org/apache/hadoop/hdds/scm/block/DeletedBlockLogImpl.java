@@ -193,7 +193,7 @@ public class DeletedBlockLogImpl
           long txID = transactionResult.getTxID();
           // set of dns which have successfully committed transaction txId.
           dnsWithCommittedTxn = transactionToDNsCommitMap.get(txID);
-          final ContainerID containerId = ContainerID.valueof(
+          final ContainerID containerId = ContainerID.valueOf(
               transactionResult.getContainerID());
           if (dnsWithCommittedTxn == null) {
             // Mostly likely it's a retried delete command response.

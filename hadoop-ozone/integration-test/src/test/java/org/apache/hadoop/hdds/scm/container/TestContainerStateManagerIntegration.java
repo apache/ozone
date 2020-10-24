@@ -252,7 +252,7 @@ public class TestContainerStateManagerIntegration {
     ContainerInfo info = containerManager
         .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
             container1.getPipeline(),
-            new HashSet<>(Collections.singletonList(new ContainerID(1))));
+            new HashSet<>(Collections.singletonList(ContainerID.valueOf(1))));
     Assert.assertNotEquals(container1.getContainerInfo().getContainerID(),
         info.getContainerID());
   }
@@ -277,8 +277,8 @@ public class TestContainerStateManagerIntegration {
     ContainerInfo info = containerManager
         .getMatchingContainer(OzoneConsts.GB * 3, OzoneConsts.OZONE,
             container1.getPipeline(),
-            new HashSet<>(Arrays.asList(new ContainerID(1), new
-                ContainerID(2), new ContainerID(3))));
+            new HashSet<>(Arrays.asList(ContainerID.valueOf(1),
+                ContainerID.valueOf(2), ContainerID.valueOf(3))));
     Assert.assertEquals(info.getContainerID(), 4);
   }
 
@@ -418,7 +418,7 @@ public class TestContainerStateManagerIntegration {
         .setUuid(UUID.randomUUID()).build();
 
     // Test 1: no replica's exist
-    ContainerID containerID = ContainerID.valueof(RandomUtils.nextLong());
+    ContainerID containerID = ContainerID.valueOf(RandomUtils.nextLong());
     Set<ContainerReplica> replicaSet;
     try {
       containerStateManager.getContainerReplicas(containerID);

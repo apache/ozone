@@ -58,21 +58,21 @@ public final class OzoneTestUtils {
       StorageContainerManager scm) throws Exception {
     performOperationOnKeyContainers((blockID) -> {
       if (scm.getContainerManager()
-          .getContainer(ContainerID.valueof(blockID.getContainerID()))
+          .getContainer(ContainerID.valueOf(blockID.getContainerID()))
           .getState() == HddsProtos.LifeCycleState.OPEN) {
         scm.getContainerManager()
-            .updateContainerState(ContainerID.valueof(blockID.getContainerID()),
+            .updateContainerState(ContainerID.valueOf(blockID.getContainerID()),
                 HddsProtos.LifeCycleEvent.FINALIZE);
       }
       if (scm.getContainerManager()
-          .getContainer(ContainerID.valueof(blockID.getContainerID()))
+          .getContainer(ContainerID.valueOf(blockID.getContainerID()))
           .getState() == HddsProtos.LifeCycleState.CLOSING) {
         scm.getContainerManager()
-            .updateContainerState(ContainerID.valueof(blockID.getContainerID()),
+            .updateContainerState(ContainerID.valueOf(blockID.getContainerID()),
                 HddsProtos.LifeCycleEvent.CLOSE);
       }
       Assert.assertFalse(scm.getContainerManager()
-          .getContainer(ContainerID.valueof(blockID.getContainerID()))
+          .getContainer(ContainerID.valueOf(blockID.getContainerID()))
           .isOpen());
     }, omKeyLocationInfoGroups);
   }

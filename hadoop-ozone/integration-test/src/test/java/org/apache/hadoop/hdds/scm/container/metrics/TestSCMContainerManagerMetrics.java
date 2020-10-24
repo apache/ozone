@@ -113,7 +113,7 @@ public class TestSCMContainerManagerMetrics {
         "NumSuccessfulDeleteContainers", metrics);
 
     containerManager.deleteContainer(
-        new ContainerID(containerInfo.getContainerID()));
+        ContainerID.valueOf(containerInfo.getContainerID()));
 
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
     Assert.assertEquals(getLongCounter("NumSuccessfulDeleteContainers",
@@ -123,7 +123,7 @@ public class TestSCMContainerManagerMetrics {
     try {
       // Give random container to delete.
       containerManager.deleteContainer(
-          new ContainerID(RandomUtils.nextLong(10000, 20000)));
+          ContainerID.valueOf(RandomUtils.nextLong(10000, 20000)));
       fail("testContainerOpsMetrics failed");
     } catch (IOException ex) {
       // Here it should fail, so it should have the old metric value.
@@ -135,7 +135,7 @@ public class TestSCMContainerManagerMetrics {
     }
 
     containerManager.listContainer(
-        new ContainerID(containerInfo.getContainerID()), 1);
+        ContainerID.valueOf(containerInfo.getContainerID()), 1);
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
     Assert.assertEquals(getLongCounter("NumListContainerOps",
         metrics), 1);

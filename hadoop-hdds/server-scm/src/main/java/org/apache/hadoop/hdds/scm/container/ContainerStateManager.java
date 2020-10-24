@@ -329,7 +329,7 @@ public class ContainerStateManager {
       // In Recon, while adding a 'new' CLOSED container, pipeline will be a
       // random ID, and hence be passed down as null.
       pipelineManager.addContainerToPipeline(pipeline.getId(),
-          ContainerID.valueof(containerID));
+          ContainerID.valueOf(containerID));
     }
     containerStateCount.incrementAndGet(containerInfo.getState());
   }
@@ -371,12 +371,8 @@ public class ContainerStateManager {
   void updateDeleteTransactionId(
       final Map<Long, Long> deleteTransactionMap) {
     deleteTransactionMap.forEach((k, v) -> {
-      try {
-        containers.getContainerInfo(ContainerID.valueof(k))
-            .updateDeleteTransactionId(v);
-      } catch (ContainerNotFoundException e) {
-        LOG.warn("Exception while updating delete transaction id.", e);
-      }
+      containers.getContainerInfo(ContainerID.valueOf(k))
+          .updateDeleteTransactionId(v);
     });
   }
 
@@ -432,18 +428,13 @@ public class ContainerStateManager {
   private ContainerInfo findContainerWithSpace(final long size,
       final NavigableSet<ContainerID> searchSet, final String owner,
       final PipelineID pipelineID) {
-    try {
-      // Get the container with space to meet our request.
-      for (ContainerID id : searchSet) {
-        final ContainerInfo containerInfo = containers.getContainerInfo(id);
-        if (containerInfo.getUsedBytes() + size <= this.containerSize) {
-          containerInfo.updateLastUsedTime();
-          return containerInfo;
-        }
+    // Get the container with space to meet our request.
+    for (ContainerID id : searchSet) {
+      final ContainerInfo containerInfo = containers.getContainerInfo(id);
+      if (containerInfo.getUsedBytes() + size <= this.containerSize) {
+        containerInfo.updateLastUsedTime();
+        return containerInfo;
       }
-    } catch (ContainerNotFoundException e) {
-      // This should not happen!
-      LOG.warn("Exception while finding container with space", e);
     }
     return null;
   }
@@ -496,7 +487,11 @@ public class ContainerStateManager {
    */
   ContainerInfo getContainer(final ContainerID containerID)
       throws ContainerNotFoundException {
-    return containers.getContainerInfo(containerID);
+    final ContainerInfo container = containers.getContainerInfo(containerID);
+    if (container != null) {
+      return container;
+    }
+    throw new ContainerNotFoundException(containerID.toString());
   }
 
   void close() throws IOException {
@@ -540,6 +535,9 @@ public class ContainerStateManager {
 
   void removeContainer(final ContainerID containerID)
       throws ContainerNotFoundException {
+    if (containers.getContainerInfo(containerID) == null) {
+      throw new ContainerNotFoundException(containerID.toString());
+    }
     containers.removeContainer(containerID);
   }
 

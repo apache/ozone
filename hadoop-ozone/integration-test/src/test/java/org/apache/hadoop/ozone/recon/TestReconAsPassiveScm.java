@@ -202,6 +202,6 @@ public class TestReconAsPassiveScm {
 
     LambdaTestUtils.await(90000, 5000,
         () -> (newReconScm.getContainerManager()
-            .exists(ContainerID.valueof(containerID))));
+            .exists(ContainerID.valueOf(containerID))));
   }
 }

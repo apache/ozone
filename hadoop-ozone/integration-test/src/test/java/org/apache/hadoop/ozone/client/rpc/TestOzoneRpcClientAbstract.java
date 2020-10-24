@@ -1542,7 +1542,7 @@ public abstract class TestOzoneRpcClientAbstract {
     // Second, sum the data size from chunks in Container via containerID
     // and localID, make sure the size equals to the size from keyDetails.
     ContainerInfo container = cluster.getStorageContainerManager()
-        .getContainerManager().getContainer(ContainerID.valueof(containerID));
+        .getContainerManager().getContainer(ContainerID.valueOf(containerID));
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
     List<DatanodeDetails> datanodes = pipeline.getNodes();

@@ -17,7 +17,6 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -27,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 
 /**
  * TODO: Add extensive javadoc.
@@ -38,26 +38,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 public interface ContainerManagerV2 extends AutoCloseable {
   // TODO: Rename this to ContainerManager
 
-  /**
-   * Returns all the container Ids managed by ContainerManager.
-   *
-   * @return Set of ContainerID
-   */
-  Set<ContainerID> getContainerIDs();
-
-  /**
-   * Returns all the containers managed by ContainerManager.
-   *
-   * @return List of ContainerInfo
-   */
-  Set<ContainerInfo> getContainers();
-
-  /**
-   * Returns all the containers which are in the specified state.
-   *
-   * @return List of ContainerInfo
-   */
-  Set<ContainerInfo> getContainers(LifeCycleState state);
 
   /**
    * Returns the ContainerInfo from the container ID.
@@ -65,8 +45,6 @@ public interface ContainerManagerV2 extends AutoCloseable {
    */
   ContainerInfo getContainer(ContainerID containerID)
       throws ContainerNotFoundException;
-
-  boolean exists(ContainerID containerID);
 
   /**
    * Returns containers under certain conditions.
@@ -84,6 +62,14 @@ public interface ContainerManagerV2 extends AutoCloseable {
    */
   List<ContainerInfo> listContainers(ContainerID startID, int count);
 
+
+  /**
+   * Returns all the containers which are in the specified state.
+   *
+   * @return List of ContainerInfo
+   */
+  List<ContainerInfo> listContainers(LifeCycleState state);
+
   /**
    * Allocates a new container for a given keyName and replication factor.
    *
@@ -97,23 +83,15 @@ public interface ContainerManagerV2 extends AutoCloseable {
                                   String owner) throws IOException;
 
   /**
-   * Deletes a container from SCM.
-   *
-   * @param containerID - Container ID
-   * @throws IOException
-   */
-  void deleteContainer(ContainerID containerID)
-      throws ContainerNotFoundException;
-
-  /**
    * Update container state.
    * @param containerID - Container ID
    * @param event - container life cycle event
    * @throws IOException
+   * @throws InvalidStateTransitionException
    */
   void updateContainerState(ContainerID containerID,
                             LifeCycleEvent event)
-      throws ContainerNotFoundException;
+      throws IOException, InvalidStateTransitionException;
 
   /**
    * Returns the latest list of replicas for given containerId.
@@ -157,18 +135,6 @@ public interface ContainerManagerV2 extends AutoCloseable {
    * Returns ContainerInfo which matches the requirements.
    * @param size - the amount of space required in the container
    * @param owner - the user which requires space in its owned container
-   * @param pipeline - pipeline to which the container should belong
-   * @return ContainerInfo for the matching container.
-   */
-  default ContainerInfo getMatchingContainer(long size, String owner,
-                                     Pipeline pipeline) {
-    return getMatchingContainer(size, owner, pipeline, Collections.emptyList());
-  }
-
-  /**
-   * Returns ContainerInfo which matches the requirements.
-   * @param size - the amount of space required in the container
-   * @param owner - the user which requires space in its owned container
    * @param pipeline - pipeline to which the container should belong.
    * @param excludedContainerIDS - containerIds to be excluded.
    * @return ContainerInfo for the matching container.
@@ -185,4 +151,13 @@ public interface ContainerManagerV2 extends AutoCloseable {
    */
   // Is it possible to remove this from the Interface?
   void notifyContainerReportProcessing(boolean isFullReport, boolean success);
+
+  /**
+   * Deletes a container from SCM.
+   *
+   * @param containerID - Container ID
+   * @throws IOException
+   */
+  void deleteContainer(ContainerID containerID)
+      throws IOException;
 }
