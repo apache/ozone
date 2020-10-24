@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
@@ -80,7 +79,7 @@ public class SCMBlockLocationFailoverProxyProvider implements
 
   public SCMBlockLocationFailoverProxyProvider(ConfigurationSource conf) {
     this.conf = conf;
-    this.scmVersion = RPC.getProtocolVersion(ScmBlockLocationProtocol.class);
+    this.scmVersion = RPC.getProtocolVersion(ScmBlockLocationProtocolPB.class);
     this.scmServiceId = conf.getTrimmed(OZONE_SCM_SERVICE_IDS_KEY);
     this.scmProxies = new HashMap<>();
     this.scmProxyInfoMap = new HashMap<>();
@@ -257,7 +256,7 @@ public class SCMBlockLocationFailoverProxyProvider implements
       InetSocketAddress scmAddress) throws IOException {
     Configuration hadoopConf =
         LegacyHadoopConfigurationSource.asHadoopConfiguration(conf);
-    RPC.setProtocolEngine(hadoopConf, ScmBlockLocationProtocol.class,
+    RPC.setProtocolEngine(hadoopConf, ScmBlockLocationProtocolPB.class,
         ProtobufRpcEngine.class);
     return RPC.getProxy(ScmBlockLocationProtocolPB.class, scmVersion,
         scmAddress, UserGroupInformation.getCurrentUser(), hadoopConf,
