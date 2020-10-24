@@ -23,12 +23,17 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.ratis.protocol.NotLeaderException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Handles Stale node event.
  */
 public class NonHealthyToHealthyNodeHandler
     implements EventHandler<DatanodeDetails> {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(NonHealthyToHealthyNodeHandler.class);
 
   private final PipelineManager pipelineManager;
   private final ConfigurationSource conf;
@@ -42,6 +47,11 @@ public class NonHealthyToHealthyNodeHandler
   @Override
   public void onMessage(DatanodeDetails datanodeDetails,
       EventPublisher publisher) {
-    pipelineManager.triggerPipelineCreation();
+    try {
+      pipelineManager.triggerPipelineCreation();
+    } catch (NotLeaderException ex) {
+      LOG.debug("Not the current leader SCM and cannot start pipeline" +
+          " creation.");
+    }
   }
 }

@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.protocol.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,19 +76,21 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   private final SCMPipelineMetrics metrics;
   private long pipelineWaitDefaultTimeout;
   private final AtomicBoolean isInSafeMode;
+  private SCMHAManager scmhaManager;
   // Used to track if the safemode pre-checks have completed. This is designed
   // to prevent pipelines being created until sufficient nodes have registered.
   private final AtomicBoolean pipelineCreationAllowed;
 
   private PipelineManagerV2Impl(ConfigurationSource conf,
-                               NodeManager nodeManager,
-                               StateManager pipelineStateManager,
-                               PipelineFactory pipelineFactory,
+                                SCMHAManager scmhaManager,
+                                StateManager pipelineStateManager,
+                                PipelineFactory pipelineFactory,
                                 EventPublisher eventPublisher) {
     this.lock = new ReentrantReadWriteLock();
     this.pipelineFactory = pipelineFactory;
     this.stateManager = pipelineStateManager;
     this.conf = conf;
+    this.scmhaManager = scmhaManager;
     this.eventPublisher = eventPublisher;
     this.pmInfoBean = MBeans.register("SCMPipelineManager",
         "SCMPipelineManagerInfo", this);
@@ -120,7 +123,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
         nodeManager, stateManager, conf, eventPublisher);
     // Create PipelineManager
     PipelineManagerV2Impl pipelineManager = new PipelineManagerV2Impl(conf,
-        nodeManager, stateManager, pipelineFactory, eventPublisher);
+        scmhaManager, stateManager, pipelineFactory, eventPublisher);
 
     // Create background thread.
     Scheduler scheduler = new Scheduler(
@@ -136,6 +139,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public Pipeline createPipeline(ReplicationType type,
                                  ReplicationFactor factor) throws IOException {
+    checkLeader();
     if (!isPipelineCreationAllowed() && factor != ReplicationFactor.ONE) {
       LOG.debug("Pipeline creation is not allowed until safe mode prechecks " +
           "complete");
@@ -266,6 +270,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void addContainerToPipeline(
       PipelineID pipelineID, ContainerID containerID) throws IOException {
+    checkLeader();
     lock.writeLock().lock();
     try {
       stateManager.addContainerToPipeline(pipelineID, containerID);
@@ -277,6 +282,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void removeContainerFromPipeline(
       PipelineID pipelineID, ContainerID containerID) throws IOException {
+    checkLeader();
     lock.writeLock().lock();
     try {
       stateManager.removeContainerFromPipeline(pipelineID, containerID);
@@ -288,6 +294,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public NavigableSet<ContainerID> getContainersInPipeline(
       PipelineID pipelineID) throws IOException {
+    checkLeader();
     lock.readLock().lock();
     try {
       return stateManager.getContainers(pipelineID);
@@ -298,11 +305,13 @@ public final class PipelineManagerV2Impl implements PipelineManager {
 
   @Override
   public int getNumberOfContainers(PipelineID pipelineID) throws IOException {
+    checkLeader();
     return stateManager.getNumberOfContainers(pipelineID);
   }
 
   @Override
   public void openPipeline(PipelineID pipelineId) throws IOException {
+    checkLeader();
     lock.writeLock().lock();
     try {
       Pipeline pipeline = stateManager.getPipeline(pipelineId);
@@ -328,6 +337,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
    * @throws IOException
    */
   protected void removePipeline(Pipeline pipeline) throws IOException {
+    checkLeader();
     pipelineFactory.close(pipeline.getType(), pipeline);
     PipelineID pipelineID = pipeline.getId();
     lock.writeLock().lock();
@@ -349,6 +359,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
    */
   protected void closeContainersForPipeline(final PipelineID pipelineId)
       throws IOException {
+    checkLeader();
     Set<ContainerID> containerIDs = stateManager.getContainers(pipelineId);
     for (ContainerID containerID : containerIDs) {
       eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
@@ -364,6 +375,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void closePipeline(Pipeline pipeline, boolean onTimeout)
       throws IOException {
+    checkLeader();
     PipelineID pipelineID = pipeline.getId();
     lock.writeLock().lock();
     try {
@@ -393,6 +405,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void scrubPipeline(ReplicationType type, ReplicationFactor factor)
       throws IOException {
+    checkLeader();
     if (type != ReplicationType.RATIS || factor != ReplicationFactor.THREE) {
       // Only srub pipeline for RATIS THREE pipeline
       return;
@@ -439,7 +452,9 @@ public final class PipelineManagerV2Impl implements PipelineManager {
    * Triggers pipeline creation after the specified time.
    */
   @Override
-  public void triggerPipelineCreation() {
+  public void triggerPipelineCreation() throws NotLeaderException {
+    // TODO add checkLeader once follower validates safemode
+    // before it becomes leader.
     backgroundPipelineCreator.triggerPipelineCreation();
   }
 
@@ -457,6 +472,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void activatePipeline(PipelineID pipelineID)
       throws IOException {
+    checkLeader();
     stateManager.updatePipelineState(pipelineID.getProtobuf(),
         HddsProtos.PipelineState.PIPELINE_OPEN);
   }
@@ -470,6 +486,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void deactivatePipeline(PipelineID pipelineID)
       throws IOException {
+    checkLeader();
     stateManager.updatePipelineState(pipelineID.getProtobuf(),
         HddsProtos.PipelineState.PIPELINE_DORMANT);
   }
@@ -484,6 +501,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void waitPipelineReady(PipelineID pipelineID, long timeout)
       throws IOException {
+    checkLeader();
     long st = Time.monotonicNow();
     if (timeout == 0) {
       timeout = pipelineWaitDefaultTimeout;
@@ -515,7 +533,8 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   }
 
   @Override
-  public Map<String, Integer> getPipelineInfo() {
+  public Map<String, Integer> getPipelineInfo() throws NotLeaderException {
+    checkLeader();
     final Map<String, Integer> pipelineInfo = new HashMap<>();
     for (Pipeline.PipelineState state : Pipeline.PipelineState.values()) {
       pipelineInfo.put(state.toString(), 0);
@@ -564,13 +583,21 @@ public final class PipelineManagerV2Impl implements PipelineManager {
 
     // Trigger pipeline creation only if the preCheck status has changed to
     // complete.
-    if (isPipelineCreationAllowed() && !currentAllowPipelines) {
-      triggerPipelineCreation();
+
+    try {
+      if (isPipelineCreationAllowed() && !currentAllowPipelines) {
+        triggerPipelineCreation();
+      }
+      // Start the pipeline creation thread only when safemode switches off
+      if (!getSafeModeStatus() && currentlyInSafeMode) {
+        startPipelineCreator();
+      }
+    } catch (NotLeaderException ex) {
+      LOG.warn("Not the current leader SCM and cannot process pipeline" +
+              " creation. Suggested leader is: ",
+          scmhaManager.getSuggestedLeader().getAddress());
     }
-    // Start the pipeline creation thread only when safemode switches off
-    if (!getSafeModeStatus() && currentlyInSafeMode) {
-      startPipelineCreator();
-    }
+
   }
 
   @VisibleForTesting
@@ -592,6 +619,20 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @VisibleForTesting
   public StateManager getStateManager() {
     return stateManager;
+  }
+  
+  public void setScmhaManager(SCMHAManager scmhaManager) {
+    this.scmhaManager = scmhaManager;
+  }
+
+  /**
+   * Check if scm is current leader.
+   * @throws NotLeaderException when it's not the current leader.
+   */
+  private void checkLeader() throws NotLeaderException {
+    if (!scmhaManager.isLeader()) {
+      throw scmhaManager.triggerNotLeaderException();
+    }
   }
 
   private void setBackgroundPipelineCreator(

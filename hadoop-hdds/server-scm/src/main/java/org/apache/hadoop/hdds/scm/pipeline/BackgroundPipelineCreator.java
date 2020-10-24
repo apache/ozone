@@ -103,7 +103,7 @@ class BackgroundPipelineCreator {
     }
   }
 
-  private void createPipelines() {
+  private void createPipelines() throws RuntimeException {
     // TODO: #CLUTIL Different replication factor may need to be supported
     HddsProtos.ReplicationType type = HddsProtos.ReplicationType.valueOf(
         conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,

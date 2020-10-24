@@ -18,8 +18,12 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.server.RaftServer;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 /**
@@ -35,4 +39,10 @@ public interface SCMRatisServer {
       throws IOException, ExecutionException, InterruptedException;
 
   void stop() throws IOException;
+
+  RaftServer getServer();
+
+  RaftGroupId getRaftGroupId();
+
+  List<RaftPeer> getRaftPeers();
 }

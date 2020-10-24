@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.ratis.protocol.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -98,7 +99,7 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
    * @throws ContainerNotFoundException
    */
   private List<DatanodeDetails> getNodes(final ContainerInfo container)
-      throws ContainerNotFoundException {
+      throws ContainerNotFoundException, NotLeaderException {
     try {
       return pipelineManager.getPipeline(container.getPipelineID()).getNodes();
     } catch (PipelineNotFoundException ex) {
@@ -109,5 +110,4 @@ public class CloseContainerEventHandler implements EventHandler<ContainerID> {
           .collect(Collectors.toList());
     }
   }
-
 }

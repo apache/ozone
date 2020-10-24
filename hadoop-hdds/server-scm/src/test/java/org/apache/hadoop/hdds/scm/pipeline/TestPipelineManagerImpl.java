@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.MockSCMHAManager;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
@@ -37,6 +38,7 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.ratis.protocol.NotLeaderException;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -66,7 +68,6 @@ public class TestPipelineManagerImpl {
   private DBStore dbStore;
   private static MockNodeManager nodeManager;
   private static int maxPipelineCount;
-  private static EventQueue eventQueue;
 
   @Before
   public void init() throws Exception {
@@ -76,7 +77,6 @@ public class TestPipelineManagerImpl {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(conf, new SCMDBDefinition());
     nodeManager = new MockNodeManager(true, 20);
-    eventQueue = new EventQueue();
     maxPipelineCount = nodeManager.getNodeCount(HddsProtos.NodeState.HEALTHY) *
         conf.getInt(OZONE_DATANODE_PIPELINE_LIMIT,
             OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT) /
@@ -91,17 +91,23 @@ public class TestPipelineManagerImpl {
     FileUtil.fullyDelete(testDir);
   }
 
-  private PipelineManagerV2Impl createPipelineManager()
+  private PipelineManagerV2Impl createPipelineManager(boolean leader)
       throws IOException {
-    return PipelineManagerV2Impl.newPipelineManager(
-        conf, MockSCMHAManager.getInstance(),
-        nodeManager,
-        SCMDBDefinition.PIPELINES.getTable(dbStore), eventQueue);
+    SCMHAManager scmhaManager;
+    if (leader) {
+      scmhaManager = MockSCMHAManager.getLeaderInstance();
+    } else {
+      scmhaManager = MockSCMHAManager.getFollowerInstance();
+    }
+    return PipelineManagerV2Impl.newPipelineManager(conf, scmhaManager,
+        new MockNodeManager(true, 20),
+        SCMDBDefinition.PIPELINES.getTable(dbStore),
+        new EventQueue());
   }
 
   @Test
   public void testCreatePipeline() throws Exception {
-    PipelineManagerV2Impl pipelineManager = createPipelineManager();
+    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
     Assert.assertTrue(pipelineManager.getPipelines().isEmpty());
     pipelineManager.allowPipelineCreation();
     Pipeline pipeline1 = pipelineManager.createPipeline(
@@ -115,7 +121,7 @@ public class TestPipelineManagerImpl {
     Assert.assertTrue(pipelineManager.containsPipeline(pipeline2.getId()));
     pipelineManager.close();
 
-    PipelineManagerV2Impl pipelineManager2 = createPipelineManager();
+    PipelineManagerV2Impl pipelineManager2 = createPipelineManager(true);
     // Should be able to load previous pipelines.
     Assert.assertFalse(pipelineManager.getPipelines().isEmpty());
     Assert.assertEquals(2, pipelineManager.getPipelines().size());
@@ -129,8 +135,24 @@ public class TestPipelineManagerImpl {
   }
 
   @Test
+  public void testCreatePipelineShouldFailOnFollower() throws Exception {
+    PipelineManagerV2Impl pipelineManager = createPipelineManager(false);
+    Assert.assertTrue(pipelineManager.getPipelines().isEmpty());
+    pipelineManager.allowPipelineCreation();
+    try {
+      pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
+          HddsProtos.ReplicationFactor.THREE);
+    } catch (NotLeaderException ex) {
+      pipelineManager.close();
+      return;
+    }
+    // Should not reach here.
+    Assert.fail();
+  }
+
+  @Test
   public void testUpdatePipelineStates() throws Exception {
-    PipelineManagerV2Impl pipelineManager = createPipelineManager();
+    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
     pipelineManager.allowPipelineCreation();
     Pipeline pipeline = pipelineManager.createPipeline(
         HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE);
@@ -164,8 +186,71 @@ public class TestPipelineManagerImpl {
   }
 
   @Test
+  public void testOpenPipelineShouldFailOnFollower() throws Exception {
+    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
+    pipelineManager.allowPipelineCreation();
+    Pipeline pipeline = pipelineManager.createPipeline(
+        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE);
+    Assert.assertEquals(1, pipelineManager.getPipelines().size());
+    Assert.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
+    Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
+    // Change to follower
+    pipelineManager.setScmhaManager(MockSCMHAManager.getFollowerInstance());
+    try {
+      pipelineManager.openPipeline(pipeline.getId());
+    } catch (NotLeaderException ex) {
+      pipelineManager.close();
+      return;
+    }
+    // Should not reach here.
+    Assert.fail();
+  }
+
+  @Test
+  public void testActivatePipelineShouldFailOnFollower() throws Exception {
+    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
+    pipelineManager.allowPipelineCreation();
+    Pipeline pipeline = pipelineManager.createPipeline(
+        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE);
+    Assert.assertEquals(1, pipelineManager.getPipelines().size());
+    Assert.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
+    Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
+    // Change to follower
+    pipelineManager.setScmhaManager(MockSCMHAManager.getFollowerInstance());
+    try {
+      pipelineManager.activatePipeline(pipeline.getId());
+    } catch (NotLeaderException ex) {
+      pipelineManager.close();
+      return;
+    }
+    // Should not reach here.
+    Assert.fail();
+  }
+
+  @Test
+  public void testDeactivatePipelineShouldFailOnFollower() throws Exception {
+    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
+    pipelineManager.allowPipelineCreation();
+    Pipeline pipeline = pipelineManager.createPipeline(
+        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE);
+    Assert.assertEquals(1, pipelineManager.getPipelines().size());
+    Assert.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
+    Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
+    // Change to follower
+    pipelineManager.setScmhaManager(MockSCMHAManager.getFollowerInstance());
+    try {
+      pipelineManager.deactivatePipeline(pipeline.getId());
+    } catch (NotLeaderException ex) {
+      pipelineManager.close();
+      return;
+    }
+    // Should not reach here.
+    Assert.fail();
+  }
+
+  @Test
   public void testRemovePipeline() throws Exception {
-    PipelineManagerV2Impl pipelineManager = createPipelineManager();
+    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
     pipelineManager.allowPipelineCreation();
     // Create a pipeline
     Pipeline pipeline = pipelineManager.createPipeline(
@@ -207,12 +292,33 @@ public class TestPipelineManagerImpl {
   }
 
   @Test
+  public void testClosePipelineShouldFailOnFollower() throws Exception {
+    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
+    pipelineManager.allowPipelineCreation();
+    Pipeline pipeline = pipelineManager.createPipeline(
+        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE);
+    Assert.assertEquals(1, pipelineManager.getPipelines().size());
+    Assert.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
+    Assert.assertEquals(ALLOCATED, pipeline.getPipelineState());
+    // Change to follower
+    pipelineManager.setScmhaManager(MockSCMHAManager.getFollowerInstance());
+    try {
+      pipelineManager.closePipeline(pipeline, false);
+    } catch (NotLeaderException ex) {
+      pipelineManager.close();
+      return;
+    }
+    // Should not reach here.
+    Assert.fail();
+  }
+
+  @Test
   public void testPipelineReport() throws Exception {
-    PipelineManagerV2Impl pipelineManager = createPipelineManager();
+    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
     pipelineManager.allowPipelineCreation();
     SCMSafeModeManager scmSafeModeManager =
         new SCMSafeModeManager(conf, new ArrayList<>(), pipelineManager,
-            eventQueue);
+            new EventQueue());
     Pipeline pipeline = pipelineManager
         .createPipeline(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.THREE);
@@ -258,7 +364,7 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testPipelineCreationFailedMetric() throws Exception {
-    PipelineManagerV2Impl pipelineManager = createPipelineManager();
+    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
     pipelineManager.allowPipelineCreation();
 
     // No pipeline at start
@@ -313,7 +419,7 @@ public class TestPipelineManagerImpl {
 
   @Test
   public void testPipelineOpenOnlyWhenLeaderReported() throws Exception {
-    PipelineManagerV2Impl pipelineManager = createPipelineManager();
+    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
     pipelineManager.allowPipelineCreation();
 
     pipelineManager.onMessage(
@@ -324,13 +430,13 @@ public class TestPipelineManagerImpl {
     // close manager
     pipelineManager.close();
     // new pipeline manager loads the pipelines from the db in ALLOCATED state
-    pipelineManager = createPipelineManager();
+    pipelineManager = createPipelineManager(true);
     Assert.assertEquals(Pipeline.PipelineState.ALLOCATED,
         pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
 
     SCMSafeModeManager scmSafeModeManager =
         new SCMSafeModeManager(new OzoneConfiguration(),
-            new ArrayList<>(), pipelineManager, eventQueue);
+            new ArrayList<>(), pipelineManager, new EventQueue());
     PipelineReportHandler pipelineReportHandler =
         new PipelineReportHandler(scmSafeModeManager, pipelineManager, conf);
 
@@ -362,7 +468,7 @@ public class TestPipelineManagerImpl {
         OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, -1,
         TimeUnit.MILLISECONDS);
 
-    PipelineManagerV2Impl pipelineManager = createPipelineManager();
+    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
     pipelineManager.allowPipelineCreation();
     Pipeline pipeline = pipelineManager
         .createPipeline(HddsProtos.ReplicationType.RATIS,
@@ -388,6 +494,14 @@ public class TestPipelineManagerImpl {
     pipelineManager.close();
   }
 
+  @Test (expected = NotLeaderException.class)
+  public void testScrubPipelineShouldFailOnFollower() throws Exception {
+    PipelineManagerV2Impl pipelineManager = createPipelineManager(false);
+    pipelineManager.allowPipelineCreation();
+    pipelineManager.scrubPipeline(HddsProtos.ReplicationType.RATIS,
+        HddsProtos.ReplicationFactor.THREE);
+  }
+
   @Test
   public void testPipelineNotCreatedUntilSafeModePrecheck() throws Exception {
     // No timeout for pipeline scrubber.
@@ -395,7 +509,7 @@ public class TestPipelineManagerImpl {
         OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, -1,
         TimeUnit.MILLISECONDS);
 
-    PipelineManagerV2Impl pipelineManager = createPipelineManager();
+    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
     try {
       pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
               HddsProtos.ReplicationFactor.THREE);
@@ -433,7 +547,7 @@ public class TestPipelineManagerImpl {
         OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, -1,
         TimeUnit.MILLISECONDS);
 
-    PipelineManagerV2Impl pipelineManager = createPipelineManager();
+    PipelineManagerV2Impl pipelineManager = createPipelineManager(true);
     Assert.assertTrue(pipelineManager.getSafeModeStatus());
     Assert.assertFalse(pipelineManager.isPipelineCreationAllowed());
     // First pass pre-check as true, but safemode still on
@@ -456,6 +570,6 @@ public class TestPipelineManagerImpl {
       boolean isLeader) {
     SCMDatanodeHeartbeatDispatcher.PipelineReportFromDatanode report =
         TestUtils.getPipelineReportFromDatanode(dn, pipeline.getId(), isLeader);
-    pipelineReportHandler.onMessage(report, eventQueue);
+    pipelineReportHandler.onMessage(report, new EventQueue());
   }
 }

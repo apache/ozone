@@ -57,6 +57,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
+
+import org.apache.ratis.protocol.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -256,7 +258,8 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
    * @param containerInfo - Container Info.
    * @return AllocatedBlock
    */
-  private AllocatedBlock newBlock(ContainerInfo containerInfo) {
+  private AllocatedBlock newBlock(ContainerInfo containerInfo)
+      throws NotLeaderException {
     try {
       final Pipeline pipeline = pipelineManager
           .getPipeline(containerInfo.getPipelineID());

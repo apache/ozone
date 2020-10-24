@@ -28,11 +28,14 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.NotLeaderException;
 import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
+import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.StateMachineException;
+import org.apache.ratis.server.RaftServer;
 
 /**
  * Mock SCMHAManager implementation for testing.
@@ -40,9 +43,22 @@ import org.apache.ratis.protocol.StateMachineException;
 public final class MockSCMHAManager implements SCMHAManager {
 
   private final SCMRatisServer ratisServer;
+  private boolean isLeader;
 
   public static SCMHAManager getInstance() {
     return new MockSCMHAManager();
+  }
+
+  public static SCMHAManager getLeaderInstance() {
+    MockSCMHAManager mockSCMHAManager = new MockSCMHAManager();
+    mockSCMHAManager.setIsLeader(true);
+    return mockSCMHAManager;
+  }
+
+  public static SCMHAManager getFollowerInstance() {
+    MockSCMHAManager mockSCMHAManager = new MockSCMHAManager();
+    mockSCMHAManager.setIsLeader(false);
+    return mockSCMHAManager;
   }
 
   /**
@@ -50,6 +66,7 @@ public final class MockSCMHAManager implements SCMHAManager {
    */
   private MockSCMHAManager() {
     this.ratisServer = new MockRatisServer();
+    this.isLeader = true;
   }
 
   @Override
@@ -62,7 +79,16 @@ public final class MockSCMHAManager implements SCMHAManager {
    */
   @Override
   public boolean isLeader() {
-    return true;
+    return isLeader;
+  }
+
+  public void setIsLeader(boolean isLeader) {
+    this.isLeader = isLeader;
+  }
+
+  @Override
+  public RaftPeer getSuggestedLeader() {
+    throw new UnsupportedOperationException();
   }
 
   /**
@@ -79,6 +105,16 @@ public final class MockSCMHAManager implements SCMHAManager {
   @Override
   public void shutdown() throws IOException {
     ratisServer.stop();
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public NotLeaderException triggerNotLeaderException() {
+    return new NotLeaderException(RaftGroupMemberId.valueOf(
+        RaftPeerId.valueOf("peer"), RaftGroupId.randomId()),
+        null, new ArrayList<>());
   }
 
   private static class MockRatisServer implements SCMRatisServer {
@@ -138,6 +174,21 @@ public final class MockSCMHAManager implements SCMHAManager {
         final Exception targetEx = (Exception) e.getTargetException();
         throw targetEx != null ? targetEx : e;
       }
+    }
+
+    @Override
+    public RaftServer getServer() {
+      return null;
+    }
+
+    @Override
+    public RaftGroupId getRaftGroupId() {
+      return null;
+    }
+
+    @Override
+    public List<RaftPeer> getRaftPeers() {
+      return new ArrayList<>();
     }
 
     @Override
