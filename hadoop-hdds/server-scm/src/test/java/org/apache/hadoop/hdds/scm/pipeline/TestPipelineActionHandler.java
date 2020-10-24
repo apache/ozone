@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineActionsFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.ratis.protocol.NotLeaderException;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -37,7 +38,7 @@ public class TestPipelineActionHandler {
 
   @Test
   public void testCloseActionForMissingPipeline()
-      throws PipelineNotFoundException {
+      throws PipelineNotFoundException, NotLeaderException {
     final PipelineManager manager = Mockito.mock(PipelineManager.class);
     final EventQueue queue = Mockito.mock(EventQueue.class);
 
