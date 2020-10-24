@@ -70,6 +70,8 @@ message SCMBlockLocationResponse {
 
   optional string leaderOMNodeId = 6;
 
+  optional string leaderSCMNodeId = 7;
+
   optional AllocateScmBlockResponseProto       allocateScmBlockResponse   = 11;
   optional DeleteScmKeyBlocksResponseProto     deleteScmKeyBlocksResponse = 12;
   optional hadoop.hdds.GetScmInfoResponseProto getScmInfoResponse         = 13;
@@ -116,6 +118,7 @@ enum Status {
   INTERNAL_ERROR = 29;
   FAILED_TO_INIT_PIPELINE_CHOOSE_POLICY = 30;
   FAILED_TO_INIT_LEADER_CHOOSE_POLICY = 31;
+  SCM_NOT_LEADER = 32;
 }
 
 /**
