@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
 import org.apache.hadoop.ozone.recon.tasks.FileSizeCountTask;
+import org.apache.hadoop.ozone.recon.tasks.TableCountTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
@@ -56,7 +57,8 @@ import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import com.google.inject.multibindings.Multibinder;
 import static org.apache.hadoop.hdds.scm.cli.ContainerOperationClient.newContainerRpcClient;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
+import static org.apache.hadoop.ozone.OmUtils.getOzoneManagerServiceId;
+
 import org.apache.ratis.protocol.ClientId;
 import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
 import org.hadoop.ozone.recon.schema.tables.daos.ClusterGrowthDailyDao;
@@ -106,6 +108,7 @@ public class ReconControllerModule extends AbstractModule {
         .to(StorageContainerServiceProviderImpl.class).in(Singleton.class);
     bind(OzoneStorageContainerManager.class)
         .to(ReconStorageContainerManagerFacade.class).in(Singleton.class);
+    bind(MetricsServiceProviderFactory.class).in(Singleton.class);
   }
 
   static class ReconOmTaskBindingModule extends AbstractModule {
@@ -115,6 +118,7 @@ public class ReconControllerModule extends AbstractModule {
           Multibinder.newSetBinder(binder(), ReconOmTask.class);
       taskBinder.addBinding().to(ContainerKeyMapperTask.class);
       taskBinder.addBinding().to(FileSizeCountTask.class);
+      taskBinder.addBinding().to(TableCountTask.class);
     }
   }
 
@@ -152,11 +156,10 @@ public class ReconControllerModule extends AbstractModule {
     try {
       ClientId clientId = ClientId.randomId();
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+      String serviceId = getOzoneManagerServiceId(ozoneConfiguration);
       OmTransport transport =
-          OmTransportFactory.create(ozoneConfiguration, ugi,
-              ozoneConfiguration.get(OZONE_OM_INTERNAL_SERVICE_ID));
-      ozoneManagerClient = new
-          OzoneManagerProtocolClientSideTranslatorPB(
+          OmTransportFactory.create(ozoneConfiguration, ugi, serviceId);
+      ozoneManagerClient = new OzoneManagerProtocolClientSideTranslatorPB(
           transport, clientId.toString());
     } catch (IOException ioEx) {
       LOG.error("Error in provisioning OzoneManagerProtocol ", ioEx);

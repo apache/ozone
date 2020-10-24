@@ -60,6 +60,8 @@ enum Type {
   CommitKey = 36;
   AllocateBlock = 37;
   DeleteKeys = 38;
+  RenameKeys = 39;
+  DeleteOpenKeys = 40;
 
   InitiateMultiPartUpload = 45;
   CommitMultiPartUpload = 46;
@@ -126,6 +128,8 @@ message OMRequest {
   optional CommitKeyRequest                 commitKeyRequest               = 36;
   optional AllocateBlockRequest             allocateBlockRequest           = 37;
   optional DeleteKeysRequest                deleteKeysRequest              = 38;
+  optional RenameKeysRequest                renameKeysRequest              = 39;
+  optional DeleteOpenKeysRequest            deleteOpenKeysRequest          = 40;
 
   optional MultipartInfoInitiateRequest     initiateMultiPartUploadRequest = 45;
   optional MultipartCommitUploadPartRequest commitMultiPartUploadRequest   = 46;
@@ -198,6 +202,7 @@ message OMResponse {
   optional CommitKeyResponse                 commitKeyResponse             = 36;
   optional AllocateBlockResponse             allocateBlockResponse         = 37;
   optional DeleteKeysResponse                deleteKeysResponse            = 38;
+  optional RenameKeysResponse                renameKeysResponse            = 39;
 
   optional MultipartInfoInitiateResponse   initiateMultiPartUploadResponse = 45;
   optional MultipartCommitUploadPartResponse commitMultiPartUploadResponse = 46;
@@ -304,6 +309,15 @@ enum Status {
     INVALID_VOLUME_NAME = 61;
 
     PARTIAL_DELETE = 62;
+
+    DETECTED_LOOP_IN_BUCKET_LINKS = 63;
+
+    NOT_SUPPORTED_OPERATION = 64;
+
+    PARTIAL_RENAME = 65;
+
+    QUOTA_EXCEEDED = 66;
+
 }
 
 /**
@@ -349,6 +363,9 @@ message VolumeInfo {
     optional uint64 objectID = 8;
     optional uint64 updateID = 9;
     optional uint64 modificationTime = 10;
+    optional uint64 quotaInCounts = 11;
+    optional uint64 usedBytes = 12;
+
 }
 
 /**
@@ -407,6 +424,7 @@ message SetVolumePropertyRequest {
     optional string ownerName = 2;
     optional uint64 quotaInBytes = 3;
     optional uint64 modificationTime = 4;
+    optional uint64 quotaInCounts = 5;
 }
 
 message SetVolumePropertyResponse {
@@ -483,6 +501,11 @@ message BucketInfo {
     optional uint64 objectID = 9;
     optional uint64 updateID = 10;
     optional uint64 modificationTime = 11;
+    optional string sourceVolume = 12;
+    optional string sourceBucket = 13;
+    optional uint64 usedBytes = 14;
+    optional uint64 quotaInBytes = 15;
+    optional uint64 quotaInCounts = 16;
 }
 
 enum StorageTypeProto {
@@ -552,6 +575,8 @@ message BucketArgs {
     optional bool isVersionEnabled = 5;
     optional StorageTypeProto storageType = 6;
     repeated hadoop.hdds.KeyValue metadata = 7;
+    optional uint64 quotaInBytes = 8;
+    optional uint64 quotaInCounts = 9;
 }
 
 message PrefixInfo {
@@ -833,6 +858,26 @@ message LookupKeyResponse {
     optional uint64 openVersion = 4;
 }
 
+message RenameKeysRequest {
+    required RenameKeysArgs renameKeysArgs = 1;
+}
+
+message RenameKeysArgs {
+    required string volumeName = 1;
+    required string bucketName = 2;
+    repeated RenameKeysMap renameKeysMap = 3;
+}
+
+message RenameKeysMap {
+    required string fromKeyName = 1;
+    required string toKeyName = 2;
+}
+
+message RenameKeysResponse{
+    repeated RenameKeysMap unRenamedKeys = 1;
+    optional bool status = 2;
+}
+
 message RenameKeyRequest{
     required KeyArgs keyArgs = 1;
     required string toKeyName = 2;
@@ -884,6 +929,21 @@ message PurgeKeysRequest {
 
 message PurgeKeysResponse {
 
+}
+
+message DeleteOpenKeysRequest {
+  repeated OpenKeyBucket openKeysPerBucket = 1;
+}
+
+message OpenKeyBucket {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  repeated OpenKey keys = 3;
+}
+
+message OpenKey {
+  required string name = 1;
+  required uint64 clientID = 2;
 }
 
 message OMTokenProto {

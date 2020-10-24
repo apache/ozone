@@ -66,8 +66,10 @@ public class KeyDeletingService extends BackgroundService {
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyDeletingService.class);
 
-  // The thread pool size for key deleting service.
-  private final static int KEY_DELETING_CORE_POOL_SIZE = 2;
+  // Use only a single thread for KeyDeletion. Multiple threads would read
+  // from the same table and can send deletion requests for same key multiple
+  // times.
+  private final static int KEY_DELETING_CORE_POOL_SIZE = 1;
 
   private final OzoneManager ozoneManager;
   private final ScmBlockLocationProtocol scmClient;
@@ -141,8 +143,7 @@ public class KeyDeletingService extends BackgroundService {
    * the blocks info in its deletedBlockLog), it removes these keys from the
    * DB.
    */
-  private class KeyDeletingTask implements
-      BackgroundTask<BackgroundTaskResult> {
+  private class KeyDeletingTask implements BackgroundTask {
 
     @Override
     public int getPriority() {

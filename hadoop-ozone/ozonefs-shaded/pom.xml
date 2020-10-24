@@ -19,12 +19,12 @@
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-ozone</artifactId>
-    <version>0.6.0-SNAPSHOT</version>
+    <version>1.1.0-SNAPSHOT</version>
   </parent>
   <artifactId>hadoop-ozone-filesystem-shaded</artifactId>
   <name>Apache Hadoop Ozone FileSystem Shaded</name>
   <packaging>jar</packaging>
-  <version>0.6.0-SNAPSHOT</version>
+  <version>1.1.0-SNAPSHOT</version>
 
   <properties>
     <shaded.prefix>org.apache.hadoop.ozone.shaded</shaded.prefix>
@@ -58,6 +58,10 @@
         <exclusion>
           <groupId>org.slf4j</groupId>
           <artifactId>slf4j-api</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.google.protobuf</groupId>
+          <artifactId>protobuf-java</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -113,6 +117,7 @@
                     <include>org.apache.commons.logging.**.*</include>
                     <include>org.apache.commons.pool2.**.*</include>
                     <include>org.apache.commons.validator.**.*</include>
+                    <include>org.apache.commons.lang3.**.*</include>
                     <include>org.sqlite.**.*</include>
                     <include>org.apache.thrift.**.*</include>
                   </includes>

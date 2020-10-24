@@ -19,11 +19,13 @@ package org.apache.hadoop.ozone.container.common.statemachine;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
@@ -50,7 +52,6 @@ import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.JvmPauseMonitor;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.util.concurrent.HadoopExecutors;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -89,7 +90,7 @@ public class DatanodeStateMachine implements Closeable {
 
   /**
    * Constructs a a datanode state machine.
-   *  @param datanodeDetails - DatanodeDetails used to identify a datanode
+   * @param datanodeDetails - DatanodeDetails used to identify a datanode
    * @param conf - Configuration.
    * @param certClient - Datanode Certificate client, required if security is
    *                     enabled
@@ -103,9 +104,10 @@ public class DatanodeStateMachine implements Closeable {
     this.hddsDatanodeStopService = hddsDatanodeStopService;
     this.conf = conf;
     this.datanodeDetails = datanodeDetails;
-    executorService = HadoopExecutors.newCachedThreadPool(
-                new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("Datanode State Machine Thread - %d").build());
+    executorService = Executors.newFixedThreadPool(
+        getEndPointTaskThreadPoolSize(),
+        new ThreadFactoryBuilder()
+            .setNameFormat("Datanode State Machine Task Thread - %d").build());
     connectionManager = new SCMConnectionManager(conf);
     context = new StateContext(this.conf, DatanodeStates.getInitState(), this);
     // OzoneContainer instance is used in a non-thread safe way by the context
@@ -124,14 +126,16 @@ public class DatanodeStateMachine implements Closeable {
     ContainerReplicator replicator =
         new DownloadAndImportReplicator(container.getContainerSet(),
             container.getController(),
-            new SimpleContainerDownloader(conf), new TarContainerPacker());
+            new SimpleContainerDownloader(conf,
+                dnCertClient != null ? dnCertClient.getCACertificate() : null),
+            new TarContainerPacker());
 
     supervisor =
         new ReplicationSupervisor(container.getContainerSet(), replicator,
             dnConf.getReplicationMaxStreams());
 
     // When we add new handlers just adding a new handler here should do the
-     // trick.
+    // trick.
     commandDispatcher = CommandDispatcher.newBuilder()
         .addHandler(new CloseContainerCommandHandler())
         .addHandler(new DeleteBlocksCommandHandler(container.getContainerSet(),
@@ -153,6 +157,21 @@ public class DatanodeStateMachine implements Closeable {
         .addPublisherFor(CommandStatusReportsProto.class)
         .addPublisherFor(PipelineReportsProto.class)
         .build();
+  }
+
+  private int getEndPointTaskThreadPoolSize() {
+    // TODO(runzhiwang): current only support one recon, if support multiple
+    //  recon in future reconServerCount should be the real number of recon
+    int reconServerCount = 1;
+    int totalServerCount = reconServerCount;
+
+    try {
+      totalServerCount += HddsUtils.getSCMAddresses(conf).size();
+    } catch (Exception e) {
+      LOG.error("Fail to get scm addresses", e);
+    }
+
+    return totalServerCount;
   }
 
   /**
@@ -207,18 +226,24 @@ public class DatanodeStateMachine implements Closeable {
         nextHB.set(Time.monotonicNow() + heartbeatFrequency);
         context.execute(executorService, heartbeatFrequency,
             TimeUnit.MILLISECONDS);
-        now = Time.monotonicNow();
-        if (now < nextHB.get()) {
-          if(!Thread.interrupted()) {
-            Thread.sleep(nextHB.get() - now);
-          }
-        }
       } catch (InterruptedException e) {
         // Some one has sent interrupt signal, this could be because
         // 1. Trigger heartbeat immediately
         // 2. Shutdown has be initiated.
+        Thread.currentThread().interrupt();
       } catch (Exception e) {
         LOG.error("Unable to finish the execution.", e);
+      }
+
+      now = Time.monotonicNow();
+      if (now < nextHB.get()) {
+        if(!Thread.interrupted()) {
+          try {
+            Thread.sleep(nextHB.get() - now);
+          } catch (InterruptedException e) {
+            //triggerHeartbeat is called during the sleep
+          }
+        }
       }
     }
 

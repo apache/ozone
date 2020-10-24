@@ -33,7 +33,8 @@ public final class VolumeArgs {
 
   private final String admin;
   private final String owner;
-  private final String quota;
+  private final long quotaInBytes;
+  private final long quotaInCounts;
   private final List<OzoneAcl> acls;
   private Map<String, String> metadata;
 
@@ -41,17 +42,21 @@ public final class VolumeArgs {
    * Private constructor, constructed via builder.
    * @param admin Administrator's name.
    * @param owner Volume owner's name
-   * @param quota Volume Quota.
+   * @param quotaInBytes Volume quota in bytes.
+   * @param quotaInCounts Volume quota in counts.
    * @param acls User to access rights map.
+   * @param metadata Metadata of volume.
    */
   private VolumeArgs(String admin,
       String owner,
-      String quota,
+      long quotaInBytes,
+      long quotaInCounts,
       List<OzoneAcl> acls,
       Map<String, String> metadata) {
     this.admin = admin;
     this.owner = owner;
-    this.quota = quota;
+    this.quotaInBytes = quotaInBytes;
+    this.quotaInCounts = quotaInCounts;
     this.acls = acls;
     this.metadata = metadata;
   }
@@ -73,11 +78,19 @@ public final class VolumeArgs {
   }
 
   /**
-   * Returns Volume Quota.
-   * @return Quota.
+   * Returns Volume Quota in bytes.
+   * @return quotaInBytes.
    */
-  public String getQuota() {
-    return quota;
+  public long getQuotaInBytes() {
+    return quotaInBytes;
+  }
+
+  /**
+   * Returns Volume Quota in bucket counts.
+   * @return quotaInCounts.
+   */
+  public long getQuotaInCounts() {
+    return quotaInCounts;
   }
 
   /**
@@ -107,7 +120,8 @@ public final class VolumeArgs {
   public static class Builder {
     private String adminName;
     private String ownerName;
-    private String volumeQuota;
+    private long quotaInBytes;
+    private long quotaInCounts;
     private List<OzoneAcl> listOfAcls;
     private Map<String, String> metadata = new HashMap<>();
 
@@ -122,8 +136,13 @@ public final class VolumeArgs {
       return this;
     }
 
-    public VolumeArgs.Builder setQuota(String quota) {
-      this.volumeQuota = quota;
+    public VolumeArgs.Builder setQuotaInBytes(long quota) {
+      this.quotaInBytes = quota;
+      return this;
+    }
+
+    public VolumeArgs.Builder setQuotaInCounts(long quota) {
+      this.quotaInCounts = quota;
       return this;
     }
 
@@ -142,8 +161,8 @@ public final class VolumeArgs {
      * @return CreateVolumeArgs.
      */
     public VolumeArgs build() {
-      return new VolumeArgs(adminName, ownerName, volumeQuota, listOfAcls,
-          metadata);
+      return new VolumeArgs(adminName, ownerName, quotaInBytes,
+          quotaInCounts, listOfAcls, metadata);
     }
   }
 

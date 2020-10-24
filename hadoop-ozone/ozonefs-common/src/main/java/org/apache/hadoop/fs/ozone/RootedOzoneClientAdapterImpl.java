@@ -53,9 +53,9 @@ public class RootedOzoneClientAdapterImpl
   }
 
   @Override
-  protected void incrementCounter(Statistic objectsRead) {
+  protected void incrementCounter(Statistic objectsRead, long count) {
     if (storageStatistics != null) {
-      storageStatistics.incrementCounter(objectsRead, 1);
+      storageStatistics.incrementCounter(objectsRead, count);
     }
   }
 }

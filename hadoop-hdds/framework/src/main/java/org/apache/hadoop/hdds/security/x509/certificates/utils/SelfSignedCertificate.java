@@ -26,7 +26,9 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
@@ -37,10 +39,17 @@ import org.apache.hadoop.util.Time;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.logging.log4j.util.Strings;
-import org.bouncycastle.asn1.DEROctetString;
+import org.bouncycastle.asn1.ASN1EncodableVector;
+import org.bouncycastle.asn1.ASN1Object;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+import org.bouncycastle.asn1.DERSequence;
+import org.bouncycastle.asn1.DERTaggedObject;
+import org.bouncycastle.asn1.DERUTF8String;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.GeneralName;
+import org.bouncycastle.asn1.x509.GeneralNames;
 import org.bouncycastle.asn1.x509.KeyUsage;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.cert.CertIOException;
@@ -64,28 +73,23 @@ public final class SelfSignedCertificate {
   private LocalDate endDate;
   private KeyPair key;
   private SecurityConfig config;
+  private List<GeneralName> altNames;
 
   /**
    * Private Ctor invoked only via Builder Interface.
    *
-   * @param subject - Subject
-   * @param scmID - SCM ID
-   * @param clusterID - Cluster ID
-   * @param beginDate - NotBefore
-   * @param endDate - Not After
-   * @param configuration - SCM Config
-   * @param keyPair - KeyPair
+   * @param builder - builder
    */
-  private SelfSignedCertificate(String subject, String scmID, String clusterID,
-      LocalDate beginDate, LocalDate endDate, SecurityConfig configuration,
-      KeyPair keyPair) {
-    this.subject = subject;
-    this.clusterID = clusterID;
-    this.scmID = scmID;
-    this.beginDate = beginDate;
-    this.endDate = endDate;
-    config = configuration;
-    this.key = keyPair;
+
+  private SelfSignedCertificate(Builder builder) {
+    this.subject = builder.subject;
+    this.clusterID = builder.clusterID;
+    this.scmID = builder.scmID;
+    this.beginDate = builder.beginDate;
+    this.endDate = builder.endDate;
+    this.config = builder.config;
+    this.key = builder.key;
+    this.altNames = builder.altNames;
   }
 
   @VisibleForTesting
@@ -140,8 +144,12 @@ public final class SelfSignedCertificate {
           new BasicConstraints(true));
       int keyUsageFlag = KeyUsage.keyCertSign | KeyUsage.cRLSign;
       KeyUsage keyUsage = new KeyUsage(keyUsageFlag);
-      builder.addExtension(Extension.keyUsage, false,
-          new DEROctetString(keyUsage));
+      builder.addExtension(Extension.keyUsage, true, keyUsage);
+      if (altNames != null && altNames.size() >= 1) {
+        builder.addExtension(new Extension(Extension.subjectAlternativeName,
+            false, new GeneralNames(altNames.toArray(
+                new GeneralName[altNames.size()])).getEncoded()));
+      }
     }
     return builder.build(contentSigner);
   }
@@ -158,6 +166,7 @@ public final class SelfSignedCertificate {
     private KeyPair key;
     private SecurityConfig config;
     private boolean isCA;
+    private List<GeneralName> altNames;
 
     public Builder setConfiguration(ConfigurationSource configuration) {
       this.config = new SecurityConfig(configuration);
@@ -199,6 +208,62 @@ public final class SelfSignedCertificate {
       return this;
     }
 
+    // Support SAN extension with DNS and RFC822 Name
+    // other name type will be added as needed.
+    public Builder addDnsName(String dnsName) {
+      Preconditions.checkNotNull(dnsName, "dnsName cannot be null");
+      this.addAltName(GeneralName.dNSName, dnsName);
+      return this;
+    }
+
+    // IP address is subject to change which is optional for now.
+    public Builder addIpAddress(String ip) {
+      Preconditions.checkNotNull(ip, "Ip address cannot be null");
+      this.addAltName(GeneralName.iPAddress, ip);
+      return this;
+    }
+
+    public Builder addServiceName(
+        String serviceName) {
+      Preconditions.checkNotNull(
+          serviceName, "Service Name cannot be null");
+
+      this.addAltName(GeneralName.otherName, serviceName);
+      return this;
+    }
+
+    private Builder addAltName(int tag, String name) {
+      if (altNames == null) {
+        altNames = new ArrayList<>();
+      }
+      if (tag == GeneralName.otherName) {
+        ASN1Object ono = addOtherNameAsn1Object(name);
+
+        altNames.add(new GeneralName(tag, ono));
+      } else {
+        altNames.add(new GeneralName(tag, name));
+      }
+      return this;
+    }
+
+    /**
+     * addOtherNameAsn1Object requires special handling since
+     * Bouncy Castle does not support othername as string.
+     * @param name
+     * @return
+     */
+    private ASN1Object addOtherNameAsn1Object(String name) {
+      // Below oid is copied from this URL:
+      // https://docs.microsoft.com/en-us/windows/win32/adschema/a-middlename
+      final String otherNameOID = "2.16.840.1.113730.3.1.34";
+      ASN1EncodableVector otherName = new ASN1EncodableVector();
+      otherName.add(new ASN1ObjectIdentifier(otherNameOID));
+      otherName.add(new DERTaggedObject(
+          true, GeneralName.otherName, new DERUTF8String(name)));
+      return new DERTaggedObject(
+          false, 0, new DERSequence(otherName));
+    }
+
     public X509CertificateHolder build()
         throws SCMSecurityException, IOException {
       Preconditions.checkNotNull(key, "Key cannot be null");
@@ -225,9 +290,7 @@ public final class SelfSignedCertificate {
       }
 
       SelfSignedCertificate rootCertificate =
-          new SelfSignedCertificate(this.subject,
-              this.scmID, this.clusterID, this.beginDate, this.endDate,
-              this.config, key);
+          new SelfSignedCertificate(this);
       try {
         return rootCertificate.generateCertificate(isCA);
       } catch (OperatorCreationException | CertIOException e) {

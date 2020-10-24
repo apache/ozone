@@ -73,6 +73,10 @@ public class OMMetrics {
   private @Metric MutableCounterLong numLookupFile;
   private @Metric MutableCounterLong numListStatus;
 
+  private @Metric MutableCounterLong numOpenKeyDeleteRequests;
+  private @Metric MutableCounterLong numOpenKeysSubmittedForDeletion;
+  private @Metric MutableCounterLong numOpenKeysDeleted;
+
   // Failure Metrics
   private @Metric MutableCounterLong numVolumeCreateFails;
   private @Metric MutableCounterLong numVolumeUpdateFails;
@@ -103,6 +107,7 @@ public class OMMetrics {
   private @Metric MutableCounterLong numAbortMultipartUploadFails;
   private @Metric MutableCounterLong numListMultipartUploadParts;
   private @Metric MutableCounterLong numListMultipartUploadPartFails;
+  private @Metric MutableCounterLong numOpenKeyDeleteRequestFails;
 
   private @Metric MutableCounterLong numGetFileStatusFails;
   private @Metric MutableCounterLong numCreateDirectoryFails;
@@ -539,6 +544,22 @@ public class OMMetrics {
     numCheckpointFails.incr();
   }
 
+  public void incNumOpenKeyDeleteRequests() {
+    numOpenKeyDeleteRequests.incr();
+  }
+
+  public void incNumOpenKeysSubmittedForDeletion(long amount) {
+    numOpenKeysSubmittedForDeletion.incr(amount);
+  }
+
+  public void incNumOpenKeysDeleted() {
+    numOpenKeysDeleted.incr();
+  }
+
+  public void incNumOpenKeyDeleteRequestFails() {
+    numOpenKeyDeleteRequestFails.incr();
+  }
+
   @VisibleForTesting
   public long getNumVolumeCreates() {
     return numVolumeCreates.value();
@@ -793,6 +814,22 @@ public class OMMetrics {
   @VisibleForTesting
   public long getLastCheckpointStreamingTimeTaken() {
     return lastCheckpointStreamingTimeTaken.value();
+  }
+
+  public long getNumOpenKeyDeleteRequests() {
+    return numOpenKeyDeleteRequests.value();
+  }
+
+  public long getNumOpenKeysSubmittedForDeletion() {
+    return numOpenKeysSubmittedForDeletion.value();
+  }
+
+  public long getNumOpenKeysDeleted() {
+    return numOpenKeysDeleted.value();
+  }
+
+  public long getNumOpenKeyDeleteRequestFails() {
+    return numOpenKeyDeleteRequestFails.value();
   }
 
   public void unRegister() {

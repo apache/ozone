@@ -19,12 +19,14 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheResult;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -178,6 +180,19 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   /**
+   * Skip checking cache and get the value mapped to the given key in byte
+   * array or returns null if the key is not found.
+   *
+   * @param key metadata key
+   * @return value in byte array or null if the key is not found.
+   * @throws IOException on Failure
+   */
+  @Override
+  public VALUE getSkipCache(KEY key) throws IOException {
+    return getFromTable(key);
+  }
+
+  /**
    * This method returns the value if it exists in cache, if it 
    * does not, get the value from the underlying rockdb table. If it 
    * exists in cache, it returns the same reference of the cached value.
@@ -293,6 +308,50 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   public Iterator<Map.Entry<CacheKey<KEY>, CacheValue<VALUE>>> cacheIterator() {
     return cache.iterator();
+  }
+
+  @Override
+  public List<TypedKeyValue> getRangeKVs(
+          KEY startKey, int count,
+          MetadataKeyFilters.MetadataKeyFilter... filters)
+          throws IOException, IllegalArgumentException {
+
+    // A null start key means to start from the beginning of the table.
+    // Cannot convert a null key to bytes.
+    byte[] startKeyBytes = null;
+    if (startKey != null) {
+      startKeyBytes = codecRegistry.asRawData(startKey);
+    }
+
+    List<? extends KeyValue<byte[], byte[]>> rangeKVBytes =
+            rawTable.getRangeKVs(startKeyBytes, count, filters);
+
+    List<TypedKeyValue> rangeKVs = new ArrayList<>();
+    rangeKVBytes.forEach(byteKV -> rangeKVs.add(new TypedKeyValue(byteKV)));
+
+    return rangeKVs;
+  }
+
+  @Override
+  public List<TypedKeyValue> getSequentialRangeKVs(
+          KEY startKey, int count,
+          MetadataKeyFilters.MetadataKeyFilter... filters)
+          throws IOException, IllegalArgumentException {
+
+    // A null start key means to start from the beginning of the table.
+    // Cannot convert a null key to bytes.
+    byte[] startKeyBytes = null;
+    if (startKey != null) {
+      startKeyBytes = codecRegistry.asRawData(startKey);
+    }
+
+    List<? extends KeyValue<byte[], byte[]>> rangeKVBytes =
+            rawTable.getSequentialRangeKVs(startKeyBytes, count, filters);
+
+    List<TypedKeyValue> rangeKVs = new ArrayList<>();
+    rangeKVBytes.forEach(byteKV -> rangeKVs.add(new TypedKeyValue(byteKV)));
+
+    return rangeKVs;
   }
 
   @Override

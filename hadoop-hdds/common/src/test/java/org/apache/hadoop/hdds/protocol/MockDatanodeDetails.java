@@ -44,7 +44,7 @@ public final class MockDatanodeDetails {
    * @return DatanodeDetails
    */
   public static DatanodeDetails createDatanodeDetails(String hostname,
-       String loc) {
+      String loc) {
     Random random = ThreadLocalRandom.current();
     String ipAddress = random.nextInt(256)
         + "." + random.nextInt(256)

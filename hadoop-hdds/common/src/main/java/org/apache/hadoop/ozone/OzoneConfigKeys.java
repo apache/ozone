@@ -95,6 +95,9 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CONTAINER_CACHE_SIZE =
       "ozone.container.cache.size";
   public static final int OZONE_CONTAINER_CACHE_DEFAULT = 1024;
+  public static final String OZONE_CONTAINER_CACHE_LOCK_STRIPES =
+      "ozone.container.cache.lock.stripes";
+  public static final int OZONE_CONTAINER_CACHE_LOCK_STRIPES_DEFAULT = 1024;
 
   public static final String OZONE_SCM_BLOCK_SIZE =
       "ozone.scm.block.size";
@@ -465,6 +468,7 @@ public final class OzoneConfigKeys {
   public static final String  OZONE_CLIENT_HTTPS_NEED_AUTH_KEY =
       "ozone.https.client.need-auth";
   public static final boolean OZONE_CLIENT_HTTPS_NEED_AUTH_DEFAULT = false;
+
   /**
    * There is no need to instantiate this class.
    */

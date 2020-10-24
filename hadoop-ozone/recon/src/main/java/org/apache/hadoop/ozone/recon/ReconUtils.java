@@ -24,13 +24,14 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLConnection;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.Timestamp;
 import java.util.zip.GZIPOutputStream;
 
+import com.google.inject.Singleton;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -44,14 +45,21 @@ import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
+import static org.jooq.impl.DSL.currentTimestamp;
+import static org.jooq.impl.DSL.select;
+import static org.jooq.impl.DSL.using;
 
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
+import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
+import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Recon Utility class.
  */
+@Singleton
 public class ReconUtils {
 
   private final static int WRITE_BUFFER = 1048576; //1MB
@@ -215,20 +223,20 @@ public class ReconUtils {
   }
 
   /**
-   * Make HTTP GET call on the URL and return inputstream to the response.
+   * Make HTTP GET call on the URL and return HttpURLConnection instance.
    * @param connectionFactory URLConnectionFactory to use.
    * @param url url to call
    * @param isSpnego is SPNEGO enabled
-   * @return Inputstream to the response of the HTTP call.
+   * @return HttpURLConnection instance of the HTTP call.
    * @throws IOException, AuthenticationException While reading the response.
    */
-  public InputStream makeHttpCall(URLConnectionFactory connectionFactory,
+  public HttpURLConnection makeHttpCall(URLConnectionFactory connectionFactory,
                                   String url, boolean isSpnego)
       throws IOException, AuthenticationException {
-    URLConnection urlConnection =
+    HttpURLConnection urlConnection = (HttpURLConnection)
           connectionFactory.openConnection(new URL(url), isSpnego);
     urlConnection.connect();
-    return urlConnection.getInputStream();
+    return urlConnection;
   }
 
   /**
@@ -266,4 +274,29 @@ public class ReconUtils {
         new File(reconDbDir.getPath(), lastKnownSnapshotFileName);
   }
 
+  /**
+   * Upsert row in GlobalStats table.
+   *
+   * @param sqlConfiguration
+   * @param globalStatsDao
+   * @param key
+   * @param count
+   */
+  public static void upsertGlobalStatsTable(Configuration sqlConfiguration,
+                                            GlobalStatsDao globalStatsDao,
+                                            String key,
+                                            Long count) {
+    // Get the current timestamp
+    Timestamp now =
+        using(sqlConfiguration).fetchValue(select(currentTimestamp()));
+    GlobalStats record = globalStatsDao.fetchOneByKey(key);
+    GlobalStats newRecord = new GlobalStats(key, count, now);
+
+    // Insert a new record for key if it does not exist
+    if (record == null) {
+      globalStatsDao.insert(newRecord);
+    } else {
+      globalStatsDao.update(newRecord);
+    }
+  }
 }

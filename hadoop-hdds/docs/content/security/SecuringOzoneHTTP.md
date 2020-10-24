@@ -1,8 +1,11 @@
 ---
-title: "Securing Ozone HTTP web-consoles"
+title: "Securing HTTP"
 date: "2020-June-17"
 summary: Secure HTTP web-consoles for Ozone services 
-weight: 3
+weight: 4
+menu:
+   main:
+      parent: Security
 icon: lock
 ---
 <!---

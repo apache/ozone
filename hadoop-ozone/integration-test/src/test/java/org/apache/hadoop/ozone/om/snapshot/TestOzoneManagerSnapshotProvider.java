@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import java.util.UUID;
 
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -31,11 +32,10 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
-
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -124,7 +124,7 @@ public class TestOzoneManagerSnapshotProvider {
         .getOzoneManagerDBSnapshot(leaderOMNodeId);
 
     long leaderSnapshotIndex = leaderOM.getRatisSnapshotIndex();
-    long downloadedSnapshotIndex = getDownloadSnapshotIndex(omSnapshot);
+    long downloadedSnapshotIndex = getDownloadedSnapshotIndex(omSnapshot);
 
     // The snapshot index downloaded from leader OM should match the ratis
     // snapshot index on the leader OM
@@ -133,21 +133,13 @@ public class TestOzoneManagerSnapshotProvider {
         leaderSnapshotIndex, downloadedSnapshotIndex);
   }
 
-  private long getDownloadSnapshotIndex(DBCheckpoint dbCheckpoint)
+  private long getDownloadedSnapshotIndex(DBCheckpoint dbCheckpoint)
       throws Exception {
 
-    OzoneConfiguration configuration = new OzoneConfiguration(conf);
-    configuration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        dbCheckpoint.getCheckpointLocation().getParent().toString());
+    OMTransactionInfo trxnInfoFromCheckpoint =
+        OzoneManagerRatisUtils.getTrxnInfoFromCheckpoint(conf,
+            dbCheckpoint.getCheckpointLocation());
 
-    OmMetadataManagerImpl omMetadataManager =
-        new OmMetadataManagerImpl(configuration);
-
-    long transactionIndex =
-        OMTransactionInfo.readTransactionInfo(omMetadataManager)
-        .getTransactionIndex();
-    omMetadataManager.stop();
-    return transactionIndex;
-
+    return trxnInfoFromCheckpoint.getTransactionIndex();
   }
 }

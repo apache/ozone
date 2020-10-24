@@ -21,8 +21,9 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.*;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -41,7 +42,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.ratis.protocol.GroupMismatchException;
+import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.After;
@@ -100,23 +101,25 @@ public class TestWatchForCommit {
     conf.setTimeDuration(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 10,
             TimeUnit.SECONDS);
     conf.setQuietMode(false);
-    conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
-            + ".client.request.write.timeout", 10, TimeUnit.SECONDS);
-    conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
-            + ".client.request.watch.timeout", 10, TimeUnit.SECONDS);
+
+    RatisClientConfig ratisClientConfig =
+        conf.getObject(RatisClientConfig.class);
+    ratisClientConfig.setWriteRequestTimeout(Duration.ofSeconds(10));
+    ratisClientConfig.setWatchRequestTimeout(Duration.ofSeconds(10));
+    conf.setFromObject(ratisClientConfig);
+
     DatanodeRatisServerConfig ratisServerConfig =
         conf.getObject(DatanodeRatisServerConfig.class);
     ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
     ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(3));
     conf.setFromObject(ratisServerConfig);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
-                    "rpc.request.timeout",
-            3, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY+ "." +
-                    "watch.request.timeout",
-            10, TimeUnit.SECONDS);
+
+    RatisClientConfig.RaftConfig raftClientConfig =
+        conf.getObject(RatisClientConfig.RaftConfig.class);
+    raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
+    raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(10));
+    conf.setFromObject(raftClientConfig);
+
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 30, TimeUnit.SECONDS);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(9)
@@ -295,9 +298,11 @@ public class TestWatchForCommit {
             xceiverClient.getPipeline()));
     reply.getResponse().get();
     Assert.assertEquals(3, ratisClient.getCommitInfoMap().size());
+    List<DatanodeDetails> nodesInPipeline = pipeline.getNodes();
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       // shutdown the ratis follower
-      if (ContainerTestHelper.isRatisFollower(dn, pipeline)) {
+      if (nodesInPipeline.contains(dn.getDatanodeDetails())
+          && ContainerTestHelper.isRatisFollower(dn, pipeline)) {
         cluster.shutdownHddsDatanode(dn.getDatanodeDetails());
         break;
       }

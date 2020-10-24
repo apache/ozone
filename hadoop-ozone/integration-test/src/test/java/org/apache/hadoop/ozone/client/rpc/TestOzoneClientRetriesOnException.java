@@ -40,7 +40,7 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
-import org.apache.ratis.protocol.GroupMismatchException;
+import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;

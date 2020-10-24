@@ -50,7 +50,7 @@ public class StorageContainerDatanodeProtocolServerSideTranslatorPB
 
   private final StorageContainerDatanodeProtocol impl;
   private final OzoneProtocolMessageDispatcher<SCMDatanodeRequest,
-      SCMDatanodeResponse> dispatcher;
+      SCMDatanodeResponse, ProtocolMessageEnum> dispatcher;
 
   public StorageContainerDatanodeProtocolServerSideTranslatorPB(
       StorageContainerDatanodeProtocol impl,
@@ -68,7 +68,7 @@ public class StorageContainerDatanodeProtocolServerSideTranslatorPB
         .getContainerReport();
     NodeReportProto dnNodeReport = request.getNodeReport();
     PipelineReportsProto pipelineReport = request.getPipelineReports();
-    return impl.register(request.getDatanodeDetails(), dnNodeReport,
+    return impl.register(request.getExtendedDatanodeDetails(), dnNodeReport,
         containerRequestProto, pipelineReport);
 
   }

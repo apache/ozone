@@ -88,7 +88,7 @@ message SCMVersionResponseProto {
 }
 
 message SCMRegisterRequestProto {
-  required DatanodeDetailsProto datanodeDetails = 1;
+  required ExtendedDatanodeDetailsProto extendedDatanodeDetails = 1;
   required NodeReportProto nodeReport = 2;
   required ContainerReportsProto containerReport = 3;
   required PipelineReportsProto pipelineReports = 4;
@@ -146,6 +146,7 @@ message SCMNodeAddressList {
 */
 message NodeReportProto {
   repeated StorageReportProto storageReport = 1;
+  repeated MetadataStorageReportProto metadataStorageReport = 2;
 }
 
 message StorageReportProto {
@@ -156,6 +157,11 @@ message StorageReportProto {
   optional uint64 remaining = 5 [default = 0];
   optional StorageTypeProto storageType = 6 [default = DISK];
   optional bool failed = 7 [default = false];
+}
+
+message MetadataStorageReportProto {
+  required string storageLocation = 1;
+  optional StorageTypeProto storageType = 2 [default = DISK];
 }
 
 /**
@@ -374,6 +380,7 @@ message CreatePipelineCommandProto {
   required ReplicationFactor factor = 3;
   repeated DatanodeDetailsProto datanode = 4;
   required int64 cmdId = 5;
+  repeated int32 priority = 6;
 }
 
 /**

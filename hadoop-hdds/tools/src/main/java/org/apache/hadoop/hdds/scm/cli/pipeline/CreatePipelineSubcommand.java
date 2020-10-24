@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,11 +20,12 @@ package org.apache.hadoop.hdds.scm.cli.pipeline;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import picocli.CommandLine;
 
-import java.util.concurrent.Callable;
+import java.io.IOException;
 
 /**
  * Handler of createPipeline command.
@@ -34,44 +35,39 @@ import java.util.concurrent.Callable;
     description = "create pipeline",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class CreatePipelineSubcommand implements Callable<Void> {
-  @CommandLine.ParentCommand
-  private PipelineCommands parent;
+public class CreatePipelineSubcommand extends ScmSubcommand {
 
   @CommandLine.Option(
-      names = {"-t", "--replicationType"},
-      description = "Replication type (STAND_ALONE, RATIS)",
+      names = {"-t", "--replication-type", "--replicationType"},
+      description = "Replication type (STAND_ALONE, RATIS). Full name" +
+          " --replicationType will be removed in later versions.",
       defaultValue = "STAND_ALONE"
   )
-  private HddsProtos.ReplicationType type
-      = HddsProtos.ReplicationType.STAND_ALONE;
+  private HddsProtos.ReplicationType type;
 
   @CommandLine.Option(
-      names = {"-f", "--replicationFactor"},
-      description = "Replication factor (ONE, THREE)",
+      names = {"-f", "--replication-factor", "--replicationFactor"},
+      description = "Replication factor (ONE, THREE). Full name" +
+          " --replicationFactor will be removed in later versions.",
       defaultValue = "ONE"
   )
-  private HddsProtos.ReplicationFactor factor
-      = HddsProtos.ReplicationFactor.ONE;
+  private HddsProtos.ReplicationFactor factor;
 
   @Override
-  public Void call() throws Exception {
+  public void execute(ScmClient scmClient) throws IOException {
     if (type == HddsProtos.ReplicationType.CHAINED) {
       throw new IllegalArgumentException(type.name()
           + " is not supported yet.");
     }
-    try (ScmClient scmClient = parent.getParent().createScmClient()) {
-      Pipeline pipeline = scmClient.createReplicationPipeline(
-          type,
-          factor,
-          HddsProtos.NodePool.getDefaultInstance());
+    Pipeline pipeline = scmClient.createReplicationPipeline(
+        type,
+        factor,
+        HddsProtos.NodePool.getDefaultInstance());
 
-      if (pipeline != null) {
-        System.out.println(pipeline.getId().toString() +
-            " is created. Factor: " + pipeline.getFactor() +
-            ", Type: " + pipeline.getType());
-      }
-      return null;
+    if (pipeline != null) {
+      System.out.println(pipeline.getId().toString() +
+          " is created. Factor: " + pipeline.getFactor() +
+          ", Type: " + pipeline.getType());
     }
   }
 }

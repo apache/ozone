@@ -46,6 +46,9 @@ public class GetTokenHandler extends Handler {
   @CommandLine.Mixin
   private RenewerOption renewer;
 
+  @CommandLine.Mixin
+  private TokenOption tokenFile;
+
   @Override
   protected OzoneAddress getAddress() throws OzoneClientException {
     return new OzoneAddress(uri);
@@ -66,7 +69,10 @@ public class GetTokenHandler extends Handler {
       err().println("Error: Get delegation token operation failed. " +
           "Check OzoneManager logs for more details.");
     } else {
-      printObjectAsJson(token.encodeToUrlString());
+      out().println("Successfully get token for service " +
+          token.getService());
+      out().println(token.toString());
+      tokenFile.persistToken(token);
     }
   }
 }

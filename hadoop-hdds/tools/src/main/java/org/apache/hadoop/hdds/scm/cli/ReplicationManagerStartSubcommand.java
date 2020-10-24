@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -22,32 +22,25 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.ParentCommand;
 
-import java.util.concurrent.Callable;
+import java.io.IOException;
 
 /**
- * This is the handler that process safe mode check command.
+ * Handler to start replication manager.
  */
 @Command(
     name = "start",
     description = "Start ReplicationManager",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class ReplicationManagerStartSubcommand implements Callable<Void> {
+public class ReplicationManagerStartSubcommand extends ScmSubcommand {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReplicationManagerStartSubcommand.class);
 
-  @ParentCommand
-  private ReplicationManagerCommands parent;
-
   @Override
-  public Void call() throws Exception {
-    try (ScmClient scmClient = parent.getParent().createScmClient()) {
-      scmClient.startReplicationManager();
-      LOG.info("Starting ReplicationManager...");
-      return null;
-    }
+  public void execute(ScmClient scmClient) throws IOException {
+    scmClient.startReplicationManager();
+    LOG.info("Starting ReplicationManager...");
   }
 }

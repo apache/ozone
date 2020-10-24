@@ -893,6 +893,27 @@ public final class HttpServer2 implements FilterContainer {
     }
     webAppContext.addServlet(holder, pathSpec);
 
+    // Remove any previous filter attached to the removed servlet path to avoid
+    // Kerberos replay error.
+    FilterMapping[] filterMappings = webAppContext.getServletHandler().
+        getFilterMappings();
+    for (int i = 0; i < filterMappings.length; i++) {
+      if (filterMappings[i].getPathSpecs() == null) {
+        LOG.debug("Skip checking {} filterMappings {} without a path spec.",
+            filterMappings[i].getFilterName(), filterMappings[i]);
+        continue;
+      }
+      int oldPathSpecsLen = filterMappings[i].getPathSpecs().length;
+      String[] newPathSpecs =
+          ArrayUtil.removeFromArray(filterMappings[i].getPathSpecs(), pathSpec);
+      if (newPathSpecs.length == 0) {
+        webAppContext.getServletHandler().setFilterMappings(
+            ArrayUtil.removeFromArray(filterMappings, filterMappings[i]));
+      } else if (newPathSpecs.length != oldPathSpecsLen) {
+        filterMappings[i].setPathSpecs(newPathSpecs);
+      }
+    }
+
     if (requireAuth && UserGroupInformation.isSecurityEnabled()) {
       LOG.info("Adding Kerberos (SPNEGO) filter to {}", name);
       ServletHandler handler = webAppContext.getServletHandler();

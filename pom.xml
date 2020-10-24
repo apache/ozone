@@ -18,7 +18,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.hadoop</groupId>
   <artifactId>hadoop-main-ozone</artifactId>
-  <version>0.6.0-SNAPSHOT</version>
+  <version>1.1.0-SNAPSHOT</version>
   <description>Apache Hadoop Ozone Main</description>
   <name>Apache Hadoop Ozone Main</name>
   <packaging>pom</packaging>
@@ -73,16 +73,16 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- version for hdds/ozone components -->
     <hdds.version>${ozone.version}</hdds.version>
-    <ozone.version>0.6.0-SNAPSHOT</ozone.version>
+    <ozone.version>1.1.0-SNAPSHOT</ozone.version>
     <ozone.release>Denali</ozone.release>
     <declared.hdds.version>${hdds.version}</declared.hdds.version>
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
 
     <!-- Apache Ratis version -->
-    <ratis.version>0.6.0-6ab75ae-SNAPSHOT</ratis.version>
+    <ratis.version>1.1.0-11689cd-SNAPSHOT</ratis.version>
 
     <!-- Apache Ratis thirdparty version -->
-    <ratis.thirdparty.version>0.4.0</ratis.thirdparty.version>
+    <ratis.thirdparty.version>0.6.0-SNAPSHOT</ratis.thirdparty.version>
 
     <distMgmtSnapshotsId>apache.snapshots.https</distMgmtSnapshotsId>
     <distMgmtSnapshotsName>Apache Development Snapshot Repository</distMgmtSnapshotsName>
@@ -109,12 +109,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- number of threads/forks to use when running tests in parallel, see parallel-tests profile -->
     <testsThreadCount>4</testsThreadCount>
-
-    <!-- These 2 versions are defined here because they are used -->
-    <!-- JDIFF generation from embedded ant in the antrun plugin -->
-    <jdiff.version>1.0.9</jdiff.version>
-    <!-- Version number for xerces used by JDiff -->
-    <xerces.jdiff.version>2.11.0</xerces.jdiff.version>
 
     <commons-daemon.version>1.0.13</commons-daemon.version>
 
@@ -146,7 +140,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- SLF4J/LOG4J version -->
     <slf4j.version>1.7.25</slf4j.version>
     <log4j.version>1.2.17</log4j.version>
-    <log4j2.version>2.11.0</log4j2.version>
+    <log4j2.version>2.13.3</log4j2.version>
     <disruptor.version>3.4.2</disruptor.version>
 
     <prometheus.version>0.7.0</prometheus.version>
@@ -229,7 +223,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <native-maven-plugin.version>1.0-alpha-8</native-maven-plugin.version>
     <maven-checkstyle-plugin.version>3.0.0</maven-checkstyle-plugin.version>
     <checkstyle.version>8.19</checkstyle.version>
-    <surefire.fork.timeout>900</surefire.fork.timeout>
+    <surefire.fork.timeout>1200</surefire.fork.timeout>
     <aws-java-sdk.version>1.11.615</aws-java-sdk.version>
     <hsqldb.version>2.3.4</hsqldb.version>
     <frontend-maven-plugin.version>1.10.0</frontend-maven-plugin.version>
@@ -260,12 +254,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>info.picocli</groupId>
         <artifactId>picocli</artifactId>
-        <version>3.9.6</version>
-      </dependency>
-      <dependency>
-        <groupId>jdiff</groupId>
-        <artifactId>jdiff</artifactId>
-        <version>${jdiff.version}</version>
+        <version>4.4.0</version>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
@@ -1292,11 +1281,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>0.3</version>
       </dependency>
       <dependency>
-        <groupId>org.apache.ant</groupId>
-        <artifactId>ant</artifactId>
-        <version>1.8.1</version>
-      </dependency>
-      <dependency>
         <groupId>com.google.re2j</groupId>
         <artifactId>re2j</artifactId>
         <version>${re2j.version}</version>
@@ -1331,6 +1315,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.hsqldb</groupId>
         <artifactId>hsqldb</artifactId>
         <version>${hsqldb.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.kohsuke.metainf-services</groupId>
+        <artifactId>metainf-services</artifactId>
+        <version>1.8</version>
+        <optional>true</optional>
       </dependency>
       <dependency>
         <groupId>io.dropwizard.metrics</groupId>
@@ -1615,7 +1605,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <artifactId>proto-backwards-compatibility</artifactId>
           <version>${proto-backwards-compatibility.version}</version>
           <configuration>
-            <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
+            <protoSourceRoot>${basedir}/target/classes</protoSourceRoot>
           </configuration>
           <executions>
             <execution>
@@ -2147,22 +2137,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </build>
     </profile>
     <profile>
-      <id>freon</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <includes>
-                <include>org.apache.hadoop.ozone.freon.**</include>
-              </includes>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
       <id>client</id>
       <build>
         <plugins>
@@ -2179,23 +2153,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </build>
     </profile>
     <profile>
-      <id>filesystem-contract</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <includes>
-                <include>org.apache.hadoop.fs.ozone.contract.**</include>
-              </includes>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>filesystem</id>
+      <id>filesystem-hdds</id>
       <build>
         <plugins>
           <plugin>
@@ -2204,26 +2162,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <configuration>
               <includes>
                 <include>org.apache.hadoop.fs.ozone.**</include>
-              </includes>
-              <excludes>
-                <exclude>org.apache.hadoop.fs.ozone.contract.**</exclude>
-              </excludes>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>hdds-om</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <includes>
                 <include>org.apache.hadoop.hdds.**</include>
-                <include>org.apache.hadoop.ozone.om.**</include>
               </includes>
             </configuration>
           </plugin>
@@ -2243,8 +2182,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               </includes>
               <excludes>
                 <exclude>org.apache.hadoop.ozone.client.**</exclude>
-                <exclude>org.apache.hadoop.ozone.freon.**</exclude>
-                <exclude>org.apache.hadoop.ozone.om.**</exclude>
               </excludes>
             </configuration>
           </plugin>

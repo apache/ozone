@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
@@ -79,7 +80,7 @@ import org.slf4j.LoggerFactory;
 public class ReplicationManager
     implements MetricsSource, EventHandler<SafeModeStatus> {
 
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(ReplicationManager.class);
 
   public static final String METRICS_SOURCE_NAME = "SCMReplicationManager";
@@ -312,6 +313,15 @@ public class ReplicationManager
           action -> replicas.stream()
               .noneMatch(r -> r.getDatanodeDetails().equals(action.datanode)));
 
+      /*
+       * If container is under deleting and all it's replicas are deleted, then
+       * make the container as CLEANED, or resend the delete replica command if
+       * needed.
+       */
+      if (state == LifeCycleState.DELETING) {
+        handleContainerUnderDelete(container, replicas);
+        return;
+      }
 
       /*
        * We don't have to take any action if the container is healthy.
@@ -321,6 +331,12 @@ public class ReplicationManager
        * exact number of replicas in the same state.
        */
       if (isContainerHealthy(container, replicas)) {
+        /*
+         *  If container is empty, schedule task to delete the container.
+         */
+        if (isContainerEmpty(container, replicas)) {
+          deleteContainerReplicas(container, replicas);
+        }
         return;
       }
 
@@ -402,6 +418,21 @@ public class ReplicationManager
   }
 
   /**
+   * Returns true if the container is empty and CLOSED.
+   *
+   * @param container Container to check
+   * @param replicas Set of ContainerReplicas
+   * @return true if the container is empty, false otherwise
+   */
+  private boolean isContainerEmpty(final ContainerInfo container,
+      final Set<ContainerReplica> replicas) {
+    return container.getState() == LifeCycleState.CLOSED &&
+        (container.getUsedBytes() == 0 && container.getNumberOfKeys() == 0) &&
+        replicas.stream().allMatch(r -> r.getState() == State.CLOSED &&
+            r.getBytesUsed() == 0 && r.getKeyCount() == 0);
+  }
+
+  /**
    * Checks if the container is under replicated or not.
    *
    * @param container Container to check
@@ -410,6 +441,10 @@ public class ReplicationManager
    */
   private boolean isContainerUnderReplicated(final ContainerInfo container,
       final Set<ContainerReplica> replicas) {
+    if (container.getState() != LifeCycleState.CLOSED &&
+        container.getState() != LifeCycleState.QUASI_CLOSED) {
+      return false;
+    }
     boolean misReplicated = !getPlacementStatus(
         replicas, container.getReplicationFactor().getNumber())
         .isPolicySatisfied();
@@ -464,6 +499,64 @@ public class ReplicationManager
         .distinct()
         .count();
     return uniqueQuasiClosedReplicaCount > (replicationFactor / 2);
+  }
+
+  /**
+   * Delete the container and its replicas.
+   *
+   * @param container ContainerInfo
+   * @param replicas Set of ContainerReplicas
+   */
+  private void deleteContainerReplicas(final ContainerInfo container,
+      final Set<ContainerReplica> replicas) throws IOException {
+    Preconditions.assertTrue(container.getState() ==
+        LifeCycleState.CLOSED);
+    Preconditions.assertTrue(container.getNumberOfKeys() == 0);
+    Preconditions.assertTrue(container.getUsedBytes() == 0);
+
+    replicas.stream().forEach(rp -> {
+      Preconditions.assertTrue(rp.getState() == State.CLOSED);
+      Preconditions.assertTrue(rp.getBytesUsed() == 0);
+      Preconditions.assertTrue(rp.getKeyCount() == 0);
+      sendDeleteCommand(container, rp.getDatanodeDetails(), false);
+    });
+    containerManager.updateContainerState(container.containerID(),
+        HddsProtos.LifeCycleEvent.DELETE);
+    LOG.debug("Deleting empty container {} replicas,", container.containerID());
+  }
+
+  /**
+   * Handle the container which is under delete.
+   *
+   * @param container ContainerInfo
+   * @param replicas Set of ContainerReplicas
+   */
+  private void handleContainerUnderDelete(final ContainerInfo container,
+      final Set<ContainerReplica> replicas) throws IOException {
+    if (replicas.size() == 0) {
+      containerManager.updateContainerState(container.containerID(),
+          HddsProtos.LifeCycleEvent.CLEANUP);
+      LOG.debug("Container {} state changes to DELETED",
+          container.containerID());
+    } else {
+      // Check whether to resend the delete replica command
+      final List<DatanodeDetails> deletionInFlight = inflightDeletion
+          .getOrDefault(container.containerID(), Collections.emptyList())
+          .stream()
+          .map(action -> action.datanode)
+          .collect(Collectors.toList());
+      Set<ContainerReplica> filteredReplicas = replicas.stream().filter(
+          r -> !deletionInFlight.contains(r.getDatanodeDetails()))
+          .collect(Collectors.toSet());
+      // Resend the delete command
+      if (filteredReplicas.size() > 0) {
+        filteredReplicas.stream().forEach(rp -> {
+          sendDeleteCommand(container, rp.getDatanodeDetails(), false);
+        });
+        LOG.debug("Resend delete Container {} command",
+            container.containerID());
+      }
+    }
   }
 
   /**
@@ -625,17 +718,20 @@ public class ReplicationManager
               " is {}, but found {}.", id, replicationFactor,
           replicationFactor + excess);
 
+      final List<ContainerReplica> eligibleReplicas = new ArrayList<>(replicas);
+
       final Map<UUID, ContainerReplica> uniqueReplicas =
           new LinkedHashMap<>();
 
-      replicas.stream()
-          .filter(r -> compareState(container.getState(), r.getState()))
-          .forEach(r -> uniqueReplicas
-              .putIfAbsent(r.getOriginDatanodeId(), r));
+      if (container.getState() != LifeCycleState.CLOSED) {
+        replicas.stream()
+            .filter(r -> compareState(container.getState(), r.getState()))
+            .forEach(r -> uniqueReplicas
+                .putIfAbsent(r.getOriginDatanodeId(), r));
 
-      // Retain one healthy replica per origin node Id.
-      final List<ContainerReplica> eligibleReplicas = new ArrayList<>(replicas);
-      eligibleReplicas.removeAll(uniqueReplicas.values());
+        // Retain one healthy replica per origin node Id.
+        eligibleReplicas.removeAll(uniqueReplicas.values());
+      }
 
       final List<ContainerReplica> unhealthyReplicas = eligibleReplicas
           .stream()
@@ -650,8 +746,9 @@ public class ReplicationManager
         if (excess > 0) {
           sendDeleteCommand(container, r.getDatanodeDetails(), true);
           excess -= 1;
+        } else {
+          break;
         }
-        break;
       }
       // After removing all unhealthy replicas, if the container is still over
       // replicated then we need to check if it is already mis-replicated.
@@ -661,9 +758,8 @@ public class ReplicationManager
       if (excess > 0) {
         eligibleReplicas.removeAll(unhealthyReplicas);
         Set<ContainerReplica> replicaSet = new HashSet<>(eligibleReplicas);
-        boolean misReplicated =
-            getPlacementStatus(replicaSet, replicationFactor)
-                .isPolicySatisfied();
+        ContainerPlacementStatus ps =
+            getPlacementStatus(replicaSet, replicationFactor);
         for (ContainerReplica r : eligibleReplicas) {
           if (excess <= 0) {
             break;
@@ -671,11 +767,14 @@ public class ReplicationManager
           // First remove the replica we are working on from the set, and then
           // check if the set is now mis-replicated.
           replicaSet.remove(r);
-          boolean nowMisRep = getPlacementStatus(replicaSet, replicationFactor)
-              .isPolicySatisfied();
-          if (misReplicated || !nowMisRep) {
-            // Remove the replica if the container was already mis-replicated
-            // OR if losing this replica does not make it become mis-replicated
+          ContainerPlacementStatus nowPS =
+              getPlacementStatus(replicaSet, replicationFactor);
+          if ((!ps.isPolicySatisfied()
+                && nowPS.actualPlacementCount() == ps.actualPlacementCount())
+              || (ps.isPolicySatisfied() && nowPS.isPolicySatisfied())) {
+            // Remove the replica if the container was already unsatisfied
+            // and losing this replica keep actual placement count unchanged.
+            // OR if losing this replica still keep satisfied
             sendDeleteCommand(container, r.getDatanodeDetails(), true);
             excess -= 1;
             continue;

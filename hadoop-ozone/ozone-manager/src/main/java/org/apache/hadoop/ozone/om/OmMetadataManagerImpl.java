@@ -19,6 +19,9 @@ package org.apache.hadoop.ozone.om;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -77,9 +80,11 @@ import com.google.common.collect.Lists;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
+import org.apache.ratis.util.ExitUtils;
 import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,7 +119,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    * |----------------------------------------------------------------------|
    * | s3SecretTable      | s3g_access_key_id -> s3Secret                   |
    * |----------------------------------------------------------------------|
-   * | dTokenTable        | s3g_access_key_id -> s3Secret                   |
+   * | dTokenTable        | OzoneTokenID -> renew_time                      |
    * |----------------------------------------------------------------------|
    * | prefixInfoTable    | prefix -> PrefixInfo                            |
    * |----------------------------------------------------------------------|
@@ -155,6 +160,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private Table prefixTable;
   private Table transactionInfoTable;
   private boolean isRatisEnabled;
+  private boolean ignorePipelineinKey;
 
   private Map<String, Table> tableMap = new HashMap<>();
 
@@ -170,6 +176,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     isRatisEnabled = conf.getBoolean(
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
+    // For test purpose only
+    ignorePipelineinKey = conf.getBoolean(
+        "ozone.om.ignore.pipeline", Boolean.TRUE);
     start(conf);
   }
 
@@ -249,6 +258,21 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     if (store == null) {
       File metaDir = OMStorage.getOmDbDir(configuration);
 
+      // Check if there is a DB Inconsistent Marker in the metaDir. This
+      // marker indicates that the DB is in an inconsistent state and hence
+      // the OM process should be terminated.
+      File markerFile = new File(metaDir, DB_TRANSIENT_MARKER);
+      if (markerFile.exists()) {
+        LOG.error("File {} marks that OM DB is in an inconsistent state.",
+                markerFile);
+        // Note - The marker file should be deleted only after fixing the DB.
+        // In an HA setup, this can be done by replacing this DB with a
+        // checkpoint from another OM.
+        String errorMsg = "Cannot load OM DB as it is in an inconsistent " +
+            "state.";
+        ExitUtils.terminate(1, errorMsg, LOG);
+      }
+
       RocksDBConfiguration rocksDBConfiguration =
           configuration.getObject(RocksDBConfiguration.class);
 
@@ -273,10 +297,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
 
   public static DBStore loadDB(OzoneConfiguration configuration, File metaDir)
       throws IOException {
+    return loadDB(configuration, metaDir, OM_DB_NAME);
+  }
+
+  public static DBStore loadDB(OzoneConfiguration configuration, File metaDir,
+      String dbName) throws IOException {
     RocksDBConfiguration rocksDBConfiguration =
         configuration.getObject(RocksDBConfiguration.class);
     DBStoreBuilder dbStoreBuilder = DBStoreBuilder.newBuilder(configuration,
-        rocksDBConfiguration).setName(OM_DB_NAME)
+        rocksDBConfiguration).setName(dbName)
         .setPath(Paths.get(metaDir.getPath()));
     DBStore dbStore = addOMTablesAndCodecs(dbStoreBuilder).build();
     return dbStore;
@@ -296,8 +325,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
         .addTable(PREFIX_TABLE)
         .addTable(TRANSACTION_INFO_TABLE)
         .addCodec(OzoneTokenIdentifier.class, new TokenIdentifierCodec())
-        .addCodec(OmKeyInfo.class, new OmKeyInfoCodec())
-        .addCodec(RepeatedOmKeyInfo.class, new RepeatedOmKeyInfoCodec())
+        .addCodec(OmKeyInfo.class, new OmKeyInfoCodec(true))
+        .addCodec(RepeatedOmKeyInfo.class,
+            new RepeatedOmKeyInfoCodec(true))
         .addCodec(OmBucketInfo.class, new OmBucketInfoCodec())
         .addCodec(OmVolumeArgs.class, new OmVolumeArgsCodec())
         .addCodec(UserVolumeInfo.class, new UserVolumeInfoCodec())
@@ -966,10 +996,34 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   }
 
   @Override
-  public List<BlockGroup> getExpiredOpenKeys() throws IOException {
-    List<BlockGroup> keyBlocksList = Lists.newArrayList();
-    // TODO: Fix the getExpiredOpenKeys, Not part of this patch.
-    return keyBlocksList;
+  public List<String> getExpiredOpenKeys(int count) throws IOException {
+    // Only check for expired keys in the open key table, not its cache.
+    // If a key expires while it is in the cache, it will be cleaned
+    // up after the cache is flushed.
+    final Duration expirationDuration =
+            Duration.of(openKeyExpireThresholdMS, ChronoUnit.MILLIS);
+    List<String> expiredKeys = Lists.newArrayList();
+
+    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+                 keyValueTableIterator = getOpenKeyTable().iterator()) {
+
+      while (keyValueTableIterator.hasNext() && expiredKeys.size() < count) {
+        KeyValue<String, OmKeyInfo> openKeyValue = keyValueTableIterator.next();
+        String openKey = openKeyValue.getKey();
+        OmKeyInfo openKeyInfo = openKeyValue.getValue();
+
+        Duration openKeyAge =
+                Duration.between(
+                        Instant.ofEpochMilli(openKeyInfo.getCreationTime()),
+                        Instant.now());
+
+        if (openKeyAge.compareTo(expirationDuration) >= 0) {
+          expiredKeys.add(openKey);
+        }
+      }
+    }
+
+    return expiredKeys;
   }
 
   @Override

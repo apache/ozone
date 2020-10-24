@@ -56,6 +56,11 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   private final int heavyNodeCriteria;
   private static final int REQUIRED_RACKS = 2;
 
+  public static final String MULTIPLE_RACK_PIPELINE_MSG =
+      "The cluster has multiple racks, but all nodes with available " +
+      "pipeline capacity are on a single rack. There are insufficient " +
+      "cross rack nodes available to create a pipeline";
+
   /**
    * Constructs a pipeline placement with considering network topology,
    * load balancing and rack awareness.
@@ -71,9 +76,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     this.nodeManager = nodeManager;
     this.conf = conf;
     this.stateManager = stateManager;
-    this.heavyNodeCriteria = conf.getInt(
-        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
-        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT);
+    String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
+    this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
   }
 
   int currentPipelineCount(DatanodeDetails datanodeDetails, int nodesRequired) {
@@ -121,6 +125,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     // get nodes in HEALTHY state
     List<DatanodeDetails> healthyNodes =
         nodeManager.getNodes(HddsProtos.NodeState.HEALTHY);
+    boolean multipleRacks = multipleRacksAvailable(healthyNodes);
     if (excludedNodes != null) {
       healthyNodes.removeAll(excludedNodes);
     }
@@ -144,7 +149,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         .map(d ->
             new DnWithPipelines(d, currentPipelineCount(d, nodesRequired)))
         .filter(d ->
-            ((d.getPipelines() < heavyNodeCriteria) || heavyNodeCriteria == 0))
+            (d.getPipelines() < nodeManager.pipelineLimit(d.getDn())))
         .sorted(Comparator.comparingInt(DnWithPipelines::getPipelines))
         .map(d -> d.getDn())
         .collect(Collectors.toList());
@@ -164,7 +169,36 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
+
+    if (!checkAllNodesAreEqual(nodeManager.getClusterNetworkTopologyMap())) {
+      boolean multipleRacksAfterFilter = multipleRacksAvailable(healthyList);
+      if (multipleRacks && !multipleRacksAfterFilter) {
+        LOG.debug(MULTIPLE_RACK_PIPELINE_MSG);
+        throw new SCMException(MULTIPLE_RACK_PIPELINE_MSG,
+            SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+      }
+    }
     return healthyList;
+  }
+
+  /**
+   * Given a list of Datanodes, return false if the entire list is only on a
+   * single rack, or the list is empty. If there is more than 1 rack, return
+   * true.
+   * @param dns List of datanodes to check
+   * @return True if there are multiple racks, false otherwise
+   */
+  private boolean multipleRacksAvailable(List<DatanodeDetails> dns) {
+    if (dns.size() <= 1) {
+      return false;
+    }
+    String initialRack = dns.get(0).getNetworkLocation();
+    for (DatanodeDetails dn : dns) {
+      if (!dn.getNetworkLocation().equals(initialRack)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

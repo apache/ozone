@@ -99,7 +99,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private HddsDatanodeHttpServer httpServer;
   private boolean printBanner;
   private String[] args;
-  private volatile AtomicBoolean isStopped = new AtomicBoolean(false);
+  private final AtomicBoolean isStopped = new AtomicBoolean(false);
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
   private DNMXBeanImpl serviceRuntimeInfo =
@@ -208,6 +208,9 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       datanodeDetails.setVersion(
           HddsVersionInfo.HDDS_VERSION_INFO.getVersion());
       datanodeDetails.setSetupTime(Time.now());
+      datanodeDetails.setRevision(
+          HddsVersionInfo.HDDS_VERSION_INFO.getRevision());
+      datanodeDetails.setBuildDate(HddsVersionInfo.HDDS_VERSION_INFO.getDate());
       TracingUtil.initTracing(
           "HddsDatanodeService." + datanodeDetails.getUuidString()
               .substring(0, 8), conf);
@@ -349,9 +352,15 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         dnCertClient.storeCertificate(pemEncodedCert, true);
         dnCertClient.storeCertificate(response.getX509CACertificate(), true,
             true);
-        datanodeDetails.setCertSerialId(getX509Certificate(pemEncodedCert).
-            getSerialNumber().toString());
+        String dnCertSerialId = getX509Certificate(pemEncodedCert).
+            getSerialNumber().toString();
+        datanodeDetails.setCertSerialId(dnCertSerialId);
         persistDatanodeDetails(datanodeDetails);
+        // Rebuild dnCertClient with the new CSR result so that the default
+        // certSerialId and the x509Certificate can be updated.
+        dnCertClient = new DNCertificateClient(
+            new SecurityConfig(config), dnCertSerialId);
+
       } else {
         throw new RuntimeException("Unable to retrieve datanode certificate " +
             "chain");
@@ -522,8 +531,7 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
 
   @Override
   public void stop() {
-    if (!isStopped.get()) {
-      isStopped.set(true);
+    if (!isStopped.getAndSet(true)) {
       if (plugins != null) {
         for (ServicePlugin plugin : plugins) {
           try {

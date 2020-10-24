@@ -60,10 +60,10 @@ public class ReconContainerReportHandler extends ContainerReportHandler {
           containerReplicaProto.getContainerID());
       try {
         containerManager.checkAndAddNewContainer(id,
+            containerReplicaProto.getState(),
             reportFromDatanode.getDatanodeDetails());
       } catch (IOException ioEx) {
         LOG.error("Exception while checking and adding new container.", ioEx);
-        return;
       }
       LOG.debug("Got container report for containerID {} ",
           containerReplicaProto.getContainerID());

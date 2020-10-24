@@ -23,7 +23,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 
 /**
  * Ozone user interface commands.
- *
+ * <p>
  * This class uses dispatch method to make calls
  * to appropriate handlers that execute the ozone functions.
  */
@@ -35,6 +35,12 @@ public abstract class Shell extends GenericCli {
       + "If they are not specified it will be identified from "
       + "the config files.";
 
+  public Shell() {
+  }
+
+  public Shell(Class<?> type) {
+    super(type);
+  }
 
   @Override
   protected void printError(Throwable errorArg) {

@@ -51,4 +51,4 @@ spec:
         - csi
       volumes:
       - name: socket-dir
-        emptyDir: null
+        emptyDir: {}

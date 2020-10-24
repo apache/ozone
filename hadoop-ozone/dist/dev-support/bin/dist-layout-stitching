@@ -108,6 +108,7 @@ run cp "${ROOT}/hadoop-ozone/dist/src/shell/hdds/hadoop-config.cmd" "libexec/"
 run cp "${ROOT}/hadoop-ozone/dist/src/shell/hdds/hadoop-functions.sh" "libexec/"
 run cp "${ROOT}/hadoop-ozone/dist/src/shell/ozone/ozone-config.sh" "libexec/"
 run cp -r "${ROOT}/hadoop-ozone/dist/src/shell/shellprofile.d" "libexec/"
+run cp -r "${ROOT}/hadoop-ozone/dist/src/shell/upgrade" "libexec/"
 
 
 run cp "${ROOT}/hadoop-ozone/dist/src/shell/hdds/hadoop-daemons.sh" "sbin/"
@@ -121,6 +122,9 @@ run cp  -r "${ROOT}/hadoop-ozone/fault-injection-test/network-tests/src/test/blo
 # Optional documentation, could be missing
 cp -r "${ROOT}/hadoop-hdds/docs/target/classes/docs" ./
 
+#copy byteman helpers
+run cp -r "${ROOT}/dev-support/byteman" "share/ozone/"
+
 #Copy docker compose files
 #compose files are preprocessed: properties (eg. project.version) are replaced first by maven.
 run cp -p -R "${ROOT}/hadoop-ozone/dist/target/compose" .
@@ -130,3 +134,4 @@ run cp -p -r "${ROOT}/hadoop-ozone/dist/target/Dockerfile" .
 
 #workaround for https://issues.apache.org/jira/browse/MRESOURCES-236
 find ./compose -name "*.sh" -exec chmod 755 {} \;
+find ./kubernetes -name "*.sh" -exec chmod 755 {} \;

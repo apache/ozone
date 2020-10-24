@@ -241,6 +241,11 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_HEARTBEAT_RPC_TIMEOUT_DEFAULT =
       "1s";
 
+  public static final String OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT =
+      "ozone.scm.heartbeat.rpc-retry-count";
+  public static final int OZONE_SCM_HEARTBEAT_RPC_RETRY_COUNT_DEFAULT =
+      15;
+
   /**
    * Defines how frequently we will log the missing of heartbeat to a specific
    * SCM. In the default case we will write a warning message for each 10
@@ -299,6 +304,7 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT =
       "ozone.scm.pipeline.owner.container.count";
   public static final int OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT = 3;
+
   // Pipeline placement policy:
   // Upper limit for how many pipelines a datanode can engage in.
   public static final String OZONE_DATANODE_PIPELINE_LIMIT =
@@ -317,9 +323,16 @@ public final class ScmConfigKeys {
       OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY =
       "ozone.scm.keyvalue.container.deletion-choosing.policy";
 
+  public static final String OZONE_SCM_PIPELINE_PER_METADATA_VOLUME =
+      "ozone.scm.pipeline.per.metadata.disk";
+
+  public static final int OZONE_SCM_PIPELINE_PER_METADATA_VOLUME_DEFAULT = 2;
   // Max timeout for pipeline to stay at ALLOCATED state before scrubbed.
   public static final String OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT =
       "ozone.scm.pipeline.allocated.timeout";
+
+  public static final String OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY =
+      "ozone.scm.pipeline.leader-choose.policy";
 
   public static final String OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT =
       "5m";

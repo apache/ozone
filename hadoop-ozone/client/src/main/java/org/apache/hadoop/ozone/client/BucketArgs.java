@@ -54,6 +54,11 @@ public final class BucketArgs {
    * Bucket encryption key name.
    */
   private String bucketEncryptionKey;
+  private final String sourceVolume;
+  private final String sourceBucket;
+
+  private long quotaInBytes;
+  private long quotaInCounts;
 
   /**
    * Private constructor, constructed via builder.
@@ -62,15 +67,25 @@ public final class BucketArgs {
    * @param acls list of ACLs.
    * @param metadata map of bucket metadata
    * @param bucketEncryptionKey bucket encryption key name
+   * @param sourceVolume
+   * @param sourceBucket
+   * @param quotaInBytes Bucket quota in bytes.
+   * @param quotaInCounts Bucket quota in counts.
    */
+  @SuppressWarnings("parameternumber")
   private BucketArgs(Boolean versioning, StorageType storageType,
-                     List<OzoneAcl> acls, Map<String, String> metadata,
-                     String bucketEncryptionKey) {
+      List<OzoneAcl> acls, Map<String, String> metadata,
+      String bucketEncryptionKey, String sourceVolume, String sourceBucket,
+      long quotaInBytes, long quotaInCounts) {
     this.acls = acls;
     this.versioning = versioning;
     this.storageType = storageType;
     this.metadata = metadata;
     this.bucketEncryptionKey = bucketEncryptionKey;
+    this.sourceVolume = sourceVolume;
+    this.sourceBucket = sourceBucket;
+    this.quotaInBytes = quotaInBytes;
+    this.quotaInCounts = quotaInCounts;
   }
 
   /**
@@ -123,6 +138,30 @@ public final class BucketArgs {
     return new BucketArgs.Builder();
   }
 
+  public String getSourceVolume() {
+    return sourceVolume;
+  }
+
+  public String getSourceBucket() {
+    return sourceBucket;
+  }
+
+  /**
+   * Returns Bucket Quota in bytes.
+   * @return quotaInBytes.
+   */
+  public long getQuotaInBytes() {
+    return quotaInBytes;
+  }
+
+  /**
+   * Returns Bucket Quota in key counts.
+   * @return quotaInCounts.
+   */
+  public long getQuotaInCounts() {
+    return quotaInCounts;
+  }
+
   /**
    * Builder for OmBucketInfo.
    */
@@ -132,6 +171,10 @@ public final class BucketArgs {
     private List<OzoneAcl> acls;
     private Map<String, String> metadata;
     private String bucketEncryptionKey;
+    private String sourceVolume;
+    private String sourceBucket;
+    private long quotaInBytes;
+    private long quotaInCounts;
 
     public Builder() {
       metadata = new HashMap<>();
@@ -161,13 +204,36 @@ public final class BucketArgs {
       this.bucketEncryptionKey = bek;
       return this;
     }
+
+    public BucketArgs.Builder setSourceVolume(String volume) {
+      sourceVolume = volume;
+      return this;
+    }
+
+    public BucketArgs.Builder setSourceBucket(String bucket) {
+      sourceBucket = bucket;
+      return this;
+    }
+
+    public BucketArgs.Builder setQuotaInBytes(long quota) {
+      quotaInBytes = quota;
+      return this;
+    }
+
+    public BucketArgs.Builder setQuotaInCounts(long quota) {
+      quotaInCounts = quota;
+      return this;
+    }
+
+
     /**
      * Constructs the BucketArgs.
      * @return instance of BucketArgs.
      */
     public BucketArgs build() {
       return new BucketArgs(versioning, storageType, acls, metadata,
-          bucketEncryptionKey);
+          bucketEncryptionKey, sourceVolume, sourceBucket, quotaInBytes,
+          quotaInCounts);
     }
   }
 }

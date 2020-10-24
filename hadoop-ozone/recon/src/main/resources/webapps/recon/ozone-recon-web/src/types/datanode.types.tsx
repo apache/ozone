@@ -16,7 +16,9 @@
  * limitations under the License.
  */
 
-export type DatanodeStatus = 'HEALTHY' | 'STALE' | 'DEAD' | 'DECOMMISSIONING' | 'DECOMMISSIONED';
+export const DatanodeStatusList = ['HEALTHY', 'STALE', 'DEAD', 'DECOMMISSIONING', 'DECOMMISSIONED'] as const;
+type DatanodeStatusTuple = typeof DatanodeStatusList;
+export type DatanodeStatus = DatanodeStatusTuple[number]; // 'HEALTHY' | 'STALE' | 'DEAD' | 'DECOMMISSIONING' | 'DECOMMISSIONED';
 
 export interface IStorageReport {
   capacity: number;

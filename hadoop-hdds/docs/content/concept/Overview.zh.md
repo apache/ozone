@@ -2,6 +2,11 @@
 title: 概览
 date: "2017-10-10"
 weight: 1
+menu: 
+  main:
+     name: "ArchitectureOverview"
+     title: "概览"
+     parent: 概念
 summary: 介绍 Ozone 的整体和各个组件。
 ---
 
@@ -24,7 +29,7 @@ summary: 介绍 Ozone 的整体和各个组件。
 
 Ozone 是一个分布式、多副本的对象存储系统，并针对大数据场景进行了专门的优化。Ozone 主要围绕可扩展性进行设计，目标是十亿数量级以上的对象存储。
 
-Ozone 通过对命名空间与块空间的管理进行分离，大大增加了其可扩展性，其中命名空间由 [Ozone Manager ]({{< ref "OzoneManager.zh.md" >}})（OM）管理，块空间由 [Storage Container Manager] ({{< ref "Hdds.zh.md" >}})（SCM）管理。
+Ozone 通过对命名空间与块空间的管理进行分离，大大增加了其可扩展性，其中命名空间由 [Ozone Manager ]({{< ref "OzoneManager.zh.md" >}})（OM）管理，块空间由 [Storage Container Manager]({{< ref "StorageContainerManager.zh.md" >}})（SCM）管理。
 
 
 Ozone 的管理由卷、桶和键组成。卷类似于个人主目录，只有管理员可以创建。

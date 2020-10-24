@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
@@ -50,6 +51,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_FIND_CONTAINER;
 
 /**
  * ContainerManager class contains the mapping from a name to a pipeline
@@ -66,7 +69,7 @@ public class SCMContainerManager implements ContainerManager {
 
   private final ContainerStateManager containerStateManager;
 
-  private final int numContainerPerOwnerInPipeline;
+  private final int numContainerPerVolume;
 
   private final SCMContainerManagerMetrics scmContainerManagerMetrics;
 
@@ -98,13 +101,21 @@ public class SCMContainerManager implements ContainerManager {
     this.lock = new ReentrantLock();
     this.pipelineManager = pipelineManager;
     this.containerStateManager = new ContainerStateManager(conf);
-    this.numContainerPerOwnerInPipeline = conf
+    this.numContainerPerVolume = conf
         .getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
             ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
 
     loadExistingContainers();
 
     scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
+  }
+
+  private int getOpenContainerCountPerPipeline(Pipeline pipeline) {
+    int minContainerCountPerDn = numContainerPerVolume *
+        pipelineManager.minHealthyVolumeNum(pipeline);
+    int minPipelineCountPerDn = pipelineManager.minPipelineLimit(pipeline);
+    return (int) Math.ceil(
+        ((double) minContainerCountPerDn / minPipelineCountPerDn));
   }
 
   private void loadExistingContainers() throws IOException {
@@ -314,7 +325,7 @@ public class SCMContainerManager implements ContainerManager {
       throw new SCMException(
           "Failed to delete container " + containerID + ", reason : " +
               "container doesn't exist.",
-          SCMException.ResultCodes.FAILED_TO_FIND_CONTAINER);
+          FAILED_TO_FIND_CONTAINER);
     } finally {
       lock.unlock();
     }
@@ -348,19 +359,29 @@ public class SCMContainerManager implements ContainerManager {
       if (!skipPipelineToContainerRemove) {
         if (oldState == LifeCycleState.OPEN &&
             newState != LifeCycleState.OPEN) {
-          pipelineManager
-              .removeContainerFromPipeline(container.getPipelineID(),
-                  containerID);
+          try {
+            pipelineManager
+                .removeContainerFromPipeline(container.getPipelineID(),
+                    containerID);
+          } catch (PipelineNotFoundException e) {
+            LOG.warn("Unable to remove container {} from pipeline {} " +
+                " as the pipeline no longer exists",
+                containerID, container.getPipelineID());
+          }
         }
       }
-      containerStore.put(containerID, container);
+      if (newState == LifeCycleState.DELETED) {
+        containerStore.delete(containerID);
+      } else {
+        containerStore.put(containerID, container);
+      }
       return newState;
     } catch (ContainerNotFoundException cnfe) {
       throw new SCMException(
           "Failed to update container state"
               + containerID
               + ", reason : container doesn't exist.",
-          SCMException.ResultCodes.FAILED_TO_FIND_CONTAINER);
+          FAILED_TO_FIND_CONTAINER);
     } finally {
       lock.unlock();
     }
@@ -379,29 +400,28 @@ public class SCMContainerManager implements ContainerManager {
     if (deleteTransactionMap == null) {
       return;
     }
-    org.apache.hadoop.hdds.utils.db.BatchOperation batchOperation =
-        batchHandler.initBatchOperation();
     lock.lock();
-    try {
-      for (Map.Entry<Long, Long> entry : deleteTransactionMap.entrySet()) {
+    try(BatchOperation batchOperation = batchHandler.initBatchOperation()) {
+      for (Map.Entry< Long, Long > entry : deleteTransactionMap.entrySet()) {
         long containerID = entry.getKey();
-
         ContainerID containerIdObject = new ContainerID(containerID);
         ContainerInfo containerInfo =
             containerStore.get(containerIdObject);
-        if (containerInfo == null) {
-          throw new SCMException(
-              "Failed to increment number of deleted blocks for container "
-                  + containerID + ", reason : " + "container doesn't exist.",
-              SCMException.ResultCodes.FAILED_TO_FIND_CONTAINER);
+        ContainerInfo containerInfoInMem = containerStateManager
+            .getContainer(containerIdObject);
+        if (containerInfo == null || containerInfoInMem == null) {
+          throw new SCMException("Failed to increment number of deleted " +
+              "blocks for container " + containerID + ", reason : " +
+              "container doesn't exist.", FAILED_TO_FIND_CONTAINER);
         }
         containerInfo.updateDeleteTransactionId(entry.getValue());
-        containerStore
-            .putWithBatch(batchOperation, containerIdObject, containerInfo);
+        containerInfo.setNumberOfKeys(containerInfoInMem.getNumberOfKeys());
+        containerInfo.setUsedBytes(containerInfoInMem.getUsedBytes());
+        containerStore.putWithBatch(batchOperation, containerIdObject,
+            containerInfo);
       }
       batchHandler.commitBatchOperation(batchOperation);
-      containerStateManager
-          .updateDeleteTransactionId(deleteTransactionMap);
+      containerStateManager.updateDeleteTransactionId(deleteTransactionMap);
     } finally {
       lock.unlock();
     }
@@ -432,7 +452,7 @@ public class SCMContainerManager implements ContainerManager {
       synchronized (pipeline) {
         containerIDs = getContainersForOwner(pipeline, owner);
 
-        if (containerIDs.size() < numContainerPerOwnerInPipeline) {
+        if (containerIDs.size() < getOpenContainerCountPerPipeline(pipeline)) {
           containerInfo =
                   containerStateManager.allocateContainer(
                           pipelineManager, owner, pipeline);
@@ -458,7 +478,7 @@ public class SCMContainerManager implements ContainerManager {
         return containerInfo;
       }
     } catch (Exception e) {
-      LOG.warn("Container allocation failed for pipeline={} requiredSize={} {}",
+      LOG.warn("Container allocation failed for pipeline={} requiredSize={}.",
               pipeline, sizeRequired, e);
       return null;
     }
@@ -514,7 +534,7 @@ public class SCMContainerManager implements ContainerManager {
           containerIDIterator.remove();
         }
       } catch (ContainerNotFoundException e) {
-        LOG.error("Could not find container info for container id={} {}", cid,
+        LOG.error("Could not find container info for container id={}.", cid,
             e);
         containerIDIterator.remove();
       }

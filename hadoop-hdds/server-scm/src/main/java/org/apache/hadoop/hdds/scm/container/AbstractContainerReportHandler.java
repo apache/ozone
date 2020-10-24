@@ -20,14 +20,22 @@ package org.apache.hadoop.hdds.scm.container;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.slf4j.Logger;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -64,7 +72,7 @@ public class AbstractContainerReportHandler {
    * @throws IOException In case of any Exception while processing the report
    */
   protected void processContainerReplica(final DatanodeDetails datanodeDetails,
-                               final ContainerReplicaProto replicaProto)
+      final ContainerReplicaProto replicaProto, final EventPublisher publisher)
       throws IOException {
     final ContainerID containerId = ContainerID
         .valueof(replicaProto.getContainerID());
@@ -76,9 +84,11 @@ public class AbstractContainerReportHandler {
     // Synchronized block should be replaced by container lock,
     // once we have introduced lock inside ContainerInfo.
     synchronized (containerManager.getContainer(containerId)) {
-      updateContainerStats(containerId, replicaProto);
-      updateContainerState(datanodeDetails, containerId, replicaProto);
-      updateContainerReplica(datanodeDetails, containerId, replicaProto);
+      updateContainerStats(datanodeDetails, containerId, replicaProto);
+      if (!updateContainerState(datanodeDetails, containerId, replicaProto,
+          publisher)) {
+        updateContainerReplica(datanodeDetails, containerId, replicaProto);
+      }
     }
   }
 
@@ -90,26 +100,57 @@ public class AbstractContainerReportHandler {
    * @param replicaProto Container Replica information
    * @throws ContainerNotFoundException If the container is not present
    */
-  private void updateContainerStats(final ContainerID containerId,
+  private void updateContainerStats(final DatanodeDetails datanodeDetails,
+                                    final ContainerID containerId,
                                     final ContainerReplicaProto replicaProto)
       throws ContainerNotFoundException {
+    final ContainerInfo containerInfo = containerManager
+        .getContainer(containerId);
 
     if (isHealthy(replicaProto::getState)) {
-      final ContainerInfo containerInfo = containerManager
-          .getContainer(containerId);
-
       if (containerInfo.getSequenceId() <
           replicaProto.getBlockCommitSequenceId()) {
         containerInfo.updateSequenceId(
             replicaProto.getBlockCommitSequenceId());
       }
-      if (containerInfo.getUsedBytes() < replicaProto.getUsed()) {
-        containerInfo.setUsedBytes(replicaProto.getUsed());
+      List<ContainerReplica> otherReplicas =
+          getOtherReplicas(containerId, datanodeDetails);
+      long usedBytes = replicaProto.getUsed();
+      long keyCount = replicaProto.getKeyCount();
+      for (ContainerReplica r : otherReplicas) {
+        // Open containers are generally growing in key count and size, the
+        // overall size should be the min of all reported replicas.
+        if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)) {
+          usedBytes = Math.min(usedBytes, r.getBytesUsed());
+          keyCount = Math.min(keyCount, r.getKeyCount());
+        } else {
+          // Containers which are not open can only shrink in size, so use the
+          // largest values reported.
+          usedBytes = Math.max(usedBytes, r.getBytesUsed());
+          keyCount = Math.max(keyCount, r.getKeyCount());
+        }
       }
-      if (containerInfo.getNumberOfKeys() < replicaProto.getKeyCount()) {
-        containerInfo.setNumberOfKeys(replicaProto.getKeyCount());
+
+      if (containerInfo.getUsedBytes() != usedBytes) {
+        containerInfo.setUsedBytes(usedBytes);
+      }
+      if (containerInfo.getNumberOfKeys() != keyCount) {
+        containerInfo.setNumberOfKeys(keyCount);
       }
     }
+  }
+
+  private List<ContainerReplica> getOtherReplicas(ContainerID containerId,
+      DatanodeDetails exclude) throws ContainerNotFoundException {
+    List<ContainerReplica> filteredReplicas = new ArrayList<>();
+    Set<ContainerReplica> replicas
+        = containerManager.getContainerReplicas(containerId);
+    for (ContainerReplica r : replicas) {
+      if (!r.getDatanodeDetails().equals(exclude)) {
+        filteredReplicas.add(r);
+      }
+    }
+    return filteredReplicas;
   }
 
   /**
@@ -118,15 +159,18 @@ public class AbstractContainerReportHandler {
    * @param datanode Datanode from which the report is received
    * @param containerId ID of the container
    * @param replica ContainerReplica
+   * @boolean true - replica should be ignored in the next process
    * @throws IOException In case of Exception
    */
-  private void updateContainerState(final DatanodeDetails datanode,
+  private boolean updateContainerState(final DatanodeDetails datanode,
                                     final ContainerID containerId,
-                                    final ContainerReplicaProto replica)
+                                    final ContainerReplicaProto replica,
+                                    final EventPublisher publisher)
       throws IOException {
 
     final ContainerInfo container = containerManager
         .getContainer(containerId);
+    boolean ignored = false;
 
     switch (container.getState()) {
     case OPEN:
@@ -208,26 +252,37 @@ public class AbstractContainerReportHandler {
        */
       break;
     case DELETING:
-      throw new UnsupportedOperationException(
-          "Unsupported container state 'DELETING'.");
+      /*
+       * The container is under deleting. do nothing.
+       */
+      break;
     case DELETED:
-      throw new UnsupportedOperationException(
-          "Unsupported container state 'DELETED'.");
+      /*
+       * The container is deleted. delete the replica.
+       */
+      deleteReplica(containerId, datanode, publisher, "DELETED");
+      ignored = true;
+      break;
     default:
       break;
     }
+
+    return ignored;
   }
 
   private void updateContainerReplica(final DatanodeDetails datanodeDetails,
                                       final ContainerID containerId,
                                       final ContainerReplicaProto replicaProto)
       throws ContainerNotFoundException, ContainerReplicaNotFoundException {
+
     final ContainerReplica replica = ContainerReplica.newBuilder()
         .setContainerID(containerId)
         .setContainerState(replicaProto.getState())
         .setDatanodeDetails(datanodeDetails)
         .setOriginNodeId(UUID.fromString(replicaProto.getOriginNodeId()))
         .setSequenceId(replicaProto.getBlockCommitSequenceId())
+        .setKeyCount(replicaProto.getKeyCount())
+        .setBytesUsed(replicaProto.getUsed())
         .build();
 
     if (replica.getState().equals(State.DELETED)) {
@@ -259,4 +314,14 @@ public class AbstractContainerReportHandler {
     return containerManager;
   }
 
+  protected void deleteReplica(ContainerID containerID, DatanodeDetails dn,
+      EventPublisher publisher, String reason) {
+    final DeleteContainerCommand deleteCommand =
+        new DeleteContainerCommand(containerID.getId(), true);
+    final CommandForDatanode datanodeCommand = new CommandForDatanode<>(
+        dn.getUuid(), deleteCommand);
+    publisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
+    logger.info("Sending delete container command for " + reason +
+        " container {} to datanode {}", containerID.getId(), dn);
+  }
 }

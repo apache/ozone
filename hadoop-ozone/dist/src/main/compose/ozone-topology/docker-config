@@ -14,10 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+CORE-SITE.XML_fs.defaultFS=ofs://om
+
 OZONE-SITE.XML_ozone.om.address=om
 OZONE-SITE.XML_ozone.om.http-address=om:9874
 OZONE-SITE.XML_ozone.scm.container.size=256MB
 OZONE-SITE.XML_ozone.ozone.scm.block.size=64MB
+OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
 OZONE-SITE.XML_ozone.scm.names=scm
 OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
@@ -36,8 +39,8 @@ OZONE-SITE.XML_ozone.network.topology.aware.read=true
 HDFS-SITE.XML_rpc.metrics.quantile.enable=true
 HDFS-SITE.XML_rpc.metrics.percentiles.intervals=60,300
 ASYNC_PROFILER_HOME=/opt/profiler
-HDDS_DN_OPTS=-Dmodule.name=datanode
-HDFS_OM_OPTS=-Dmodule.name=om
+OZONE_DATANODE_OPTS=-Dmodule.name=datanode
+OZONE_MANAGER_OPTS=-Dmodule.name=om
 HDFS_STORAGECONTAINERMANAGER_OPTS=-Dmodule.name=scm
 HDFS_OM_SH_OPTS=-Dmodule.name=sh
 HDFS_SCM_CLI_OPTS=-Dmodule.name=admin

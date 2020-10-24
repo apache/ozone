@@ -22,10 +22,13 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
@@ -56,13 +59,17 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_L
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+
+import org.apache.hadoop.test.GenericTestUtils.LogCapturer;
 import org.junit.After;
 import org.junit.Assert;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.mockito.InOrder;
+
 
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
@@ -70,6 +77,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.slf4j.event.Level.INFO;
 
 /**
  * Test cases to verify PipelineManager.
@@ -268,6 +276,7 @@ public class TestSCMPipelineManager {
         new SCMPipelineManager(conf, nodeManagerMock,
             scmMetadataStore.getPipelineTable(), new EventQueue());
     pipelineManager.allowPipelineCreation();
+    nodeManagerMock.setNumPipelinePerDatanode(1);
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManagerMock,
             pipelineManager.getStateManager(), conf);
@@ -298,6 +307,84 @@ public class TestSCMPipelineManager {
         "NumPipelineCreationFailed", metrics);
     Assert.assertEquals(0, numPipelineCreateFailed);
 
+    LogCapturer logs = LogCapturer.captureLogs(SCMPipelineManager.getLog());
+    GenericTestUtils.setLogLevel(SCMPipelineManager.getLog(), INFO);
+    //This should fail...
+    try {
+      pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
+          HddsProtos.ReplicationFactor.THREE);
+      fail();
+    } catch (SCMException ioe) {
+      // pipeline creation failed this time.
+      Assert.assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
+          ioe.getResult());
+      Assert.assertFalse(logs.getOutput().contains(
+          "Failed to create pipeline of type"));
+    } finally {
+      logs.stopCapturing();
+    }
+
+    metrics = getMetrics(
+        SCMPipelineMetrics.class.getSimpleName());
+    numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
+    Assert.assertEquals(5, numPipelineAllocated);
+
+    numPipelineCreateFailed = getLongCounter(
+        "NumPipelineCreationFailed", metrics);
+    Assert.assertEquals(1, numPipelineCreateFailed);
+
+    // clean up
+    pipelineManager.close();
+  }
+
+  @Test
+  public void testPipelineLimit() throws Exception {
+    int numMetaDataVolumes = 2;
+    final OzoneConfiguration config = new OzoneConfiguration();
+    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    config.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
+        false);
+    // turning off this config will ensure, pipeline creation is determined by
+    // metadata volume count.
+    config.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 0);
+    MockNodeManager nodeManagerMock = new MockNodeManager(true,
+        3);
+    nodeManagerMock.setNumMetaDataVolumes(numMetaDataVolumes);
+    int pipelinePerDn = numMetaDataVolumes *
+        MockNodeManager.NUM_PIPELINE_PER_METADATA_DISK;
+    nodeManagerMock.setNumPipelinePerDatanode(pipelinePerDn);
+    SCMPipelineManager pipelineManager =
+        new SCMPipelineManager(config, nodeManagerMock,
+            scmMetadataStore.getPipelineTable(), new EventQueue());
+    pipelineManager.allowPipelineCreation();
+    PipelineProvider mockRatisProvider =
+        new MockRatisPipelineProvider(nodeManagerMock,
+            pipelineManager.getStateManager(), config);
+    pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
+        mockRatisProvider);
+
+    MetricsRecordBuilder metrics = getMetrics(
+        SCMPipelineMetrics.class.getSimpleName());
+    long numPipelineAllocated = getLongCounter("NumPipelineAllocated",
+        metrics);
+    Assert.assertEquals(0, numPipelineAllocated);
+
+    // max limit on no of pipelines is 4
+    for (int i = 0; i < pipelinePerDn; i++) {
+      Pipeline pipeline = pipelineManager
+          .createPipeline(HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.THREE);
+      Assert.assertNotNull(pipeline);
+    }
+
+    metrics = getMetrics(
+        SCMPipelineMetrics.class.getSimpleName());
+    numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
+    Assert.assertEquals(4, numPipelineAllocated);
+
+    long numPipelineCreateFailed = getLongCounter(
+        "NumPipelineCreationFailed", metrics);
+    Assert.assertEquals(0, numPipelineCreateFailed);
     //This should fail...
     try {
       pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
@@ -312,7 +399,7 @@ public class TestSCMPipelineManager {
     metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
     numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
-    Assert.assertEquals(5, numPipelineAllocated);
+    Assert.assertEquals(4, numPipelineAllocated);
 
     numPipelineCreateFailed = getLongCounter(
         "NumPipelineCreationFailed", metrics);
@@ -615,6 +702,80 @@ public class TestSCMPipelineManager {
     inorderVerifier.verify(pipelineStore).put(p3.getId(), p3);
 
     verify(pipelineStore, never()).put(p2.getId(), p2);
+  }
+
+  @Test
+  public void testScmWithPipelineDBKeyFormatChange() throws Exception {
+    TemporaryFolder tempDir = new TemporaryFolder();
+    tempDir.create();
+    File dir = tempDir.newFolder();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.getAbsolutePath());
+
+    SCMMetadataStore scmDbWithOldKeyFormat = null;
+    Map<UUID, Pipeline> oldPipelines = new HashMap<>();
+    try {
+      scmDbWithOldKeyFormat =
+          new TestSCMStoreImplWithOldPipelineIDKeyFormat(conf);
+      // Create 3 pipelines.
+      for (int i = 0; i < 3; i++) {
+        Pipeline pipeline = pipelineStub();
+        scmDbWithOldKeyFormat.getPipelineTable()
+            .put(pipeline.getId(), pipeline);
+        oldPipelines.put(pipeline.getId().getId(), pipeline);
+      }
+    } finally {
+      if (scmDbWithOldKeyFormat != null) {
+        scmDbWithOldKeyFormat.stop();
+      }
+    }
+
+    LogCapturer logCapturer =
+        LogCapturer.captureLogs(SCMPipelineManager.getLog());
+
+    // Create SCMPipelineManager with new DBDefinition.
+    SCMMetadataStore newScmMetadataStore = null;
+    try {
+      newScmMetadataStore = new SCMMetadataStoreImpl(conf);
+      SCMPipelineManager pipelineManager = new SCMPipelineManager(conf,
+          nodeManager,
+          newScmMetadataStore.getPipelineTable(),
+          new EventQueue());
+
+      waitForLog(logCapturer);
+      assertEquals(3, pipelineManager.getPipelines().size());
+      oldPipelines.values().forEach(p ->
+          pipelineManager.containsPipeline(p.getId()));
+    } finally {
+      newScmMetadataStore.stop();
+    }
+
+    // Mimicking another restart.
+    try {
+      logCapturer.clearOutput();
+      newScmMetadataStore = new SCMMetadataStoreImpl(conf);
+      SCMPipelineManager pipelineManager = new SCMPipelineManager(conf,
+          nodeManager,
+          newScmMetadataStore.getPipelineTable(),
+          new EventQueue());
+      try {
+        waitForLog(logCapturer);
+        Assert.fail("Unexpected log: " + logCapturer.getOutput());
+      } catch (TimeoutException ex) {
+        Assert.assertTrue(ex.getMessage().contains("Timed out"));
+      }
+      assertEquals(3, pipelineManager.getPipelines().size());
+      oldPipelines.values().forEach(p ->
+          pipelineManager.containsPipeline(p.getId()));
+    } finally {
+      newScmMetadataStore.stop();
+    }
+  }
+
+  private static void waitForLog(LogCapturer logCapturer)
+      throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> logCapturer.getOutput()
+            .contains("Found pipeline in old format key"),
+        1000, 5000);
   }
 
   private Pipeline pipelineStub() {

@@ -28,6 +28,8 @@ fi
 
 mkdir -p "$REPORT_DIR"
 
+export OZONE_ACCEPTANCE_SUITE
+
 cd "$DIST_DIR/compose" || exit 1
 ./test-all.sh
 RES=$?
