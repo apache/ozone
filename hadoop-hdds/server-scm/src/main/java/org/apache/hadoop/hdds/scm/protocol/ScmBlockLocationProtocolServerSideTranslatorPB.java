@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
+import org.apache.hadoop.hdds.scm.server.SCMBlockProtocolServer;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
@@ -94,9 +95,26 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
         .setTraceID(traceID);
   }
 
+  private boolean isLeader() throws ServiceException {
+    if (!(impl instanceof SCMBlockProtocolServer)) {
+      throw new ServiceException("Should be SCMBlockProtocolServer");
+    } else {
+      return ((SCMBlockProtocolServer) impl).getScm().checkLeader();
+    }
+  }
+
   @Override
   public SCMBlockLocationResponse send(RpcController controller,
       SCMBlockLocationRequest request) throws ServiceException {
+    if (!isLeader()) {
+      SCMBlockLocationResponse.Builder response = createSCMBlockResponse(
+          request.getCmdType(),
+          request.getTraceID());
+      response.setSuccess(false);
+      response.setStatus(Status.SCM_NOT_LEADER);
+      response.setLeaderSCMNodeId(null);
+      return response.build();
+    }
     return dispatcher.processRequest(
         request,
         this::processMessage,
