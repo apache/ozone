@@ -84,7 +84,6 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
           VOLUME_LOCK, volume);
       omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
 
-
       // result is false upon add existing acl or remove non-existing acl
       boolean applyAcl = true;
       try {
