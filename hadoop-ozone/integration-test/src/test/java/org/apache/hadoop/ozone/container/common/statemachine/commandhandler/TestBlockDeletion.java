@@ -17,9 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
-import com.google.common.primitives.Longs;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -29,9 +27,13 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ReplicationManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
@@ -40,6 +42,8 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -67,6 +71,7 @@ import java.util.List;
 import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.UUID;
+import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -97,6 +102,7 @@ public class TestBlockDeletion {
     conf = new OzoneConfiguration();
     GenericTestUtils.setLogLevel(DeletedBlockLogImpl.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(SCMBlockDeletingService.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(ReplicationManager.LOG, Level.DEBUG);
 
     String path =
         GenericTestUtils.getTempPath(TestBlockDeletion.class.getSimpleName());
@@ -112,7 +118,13 @@ public class TestBlockDeletion {
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL,
         3, TimeUnit.SECONDS);
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
+        false);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
+    conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
     conf.setQuietMode(false);
+    conf.setTimeDuration("hdds.scm.replication.event.timeout", 100,
+        TimeUnit.MILLISECONDS);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .setHbInterval(200)
@@ -180,10 +192,8 @@ public class TestBlockDeletion {
     }
 
     // close the containers which hold the blocks for the key
-    OzoneTestUtils.closeContainers(omKeyLocationInfoGroupList, scm);
-
-    waitForDatanodeCommandRetry();
-
+    OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
+    Thread.sleep(2000);
     // make sure the containers are closed on the dn
     omKeyLocationInfoGroupList.forEach((group) -> {
       List<OmKeyLocationInfo> locationInfo = group.getLocationList();
@@ -193,6 +203,9 @@ public class TestBlockDeletion {
               .getContainer(info.getContainerID()).getContainerData()
               .setState(ContainerProtos.ContainerDataProto.State.CLOSED));
     });
+
+    waitForDatanodeCommandRetry();
+
     waitForDatanodeBlockDeletionStart();
     // The blocks should be deleted in the DN.
     verifyBlocksDeleted(omKeyLocationInfoGroupList);
@@ -212,6 +225,99 @@ public class TestBlockDeletion {
 
     // Verify transactions committed
     verifyTransactionsCommitted();
+  }
+
+  @Test
+  public void testContainerStatisticsAfterDelete() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    String value = RandomStringUtils.random(1000000);
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    String keyName = UUID.randomUUID().toString();
+    OzoneOutputStream out = bucket.createKey(keyName, value.getBytes().length,
+        ReplicationType.RATIS, ReplicationFactor.THREE, new HashMap<>());
+    out.write(value.getBytes());
+    out.close();
+
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
+        .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
+        .setType(HddsProtos.ReplicationType.RATIS)
+        .setFactor(HddsProtos.ReplicationFactor.THREE)
+        .setRefreshPipeline(true)
+        .build();
+    List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =
+        om.lookupKey(keyArgs).getKeyLocationVersions();
+    Thread.sleep(5000);
+    List<ContainerInfo> containerInfos =
+        scm.getContainerManager().getContainers();
+    final int valueSize = value.getBytes().length;
+    final int keyCount = 1;
+    containerInfos.stream().forEach(container -> {
+      Assert.assertEquals(valueSize, container.getUsedBytes());
+      Assert.assertEquals(keyCount, container.getNumberOfKeys());
+    });
+
+    OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
+    // Wait for container to close
+    Thread.sleep(2000);
+    // make sure the containers are closed on the dn
+    omKeyLocationInfoGroupList.forEach((group) -> {
+      List<OmKeyLocationInfo> locationInfo = group.getLocationList();
+      locationInfo.forEach(
+          (info) -> cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
+              .getContainer().getContainerSet()
+              .getContainer(info.getContainerID()).getContainerData()
+              .setState(ContainerProtos.ContainerDataProto.State.CLOSED));
+    });
+
+    om.deleteKey(keyArgs);
+    // Wait for blocks to be deleted and container reports to be processed
+    Thread.sleep(5000);
+    containerInfos = scm.getContainerManager().getContainers();
+    containerInfos.stream().forEach(container -> {
+      Assert.assertEquals(0, container.getUsedBytes());
+      Assert.assertEquals(0, container.getNumberOfKeys());
+    });
+
+    cluster.shutdownHddsDatanode(0);
+    scm.getReplicationManager().processContainersNow();
+    // Wait for container state change to DELETING
+    Thread.sleep(100);
+    containerInfos = scm.getContainerManager().getContainers();
+    containerInfos.stream().forEach(container ->
+        Assert.assertEquals(HddsProtos.LifeCycleState.DELETING,
+            container.getState()));
+    LogCapturer logCapturer =
+        LogCapturer.captureLogs(ReplicationManager.LOG);
+    logCapturer.clearOutput();
+
+    scm.getReplicationManager().processContainersNow();
+    Thread.sleep(100);
+    // Wait for delete replica command resend
+    GenericTestUtils.waitFor(() -> logCapturer.getOutput()
+        .contains("Resend delete Container"), 500, 5000);
+    cluster.restartHddsDatanode(0, true);
+    Thread.sleep(100);
+
+    scm.getReplicationManager().processContainersNow();
+    // Wait for container state change to DELETED
+    Thread.sleep(100);
+    containerInfos = scm.getContainerManager().getContainers();
+    containerInfos.stream().forEach(container -> {
+      Assert.assertEquals(HddsProtos.LifeCycleState.DELETED,
+          container.getState());
+      try {
+        Assert.assertNull(scm.getScmMetadataStore().getContainerTable()
+            .get(container.containerID()));
+      } catch (IOException e) {
+        Assert.fail("Getting container from SCM DB should not fail");
+      }
+    });
   }
 
   private void waitForDatanodeBlockDeletionStart()
@@ -275,16 +381,13 @@ public class TestBlockDeletion {
     cluster.getHddsDatanodes().get(0)
         .getDatanodeStateMachine().triggerHeartbeat();
     // wait for event to be handled by event handler
-    Thread.sleep(1000);
+    Thread.sleep(2000);
     String output = logCapturer.getOutput();
     for (ContainerReplicaProto containerInfo : dummyReport.getReportsList()) {
       long containerId = containerInfo.getContainerID();
       // Event should be triggered only for containers which have deleted blocks
       if (containerIdsWithDeletedBlocks.contains(containerId)) {
         Assert.assertTrue(output.contains(
-            "for containerID " + containerId + ". Datanode delete txnID"));
-      } else {
-        Assert.assertTrue(!output.contains(
             "for containerID " + containerId + ". Datanode delete txnID"));
       }
     }
@@ -304,9 +407,6 @@ public class TestBlockDeletion {
             scm.getContainerInfo(containerId).getDeleteTransactionId() > 0);
         maxTransactionId = max(maxTransactionId,
             scm.getContainerInfo(containerId).getDeleteTransactionId());
-      } else {
-        Assert.assertEquals(
-            scm.getContainerInfo(containerId).getDeleteTransactionId(), 0);
       }
       Assert.assertEquals(((KeyValueContainerData)dnContainerSet
               .getContainer(containerId).getContainerData())
@@ -324,8 +424,9 @@ public class TestBlockDeletion {
       try(ReferenceCountedDB db =
           BlockUtils.getDB((KeyValueContainerData) dnContainerSet
           .getContainer(blockID.getContainerID()).getContainerData(), conf)) {
-        Assert.assertNotNull(db.getStore().get(
-            Longs.toByteArray(blockID.getLocalID())));
+        Assert.assertNotNull(
+                db.getStore().getBlockDataTable()
+                .get(Long.toString(blockID.getLocalID())));
       }
     }, omKeyLocationInfoGroups);
   }
@@ -339,14 +440,42 @@ public class TestBlockDeletion {
       try(ReferenceCountedDB db =
           BlockUtils.getDB((KeyValueContainerData) dnContainerSet
           .getContainer(blockID.getContainerID()).getContainerData(), conf)) {
-        Assert.assertNull(db.getStore().get(
-            Longs.toByteArray(blockID.getLocalID())));
-        Assert.assertNull(db.getStore().get(StringUtils.string2Bytes(
-            OzoneConsts.DELETING_KEY_PREFIX + blockID.getLocalID())));
-        Assert.assertNotNull(StringUtils.string2Bytes(
-            OzoneConsts.DELETED_KEY_PREFIX + blockID.getLocalID()));
+
+        Table<String, BlockData> blockDataTable =
+                db.getStore().getBlockDataTable();
+        Table<String, ChunkInfoList> deletedBlocksTable =
+                db.getStore().getDeletedBlocksTable();
+
+        String blockIDString = Long.toString(blockID.getLocalID());
+
+        BlockData blockData = blockDataTable.get(blockIDString);
+        Assert.assertNotNull(blockData);
+
+        String deletingKey = OzoneConsts.DELETING_KEY_PREFIX + blockIDString;
+        Assert.assertNull(blockDataTable.get(deletingKey));
+
+        ChunkInfoList deletedBlocksChunks =
+                deletedBlocksTable.get(blockIDString);
+        Assert.assertNotNull(deletedBlocksChunks);
+
+        verifyChunksEqual(blockData.getChunks(), deletedBlocksChunks.asList());
       }
       containerIdsWithDeletedBlocks.add(blockID.getContainerID());
     }, omKeyLocationInfoGroups);
+  }
+
+  private void verifyChunksEqual(List<ContainerProtos.ChunkInfo> chunks1,
+                                    List<ContainerProtos.ChunkInfo> chunks2) {
+    Assert.assertEquals(chunks1.size(), chunks2.size());
+
+    Iterator<ContainerProtos.ChunkInfo> iter1 = chunks1.iterator();
+    Iterator<ContainerProtos.ChunkInfo> iter2 = chunks2.iterator();
+
+    while(iter1.hasNext() && iter2.hasNext())  {
+      ContainerProtos.ChunkInfo c1 = iter1.next();
+      ContainerProtos.ChunkInfo c2 = iter2.next();
+
+      Assert.assertEquals(c1, c2);
+    }
   }
 }

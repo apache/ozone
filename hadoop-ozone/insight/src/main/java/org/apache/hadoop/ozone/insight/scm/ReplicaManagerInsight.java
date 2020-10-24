@@ -42,7 +42,7 @@ public class ReplicaManagerInsight extends BaseInsightPoint {
   }
 
   @Override
-  public List<MetricGroupDisplay> getMetrics() {
+  public List<MetricGroupDisplay> getMetrics(Map<String, String> filters) {
     List<MetricGroupDisplay> display = new ArrayList<>();
     return display;
   }

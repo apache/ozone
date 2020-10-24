@@ -847,11 +847,12 @@ public class TestSCMNodeManager {
     final long capacity = 2000;
     final long used = 100;
     final long remaining = capacity - used;
-
+    List<DatanodeDetails> dnList = new ArrayList<>(nodeCount);
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       EventQueue eventQueue = (EventQueue) scm.getEventQueue();
       for (int x = 0; x < nodeCount; x++) {
         DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+        dnList.add(dn);
         UUID dnId = dn.getUuid();
         long free = capacity - used;
         String storagePath = testDir.getAbsolutePath() + "/" + dnId;
@@ -870,8 +871,56 @@ public class TestSCMNodeManager {
           .getScmUsed().get());
       assertEquals(remaining * nodeCount, (long) nodeManager.getStats()
           .getRemaining().get());
+      assertEquals(1, nodeManager.minHealthyVolumeNum(dnList));
+      dnList.clear();
     }
   }
+
+  /**
+   * Test multiple nodes sending initial heartbeat with their node report
+   * with multiple volumes.
+   *
+   * @throws IOException
+   * @throws InterruptedException
+   * @throws TimeoutException
+   */
+  @Test
+  public void tesVolumeInfoFromNodeReport()
+          throws IOException, InterruptedException, AuthenticationException {
+    OzoneConfiguration conf = getConf();
+    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
+            MILLISECONDS);
+    final int volumeCount = 10;
+    final long capacity = 2000;
+    final long used = 100;
+    List<DatanodeDetails> dnList = new ArrayList<>(1);
+    try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      EventQueue eventQueue = (EventQueue) scm.getEventQueue();
+      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      dnList.add(dn);
+      UUID dnId = dn.getUuid();
+      long free = capacity - used;
+      List<StorageReportProto> reports = new ArrayList<>(volumeCount);
+      boolean failed = true;
+      for (int x = 0; x < volumeCount; x++) {
+        String storagePath = testDir.getAbsolutePath() + "/" + dnId;
+        reports.add(TestUtils
+                .createStorageReport(dnId, storagePath, capacity,
+                        used, free, null, failed));
+        failed = !failed;
+      }
+      nodeManager.register(dn, TestUtils.createNodeReport(reports), null);
+      nodeManager.processHeartbeat(dn);
+      //TODO: wait for EventQueue to be processed
+      eventQueue.processAll(8000L);
+
+      assertEquals(1, nodeManager.getNodeCount(HEALTHY));
+      assertEquals(volumeCount / 2,
+              nodeManager.minHealthyVolumeNum(dnList));
+      dnList.clear();
+    }
+  }
+
 
   /**
    * Test single node stat update based on nodereport from different heartbeat

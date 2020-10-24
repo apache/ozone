@@ -83,7 +83,13 @@ public interface DBStore extends AutoCloseable, BatchOperationHandler {
    * Flush the DB buffer onto persistent storage.
    * @throws IOException
    */
-  void flush() throws IOException;
+  void flushDB() throws IOException;
+
+  /**
+   * Flush the outstanding I/O operations of the DB.
+   * @param sync if true will sync the outstanding I/Os to the disk.
+   */
+  void flushLog(boolean sync) throws IOException;
 
   /**
    * Compact the entire database.

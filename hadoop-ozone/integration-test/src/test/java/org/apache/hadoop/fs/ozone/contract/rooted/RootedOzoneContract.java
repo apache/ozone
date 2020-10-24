@@ -20,7 +20,6 @@ package org.apache.hadoop.fs.ozone.contract.rooted;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -29,7 +28,7 @@ import org.apache.hadoop.fs.contract.AbstractFSContract;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -68,14 +67,13 @@ class RootedOzoneContract extends AbstractFSContract {
     ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
     ratisServerConfig.setWatchTimeOut(Duration.ofSeconds(10));
     conf.setFromObject(ratisServerConfig);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY + "." +
-                    "rpc.request.timeout",
-            3, TimeUnit.SECONDS);
-    conf.setTimeDuration(
-            RatisHelper.HDDS_DATANODE_RATIS_CLIENT_PREFIX_KEY + "." +
-                    "watch.request.timeout",
-            10, TimeUnit.SECONDS);
+
+    RatisClientConfig.RaftConfig raftClientConfig =
+        conf.getObject(RatisClientConfig.RaftConfig.class);
+    raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
+    raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(10));
+    conf.setFromObject(raftClientConfig);
+
     conf.addResource(CONTRACT_XML);
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
@@ -101,12 +99,7 @@ class RootedOzoneContract extends AbstractFSContract {
         OzoneConsts.OZONE_OFS_URI_SCHEME,
         cluster.getOzoneManager().getRpcPort());
     getConf().set("fs.defaultFS", uri);
-
-    // Note: FileSystem#loadFileSystems doesn't load OFS class because
-    //  META-INF points to org.apache.hadoop.fs.ozone.OzoneFileSystem
-    getConf().set("fs.ofs.impl",
-        "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem");
-
+    // fs.ofs.impl should be loaded from META-INF, no need to explicitly set it
     copyClusterConfigs(OMConfigKeys.OZONE_OM_ADDRESS_KEY);
     copyClusterConfigs(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY);
     return FileSystem.get(getConf());

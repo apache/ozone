@@ -16,10 +16,10 @@
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-main-ozone</artifactId>
-    <version>0.6.0-SNAPSHOT</version>
+    <version>1.1.0-SNAPSHOT</version>
   </parent>
   <artifactId>hadoop-ozone</artifactId>
-  <version>0.6.0-SNAPSHOT</version>
+  <version>1.1.0-SNAPSHOT</version>
   <description>Apache Hadoop Ozone Project</description>
   <name>Apache Hadoop Ozone</name>
   <packaging>pom</packaging>
@@ -31,6 +31,7 @@
   </properties>
   <modules>
     <module>interface-client</module>
+    <module>interface-storage</module>
     <module>common</module>
     <module>client</module>
     <module>ozone-manager</module>
@@ -41,7 +42,6 @@
     <module>datanode</module>
     <module>s3gateway</module>
     <module>dist</module>
-    <module>upgrade</module>
     <module>csi</module>
     <module>fault-injection-test</module>
     <module>insight</module>
@@ -70,6 +70,11 @@
       <dependency>
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-ozone-interface-client</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-ozone-interface-storage</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
@@ -213,11 +218,6 @@
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-ozone-upgrade</artifactId>
-        <version>${ozone.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-hdds-container-service</artifactId>
         <version>${hdds.version}</version>
         <type>test-jar</type>
@@ -265,7 +265,15 @@
             <exclude>**/hs_err*.log</exclude>
             <exclude>**/target/**</exclude>
             <exclude>.gitattributes</exclude>
-            <exclude>.idea/**</exclude>
+            <exclude>**/.attach_*</exclude>
+            <exclude>**/**.rej</exclude>
+            <exclude>**/.factorypath</exclude>
+            <exclude>public</exclude>
+            <exclude>**/*.iml</exclude>
+            <exclude>**/output.xml</exclude>
+            <exclude>**/log.html</exclude>
+            <exclude>**/report.html</exclude>
+            <exclude>**/.idea/**</exclude>
             <exclude>**/.ssh/id_rsa*</exclude>
             <exclude>dev-support/*tests</exclude>
             <exclude>dev-support/checkstyle*</exclude>
@@ -286,9 +294,9 @@
             <exclude>src/test/resources/ssl/*</exclude>
             <exclude>src/main/compose/ozonesecure/docker-image/runner/build/apache-rat-0.12/README-CLI.txt</exclude>
             <exclude>src/main/compose/ozonesecure/docker-image/runner/build/apache-rat-0.12/README-ANT.txt</exclude>
-            <exclude>webapps/static/angular-1.7.9.min.js</exclude>
+            <exclude>webapps/static/angular-1.8.0.min.js</exclude>
             <exclude>webapps/static/angular-nvd3-1.0.9.min.js</exclude>
-            <exclude>webapps/static/angular-route-1.7.9.min.js</exclude>
+            <exclude>webapps/static/angular-route-1.8.0.min.js</exclude>
             <exclude>webapps/static/bootstrap-3.4.1/**</exclude>
             <exclude>webapps/static/d3-3.5.17.min.js</exclude>
             <exclude>webapps/static/jquery-3.5.1.min.js</exclude>
@@ -302,8 +310,9 @@
             <exclude>**/yarn.lock</exclude>
             <exclude>**/pnpm-lock.yaml</exclude>
             <exclude>**/ozone-recon-web/build/**</exclude>
+            <exclude>src/test/resources/prometheus-test-response.txt</exclude>
             <exclude>src/main/license/**</exclude>
-            <exclude>src/main/proto/proto.lock</exclude>
+            <exclude>src/main/resources/proto.lock</exclude>
           </excludes>
         </configuration>
       </plugin>

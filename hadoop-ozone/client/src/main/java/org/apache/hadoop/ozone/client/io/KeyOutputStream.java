@@ -17,12 +17,23 @@
  */
 package org.apache.hadoop.ozone.client.io;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.io.OutputStream;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -31,24 +42,19 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ozone.om.helpers.*;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
-import org.apache.ratis.protocol.AlreadyClosedException;
-import org.apache.ratis.protocol.RaftRetryFailureException;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
+import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.io.InterruptedIOException;
-import java.io.OutputStream;
-import java.util.List;
-import java.util.Collection;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * Maintaining a list of BlockInputStream. Write based on offset.
@@ -105,8 +111,8 @@ public class KeyOutputStream extends OutputStream {
   }
 
   @VisibleForTesting
-  public XceiverClientManager getXceiverClientManager() {
-    return blockOutputStreamEntryPool.getXceiverClientManager();
+  public XceiverClientFactory getXceiverClientFactory() {
+    return blockOutputStreamEntryPool.getXceiverClientFactory();
   }
 
   @VisibleForTesting
@@ -121,21 +127,23 @@ public class KeyOutputStream extends OutputStream {
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public KeyOutputStream(OpenKeySession handler,
-      XceiverClientManager xceiverClientManager,
+      XceiverClientFactory xceiverClientManager,
       OzoneManagerProtocol omClient, int chunkSize,
       String requestId, ReplicationFactor factor, ReplicationType type,
       int bufferSize, long bufferFlushSize, boolean isBufferFlushDelay,
       long bufferMaxSize, long size, long watchTimeout,
       ChecksumType checksumType, int bytesPerChecksum,
       String uploadID, int partNumber, boolean isMultipart,
-      int maxRetryCount, long retryInterval) {
+      int maxRetryCount, long retryInterval,
+      boolean unsafeByteBufferConversion) {
     OmKeyInfo info = handler.getKeyInfo();
     blockOutputStreamEntryPool =
         new BlockOutputStreamEntryPool(omClient, chunkSize, requestId, factor,
             type, bufferSize, bufferFlushSize, isBufferFlushDelay,
             bufferMaxSize, size,
             watchTimeout, checksumType, bytesPerChecksum, uploadID, partNumber,
-            isMultipart, info, xceiverClientManager, handler.getId());
+            isMultipart, info, unsafeByteBufferConversion,
+            xceiverClientManager, handler.getId());
     // Retrieve the file encryption key info, null if file is not in
     // encrypted bucket.
     this.feInfo = info.getFileEncryptionInfo();
@@ -554,6 +562,7 @@ public class KeyOutputStream extends OutputStream {
     private boolean isMultipartKey;
     private int maxRetryCount;
     private long retryInterval;
+    private boolean unsafeByteBufferConversion;
 
     public Builder setMultipartUploadID(String uploadID) {
       this.multipartUploadID = uploadID;
@@ -650,6 +659,11 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
+    public Builder enableUnsafeByteBufferConversion(boolean enabled) {
+      this.unsafeByteBufferConversion = enabled;
+      return this;
+    }
+
     public KeyOutputStream build() {
       return new KeyOutputStream(openHandler, xceiverManager, omClient,
           chunkSize, requestID, factor, type,
@@ -657,7 +671,7 @@ public class KeyOutputStream extends OutputStream {
           streamBufferMaxSize,
           blockSize, watchTimeout, checksumType,
           bytesPerChecksum, multipartUploadID, multipartNumber, isMultipartKey,
-          maxRetryCount, retryInterval);
+          maxRetryCount, retryInterval, unsafeByteBufferConversion);
     }
   }
 

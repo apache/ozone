@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-CORE-SITE.XML_fs.o3fs.impl=org.apache.hadoop.fs.ozone.OzoneFileSystem
-CORE-SITE.XML_fs.defaultFS=o3fs://bucket.volume.id1
+CORE-SITE.XML_fs.defaultFS=ofs://id1
+
 OZONE-SITE.XML_ozone.om.service.ids=id1
 OZONE-SITE.XML_ozone.om.nodes.id1=om1,om2,om3
 OZONE-SITE.XML_ozone.om.address.id1.om1=om1
@@ -23,6 +23,7 @@ OZONE-SITE.XML_ozone.om.address.id1.om2=om2
 OZONE-SITE.XML_ozone.om.address.id1.om3=om3
 OZONE-SITE.XML_ozone.om.ratis.enable=true
 OZONE-SITE.XML_ozone.scm.container.size=1GB
+OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
 OZONE-SITE.XML_ozone.scm.names=scm
 OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data

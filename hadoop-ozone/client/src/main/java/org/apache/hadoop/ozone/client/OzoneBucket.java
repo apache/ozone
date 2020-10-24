@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.client;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -47,6 +48,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+
+import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
 
 /**
  * A class that encapsulates OzoneBucket.
@@ -93,6 +96,11 @@ public class OzoneBucket extends WithMetadata {
   private int listCacheSize;
 
   /**
+   * Used bytes of the bucket.
+   */
+  private long usedBytes;
+
+  /**
    * Creation time of the bucket.
    */
   private Instant creationTime;
@@ -109,6 +117,17 @@ public class OzoneBucket extends WithMetadata {
 
   private OzoneObj ozoneObj;
 
+  private String sourceVolume;
+  private String sourceBucket;
+
+  /**
+   * Quota of bytes allocated for the bucket.
+   */
+  private long quotaInBytes;
+  /**
+   * Quota of key count allocated for the bucket.
+   */
+  private long quotaInCounts;
 
   private OzoneBucket(ConfigurationSource conf, String volumeName,
       String bucketName, ReplicationFactor defaultReplication,
@@ -138,11 +157,13 @@ public class OzoneBucket extends WithMetadata {
         .setResType(OzoneObj.ResourceType.BUCKET)
         .setStoreType(OzoneObj.StoreType.OZONE).build();
   }
+
   @SuppressWarnings("parameternumber")
   public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
       String volumeName, String bucketName, StorageType storageType,
       Boolean versioning, long creationTime, Map<String, String> metadata,
-      String encryptionKeyName) {
+      String encryptionKeyName,
+      String sourceVolume, String sourceBucket) {
     this(conf, volumeName, bucketName, null, null, proxy);
     this.storageType = storageType;
     this.versioning = versioning;
@@ -150,6 +171,8 @@ public class OzoneBucket extends WithMetadata {
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.metadata = metadata;
     this.encryptionKeyName = encryptionKeyName;
+    this.sourceVolume = sourceVolume;
+    this.sourceBucket = sourceBucket;
     modificationTime = Instant.now();
     if (modificationTime.isBefore(this.creationTime)) {
       modificationTime = Instant.ofEpochSecond(
@@ -161,10 +184,26 @@ public class OzoneBucket extends WithMetadata {
   public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
       String volumeName, String bucketName, StorageType storageType,
       Boolean versioning, long creationTime, long modificationTime,
-      Map<String, String> metadata, String encryptionKeyName) {
+      Map<String, String> metadata, String encryptionKeyName,
+      String sourceVolume, String sourceBucket) {
     this(conf, proxy, volumeName, bucketName, storageType, versioning,
-        creationTime, metadata, encryptionKeyName);
+        creationTime, metadata, encryptionKeyName, sourceVolume, sourceBucket);
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
+  }
+
+  @SuppressWarnings("parameternumber")
+  public OzoneBucket(ConfigurationSource conf, ClientProtocol proxy,
+      String volumeName, String bucketName, StorageType storageType,
+      Boolean versioning, long creationTime, long modificationTime,
+      Map<String, String> metadata, String encryptionKeyName,
+      String sourceVolume, String sourceBucket, long usedBytes,
+      long quotaInBytes, long quotaInCounts) {
+    this(conf, proxy, volumeName, bucketName, storageType, versioning,
+        creationTime, metadata, encryptionKeyName, sourceVolume, sourceBucket);
+    this.usedBytes = usedBytes;
+    this.modificationTime = Instant.ofEpochMilli(modificationTime);
+    this.quotaInBytes = quotaInBytes;
+    this.quotaInCounts = quotaInCounts;
   }
 
   /**
@@ -306,6 +345,34 @@ public class OzoneBucket extends WithMetadata {
     return encryptionKeyName;
   }
 
+  public String getSourceVolume() {
+    return sourceVolume;
+  }
+
+  public String getSourceBucket() {
+    return sourceBucket;
+  }
+
+  /**
+   * Returns Quota allocated for the Bucket in bytes.
+   *
+   * @return quotaInBytes
+   */
+  public long getQuotaInBytes() {
+    return quotaInBytes;
+  }
+
+  /**
+   * Returns quota of key counts allocated for the Bucket.
+   *
+   * @return quotaInCounts
+   */
+  public long getQuotaInCounts() {
+    return quotaInCounts;
+  }
+
+  /**
+   * Builder for OmBucketInfo.
   /**
    * Adds ACLs to the Bucket.
    * @param addAcl ACL to be added
@@ -345,6 +412,45 @@ public class OzoneBucket extends WithMetadata {
   public void setVersioning(Boolean newVersioning) throws IOException {
     proxy.setBucketVersioning(volumeName, name, newVersioning);
     versioning = newVersioning;
+  }
+
+  /**
+   * Clean the space quota of the bucket.
+   *
+   * @throws IOException
+   */
+  public void clearSpaceQuota() throws IOException {
+    OzoneBucket ozoneBucket = proxy.getBucketDetails(volumeName, name);
+    proxy.setBucketQuota(volumeName, name, ozoneBucket.getQuotaInCounts(),
+        QUOTA_RESET);
+    quotaInBytes = QUOTA_RESET;
+    quotaInCounts = ozoneBucket.getQuotaInCounts();
+  }
+
+  /**
+   * Clean the count quota of the bucket.
+   *
+   * @throws IOException
+   */
+  public void clearCountQuota() throws IOException {
+    OzoneBucket ozoneBucket = proxy.getBucketDetails(volumeName, name);
+    proxy.setBucketQuota(volumeName, name, QUOTA_RESET,
+        ozoneBucket.getQuotaInBytes());
+    quotaInBytes = ozoneBucket.getQuotaInBytes();
+    quotaInCounts = QUOTA_RESET;
+  }
+
+  /**
+   * Sets/Changes the quota of this Bucket.
+   *
+   * @param quota OzoneQuota Object that can be applied to storage bucket.
+   * @throws IOException
+   */
+  public void setQuota(OzoneQuota quota) throws IOException {
+    proxy.setBucketQuota(volumeName, name, quota.getQuotaInCounts(),
+        quota.getQuotaInBytes());
+    quotaInBytes = quota.getQuotaInBytes();
+    quotaInCounts = quota.getQuotaInCounts();
   }
 
   /**
@@ -397,6 +503,10 @@ public class OzoneBucket extends WithMetadata {
    */
   public OzoneKeyDetails getKey(String key) throws IOException {
     return proxy.getKeyDetails(volumeName, name, key);
+  }
+
+  public long getUsedBytes() {
+    return usedBytes;
   }
 
   /**
@@ -453,6 +563,16 @@ public class OzoneBucket extends WithMetadata {
   public void renameKey(String fromKeyName, String toKeyName)
       throws IOException {
     proxy.renameKey(volumeName, name, fromKeyName, toKeyName);
+  }
+
+  /**
+   * Rename the key by keyMap, The key is fromKeyName and value is toKeyName.
+   * @param keyMap The key is original key name nad value is new key name.
+   * @throws IOException
+   */
+  public void renameKeys(Map<String, String> keyMap)
+      throws IOException {
+    proxy.renameKeys(volumeName, name, keyMap);
   }
 
   /**

@@ -196,8 +196,9 @@ public class DeletedBlockLogImpl
           final ContainerID containerId = ContainerID.valueof(
               transactionResult.getContainerID());
           if (dnsWithCommittedTxn == null) {
-            LOG.warn("Transaction txId={} commit by dnId={} for containerID={} "
-                    + "failed. Corresponding entry not found.", txID, dnID,
+            // Mostly likely it's a retried delete command response.
+            LOG.debug("Transaction txId={} commit by dnId={} for containerID={}"
+                    + " failed. Corresponding entry not found.", txID, dnID,
                 containerId);
             return;
           }
@@ -301,15 +302,18 @@ public class DeletedBlockLogImpl
       throws IOException {
     lock.lock();
     try {
-      BatchOperation batch = scmMetadataStore.getStore().initBatchOperation();
-      for (Map.Entry<Long, List<Long>> entry : containerBlocksMap.entrySet()) {
-        long nextTXID = scmMetadataStore.getNextDeleteBlockTXID();
-        DeletedBlocksTransaction tx = constructNewTransaction(nextTXID,
-            entry.getKey(), entry.getValue());
-        scmMetadataStore.getDeletedBlocksTXTable().putWithBatch(batch,
-            nextTXID, tx);
+      try(BatchOperation batch =
+          scmMetadataStore.getStore().initBatchOperation()) {
+        for (Map.Entry< Long, List< Long > > entry :
+            containerBlocksMap.entrySet()) {
+          long nextTXID = scmMetadataStore.getNextDeleteBlockTXID();
+          DeletedBlocksTransaction tx = constructNewTransaction(nextTXID,
+              entry.getKey(), entry.getValue());
+          scmMetadataStore.getDeletedBlocksTXTable().putWithBatch(batch,
+              nextTXID, tx);
+        }
+        scmMetadataStore.getStore().commitBatchOperation(batch);
       }
-      scmMetadataStore.getStore().commitBatchOperation(batch);
     } finally {
       lock.unlock();
     }

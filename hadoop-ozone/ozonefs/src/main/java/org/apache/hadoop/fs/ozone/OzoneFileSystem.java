@@ -81,9 +81,9 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
   }
 
   @Override
-  protected void incrementCounter(Statistic statistic) {
+  protected void incrementCounter(Statistic statistic, long count) {
     if (storageStatistics != null) {
-      storageStatistics.incrementCounter(statistic, 1);
+      storageStatistics.incrementCounter(statistic, count);
     }
   }
 

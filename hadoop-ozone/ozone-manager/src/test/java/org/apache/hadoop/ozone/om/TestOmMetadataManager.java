@@ -33,9 +33,15 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.TreeSet;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 
@@ -76,7 +82,7 @@ public class TestOmMetadataManager {
     OMTransactionInfo omTransactionInfo =
         omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
 
-    Assert.assertEquals(3, omTransactionInfo.getCurrentTerm());
+    Assert.assertEquals(3, omTransactionInfo.getTerm());
     Assert.assertEquals(250, omTransactionInfo.getTransactionIndex());
 
 
@@ -519,6 +525,77 @@ public class TestOmMetadataManager {
 
 
 
+  }
+
+  @Test
+  public void testGetExpiredOpenKeys() throws Exception {
+    final String bucketName = "bucket";
+    final String volumeName = "volume";
+    final int numExpiredOpenKeys = 4;
+    final int numUnexpiredOpenKeys = 1;
+    final long clientID = 1000L;
+    // To create expired keys, they will be assigned a creation time twice as
+    // old as the minimum expiration time.
+    final long minExpiredTimeSeconds = ozoneConfiguration.getInt(
+            OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS,
+            OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT);
+    final long expiredAgeMillis =
+            Instant.now().minus(minExpiredTimeSeconds * 2,
+                    ChronoUnit.SECONDS).toEpochMilli();
+
+    // Add expired keys to open key table.
+    // The method under test does not check for expired open keys in the
+    // cache, since they will be picked up once the cache is flushed.
+    Set<String> expiredKeys = new HashSet<>();
+    for (int i = 0; i < numExpiredOpenKeys; i++) {
+      OmKeyInfo keyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
+              bucketName, "expired" + i, HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.ONE, 0L, expiredAgeMillis);
+
+      TestOMRequestUtils.addKeyToTable(true, false,
+              keyInfo, clientID, 0L, omMetadataManager);
+
+      String groupID = omMetadataManager.getOpenKey(volumeName, bucketName,
+              keyInfo.getKeyName(), clientID);
+      expiredKeys.add(groupID);
+    }
+
+    // Add unexpired keys to open key table.
+    for (int i = 0; i < numUnexpiredOpenKeys; i++) {
+      OmKeyInfo keyInfo = TestOMRequestUtils.createOmKeyInfo(volumeName,
+              bucketName, "unexpired" + i, HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.ONE);
+
+      TestOMRequestUtils.addKeyToTable(true, false,
+              keyInfo, clientID, 0L, omMetadataManager);
+    }
+
+    // Test retrieving fewer expired keys than actually exist.
+    List<String> someExpiredKeys =
+            omMetadataManager.getExpiredOpenKeys(numExpiredOpenKeys - 1);
+
+    Assert.assertEquals(numExpiredOpenKeys - 1, someExpiredKeys.size());
+    for (String key: someExpiredKeys) {
+      Assert.assertTrue(expiredKeys.contains(key));
+    }
+
+    // Test attempting to retrieving more expired keys than actually exist.
+    List<String> allExpiredKeys =
+            omMetadataManager.getExpiredOpenKeys(numExpiredOpenKeys + 1);
+
+    Assert.assertEquals(numExpiredOpenKeys, allExpiredKeys.size());
+    for (String key: allExpiredKeys) {
+      Assert.assertTrue(expiredKeys.contains(key));
+    }
+
+    // Test retrieving exact amount of expired keys that exist.
+    allExpiredKeys =
+            omMetadataManager.getExpiredOpenKeys(numExpiredOpenKeys);
+
+    Assert.assertEquals(numExpiredOpenKeys, allExpiredKeys.size());
+    for (String key: allExpiredKeys) {
+      Assert.assertTrue(expiredKeys.contains(key));
+    }
   }
 
   private void addKeysToOM(String volumeName, String bucketName,

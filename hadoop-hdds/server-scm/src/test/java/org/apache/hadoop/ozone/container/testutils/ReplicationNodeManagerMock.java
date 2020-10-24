@@ -343,4 +343,19 @@ public class ReplicationNodeManagerMock implements NodeManager {
   public NetworkTopology getClusterNetworkTopologyMap() {
     return null;
   }
+
+  @Override
+  public int minHealthyVolumeNum(List<DatanodeDetails> dnList) {
+    return 0;
+  }
+
+  @Override
+  public int pipelineLimit(DatanodeDetails dn) {
+    return 0;
+  }
+
+  @Override
+  public int minPipelineLimit(List<DatanodeDetails> dn) {
+    return 0;
+  }
 }

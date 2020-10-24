@@ -83,7 +83,7 @@ public class PipelineReportHandler implements
       try {
         processPipelineReport(report, dn, publisher);
       } catch (IOException e) {
-        LOGGER.error("Could not process pipeline report={} from dn={} {}",
+        LOGGER.error("Could not process pipeline report={} from dn={}.",
             report, dn, e);
       }
     }

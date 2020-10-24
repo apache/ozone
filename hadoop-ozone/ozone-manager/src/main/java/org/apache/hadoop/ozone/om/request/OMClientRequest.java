@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -38,13 +39,18 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.nio.file.Paths;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 
 /**
  * OMClientRequest provides methods which every write OM request should
@@ -52,7 +58,12 @@ import java.util.Map;
  */
 public abstract class OMClientRequest implements RequestAuditor {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMClientRequest.class);
   private OMRequest omRequest;
+
+  private UserGroupInformation userGroupInformation;
+  private InetAddress inetAddress;
 
   /**
    * Stores the result of request execution in
@@ -152,10 +163,16 @@ public abstract class OMClientRequest implements RequestAuditor {
    */
   @VisibleForTesting
   public UserGroupInformation createUGI() {
+
+    if (userGroupInformation != null) {
+      return userGroupInformation;
+    }
+
     if (omRequest.hasUserInfo() &&
         !StringUtils.isBlank(omRequest.getUserInfo().getUserName())) {
-      return UserGroupInformation.createRemoteUser(
+      userGroupInformation = UserGroupInformation.createRemoteUser(
           omRequest.getUserInfo().getUserName());
+      return userGroupInformation;
     } else {
       // This will never happen, as for every OM request preExecute, we
       // should add userInfo.
@@ -171,9 +188,14 @@ public abstract class OMClientRequest implements RequestAuditor {
    */
   @VisibleForTesting
   public InetAddress getRemoteAddress() throws IOException {
+    if (inetAddress != null) {
+      return inetAddress;
+    }
+
     if (omRequest.hasUserInfo()) {
-      return InetAddress.getByName(omRequest.getUserInfo()
+      inetAddress = InetAddress.getByName(omRequest.getUserInfo()
           .getRemoteAddress());
+      return inetAddress;
     } else {
       return null;
     }
@@ -264,5 +286,73 @@ public abstract class OMClientRequest implements RequestAuditor {
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.VOLUME, volume);
     return auditMap;
+  }
+
+
+  public static String validateAndNormalizeKey(boolean enableFileSystemPaths,
+      String keyName) throws OMException {
+    if (enableFileSystemPaths) {
+      return validateAndNormalizeKey(keyName);
+    } else {
+      return keyName;
+    }
+  }
+
+  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
+  public static String validateAndNormalizeKey(String keyName)
+      throws OMException {
+    String normalizedKeyName;
+    if (keyName.startsWith(OM_KEY_PREFIX)) {
+      normalizedKeyName = Paths.get(keyName).toUri().normalize().getPath();
+    } else {
+      normalizedKeyName = Paths.get(OM_KEY_PREFIX, keyName).toUri()
+          .normalize().getPath();
+    }
+    if (!keyName.equals(normalizedKeyName)) {
+      LOG.debug("Normalized key {} to {} ", keyName,
+          normalizedKeyName.substring(1));
+    }
+    return isValidKeyPath(normalizedKeyName.substring(1));
+  }
+
+  /**
+   * Whether the pathname is valid.  Check key names which contain a
+   * ":", ".", "..", "//", "". If it has any of these characters throws
+   * OMException, else return the path.
+   */
+  private static String isValidKeyPath(String path) throws OMException {
+    boolean isValid = true;
+
+    // If keyName is empty string throw error.
+    if (path.length() == 0) {
+      throw new OMException("Invalid KeyPath, empty keyName" + path,
+          INVALID_KEY_NAME);
+    } else if(path.startsWith("/")) {
+      isValid = false;
+    } else {
+      // Check for ".." "." ":" "/"
+      String[] components = StringUtils.split(path, '/');
+      for (int i = 0; i < components.length; i++) {
+        String element = components[i];
+        if (element.equals(".") ||
+            (element.contains(":")) ||
+            (element.contains("/") || element.equals(".."))) {
+          isValid = false;
+          break;
+        }
+
+        // The string may end with a /, but not have
+        // "//" in the middle.
+        if (element.isEmpty() && i != components.length - 1) {
+          isValid = false;
+        }
+      }
+    }
+
+    if (isValid) {
+      return path;
+    } else {
+      throw new OMException("Invalid KeyPath " + path, INVALID_KEY_NAME);
+    }
   }
 }

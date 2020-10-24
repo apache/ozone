@@ -68,7 +68,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
       .getLogger(ScmBlockLocationProtocolServerSideTranslatorPB.class);
 
   private final OzoneProtocolMessageDispatcher<SCMBlockLocationRequest,
-      SCMBlockLocationResponse>
+      SCMBlockLocationResponse, ProtocolMessageEnum>
       dispatcher;
 
   /**

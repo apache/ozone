@@ -35,12 +35,15 @@ import java.util.UUID;
  * - UUID of the DataNode.
  * - IP and Hostname details.
  * - Port details to which the DataNode will be listening.
+ * and may also include some extra info like:
+ * - version of the DataNode
+ * - setup time etc.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class DatanodeDetails extends NodeImpl implements
     Comparable<DatanodeDetails> {
-/**
+  /**
    * DataNode's unique identifier in the cluster.
    */
   private final UUID uuid;
@@ -51,6 +54,8 @@ public class DatanodeDetails extends NodeImpl implements
   private String certSerialId;
   private String version;
   private long setupTime;
+  private String revision;
+  private String buildDate;
 
   /**
    * Constructs DatanodeDetails instance. DatanodeDetails.Builder is used
@@ -63,11 +68,13 @@ public class DatanodeDetails extends NodeImpl implements
    * @param certSerialId serial id from SCM issued certificate.
    * @param version DataNode's version
    * @param setupTime the setup time of DataNode
+   * @param revision DataNodes's revision
+   * @param buildDate DataNodes's build timestamp
    */
   @SuppressWarnings("parameternumber")
   private DatanodeDetails(UUID uuid, String ipAddress, String hostName,
       String networkLocation, List<Port> ports, String certSerialId,
-      String version, long setupTime) {
+      String version, long setupTime, String revision, String buildDate) {
     super(hostName, networkLocation, NetConstants.NODE_COST_DEFAULT);
     this.uuid = uuid;
     this.ipAddress = ipAddress;
@@ -76,6 +83,8 @@ public class DatanodeDetails extends NodeImpl implements
     this.certSerialId = certSerialId;
     this.version = version;
     this.setupTime = setupTime;
+    this.revision = revision;
+    this.buildDate = buildDate;
   }
 
   public DatanodeDetails(DatanodeDetails datanodeDetails) {
@@ -89,6 +98,8 @@ public class DatanodeDetails extends NodeImpl implements
     this.setParent(datanodeDetails.getParent());
     this.version = datanodeDetails.version;
     this.setupTime = datanodeDetails.setupTime;
+    this.revision = datanodeDetails.revision;
+    this.buildDate = datanodeDetails.buildDate;
   }
 
   /**
@@ -217,11 +228,34 @@ public class DatanodeDetails extends NodeImpl implements
     if (datanodeDetailsProto.hasNetworkLocation()) {
       builder.setNetworkLocation(datanodeDetailsProto.getNetworkLocation());
     }
-    if (datanodeDetailsProto.hasVersion()) {
-      builder.setVersion(datanodeDetailsProto.getVersion());
+    return builder.build();
+  }
+
+  /**
+   * Returns a ExtendedDatanodeDetails from the protocol buffers.
+   *
+   * @param extendedDetailsProto - protoBuf Message
+   * @return DatanodeDetails
+   */
+  public static DatanodeDetails getFromProtoBuf(
+      HddsProtos.ExtendedDatanodeDetailsProto extendedDetailsProto) {
+    DatanodeDetails.Builder builder = newBuilder();
+    if (extendedDetailsProto.hasDatanodeDetails()) {
+      DatanodeDetails datanodeDetails = getFromProtoBuf(
+          extendedDetailsProto.getDatanodeDetails());
+      builder.setDatanodeDetails(datanodeDetails);
     }
-    if (datanodeDetailsProto.hasSetupTime()) {
-      builder.setSetupTime(datanodeDetailsProto.getSetupTime());
+    if (extendedDetailsProto.hasVersion()) {
+      builder.setVersion(extendedDetailsProto.getVersion());
+    }
+    if (extendedDetailsProto.hasSetupTime()) {
+      builder.setSetupTime(extendedDetailsProto.getSetupTime());
+    }
+    if (extendedDetailsProto.hasRevision()) {
+      builder.setRevision(extendedDetailsProto.getRevision());
+    }
+    if (extendedDetailsProto.hasBuildDate()) {
+      builder.setBuildDate(extendedDetailsProto.getBuildDate());
     }
     return builder.build();
   }
@@ -265,13 +299,34 @@ public class DatanodeDetails extends NodeImpl implements
           .build());
     }
 
+    return builder.build();
+  }
+
+  /**
+   * Returns a ExtendedDatanodeDetails protobuf message from a datanode ID.
+   * @return HddsProtos.ExtendedDatanodeDetailsProto
+   */
+  public HddsProtos.ExtendedDatanodeDetailsProto getExtendedProtoBufMessage() {
+    HddsProtos.DatanodeDetailsProto datanodeDetailsProto = getProtoBufMessage();
+
+    HddsProtos.ExtendedDatanodeDetailsProto.Builder extendedBuilder =
+        HddsProtos.ExtendedDatanodeDetailsProto.newBuilder()
+            .setDatanodeDetails(datanodeDetailsProto);
+
     if (!Strings.isNullOrEmpty(getVersion())) {
-      builder.setVersion(getVersion());
+      extendedBuilder.setVersion(getVersion());
     }
 
-    builder.setSetupTime(getSetupTime());
+    extendedBuilder.setSetupTime(getSetupTime());
 
-    return builder.build();
+    if (!Strings.isNullOrEmpty(getRevision())) {
+      extendedBuilder.setRevision(getRevision());
+    }
+    if (!Strings.isNullOrEmpty(getBuildDate())) {
+      extendedBuilder.setBuildDate(getBuildDate());
+    }
+
+    return extendedBuilder.build();
   }
 
   @Override
@@ -325,6 +380,8 @@ public class DatanodeDetails extends NodeImpl implements
     private String certSerialId;
     private String version;
     private long setupTime;
+    private String revision;
+    private String buildDate;
 
     /**
      * Default private constructor. To create Builder instance use
@@ -332,6 +389,27 @@ public class DatanodeDetails extends NodeImpl implements
      */
     private Builder() {
       ports = new ArrayList<>();
+    }
+
+    /**
+     * Initialize with DatanodeDetails.
+     *
+     * @param details DatanodeDetails
+     * @return DatanodeDetails.Builder
+     */
+    public Builder setDatanodeDetails(DatanodeDetails details) {
+      this.id = details.getUuid();
+      this.ipAddress = details.getIpAddress();
+      this.hostName = details.getHostName();
+      this.networkName = details.getNetworkName();
+      this.networkLocation = details.getNetworkLocation();
+      this.ports = details.getPorts();
+      this.certSerialId = details.getCertSerialId();
+      this.version = details.getVersion();
+      this.setupTime = details.getSetupTime();
+      this.revision = details.getRevision();
+      this.buildDate = details.getBuildDate();
+      return this;
     }
 
     /**
@@ -426,6 +504,30 @@ public class DatanodeDetails extends NodeImpl implements
     }
 
     /**
+     * Sets the DataNode revision.
+     *
+     * @param rev the revision of DataNode.
+     *
+     * @return DatanodeDetails.Builder
+     */
+    public Builder setRevision(String rev) {
+      this.revision = rev;
+      return this;
+    }
+
+    /**
+     * Sets the DataNode build date.
+     *
+     * @param date the build date of DataNode.
+     *
+     * @return DatanodeDetails.Builder
+     */
+    public Builder setBuildDate(String date) {
+      this.buildDate = date;
+      return this;
+    }
+
+    /**
      * Sets the DataNode setup time.
      *
      * @param time the setup time of DataNode.
@@ -448,7 +550,8 @@ public class DatanodeDetails extends NodeImpl implements
         networkLocation = NetConstants.DEFAULT_RACK;
       }
       DatanodeDetails dn = new DatanodeDetails(id, ipAddress, hostName,
-          networkLocation, ports, certSerialId, version, setupTime);
+          networkLocation, ports, certSerialId,
+          version, setupTime, revision, buildDate);
       if (networkName != null) {
         dn.setNetworkName(networkName);
       }
@@ -589,5 +692,41 @@ public class DatanodeDetails extends NodeImpl implements
    */
   public void setSetupTime(long setupTime) {
     this.setupTime = setupTime;
+  }
+
+  /**
+   * Returns the DataNode revision.
+   *
+   * @return DataNode revision
+   */
+  public String getRevision() {
+    return revision;
+  }
+
+  /**
+   * Set DataNode revision.
+   *
+   * @param rev DataNode revision
+   */
+  public void setRevision(String rev) {
+    this.revision = rev;
+  }
+
+  /**
+   * Returns the DataNode build date.
+   *
+   * @return DataNode build date
+   */
+  public String getBuildDate() {
+    return buildDate;
+  }
+
+  /**
+   * Set DataNode build date.
+   *
+   * @param date DataNode build date
+   */
+  public void setBuildDate(String date) {
+    this.buildDate = date;
   }
 }

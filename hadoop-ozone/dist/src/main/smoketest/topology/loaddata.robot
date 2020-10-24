@@ -25,7 +25,7 @@ Test Timeout        5 minutes
 
 *** Test Cases ***
 Create a volume, bucket and key
-    ${output} =         Execute          ozone sh volume create topvol1 --quota 100TB
+    ${output} =         Execute          ozone sh volume create topvol1
                         Should not contain  ${output}       Failed
     ${output} =         Execute          ozone sh bucket create /topvol1/bucket1
                         Should not contain  ${output}       Failed

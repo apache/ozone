@@ -28,9 +28,12 @@ import {AutoReloadHelper} from 'utils/autoReloadHelper';
 import AutoReloadPanel from 'components/autoReloadPanel/autoReloadPanel';
 import {showDataFetchError} from 'utils/common';
 import {IAxiosResponse} from 'types/axios.types';
+import {ColumnSearch} from 'utils/columnSearch';
 
 const {TabPane} = Tabs;
-export type PipelineStatus = 'active' | 'inactive';
+const PipelineStatusList = ['OPEN', 'CLOSING', 'QUASI_CLOSED', 'CLOSED', 'UNHEALTHY', 'INVALID', 'DELETED'] as const;
+type PipelineStatusTuple = typeof PipelineStatusList;
+export type PipelineStatus = PipelineStatusTuple[number]; // 'OPEN' | 'CLOSING' | 'QUASI_CLOSED' | 'CLOSED' | 'UNHEALTHY' | 'INVALID' | 'DELETED';
 
 interface IPipelineResponse {
   pipelineId: string;
@@ -62,6 +65,7 @@ const COLUMNS = [
     title: 'Pipeline ID',
     dataIndex: 'pipelineId',
     key: 'pipelineId',
+    isSearchable: true,
     sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.pipelineId.localeCompare(b.pipelineId)
   },
   {
@@ -89,24 +93,30 @@ const COLUMNS = [
     title: 'Status',
     dataIndex: 'status',
     key: 'status',
+    filterMultiple: true,
+    filters: PipelineStatusList.map(status => ({text: status, value: status})),
+    onFilter: (value: PipelineStatus, record: IPipelineResponse) => record.status === value,
     sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.status.localeCompare(b.status)
   },
   {
     title: 'Containers',
     dataIndex: 'containers',
     key: 'containers',
+    isSearchable: true,
     sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.containers - b.containers
   },
   {
     title: 'Datanodes',
     dataIndex: 'datanodes',
     key: 'datanodes',
+    isSearchable: true,
     render: (datanodes: string[]) => <div>{datanodes.map(datanode => <div key={datanode}>{datanode}</div>)}</div>
   },
   {
     title: 'Leader',
     dataIndex: 'leaderNode',
     key: 'leaderNode',
+    isSearchable: true,
     sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.leaderNode.localeCompare(b.leaderNode)
   },
   {
@@ -114,7 +124,7 @@ const COLUMNS = [
     dataIndex: 'lastLeaderElection',
     key: 'lastLeaderElection',
     render: (lastLeaderElection: number) => lastLeaderElection > 0 ?
-      moment(lastLeaderElection).format('lll') : 'NA',
+      moment(lastLeaderElection).format('ll LTS') : 'NA',
     sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.lastLeaderElection - b.lastLeaderElection
   },
   {
@@ -128,6 +138,7 @@ const COLUMNS = [
     title: 'No. of Elections',
     dataIndex: 'leaderElections',
     key: 'leaderElections',
+    isSearchable: true,
     sorter: (a: IPipelineResponse, b: IPipelineResponse) => a.leaderElections - b.leaderElections
   }
 ];
@@ -205,7 +216,22 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
         <div className='content-div'>
           <Tabs defaultActiveKey='1' onChange={this.onTabChange}>
             <TabPane key='1' tab='Active'>
-              <Table dataSource={activeDataSource} columns={COLUMNS} loading={activeLoading} pagination={paginationConfig} rowKey='pipelineId'/>
+              <Table
+                dataSource={activeDataSource}
+                columns={COLUMNS.reduce<any[]>((filtered, column) => {
+                  if (column.isSearchable) {
+                    const newColumn = {
+                      ...column,
+                      ...new ColumnSearch(column).getColumnSearchProps(column.dataIndex)
+                    };
+                    filtered.push(newColumn);
+                  } else {
+                    filtered.push(column);
+                  }
+
+                  return filtered;
+                }, [])}
+                loading={activeLoading} pagination={paginationConfig} rowKey='pipelineId'/>
             </TabPane>
             <TabPane key='2' tab='Inactive'/>
           </Tabs>

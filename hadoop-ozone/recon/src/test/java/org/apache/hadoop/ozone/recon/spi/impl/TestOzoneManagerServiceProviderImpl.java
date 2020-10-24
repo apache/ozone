@@ -46,6 +46,7 @@ import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.nio.file.Paths;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -113,8 +114,10 @@ public class TestOzoneManagerServiceProviderImpl {
     File tarFile = createTarFile(checkpoint.getCheckpointLocation());
     InputStream inputStream = new FileInputStream(tarFile);
     ReconUtils reconUtilsMock = getMockReconUtils();
+    HttpURLConnection httpURLConnectionMock = mock(HttpURLConnection.class);
+    when(httpURLConnectionMock.getInputStream()).thenReturn(inputStream);
     when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
-        .thenReturn(inputStream);
+        .thenReturn(httpURLConnectionMock);
 
     ReconTaskController reconTaskController = getMockTaskController();
 
@@ -164,8 +167,10 @@ public class TestOzoneManagerServiceProviderImpl {
     File tarFile = createTarFile(checkpointDir.toPath());
     InputStream fileInputStream = new FileInputStream(tarFile);
     ReconUtils reconUtilsMock = getMockReconUtils();
+    HttpURLConnection httpURLConnectionMock = mock(HttpURLConnection.class);
+    when(httpURLConnectionMock.getInputStream()).thenReturn(fileInputStream);
     when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
-        .thenReturn(fileInputStream);
+        .thenReturn(httpURLConnectionMock);
 
     ReconOMMetadataManager reconOMMetadataManager =
         mock(ReconOMMetadataManager.class);

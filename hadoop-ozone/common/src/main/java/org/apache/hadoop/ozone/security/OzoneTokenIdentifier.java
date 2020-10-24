@@ -21,17 +21,22 @@ import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Arrays;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.io.DataInputBuffer;
+import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenIdentifier;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
+
 
 /**
  * The token identifier for Ozone Master.
@@ -77,6 +82,55 @@ public class OzoneTokenIdentifier extends
     return KIND_NAME;
   }
 
+  /** Instead of relying on proto serialization, this
+   *  provides  explicit serialization for OzoneTokenIdentifier.
+   * @return byte[]
+   */
+  public byte[] toUniqueSerializedKey() {
+    DataOutputBuffer buf = new DataOutputBuffer();
+    try {
+      super.write(buf);
+      WritableUtils.writeVInt(buf, getTokenType().getNumber());
+      // Set s3 specific fields.
+      if (getTokenType().equals(S3AUTHINFO)) {
+        WritableUtils.writeString(buf, getAwsAccessId());
+        WritableUtils.writeString(buf, getSignature());
+        WritableUtils.writeString(buf, getStrToSign());
+      } else {
+        WritableUtils.writeString(buf, getOmCertSerialId());
+        WritableUtils.writeString(buf, getOmServiceId());
+      }
+    } catch (java.io.IOException e) {
+      throw new IllegalArgumentException(
+          "Can't encode the the raw data ", e);
+    }
+    return buf.getData();
+  }
+
+  /** Instead of relying on proto deserialization, this
+   *  provides  explicit deserialization for OzoneTokenIdentifier.
+   * @return byte[]
+   */
+  public OzoneTokenIdentifier fromUniqueSerializedKey(byte[] rawData)
+      throws IOException {
+    DataInputBuffer in = new DataInputBuffer();
+    in.reset(rawData, rawData.length);
+    super.readFields(in);
+    int type = WritableUtils.readVInt(in);
+    // Set s3 specific fields.
+    if (type == S3AUTHINFO.getNumber()) {
+      this.tokenType = Type.S3AUTHINFO;
+      setAwsAccessId(WritableUtils.readString(in));
+      setSignature(WritableUtils.readString(in));
+      setStrToSign(WritableUtils.readString(in));
+    } else {
+      this.tokenType = Type.DELEGATION_TOKEN;
+      setOmCertSerialId(WritableUtils.readString(in));
+      setOmServiceId(WritableUtils.readString(in));
+    }
+    return this;
+  }
+
   /**
    * Overrides default implementation to write using Protobuf.
    *
@@ -92,7 +146,6 @@ public class OzoneTokenIdentifier extends
         .setRealUser(getRealUser().toString())
         .setRenewer(getRenewer().toString())
         .setIssueDate(getIssueDate())
-        .setMaxDate(getMaxDate())
         .setSequenceNumber(getSequenceNumber())
         .setMasterKeyId(getMasterKeyId());
 
@@ -322,8 +375,8 @@ public class OzoneTokenIdentifier extends
         .append(" owner=").append(getOwner())
         .append(", renewer=").append(getRenewer())
         .append(", realUser=").append(getRealUser())
-        .append(", issueDate=").append(getIssueDate())
-        .append(", maxDate=").append(getMaxDate())
+        .append(", issueDate=").append(Instant.ofEpochMilli(getIssueDate()))
+        .append(", maxDate=").append(Instant.ofEpochMilli(getMaxDate()))
         .append(", sequenceNumber=").append(getSequenceNumber())
         .append(", masterKeyId=").append(getMasterKeyId())
         .append(", strToSign=").append(getStrToSign())

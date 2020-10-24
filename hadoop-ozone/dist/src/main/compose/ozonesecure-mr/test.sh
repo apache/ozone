@@ -37,7 +37,10 @@ source "$COMPOSE_DIR/../testlib.sh"
 
 execute_robot_test rm kinit-hadoop.robot
 
-execute_robot_test rm mapreduce.robot
+for scheme in o3fs ofs; do
+  execute_robot_test rm -v "SCHEME:${scheme}" -N "hadoopfs-${scheme}" ozonefs/hadoopo3fs.robot
+  execute_robot_test rm -v "SCHEME:${scheme}" -N "mapreduce-${scheme}" mapreduce.robot
+done
 
 stop_docker_env
 

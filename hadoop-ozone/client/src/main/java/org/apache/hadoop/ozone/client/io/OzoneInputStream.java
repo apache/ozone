@@ -57,6 +57,11 @@ public class OzoneInputStream extends InputStream {
     return inputStream.available();
   }
 
+  @Override
+  public long skip(long n) throws IOException {
+    return inputStream.skip(n);
+  }
+
   public InputStream getInputStream() {
     return inputStream;
   }

@@ -30,6 +30,8 @@ execute_robot_test scm kinit.robot
 
 execute_robot_test scm freon
 
+execute_robot_test scm basic/links.robot
+
 stop_docker_env
 
 generate_report

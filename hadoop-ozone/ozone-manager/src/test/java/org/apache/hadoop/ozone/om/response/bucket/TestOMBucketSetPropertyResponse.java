@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone.om.response.bucket;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -60,6 +61,14 @@ public class TestOMBucketSetPropertyResponse {
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
+
+  @After
+  public void tearDown() {
+    if (batchOperation != null) {
+      batchOperation.close();
+    }
+  }
+
 
   @Test
   public void testAddToDBBatch() throws Exception {

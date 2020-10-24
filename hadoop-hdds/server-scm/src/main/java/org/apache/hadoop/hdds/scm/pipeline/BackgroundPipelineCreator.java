@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import org.apache.commons.collections.iterators.LoopingIterator;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -26,6 +27,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -109,35 +112,43 @@ class BackgroundPipelineCreator {
         ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
         ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE_DEFAULT);
 
+    List<HddsProtos.ReplicationFactor> list =
+        new ArrayList<>();
     for (HddsProtos.ReplicationFactor factor : HddsProtos.ReplicationFactor
         .values()) {
       if (skipCreation(factor, type, autoCreateFactorOne)) {
         // Skip this iteration for creating pipeline
         continue;
       }
-
+      list.add(factor);
       if (!pipelineManager.getSafeModeStatus()) {
         try {
           pipelineManager.scrubPipeline(type, factor);
         } catch (IOException e) {
-          LOG.error("Error while scrubbing pipelines {}", e);
-        }
-      }
-
-      while (true) {
-        try {
-          if (scheduler.isClosed()) {
-            break;
-          }
-          pipelineManager.createPipeline(type, factor);
-        } catch (IOException ioe) {
-          break;
-        } catch (Throwable t) {
-          LOG.error("Error while creating pipelines", t);
-          break;
+          LOG.error("Error while scrubbing pipelines.", e);
         }
       }
     }
+
+    LoopingIterator it = new LoopingIterator(list);
+    while (it.hasNext()) {
+      HddsProtos.ReplicationFactor factor =
+          (HddsProtos.ReplicationFactor) it.next();
+
+      try {
+        if (scheduler.isClosed()) {
+          break;
+        }
+        pipelineManager.createPipeline(type, factor);
+      } catch (IOException ioe) {
+        it.remove();
+      } catch (Throwable t) {
+        LOG.error("Error while creating pipelines", t);
+        it.remove();
+      }
+    }
+
     isPipelineCreatorRunning.set(false);
+    LOG.debug("BackgroundPipelineCreator createPipelines finished.");
   }
 }

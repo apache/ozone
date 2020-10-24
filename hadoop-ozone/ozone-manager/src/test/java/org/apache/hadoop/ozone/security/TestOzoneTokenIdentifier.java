@@ -47,6 +47,7 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ozone.om.codec.TokenIdentifierCodec;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.TestSSLFactory;
 import org.apache.hadoop.security.token.Token;
@@ -326,5 +327,23 @@ public class TestOzoneTokenIdentifier {
     OzoneTokenIdentifier idDecode = new OzoneTokenIdentifier();
     idDecode.readFields(in);
     Assert.assertEquals(idEncode, idDecode);
+  }
+
+  @Test
+  public void testTokenPersistence() throws IOException {
+    OzoneTokenIdentifier idWrite = getIdentifierInst();
+    idWrite.setOmServiceId("defaultServiceId");
+
+    byte[] oldIdBytes = idWrite.getBytes();
+    TokenIdentifierCodec idCodec = new TokenIdentifierCodec();
+
+    OzoneTokenIdentifier idRead = null;
+    try {
+      idRead =  idCodec.fromPersistedFormat(oldIdBytes);
+    } catch (IOException ex) {
+      Assert.fail("Should not fail to load old token format");
+    }
+    Assert.assertEquals("Deserialize Serialized Token should equal.",
+        idWrite, idRead);
   }
 }

@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.om.request.key;
 import java.io.IOException;
 
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.response.key.OMTrashRecoverResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -86,6 +88,11 @@ public class OMTrashRecoverRequest extends OMKeyRequest {
     boolean acquireLock = false;
     OMClientResponse omClientResponse = null;
     try {
+      ResolvedBucket bucket = ozoneManager.resolveBucketLink(
+          Pair.of(volumeName, destinationBucket), this);
+      volumeName = bucket.realVolume();
+      destinationBucket = bucket.realBucket();
+
       // Check acl for the destination bucket.
       checkBucketAcls(ozoneManager, volumeName, destinationBucket, keyName,
           IAccessAuthorizer.ACLType.WRITE);

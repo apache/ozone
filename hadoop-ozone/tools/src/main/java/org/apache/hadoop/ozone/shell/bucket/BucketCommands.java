@@ -23,9 +23,12 @@ import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.GenericParentCommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.MissingSubcommandException;
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.shell.OzoneShell;
 import org.apache.hadoop.ozone.shell.Shell;
 
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
 
@@ -38,15 +41,20 @@ import picocli.CommandLine.ParentCommand;
         InfoBucketHandler.class,
         ListBucketHandler.class,
         CreateBucketHandler.class,
+        SetQuotaHandler.class,
+        LinkBucketHandler.class,
         DeleteBucketHandler.class,
         AddAclBucketHandler.class,
         RemoveAclBucketHandler.class,
         GetAclBucketHandler.class,
-        SetAclBucketHandler.class
+        SetAclBucketHandler.class,
+        ClearQuotaHandler.class
     },
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class BucketCommands implements GenericParentCommand, Callable<Void> {
+@MetaInfServices(SubcommandWithParent.class)
+public class BucketCommands implements GenericParentCommand, Callable<Void>,
+    SubcommandWithParent {
 
   @ParentCommand
   private Shell shell;
@@ -65,5 +73,10 @@ public class BucketCommands implements GenericParentCommand, Callable<Void> {
   @Override
   public OzoneConfiguration createOzoneConfiguration() {
     return shell.createOzoneConfiguration();
+  }
+
+  @Override
+  public Class<?> getParentType() {
+    return OzoneShell.class;
   }
 }

@@ -117,6 +117,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
         .setDeleteTransactionId(info.getDeleteTransactionId())
         .setReplicationFactor(info.getReplicationFactor())
         .setReplicationType(info.getReplicationType())
+        .setSequenceId(info.getSequenceId())
         .build();
   }
 
@@ -212,6 +213,7 @@ public class ContainerInfo implements Comparator<ContainerInfo>,
         .setReplicationFactor(getReplicationFactor())
         .setReplicationType(getReplicationType())
         .setOwner(getOwner())
+        .setSequenceId(getSequenceId())
         .build();
   }
 

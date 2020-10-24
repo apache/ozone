@@ -26,6 +26,7 @@ import java.util.Map;
 
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 /**
@@ -80,6 +81,19 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
    * @throws IOException on Failure
    */
   VALUE get(KEY key) throws IOException;
+
+
+  /**
+   * Skip checking cache and get the value mapped to the given key in byte
+   * array or returns null if the key is not found.
+   *
+   * @param key metadata key
+   * @return value in byte array or null if the key is not found.
+   * @throws IOException on Failure
+   */
+  default VALUE getSkipCache(KEY key) throws IOException {
+    throw new NotImplementedException("getSkipCache is not implemented");
+  }
 
 
   /**
@@ -189,6 +203,61 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
       cacheIterator() {
     throw new NotImplementedException("cacheIterator is not implemented");
   }
+
+  /**
+   * Returns a certain range of key value pairs as a list based on a
+   * startKey or count. Further a {@link MetadataKeyFilters.MetadataKeyFilter}
+   * can be added to * filter keys if necessary.
+   * To prevent race conditions while listing
+   * entries, this implementation takes a snapshot and lists the entries from
+   * the snapshot. This may, on the other hand, cause the range result slight
+   * different with actual data if data is updating concurrently.
+   * <p>
+   * If the startKey is specified and found in the table, this key and the keys
+   * after this key will be included in the result. If the startKey is null
+   * all entries will be included as long as other conditions are satisfied.
+   * If the given startKey doesn't exist and empty list will be returned.
+   * <p>
+   * The count argument is to limit number of total entries to return,
+   * the value for count must be an integer greater than 0.
+   * <p>
+   * This method allows to specify one or more
+   * {@link MetadataKeyFilters.MetadataKeyFilter}
+   * to filter keys by certain condition. Once given, only the entries
+   * whose key passes all the filters will be included in the result.
+   *
+   * @param startKey a start key.
+   * @param count max number of entries to return.
+   * @param filters customized one or more
+   * {@link MetadataKeyFilters.MetadataKeyFilter}.
+   * @return a list of entries found in the database or an empty list if the
+   * startKey is invalid.
+   * @throws IOException if there are I/O errors.
+   * @throws IllegalArgumentException if count is less than 0.
+   */
+  List<? extends KeyValue<KEY, VALUE>> getRangeKVs(KEY startKey,
+          int count, MetadataKeyFilters.MetadataKeyFilter... filters)
+          throws IOException, IllegalArgumentException;
+
+  /**
+   * This method is very similar to {@link #getRangeKVs}, the only
+   * different is this method is supposed to return a sequential range
+   * of elements based on the filters. While iterating the elements,
+   * if it met any entry that cannot pass the filter, the iterator will stop
+   * from this point without looking for next match. If no filter is given,
+   * this method behaves just like {@link #getRangeKVs}.
+   *
+   * @param startKey a start key.
+   * @param count max number of entries to return.
+   * @param filters customized one or more
+   * {@link MetadataKeyFilters.MetadataKeyFilter}.
+   * @return a list of entries found in the database.
+   * @throws IOException
+   * @throws IllegalArgumentException
+   */
+  List<? extends KeyValue<KEY, VALUE>> getSequentialRangeKVs(KEY startKey,
+          int count, MetadataKeyFilters.MetadataKeyFilter... filters)
+          throws IOException, IllegalArgumentException;
 
   /**
    * Class used to represent the key and value pair of a db entry.

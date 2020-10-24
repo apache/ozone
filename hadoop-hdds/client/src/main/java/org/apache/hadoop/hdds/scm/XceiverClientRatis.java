@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.UUID;
@@ -54,9 +55,9 @@ import com.google.common.base.Supplier;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos;
-import org.apache.ratis.protocol.GroupMismatchException;
+import org.apache.ratis.protocol.exceptions.GroupMismatchException;
+import org.apache.ratis.protocol.exceptions.RaftException;
 import org.apache.ratis.protocol.RaftClientReply;
-import org.apache.ratis.protocol.RaftException;
 import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
@@ -352,4 +353,10 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     return asyncReply;
   }
 
+  @Override
+  public Map<DatanodeDetails, ContainerCommandResponseProto>
+      sendCommandOnAllNodes(ContainerCommandRequestProto request) {
+    throw new UnsupportedOperationException(
+            "Operation Not supported for ratis client");
+  }
 }

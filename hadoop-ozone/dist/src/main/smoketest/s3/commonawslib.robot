@@ -15,12 +15,13 @@
 
 *** Settings ***
 Resource            ../commonlib.robot
-Resource            ../commonlib.robot
+Resource            ../ozone-lib/shell.robot
 
 *** Variables ***
+${ENDPOINT_URL}                http://s3g:9878
 ${OZONE_S3_HEADER_VERSION}     v4
 ${OZONE_S3_SET_CREDENTIALS}    true
-${BUCKET}                      bucket-999
+${BUCKET}                      generated
 
 *** Keywords ***
 Execute AWSS3APICli
@@ -37,6 +38,12 @@ Execute AWSS3Cli
     [Arguments]       ${command}
     ${output} =       Execute                     aws s3 --endpoint-url ${ENDPOINT_URL} ${command}
     [return]          ${output}
+
+Install aws cli
+    ${rc}              ${output} =                 Run And Return Rc And Output           which apt-get
+    Run Keyword if     '${rc}' == '0'              Install aws cli s3 debian
+    ${rc}              ${output} =                 Run And Return Rc And Output           yum --help
+    Run Keyword if     '${rc}' == '0'              Install aws cli s3 centos
 
 Install aws cli s3 centos
     Execute            sudo -E yum install -y awscli
@@ -73,8 +80,9 @@ Setup dummy credentials for S3
 
 Create bucket
     ${postfix} =         Generate Random String  5  [NUMBERS]
-    Set Suite Variable   ${BUCKET}                  bucket-${postfix}
-                         Create bucket with name    ${BUCKET}
+    ${bucket} =          Set Variable               bucket-${postfix}
+                         Create bucket with name    ${bucket}
+    [Return]             ${bucket}
 
 Create bucket with name
     [Arguments]          ${bucket}
@@ -83,8 +91,26 @@ Create bucket with name
                          Should contain              ${result}         ${ENDPOINT_URL}/${bucket}
 
 Setup s3 tests
+    Run Keyword        Generate random prefix
     Run Keyword        Install aws cli
     Run Keyword if    '${OZONE_S3_SET_CREDENTIALS}' == 'true'    Setup v4 headers
-    ${result} =        Execute And Ignore Error                  ozone sh volume create o3://${OM_SERVICE_ID}/s3v
-                       Should not contain                        ${result}          Failed
-    Run Keyword if    '${BUCKET}' == 'generated'                 Create bucket
+    ${BUCKET} =        Run Keyword if                            '${BUCKET}' == 'generated'            Create bucket
+    ...                ELSE                                      Set Variable    ${BUCKET}
+                       Set Suite Variable                        ${BUCKET}
+                       Run Keyword if                            '${BUCKET}' == 'link'                 Setup links for S3 tests
+
+Setup links for S3 tests
+    ${exists} =        Bucket Exists    o3://${OM_SERVICE_ID}/s3v/link
+    Return From Keyword If    ${exists}
+    Execute            ozone sh volume create o3://${OM_SERVICE_ID}/legacy
+    Execute            ozone sh bucket create o3://${OM_SERVICE_ID}/legacy/source-bucket
+    Create link        link
+
+Create link
+    [arguments]       ${bucket}
+    Execute           ozone sh bucket link o3://${OM_SERVICE_ID}/legacy/source-bucket o3://${OM_SERVICE_ID}/s3v/${bucket}
+    [return]          ${bucket}
+
+Generate random prefix
+    ${random} =          Generate Random String  5  [NUMBERS]
+                         Set Suite Variable  ${PREFIX}  ${random}

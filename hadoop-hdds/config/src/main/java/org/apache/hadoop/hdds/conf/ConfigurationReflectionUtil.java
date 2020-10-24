@@ -23,6 +23,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Deque;
 import java.util.LinkedList;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * Reflection utilities for configuration injection.
@@ -95,6 +97,9 @@ public final class ConfigurationReflectionUtil {
           case SIZE:
             forcedFieldSet(field, configuration,
                 from.getStorageSize(key, "0B", configAnnotation.sizeUnit()));
+          case CLASS:
+            forcedFieldSet(field, configuration,
+                from.getClass(key, Object.class));
             break;
           default:
             throw new ConfigurationException(
@@ -137,6 +142,8 @@ public final class ConfigurationReflectionUtil {
     } else if (parameterType == Boolean.class
         || parameterType == boolean.class) {
       type = ConfigType.BOOLEAN;
+    } else if (parameterType == Class.class) {
+      type = ConfigType.CLASS;
     } else {
       throw new ConfigurationException(
           "Unsupported configuration type " + parameterType + " in "
@@ -229,6 +236,12 @@ public final class ConfigurationReflectionUtil {
             config.setTimeDuration(key, field.getLong(configObject),
                 configAnnotation.timeUnit());
             break;
+          case CLASS:
+            Object valueClass = field.get(configObject);
+            if (valueClass instanceof Class<?>) {
+              config.set(key, ((Class<?>) valueClass).getName());
+            }
+            break;
           default:
             throw new ConfigurationException(
                 "Unsupported ConfigType " + type + " on " + fieldLocation);
@@ -243,5 +256,49 @@ public final class ConfigurationReflectionUtil {
         }
       }
     }
+  }
+
+  public static Optional<String> getDefaultValue(Class<?> configClass,
+      String fieldName) {
+    return findFieldConfigAnnotationByName(configClass, fieldName)
+        .map(Config::defaultValue);
+  }
+
+  public static Optional<String> getKey(Class<?> configClass,
+      String fieldName) {
+    ConfigGroup configGroup =
+        configClass.getAnnotation(ConfigGroup.class);
+
+    return findFieldConfigAnnotationByName(configClass,
+        fieldName).map(
+            config -> configGroup == null ? config.key()
+                : configGroup.prefix() + "." + config.key());
+  }
+
+  public static Optional<ConfigType> getType(Class<?> configClass,
+      String fieldName) {
+    return findFieldConfigAnnotationByName(configClass, fieldName)
+        .map(Config::type);
+  }
+
+  private static Optional<Config> findFieldConfigAnnotationByName(
+      final Class<?> configClass, String fieldName) {
+    Class<?> theClass = configClass;
+    while (theClass != null) {
+      Optional<Config> config = Stream.of(theClass.getDeclaredFields())
+          .filter(f -> f.getName().equals(fieldName))
+          .findFirst()
+          .map(f -> f.getAnnotation(Config.class));
+
+      if (config.isPresent()) {
+        return config;
+      }
+
+      theClass = theClass.getSuperclass();
+      if (Object.class.equals(theClass)) {
+        theClass = null;
+      }
+    }
+    return Optional.empty();
   }
 }

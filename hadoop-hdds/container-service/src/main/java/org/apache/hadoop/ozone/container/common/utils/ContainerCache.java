@@ -18,19 +18,21 @@
 
 package org.apache.hadoop.ozone.container.common.utils;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import com.google.common.util.concurrent.Striped;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.utils.MetadataStore;
-import org.apache.hadoop.hdds.utils.MetadataStoreBuilder;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.collections.MapIterator;
 import org.apache.commons.collections.map.LRUMap;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,12 +45,14 @@ public final class ContainerCache extends LRUMap {
   private final Lock lock = new ReentrantLock();
   private static ContainerCache cache;
   private static final float LOAD_FACTOR = 0.75f;
+  private final Striped<Lock> rocksDBLock;
   /**
    * Constructs a cache that holds DBHandle references.
    */
-  private ContainerCache(int maxSize, float loadFactor, boolean
+  private ContainerCache(int maxSize, int stripes, float loadFactor, boolean
       scanUntilRemovable) {
     super(maxSize, loadFactor, scanUntilRemovable);
+    rocksDBLock = Striped.lazyWeakLock(stripes);
   }
 
   /**
@@ -63,7 +67,10 @@ public final class ContainerCache extends LRUMap {
     if (cache == null) {
       int cacheSize = conf.getInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE,
           OzoneConfigKeys.OZONE_CONTAINER_CACHE_DEFAULT);
-      cache = new ContainerCache(cacheSize, LOAD_FACTOR, true);
+      int stripes = conf.getInt(
+          OzoneConfigKeys.OZONE_CONTAINER_CACHE_LOCK_STRIPES,
+          OzoneConfigKeys.OZONE_CONTAINER_CACHE_LOCK_STRIPES_DEFAULT);
+      cache = new ContainerCache(cacheSize, stripes, LOAD_FACTOR, true);
     }
     return cache;
   }
@@ -109,38 +116,74 @@ public final class ContainerCache extends LRUMap {
    * @param containerID - ID of the container.
    * @param containerDBType - DB type of the container.
    * @param containerDBPath - DB path of the container.
+   * @param schemaVersion - Schema version of the container.
    * @param conf - Hadoop Configuration.
    * @return ReferenceCountedDB.
    */
   public ReferenceCountedDB getDB(long containerID, String containerDBType,
-                             String containerDBPath, ConfigurationSource conf)
+                                  String containerDBPath,
+                                  String schemaVersion,
+                                  ConfigurationSource conf)
       throws IOException {
     Preconditions.checkState(containerID >= 0,
         "Container ID cannot be negative.");
-    lock.lock();
+    ReferenceCountedDB db;
+    Lock containerLock = rocksDBLock.get(containerDBPath);
+    containerLock.lock();
     try {
-      ReferenceCountedDB db = (ReferenceCountedDB) this.get(containerDBPath);
-
-      if (db == null) {
-        MetadataStore metadataStore =
-            MetadataStoreBuilder.newBuilder()
-            .setDbFile(new File(containerDBPath))
-            .setCreateIfMissing(false)
-            .setConf(conf)
-            .setDBType(containerDBType)
-            .build();
-        db = new ReferenceCountedDB(metadataStore, containerDBPath);
-        this.put(containerDBPath, db);
+      lock.lock();
+      try {
+        db = (ReferenceCountedDB) this.get(containerDBPath);
+        if (db != null) {
+          db.incrementReference();
+          return db;
+        }
+      } finally {
+        lock.unlock();
       }
-      // increment the reference before returning the object
-      db.incrementReference();
-      return db;
-    } catch (Exception e) {
-      LOG.error("Error opening DB. Container:{} ContainerPath:{}",
-          containerID, containerDBPath, e);
-      throw e;
+
+      try {
+        DatanodeStore store;
+
+        if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
+          store = new DatanodeStoreSchemaOneImpl(conf,
+                  containerID, containerDBPath);
+        } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
+          store = new DatanodeStoreSchemaTwoImpl(conf,
+                  containerID, containerDBPath);
+        } else {
+          throw new IllegalArgumentException(
+                  "Unrecognized database schema version: " + schemaVersion);
+        }
+
+        db = new ReferenceCountedDB(store, containerDBPath);
+      } catch (Exception e) {
+        LOG.error("Error opening DB. Container:{} ContainerPath:{}",
+            containerID, containerDBPath, e);
+        throw e;
+      }
+
+      lock.lock();
+      try {
+        ReferenceCountedDB currentDB =
+            (ReferenceCountedDB) this.get(containerDBPath);
+        if (currentDB != null) {
+          // increment the reference before returning the object
+          currentDB.incrementReference();
+          // clean the db created in previous step
+          db.cleanup();
+          return currentDB;
+        } else {
+          this.put(containerDBPath, db);
+          // increment the reference before returning the object
+          db.incrementReference();
+          return db;
+        }
+      } finally {
+        lock.unlock();
+      }
     } finally {
-      lock.unlock();
+      containerLock.unlock();
     }
   }
 

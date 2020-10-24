@@ -33,8 +33,6 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
     .ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
-import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -140,7 +138,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
       containerManager.notifyContainerReportProcessing(true, true);
     } catch (NodeNotFoundException ex) {
       containerManager.notifyContainerReportProcessing(true, false);
-      LOG.error("Received container report from unknown datanode {} {}",
+      LOG.error("Received container report from unknown datanode {}.",
           datanodeDetails, ex);
     }
 
@@ -159,7 +157,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
       final EventPublisher publisher) {
     for (ContainerReplicaProto replicaProto : replicas) {
       try {
-        processContainerReplica(datanodeDetails, replicaProto);
+        processContainerReplica(datanodeDetails, replicaProto, publisher);
       } catch (ContainerNotFoundException e) {
         if(unknownContainerHandleAction.equals(
             UNKNOWN_CONTAINER_ACTION_WARN)) {
@@ -170,13 +168,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
             UNKNOWN_CONTAINER_ACTION_DELETE)) {
           final ContainerID containerId = ContainerID
               .valueof(replicaProto.getContainerID());
-          final DeleteContainerCommand deleteCommand =
-              new DeleteContainerCommand(containerId.getId(), true);
-          final CommandForDatanode datanodeCommand = new CommandForDatanode<>(
-              datanodeDetails.getUuid(), deleteCommand);
-          publisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
-          LOG.info("Sending delete container command for unknown container {}"
-              + " to datanode {}", containerId.getId(), datanodeDetails);
+          deleteReplica(containerId, datanodeDetails, publisher, "unknown");
         }
       } catch (IOException e) {
         LOG.error("Exception while processing container report for container" +

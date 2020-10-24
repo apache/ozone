@@ -19,10 +19,15 @@ weight: 30
   limitations under the License.
 -->
 
+<div class="alert alert-warning">
+
+注意：本页面翻译的信息可能滞后，最新的信息请参看英文版的相关页面。
+
+</div>
+
 {{< requirements >}}
  * Java 1.8
  * Maven
- * Protoc (2.5)
 {{< /requirements >}}
 
 <div class="alert alert-info" role="alert">本文档是关于从源码构建 Ozone 的指南，如果你<font

@@ -20,8 +20,10 @@ package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -50,14 +52,19 @@ public class S3MultipartUploadAbortResponse extends OMClientResponse {
   private String multipartKey;
   private OmMultipartKeyInfo omMultipartKeyInfo;
   private boolean isRatisEnabled;
+  private OmVolumeArgs omVolumeArgs;
+  private OmBucketInfo omBucketInfo;
 
   public S3MultipartUploadAbortResponse(@Nonnull OMResponse omResponse,
-      String multipartKey,
-      @Nonnull OmMultipartKeyInfo omMultipartKeyInfo, boolean isRatisEnabled) {
+      String multipartKey, @Nonnull OmMultipartKeyInfo omMultipartKeyInfo,
+      boolean isRatisEnabled, @Nonnull OmVolumeArgs omVolumeArgs,
+      @Nonnull OmBucketInfo omBucketInfo) {
     super(omResponse);
     this.multipartKey = multipartKey;
     this.omMultipartKeyInfo = omMultipartKeyInfo;
     this.isRatisEnabled = isRatisEnabled;
+    this.omVolumeArgs = omVolumeArgs;
+    this.omBucketInfo = omBucketInfo;
   }
 
   /**
@@ -96,6 +103,15 @@ public class S3MultipartUploadAbortResponse extends OMClientResponse {
 
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
           partKeyInfo.getPartName(), repeatedOmKeyInfo);
+
+      // update volume usedBytes.
+      omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
+          omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
+          omVolumeArgs);
+      // update bucket usedBytes.
+      omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+          omMetadataManager.getBucketKey(omVolumeArgs.getVolume(),
+              omBucketInfo.getBucketName()), omBucketInfo);
     }
   }
 }

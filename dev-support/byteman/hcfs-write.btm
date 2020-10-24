@@ -1,0 +1,111 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+RULE FileSystem.close
+CLASS org.apache.hadoop.fs.FileSystem
+METHOD close
+IF TRUE
+DO
+  System.out.println("Closing file system instance: " + System.identityHashCode($0));
+  System.out.println("   write.call: " + readCounter("write.call"));
+  System.out.println("   write.allTime: " + readCounter("write.allTime"));
+  System.out.println("   hsync.call: " + readCounter("hsync.call"));
+  System.out.println("   hsync.allTime: " + readCounter("hsync.allTime"));
+  System.out.println("   hflush.call: " + readCounter("hflush.call"));
+  System.out.println("   hflush.allTime: " + readCounter("hflush.allTime"));
+  System.out.println("   close.call: " + readCounter("close.call"));
+  System.out.println("   close.allTime: " + readCounter("close.allTime"))
+
+
+ENDRULE
+
+RULE DataOutputStream.Write.Entry
+CLASS ^FSDataOutputStream$PositionCache
+METHOD write
+AT ENTRY
+IF TRUE
+DO resetTimer(Thread.currentThread());
+   incrementCounter("write.call")
+ENDRULE
+
+RULE DataOutputStream.Write.Exit
+CLASS ^FSDataOutputStream$PositionCache
+METHOD write
+AT EXIT
+BIND elapsedTime = java.lang.Math.toIntExact(getElapsedTimeFromTimer(Thread.currentThread()))
+IF TRUE
+DO
+   incrementCounter("write.allTime", elapsedTime)
+ENDRULE
+
+
+RULE FSDataOutputStream.Hsync.Entry
+CLASS FSDataOutputStream
+METHOD hsync
+AT ENTRY
+IF TRUE
+DO resetTimer(Thread.currentThread());
+   incrementCounter("hsync.call")
+ENDRULE
+
+RULE FSDataOutputStream.Hsync.Exit
+CLASS FSDataOutputStream
+METHOD hsync
+AT EXIT
+BIND elapsedTime = java.lang.Math.toIntExact(getElapsedTimeFromTimer(Thread.currentThread()))
+IF TRUE
+DO
+   incrementCounter("hsync.allTime", elapsedTime)
+ENDRULE
+
+
+RULE FSDataOutputStream.Hflush.Entry
+CLASS ^FSDataOutputStream
+METHOD hflush
+AT ENTRY
+IF TRUE
+DO resetTimer(Thread.currentThread());
+   incrementCounter("hflush.call")
+ENDRULE
+
+RULE FSDataOutputStream.Hflush.Exit
+CLASS ^FSDataOutputStream
+METHOD hflush
+AT EXIT
+BIND elapsedTime = java.lang.Math.toIntExact(getElapsedTimeFromTimer(Thread.currentThread()))
+IF TRUE
+DO
+   incrementCounter("hflush.allTime", elapsedTime)
+ENDRULE
+
+
+RULE FSDataOutputStream.Close.Entry
+CLASS ^FSDataOutputStream
+METHOD close
+AT ENTRY
+IF TRUE
+DO resetTimer(Thread.currentThread());
+   incrementCounter("close.call")
+ENDRULE
+
+RULE FSDataOutputStream.Close.Exit
+CLASS ^FSDataOutputStream
+METHOD close
+AT EXIT
+BIND elapsedTime = java.lang.Math.toIntExact(getElapsedTimeFromTimer(Thread.currentThread()))
+IF TRUE
+DO
+   incrementCounter("close.allTime", elapsedTime)
+ENDRULE

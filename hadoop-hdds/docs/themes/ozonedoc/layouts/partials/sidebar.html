@@ -22,7 +22,7 @@
             <li class="{{ if $currentPage.IsMenuCurrent "main" . }}active{{ end }}">
                 <a href="{{ .URL | relURL}}">
                     {{ .Pre }}
-                    <span>{{ .Name }}</span>
+                    <span>{{ .Title }}</span>
                 </a>
                 <ul class="nav">
                     {{ range .Children }}
@@ -30,17 +30,17 @@
                            {{ if .HasChildren }}
                                <a href="{{ .URL | relURL}}">
                                  {{ .Pre }}
-                                 <span>{{ .Name }}</span>
+                                 <span>{{ .Title }}</span>
                                </a>
                                <ul class="nav">
                                {{ range .Children }}
                                   <li class="{{ if $currentPage.IsMenuCurrent "main" . }}active{{ end }}">
-                                     <a href="{{ .URL | relURL}}">{{ .Name }}</a>
+                                     <a href="{{ .URL | relURL}}">{{ .Title }}</a>
                                   </li>
                                {{ end }}
                                </ul>
                            {{ else }}
-                           <a href="{{ .URL }}">{{ .Name }}</a>
+                           <a href="{{ .URL }}">{{ .Title }}</a>
                            {{ end }}
                         </li>
                     {{ end }}
@@ -48,14 +48,14 @@
             </li>
         {{ else }}
             <li class="{{ if $currentPage.IsMenuCurrent "main" . }}active{{ end }}">
-                {{ if eq .URL "/" }}
-                   <a href="{{ "index.html" | relURL }}">
+                {{ if not (strings.HasSuffix .URL ".html")}}
+                   <a href="{{ "index.html" | relLangURL }}">
                 {{ else }}
                    <a href="{{ .URL | relURL }}">
                 {{ end }}
 
                     {{ .Pre }}
-                    <span>{{ .Name }}</span>
+                    <span>{{ .Title }}</span>
                 </a>
             </li>
         {{ end }}

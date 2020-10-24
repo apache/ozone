@@ -19,16 +19,16 @@
   <parent>
     <groupId>org.apache.hadoop</groupId>
     <artifactId>hadoop-ozone</artifactId>
-    <version>0.6.0-SNAPSHOT</version>
+    <version>1.1.0-SNAPSHOT</version>
   </parent>
   <artifactId>hadoop-ozone-dist</artifactId>
   <name>Apache Hadoop Ozone Distribution</name>
   <packaging>jar</packaging>
-  <version>0.6.0-SNAPSHOT</version>
+  <version>1.1.0-SNAPSHOT</version>
   <properties>
     <file.encoding>UTF-8</file.encoding>
     <downloadSources>true</downloadSources>
-    <docker.ozone-runner.version>20200420-1</docker.ozone-runner.version>
+    <docker.ozone-runner.version>20200625-1</docker.ozone-runner.version>
   </properties>
 
   <build>
@@ -50,8 +50,7 @@
               <includes>*.classpath</includes>
               <includeArtifactIds>
                 hadoop-hdds-server-scm,hadoop-ozone-common,hadoop-ozone-csi,hadoop-ozone-datanode,hadoop-ozone-insight,
-                hadoop-ozone-ozone-manager,hadoop-ozone-recon,hadoop-ozone-s3gateway,hadoop-ozone-tools,
-                hadoop-ozone-upgrade
+                hadoop-ozone-ozone-manager,hadoop-ozone-recon,hadoop-ozone-s3gateway,hadoop-ozone-tools
               </includeArtifactIds>
             </configuration>
           </execution>
@@ -218,10 +217,6 @@
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdds-docs</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-ozone-upgrade</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
