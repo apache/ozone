@@ -31,13 +31,11 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.protobuf.BlockingService;
 
-import java.io.File;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Collections;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
@@ -54,10 +52,6 @@ import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl;
-import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
-import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
-import org.apache.hadoop.hdds.scm.server.ratis.SCMRatisServer;
-import org.apache.hadoop.hdds.scm.server.ratis.SCMRatisSnapshotInfo;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -128,7 +122,6 @@ import org.apache.hadoop.util.JvmPauseMonitor;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
 import org.apache.ratis.grpc.GrpcTlsConfig;
-import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -202,11 +195,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private CertificateServer certificateServer;
   private GrpcTlsConfig grpcTlsConfig;
 
-  // SCM HA related
-  private SCMRatisServer scmRatisServer;
-  private SCMRatisSnapshotInfo scmRatisSnapshotInfo;
-  private File scmRatisSnapshotDir;
-
   private JvmPauseMonitor jvmPauseMonitor;
   private final OzoneConfiguration configuration;
   private SCMContainerMetrics scmContainerMetrics;
@@ -275,10 +263,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
       loginAsSCMUser(conf);
     }
-
-    this.scmRatisSnapshotInfo = new SCMRatisSnapshotInfo(
-        scmStorageConfig.getCurrentDir());
-    this.scmRatisSnapshotDir = SCMHAUtils.createSCMRatisDir(conf);
 
     // Creates the SCM DBs or opens them if it exists.
     // A valid pointer to the store is required by all the other services below.
@@ -400,13 +384,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public static StorageContainerManager createSCM(
       OzoneConfiguration conf, SCMConfigurator configurator)
       throws IOException, AuthenticationException {
-    StorageContainerManager scm = new StorageContainerManager(
-          conf, configurator);
-    if (SCMHAUtils.isSCMHAEnabled(conf) && scm.getScmRatisServer() == null) {
-      SCMRatisServer scmRatisServer = initializeRatisServer(conf, scm);
-      scm.setScmRatisServer(scmRatisServer);
-    }
-    return scm;
+    return new StorageContainerManager(conf, configurator);
   }
 
   /**
@@ -840,10 +818,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           getClientRpcAddress()));
     }
 
-    if (scmRatisServer != null) {
-      scmRatisServer.start();
-    }
-
     scmHAManager.start();
 
     ms = HddsServerUtil
@@ -1178,56 +1152,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   public NetworkTopology getClusterMap() {
     return this.clusterMap;
-  }
-
-  private static SCMRatisServer initializeRatisServer(
-      OzoneConfiguration conf, StorageContainerManager scm) throws IOException {
-    SCMNodeDetails scmNodeDetails = SCMNodeDetails
-        .initStandAlone(conf);
-    //TODO enable Ratis group
-    SCMRatisServer scmRatisServer = SCMRatisServer.newSCMRatisServer(
-        conf.getObject(SCMRatisServer.SCMRatisServerConfiguration.class),
-        scm, scmNodeDetails, Collections.EMPTY_LIST,
-        SCMRatisServer.getSCMRatisDirectory(conf));
-    if (scmRatisServer != null) {
-      LOG.info("SCM Ratis server initialized at port {}",
-          scmRatisServer.getServerPort());
-    } // TODO error handling for scmRatisServer creation failure
-    return scmRatisServer;
-  }
-
-  @VisibleForTesting
-  public SCMRatisServer getScmRatisServer() {
-    return scmRatisServer;
-  }
-
-  public void setScmRatisServer(SCMRatisServer scmRatisServer) {
-    this.scmRatisServer = scmRatisServer;
-  }
-
-  @VisibleForTesting
-  public SCMRatisSnapshotInfo getSnapshotInfo() {
-    return scmRatisSnapshotInfo;
-  }
-
-  @VisibleForTesting
-  public long getRatisSnapshotIndex() {
-    return scmRatisSnapshotInfo.getIndex();
-  }
-
-  /**
-   * Save ratis snapshot to SCM meta store and local disk.
-   */
-  public TermIndex saveRatisSnapshot() throws IOException {
-    TermIndex snapshotIndex = scmRatisServer.getLastAppliedTermIndex();
-    if (scmMetadataStore != null) {
-      // Flush the SCM state to disk
-      scmMetadataStore.getStore().flushDB();
-    }
-
-    scmRatisSnapshotInfo.saveRatisSnapshotToDisk(snapshotIndex);
-
-    return snapshotIndex;
   }
 
   /**

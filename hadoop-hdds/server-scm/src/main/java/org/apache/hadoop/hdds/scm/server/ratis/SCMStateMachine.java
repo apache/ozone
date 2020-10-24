@@ -73,7 +73,8 @@ public class SCMStateMachine extends BaseStateMachine {
     this.scmRatisServer = ratisServer;
     this.scm = ratisServer.getSCM();
 
-    this.snapshotInfo = scm.getSnapshotInfo();
+    // TODO: remove the whole file later
+    this.snapshotInfo = null;
     updateLastAppliedIndexWithSnaphsotIndex();
 
     ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
@@ -158,7 +159,8 @@ public class SCMStateMachine extends BaseStateMachine {
   public long takeSnapshot() throws IOException {
     LOG.info("Saving Ratis snapshot on the SCM.");
     if (scm != null) {
-      return scm.saveRatisSnapshot().getIndex();
+      // TODO: remove the whole file later
+      return 0;
     }
     return 0;
   }
