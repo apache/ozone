@@ -1184,4 +1184,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public String getClusterId() {
     return getScmStorageConfig().getClusterID();
   }
+
+  public SCMHAManager getScmHAManager() {
+    return scmHAManager;
+  }
 }

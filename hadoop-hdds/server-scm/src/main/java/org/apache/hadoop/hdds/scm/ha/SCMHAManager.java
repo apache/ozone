@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import java.util.List;
 import org.apache.ratis.protocol.NotLeaderException;
 import org.apache.ratis.protocol.RaftPeer;
 
@@ -51,6 +52,11 @@ public interface SCMHAManager {
    * Stops the HA service.
    */
   void shutdown() throws IOException;
+
+  /**
+   * Returns roles of ratis peers.
+   */
+  List<String> getRatisRoles();
 
   /**
    * Returns NotLeaderException with useful info.

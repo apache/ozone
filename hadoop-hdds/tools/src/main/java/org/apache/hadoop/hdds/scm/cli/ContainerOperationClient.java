@@ -508,4 +508,8 @@ public class ContainerOperationClient implements ScmClient {
     return storageContainerLocationClient.getReplicationManagerStatus();
   }
 
+  @Override
+  public List<String> getScmRatisRoles() throws IOException {
+    return storageContainerLocationClient.getScmInfo().getRatisPeerRoles();
+  }
 }

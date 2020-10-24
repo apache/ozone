@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * ScmInfo wraps the result returned from SCM#getScmInfo which
  * contains clusterId and the SCM Id.
@@ -25,6 +28,7 @@ package org.apache.hadoop.hdds.scm;
 public final class ScmInfo {
   private String clusterId;
   private String scmId;
+  private List<String> peerRoles;
 
   /**
    * Builder for ScmInfo.
@@ -32,6 +36,11 @@ public final class ScmInfo {
   public static class Builder {
     private String clusterId;
     private String scmId;
+    private List<String> peerRoles;
+
+    public Builder() {
+      peerRoles = new ArrayList<>();
+    }
 
     /**
      * sets the cluster id.
@@ -53,14 +62,25 @@ public final class ScmInfo {
       return this;
     }
 
+    /**
+     * Set peer address in Scm HA.
+     * @param roles ratis peer address in the format of [ip|hostname]:port
+     * @return  Builder for scmInfo
+     */
+    public Builder setRatisPeerRoles(List<String> roles) {
+      peerRoles.addAll(roles);
+      return this;
+    }
+
     public ScmInfo build() {
-      return new ScmInfo(clusterId, scmId);
+      return new ScmInfo(clusterId, scmId, peerRoles);
     }
   }
 
-  private ScmInfo(String clusterId, String scmId) {
+  private ScmInfo(String clusterId, String scmId, List<String> peerRoles) {
     this.clusterId = clusterId;
     this.scmId = scmId;
+    this.peerRoles = peerRoles;
   }
 
   /**
@@ -77,5 +97,13 @@ public final class ScmInfo {
    */
   public String getScmId() {
     return scmId;
+  }
+
+  /**
+   * Gets the list of peer roles (currently address) in Scm HA.
+   * @return List of peer address
+   */
+  public List<String> getRatisPeerRoles() {
+    return peerRoles;
   }
 }
