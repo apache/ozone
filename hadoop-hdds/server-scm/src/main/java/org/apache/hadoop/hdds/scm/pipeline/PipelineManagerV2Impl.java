@@ -406,10 +406,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   public void scrubPipeline(ReplicationType type, ReplicationFactor factor)
       throws IOException {
     checkLeader();
-    if (type != ReplicationType.RATIS || factor != ReplicationFactor.THREE) {
-      // Only srub pipeline for RATIS THREE pipeline
-      return;
-    }
+
     Instant currentTime = Instant.now();
     Long pipelineScrubTimeoutInMills = conf.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT,
