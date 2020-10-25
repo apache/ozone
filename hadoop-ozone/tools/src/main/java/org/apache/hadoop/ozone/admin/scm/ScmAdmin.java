@@ -19,8 +19,7 @@ package org.apache.hadoop.ozone.admin.scm;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.apache.hadoop.ozone.admin.OzoneAdmin;
+import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import picocli.CommandLine;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
@@ -54,7 +53,4 @@ public class ScmAdmin extends GenericCli {
     return null;
   }
 
-  public ScmClient createScmClient() {
-    return parent.createScmClient();
-  }
 }

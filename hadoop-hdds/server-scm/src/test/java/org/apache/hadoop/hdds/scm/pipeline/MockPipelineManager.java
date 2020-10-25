@@ -193,6 +193,16 @@ public final class MockPipelineManager implements PipelineManager {
   }
 
   @Override
+  public int minHealthyVolumeNum(Pipeline pipeline) {
+    return 0;
+  }
+
+  @Override
+  public int minPipelineLimit(Pipeline pipeline) {
+    return 0;
+  }
+
+  @Override
   public void activatePipeline(final PipelineID pipelineID)
       throws IOException {
 

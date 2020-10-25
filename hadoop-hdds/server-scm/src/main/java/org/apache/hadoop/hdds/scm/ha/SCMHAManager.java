@@ -18,8 +18,8 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import java.util.List;
-import org.apache.ratis.protocol.NotLeaderException;
 import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 import java.io.IOException;
 

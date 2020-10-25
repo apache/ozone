@@ -26,12 +26,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys
 import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.junit.Assert.fail;
-<<<<<<< HEAD
 
 import org.apache.hadoop.hdds.scm.TestUtils;
-import org.junit.Ignore;
-=======
->>>>>>> master
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;

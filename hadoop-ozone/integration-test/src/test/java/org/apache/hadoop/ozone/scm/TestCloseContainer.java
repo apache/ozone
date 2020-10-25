@@ -105,7 +105,7 @@ public class TestCloseContainer {
     ContainerInfo container = scm.getContainerManager().getContainers().get(0);
     Pipeline pipeline = scm.getPipelineManager()
         .getPipeline(container.getPipelineID());
-    scm.getPipelineManager().finalizeAndDestroyPipeline(pipeline, false);
+    scm.getPipelineManager().closePipeline(pipeline, false);
     GenericTestUtils.waitFor(() ->
             container.getState() == HddsProtos.LifeCycleState.CLOSED,
         200, 30000);

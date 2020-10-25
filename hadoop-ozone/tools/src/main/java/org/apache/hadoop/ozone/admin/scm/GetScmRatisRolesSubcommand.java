@@ -17,9 +17,10 @@
  */
 package org.apache.hadoop.ozone.admin.scm;
 
+import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import picocli.CommandLine;
 
@@ -31,16 +32,14 @@ import picocli.CommandLine;
     description = "List all SCMs and their respective Ratis server roles",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class GetScmRatisRolesSubcommand implements Callable<Void> {
+public class GetScmRatisRolesSubcommand extends ScmSubcommand {
 
   @CommandLine.ParentCommand
   private ScmAdmin parent;
 
   @Override
-  public Void call() throws Exception {
-    ScmClient scmClient = parent.createScmClient();
+  protected void execute(ScmClient scmClient) throws IOException {
     List<String> roles = scmClient.getScmRatisRoles();
     System.out.println(roles);
-    return null;
   }
 }

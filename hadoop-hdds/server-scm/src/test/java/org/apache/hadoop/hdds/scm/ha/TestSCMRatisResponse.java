@@ -20,13 +20,13 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.protocol.LeaderNotReadyException;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
-import org.apache.ratis.protocol.RaftException;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.protocol.exceptions.LeaderNotReadyException;
+import org.apache.ratis.protocol.exceptions.RaftException;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
