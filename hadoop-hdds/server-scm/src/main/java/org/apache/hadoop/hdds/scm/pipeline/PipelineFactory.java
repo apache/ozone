@@ -45,7 +45,8 @@ public class PipelineFactory {
     providers.put(ReplicationType.STAND_ALONE,
         new SimplePipelineProvider(nodeManager, stateManager));
     providers.put(ReplicationType.RATIS,
-        new RatisPipelineProvider(nodeManager, stateManager, conf,
+        new RatisPipelineProvider(nodeManager,
+            (PipelineStateManager) stateManager, conf,
             eventPublisher));
   }
 

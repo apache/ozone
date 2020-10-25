@@ -36,7 +36,7 @@ import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.util.Time;
-import org.apache.ratis.protocol.NotLeaderException;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -458,6 +458,18 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   @Override
   public void incNumBlocksAllocatedMetric(PipelineID id) {
     metrics.incNumBlocksAllocated(id);
+  }
+
+  @Override
+  public int minHealthyVolumeNum(Pipeline pipeline) {
+    // TODO:
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public int minPipelineLimit(Pipeline pipeline) {
+    // TODO:
+    throw new UnsupportedOperationException();
   }
 
   /**
