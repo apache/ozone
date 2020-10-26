@@ -26,9 +26,14 @@ import org.apache.hadoop.hdds.utils.db.*;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
+import org.rocksdb.BlockBasedTableConfig;
+import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.DBOptions;
+import org.rocksdb.LRUCache;
+import org.rocksdb.Options;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
+import org.rocksdb.util.SizeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +64,15 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   private DBStore store;
   private final AbstractDatanodeDBDefinition dbDef;
   private final long containerID;
+  private static final ColumnFamilyOptions cfOptions;
+
+  static {
+    BlockBasedTableConfig table_config = new BlockBasedTableConfig();
+    table_config.setBlockCache(new LRUCache(8 * SizeUnit.MB));
+    Options options = new Options();
+    options.setTableFormatConfig(table_config);
+    cfOptions = new ColumnFamilyOptions(options);
+  }
 
   /**
    * Constructs the metadata store and starts the DB services.
