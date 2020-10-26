@@ -52,6 +52,8 @@ import org.rocksdb.WriteOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.security.auth.login.Configuration;
+
 /**
  * DBStore Builder.
  */
@@ -69,9 +71,9 @@ public final class DBStoreBuilder {
   // DB PKIProfile used by ROCKDB instances.
   public static final DBProfile HDDS_DEFAULT_DB_PROFILE = DBProfile.DISK;
 
-  private Set<TableConfig> tables;
-  private DBProfile dbProfile;
+  private Set<TableConfig> tableConfigs;
   private DBOptions rocksDBOption;
+  private ColumnFamilyOptions columnFamilyOptions;
   private String dbname;
   private Path dbPath;
   private List<String> tableNames;
@@ -80,13 +82,36 @@ public final class DBStoreBuilder {
   private String rocksDbStat;
   private RocksDBConfiguration rocksDBConfiguration;
 
-  private DBStoreBuilder(ConfigurationSource configuration) {
-    this(configuration, configuration.getObject(RocksDBConfiguration.class));
+  /**
+   * Create DBStoreBuilder from a generic DBDefinition.
+   */
+  public static DBStore createDBStore(ConfigurationSource configuration,
+      DBDefinition definition) throws IOException {
+    return newBuilder(configuration, definition).build();
+  }
+
+  public static DBStoreBuilder newBuilder(ConfigurationSource configuration,
+      DBDefinition definition) {
+
+    DBStoreBuilder builder = newBuilder(configuration);
+    builder.applyDBDefinition(definition);
+
+    return builder;
+  }
+
+  public static DBStoreBuilder newBuilder(ConfigurationSource configuration) {
+    return newBuilder(configuration,
+        configuration.getObject(RocksDBConfiguration.class));
+  }
+
+  public static DBStoreBuilder newBuilder(ConfigurationSource configuration,
+      RocksDBConfiguration rocksDBConfiguration) {
+    return new DBStoreBuilder(configuration, rocksDBConfiguration);
   }
 
   private DBStoreBuilder(ConfigurationSource configuration,
       RocksDBConfiguration rocksDBConfiguration) {
-    tables = new HashSet<>();
+    tableConfigs = new HashSet<>();
     tableNames = new LinkedList<>();
     this.configuration = configuration;
     this.registry = new CodecRegistry();
@@ -96,41 +121,10 @@ public final class DBStoreBuilder {
     this.rocksDBConfiguration = rocksDBConfiguration;
   }
 
-  public static DBStoreBuilder newBuilder(ConfigurationSource configuration) {
-    return new DBStoreBuilder(configuration);
-  }
-
-  public static DBStoreBuilder newBuilder(OzoneConfiguration configuration,
-      RocksDBConfiguration rocksDBConfiguration) {
-    return new DBStoreBuilder(configuration, rocksDBConfiguration);
-  }
-
-  public static DBStoreBuilder newBuilder(ConfigurationSource configuration,
-      DBDefinition definition) {
-    DBStoreBuilder builder = createDBStoreBuilder(configuration, definition);
-    builder.registerTables(definition);
-
-    return builder;
-  }
-
-  /**
-   * Create DBStoreBuilder from a generic DBDefinition.
-   */
-  public static DBStore createDBStore(ConfigurationSource configuration,
-      DBDefinition definition) throws IOException {
-    DBStoreBuilder builder = createDBStoreBuilder(configuration, definition);
-    builder.registerTables(definition);
-
-    return builder.build();
-  }
-
-  private static DBStoreBuilder createDBStoreBuilder(
-      ConfigurationSource configuration, DBDefinition definition) {
-
+  private DBStoreBuilder applyDBDefinition(DBDefinition definition) {
     File metadataDir = definition.getDBLocation(configuration);
 
     if (metadataDir == null) {
-
       LOG.warn("{} is not configured. We recommend adding this setting. " +
               "Falling back to {} instead.",
           definition.getLocationConfigKey(),
@@ -138,13 +132,10 @@ public final class DBStoreBuilder {
       metadataDir = getOzoneMetaDirPath(configuration);
     }
 
-    return DBStoreBuilder.newBuilder(configuration)
-        .setName(definition.getName())
-        .setPath(Paths.get(metadataDir.getPath()));
-  }
+    registerTables(definition);
+    setName(definition.getName());
+    setPath(Paths.get(metadataDir.getPath()));
 
-  public DBStoreBuilder setProfile(DBProfile profile) {
-    dbProfile = profile;
     return this;
   }
 
@@ -166,7 +157,7 @@ public final class DBStoreBuilder {
   private DBStoreBuilder addTableDefinition(String tableName,
       ColumnFamilyOptions option) throws IOException {
     TableConfig tableConfig = new TableConfig(tableName, option);
-    if (!tables.add(tableConfig)) {
+    if (!tableConfigs.add(tableConfig)) {
       String message = "Unable to add the table: " + tableName +
           ".  Please check if this table name is already in use.";
       LOG.error(message);
@@ -197,26 +188,25 @@ public final class DBStoreBuilder {
       throw new IOException("Required parameter is missing. Please make sure "
           + "sure Path and DB name is provided.");
     }
-    processDBProfile();
+    setDefaultDBProfile();
     processTables();
     DBOptions options = getDbProfile();
 
     WriteOptions writeOptions = new WriteOptions();
     writeOptions.setSync(rocksDBConfiguration.getSyncOption());
 
-
     File dbFile = getDBFile();
     if (!dbFile.getParentFile().exists()) {
       throw new IOException("The DB destination directory should exist.");
     }
-    return new RDBStore(dbFile, options, writeOptions, tables, registry);
+    return new RDBStore(dbFile, options, writeOptions, tableConfigs, registry);
   }
 
   /**
    * if the DBProfile is not set, we will default to using default from the
    * config file.
    */
-  private void processDBProfile() {
+  private void setDefaultDBProfile() {
     if (dbProfile == null) {
       dbProfile = this.configuration.getEnum(HDDS_DB_PROFILE,
           HDDS_DEFAULT_DB_PROFILE);
@@ -241,7 +231,7 @@ public final class DBStoreBuilder {
     if (StringUtil.isNotBlank(dbname)) {
       List<ColumnFamilyDescriptor> columnFamilyDescriptors = new LinkedList<>();
 
-      for (TableConfig tc : tables) {
+      for (TableConfig tc : tableConfigs) {
         columnFamilyDescriptors.add(tc.getDescriptor());
       }
 
