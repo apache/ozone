@@ -82,7 +82,7 @@ class DummyBlockInputStream extends BlockInputStream {
     TestChunkInputStream testChunkInputStream = new TestChunkInputStream();
     getChunkStreams().add(new DummyChunkInputStream(testChunkInputStream,
         chunkInfo, null, null, false,
-        chunkDataMap.get(chunkInfo.getChunkName()).clone()));
+        chunkDataMap.get(chunkInfo.getChunkName()).clone(), null));
   }
 
   @Override

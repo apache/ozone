@@ -22,8 +22,9 @@ import java.util.List;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
-import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 /**
@@ -39,10 +40,11 @@ public class DummyChunkInputStream extends ChunkInputStream {
   public DummyChunkInputStream(TestChunkInputStream testChunkInputStream,
       ChunkInfo chunkInfo,
       BlockID blockId,
-      XceiverClientSpi xceiverClient,
+      XceiverClientFactory xceiverClientFactory,
       boolean verifyChecksum,
-      byte[] data) {
-    super(chunkInfo, blockId, xceiverClient, verifyChecksum, null);
+      byte[] data, Pipeline pipeline) {
+    super(chunkInfo, blockId, xceiverClientFactory, pipeline, verifyChecksum,
+        null);
     this.chunkData = data;
   }
 
@@ -56,8 +58,13 @@ public class DummyChunkInputStream extends ChunkInputStream {
   }
 
   @Override
-  protected void checkOpen() {
+  protected void acquireClient() {
     // No action needed
+  }
+
+  @Override
+  protected void releaseClient() {
+    // no-op
   }
 
   public List<ByteString> getReadByteBuffers() {

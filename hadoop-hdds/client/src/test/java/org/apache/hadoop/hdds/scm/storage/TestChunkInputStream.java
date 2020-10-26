@@ -62,8 +62,8 @@ public class TestChunkInputStream {
             chunkData, 0, CHUNK_SIZE).getProtoBufMessage())
         .build();
 
-    chunkStream =
-        new DummyChunkInputStream(this, chunkInfo, null, null, true, chunkData);
+    chunkStream = new DummyChunkInputStream(this, chunkInfo, null, null, true,
+        chunkData, null);
   }
 
   static byte[] generateRandomData(int length) {

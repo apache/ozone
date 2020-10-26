@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 
+import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
@@ -50,7 +51,8 @@ import org.slf4j.LoggerFactory;
  * This class encapsulates all state management for iterating
  * through the sequence of chunks through {@link ChunkInputStream}.
  */
-public class BlockInputStream extends InputStream implements Seekable {
+public class BlockInputStream extends InputStream
+    implements Seekable, CanUnbuffer {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(BlockInputStream.class);
@@ -214,7 +216,7 @@ public class BlockInputStream extends InputStream implements Seekable {
    */
   protected synchronized void addStream(ChunkInfo chunkInfo) {
     chunkStreams.add(new ChunkInputStream(chunkInfo, blockID,
-        xceiverClient, verifyChecksum, token));
+        xceiverClientFactory, pipeline, verifyChecksum, token));
   }
 
   public synchronized long getRemaining() throws IOException {
@@ -376,9 +378,13 @@ public class BlockInputStream extends InputStream implements Seekable {
 
   @Override
   public synchronized void close() {
+    releaseClient();
+    xceiverClientFactory = null;
+  }
+
+  private void releaseClient() {
     if (xceiverClientFactory != null && xceiverClient != null) {
       xceiverClientFactory.releaseClient(xceiverClient, false);
-      xceiverClientFactory = null;
       xceiverClient = null;
     }
   }
@@ -393,7 +399,7 @@ public class BlockInputStream extends InputStream implements Seekable {
    * @throws IOException if stream is closed
    */
   protected synchronized void checkOpen() throws IOException {
-    if (xceiverClient == null) {
+    if (xceiverClientFactory == null) {
       throw new IOException("BlockInputStream has been closed.");
     }
   }
@@ -419,5 +425,17 @@ public class BlockInputStream extends InputStream implements Seekable {
   @VisibleForTesting
   synchronized List<ChunkInputStream> getChunkStreams() {
     return chunkStreams;
+  }
+
+  @Override
+  public void unbuffer() {
+    releaseClient();
+
+    final List<ChunkInputStream> inputStreams = this.chunkStreams;
+    if (inputStreams != null) {
+      for (ChunkInputStream is : inputStreams) {
+        is.unbuffer();
+      }
+    }
   }
 }
