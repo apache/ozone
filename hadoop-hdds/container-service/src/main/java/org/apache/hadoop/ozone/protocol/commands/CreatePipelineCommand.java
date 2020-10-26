@@ -139,4 +139,20 @@ public class CreatePipelineCommand
   public PipelineID getPipelineID() {
     return pipelineID;
   }
+
+  public List<DatanodeDetails> getNodeList() {
+    return nodelist;
+  }
+
+  public List<Integer> getPriorityList() {
+    return priorityList;
+  }
+
+  public ReplicationType getReplicationType() {
+    return type;
+  }
+
+  public ReplicationFactor getFactor() {
+    return factor;
+  }
 }
