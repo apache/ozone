@@ -635,6 +635,7 @@ message GetAclResponse {
 message AddAclRequest {
   required OzoneObj obj = 1;
   required OzoneAclInfo acl = 2;
+  optional uint64 modificationTime = 3;
 }
 
 message AddAclResponse {
@@ -644,6 +645,7 @@ message AddAclResponse {
 message RemoveAclRequest {
   required OzoneObj obj = 1;
   required OzoneAclInfo acl = 2;
+  optional uint64 modificationTime = 3;
 }
 
 message RemoveAclResponse {
@@ -653,6 +655,7 @@ message RemoveAclResponse {
 message SetAclRequest {
   required OzoneObj obj = 1;
   repeated OzoneAclInfo acl = 2;
+  optional uint64 modificationTime = 3;
 }
 
 message SetAclResponse {
