@@ -38,8 +38,6 @@ import java.io.IOException;
  * node Ratis ring. The Ratis ring will have one Leader node and 2N follower
  * nodes.
  *
- * TODO
- *
  */
 public class SCMHAManagerImpl implements SCMHAManager {
 
