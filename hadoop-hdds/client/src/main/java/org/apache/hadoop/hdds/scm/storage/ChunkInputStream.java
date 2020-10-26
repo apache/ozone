@@ -448,7 +448,8 @@ public class ChunkInputStream extends InputStream
   /**
    * Check if the buffers have been allocated data and false otherwise.
    */
-  private boolean buffersAllocated() {
+  @VisibleForTesting
+  protected boolean buffersAllocated() {
     return buffers != null && !buffers.isEmpty();
   }
 

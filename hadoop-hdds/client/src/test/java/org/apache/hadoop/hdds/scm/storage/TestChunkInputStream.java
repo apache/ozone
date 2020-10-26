@@ -177,4 +177,20 @@ public class TestChunkInputStream {
     chunkStream.read(b2, 0, 20);
     matchWithInputData(b2, 70, 20);
   }
+
+  @Test
+  public void testUnbuffer() throws Exception {
+    byte[] b1 = new byte[20];
+    chunkStream.read(b1, 0, 20);
+    matchWithInputData(b1, 0, 20);
+
+    chunkStream.unbuffer();
+
+    Assert.assertFalse(chunkStream.buffersAllocated());
+
+    // Next read should start from the position of the last read + 1 i.e. 20
+    byte[] b2 = new byte[20];
+    chunkStream.read(b2, 0, 20);
+    matchWithInputData(b2, 20, 20);
+  }
 }
