@@ -106,11 +106,41 @@ public final class DBStoreBuilder {
   }
 
   public static DBStoreBuilder newBuilder(ConfigurationSource configuration,
-                                          DBDefinition definition) {
+      DBDefinition definition) {
     DBStoreBuilder builder = createDBStoreBuilder(configuration, definition);
     builder.registerTables(definition);
 
     return builder;
+  }
+
+  /**
+   * Create DBStoreBuilder from a generic DBDefinition.
+   */
+  public static DBStore createDBStore(ConfigurationSource configuration,
+      DBDefinition definition) throws IOException {
+    DBStoreBuilder builder = createDBStoreBuilder(configuration, definition);
+    builder.registerTables(definition);
+
+    return builder.build();
+  }
+
+  private static DBStoreBuilder createDBStoreBuilder(
+      ConfigurationSource configuration, DBDefinition definition) {
+
+    File metadataDir = definition.getDBLocation(configuration);
+
+    if (metadataDir == null) {
+
+      LOG.warn("{} is not configured. We recommend adding this setting. " +
+              "Falling back to {} instead.",
+          definition.getLocationConfigKey(),
+          HddsConfigKeys.OZONE_METADATA_DIRS);
+      metadataDir = getOzoneMetaDirPath(configuration);
+    }
+
+    return DBStoreBuilder.newBuilder(configuration)
+        .setName(definition.getName())
+        .setPath(Paths.get(metadataDir.getPath()));
   }
 
   public DBStoreBuilder setProfile(DBProfile profile) {
@@ -131,12 +161,6 @@ public final class DBStoreBuilder {
   public <T> DBStoreBuilder addCodec(Class<T> type, Codec<T> codec) {
     registry.addCodec(type, codec);
     return this;
-  }
-
-  public DBStoreBuilder addTable(String tableName, ColumnFamilyOptions option)
-      throws IOException {
-    LOG.debug("using custom profile for table: {}", tableName);
-    return addTableDefinition(tableName, option);
   }
 
   private DBStoreBuilder addTableDefinition(String tableName,
@@ -273,38 +297,7 @@ public final class DBStoreBuilder {
     return Paths.get(dbPath.toString(), dbname).toFile();
   }
 
-  private static DBStoreBuilder createDBStoreBuilder(
-      ConfigurationSource configuration, DBDefinition definition) {
-
-    File metadataDir = definition.getDBLocation(configuration);
-
-    if (metadataDir == null) {
-
-      LOG.warn("{} is not configured. We recommend adding this setting. " +
-              "Falling back to {} instead.",
-          definition.getLocationConfigKey(),
-          HddsConfigKeys.OZONE_METADATA_DIRS);
-      metadataDir = getOzoneMetaDirPath(configuration);
-    }
-
-    return DBStoreBuilder.newBuilder(configuration)
-        .setName(definition.getName())
-        .setPath(Paths.get(metadataDir.getPath()));
-  }
-
-  /**
-   * Create DBStoreBuilder from a generic DBDefinition.
-   */
-  public static DBStore createDBStore(ConfigurationSource configuration,
-      DBDefinition definition)
-      throws IOException {
-    DBStoreBuilder builder = createDBStoreBuilder(configuration, definition);
-    builder.registerTables(definition);
-
-    return builder.build();
-  }
-
-  public <KEY, VALUE> DBStoreBuilder registerTables(DBDefinition definition) {
+  private <KEY, VALUE> DBStoreBuilder registerTables(DBDefinition definition) {
     for (DBColumnFamilyDefinition<KEY, VALUE> columnFamily :
             definition.getColumnFamilies()) {
 
