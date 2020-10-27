@@ -620,7 +620,7 @@ public class VolumeManagerImpl implements VolumeManager {
     Objects.requireNonNull(context);
 
     String volume = ozObject.getVolumeName();
-    metadataManager.getLock().acquireWriteLock(VOLUME_LOCK, volume);
+    metadataManager.getLock().acquireReadLock(VOLUME_LOCK, volume);
     try {
       String dbVolumeKey = metadataManager.getVolumeKey(volume);
       OmVolumeArgs volumeArgs =
@@ -647,7 +647,7 @@ public class VolumeManagerImpl implements VolumeManager {
       throw new OMException("Check access operation failed for " +
           "volume:" + volume, ex, ResultCodes.INTERNAL_ERROR);
     } finally {
-      metadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volume);
+      metadataManager.getLock().releaseReadLock(VOLUME_LOCK, volume);
     }
   }
 }
