@@ -1173,9 +1173,9 @@ public class TestRootedOzoneFileSystem {
   }
 
   /**
-   * @throws Exception
    * 1.Move a Key to Trash
    * 2.Verify that the key gets deleted by the trash emptier.
+   * @throws Exception
    */
   @Test
   public void testTrash() throws Exception {
