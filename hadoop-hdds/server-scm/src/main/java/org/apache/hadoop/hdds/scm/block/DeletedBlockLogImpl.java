@@ -302,15 +302,18 @@ public class DeletedBlockLogImpl
       throws IOException {
     lock.lock();
     try {
-      BatchOperation batch = scmMetadataStore.getStore().initBatchOperation();
-      for (Map.Entry<Long, List<Long>> entry : containerBlocksMap.entrySet()) {
-        long nextTXID = scmMetadataStore.getNextDeleteBlockTXID();
-        DeletedBlocksTransaction tx = constructNewTransaction(nextTXID,
-            entry.getKey(), entry.getValue());
-        scmMetadataStore.getDeletedBlocksTXTable().putWithBatch(batch,
-            nextTXID, tx);
+      try(BatchOperation batch =
+          scmMetadataStore.getStore().initBatchOperation()) {
+        for (Map.Entry< Long, List< Long > > entry :
+            containerBlocksMap.entrySet()) {
+          long nextTXID = scmMetadataStore.getNextDeleteBlockTXID();
+          DeletedBlocksTransaction tx = constructNewTransaction(nextTXID,
+              entry.getKey(), entry.getValue());
+          scmMetadataStore.getDeletedBlocksTXTable().putWithBatch(batch,
+              nextTXID, tx);
+        }
+        scmMetadataStore.getStore().commitBatchOperation(batch);
       }
-      scmMetadataStore.getStore().commitBatchOperation(batch);
     } finally {
       lock.unlock();
     }

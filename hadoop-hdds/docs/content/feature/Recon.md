@@ -44,4 +44,4 @@ ozone.recon.http-address | 0.0.0.0:9888 | The address and the base port where th
 ozone.recon.address | 0.0.0.0:9891 | RPC address of the Recon.
 ozone.recon.db.dir | none | Directory where the Recon Server stores its metadata.
 ozone.recon.om.db.dir | none | Directory where the Recon Server stores its OM snapshot DB.
-recon.om.snapshot.task.interval.delay | 10m | Interval in MINUTES by Recon to request OM DB Snapshot.
+ozone.recon.om.snapshot.task.interval.delay | 10m | Interval in MINUTES by Recon to request OM DB Snapshot.

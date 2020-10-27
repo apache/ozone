@@ -265,7 +265,7 @@ public final class CertificateSignRequest {
       }
       KeyUsage keyUsage = new KeyUsage(keyUsageFlag);
       return new Extension(Extension.keyUsage, true,
-          new DEROctetString(keyUsage));
+          keyUsage.getEncoded());
     }
 
     private Optional<Extension> getSubjectAltNameExtension() throws

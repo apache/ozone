@@ -38,10 +38,10 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_METRICS_HTTP_CONNECTION_TIMEOUT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_METRICS_HTTP_CONNECTION_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT_DEFAULT;
 
 /**
  * Implementation of the Prometheus Metrics Service provider.
@@ -64,11 +64,12 @@ public class PrometheusServiceProviderImpl
                                        ReconUtils reconUtils) {
 
     int connectionTimeout = (int) configuration.getTimeDuration(
-        RECON_METRICS_HTTP_CONNECTION_TIMEOUT,
-        RECON_METRICS_HTTP_CONNECTION_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
+        OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT,
+        OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT_DEFAULT,
+        TimeUnit.MILLISECONDS);
     int connectionRequestTimeout = (int) configuration.getTimeDuration(
-        RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT,
-        RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT,
+        OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT,
+        OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
 
     connectionFactory =

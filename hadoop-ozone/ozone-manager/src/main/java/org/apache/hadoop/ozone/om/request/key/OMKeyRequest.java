@@ -32,6 +32,7 @@ import java.util.Map;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.PrefixManager;
@@ -195,6 +196,19 @@ public abstract class OMKeyRequest extends OMClientRequest {
       // exception
       throw new OMException("Bucket not found " + bucketName, BUCKET_NOT_FOUND);
     }
+  }
+
+  // For keys batch delete and rename only
+  protected String getVolumeOwner(OMMetadataManager omMetadataManager,
+      String volumeName) throws IOException {
+    String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);
+    OmVolumeArgs volumeArgs =
+        omMetadataManager.getVolumeTable().get(dbVolumeKey);
+    if (volumeArgs == null) {
+      throw new OMException("Volume not found " + volumeName,
+          VOLUME_NOT_FOUND);
+    }
+    return volumeArgs.getOwnerName();
   }
 
   protected static Optional<FileEncryptionInfo> getFileEncryptionInfo(
@@ -436,6 +450,27 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
+   * Check Acls for the ozone key with volumeOwner.
+   * @param ozoneManager
+   * @param volume
+   * @param bucket
+   * @param key
+   * @param aclType
+   * @param resourceType
+   * @throws IOException
+   */
+  @SuppressWarnings("parameternumber")
+  protected void checkKeyAcls(OzoneManager ozoneManager, String volume,
+      String bucket, String key, IAccessAuthorizer.ACLType aclType,
+      OzoneObj.ResourceType resourceType, String volumeOwner)
+      throws IOException {
+    if (ozoneManager.getAclsEnabled()) {
+      checkAcls(ozoneManager, resourceType, OzoneObj.StoreType.OZONE, aclType,
+          volume, bucket, key, volumeOwner);
+    }
+  }
+
+  /**
    * Check ACLs for Ozone Key in OpenKey table
    * if ozone native authorizer is enabled.
    * @param ozoneManager
@@ -556,6 +591,27 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
+   * Check bucket quota in bytes.
+   * @param omBucketInfo
+   * @param allocateSize
+   * @throws IOException
+   */
+  protected void checkBucketQuotaInBytes(OmBucketInfo omBucketInfo,
+      long allocateSize) throws IOException {
+    if (omBucketInfo.getQuotaInBytes() > OzoneConsts.QUOTA_RESET) {
+      long usedBytes = omBucketInfo.getUsedBytes().sum();
+      long quotaInBytes = omBucketInfo.getQuotaInBytes();
+      if (quotaInBytes - usedBytes < allocateSize) {
+        throw new OMException("The DiskSpace quota of bucket:"
+            + omBucketInfo.getBucketName() + "exceeded: quotaInBytes: "
+            + quotaInBytes + " Bytes but diskspace consumed: " + (usedBytes
+            + allocateSize) + " Bytes.",
+            OMException.ResultCodes.QUOTA_EXCEEDED);
+      }
+    }
+  }
+
+  /**
    * Check directory exists. If exists return true, else false.
    * @param volumeName
    * @param bucketName
@@ -575,7 +631,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
-   * Return volume info for the specified volume.
+   * Return volume info for the specified volume. If the volume does not
+   * exist, returns {@code null}.
    * @param omMetadataManager
    * @param volume
    * @return OmVolumeArgs
@@ -583,9 +640,34 @@ public abstract class OMKeyRequest extends OMClientRequest {
    */
   protected OmVolumeArgs getVolumeInfo(OMMetadataManager omMetadataManager,
       String volume) {
-    return omMetadataManager.getVolumeTable().getCacheValue(
-        new CacheKey<>(omMetadataManager.getVolumeKey(volume)))
-        .getCacheValue();
+
+    OmVolumeArgs volumeArgs = null;
+
+    CacheValue<OmVolumeArgs> value =
+        omMetadataManager.getVolumeTable().getCacheValue(
+        new CacheKey<>(omMetadataManager.getVolumeKey(volume)));
+
+    if (value != null) {
+      volumeArgs = value.getCacheValue();
+    }
+
+    return volumeArgs;
+  }
+
+  /**
+   * @return the number of bytes used by blocks pointed to by {@code omKeyInfo}.
+   */
+  protected static long sumBlockLengths(OmKeyInfo omKeyInfo) {
+    long bytesUsed = 0;
+    int keyFactor = omKeyInfo.getFactor().getNumber();
+    OmKeyLocationInfoGroup keyLocationGroup =
+        omKeyInfo.getLatestVersionLocations();
+
+    for(OmKeyLocationInfo locationInfo: keyLocationGroup.getLocationList()) {
+      bytesUsed += locationInfo.getLength() * keyFactor;
+    }
+
+    return bytesUsed;
   }
 
   /**

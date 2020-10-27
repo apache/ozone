@@ -858,6 +858,24 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.pipeline.leader-choose.policy</name>
+    <value>
+      org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.DefaultLeaderChoosePolicy
+    </value>
+    <tag>OZONE, SCM, PIPELINE</tag>
+    <description>
+      The policy used for choosing desired leader for pipeline creation.
+      There are two policies supporting now: DefaultLeaderChoosePolicy, MinLeaderCountChoosePolicy.
+      org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.DefaultLeaderChoosePolicy
+      implements a policy that choose leader without depending on priority.
+      org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms.MinLeaderCountChoosePolicy
+      implements a policy that choose leader which has the minimum exist leader count.
+      In the future, we need to add policies which consider:
+      1. resource, the datanode with the most abundant cpu and memory can be made the leader
+      2. topology, the datanode nearest to the client can be made the leader
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.container.size</name>
     <value>5GB</value>
     <tag>OZONE, PERFORMANCE, MANAGEMENT</tag>
@@ -2322,7 +2340,7 @@
   </description>
 </property>
   <property>
-    <name>recon.om.connection.request.timeout</name>
+    <name>ozone.recon.om.connection.request.timeout</name>
     <value>5000</value>
     <tag>OZONE, RECON, OM</tag>
     <description>
@@ -2331,7 +2349,7 @@
     </description>
   </property>
   <property>
-    <name>recon.om.connection.timeout</name>
+    <name>ozone.recon.om.connection.timeout</name>
     <value>5s</value>
     <tag>OZONE, RECON, OM</tag>
     <description>
@@ -2340,7 +2358,7 @@
     </description>
   </property>
   <property>
-    <name>recon.om.socket.timeout</name>
+    <name>ozone.recon.om.socket.timeout</name>
     <value>5s</value>
     <tag>OZONE, RECON, OM</tag>
     <description>
@@ -2349,7 +2367,7 @@
     </description>
   </property>
   <property>
-    <name>recon.om.snapshot.task.initial.delay</name>
+    <name>ozone.recon.om.snapshot.task.initial.delay</name>
     <value>1m</value>
     <tag>OZONE, RECON, OM</tag>
     <description>
@@ -2357,7 +2375,7 @@
     </description>
   </property>
   <property>
-    <name>recon.om.snapshot.task.interval.delay</name>
+    <name>ozone.recon.om.snapshot.task.interval.delay</name>
     <value>10m</value>
     <tag>OZONE, RECON, OM</tag>
     <description>
@@ -2365,7 +2383,7 @@
     </description>
   </property>
   <property>
-    <name>recon.om.snapshot.task.flush.param</name>
+    <name>ozone.recon.om.snapshot.task.flush.param</name>
     <value>false</value>
     <tag>OZONE, RECON, OM</tag>
     <description>

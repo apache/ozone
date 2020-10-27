@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
 import org.apache.hadoop.ozone.OmUtils;
@@ -205,6 +206,11 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
 
   public static String getRequestType() {
     return CreateVolume.name();
+  }
+
+  @VisibleForTesting
+  public static Logger getLogger() {
+    return LOG;
   }
 }
 

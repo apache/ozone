@@ -215,8 +215,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
       for (Long blkLong : delTX.getLocalIDList()) {
         String blk = blkLong.toString();
-        BatchOperation batch = containerDB.getStore()
-                .getBatchHandler().initBatchOperation();
         BlockData blkInfo = blockDataTable.get(blk);
         if (blkInfo != null) {
           String deletingKey = OzoneConsts.DELETING_KEY_PREFIX + blk;
@@ -230,13 +228,15 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
             }
             continue;
           }
-          // Found the block in container db,
-          // use an atomic update to change its state to deleting.
-          blockDataTable.putWithBatch(batch, deletingKey, blkInfo);
-          blockDataTable.deleteWithBatch(batch, blk);
-          try {
+
+          try(BatchOperation batch = containerDB.getStore()
+              .getBatchHandler().initBatchOperation()) {
+            // Found the block in container db,
+            // use an atomic update to change its state to deleting.
+            blockDataTable.putWithBatch(batch, deletingKey, blkInfo);
+            blockDataTable.deleteWithBatch(batch, blk);
             containerDB.getStore().getBatchHandler()
-                    .commitBatchOperation(batch);
+                .commitBatchOperation(batch);
             newDeletionBlocks++;
             if (LOG.isDebugEnabled()) {
               LOG.debug("Transited Block {} to DELETING state in container {}",
@@ -259,32 +259,33 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
       if (newDeletionBlocks > 0) {
         // Finally commit the DB counters.
-        BatchOperation batchOperation = containerDB.getStore().getBatchHandler()
-                .initBatchOperation();
-        Table<String, Long> metadataTable = containerDB.getStore()
-                .getMetadataTable();
-  
-        // In memory is updated only when existing delete transactionID is
-        // greater.
-        if (delTX.getTxID() > containerData.getDeleteTransactionId()) {
-          // Update in DB pending delete key count and delete transaction ID.
-          metadataTable.putWithBatch(batchOperation,
-                  OzoneConsts.DELETE_TRANSACTION_KEY, delTX.getTxID());
-        }
-  
-        long pendingDeleteBlocks = containerData.getNumPendingDeletionBlocks() +
-                newDeletionBlocks;
-        metadataTable.putWithBatch(batchOperation,
-                OzoneConsts.PENDING_DELETE_BLOCK_COUNT, pendingDeleteBlocks);
-  
-        containerDB.getStore().getBatchHandler()
-                .commitBatchOperation(batchOperation);
-  
-        // update pending deletion blocks count and delete transaction ID in
-        // in-memory container status
-        containerData.updateDeleteTransactionId(delTX.getTxID());
+        try(BatchOperation batchOperation =
+                containerDB.getStore().getBatchHandler().initBatchOperation()) {
+          Table< String, Long > metadataTable = containerDB.getStore()
+              .getMetadataTable();
 
-        containerData.incrPendingDeletionBlocks(newDeletionBlocks);
+          // In memory is updated only when existing delete transactionID is
+          // greater.
+          if (delTX.getTxID() > containerData.getDeleteTransactionId()) {
+            // Update in DB pending delete key count and delete transaction ID.
+            metadataTable.putWithBatch(batchOperation,
+                OzoneConsts.DELETE_TRANSACTION_KEY, delTX.getTxID());
+          }
+
+          long pendingDeleteBlocks =
+              containerData.getNumPendingDeletionBlocks() + newDeletionBlocks;
+          metadataTable.putWithBatch(batchOperation,
+              OzoneConsts.PENDING_DELETE_BLOCK_COUNT, pendingDeleteBlocks);
+
+          containerDB.getStore().getBatchHandler()
+              .commitBatchOperation(batchOperation);
+
+          // update pending deletion blocks count and delete transaction ID in
+          // in-memory container status
+          containerData.updateDeleteTransactionId(delTX.getTxID());
+
+          containerData.incrPendingDeletionBlocks(newDeletionBlocks);
+        }
       }
     }
   }

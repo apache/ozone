@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.ratis;
 
 import java.io.IOException;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -106,6 +107,11 @@ public final class RatisHelper {
     return new RaftPeer(toRaftPeerId(id), toRaftPeerAddressString(id));
   }
 
+  public static RaftPeer toRaftPeer(DatanodeDetails id, int priority) {
+    return new RaftPeer(
+        toRaftPeerId(id), toRaftPeerAddressString(id), priority);
+  }
+
   private static List<RaftPeer> toRaftPeers(Pipeline pipeline) {
     return toRaftPeers(pipeline.getNodes());
   }
@@ -123,6 +129,19 @@ public final class RatisHelper {
   private static RaftGroup newRaftGroup(Collection<RaftPeer> peers) {
     return peers.isEmpty()? emptyRaftGroup()
         : RaftGroup.valueOf(DUMMY_GROUP_ID, peers);
+  }
+
+  public static RaftGroup newRaftGroup(RaftGroupId groupId,
+      List<DatanodeDetails> peers, List<Integer> priorityList) {
+    assert peers.size() == priorityList.size();
+
+    final List<RaftPeer> newPeers = new ArrayList<>();
+    for (int i = 0; i < peers.size(); i++) {
+      RaftPeer peer = RatisHelper.toRaftPeer(peers.get(i), priorityList.get(i));
+      newPeers.add(peer);
+    }
+    return peers.isEmpty() ? RaftGroup.valueOf(groupId, Collections.emptyList())
+        : RaftGroup.valueOf(groupId, newPeers);
   }
 
   public static RaftGroup newRaftGroup(RaftGroupId groupId,
