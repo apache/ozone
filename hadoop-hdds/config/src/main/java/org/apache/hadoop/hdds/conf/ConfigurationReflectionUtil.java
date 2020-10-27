@@ -94,6 +94,10 @@ public final class ConfigurationReflectionUtil {
             forcedFieldSet(field, configuration,
                 from.getTimeDuration(key, "0s", configAnnotation.timeUnit()));
             break;
+          case CLASS:
+            forcedFieldSet(field, configuration,
+                from.getClass(key, Object.class));
+            break;
           default:
             throw new ConfigurationException(
                 "Unsupported ConfigType " + type + " on " + fieldLocation);
@@ -135,6 +139,8 @@ public final class ConfigurationReflectionUtil {
     } else if (parameterType == Boolean.class
         || parameterType == boolean.class) {
       type = ConfigType.BOOLEAN;
+    } else if (parameterType == Class.class) {
+      type = ConfigType.CLASS;
     } else {
       throw new ConfigurationException(
           "Unsupported configuration type " + parameterType + " in "
@@ -226,6 +232,12 @@ public final class ConfigurationReflectionUtil {
           case TIME:
             config.setTimeDuration(key, field.getLong(configObject),
                 configAnnotation.timeUnit());
+            break;
+          case CLASS:
+            Object valueClass = field.get(configObject);
+            if (valueClass instanceof Class<?>) {
+              config.set(key, ((Class<?>) valueClass).getName());
+            }
             break;
           default:
             throw new ConfigurationException(

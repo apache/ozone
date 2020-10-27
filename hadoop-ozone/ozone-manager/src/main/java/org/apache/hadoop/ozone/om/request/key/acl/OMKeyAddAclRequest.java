@@ -25,11 +25,13 @@ import java.util.List;
 
 import com.google.common.collect.Lists;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.key.acl.OMKeyAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,6 +47,19 @@ public class OMKeyAddAclRequest extends OMKeyAclRequest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeyAddAclRequest.class);
+
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    long modificationTime = Time.now();
+    OzoneManagerProtocolProtos.AddAclRequest.Builder addAclRequestBuilder =
+        getOmRequest().getAddAclRequest().toBuilder()
+            .setModificationTime(modificationTime);
+
+    return getOmRequest().toBuilder()
+        .setAddAclRequest(addAclRequestBuilder)
+        .setUserInfo(getUserInfo())
+        .build();
+  }
 
   private String path;
   private List<OzoneAcl> ozoneAcls;

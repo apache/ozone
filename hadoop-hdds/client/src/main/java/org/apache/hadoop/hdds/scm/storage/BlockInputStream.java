@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -192,13 +191,10 @@ public class BlockInputStream extends InputStream implements Seekable {
             blockID.getContainerID());
       }
 
-      if (token != null) {
-        UserGroupInformation.getCurrentUser().addToken(token);
-      }
       DatanodeBlockID datanodeBlockID = blockID
           .getDatanodeBlockIDProtobuf();
       GetBlockResponseProto response = ContainerProtocolCalls
-          .getBlock(xceiverClient, datanodeBlockID);
+          .getBlock(xceiverClient, datanodeBlockID, token);
 
       chunks = response.getBlockData().getChunksList();
       success = true;
@@ -218,7 +214,7 @@ public class BlockInputStream extends InputStream implements Seekable {
    */
   protected synchronized void addStream(ChunkInfo chunkInfo) {
     chunkStreams.add(new ChunkInputStream(chunkInfo, blockID,
-        xceiverClient, verifyChecksum));
+        xceiverClient, verifyChecksum, token));
   }
 
   public synchronized long getRemaining() throws IOException {

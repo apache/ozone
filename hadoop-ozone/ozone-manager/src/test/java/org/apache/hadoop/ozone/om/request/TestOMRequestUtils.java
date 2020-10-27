@@ -26,12 +26,16 @@ import java.util.List;
 import java.util.UUID;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -201,20 +205,28 @@ public final class TestOMRequestUtils {
             keyName)), new CacheValue<>(Optional.of(omKeyInfo), 1L));
   }
 
-  private OmKeyInfo createKeyInfo(String volumeName, String bucketName,
-      String keyName, HddsProtos.ReplicationType replicationType,
-      HddsProtos.ReplicationFactor replicationFactor) {
-    return new OmKeyInfo.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-        .setCreationTime(Time.now())
-        .setModificationTime(Time.now())
-        .setDataSize(1000L)
-        .setReplicationType(replicationType)
-        .setReplicationFactor(replicationFactor).build();
+  /**
+   * Adds one block to {@code keyInfo} with the provided size and offset.
+   */
+  public static void addKeyLocationInfo(
+      OmKeyInfo keyInfo, long offset, long keyLength) throws IOException {
+
+    Pipeline pipeline = Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setType(keyInfo.getType())
+        .setFactor(keyInfo.getFactor())
+        .setNodes(new ArrayList<>())
+        .build();
+
+    OmKeyLocationInfo locationInfo = new OmKeyLocationInfo.Builder()
+          .setBlockID(new BlockID(100L, 1000L))
+          .setOffset(offset)
+          .setLength(keyLength)
+          .setPipeline(pipeline)
+          .build();
+
+    keyInfo.appendNewBlocks(Collections.singletonList(locationInfo), false);
   }
 
   /**
@@ -497,6 +509,66 @@ public final class TestOMRequestUtils {
         .setResType(ResourceType.VOLUME)
         .setStoreType(StoreType.OZONE)
         .build()));
+    if (acls != null) {
+      acls.forEach(
+          acl -> setAclRequestBuilder.addAcl(OzoneAcl.toProtobuf(acl)));
+    }
+
+    return OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
+        .setCmdType(OzoneManagerProtocolProtos.Type.SetAcl)
+        .setSetAclRequest(setAclRequestBuilder.build()).build();
+  }
+
+  // Create OMRequest for testing adding acl of bucket.
+  public static OMRequest createBucketAddAclRequest(String volumeName,
+      String bucketName, OzoneAcl acl) {
+    AddAclRequest.Builder addAclRequestBuilder = AddAclRequest.newBuilder();
+    addAclRequestBuilder.setObj(OzoneObj.toProtobuf(new OzoneObjInfo.Builder()
+        .setVolumeName(volumeName).setBucketName(bucketName)
+        .setResType(ResourceType.BUCKET)
+        .setStoreType(StoreType.OZONE)
+        .build()));
+
+    if (acl != null) {
+      addAclRequestBuilder.setAcl(OzoneAcl.toProtobuf(acl));
+    }
+
+    return OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
+        .setCmdType(OzoneManagerProtocolProtos.Type.AddAcl)
+        .setAddAclRequest(addAclRequestBuilder.build()).build();
+  }
+
+  // Create OMRequest for testing removing acl of bucket.
+  public static OMRequest createBucketRemoveAclRequest(String volumeName,
+      String bucketName, OzoneAcl acl) {
+    RemoveAclRequest.Builder removeAclRequestBuilder =
+        RemoveAclRequest.newBuilder();
+    removeAclRequestBuilder.setObj(OzoneObj.toProtobuf(
+        new OzoneObjInfo.Builder()
+            .setVolumeName(volumeName).setBucketName(bucketName)
+            .setResType(ResourceType.BUCKET)
+            .setStoreType(StoreType.OZONE)
+            .build()));
+
+    if (acl != null) {
+      removeAclRequestBuilder.setAcl(OzoneAcl.toProtobuf(acl));
+    }
+
+    return OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
+        .setCmdType(OzoneManagerProtocolProtos.Type.RemoveAcl)
+        .setRemoveAclRequest(removeAclRequestBuilder.build()).build();
+  }
+
+  // Create OMRequest for testing setting acls of bucket.
+  public static OMRequest createBucketSetAclRequest(String volumeName,
+      String bucketName, List<OzoneAcl> acls) {
+    SetAclRequest.Builder setAclRequestBuilder = SetAclRequest.newBuilder();
+    setAclRequestBuilder.setObj(OzoneObj.toProtobuf(new OzoneObjInfo.Builder()
+        .setVolumeName(volumeName).setBucketName(bucketName)
+        .setResType(ResourceType.BUCKET)
+        .setStoreType(StoreType.OZONE)
+        .build()));
+
     if (acls != null) {
       acls.forEach(
           acl -> setAclRequestBuilder.addAcl(OzoneAcl.toProtobuf(acl)));

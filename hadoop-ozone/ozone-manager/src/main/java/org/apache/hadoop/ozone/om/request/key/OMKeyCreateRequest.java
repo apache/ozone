@@ -299,7 +299,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       long preAllocatedSpace = newLocationList.size()
           * ozoneManager.getScmBlockSize()
           * omKeyInfo.getFactor().getNumber();
-      // check volume quota
+      // check bucket and volume quota
+      checkBucketQuotaInBytes(omBucketInfo, preAllocatedSpace);
       checkVolumeQuotaInBytes(omVolumeArgs, preAllocatedSpace);
 
       // Add to cache entry can be done outside of lock for this openKey.

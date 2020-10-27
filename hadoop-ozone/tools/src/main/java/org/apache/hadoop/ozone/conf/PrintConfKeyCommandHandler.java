@@ -44,7 +44,8 @@ public class PrintConfKeyCommandHandler implements Callable<Void> {
     if (value != null) {
       tool.printOut(value);
     } else {
-      tool.printError("Configuration " + confKey + " is missing.");
+      throw new IllegalArgumentException(
+          "Configuration " + confKey + " is missing.");
     }
     return null;
   }

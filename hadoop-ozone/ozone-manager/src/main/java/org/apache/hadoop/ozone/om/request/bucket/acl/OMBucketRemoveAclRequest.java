@@ -23,8 +23,10 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import java.io.IOException;
 import java.util.List;
 
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,6 +58,19 @@ public class OMBucketRemoveAclRequest extends OMBucketAclRequest {
     bucketAddAclOp = (ozoneAcls, omBucketInfo) -> {
       return omBucketInfo.removeAcl(ozoneAcls.get(0));
     };
+  }
+
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    long modificationTime = Time.now();
+    OzoneManagerProtocolProtos.RemoveAclRequest.Builder removeAclRequestBuilder
+        = getOmRequest().getRemoveAclRequest().toBuilder()
+            .setModificationTime(modificationTime);
+
+    return getOmRequest().toBuilder()
+        .setRemoveAclRequest(removeAclRequestBuilder)
+        .setUserInfo(getUserInfo())
+        .build();
   }
 
   public OMBucketRemoveAclRequest(OMRequest omRequest) {

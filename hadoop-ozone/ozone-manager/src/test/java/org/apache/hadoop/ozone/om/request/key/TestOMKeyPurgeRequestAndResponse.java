@@ -137,15 +137,16 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
         .setStatus(Status.OK)
         .build();
 
-    BatchOperation batchOperation =
-        omMetadataManager.getStore().initBatchOperation();
+    try(BatchOperation batchOperation =
+        omMetadataManager.getStore().initBatchOperation()) {
 
-    OMKeyPurgeResponse omKeyPurgeResponse = new OMKeyPurgeResponse(
-        omResponse, deletedKeyNames);
-    omKeyPurgeResponse.addToDBBatch(omMetadataManager, batchOperation);
+      OMKeyPurgeResponse omKeyPurgeResponse = new OMKeyPurgeResponse(
+          omResponse, deletedKeyNames);
+      omKeyPurgeResponse.addToDBBatch(omMetadataManager, batchOperation);
 
-    // Do manual commit and see whether addToBatch is successful or not.
-    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+      // Do manual commit and see whether addToBatch is successful or not.
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    }
 
     // The keys should not exist in the DeletedKeys table
     for (String deletedKey : deletedKeyNames) {
