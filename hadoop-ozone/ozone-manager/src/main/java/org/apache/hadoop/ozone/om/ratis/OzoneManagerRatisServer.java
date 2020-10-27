@@ -688,7 +688,7 @@ public final class OzoneManagerRatisServer {
 
     if (Strings.isNullOrEmpty(storageDir)) {
       storageDir = ServerUtils.getDefaultRatisDirectory(conf);
-    }
+    }StateContextQueue
     return storageDir;
   }
 
@@ -706,7 +706,4 @@ public final class OzoneManagerRatisServer {
     return omStateMachine.getLastAppliedTermIndex();
   }
 
-  public RaftServer getServer() {
-    return server;
-  }
 }
