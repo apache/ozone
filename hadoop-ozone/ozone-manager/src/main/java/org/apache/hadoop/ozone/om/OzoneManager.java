@@ -1254,7 +1254,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   /**
    * Starts a Trash Emptier thread that does an fs.trashRoots and performs
-   * checkpointing & deletion
+   * checkpointing & deletion.
    * @param conf
    * @throws IOException
    */
