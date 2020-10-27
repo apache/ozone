@@ -6,7 +6,7 @@ summary: GDPR in Ozone
 icon: user
 menu:
    main:
-      parent: Features
+      parent: Security
 summary: Support to implement the "Right to be Forgotten" requirement of GDPR
 ---
 <!---
