@@ -1253,15 +1253,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
 
   /**
-   * @param conf
-   * @throws IOException
    * Starts a Trash Emptier thread that does an fs.trashRoots and performs
    * checkpointing & deletion
+   * @param conf
+   * @throws IOException
    */
   private void startTrashEmptier(Configuration conf) throws IOException {
     long trashInterval =
             conf.getLong(FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT);
     if (trashInterval == 0) {
+      LOG.info("Trash Interval set to 0. Files deleted will not move to trash");
       return;
     } else if (trashInterval < 0) {
       throw new IOException("Cannot start trash emptier with negative interval."
