@@ -40,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -107,6 +108,8 @@ public class TestReconWithOzoneManager {
             OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT),
         TimeUnit.MILLISECONDS
     );
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
+            true);
     RequestConfig config = RequestConfig.custom()
         .setConnectTimeout(socketTimeout)
         .setConnectionRequestTimeout(connectionTimeout)

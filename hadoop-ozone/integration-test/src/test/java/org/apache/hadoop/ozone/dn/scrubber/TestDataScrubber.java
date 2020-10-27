@@ -95,6 +95,8 @@ public class TestDataScrubber {
         SCMContainerPlacementCapacity.class, PlacementPolicy.class);
     ozoneConfig.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
         false);
+    ozoneConfig.setBoolean(
+            ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, true);
     cluster = MiniOzoneCluster.newBuilder(ozoneConfig).setNumDatanodes(1)
         .build();
     cluster.waitForClusterToBeReady();

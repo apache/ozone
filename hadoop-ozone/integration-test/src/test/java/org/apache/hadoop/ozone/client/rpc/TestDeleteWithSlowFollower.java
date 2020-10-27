@@ -115,6 +115,8 @@ public class TestDeleteWithSlowFollower {
         TimeUnit.SECONDS);
     DatanodeRatisServerConfig ratisServerConfig =
         conf.getObject(DatanodeRatisServerConfig.class);
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
+            true);
     ratisServerConfig.setFollowerSlownessTimeout(Duration.ofSeconds(1000));
     ratisServerConfig.setNoLeaderTimeout(Duration.ofSeconds(1000));
     ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));

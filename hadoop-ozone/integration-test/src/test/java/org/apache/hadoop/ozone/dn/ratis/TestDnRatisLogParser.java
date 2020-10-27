@@ -23,6 +23,7 @@ import java.io.PrintStream;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.segmentparser.DatanodeRatisLogParser;
@@ -53,6 +54,8 @@ public class TestDnRatisLogParser {
   @Before
   public void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
+            true);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1).setTotalPipelineNumLimit(2).build();
     cluster.waitForClusterToBeReady();

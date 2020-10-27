@@ -97,8 +97,8 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     super(conf, ozoneManagers, scm, hddsDatanodes, omServiceID);
     this.numDatanodes = getHddsDatanodes().size();
     this.numOzoneManagers = ozoneManagers.size();
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
-            true);
+    conf.setIfUnset(ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
+            "true");
     this.failedOmSet = new HashSet<>();
     this.failedDnSet = new HashSet<>();
 

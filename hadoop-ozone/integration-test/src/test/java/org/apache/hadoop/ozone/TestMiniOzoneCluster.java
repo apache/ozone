@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -339,6 +340,8 @@ public class TestMiniOzoneCluster {
   @Test (timeout = 60000)
   public void testMultipleDataDirs() throws Exception {
     // Start a cluster with 3 DN
+    conf.setBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
+            true);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(1)
         .setNumDataVolumes(3)
