@@ -688,7 +688,7 @@ public final class OzoneManagerRatisServer {
 
     if (Strings.isNullOrEmpty(storageDir)) {
       storageDir = ServerUtils.getDefaultRatisDirectory(conf);
-    }StateContextQueue
+    }
     return storageDir;
   }
 
