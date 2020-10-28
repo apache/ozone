@@ -64,6 +64,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import org.apache.hadoop.test.LambdaTestUtils;
+import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Rule;
@@ -100,14 +101,19 @@ public class TestOzoneFileSystem {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystem.class);
 
-  private boolean enabledFileSystemPaths;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
+  protected boolean enabledFileSystemPaths;
 
-  private MiniOzoneCluster cluster;
-  private FileSystem fs;
-  private OzoneFileSystem o3fs;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
+  protected MiniOzoneCluster cluster;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
+  protected FileSystem fs;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
+  protected OzoneFileSystem o3fs;
   private String volumeName;
   private String bucketName;
-  private int rootItemCount;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
+  protected int rootItemCount;
   private Trash trash;
 
   public void testCreateFileShouldCheckExistenceOfDirWithSameName()
@@ -249,9 +255,9 @@ public class TestOzoneFileSystem {
     }
   }
 
-  private void setupOzoneFileSystem()
+  protected void setupOzoneFileSystem()
       throws IOException, TimeoutException, InterruptedException {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    OzoneConfiguration conf = getOzoneConfig();
     conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
         enabledFileSystemPaths);
@@ -276,7 +282,7 @@ public class TestOzoneFileSystem {
     trash = new Trash(conf);
   }
 
-  private void testOzoneFsServiceLoader() throws IOException {
+  protected void testOzoneFsServiceLoader() throws IOException {
     assertEquals(
         FileSystem.getFileSystemClass(OzoneConsts.OZONE_URI_SCHEME, null),
         OzoneFileSystem.class);
@@ -615,7 +621,7 @@ public class TestOzoneFileSystem {
         interimPath.getName(), fileStatus.getPath().getName());
   }
 
-  private void testRenameDir() throws Exception {
+  protected void testRenameDir() throws Exception {
     final String dir = "/root_dir/dir1";
     final Path source = new Path(fs.getUri().toString() + dir);
     final Path dest = new Path(source.toString() + ".renamed");
@@ -634,10 +640,6 @@ public class TestOzoneFileSystem {
     // Test if one path belongs to other FileSystem.
     LambdaTestUtils.intercept(IllegalArgumentException.class, "Wrong FS",
         () -> fs.rename(new Path(fs.getUri().toString() + "fake" + dir), dest));
-
-    // Renaming to same path when src is specified with scheme.
-    assertTrue("Renaming to same path should be success.",
-        fs.rename(source, new Path(dir)));
   }
   private OzoneKeyDetails getKey(Path keyPath, boolean isDirectory)
       throws IOException {
@@ -777,4 +779,14 @@ public class TestOzoneFileSystem {
     // Cleanup
     o3fs.delete(trashRoot, true);
   }
+
+  @NotNull
+  protected OzoneConfiguration getOzoneConfig() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(FS_TRASH_INTERVAL_KEY, 1);
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+            enabledFileSystemPaths);
+    return conf;
+  }
+
 }

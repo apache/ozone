@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -309,6 +310,13 @@ public class BasicOzoneFileSystem extends FileSystem {
    */
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
+
+    String layOutVersion = adapter.getLayoutVersion();
+    if (layOutVersion != null &&
+            OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1.equals(layOutVersion)) {
+      return renameV1(src, dst);
+    }
+
     incrementCounter(Statistic.INVOCATION_RENAME, 1);
     statistics.incrementWriteOps(1);
     super.checkPath(src);
@@ -405,6 +413,29 @@ public class BasicOzoneFileSystem extends FileSystem {
       createFakeParentDirectory(src);
     }
     return result;
+  }
+
+  private boolean renameV1(Path src, Path dst) throws IOException {
+    incrementCounter(Statistic.INVOCATION_RENAME);
+    statistics.incrementWriteOps(1);
+    super.checkPath(src);
+    super.checkPath(dst);
+
+    String srcPath = src.toUri().getPath();
+    String dstPath = dst.toUri().getPath();
+    if (srcPath.equals(dstPath)) {
+      return true;
+    }
+
+    LOG.trace("rename() from:{} to:{}", src, dst);
+    if (src.isRoot()) {
+      // Cannot rename root of file system
+      LOG.trace("Cannot rename the root of a filesystem");
+      return false;
+    }
+
+    adapter.renameKey(srcPath, dstPath);
+    return true;
   }
 
   /**

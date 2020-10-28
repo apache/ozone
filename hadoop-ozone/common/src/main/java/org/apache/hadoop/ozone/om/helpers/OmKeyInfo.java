@@ -158,6 +158,9 @@ public final class OmKeyInfo extends WithObjectID {
     return parentObjectID;
   }
 
+  public void setParentObjectID(long parentObjectID) {
+    this.parentObjectID = parentObjectID;
+  }
 
   public synchronized OmKeyLocationInfoGroup getLatestVersionLocations() {
     return keyLocationVersions.size() == 0? null :

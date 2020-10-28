@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.om.request.bucket;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
@@ -28,6 +30,7 @@ import com.google.common.base.Optional;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -156,6 +159,9 @@ public class OMBucketCreateRequest extends OMClientRequest {
         getOmRequest());
     OmBucketInfo omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo);
 
+    // Add layout version V1 to bucket info
+    addLayoutVersionToBucket(omBucketInfo);
+
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
 
@@ -248,6 +254,15 @@ public class OMBucketCreateRequest extends OMClientRequest {
     }
   }
 
+  private void addLayoutVersionToBucket(OmBucketInfo omBucketInfo) {
+    Map<String, String> metadata = omBucketInfo.getMetadata();
+    if (metadata == null) {
+      metadata = new HashMap<>();
+    }
+    metadata.put(OMConfigKeys.OZONE_OM_LAYOUT_VERSION,
+            OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1);
+    omBucketInfo.setMetadata(metadata);
+  }
 
   /**
    * Add default acls for bucket. These acls are inherited from volume
