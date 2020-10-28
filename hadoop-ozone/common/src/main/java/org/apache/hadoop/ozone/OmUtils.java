@@ -22,6 +22,8 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -34,6 +36,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -51,6 +54,7 @@ import com.google.common.base.Joiner;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BIND_HOST_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY;
@@ -601,5 +605,41 @@ public final class OmUtils {
       }
     }
     return false;
+  }
+
+  /**
+   * Normalize the key name. This method used {@link Path#normalize()} to
+   * normalize the key name.
+   * @param keyName
+   * @param preserveTrailingSlash - if True preserves trailing slash, else
+   * does not preserve.
+   * @return normalized key name.
+   */
+  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
+  public static String normalizeKey(String keyName,
+      boolean preserveTrailingSlash) {
+    // For empty strings do nothing, just return the same.
+    // Reason to check here is the Paths method fail with NPE.
+    if (!StringUtils.isBlank(keyName)) {
+      String normalizedKeyName;
+      if (keyName.startsWith(OM_KEY_PREFIX)) {
+        normalizedKeyName = Paths.get(keyName).toUri().normalize().getPath();
+      } else {
+        normalizedKeyName = Paths.get(OM_KEY_PREFIX, keyName).toUri()
+            .normalize().getPath();
+      }
+      if (!keyName.equals(normalizedKeyName)) {
+        LOG.debug("Normalized key {} to {} ", keyName,
+            normalizedKeyName.substring(1));
+      }
+      if (preserveTrailingSlash) {
+        if (keyName.endsWith("/")) {
+          return normalizedKeyName.substring(1) + "/";
+        }
+      }
+      return normalizedKeyName.substring(1);
+    }
+
+    return keyName;
   }
 }
