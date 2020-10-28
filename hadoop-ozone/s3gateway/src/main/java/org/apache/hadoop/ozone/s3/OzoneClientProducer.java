@@ -78,16 +78,11 @@ public class OzoneClientProducer {
   private OzoneClient getClient(OzoneConfiguration config) throws IOException {
     try {
       String awsAccessId = signatureParser.getAwsAccessId();
+      validateAccessId(awsAccessId);
+
       UserGroupInformation remoteUser =
           UserGroupInformation.createRemoteUser(awsAccessId);
       if (OzoneSecurityUtil.isSecurityEnabled(config)) {
-        try {
-          validateAccessId(awsAccessId);
-        } catch (OS3Exception ex) {
-          LOG.error("Malformed s3 header.", ex);
-          throw ex;
-        }
-        
         LOG.debug("Creating s3 auth info for client.");
         try {
           OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
@@ -125,6 +120,7 @@ public class OzoneClientProducer {
   // ONLY validate aws access id when needed.
   private void validateAccessId(String awsAccessId) throws Exception {
     if (awsAccessId == null || awsAccessId.equals("")) {
+      LOG.error("Malformed s3 header. awsAccessID: ", awsAccessId);
       throw MALFORMED_HEADER;
     }
   }
