@@ -1196,7 +1196,7 @@
 
   <property>
     <name>ozone.open.key.expire.threshold</name>
-    <value>24h</value>
+    <value>1w</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
     <description>
       Controls how long an open key operation is considered active. Specifically, if a key
@@ -1207,7 +1207,7 @@
 
   <property>
     <name>ozone.open.key.cleanup.limit.per.task</name>
-    <value>100</value>
+    <value>1000</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
     <description>
       The maximum number of open keys to be identified as expired and marked
