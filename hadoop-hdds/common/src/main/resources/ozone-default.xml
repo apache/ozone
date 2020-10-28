@@ -1196,7 +1196,7 @@
 
   <property>
     <name>ozone.open.key.expire.threshold</name>
-    <value>1w</value>
+    <value>7d</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
     <description>
       Controls how long an open key operation is considered active. Specifically, if a key
