@@ -107,7 +107,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       }
 
       this.store = DBStoreBuilder.newBuilder(config, dbDef)
-              .setDBOption(options)
+              .setDBOptions(options)
               .build();
 
       // Use the DatanodeTable wrapper to disable the table iterator on

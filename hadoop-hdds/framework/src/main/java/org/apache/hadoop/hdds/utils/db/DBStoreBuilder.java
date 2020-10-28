@@ -24,15 +24,17 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
@@ -52,8 +54,6 @@ import org.rocksdb.WriteOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.security.auth.login.Configuration;
-
 /**
  * DBStore Builder.
  */
@@ -71,12 +71,12 @@ public final class DBStoreBuilder {
   // DB PKIProfile used by ROCKDB instances.
   public static final DBProfile HDDS_DEFAULT_DB_PROFILE = DBProfile.DISK;
 
-  private Set<TableConfig> tableConfigs;
   private DBOptions rocksDBOption;
-  private ColumnFamilyOptions columnFamilyOptions;
+  private DBOptions defaultDBOptions;
+  private ColumnFamilyOptions defaultColumnFamilyOptions;
   private String dbname;
   private Path dbPath;
-  private List<String> tableNames;
+  private Map<String, ColumnFamilyOptions> tableOptions;
   private ConfigurationSource configuration;
   private CodecRegistry registry;
   private String rocksDbStat;
@@ -111,17 +111,24 @@ public final class DBStoreBuilder {
 
   private DBStoreBuilder(ConfigurationSource configuration,
       RocksDBConfiguration rocksDBConfiguration) {
-    tableConfigs = new HashSet<>();
-    tableNames = new LinkedList<>();
+    tableOptions = new HashMap<>();
     this.configuration = configuration;
     this.registry = new CodecRegistry();
     this.rocksDbStat = configuration.getTrimmed(
         OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
         OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
     this.rocksDBConfiguration = rocksDBConfiguration;
+
+    DBProfile dbProfile = this.configuration.getEnum(HDDS_DB_PROFILE,
+          HDDS_DEFAULT_DB_PROFILE);
+    LOG.debug("default profile:{}", dbProfile);
+
+    defaultDBOptions = dbProfile.getDBOptions();
+    setDefaultColumnFamilyOptions(dbProfile.getColumnFamilyOptions());
   }
 
   private DBStoreBuilder applyDBDefinition(DBDefinition definition) {
+    // Set metadata dirs.
     File metadataDir = definition.getDBLocation(configuration);
 
     if (metadataDir == null) {
@@ -132,48 +139,18 @@ public final class DBStoreBuilder {
       metadataDir = getOzoneMetaDirPath(configuration);
     }
 
-    registerTables(definition);
     setName(definition.getName());
     setPath(Paths.get(metadataDir.getPath()));
 
-    return this;
-  }
+    // Add column family names and codecs.
+    for (DBColumnFamilyDefinition columnFamily :
+        definition.getColumnFamilies()) {
 
-  public DBStoreBuilder setName(String name) {
-    dbname = name;
-    return this;
-  }
-
-  public DBStoreBuilder addTable(String tableName) {
-    tableNames.add(tableName);
-    return this;
-  }
-
-  public <T> DBStoreBuilder addCodec(Class<T> type, Codec<T> codec) {
-    registry.addCodec(type, codec);
-    return this;
-  }
-
-  private DBStoreBuilder addTableDefinition(String tableName,
-      ColumnFamilyOptions option) throws IOException {
-    TableConfig tableConfig = new TableConfig(tableName, option);
-    if (!tableConfigs.add(tableConfig)) {
-      String message = "Unable to add the table: " + tableName +
-          ".  Please check if this table name is already in use.";
-      LOG.error(message);
-      throw new IOException(message);
+      addTable(columnFamily.getName());
+      addCodec(columnFamily.getKeyType(), columnFamily.getKeyCodec());
+      addCodec(columnFamily.getValueType(), columnFamily.getValueCodec());
     }
-    return this;
-  }
 
-  public DBStoreBuilder setDBOption(DBOptions option) {
-    rocksDBOption = option;
-    return this;
-  }
-
-  public DBStoreBuilder setPath(Path path) {
-    Preconditions.checkNotNull(path);
-    dbPath = path;
     return this;
   }
 
@@ -186,11 +163,14 @@ public final class DBStoreBuilder {
     if(StringUtil.isBlank(dbname) || (dbPath == null)) {
       LOG.error("Required Parameter missing.");
       throw new IOException("Required parameter is missing. Please make sure "
-          + "sure Path and DB name is provided.");
+          + "Path and DB name is provided.");
     }
-    setDefaultDBProfile();
-    processTables();
-    DBOptions options = getDbProfile();
+
+    Set<TableConfig> tableConfigs = makeTableConfigs();
+
+    if (rocksDBOption == null) {
+      rocksDBOption = getDefaultDBOptions(tableConfigs);
+    }
 
     WriteOptions writeOptions = new WriteOptions();
     writeOptions.setSync(rocksDBConfiguration.getSyncOption());
@@ -199,38 +179,110 @@ public final class DBStoreBuilder {
     if (!dbFile.getParentFile().exists()) {
       throw new IOException("The DB destination directory should exist.");
     }
-    return new RDBStore(dbFile, options, writeOptions, tableConfigs, registry);
+
+    return new RDBStore(dbFile, rocksDBOption, writeOptions, tableConfigs,
+        registry);
   }
 
-  /**
-   * if the DBProfile is not set, we will default to using default from the
-   * config file.
-   */
-  private void setDefaultDBProfile() {
-    if (dbProfile == null) {
-      dbProfile = this.configuration.getEnum(HDDS_DB_PROFILE,
-          HDDS_DEFAULT_DB_PROFILE);
-    }
-    LOG.debug("default profile:{}", dbProfile);
+  public DBStoreBuilder setName(String name) {
+    dbname = name;
+    return this;
   }
 
-  private void processTables() throws IOException {
-    List<String> list = new ArrayList<>(tableNames);
-    list.add(DEFAULT_COLUMN_FAMILY_NAME);
-    for (String name : list) {
-      LOG.debug("using default profile for table:{}", name);
-      addTableDefinition(name, dbProfile.getColumnFamilyOptions());
-    }
+  public DBStoreBuilder addTable(String tableName) {
+    return addTable(tableName, null);
   }
 
-  private DBOptions getDbProfile() {
-    if (rocksDBOption != null) {
-      return rocksDBOption;
+  public DBStoreBuilder addTable(String tableName,
+      ColumnFamilyOptions options) {
+    tableOptions.put(tableName, options);
+    return this;
+  }
+
+  public <T> DBStoreBuilder addCodec(Class<T> type, Codec<T> codec) {
+    registry.addCodec(type, codec);
+    return this;
+  }
+
+  public DBStoreBuilder setDBOptions(DBOptions option) {
+    rocksDBOption = option;
+    return this;
+  }
+
+  public DBStoreBuilder setDefaultColumnFamilyOptions(
+      ColumnFamilyOptions cfOptions) {
+    defaultColumnFamilyOptions = cfOptions;
+    return this;
+  }
+
+  public DBStoreBuilder setPath(Path path) {
+    Preconditions.checkNotNull(path);
+    dbPath = path;
+    return this;
+  }
+
+  private Set<TableConfig> makeTableConfigs() throws IOException {
+    Set<TableConfig> tableConfigs = new HashSet<>();
+
+    tableOptions.putIfAbsent(DEFAULT_COLUMN_FAMILY_NAME,
+        defaultColumnFamilyOptions);
+
+    for (Map.Entry<String, ColumnFamilyOptions> entry:
+        tableOptions.entrySet()) {
+      String name = entry.getKey();
+      ColumnFamilyOptions options = entry.getValue();
+
+      if (options == null) {
+        LOG.debug("using default profile for table:{}", name);
+        tableConfigs.add(new TableConfig(name, defaultColumnFamilyOptions));
+      }
+      else {
+        tableConfigs.add(new TableConfig(name, options));
+      }
     }
+
+    return tableConfigs;
+  }
+
+  private DBOptions getDefaultDBOptions(Collection<TableConfig> tableConfigs) {
+    DBOptions dbOptions = getDBOptionsFromFile(tableConfigs);
+
+    if (dbOptions == null) {
+      dbOptions = defaultDBOptions;
+
+      LOG.debug("Using default options: {}", dbProfile);
+    }
+
+    // Apply logging settings.
+    if (rocksDBConfiguration.isRocksdbLoggingEnabled()) {
+      org.rocksdb.Logger logger = new org.rocksdb.Logger(dbOptions) {
+        @Override
+        protected void log(InfoLogLevel infoLogLevel, String s) {
+          ROCKS_DB_LOGGER.info(s);
+        }
+      };
+      InfoLogLevel level = InfoLogLevel.valueOf(rocksDBConfiguration
+          .getRocksdbLogLevel() + "_LEVEL");
+      logger.setInfoLogLevel(level);
+      dbOptions.setLogger(logger);
+    }
+
+    // Create statistics.
+    if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
+      Statistics statistics = new Statistics();
+      statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
+      dbOptions = dbOptions.setStatistics(statistics);
+    }
+
+    return dbOptions;
+  }
+
+  private DBOptions getDBOptionsFromFile(Collection<TableConfig> tableConfigs) {
     DBOptions option = null;
-    if (StringUtil.isNotBlank(dbname)) {
-      List<ColumnFamilyDescriptor> columnFamilyDescriptors = new LinkedList<>();
 
+    List<ColumnFamilyDescriptor> columnFamilyDescriptors = new ArrayList<>();
+
+    if (StringUtil.isNotBlank(dbname)) {
       for (TableConfig tc : tableConfigs) {
         columnFamilyDescriptors.add(tc.getDescriptor());
       }
@@ -248,29 +300,6 @@ public final class DBStoreBuilder {
       }
     }
 
-    if (option == null) {
-      LOG.debug("Using default options: {}", dbProfile);
-      option = dbProfile.getDBOptions();
-    }
-
-    if (rocksDBConfiguration.isRocksdbLoggingEnabled()) {
-      org.rocksdb.Logger logger = new org.rocksdb.Logger(option) {
-        @Override
-        protected void log(InfoLogLevel infoLogLevel, String s) {
-          ROCKS_DB_LOGGER.info(s);
-        }
-      };
-      InfoLogLevel level = InfoLogLevel.valueOf(rocksDBConfiguration
-          .getRocksdbLogLevel() + "_LEVEL");
-      logger.setInfoLogLevel(level);
-      option.setLogger(logger);
-    }
-
-    if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
-      Statistics statistics = new Statistics();
-      statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
-      option = option.setStatistics(statistics);
-    }
     return option;
   }
 
@@ -285,24 +314,5 @@ public final class DBStoreBuilder {
       throw new IOException("A valid DB name is required.");
     }
     return Paths.get(dbPath.toString(), dbname).toFile();
-  }
-
-  private <KEY, VALUE> DBStoreBuilder registerTables(DBDefinition definition) {
-    for (DBColumnFamilyDefinition<KEY, VALUE> columnFamily :
-            definition.getColumnFamilies()) {
-
-      if (!columnFamily.getTableName().equals(DEFAULT_COLUMN_FAMILY_NAME)) {
-        // The default column family is always added.
-        // If it is present in the DB Definition, ignore it so we don't get an
-        // error about adding it twice.
-        addTable(columnFamily.getName());
-      }
-      // Add new codecs specified for the table, which may be an alias for a
-      // table that was already added with different codecs.
-      addCodec(columnFamily.getKeyType(), columnFamily.getKeyCodec());
-      addCodec(columnFamily.getValueType(), columnFamily.getValueCodec());
-    }
-
-    return this;
   }
 }
