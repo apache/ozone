@@ -26,6 +26,8 @@ import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
@@ -111,6 +113,7 @@ public class OzoneManagerStarter extends GenericCli {
           "transactions.)",
       mixinStandardHelpOptions = true,
       versionProvider = HddsVersionProvider.class)
+  @SuppressFBWarnings("DM_EXIT")
   public void prepareOmForUpgrade() throws Exception {
     commonInit();
     boolean result = receiver.prepareForUpgrade(conf);
