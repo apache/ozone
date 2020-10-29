@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -71,12 +70,19 @@ public final class DBStoreBuilder {
   // DB PKIProfile used by ROCKDB instances.
   public static final DBProfile HDDS_DEFAULT_DB_PROFILE = DBProfile.DISK;
 
+  // the DBOptions used if the caller does not specify.
+  private final DBOptions defaultDBOptions;
+  // The DBOptions specified by the caller.
   private DBOptions rocksDBOption;
-  private DBOptions defaultDBOptions;
-  private ColumnFamilyOptions defaultColumnFamilyOptions;
+  // The column family options that will be used for any column families
+  // added by name only (without specifying options).
+  private ColumnFamilyOptions defaultCfOptions;
   private String dbname;
   private Path dbPath;
-  private Map<String, ColumnFamilyOptions> tableOptions;
+  // Maps added column family names to the column family options they were
+  // added with. Value will be null if the column family was not added with
+  // any options. On build, this will be replaced with defaultCfOptions.
+  private Map<String, ColumnFamilyOptions> cfOptions;
   private ConfigurationSource configuration;
   private CodecRegistry registry;
   private String rocksDbStat;
@@ -111,7 +117,7 @@ public final class DBStoreBuilder {
 
   private DBStoreBuilder(ConfigurationSource configuration,
       RocksDBConfiguration rocksDBConfiguration) {
-    tableOptions = new HashMap<>();
+    cfOptions = new HashMap<>();
     this.configuration = configuration;
     this.registry = new CodecRegistry();
     this.rocksDbStat = configuration.getTrimmed(
@@ -119,15 +125,17 @@ public final class DBStoreBuilder {
         OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
     this.rocksDBConfiguration = rocksDBConfiguration;
 
+    // Get default DBOptions and ColumnFamilyOptions from the default DB
+    // profile.
     DBProfile dbProfile = this.configuration.getEnum(HDDS_DB_PROFILE,
           HDDS_DEFAULT_DB_PROFILE);
-    LOG.debug("default profile:{}", dbProfile);
+    LOG.debug("Default DB profile:{}", dbProfile);
 
     defaultDBOptions = dbProfile.getDBOptions();
-    setDefaultColumnFamilyOptions(dbProfile.getColumnFamilyOptions());
+    setDefaultCfOptions(dbProfile.getColumnFamilyOptions());
   }
 
-  private DBStoreBuilder applyDBDefinition(DBDefinition definition) {
+  private void applyDBDefinition(DBDefinition definition) {
     // Set metadata dirs.
     File metadataDir = definition.getDBLocation(configuration);
 
@@ -150,8 +158,6 @@ public final class DBStoreBuilder {
       addCodec(columnFamily.getKeyType(), columnFamily.getKeyCodec());
       addCodec(columnFamily.getValueType(), columnFamily.getValueCodec());
     }
-
-    return this;
   }
 
   /**
@@ -195,7 +201,7 @@ public final class DBStoreBuilder {
 
   public DBStoreBuilder addTable(String tableName,
       ColumnFamilyOptions options) {
-    tableOptions.put(tableName, options);
+    cfOptions.put(tableName, options);
     return this;
   }
 
@@ -209,9 +215,9 @@ public final class DBStoreBuilder {
     return this;
   }
 
-  public DBStoreBuilder setDefaultColumnFamilyOptions(
+  public DBStoreBuilder setDefaultCfOptions(
       ColumnFamilyOptions cfOptions) {
-    defaultColumnFamilyOptions = cfOptions;
+    defaultCfOptions = cfOptions;
     return this;
   }
 
@@ -221,20 +227,33 @@ public final class DBStoreBuilder {
     return this;
   }
 
-  private Set<TableConfig> makeTableConfigs() throws IOException {
+  public DBStoreBuilder setProfile(DBProfile prof) {
+    setDBOptions(prof.getDBOptions());
+    setDefaultCfOptions(prof.getColumnFamilyOptions());
+    return this;
+  }
+
+  /**
+   * Converts column families and their corresponding options that have been
+   * registered with the builder to a set of {@link TableConfig} objects.
+   * Column families with no options specified will have the default column
+   * family options for this builder applied.
+   */
+  private Set<TableConfig> makeTableConfigs() {
     Set<TableConfig> tableConfigs = new HashSet<>();
 
-    tableOptions.putIfAbsent(DEFAULT_COLUMN_FAMILY_NAME,
-        defaultColumnFamilyOptions);
+    // If default column family was not added, add it with the default options.
+    cfOptions.putIfAbsent(DEFAULT_COLUMN_FAMILY_NAME,
+        defaultCfOptions);
 
     for (Map.Entry<String, ColumnFamilyOptions> entry:
-        tableOptions.entrySet()) {
+        cfOptions.entrySet()) {
       String name = entry.getKey();
       ColumnFamilyOptions options = entry.getValue();
 
       if (options == null) {
-        LOG.debug("using default profile for table:{}", name);
-        tableConfigs.add(new TableConfig(name, defaultColumnFamilyOptions));
+        LOG.debug("using default column family options for table: {}", name);
+        tableConfigs.add(new TableConfig(name, defaultCfOptions));
       }
       else {
         tableConfigs.add(new TableConfig(name, options));
@@ -244,13 +263,27 @@ public final class DBStoreBuilder {
     return tableConfigs;
   }
 
+  /**
+   * Attempts to get RocksDB {@link DBOptions} from an ini config file. If
+   * that file does not exist, the value of {@code defaultDBOptions}  is used
+   * instead.
+   * After an {@link DBOptions} is chosen, it will have the logging level
+   * specified by builder's {@link RocksDBConfiguration} applied to it. It
+   * will also have statistics added if they are not turned off in the
+   * builder's {@link ConfigurationSource}.
+   *
+   * @param tableConfigs Configurations for each column family, used when
+   * reading DB options from the ini file.
+   *
+   * @return The {@link DBOptions} that should be used as the default value
+   * for this builder if one is not specified by the caller.
+   */
   private DBOptions getDefaultDBOptions(Collection<TableConfig> tableConfigs) {
     DBOptions dbOptions = getDBOptionsFromFile(tableConfigs);
 
     if (dbOptions == null) {
       dbOptions = defaultDBOptions;
-
-      LOG.debug("Using default options: {}", dbProfile);
+      LOG.debug("Using RocksDB DBOptions from default profile.");
     }
 
     // Apply logging settings.
@@ -277,6 +310,12 @@ public final class DBStoreBuilder {
     return dbOptions;
   }
 
+  /**
+   * Attempts to construct a {@link DBOptions} object from the configuration
+   * directory with name equal to {@code database name}.ini, where {@code
+   * database name} is the property set by
+   * {@link DBStoreBuilder#setName(String)}.
+   */
   private DBOptions getDBOptionsFromFile(Collection<TableConfig> tableConfigs) {
     DBOptions option = null;
 
@@ -292,10 +331,10 @@ public final class DBStoreBuilder {
           option = DBConfigFromFile.readFromFile(dbname,
               columnFamilyDescriptors);
           if(option != null) {
-            LOG.info("Using Configs from {}.ini file", dbname);
+            LOG.info("Using RocksDB DBOptions from {}.ini file", dbname);
           }
         } catch (IOException ex) {
-          LOG.info("Unable to read RocksDB config from {}", dbname, ex);
+          LOG.info("Unable to read RocksDB DBOptions from {}", dbname, ex);
         }
       }
     }
