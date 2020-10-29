@@ -459,7 +459,7 @@ public class KeyManagerImpl implements KeyManager {
         args.getVolumeName(), args.getBucketName(), args.getKeyName());
 
     FileEncryptionInfo encInfo;
-    metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
+    metadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
         bucketName);
     OmBucketInfo bucketInfo;
     try {
@@ -473,7 +473,7 @@ public class KeyManagerImpl implements KeyManager {
           volumeName, bucketName, keyName, ex);
       throw new OMException(ex.getMessage(), ResultCodes.KEY_ALLOCATION_ERROR);
     } finally {
-      metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
+      metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
           bucketName);
     }
     if (keyInfo == null) {

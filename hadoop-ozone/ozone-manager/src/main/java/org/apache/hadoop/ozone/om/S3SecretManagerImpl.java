@@ -61,7 +61,7 @@ public class S3SecretManagerImpl implements S3SecretManager {
     Preconditions.checkArgument(Strings.isNotBlank(kerberosID),
         "kerberosID cannot be null or empty.");
     S3SecretValue result = null;
-    omMetadataManager.getLock().acquireReadLock(S3_SECRET_LOCK, kerberosID);
+    omMetadataManager.getLock().acquireWriteLock(S3_SECRET_LOCK, kerberosID);
     try {
       S3SecretValue s3Secret =
           omMetadataManager.getS3SecretTable().get(kerberosID);
@@ -73,7 +73,7 @@ public class S3SecretManagerImpl implements S3SecretManager {
         return s3Secret;
       }
     } finally {
-      omMetadataManager.getLock().releaseReadLock(S3_SECRET_LOCK, kerberosID);
+      omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK, kerberosID);
     }
     if (LOG.isTraceEnabled()) {
       LOG.trace("Secret for accessKey:{}, proto:{}", kerberosID, result);
