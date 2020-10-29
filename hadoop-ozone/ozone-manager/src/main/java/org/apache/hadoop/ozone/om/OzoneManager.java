@@ -1182,7 +1182,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     omRpcServer.start();
     isOmRpcServerRunning = true;
-    startTrashEmptier(configuration);
+    // Run the trash Emptier only on the leader node
+    if (isLeader()){
+      startTrashEmptier(configuration);
+    }
     registerMXBean();
 
     startJVMPauseMonitor();
@@ -1242,7 +1245,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     isOmRpcServerRunning = true;
 
-    startTrashEmptier(configuration);
+    if (isLeader()) {
+      startTrashEmptier(configuration);
+    }
 
     registerMXBean();
 
