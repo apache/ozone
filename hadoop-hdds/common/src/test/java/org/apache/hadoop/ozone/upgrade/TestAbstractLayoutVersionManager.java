@@ -26,21 +26,16 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.util.Iterator;
-import java.util.Map;
 
-import org.apache.log4j.Layout;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.Spy;
 import org.mockito.junit.MockitoJUnitRunner;
-import sun.jvm.hotspot.oops.Metadata;
 
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
-import javax.management.openmbean.TabularData;
-
 
 /**
  * Test generic layout management init and APIs.

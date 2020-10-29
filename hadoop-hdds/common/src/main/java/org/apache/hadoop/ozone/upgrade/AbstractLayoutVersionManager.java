@@ -20,16 +20,13 @@ package org.apache.hadoop.ozone.upgrade;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.metrics2.util.MBeans;
-import picocli.CommandLine;
 
 import javax.management.ObjectName;
 
