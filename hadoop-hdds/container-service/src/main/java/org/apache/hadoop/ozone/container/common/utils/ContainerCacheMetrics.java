@@ -26,7 +26,7 @@ import org.apache.hadoop.metrics2.lib.MutableRate;
 /**
  * Metrics for the usage of ContainerDB.
  */
-public class ContainerCacheMetrics {
+public final class ContainerCacheMetrics {
 
   private final String name;
   private final MetricsSystem ms;

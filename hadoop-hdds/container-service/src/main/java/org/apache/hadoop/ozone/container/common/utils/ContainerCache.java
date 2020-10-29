@@ -48,7 +48,7 @@ public final class ContainerCache extends LRUMap {
   private static ContainerCache cache;
   private static final float LOAD_FACTOR = 0.75f;
   private final Striped<Lock> rocksDBLock;
-  private final ContainerCacheMetrics metrics;
+  private static ContainerCacheMetrics metrics;
   /**
    * Constructs a cache that holds DBHandle references.
    */
@@ -56,12 +56,11 @@ public final class ContainerCache extends LRUMap {
       scanUntilRemovable) {
     super(maxSize, loadFactor, scanUntilRemovable);
     rocksDBLock = Striped.lazyWeakLock(stripes);
-    metrics = ContainerCacheMetrics.create();
   }
 
   @VisibleForTesting
   public ContainerCacheMetrics getMetrics() {
-    return this.metrics;
+    return metrics;
   }
 
   /**
@@ -80,6 +79,7 @@ public final class ContainerCache extends LRUMap {
           OzoneConfigKeys.OZONE_CONTAINER_CACHE_LOCK_STRIPES,
           OzoneConfigKeys.OZONE_CONTAINER_CACHE_LOCK_STRIPES_DEFAULT);
       cache = new ContainerCache(cacheSize, stripes, LOAD_FACTOR, true);
+      metrics = ContainerCacheMetrics.create();
     }
     return cache;
   }
