@@ -35,6 +35,7 @@ import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.Spy;
 import org.mockito.junit.MockitoJUnitRunner;
+import sun.jvm.hotspot.oops.Metadata;
 
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
@@ -164,7 +165,9 @@ public class TestAbstractLayoutVersionManager {
   @Test
   public void testJmx() throws Exception {
     final int numLayoutFeatures = 3;
-    versionManager.init(1, getTestLayoutFeatures(numLayoutFeatures));
+    final int metadataLayoutVersion = 1;
+    versionManager.init(metadataLayoutVersion,
+        getTestLayoutFeatures(numLayoutFeatures));
 
     MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
     ObjectName bean = new ObjectName(
@@ -172,12 +175,9 @@ public class TestAbstractLayoutVersionManager {
             "name=AbstractLayoutVersionManager");
 
     Object mlv = mbs.getAttribute(bean, "MetadataLayoutVersion");
-    assertEquals(1, mlv);
+    assertEquals(metadataLayoutVersion, mlv);
     Object slv = mbs.getAttribute(bean, "SoftwareLayoutVersion");
     assertEquals(numLayoutFeatures, slv);
-
-    Object features = mbs.getAttribute(bean, "LayoutFeatures");
-//    System.out.println(features.toString());
   }
 
   private LayoutFeature[] getTestLayoutFeatures(int num) {

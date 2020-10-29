@@ -118,11 +118,6 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   }
 
   @Override
-  public LayoutFeature getLayoutFeatures() {
-    return features.get(0);
-  }
-
-  @Override
   public boolean needsFinalization() {
     return metadataLayoutVersion < softwareLayoutVersion;
   }

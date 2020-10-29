@@ -18,33 +18,17 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
-import javax.management.openmbean.CompositeData;
-import javax.management.openmbean.CompositeDataSupport;
-import javax.management.openmbean.CompositeDataView;
-import javax.management.openmbean.CompositeType;
-import javax.management.openmbean.OpenDataException;
-import java.util.Collections;
 import java.util.Optional;
 
 /**
  * Generic Layout feature interface for Ozone.
  */
-public interface LayoutFeature extends CompositeDataView {
+public interface LayoutFeature {
   String name();
 
   int layoutVersion();
 
   String description();
-
-  @Override
-  default CompositeData toCompositeData(CompositeType ct) {
-    try {
-      return new CompositeDataSupport(ct, Collections.EMPTY_MAP);
-    }
-    catch (OpenDataException e) {
-      throw new RuntimeException(e);
-    }
-  }
 
   default Optional<? extends UpgradeAction> onFinalizeAction() {
     return Optional.empty();
