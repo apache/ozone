@@ -95,7 +95,7 @@ import org.slf4j.LoggerFactory;
  */
 public class SCMNodeManager implements NodeManager {
 
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(SCMNodeManager.class);
 
   private final NodeStateManager nodeStateManager;
@@ -434,7 +434,7 @@ public class SCMNodeManager implements NodeManager {
 
       // If the data node slv is > scm slv => log error condition
       if (dnSlv > scmSlv) {
-        LOG.error("Rogue data node {} in the cluster. " +
+        LOG.error("Rogue data node in the cluster : {}. " +
                 "DataNode SoftwareLayoutVersion = {}, SCM " +
                 "SoftwareLayoutVersion = {}",
             datanodeDetails.getHostName(), dnSlv, scmSlv);

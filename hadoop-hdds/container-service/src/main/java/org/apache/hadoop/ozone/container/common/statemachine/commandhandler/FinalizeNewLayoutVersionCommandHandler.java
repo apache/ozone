@@ -63,7 +63,7 @@ public class FinalizeNewLayoutVersionCommandHandler implements CommandHandler {
   @Override
   public void handle(SCMCommand command, OzoneContainer ozoneContainer,
       StateContext context, SCMConnectionManager connectionManager) {
-    LOG.debug("Processing FinalizeNewLayoutVersionCommandHandler command.");
+    LOG.info("Processing FinalizeNewLayoutVersionCommandHandler command.");
     invocationCount.incrementAndGet();
     final long startTime = Time.monotonicNow();
     final DatanodeDetails datanodeDetails = context.getParent()
