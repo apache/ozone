@@ -20,25 +20,33 @@ package org.apache.hadoop.ozone.upgrade;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.metrics2.util.MBeans;
+import picocli.CommandLine;
+
+import javax.management.ObjectName;
 
 /**
  * Layout Version Manager containing generic method implementations.
  */
 @SuppressWarnings("visibilitymodifier")
 public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
-    implements LayoutVersionManager {
+    implements LayoutVersionManager, LayoutVersionManagerMXBean {
 
   protected int metadataLayoutVersion; // MLV.
   protected int softwareLayoutVersion; // SLV.
   protected TreeMap<Integer, T> features = new TreeMap<>();
   protected Map<String, T> featureMap = new HashMap<>();
   protected volatile boolean isInitialized = false;
+
+  private ObjectName mxBean;
 
   protected void init(int version, T[] lfs) throws IOException {
 
@@ -54,6 +62,9 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
                 metadataLayoutVersion, softwareLayoutVersion));
       }
     }
+
+    mxBean = MBeans.register("LayoutVersionManager",
+        "AbstractLayoutVersionManager", this);
   }
 
   private void initializeFeatures(T[] lfs) {
@@ -104,6 +115,11 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   @Override
   public int getSoftwareLayoutVersion() {
     return softwareLayoutVersion;
+  }
+
+  @Override
+  public LayoutFeature getLayoutFeatures() {
+    return features.get(0);
   }
 
   @Override

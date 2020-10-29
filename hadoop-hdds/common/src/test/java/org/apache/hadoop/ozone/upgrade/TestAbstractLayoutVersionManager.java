@@ -24,14 +24,21 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.util.Iterator;
+import java.util.Map;
 
+import org.apache.log4j.Layout;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.Spy;
 import org.mockito.junit.MockitoJUnitRunner;
+
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
+import javax.management.openmbean.TabularData;
 
 
 /**
@@ -152,6 +159,25 @@ public class TestAbstractLayoutVersionManager {
 
     assertFalse(versionManager.isAllowed(lfs[2].name()));
     assertFalse(versionManager.isAllowed(lfs[2]));
+  }
+
+  @Test
+  public void testJmx() throws Exception {
+    final int numLayoutFeatures = 3;
+    versionManager.init(1, getTestLayoutFeatures(numLayoutFeatures));
+
+    MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+    ObjectName bean = new ObjectName(
+        "Hadoop:service=LayoutVersionManager," +
+            "name=AbstractLayoutVersionManager");
+
+    Object mlv = mbs.getAttribute(bean, "MetadataLayoutVersion");
+    assertEquals(1, mlv);
+    Object slv = mbs.getAttribute(bean, "SoftwareLayoutVersion");
+    assertEquals(numLayoutFeatures, slv);
+
+    Object features = mbs.getAttribute(bean, "LayoutFeatures");
+//    System.out.println(features.toString());
   }
 
   private LayoutFeature[] getTestLayoutFeatures(int num) {
