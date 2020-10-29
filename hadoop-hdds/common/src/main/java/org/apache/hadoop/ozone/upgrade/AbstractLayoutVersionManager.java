@@ -28,8 +28,6 @@ import java.util.stream.Collectors;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.metrics2.util.MBeans;
 
-import javax.management.ObjectName;
-
 /**
  * Layout Version Manager containing generic method implementations.
  */
