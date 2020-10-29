@@ -43,8 +43,6 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   protected Map<String, T> featureMap = new HashMap<>();
   protected volatile boolean isInitialized = false;
 
-  private ObjectName mxBean;
-
   protected void init(int version, T[] lfs) throws IOException {
 
     if (!isInitialized) {
@@ -60,7 +58,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
       }
     }
 
-    mxBean = MBeans.register("LayoutVersionManager",
+    MBeans.register("LayoutVersionManager",
         "AbstractLayoutVersionManager", this);
   }
 
