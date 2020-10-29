@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -160,7 +161,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
     OmBucketInfo omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo);
 
     // Add layout version V1 to bucket info
-    addLayoutVersionToBucket(omBucketInfo);
+    addLayoutVersionToBucket(ozoneManager, omBucketInfo);
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
@@ -254,14 +255,22 @@ public class OMBucketCreateRequest extends OMClientRequest {
     }
   }
 
-  private void addLayoutVersionToBucket(OmBucketInfo omBucketInfo) {
+  private void addLayoutVersionToBucket(OzoneManager ozoneManager,
+                                        OmBucketInfo omBucketInfo) {
     Map<String, String> metadata = omBucketInfo.getMetadata();
     if (metadata == null) {
       metadata = new HashMap<>();
     }
-    metadata.put(OMConfigKeys.OZONE_OM_LAYOUT_VERSION,
-            OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1);
-    omBucketInfo.setMetadata(metadata);
+    OzoneConfiguration configuration = ozoneManager.getConfiguration();
+    // TODO: Many unit test cases has null config and done a simple null
+    //  check now. It can be done later, to avoid massive test code changes.
+    if (configuration != null) {
+      String layOutVersion = configuration
+              .get(OMConfigKeys.OZONE_OM_LAYOUT_VERSION,
+                      OMConfigKeys.OZONE_OM_LAYOUT_VERSION_DEFAULT);
+      metadata.put(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, layOutVersion);
+      omBucketInfo.setMetadata(metadata);
+    }
   }
 
   /**

@@ -213,8 +213,8 @@ public class OMKeyRenameRequestV1 extends OMKeyRenameRequest {
     switch (result) {
     case SUCCESS:
       LOG.debug("Rename Key is successfully completed for volume:{} bucket:{}" +
-                      " fromKey:{} toKey:{}. ", volumeName, bucketName, fromKeyName,
-              toKeyName);
+                      " fromKey:{} toKey:{}. ", volumeName, bucketName,
+              fromKeyName, toKeyName);
       break;
     case FAILURE:
       ozoneManager.getMetrics().incNumKeyRenameFails();
@@ -229,7 +229,7 @@ public class OMKeyRenameRequestV1 extends OMKeyRenameRequest {
     return omClientResponse;
   }
 
-  @NotNull
+  @SuppressWarnings("parameternumber")
   private OMClientResponse renameKey(long toKeyParentId,
       long trxnLogIndex, OmKeyInfo fromKeyValue,
       boolean isRenameDirectory, String toKeyName,

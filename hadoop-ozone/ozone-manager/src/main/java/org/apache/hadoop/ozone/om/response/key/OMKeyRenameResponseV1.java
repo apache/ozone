@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
@@ -49,21 +50,21 @@ public class OMKeyRenameResponseV1 extends OMKeyRenameResponse {
   @Override
   public void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
-    String volumeName = getRenameKeyInfo().getVolumeName();
-    String bucketName = getRenameKeyInfo().getBucketName();
 
     if (isRenameDirectory) {
       omMetadataManager.getDirectoryTable().deleteWithBatch(batchOperation,
               getFromKeyName());
 
+      OmDirectoryInfo renameDirInfo =
+              OMFileRequest.getDirectoryInfo(getRenameKeyInfo());
       omMetadataManager.getDirectoryTable().putWithBatch(batchOperation,
-              getToKeyName(), OMFileRequest.getDirectoryInfo(getRenameKeyInfo()));
+              getToKeyName(), renameDirInfo);
 
     } else {
       omMetadataManager.getKeyTable().deleteWithBatch(batchOperation,
               getFromKeyName());
-      omMetadataManager.getKeyTable().putWithBatch(batchOperation, getToKeyName(),
-              getRenameKeyInfo());
+      omMetadataManager.getKeyTable().putWithBatch(batchOperation,
+              getToKeyName(), getRenameKeyInfo());
     }
   }
 }

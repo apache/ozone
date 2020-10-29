@@ -130,8 +130,9 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
             actualSubDirPathExists);
 
     // Test if one path belongs to other FileSystem.
+    Path fakeDir = new Path(fs.getUri().toString() + "fake" + dir);
     LambdaTestUtils.intercept(IllegalArgumentException.class, "Wrong FS",
-            () -> fs.rename(new Path(fs.getUri().toString() + "fake" + dir), dest));
+        () -> fs.rename(fakeDir, dest));
   }
 
   /**
