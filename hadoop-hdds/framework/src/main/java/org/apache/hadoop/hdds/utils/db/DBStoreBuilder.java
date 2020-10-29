@@ -227,6 +227,10 @@ public final class DBStoreBuilder {
     return this;
   }
 
+  /**
+   * Set the {@link DBOptions} and default {@link ColumnFamilyOptions} based
+   * on {@code prof}.
+   */
   public DBStoreBuilder setProfile(DBProfile prof) {
     setDBOptions(prof.getDBOptions());
     setDefaultCfOptions(prof.getColumnFamilyOptions());
