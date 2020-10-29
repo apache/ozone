@@ -136,7 +136,7 @@ public class DatanodeRatisServerConfig {
     return shouldDeleteRatisLogDirectory;
   }
 
-  public void setLeaderNumPendingRequests(boolean shouldDeleteRatisLogDirectory) {
-    this.shouldDeleteRatisLogDirectory = shouldDeleteRatisLogDirectory;
+  public void setLeaderNumPendingRequests(boolean delete) {
+    this.shouldDeleteRatisLogDirectory = delete;
   }
 }
