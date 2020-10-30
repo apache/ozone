@@ -23,6 +23,7 @@ import javax.enterprise.inject.Produces;
 import javax.inject.Inject;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.security.PrivilegedExceptionAction;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
@@ -36,6 +37,7 @@ import org.apache.hadoop.security.token.Token;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 import static org.apache.hadoop.ozone.s3.SignatureProcessor.UTF_8;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
 import org.slf4j.Logger;
@@ -65,7 +67,7 @@ public class OzoneClientProducer {
 
 
   @Produces
-  public OzoneClient createClient() throws IOException {
+  public OzoneClient createClient() throws OS3Exception, IOException {
     client = getClient(ozoneConfiguration);
     return client;
   }
@@ -75,7 +77,9 @@ public class OzoneClientProducer {
     client.close();
   }
 
-  private OzoneClient getClient(OzoneConfiguration config) throws IOException {
+  private OzoneClient getClient(OzoneConfiguration config)
+      throws OS3Exception {
+    OzoneClient ozoneClient = null;
     try {
       String awsAccessId = signatureParser.getAwsAccessId();
       validateAccessId(awsAccessId);
@@ -100,21 +104,33 @@ public class OzoneClientProducer {
               omService);
           remoteUser.addToken(token);
         } catch (OS3Exception | URISyntaxException ex) {
-          LOG.error("S3 auth info creation failed.", ex);
           throw S3_AUTHINFO_CREATION_ERROR;
         }
       }
-      UserGroupInformation.setLoginUser(remoteUser);
-    } catch (Exception e) {
-      LOG.error("Error: ", e);
+      ozoneClient =
+          remoteUser.doAs((PrivilegedExceptionAction<OzoneClient>)() -> {
+            if (omServiceID == null) {
+              return OzoneClientFactory.getRpcClient(ozoneConfiguration);
+            } else {
+              // As in HA case, we need to pass om service ID.
+              return OzoneClientFactory.getRpcClient(omServiceID,
+                  ozoneConfiguration);
+            }
+          });
+    } catch (OS3Exception ex) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Error during Client Creation: ", ex);
+      }
+      throw ex;
+    } catch (Throwable t) {
+      // For any other critical errors during object creation throw Internal
+      // error.
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Error during Client Creation: ", t);
+        throw INTERNAL_ERROR;
+      }
     }
-
-    if (omServiceID == null) {
-      return OzoneClientFactory.getRpcClient(ozoneConfiguration);
-    } else {
-      // As in HA case, we need to pass om service ID.
-      return OzoneClientFactory.getRpcClient(omServiceID, ozoneConfiguration);
-    }
+    return ozoneClient;
   }
 
   // ONLY validate aws access id when needed.

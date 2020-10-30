@@ -129,7 +129,6 @@ public class AWSSignatureProcessor implements SignatureProcessor {
 
 
   private void parse() throws Exception {
-    Preconditions.checkNotNull(v4Header);
 
     StringBuilder strToSign = new StringBuilder();
     // According to AWS sigv4 documentation, authorization header should be
@@ -175,7 +174,6 @@ public class AWSSignatureProcessor implements SignatureProcessor {
 
   @VisibleForTesting
   protected String buildCanonicalRequest() throws OS3Exception {
-    Preconditions.checkNotNull(v4Header);
 
     Iterable<String> parts = split("/", uri);
     List<String> encParts = new ArrayList<>();
