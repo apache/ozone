@@ -132,7 +132,7 @@ public final class DBStoreBuilder {
     LOG.debug("Default DB profile:{}", dbProfile);
 
     defaultDBOptions = dbProfile.getDBOptions();
-    setDefaultCfOptions(dbProfile.getColumnFamilyOptions());
+    setDefaultCFOptions(dbProfile.getColumnFamilyOptions());
   }
 
   private void applyDBDefinition(DBDefinition definition) {
@@ -215,7 +215,7 @@ public final class DBStoreBuilder {
     return this;
   }
 
-  public DBStoreBuilder setDefaultCfOptions(
+  public DBStoreBuilder setDefaultCFOptions(
       ColumnFamilyOptions cfOptions) {
     defaultCfOptions = cfOptions;
     return this;
@@ -233,7 +233,7 @@ public final class DBStoreBuilder {
    */
   public DBStoreBuilder setProfile(DBProfile prof) {
     setDBOptions(prof.getDBOptions());
-    setDefaultCfOptions(prof.getColumnFamilyOptions());
+    setDefaultCFOptions(prof.getColumnFamilyOptions());
     return this;
   }
 
