@@ -505,7 +505,7 @@ public class TestSCMNodeManager {
       DatanodeDetails node1 =
           TestUtils.createRandomDatanodeAndRegister(nodeManager);
       GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(SCMNodeManager.LOG);
+          .captureLogs(SCMNodeManager.LOG);
       int scmMlv =
           nodeManager.getLayoutVersionManager().getMetadataLayoutVersion();
       nodeManager.processLayoutVersionReport(node1,

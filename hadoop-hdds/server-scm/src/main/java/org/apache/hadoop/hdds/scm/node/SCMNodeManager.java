@@ -69,7 +69,6 @@ import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.util.ReflectionUtils;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -427,8 +426,6 @@ public class SCMNodeManager implements NodeManager {
     if (layoutVersionReport != null) {
       int scmSlv = scmLayoutVersionManager.getSoftwareLayoutVersion();
       int scmMlv = scmLayoutVersionManager.getMetadataLayoutVersion();
-      UpgradeFinalizer.Status scmUpgradeState =
-          scmLayoutVersionManager.getUpgradeState();
       int dnSlv = layoutVersionReport.getSoftwareLayoutVersion();
       int dnMlv = layoutVersionReport.getMetadataLayoutVersion();
 
