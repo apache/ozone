@@ -24,6 +24,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.util.Iterator;
 
 import org.junit.Rule;
@@ -33,6 +34,8 @@ import org.junit.runner.RunWith;
 import org.mockito.Spy;
 import org.mockito.junit.MockitoJUnitRunner;
 
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
 
 /**
  * Test generic layout management init and APIs.
@@ -152,6 +155,24 @@ public class TestAbstractLayoutVersionManager {
 
     assertFalse(versionManager.isAllowed(lfs[2].name()));
     assertFalse(versionManager.isAllowed(lfs[2]));
+  }
+
+  @Test
+  public void testJmx() throws Exception {
+    final int numLayoutFeatures = 3;
+    final int metadataLayoutVersion = 1;
+    versionManager.init(metadataLayoutVersion,
+        getTestLayoutFeatures(numLayoutFeatures));
+
+    MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+    ObjectName bean = new ObjectName(
+        "Hadoop:service=LayoutVersionManager," +
+            "name=AbstractLayoutVersionManager");
+
+    Object mlv = mbs.getAttribute(bean, "MetadataLayoutVersion");
+    assertEquals(metadataLayoutVersion, mlv);
+    Object slv = mbs.getAttribute(bean, "SoftwareLayoutVersion");
+    assertEquals(numLayoutFeatures, slv);
   }
 
   private LayoutFeature[] getTestLayoutFeatures(int num) {
