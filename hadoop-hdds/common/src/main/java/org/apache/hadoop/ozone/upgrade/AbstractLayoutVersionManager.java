@@ -30,13 +30,14 @@ import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.metrics2.util.MBeans;
 
 /**
  * Layout Version Manager containing generic method implementations.
  */
 @SuppressWarnings("visibilitymodifier")
 public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
-    implements LayoutVersionManager {
+    implements LayoutVersionManager, LayoutVersionManagerMXBean {
 
   protected int metadataLayoutVersion; // MLV.
   protected int softwareLayoutVersion; // SLV.
@@ -62,6 +63,9 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
         currentUpgradeState = ALREADY_FINALIZED;
       }
     }
+
+    MBeans.register("LayoutVersionManager",
+        "AbstractLayoutVersionManager", this);
   }
 
   public UpgradeFinalizer.Status getUpgradeState() {
