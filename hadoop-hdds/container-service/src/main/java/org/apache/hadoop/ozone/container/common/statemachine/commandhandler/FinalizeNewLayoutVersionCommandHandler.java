@@ -65,13 +65,6 @@ public class FinalizeNewLayoutVersionCommandHandler implements CommandHandler {
     LOG.info("Processing FinalizeNewLayoutVersionCommandHandler command.");
     invocationCount.incrementAndGet();
     final long startTime = Time.monotonicNow();
-    //final DatanodeDetails datanodeDetails = context.getParent()
-    //    .getDatanodeDetails();
-    final FinalizeNewLayoutVersionCommandProto finalizeCommand =
-        ((FinalizeNewLayoutVersionCommand)command).getProto();
-    final ContainerController controller = ozoneContainer.getController();
-    //final boolean finalizeUpgrade =
-    //    finalizeCommand.getFinalizeNewLayoutVersion();
     try {
       // TODO : finalization logic
       if (LOG.isDebugEnabled()) {
