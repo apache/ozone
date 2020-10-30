@@ -128,6 +128,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BL
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
@@ -2298,6 +2299,8 @@ public class KeyManagerImpl implements KeyManager {
 
     int countEntries = 0;
 
+    // TODO: recursive flag=true will be handled in HDDS-4360 jira.
+
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
             bucketName);
     try {
@@ -2330,7 +2333,6 @@ public class KeyManagerImpl implements KeyManager {
         seekFileInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
         seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
 
-        // TODO: recursive flag=true will be handled in HDDS-4360 jira.
         // Order of seek -> (1)Seek dirs in dirTable (2)Seek files in fileTable
         // 1. Seek the given key in key table.
         countEntries = getFilesFromDirectory(fileStatusList, seekFileInDB,
@@ -2354,7 +2356,18 @@ public class KeyManagerImpl implements KeyManager {
          * Listing "/a", will always have the parentID as "a" irrespective of
          * the startKey value.
          */
-        // TODO: recursive flag=true will be handled in HDDS-4360 jira.
+
+        // Check startKey is an immediate child of keyName.
+        // For example, keyName=/a/ and expected startKey=/a/b.
+        // startKey can't be /xyz/b.
+        if (!OzoneFSUtils.isImmediateChild(keyName, startKey)) {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("StartKey {} is not an immediate child of keyName {}. " +
+                    "Returns empty list", startKey, keyName);
+          }
+          return Collections.emptyList();
+        }
+
         OzoneFileStatus fileStatusInfo = getOzoneFileStatusV1(volumeName,
                 bucketName, startKey, false, null, true);
 
@@ -2391,6 +2404,10 @@ public class KeyManagerImpl implements KeyManager {
         } else {
           // No key exists for the given startKey.
           // TODO: HDDS-4364: startKey can be a non-existed key
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("StartKey {} is a non-existed key and returning empty " +
+                    "list", startKey);
+          }
           return Collections.emptyList();
         }
       }
@@ -2501,9 +2518,7 @@ public class KeyManagerImpl implements KeyManager {
 
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
             cacheIter = keyTable.cacheIterator();
-    // seekKeyInDB will have two type of values.
-    // 1. "1024/"   -> startKey is null or empty
-    // 2. "1024/b"  -> startKey exists
+
     // TODO: recursive list will be handled in HDDS-4360 jira.
     while (cacheIter.hasNext() && numEntries - countEntries > 0) {
       Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry =
@@ -2520,27 +2535,12 @@ public class KeyManagerImpl implements KeyManager {
               cacheOmKeyInfo.getKeyName());
       cacheOmKeyInfo.setKeyName(fullKeyPath);
 
-      if (StringUtils.isBlank(startKey)) {
-        if (cacheKey.startsWith(seekKeyInDB) &&
-                cacheKey.compareTo(seekKeyInDB) >= 0) {
-          OzoneFileStatus fileStatus = new OzoneFileStatus(
-                  cacheOmKeyInfo, scmBlockSize, false);
-          fileStatusList.add(fileStatus);
-          countEntries++;
-        }
-      } else {
-        if (cacheKey.startsWith(Long.toString(prefixKeyInDB)) &&
-                cacheKey.compareTo(seekKeyInDB) >= 0) {
-          OzoneFileStatus fileStatus = new OzoneFileStatus(
-                  cacheOmKeyInfo, scmBlockSize, false);
-          fileStatusList.add(fileStatus);
-          countEntries++;
-        }
-      }
+      countEntries = addKeyInfoToFileStatusList(fileStatusList, prefixKeyInDB,
+              seekKeyInDB, startKey, countEntries, cacheKey, cacheOmKeyInfo,
+              false);
     }
     return countEntries;
   }
-
 
   /**
    * Helper function for listStatus to find key in DirTableCache.
@@ -2571,22 +2571,41 @@ public class KeyManagerImpl implements KeyManager {
       OmKeyInfo cacheDirKeyInfo = OMFileRequest.getOmKeyInfo(volumeName,
               bucketName, cacheOmDirInfo, fullDirPath);
 
-      if (StringUtils.isBlank(startKey)) {
-        if (cacheKey.startsWith(seekKeyInDB) &&
-                cacheKey.compareTo(seekKeyInDB) >= 0) {
-          OzoneFileStatus fileStatus = new OzoneFileStatus(cacheDirKeyInfo,
-                  scmBlockSize, true);
-          fileStatusList.add(fileStatus);
-          countEntries++;
-        }
-      } else {
-        if (cacheKey.startsWith(Long.toString(prefixKeyInDB)) &&
-                cacheKey.compareTo(seekKeyInDB) >= 0) {
-          OzoneFileStatus fileStatus = new OzoneFileStatus(cacheDirKeyInfo,
-                  scmBlockSize, true);
-          fileStatusList.add(fileStatus);
-          countEntries++;
-        }
+      countEntries = addKeyInfoToFileStatusList(fileStatusList, prefixKeyInDB,
+              seekKeyInDB, startKey, countEntries, cacheKey, cacheDirKeyInfo,
+              true);
+    }
+    return countEntries;
+  }
+
+  private int addKeyInfoToFileStatusList(Set<OzoneFileStatus> fileStatusList,
+      long prefixKeyInDB, String seekKeyInDB, String startKey,
+      int countEntries, String cacheKey, OmKeyInfo cacheOmKeyInfo,
+      boolean isDirectory) {
+    // seekKeyInDB will have two type of values.
+    // 1. "1024/"   -> startKey is null or empty
+    // 2. "1024/b"  -> startKey exists
+    if (StringUtils.isBlank(startKey)) {
+      // startKey is null or empty, then the seekKeyInDB="1024/"
+      if (cacheKey.startsWith(seekKeyInDB)) {
+        OzoneFileStatus fileStatus = new OzoneFileStatus(cacheOmKeyInfo,
+                scmBlockSize, isDirectory);
+        fileStatusList.add(fileStatus);
+        countEntries++;
+      }
+    } else {
+      // startKey not empty, then the seekKeyInDB="1024/b" and
+      // seekKeyInDBWithOnlyParentID = "1024/". This is to avoid case of
+      // parentID with "102444" cache entries.
+      // Here, it has to list all the keys after "1024/b" and requires >=0
+      // string comparison.
+      String seekKeyInDBWithOnlyParentID = prefixKeyInDB + OM_KEY_PREFIX;
+      if (cacheKey.startsWith(seekKeyInDBWithOnlyParentID) &&
+              cacheKey.compareTo(seekKeyInDB) >= 0) {
+        OzoneFileStatus fileStatus = new OzoneFileStatus(cacheOmKeyInfo,
+                scmBlockSize, isDirectory);
+        fileStatusList.add(fileStatus);
+        countEntries++;
       }
     }
     return countEntries;
