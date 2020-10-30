@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -65,6 +66,7 @@ import org.apache.hadoop.net.TableMapping;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.ReflectionUtils;
@@ -92,7 +94,7 @@ import org.slf4j.LoggerFactory;
  */
 public class SCMNodeManager implements NodeManager {
 
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(SCMNodeManager.class);
 
   private final NodeStateManager nodeStateManager;
@@ -110,6 +112,7 @@ public class SCMNodeManager implements NodeManager {
   private final int numPipelinesPerMetadataVolume;
   private final int heavyNodeCriteria;
   private final HDDSLayoutVersionManager scmLayoutVersionManager;
+  private final EventPublisher scmNodeEventPublisher;
 
   /**
    * Constructs SCM machine Manager.
@@ -119,6 +122,7 @@ public class SCMNodeManager implements NodeManager {
                         EventPublisher eventPublisher,
                         NetworkTopology networkTopology,
                         HDDSLayoutVersionManager layoutVersionManager) {
+    this.scmNodeEventPublisher = eventPublisher;
     this.nodeStateManager = new NodeStateManager(conf, eventPublisher);
     this.version = VersionInfo.getLatestVersion();
     this.commandQueue = new CommandQueue();
@@ -397,6 +401,64 @@ public class SCMNodeManager implements NodeManager {
       metrics.incNumNodeReportProcessingFailed();
       LOG.warn("Got node report from unregistered datanode {}",
           datanodeDetails);
+    }
+  }
+
+  /**
+   * Process Layout Version report.
+   *
+   * @param datanodeDetails
+   * @param layoutVersionReport
+   */
+  @Override
+  public void processLayoutVersionReport(DatanodeDetails datanodeDetails,
+                                LayoutVersionProto layoutVersionReport) {
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Processing Layout Version report from [datanode={}]",
+          datanodeDetails.getHostName());
+    }
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("HB is received from [datanode={}]: <json>{}</json>",
+          datanodeDetails.getHostName(),
+          layoutVersionReport.toString().replaceAll("\n", "\\\\n"));
+    }
+
+    if (layoutVersionReport != null) {
+      int scmSlv = scmLayoutVersionManager.getSoftwareLayoutVersion();
+      int scmMlv = scmLayoutVersionManager.getMetadataLayoutVersion();
+      int dnSlv = layoutVersionReport.getSoftwareLayoutVersion();
+      int dnMlv = layoutVersionReport.getMetadataLayoutVersion();
+
+      // If the data node slv is > scm slv => log error condition
+      if (dnSlv > scmSlv) {
+        LOG.error("Rogue data node in the cluster : {}. " +
+                "DataNode SoftwareLayoutVersion = {}, SCM " +
+                "SoftwareLayoutVersion = {}",
+            datanodeDetails.getHostName(), dnSlv, scmSlv);
+      }
+
+      // If the datanode slv < scm slv, it can not be allowed to be part of
+      // any pipeline. However it can be allowed to join the cluster
+      if (dnMlv < scmMlv) {
+        LOG.warn("Data node {} can not be used in any pipeline in the " +
+                "cluster. " + "DataNode MetadataLayoutVersion = {}, SCM " +
+                "MetadataLayoutVersion = {}",
+            datanodeDetails.getHostName(), dnMlv, scmMlv);
+
+        // TBD: Add NEED_UPGRADE state and fill out state transitions
+        // around this state. Fire event to move this data node to
+        // NEED_UPGRADE state. The DataNode will be considered HEALTHY in
+        // this state but it can not be made part of any Pipeline.
+
+        // Also send Finalize command to the data node. Its OK to
+        // send Finalize command multiple times.
+        scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
+            new CommandForDatanode<>(datanodeDetails.getUuid(),
+                new FinalizeNewLayoutVersionCommand(true,
+                    LayoutVersionProto.newBuilder()
+                        .setSoftwareLayoutVersion(dnSlv)
+                        .setMetadataLayoutVersion(dnSlv).build())));
+      }
     }
   }
 

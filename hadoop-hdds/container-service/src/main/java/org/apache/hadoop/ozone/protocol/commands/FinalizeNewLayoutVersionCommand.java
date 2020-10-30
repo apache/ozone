@@ -44,6 +44,13 @@ public class FinalizeNewLayoutVersionCommand
     this.layoutInfo = layoutInfo;
   }
 
+  public FinalizeNewLayoutVersionCommand(boolean finalizeNewLayoutVersion,
+                                         LayoutVersionProto layoutInfo) {
+    super();
+    finalizeUpgrade = finalizeNewLayoutVersion;
+    this.layoutInfo = layoutInfo;
+  }
+
   /**
    * Returns the type of this command.
    *

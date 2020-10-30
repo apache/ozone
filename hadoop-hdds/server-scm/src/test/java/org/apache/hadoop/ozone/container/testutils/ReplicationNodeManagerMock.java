@@ -322,6 +322,17 @@ public class ReplicationNodeManagerMock implements NodeManager {
     // do nothing.
   }
 
+  /**
+   * Empty implementation for processLayoutVersionReport.
+   * @param dnUuid
+   * @param layoutVersionReport
+   */
+  @Override
+  public void processLayoutVersionReport(DatanodeDetails dnUuid,
+                                LayoutVersionProto layoutVersionReport) {
+    // do nothing.
+  }
+
   @Override
   public void onMessage(CommandForDatanode commandForDatanode,
                         EventPublisher publisher) {
