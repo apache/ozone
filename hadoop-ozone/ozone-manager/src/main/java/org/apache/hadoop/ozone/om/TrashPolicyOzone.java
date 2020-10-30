@@ -73,7 +73,7 @@ public class TrashPolicyOzone extends TrashPolicy {
   }
 
   @Override
-  public void initialize(Configuration conf, FileSystem fileSystem, Path path) {
+  public void initialize(Configuration conf, FileSystem fs, Path path) {
     this.fs = fs;
     this.deletionInterval = (long)(conf.getFloat(
         FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT)
