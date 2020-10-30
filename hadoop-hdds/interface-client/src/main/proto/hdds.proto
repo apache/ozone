@@ -131,6 +131,8 @@ enum NodeState {
     DEAD = 3;
     DECOMMISSIONING = 4;
     DECOMMISSIONED = 5;
+    HEALTHY_READ_ONLY = 6;
+
 }
 
 enum QueryScope {

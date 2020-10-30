@@ -144,6 +144,7 @@ public class OMUpgradeFinalizer implements UpgradeFinalizer<OzoneManager> {
           versionManager.finalized(f);
         }
 
+        versionManager.completeFinalization();
         emitFinishedMsg();
       } finally {
         isDone = true;

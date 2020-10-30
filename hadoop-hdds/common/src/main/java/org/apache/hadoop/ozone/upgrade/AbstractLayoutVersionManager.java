@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.ALREADY_FINALIZED;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
+
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -39,6 +43,8 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   protected TreeMap<Integer, T> features = new TreeMap<>();
   protected Map<String, T> featureMap = new HashMap<>();
   protected volatile boolean isInitialized = false;
+  protected volatile UpgradeFinalizer.Status currentUpgradeState =
+      FINALIZATION_REQUIRED;
 
   protected void init(int version, T[] lfs) throws IOException {
 
@@ -52,8 +58,14 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
             String.format("Cannot initialize VersionManager. Metadata " +
                     "layout version (%d) > software layout version (%d)",
                 metadataLayoutVersion, softwareLayoutVersion));
+      } else if (metadataLayoutVersion == softwareLayoutVersion) {
+        currentUpgradeState = ALREADY_FINALIZED;
       }
     }
+  }
+
+  public UpgradeFinalizer.Status getUpgradeState() {
+    return currentUpgradeState;
   }
 
   private void initializeFeatures(T[] lfs) {
@@ -71,6 +83,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
     featureMap.clear();
     features.clear();
     isInitialized = false;
+    currentUpgradeState = ALREADY_FINALIZED;
   }
 
   public void finalized(T layoutFeature) {
@@ -90,6 +103,10 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
           msgStart + "Software Layout version: " + softwareLayoutVersion
               + " Feature Layout version: " + layoutFeature.layoutVersion());
     }
+  }
+
+  public void completeFinalization() {
+    currentUpgradeState = FINALIZATION_DONE;
   }
 
   private boolean softwareIsBehindMetaData() {

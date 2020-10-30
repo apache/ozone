@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -46,9 +47,11 @@ import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
@@ -67,6 +70,7 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.finalizeNewLayoutVersionCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.errorNodeNotPermitted;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.success;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
@@ -74,17 +78,23 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCE
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.TestUtils.getRandomPipelineReports;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.*;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 import org.junit.After;
 import org.junit.Assert;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 /**
@@ -477,6 +487,66 @@ public class TestSCMNodeManager {
       assertEquals(1, nodeManager.getNodeCount(HEALTHY));
       assertEquals(1, nodeManager.getNodeCount(STALE));
     }
+  }
+
+  @Test
+  public void testProcessLayoutVersionReportHigherMlv() throws IOException,
+      AuthenticationException {
+    final int healthCheckInterval = 200; // milliseconds
+    final int heartbeatInterval = 1; // seconds
+
+    OzoneConfiguration conf = getConf();
+    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
+        healthCheckInterval, MILLISECONDS);
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL,
+        heartbeatInterval, SECONDS);
+
+    try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      DatanodeDetails node1 =
+          TestUtils.createRandomDatanodeAndRegister(nodeManager);
+      GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
+          .captureLogs(SCMNodeManager.LOG);
+      int scmMlv =
+          nodeManager.getLayoutVersionManager().getMetadataLayoutVersion();
+      nodeManager.processLayoutVersionReport(node1,
+          LayoutVersionProto.newBuilder()
+              .setMetadataLayoutVersion(scmMlv + 1)
+              .setSoftwareLayoutVersion(scmMlv + 2)
+              .build());
+      Assert.assertTrue(logCapturer.getOutput()
+          .contains("Rogue data node in the cluster"));
+    }
+  }
+
+  @Test
+  public void testProcessLayoutVersionLowerMlv() throws IOException {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
+    when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
+    EventPublisher eventPublisher = mock(EventPublisher.class);
+    HDDSLayoutVersionManager lvm  =
+        HDDSLayoutVersionManager.initialize(scmStorageConfig);
+    SCMNodeManager nodeManager  = new SCMNodeManager(conf,
+        scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf), lvm);
+    DatanodeDetails node1 =
+        TestUtils.createRandomDatanodeAndRegister(nodeManager);
+    verify(eventPublisher,
+        times(1)).fireEvent(NEW_NODE, node1);
+    int scmMlv =
+        nodeManager.getLayoutVersionManager().getMetadataLayoutVersion();
+    nodeManager.processLayoutVersionReport(node1,
+        LayoutVersionProto.newBuilder()
+            .setMetadataLayoutVersion(scmMlv - 1)
+            .setSoftwareLayoutVersion(scmMlv)
+            .build());
+    ArgumentCaptor<CommandForDatanode> captor =
+        ArgumentCaptor.forClass(CommandForDatanode.class);
+    verify(eventPublisher, times(1))
+        .fireEvent(Mockito.eq(DATANODE_COMMAND), captor.capture());
+    assertTrue(captor.getValue().getDatanodeId()
+        .equals(node1.getUuid()));
+    assertTrue(captor.getValue().getCommand().getType()
+        .equals(finalizeNewLayoutVersionCommand));
   }
 
   /**
@@ -988,7 +1058,7 @@ public class TestSCMNodeManager {
       DatanodeDetails datanodeDetails =
           TestUtils.createRandomDatanodeAndRegister(nodeManager);
       NodeReportHandler nodeReportHandler = new NodeReportHandler(nodeManager);
-      EventPublisher publisher = Mockito.mock(EventPublisher.class);
+      EventPublisher publisher = mock(EventPublisher.class);
       final long capacity = 2000;
       final long usedPerHeartbeat = 100;
       UUID dnId = datanodeDetails.getUuid();
