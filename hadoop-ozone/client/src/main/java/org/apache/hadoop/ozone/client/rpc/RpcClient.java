@@ -134,6 +134,7 @@ public class RpcClient implements ClientProtocol {
   private final ACLType groupRights;
   private final long blockSize;
   private final ClientId clientId = ClientId.randomId();
+  private final boolean unsafeByteBufferConversion;
   private Text dtService;
   private final boolean topologyAwareReadEnabled;
   private final boolean checkKeyNameEnabled;
@@ -191,28 +192,9 @@ public class RpcClient implements ClientProtocol {
     blockSize = (long) conf.getStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
         OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
 
-<<<<<<< HEAD
     unsafeByteBufferConversion = conf.getBoolean(
             OzoneConfigKeys.OZONE_UNSAFEBYTEOPERATIONS_ENABLED,
             OzoneConfigKeys.OZONE_UNSAFEBYTEOPERATIONS_ENABLED_DEFAULT);
-        
-    int configuredChecksumSize = (int) conf.getStorageSize(
-        OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM,
-        OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_DEFAULT,
-        StorageUnit.BYTES);
-    if(configuredChecksumSize <
-        OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE) {
-      LOG.warn("The checksum size ({}) is not allowed to be less than the " +
-              "minimum size ({}), resetting to the minimum size.",
-          configuredChecksumSize,
-          OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE);
-      bytesPerChecksum =
-          OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE;
-    } else {
-      bytesPerChecksum = configuredChecksumSize;
-    }
-=======
->>>>>>> 4c6de432c (ozone client config)
 
     topologyAwareReadEnabled = conf.getBoolean(
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY,
@@ -938,6 +920,7 @@ public class RpcClient implements ClientProtocol {
             .setMultipartNumber(partNumber)
             .setMultipartUploadID(uploadID)
             .setIsMultipartKey(true)
+            .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
             .setConfig(clientConfig)
             .build();
     keyOutputStream.addPreallocateBlocks(
@@ -1235,6 +1218,7 @@ public class RpcClient implements ClientProtocol {
             .setRequestID(requestId)
             .setType(HddsProtos.ReplicationType.valueOf(type.toString()))
             .setFactor(HddsProtos.ReplicationFactor.valueOf(factor.getValue()))
+            .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
             .setConfig(clientConfig)
             .build();
     keyOutputStream

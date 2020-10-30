@@ -25,6 +25,7 @@ import java.util.ListIterator;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -66,6 +67,7 @@ public class BlockOutputStreamEntryPool {
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public BlockOutputStreamEntryPool(
+      OzoneClientConfig config,
       OzoneManagerProtocol omClient,
       String requestId, HddsProtos.ReplicationFactor factor,
       HddsProtos.ReplicationType type,
@@ -92,7 +94,8 @@ public class BlockOutputStreamEntryPool {
         new BufferPool(config.getStreamBufferSize(),
             (int) (config.getStreamBufferMaxSize() / config
                 .getStreamBufferSize()),
-            unsafeByteBufferConversion);
+            ByteStringConversion
+                .createByteBufferConversion(unsafeByteBufferConversion));
   }
 
   /**

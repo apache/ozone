@@ -128,20 +128,27 @@ public class KeyOutputStream extends OutputStream {
   }
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
-  public KeyOutputStream(OpenKeySession handler,
+  public KeyOutputStream(
+      OzoneClientConfig config,
+      OpenKeySession handler,
       XceiverClientFactory xceiverClientManager,
       OzoneManagerProtocol omClient, int chunkSize,
       String requestId, ReplicationFactor factor, ReplicationType type,
       String uploadID, int partNumber, boolean isMultipart,
-      OzoneClientConfig config) {
+      boolean unsafeByteBufferConversion
+  ) {
     this.config = config;
     OmKeyInfo info = handler.getKeyInfo();
     blockOutputStreamEntryPool =
-        new BlockOutputStreamEntryPool(omClient, chunkSize,
+        new BlockOutputStreamEntryPool(
+            config,
+            omClient,
             requestId, factor, type,
             uploadID, partNumber,
-            isMultipart, info, xceiverClientManager,
-            handler.getId(), config);
+            isMultipart, info,
+            unsafeByteBufferConversion,
+            xceiverClientManager,
+            handler.getId());
 
     // Retrieve the file encryption key info, null if file is not in
     // encrypted bucket.
@@ -258,7 +265,7 @@ public class KeyOutputStream extends OutputStream {
       // The len specified here is the combined sum of the data length of
       // the buffers
       Preconditions.checkState(!retry || len <= config
-              .getStreamBufferMaxSize());
+          .getStreamBufferMaxSize());
       int dataWritten = (int) (current.getWrittenDataLength() - currentPos);
       writeLen = retry ? (int) len : dataWritten;
       // In retry path, the data written is already accounted in offset.
@@ -609,17 +616,25 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
-
     public Builder enableUnsafeByteBufferConversion(boolean enabled) {
       this.unsafeByteBufferConversion = enabled;
       return this;
     }
 
     public KeyOutputStream build() {
-      return new KeyOutputStream(openHandler, xceiverManager, omClient,
+      return new KeyOutputStream(
+          clientConfig,
+          openHandler,
+          xceiverManager,
+          omClient,
           chunkSize,
-          requestID, factor, type, multipartUploadID, multipartNumber,
-          isMultipartKey, clientConfig);
+          requestID,
+          factor,
+          type,
+          multipartUploadID,
+          multipartNumber,
+          isMultipartKey,
+          unsafeByteBufferConversion);
     }
   }
 
