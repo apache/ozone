@@ -136,7 +136,7 @@ public class BlockOutputStream extends OutputStream {
       Pipeline pipeline,
       BufferPool bufferPool,
       OzoneClientConfig config
-      ) throws IOException {
+  ) throws IOException {
     this.config = config;
     this.blockID = new AtomicReference<>(blockID);
     KeyValue keyValue =
@@ -165,7 +165,8 @@ public class BlockOutputStream extends OutputStream {
     writtenDataLength = 0;
     failedServers = new ArrayList<>(0);
     ioException = new AtomicReference<>(null);
-    checksum = new Checksum(config.getChecksumType(), config.getBytesPerChecksum());
+    checksum = new Checksum(config.getChecksumType(),
+        config.getBytesPerChecksum());
   }
 
   private void refreshCurrentBuffer(BufferPool pool) {
@@ -470,7 +471,8 @@ public class BlockOutputStream extends OutputStream {
     if (xceiverClientFactory != null && xceiverClient != null
         && bufferPool != null && bufferPool.getSize() > 0
         && (!config.isStreamBufferFlushDelay() ||
-            writtenDataLength - totalDataFlushedLength >= config.getStreamBufferSize())) {
+            writtenDataLength - totalDataFlushedLength
+                >= config.getStreamBufferSize())) {
       try {
         handleFlush(false);
       } catch (ExecutionException e) {

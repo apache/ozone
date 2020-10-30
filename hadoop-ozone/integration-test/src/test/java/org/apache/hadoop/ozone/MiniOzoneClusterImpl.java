@@ -602,9 +602,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       OzoneClientConfig clientConfig = new OzoneClientConfig();
       clientConfig.setChecksumType(ChecksumType.NONE);
       clientConfig.setStreamBufferSize(
-          (int) Math.round(streamBufferSizeUnit.get().toBytes(streamBufferSize.getAsInt())));
-      clientConfig.setStreamBufferMaxSize(Math.round(streamBufferSizeUnit.get().toBytes(streamBufferMaxSize.get())));
-      clientConfig.setStreamBufferFlushSize(Math.round(streamBufferSizeUnit.get().toBytes(streamBufferFlushSize.get())));
+          (int) Math.round(
+              streamBufferSizeUnit.get().toBytes(streamBufferSize.getAsInt())));
+      clientConfig.setStreamBufferMaxSize(Math.round(
+          streamBufferSizeUnit.get().toBytes(streamBufferMaxSize.get())));
+      clientConfig.setStreamBufferFlushSize(Math.round(
+          streamBufferSizeUnit.get().toBytes(streamBufferFlushSize.get())));
       conf.setFromObject(clientConfig);
 
       conf.setStorageSize(ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY,
