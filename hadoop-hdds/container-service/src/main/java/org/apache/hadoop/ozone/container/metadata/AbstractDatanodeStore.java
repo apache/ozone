@@ -27,10 +27,11 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.rocksdb.BlockBasedTableConfig;
+import org.rocksdb.BloomFilter;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.DBOptions;
 import org.rocksdb.LRUCache;
-import org.rocksdb.Options;
+import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
 import org.rocksdb.util.SizeUnit;
@@ -60,18 +61,26 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   private Table<String, ChunkInfoList> deletedBlocksTable;
 
   private static final Logger LOG =
-          LoggerFactory.getLogger(AbstractDatanodeStore.class);
+      LoggerFactory.getLogger(AbstractDatanodeStore.class);
   private DBStore store;
   private final AbstractDatanodeDBDefinition dbDef;
   private final long containerID;
   private static final ColumnFamilyOptions cfOptions;
 
+  private static final DBProfile DEFAULT_PROFILE = DBProfile.DISK;
+  private static final long CACHE_SIZE = 8 * SizeUnit.MB;
+
   static {
-    BlockBasedTableConfig table_config = new BlockBasedTableConfig();
-    table_config.setBlockCache(new LRUCache(8 * SizeUnit.MB));
-    Options options = new Options();
-    options.setTableFormatConfig(table_config);
-    cfOptions = new ColumnFamilyOptions(options);
+    // Enables static construction of RocksDB objects.
+    RocksDB.loadLibrary();
+
+    BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
+    tableConfig.setBlockCache(new LRUCache(CACHE_SIZE))
+        .setPinL0FilterAndIndexBlocksInCache(true)
+        .setFilterPolicy(new BloomFilter());
+
+    cfOptions = DEFAULT_PROFILE.getColumnFamilyOptions();
+    cfOptions.setTableFormatConfig(tableConfig);
   }
 
   /**
@@ -81,8 +90,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
    * @throws IOException - on Failure.
    */
   protected AbstractDatanodeStore(ConfigurationSource config, long containerID,
-                                  AbstractDatanodeDBDefinition dbDef)
-          throws IOException {
+      AbstractDatanodeDBDefinition dbDef) throws IOException {
     this.dbDef = dbDef;
     this.containerID = containerID;
     start(config);
@@ -90,9 +98,9 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   @Override
   public void start(ConfigurationSource config)
-          throws IOException {
+      throws IOException {
     if (this.store == null) {
-      DBOptions options = new DBOptions();
+      DBOptions options = DEFAULT_PROFILE.getDBOptions();
       options.setCreateIfMissing(true);
       options.setCreateMissingColumnFamilies(true);
 
@@ -108,6 +116,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
       this.store = DBStoreBuilder.newBuilder(config, dbDef)
               .setDBOptions(options)
+              .setDefaultCFOptions(cfOptions)
               .build();
 
       // Use the DatanodeTable wrapper to disable the table iterator on
