@@ -143,6 +143,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private Map<RaftGroupId, Boolean> groupLeaderMap = new ConcurrentHashMap<>();
   // Timeout used while calling submitRequest directly.
   private long requestTimeout;
+  private boolean shouldDeleteRatisLogDirectory;
 
   /**
    * Maintains a list of active volumes per StorageType.
@@ -166,6 +167,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     nodeFailureTimeoutMs =
             conf.getObject(DatanodeRatisServerConfig.class)
                     .getFollowerSlownessTimeout();
+    shouldDeleteRatisLogDirectory =
+            conf.getObject(DatanodeRatisServerConfig.class)
+                    .shouldDeleteRatisLogDirectory();
 
     RaftServer.Builder builder =
         RaftServer.newBuilder().setServerId(raftPeerId)
@@ -755,10 +759,13 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   @Override
   public void removeGroup(HddsProtos.PipelineID pipelineId)
       throws IOException {
+    // if shouldDeleteRatisLogDirectory is set to false, the raft log
+    // directory will be renamed and kept aside for debugging.
+    // In case, its set to true, the raft log directory will be removed
     GroupManagementRequest request = GroupManagementRequest.newRemove(
         clientId, server.getId(), nextCallId(),
         RaftGroupId.valueOf(PipelineID.getFromProtobuf(pipelineId).getId()),
-        true, false);
+        shouldDeleteRatisLogDirectory, !shouldDeleteRatisLogDirectory);
 
     RaftClientReply reply;
     try {
