@@ -22,8 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -37,6 +35,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -608,7 +607,7 @@ public final class OmUtils {
   }
 
   /**
-   * Normalize the key name. This method used {@link Path#normalize()} to
+   * Normalize the key name. This method used {@link Path} to
    * normalize the key name.
    * @param keyName
    * @param preserveTrailingSlash - if True preserves trailing slash, else
@@ -623,10 +622,10 @@ public final class OmUtils {
     if (!StringUtils.isBlank(keyName)) {
       String normalizedKeyName;
       if (keyName.startsWith(OM_KEY_PREFIX)) {
-        normalizedKeyName = Paths.get(keyName).toUri().normalize().getPath();
+        normalizedKeyName = new Path(keyName).toUri().getPath();
       } else {
-        normalizedKeyName = Paths.get(OM_KEY_PREFIX, keyName).toUri()
-            .normalize().getPath();
+        normalizedKeyName = new Path(OM_KEY_PREFIX + keyName)
+            .toUri().getPath();
       }
       if (!keyName.equals(normalizedKeyName)) {
         LOG.debug("Normalized key {} to {} ", keyName,
