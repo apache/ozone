@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -200,7 +199,7 @@ public class DeletedBlockLogImpl
             LOG.debug("Transaction txId={} commit by dnId={} for containerID={}"
                     + " failed. Corresponding entry not found.", txID, dnID,
                 containerId);
-            return;
+            continue;
           }
 
           dnsWithCommittedTxn.add(dnID);
@@ -323,31 +322,54 @@ public class DeletedBlockLogImpl
   public void close() throws IOException {
   }
 
-  @Override
-  public Map<Long, Long> getTransactions(
-      DatanodeDeletedBlockTransactions transactions) throws IOException {
-    lock.lock();
+  private void getTransaction(DeletedBlocksTransaction tx,
+      DatanodeDeletedBlockTransactions transactions) {
     try {
-      Map<Long, Long> deleteTransactionMap = new HashMap<>();
-      try (TableIterator<Long,
-          ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
-               scmMetadataStore.getDeletedBlocksTXTable().iterator()) {
-        while (iter.hasNext()) {
-          Table.KeyValue<Long, DeletedBlocksTransaction> keyValue =
-              iter.next();
-          DeletedBlocksTransaction block = keyValue.getValue();
-          if (block.getCount() > -1 && block.getCount() <= maxRetry) {
-            if (transactions.addTransaction(block,
-                transactionToDNsCommitMap.get(block.getTxID()))) {
-              deleteTransactionMap.put(block.getContainerID(),
-                  block.getTxID());
-              transactionToDNsCommitMap
-                  .putIfAbsent(block.getTxID(), new LinkedHashSet<>());
-            }
+      final ContainerID id = ContainerID.valueof(tx.getContainerID());
+      if (!containerManager.getContainer(id).isOpen()) {
+        Set<ContainerReplica> replicas = containerManager
+            .getContainerReplicas(ContainerID.valueof(tx.getContainerID()));
+        for (ContainerReplica replica : replicas) {
+          UUID dnID = replica.getDatanodeDetails().getUuid();
+          Set<UUID> dnsWithTransactionCommitted =
+              transactionToDNsCommitMap.get(tx.getTxID());
+          if (dnsWithTransactionCommitted == null
+              || !dnsWithTransactionCommitted.contains(dnID)) {
+            // Transaction need not be sent to dns which have
+            // already committed it
+            transactions.addTransactionToDN(dnID, tx);
           }
         }
       }
-      return deleteTransactionMap;
+    } catch (IOException e) {
+      LOG.warn("Got container info error.", e);
+    }
+  }
+
+  @Override
+  public DatanodeDeletedBlockTransactions getTransactions(
+      int blockDeletionLimit) throws IOException {
+    lock.lock();
+    try {
+      DatanodeDeletedBlockTransactions transactions =
+          new DatanodeDeletedBlockTransactions();
+      try (TableIterator<Long,
+          ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
+               scmMetadataStore.getDeletedBlocksTXTable().iterator()) {
+        int numBlocksAdded = 0;
+        while (iter.hasNext() && numBlocksAdded < blockDeletionLimit) {
+          Table.KeyValue<Long, DeletedBlocksTransaction> keyValue =
+              iter.next();
+          DeletedBlocksTransaction txn = keyValue.getValue();
+          if (txn.getCount() > -1 && txn.getCount() <= maxRetry) {
+            numBlocksAdded += txn.getLocalIDCount();
+            getTransaction(txn, transactions);
+            transactionToDNsCommitMap
+                .putIfAbsent(txn.getTxID(), new LinkedHashSet<>());
+          }
+        }
+      }
+      return transactions;
     } finally {
       lock.unlock();
     }
