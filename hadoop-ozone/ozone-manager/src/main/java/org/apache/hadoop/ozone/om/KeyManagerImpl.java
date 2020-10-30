@@ -2288,7 +2288,6 @@ public class KeyManagerImpl implements KeyManager {
     if (numEntries <= 0) {
       return fileStatusFinalList;
     }
-
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
@@ -2296,11 +2295,9 @@ public class KeyManagerImpl implements KeyManager {
     String seekDirInDB;
     long prefixKeyInDB;
     String prefixPath = keyName;
-
     int countEntries = 0;
 
     // TODO: recursive flag=true will be handled in HDDS-4360 jira.
-
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
             bucketName);
     try {
@@ -2312,8 +2309,8 @@ public class KeyManagerImpl implements KeyManager {
 
         // Not required to search in DeletedTable because all the deleted
         // keys will be marked directly in dirTable or in keyTable by
-        // breaking the pointer to its sub-dirs. So, there is no issue of
-        // inconsistency.
+        // breaking the pointer to its sub-dirs and sub-files. So, there is no
+        // issue of inconsistency.
 
         /*
          * keyName is a directory.
@@ -2345,8 +2342,7 @@ public class KeyManagerImpl implements KeyManager {
         /*
          * startKey will be used in iterator seek and sets the beginning point
          * for key traversal.
-         *
-         * key name will be used as parentID where the user has requested to
+         * keyName will be used as parentID where the user has requested to
          * list the keys from.
          *
          * When recursive flag=false, parentID won't change between two pages.
@@ -2357,9 +2353,8 @@ public class KeyManagerImpl implements KeyManager {
          * the startKey value.
          */
 
-        // Check startKey is an immediate child of keyName.
-        // For example, keyName=/a/ and expected startKey=/a/b.
-        // startKey can't be /xyz/b.
+        // Check startKey is an immediate child of keyName. For example,
+        // keyName=/a/ and expected startKey=/a/b. startKey can't be /xyz/b.
         if (!OzoneFSUtils.isImmediateChild(keyName, startKey)) {
           if (LOG.isDebugEnabled()) {
             LOG.debug("StartKey {} is not an immediate child of keyName {}. " +
@@ -2377,32 +2372,30 @@ public class KeyManagerImpl implements KeyManager {
             seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB,
                     fileStatusInfo.getKeyInfo().getFileName());
 
-            // Order of seek -> (1) Seek dirs in dirTable. In OM, always the
-            // order of search is, first seek into fileTable and then dirTable.
-            // So, its not required to search again into the fileTable.
+            // Order of seek -> (1) Seek dirs only in dirTable. In OM, always
+            // the order of search is, first seek into fileTable and then
+            // dirTable. So, its not required to search again in the fileTable.
 
             // Seek the given key in dirTable.
             getDirectories(fileStatusList, seekDirInDB, prefixPath,
                     prefixKeyInDB, startKey, countEntries, numEntries,
                     volumeName, bucketName, recursive);
-
           } else {
             seekFileInDB = metadataManager.getOzonePathKey(prefixKeyInDB,
                     fileStatusInfo.getKeyInfo().getFileName());
             // begins from the first sub-dir under the parent dir
             seekDirInDB = metadataManager.getOzonePathKey(prefixKeyInDB, "");
 
-            // Seek the given key in key table.
+            // 1. Seek the given key in key table.
             countEntries = getFilesFromDirectory(fileStatusList, seekFileInDB,
                     prefixPath, prefixKeyInDB, startKey, countEntries,
                     numEntries);
-            // Seek the given key in dir table.
+            // 2. Seek the given key in dir table.
             getDirectories(fileStatusList, seekDirInDB, prefixPath,
                     prefixKeyInDB, startKey, countEntries, numEntries,
                     volumeName, bucketName, recursive);
           }
         } else {
-          // No key exists for the given startKey.
           // TODO: HDDS-4364: startKey can be a non-existed key
           if (LOG.isDebugEnabled()) {
             LOG.debug("StartKey {} is a non-existed key and returning empty " +
@@ -2415,8 +2408,6 @@ public class KeyManagerImpl implements KeyManager {
       metadataManager.getLock().releaseReadLock(BUCKET_LOCK, volumeName,
               bucketName);
     }
-
-    // Convert results in cacheKeyMap to List
     for (OzoneFileStatus fileStatus : fileStatusList) {
       if (fileStatus.isFile()) {
         // refreshPipeline flag check has been removed as part of
@@ -2578,6 +2569,7 @@ public class KeyManagerImpl implements KeyManager {
     return countEntries;
   }
 
+  @SuppressWarnings("parameternumber")
   private int addKeyInfoToFileStatusList(Set<OzoneFileStatus> fileStatusList,
       long prefixKeyInDB, String seekKeyInDB, String startKey,
       int countEntries, String cacheKey, OmKeyInfo cacheOmKeyInfo,

@@ -156,7 +156,8 @@ public final class OzoneFSUtils {
     // Following are the valid childKey formats:
     // childKey="/" or childKey="/a/b" or childKey="a/b"
     if (org.apache.commons.lang3.StringUtils.isBlank(parentKey)) {
-      return childParent == null || OM_KEY_PREFIX.equals(childParent.toString());
+      return childParent == null ||
+              OM_KEY_PREFIX.equals(childParent.toString());
     }
 
     return parentPath.equals(childParent);
