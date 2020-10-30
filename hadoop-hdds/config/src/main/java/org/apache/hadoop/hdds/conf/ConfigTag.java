@@ -42,5 +42,6 @@ public enum ConfigTag {
   STANDALONE,
   S3GATEWAY,
   DATANODE,
-  RECON
+  RECON,
+  DELETION
 }
