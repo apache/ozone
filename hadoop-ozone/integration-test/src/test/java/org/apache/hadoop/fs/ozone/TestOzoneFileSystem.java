@@ -121,15 +121,24 @@ public class TestOzoneFileSystem {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneFileSystem.class);
 
-  private static boolean enabledFileSystemPaths;
-  private static boolean omRatisEnabled;
-
-  private static MiniOzoneCluster cluster;
-  private static FileSystem fs;
-  private static OzoneFileSystem o3fs;
-  private static String volumeName;
-  private static String bucketName;
-  private static Trash trash;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
+  protected static boolean enabledFileSystemPaths;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
+  protected static boolean omRatisEnabled;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
+  protected static MiniOzoneCluster cluster;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
+  protected static FileSystem fs;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
+  protected static OzoneFileSystem o3fs;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
+  protected static String volumeName;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
+  protected static String bucketName;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
+  protected static int rootItemCount;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
+  protected static Trash trash;
 
   private void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -227,6 +236,28 @@ public class TestOzoneFileSystem {
     try (FSDataOutputStream outputStream3 = fs.create(file3, false)) {
       fail("Should throw FileAlreadyExistsException");
     } catch (FileAlreadyExistsException fae) {
+      // ignore as its expected
+    }
+
+    // Directory
+    FileStatus fileStatus = fs.getFileStatus(parent);
+    assertEquals("FileStatus did not return the directory",
+            "/d1/d2/d3/d4", fileStatus.getPath().toUri().getPath());
+    assertTrue("FileStatus did not return the directory",
+            fileStatus.isDirectory());
+
+    // invalid sub directory
+    try{
+      fs.getFileStatus(new Path("/d1/d2/d3/d4/key3/invalid"));
+      fail("Should throw FileNotFoundException");
+    } catch (FileNotFoundException fnfe) {
+      // ignore as its expected
+    }
+    // invalid file name
+    try{
+      fs.getFileStatus(new Path("/d1/d2/d3/d4/invalidkey"));
+      fail("Should throw FileNotFoundException");
+    } catch (FileNotFoundException fnfe) {
       // ignore as its expected
     }
   }
