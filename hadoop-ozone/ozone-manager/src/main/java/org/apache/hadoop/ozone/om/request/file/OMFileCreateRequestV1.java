@@ -153,8 +153,8 @@ public class OMFileCreateRequestV1 extends OMFileCreateRequest {
 
       // add all missing parents to dir table
       missingParentInfos =
-              OMDirectoryCreateRequestV1.getAllMissingParentDirInfo(
-                      ozoneManager, keyArgs, pathInfoV1, trxnLogIndex);
+              OMDirectoryCreateRequestV1.getAllMissingParentDirInfo(keyArgs,
+                      pathInfoV1, trxnLogIndex);
 
       // total number of keys created.
       numKeysCreated = missingParentInfos.size();
