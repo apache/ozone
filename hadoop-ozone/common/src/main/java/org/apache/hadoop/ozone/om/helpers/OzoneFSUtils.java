@@ -23,6 +23,7 @@ import org.apache.hadoop.util.StringUtils;
 import javax.annotation.Nonnull;
 import java.nio.file.Paths;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
 /**
@@ -130,5 +131,35 @@ public final class OzoneFSUtils {
     }
     // failed to converts a path key
     return keyName;
+  }
+
+  /**
+   * Verifies whether the childKey is an immediate path under the given
+   * parentKey.
+   *
+   * @param parentKey parent key name
+   * @param childKey  child key name
+   * @return true if childKey is an immediate path under the given parentKey
+   */
+  public static boolean isImmediateChild(String parentKey, String childKey) {
+
+    // Empty childKey has no parent, so just returning false.
+    if (org.apache.commons.lang3.StringUtils.isBlank(childKey)) {
+      return false;
+    }
+    java.nio.file.Path parentPath = Paths.get(parentKey);
+    java.nio.file.Path childPath = Paths.get(childKey);
+
+    java.nio.file.Path childParent = childPath.getParent();
+    // Following are the valid parentKey formats:
+    // parentKey="" or parentKey="/" or parentKey="/a" or parentKey="a"
+    // Following are the valid childKey formats:
+    // childKey="/" or childKey="/a/b" or childKey="a/b"
+    if (org.apache.commons.lang3.StringUtils.isBlank(parentKey)) {
+      return childParent == null ||
+              OM_KEY_PREFIX.equals(childParent.toString());
+    }
+
+    return parentPath.equals(childParent);
   }
 }
