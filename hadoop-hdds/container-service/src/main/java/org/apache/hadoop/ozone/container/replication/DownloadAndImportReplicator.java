@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -43,7 +44,7 @@ import org.slf4j.LoggerFactory;
  */
 public class DownloadAndImportReplicator implements ContainerReplicator {
 
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(DownloadAndImportReplicator.class);
 
   private final ContainerSet containerSet;
@@ -65,7 +66,8 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
     this.packer = packer;
   }
 
-  public void importContainer(long containerID, Path tarFilePath) {
+  public void importContainer(long containerID, Path tarFilePath)
+      throws IOException {
     try {
       ContainerData originalContainerData;
       try (FileInputStream tempContainerTarStream = new FileInputStream(
@@ -89,6 +91,7 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
       LOG.error(
           "Can't import the downloaded container data id=" + containerID,
           e);
+      throw e;
     } finally {
       try {
         Files.delete(tarFilePath);
@@ -122,7 +125,7 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
       LOG.info("Container {} is replicated successfully", containerID);
       task.setStatus(Status.DONE);
     } catch (Exception e) {
-      LOG.error("Container replication was unsuccessful .", e);
+      LOG.error("Container replication was unsuccessful.", e);
       task.setStatus(Status.FAILED);
     }
   }
