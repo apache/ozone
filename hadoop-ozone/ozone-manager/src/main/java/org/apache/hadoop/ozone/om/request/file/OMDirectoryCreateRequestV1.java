@@ -232,7 +232,6 @@ public class OMDirectoryCreateRequestV1 extends OMDirectoryCreateRequest {
   /**
    * Construct OmDirectoryInfo for every parent directory in missing list.
    *
-   * @param ozoneManager Ozone Manager
    * @param keyArgs      key arguments
    * @param pathInfo     list of parent directories to be created and its ACLs
    * @param trxnLogIndex transaction log index id
@@ -243,7 +242,6 @@ public class OMDirectoryCreateRequestV1 extends OMDirectoryCreateRequest {
           OzoneManager ozoneManager, KeyArgs keyArgs,
           OMFileRequest.OMPathInfoV1 pathInfo, long trxnLogIndex)
           throws IOException {
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     List<OmDirectoryInfo> missingParentInfos = new ArrayList<>();
 
     // The base id is left shifted by 8 bits for creating space to
