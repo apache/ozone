@@ -20,11 +20,15 @@ package org.apache.hadoop.ozone.om.request.file;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
 import com.google.common.base.Optional;
+import com.google.common.base.Strings;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -34,7 +38,10 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -432,7 +439,6 @@ public final class OMFileRequest {
    * @param omFileInfo        key info
    * @param fileName          file name
    * @param trxnLogIndex      transaction log index
-   * @return dbOmFileInfo, which keeps leaf node name in keyName field
    */
   public static void addOpenFileTableCacheEntry(
           OMMetadataManager omMetadataManager, String dbOpenFileName,
@@ -460,7 +466,6 @@ public final class OMFileRequest {
    * @param omFileInfo        key info
    * @param fileName          file name
    * @param trxnLogIndex      transaction log index
-   * @return dbOmFileInfo, which keeps leaf node name in keyName field
    */
   public static void addFileTableCacheEntry(
           OMMetadataManager omMetadataManager, String dbFileKey,
@@ -552,4 +557,112 @@ public final class OMFileRequest {
     return dbOmKeyInfo;
   }
 
+  /**
+   * Gets OmKeyInfo if exists for the given key name in the DB.
+   *
+   * @param omMetadataMgr metadata manager
+   * @param volumeName    volume name
+   * @param bucketName    bucket name
+   * @param keyName       key name
+   * @param scmBlockSize  scm block size
+   * @return OzoneFileStatus
+   * @throws IOException DB failure
+   */
+  @Nullable
+  public static OzoneFileStatus getOMKeyInfoIfExists(
+      OMMetadataManager omMetadataMgr, String volumeName, String bucketName,
+      String keyName, long scmBlockSize) throws IOException {
+
+    Path keyPath = Paths.get(keyName);
+    Iterator<Path> elements = keyPath.iterator();
+    String bucketKey = omMetadataMgr.getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo =
+            omMetadataMgr.getBucketTable().get(bucketKey);
+
+    long lastKnownParentId = omBucketInfo.getObjectID();
+    OmDirectoryInfo omDirInfo = null;
+    while (elements.hasNext()) {
+      String fileName = elements.next().toString();
+
+      // For example, /vol1/buck1/a/b/c/d/e/file1.txt
+      // 1. Do lookup path component on directoryTable starting from bucket
+      // 'buck1' to the leaf node component, which is 'file1.txt'.
+      // 2. If there is no dir exists for the leaf node component 'file1.txt'
+      // then do look it on fileTable.
+      String dbNodeName = omMetadataMgr.getOzonePathKey(
+              lastKnownParentId, fileName);
+      omDirInfo = omMetadataMgr.getDirectoryTable().get(dbNodeName);
+
+      if (omDirInfo != null) {
+        lastKnownParentId = omDirInfo.getObjectID();
+      } else if (!elements.hasNext()) {
+        // reached last path component. Check file exists for the given path.
+        OmKeyInfo omKeyInfo = OMFileRequest.getOmKeyInfoFromFileTable(false,
+                omMetadataMgr, dbNodeName, keyName);
+        if (omKeyInfo != null) {
+          return new OzoneFileStatus(omKeyInfo, scmBlockSize, false);
+        }
+      } else {
+        // Missing intermediate directory and just return null;
+        // key not found in DB
+        return null;
+      }
+    }
+
+    if (omDirInfo != null) {
+      OmKeyInfo omKeyInfo = getOmKeyInfo(volumeName, bucketName, omDirInfo,
+              keyName);
+      return new OzoneFileStatus(omKeyInfo, scmBlockSize, true);
+    }
+
+    // key not found in DB
+    return null;
+  }
+
+  /**
+   * Prepare OmKeyInfo from OmDirectoryInfo.
+   *
+   * @param volumeName volume name
+   * @param bucketName bucket name
+   * @param dirInfo    directory info
+   * @param keyName    user given key name
+   * @return OmKeyInfo object
+   */
+  @NotNull
+  public static OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
+      OmDirectoryInfo dirInfo, String keyName) {
+
+    OmKeyInfo.Builder builder = new OmKeyInfo.Builder();
+    builder.setParentObjectID(dirInfo.getParentObjectID());
+    builder.setKeyName(keyName);
+    builder.setAcls(dirInfo.getAcls());
+    builder.addAllMetadata(dirInfo.getMetadata());
+    builder.setVolumeName(volumeName);
+    builder.setBucketName(bucketName);
+    builder.setCreationTime(dirInfo.getCreationTime());
+    builder.setModificationTime(dirInfo.getModificationTime());
+    builder.setObjectID(dirInfo.getObjectID());
+    builder.setUpdateID(dirInfo.getUpdateID());
+    builder.setFileName(dirInfo.getName());
+    builder.setReplicationType(HddsProtos.ReplicationType.RATIS);
+    builder.setReplicationFactor(HddsProtos.ReplicationFactor.ONE);
+    builder.setOmKeyLocationInfos(Collections.singletonList(
+            new OmKeyLocationInfoGroup(0, new ArrayList<>())));
+    return builder.build();
+  }
+
+  /**
+   * Returns absolute path.
+   *
+   * @param prefixName prefix path
+   * @param fileName   file name
+   * @return absolute path
+   */
+  @NotNull
+  public static String getAbsolutePath(String prefixName, String fileName) {
+    if (Strings.isNullOrEmpty(prefixName)) {
+      return fileName;
+    }
+    return prefixName.concat(OzoneConsts.OZONE_URI_DELIMITER).concat(fileName);
+  }
 }
