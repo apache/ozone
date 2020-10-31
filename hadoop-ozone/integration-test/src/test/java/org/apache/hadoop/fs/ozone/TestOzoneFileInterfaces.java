@@ -56,6 +56,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
+
+import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.Assert;
 
@@ -119,7 +121,8 @@ public class TestOzoneFileInterfaces {
 
   private OMMetrics omMetrics;
 
-  private boolean enableFileSystemPaths;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
+  protected boolean enableFileSystemPaths;
 
   public TestOzoneFileInterfaces(boolean setDefaultFs,
       boolean useAbsolutePath, boolean enabledFileSystemPaths) {
@@ -134,9 +137,8 @@ public class TestOzoneFileInterfaces {
     volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
     bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
 
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
-        enableFileSystemPaths);
+    OzoneConfiguration conf = getOzoneConfiguration();
+
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
         .build();
@@ -159,6 +161,14 @@ public class TestOzoneFileInterfaces {
     o3fs = (OzoneFileSystem) fs;
     statistics = (OzoneFSStorageStatistics) o3fs.getOzoneFSOpsCountStatistics();
     omMetrics = cluster.getOzoneManager().getMetrics();
+  }
+
+  @NotNull
+  protected OzoneConfiguration getOzoneConfiguration() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
+        enableFileSystemPaths);
+    return conf;
   }
 
   @After
