@@ -3,7 +3,7 @@ title: S3/Ozone Filesystem inter-op
 summary: How to support both S3 and HCFS and the same time
 date: 2020-09-09
 jira: HDDS-4097
-status: draft
+status: accepted
 author: Marton Elek, 
 ---
 <!--
@@ -119,6 +119,10 @@ It can be done in multiple ways. For the sake of simplicity, let's imagine two c
 |-|-|
 | `ozone.om.enable.filesystem.paths=true`  | Enable intermediate dir generation **AND** key name normalization 
 | `ozone.om.enable.intermediate.dirs=true` | Enable only the intermediate dir generation
+
+## Priority 
+
+Current Ozone `master` focuses to the implementation of `ozone.om.enable.filesystem.paths`. There is a discussion of the priority of the implementation of the 3rd option  (`ozone.om.enable.intermediate.dirs`) and the final implementation depends on the business requirement.
 
 ## S3/HCFS Interoperability
 
