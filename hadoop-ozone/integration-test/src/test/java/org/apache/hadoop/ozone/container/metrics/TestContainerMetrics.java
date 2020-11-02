@@ -182,9 +182,7 @@ public class TestContainerMetrics {
       assertCounter("ReadOpCount", 1L, volumeIOMetrics);
       assertCounter("WriteBytes", 1024L, volumeIOMetrics);
       assertCounter("WriteOpCount", 1L, volumeIOMetrics);
-      // ReadTime and WriteTime vary from run to run, only checking non-zero
-      Assert.assertNotEquals(0L, getLongCounter("ReadTime", volumeIOMetrics));
-      Assert.assertNotEquals(0L, getLongCounter("WriteTime", volumeIOMetrics));
+
     } finally {
       if (client != null) {
         client.close();
