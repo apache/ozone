@@ -80,26 +80,34 @@ public class OzoneClientConfig {
 
   @Config(key = "retry.interval",
       defaultValue = "0",
-      description = "",
+      description =
+          "Indicates the time duration a client will wait before retrying a "
+              + "write key request on encountering an exception. By default "
+              + "there is no wait",
       tags = ConfigTag.CLIENT)
   private int retryInterval = 0;
 
   @Config(key = "checksum.type",
       defaultValue = "CRC32",
-      description = "",
+      description = "The checksum type [NONE/ CRC32/ CRC32C/ SHA256/ MD5] "
+          + "determines which algorithm would be used to compute checksum for "
+          + "chunk data. Default checksum type is CRC32.",
       tags = ConfigTag.CLIENT)
   private String checksumType = ChecksumType.CRC32.name();
 
   @Config(key = "bytes.per.checksum",
       defaultValue = "1MB",
       type = ConfigType.SIZE,
-      description = "",
+      description = "Checksum will be computed for every bytes per checksum "
+          + "number of bytes and stored sequentially. The minimum value for "
+          + "this config is 256KB.",
       tags = ConfigTag.CLIENT)
   private int bytesPerChecksum = 1024 * 1024;
 
   @Config(key = "verify.checksum",
       defaultValue = "true",
-      description = "",
+      description = "Ozone client to verify checksum of the checksum "
+          + "blocksize data.",
       tags = ConfigTag.CLIENT)
   private boolean checksumVerify = true;
 

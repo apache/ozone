@@ -1409,10 +1409,10 @@ public abstract class TestOzoneRpcClientAbstract {
       String keyName, boolean verifyChecksum) {
     try {
       OzoneClientConfig clientConfig = new OzoneClientConfig();
-      clientConfig.setChecksumVerify(verifyChecksum);
 
       OzoneConfiguration configuration = cluster.getConf();
       configuration.setFromObject(clientConfig);
+      clientConfig.setChecksumVerify(verifyChecksum);
 
       RpcClient client = new RpcClient(configuration, null);
       OzoneInputStream is = client.getKey(volumeName, bucketName, keyName);

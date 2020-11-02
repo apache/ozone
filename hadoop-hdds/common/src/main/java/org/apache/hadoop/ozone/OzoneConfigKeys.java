@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.ozone;
 
-import java.util.concurrent.TimeUnit;
-
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -116,22 +114,6 @@ public final class OzoneConfigKeys {
    * Used only for testing purpose. Results in making every user an admin.
    * */
   public static final String OZONE_ADMINISTRATORS_WILDCARD = "*";
-
-  public static final String OZONE_CLIENT_RETRY_INTERVAL =
-      "ozone.client.retry.interval";
-  public static final TimeDuration OZONE_CLIENT_RETRY_INTERVAL_DEFAULT =
-      TimeDuration.valueOf(0, TimeUnit.MILLISECONDS);
-
-  /**
-   * If this value is true, when the client calls the flush() method,
-   * it checks whether the data in the buffer is greater than
-   * OZONE_CLIENT_STREAM_BUFFER_SIZE_DEFAULT. If greater than,
-   * send the data in the buffer to the datanode.
-   * */
-  public static final String OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY =
-      "ozone.client.stream.buffer.flush.delay";
-  public static final boolean OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY_DEFAULT =
-      true;
 
   // This defines the overall connection limit for the connection pool used in
   // RestClient.
@@ -426,13 +408,13 @@ public final class OzoneConfigKeys {
       "ssl.server.keystore.location";
   public static final String  OZONE_SERVER_HTTPS_TRUSTSTORE_LOCATION_KEY =
       "ssl.server.truststore.location";
-  public static final String  OZONE_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY =
+  public static final String OZONE_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY =
       "ssl.server.truststore.password";
-  public static final String  OZONE_CLIENT_HTTPS_KEYSTORE_RESOURCE_KEY =
+  public static final String OZONE_CLIENT_HTTPS_KEYSTORE_RESOURCE_KEY =
       "ozone.https.client.keystore.resource";
-  public static final String  OZONE_CLIENT_HTTPS_KEYSTORE_RESOURCE_DEFAULT =
+  public static final String OZONE_CLIENT_HTTPS_KEYSTORE_RESOURCE_DEFAULT =
       "ssl-client.xml";
-  public static final String  OZONE_CLIENT_HTTPS_NEED_AUTH_KEY =
+  public static final String OZONE_CLIENT_HTTPS_NEED_AUTH_KEY =
       "ozone.https.client.need-auth";
   public static final boolean OZONE_CLIENT_HTTPS_NEED_AUTH_DEFAULT = false;
 
@@ -440,6 +422,7 @@ public final class OzoneConfigKeys {
       "ozone.om.keyname.character.check.enabled";
   public static final boolean OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT =
       false;
+
   /**
    * There is no need to instantiate this class.
    */

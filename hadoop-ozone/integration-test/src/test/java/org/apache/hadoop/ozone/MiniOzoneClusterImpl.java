@@ -39,7 +39,6 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -599,8 +598,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         streamBufferSizeUnit = Optional.of(StorageUnit.MB);
       }
 
-      OzoneClientConfig clientConfig = new OzoneClientConfig();
-      clientConfig.setChecksumType(ChecksumType.NONE);
+      OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
       clientConfig.setStreamBufferSize(
           (int) Math.round(
               streamBufferSizeUnit.get().toBytes(streamBufferSize.getAsInt())));
