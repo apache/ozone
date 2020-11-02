@@ -33,8 +33,8 @@ import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 
 import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 
 /**
  * Class defines the structure and types of the om.db.
@@ -51,13 +51,13 @@ public class OMDBDefinition implements DBDefinition {
                     new RepeatedOmKeyInfoCodec(true));
 
   public static final DBColumnFamilyDefinition<String,
-            OzoneManagerProtocolProtos.UserVolumeInfo>
+            OzoneManagerStorageProtos.PersistedUserVolumeInfo>
             USER_TABLE =
             new DBColumnFamilyDefinition<>(
                     "userTable",
                     String.class,
                     new StringCodec(),
-                    OzoneManagerProtocolProtos.UserVolumeInfo.class,
+                    OzoneManagerStorageProtos.PersistedUserVolumeInfo.class,
                     new UserVolumeInfoCodec());
 
   public static final DBColumnFamilyDefinition<String, OmVolumeArgs>

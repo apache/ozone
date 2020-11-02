@@ -65,6 +65,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType;
 
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -410,10 +411,11 @@ public final class TestOMRequestUtils {
   public static void addUserToDB(String volumeName, String ownerName,
       OMMetadataManager omMetadataManager) throws Exception {
 
-    OzoneManagerProtocolProtos.UserVolumeInfo userVolumeInfo = omMetadataManager
-        .getUserTable().get(omMetadataManager.getUserKey(ownerName));
+    OzoneManagerStorageProtos.PersistedUserVolumeInfo userVolumeInfo =
+        omMetadataManager.getUserTable().get(
+            omMetadataManager.getUserKey(ownerName));
     if (userVolumeInfo == null) {
-      userVolumeInfo = OzoneManagerProtocolProtos.UserVolumeInfo
+      userVolumeInfo = OzoneManagerStorageProtos.PersistedUserVolumeInfo
           .newBuilder()
           .addVolumeNames(volumeName)
           .setObjectID(1)
