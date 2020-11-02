@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -99,15 +100,14 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
         .get(volumeKey).getModificationTime();
     Assert.assertTrue(modificationTime > creationTime);
 
-
-    OzoneManagerProtocolProtos.UserVolumeInfo newOwnerVolumeList =
+    OzoneManagerStorageProtos.PersistedUserVolumeInfo newOwnerVolumeList =
         omMetadataManager.getUserTable().get(newOwnerKey);
 
     Assert.assertNotNull(newOwnerVolumeList);
     Assert.assertEquals(volumeName,
         newOwnerVolumeList.getVolumeNamesList().get(0));
 
-    OzoneManagerProtocolProtos.UserVolumeInfo oldOwnerVolumeList =
+    OzoneManagerStorageProtos.PersistedUserVolumeInfo oldOwnerVolumeList =
         omMetadataManager.getUserTable().get(
             omMetadataManager.getUserKey(ownerKey));
 
@@ -203,7 +203,7 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     Assert.assertFalse(omClientResponse.getOMResponse().getSuccess());
 
     // Check volume names list
-    OzoneManagerProtocolProtos.UserVolumeInfo userVolumeInfo =
+    OzoneManagerStorageProtos.PersistedUserVolumeInfo userVolumeInfo =
         omMetadataManager.getUserTable().get(newOwner);
     Assert.assertNotNull(userVolumeInfo);
     List<String> volumeNamesList = userVolumeInfo.getVolumeNamesList();
