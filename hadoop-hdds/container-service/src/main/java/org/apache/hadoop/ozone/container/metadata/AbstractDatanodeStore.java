@@ -65,8 +65,8 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   private DBStore store;
   private final AbstractDatanodeDBDefinition dbDef;
   private final long containerID;
-  private static final ColumnFamilyOptions cfOptions;
 
+  private static final ColumnFamilyOptions COLUMN_FAMILY_OPTIONS;
   private static final DBProfile DEFAULT_PROFILE = DBProfile.DISK;
   private static final long CACHE_SIZE = 8 * SizeUnit.MB;
 
@@ -79,8 +79,8 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
         .setPinL0FilterAndIndexBlocksInCache(true)
         .setFilterPolicy(new BloomFilter());
 
-    cfOptions = DEFAULT_PROFILE.getColumnFamilyOptions();
-    cfOptions.setTableFormatConfig(tableConfig);
+    COLUMN_FAMILY_OPTIONS = DEFAULT_PROFILE.getColumnFamilyOptions();
+    COLUMN_FAMILY_OPTIONS.setTableFormatConfig(tableConfig);
   }
 
   /**
@@ -116,7 +116,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
       this.store = DBStoreBuilder.newBuilder(config, dbDef)
               .setDBOptions(options)
-              .setDefaultCFOptions(cfOptions)
+              .setDefaultCFOptions(COLUMN_FAMILY_OPTIONS)
               .build();
 
       // Use the DatanodeTable wrapper to disable the table iterator on
