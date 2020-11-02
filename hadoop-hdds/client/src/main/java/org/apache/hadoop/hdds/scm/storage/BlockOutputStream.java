@@ -137,6 +137,7 @@ public class BlockOutputStream extends OutputStream {
       BufferPool bufferPool,
       OzoneClientConfig config
   ) throws IOException {
+    this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
     this.blockID = new AtomicReference<>(blockID);
     KeyValue keyValue =
