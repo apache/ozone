@@ -1408,11 +1408,13 @@ public abstract class TestOzoneRpcClientAbstract {
   private void readCorruptedKey(String volumeName, String bucketName,
       String keyName, boolean verifyChecksum) {
     try {
-      OzoneClientConfig clientConfig = new OzoneClientConfig();
 
       OzoneConfiguration configuration = cluster.getConf();
-      configuration.setFromObject(clientConfig);
+
+      final OzoneClientConfig clientConfig =
+          configuration.getObject(OzoneClientConfig.class);
       clientConfig.setChecksumVerify(verifyChecksum);
+      configuration.setFromObject(clientConfig);
 
       RpcClient client = new RpcClient(configuration, null);
       OzoneInputStream is = client.getKey(volumeName, bucketName, keyName);

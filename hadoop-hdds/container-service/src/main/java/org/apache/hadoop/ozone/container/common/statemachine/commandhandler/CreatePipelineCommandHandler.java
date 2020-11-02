@@ -108,7 +108,7 @@ public class CreatePipelineCommandHandler implements CommandHandler {
               }
             });
         LOG.info("Created Pipeline {} {} #{}.",
-            createCommand.getType(), createCommand.getFactor(), pipelineID);
+            createCommand.getType(), createCommand.getFactor(), pipelineID.getId());
       }
     } catch (IOException e) {
       LOG.error("Can't create pipeline {} {} #{}", createCommand.getType(),
