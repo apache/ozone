@@ -111,8 +111,8 @@ public class TestBlockOutputStreamCorrectness {
         xcm,
         pipeline,
         bufferPool,
-        config
-    );
+        config,
+        null);
     return outputStream;
   }
 

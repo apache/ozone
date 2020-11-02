@@ -25,7 +25,10 @@ import org.apache.hadoop.hdds.protocol.proto.
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -35,10 +38,14 @@ import java.util.stream.Collectors;
 public class CreatePipelineCommand
     extends SCMCommand<CreatePipelineCommandProto> {
 
+  private static final Integer HIGH_PRIORITY = 1;
+  private static final Integer LOW_PRIORITY = 0;
+
   private final PipelineID pipelineID;
   private final ReplicationFactor factor;
   private final ReplicationType type;
   private final List<DatanodeDetails> nodelist;
+  private final List<Integer> priorityList;
 
   public CreatePipelineCommand(final PipelineID pipelineID,
       final ReplicationType type, final ReplicationFactor factor,
@@ -48,16 +55,49 @@ public class CreatePipelineCommand
     this.factor = factor;
     this.type = type;
     this.nodelist = datanodeList;
+    if (datanodeList.size() ==
+        XceiverServerRatis.getDefaultPriorityList().size()) {
+      this.priorityList = XceiverServerRatis.getDefaultPriorityList();
+    } else {
+      this.priorityList =
+          new ArrayList<>(Collections.nCopies(datanodeList.size(), 0));
+    }
+  }
+
+  public CreatePipelineCommand(final PipelineID pipelineID,
+      final ReplicationType type, final ReplicationFactor factor,
+      final List<DatanodeDetails> datanodeList,
+      final DatanodeDetails suggestedLeader) {
+    super();
+    this.pipelineID = pipelineID;
+    this.factor = factor;
+    this.type = type;
+    this.nodelist = datanodeList;
+    this.priorityList = new ArrayList<>();
+    initPriorityList(datanodeList, suggestedLeader);
+  }
+
+  private void initPriorityList(
+      List<DatanodeDetails> dns, DatanodeDetails suggestedLeader) {
+    for (DatanodeDetails dn : dns) {
+      if (dn.equals(suggestedLeader)) {
+        priorityList.add(HIGH_PRIORITY);
+      } else {
+        priorityList.add(LOW_PRIORITY);
+      }
+    }
   }
 
   public CreatePipelineCommand(long cmdId, final PipelineID pipelineID,
       final ReplicationType type, final ReplicationFactor factor,
-      final List<DatanodeDetails> datanodeList) {
+      final List<DatanodeDetails> datanodeList,
+      final List<Integer> priorityList) {
     super(cmdId);
     this.pipelineID = pipelineID;
     this.factor = factor;
     this.type = type;
     this.nodelist = datanodeList;
+    this.priorityList = priorityList;
   }
 
   /**
@@ -80,6 +120,7 @@ public class CreatePipelineCommand
         .addAllDatanode(nodelist.stream()
             .map(DatanodeDetails::getProtoBufMessage)
             .collect(Collectors.toList()))
+        .addAllPriority(priorityList)
         .build();
   }
 
@@ -91,10 +132,27 @@ public class CreatePipelineCommand
         createPipelineProto.getType(), createPipelineProto.getFactor(),
         createPipelineProto.getDatanodeList().stream()
             .map(DatanodeDetails::getFromProtoBuf)
-            .collect(Collectors.toList()));
+            .collect(Collectors.toList()),
+        createPipelineProto.getPriorityList());
   }
 
   public PipelineID getPipelineID() {
     return pipelineID;
+  }
+
+  public List<DatanodeDetails> getNodeList() {
+    return nodelist;
+  }
+
+  public List<Integer> getPriorityList() {
+    return priorityList;
+  }
+
+  public ReplicationType getReplicationType() {
+    return type;
+  }
+
+  public ReplicationFactor getFactor() {
+    return factor;
   }
 }

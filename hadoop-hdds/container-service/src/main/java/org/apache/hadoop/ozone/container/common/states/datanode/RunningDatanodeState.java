@@ -140,7 +140,13 @@ public class RunningDatanodeState implements DatanodeState {
     for (EndpointStateMachine endpoint : connectionManager.getValues()) {
       Callable<EndPointStates> endpointTask = getEndPointTask(endpoint);
       if (endpointTask != null) {
-        ecs.submit(endpointTask);
+        // Just do a timely wait. A slow EndpointStateMachine won't occupy
+        // the thread in executor from DatanodeStateMachine for a long time,
+        // so that it won't affect the communication between datanode and
+        // other EndpointStateMachine.
+        ecs.submit(() -> endpoint.getExecutorService()
+            .submit(endpointTask)
+            .get(context.getHeartbeatFrequency(), TimeUnit.MILLISECONDS));
       } else {
         // This can happen if a task is taking more time than the timeOut
         // specified for the task in await, and when it is completed the task

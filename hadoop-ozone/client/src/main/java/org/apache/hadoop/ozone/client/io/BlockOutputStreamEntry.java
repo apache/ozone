@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -50,7 +49,7 @@ public final class BlockOutputStreamEntry extends OutputStream {
   private final long length;
   // the current position of this stream 0 <= currentPosition < length
   private long currentPosition;
-  private Token<OzoneBlockTokenIdentifier> token;
+  private final Token<OzoneBlockTokenIdentifier> token;
 
   private BufferPool bufferPool;
 
@@ -96,12 +95,9 @@ public final class BlockOutputStreamEntry extends OutputStream {
    */
   private void checkStream() throws IOException {
     if (this.outputStream == null) {
-      if (getToken() != null) {
-        UserGroupInformation.getCurrentUser().addToken(getToken());
-      }
       this.outputStream =
           new BlockOutputStream(blockID, xceiverClientManager,
-              pipeline, bufferPool, config);
+              pipeline, bufferPool, config, token);
     }
   }
 

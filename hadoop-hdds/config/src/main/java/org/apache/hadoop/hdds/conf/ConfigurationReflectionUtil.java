@@ -103,7 +103,9 @@ public final class ConfigurationReflectionUtil {
               forcedFieldSet(field, configuration, value);
 
             }
-
+          case CLASS:
+            forcedFieldSet(field, configuration,
+                from.getClass(key, Object.class));
             break;
           default:
             throw new ConfigurationException(
@@ -146,6 +148,8 @@ public final class ConfigurationReflectionUtil {
     } else if (parameterType == Boolean.class
         || parameterType == boolean.class) {
       type = ConfigType.BOOLEAN;
+    } else if (parameterType == Class.class) {
+      type = ConfigType.CLASS;
     } else {
       throw new ConfigurationException(
           "Unsupported configuration type " + parameterType + " in "
@@ -241,6 +245,11 @@ public final class ConfigurationReflectionUtil {
           case SIZE:
             config.setStorageSize(key, field.getLong(configObject),
                 StorageUnit.BYTES);
+          case CLASS:
+            Object valueClass = field.get(configObject);
+            if (valueClass instanceof Class<?>) {
+              config.set(key, ((Class<?>) valueClass).getName());
+            }
             break;
           default:
             throw new ConfigurationException(

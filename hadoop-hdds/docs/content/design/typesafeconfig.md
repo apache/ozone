@@ -2,7 +2,7 @@
 title: Type-safe configuration API
 summary: Inject configuration values based on annotations instead of using constants and Hadoop API
 date: 2019-04-25
-jira: HDDS-505
+jira: HDDS-1466
 status: implemented
 author: Anu Engineer, Marton Elek
 ---
@@ -22,12 +22,8 @@ author: Anu Engineer, Marton Elek
 
 # Abstract
 
- HA for Ozone Manager with the help of Ratis. High performance operation with caching and double-buffer.
+ Generate configuration from annotated plain Java objects to make configuration more structured and type safe.
  
 # Link
 
- * https://issues.apache.org/jira/secure/attachment/12940314/OzoneManager%20HA.pdf
-
- * https://issues.apache.org/jira/secure/attachment/12990063/OM%20HA%20Cache%20Design.pdf
-
- * https://issues.apache.org/jira/secure/attachment/12973260/Handling%20Write%20Requests%20with%20OM%20HA.pdf
+ * https://issues.apache.org/jira/secure/attachment/12966991/typesafe.pdf

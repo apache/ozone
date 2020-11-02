@@ -23,6 +23,7 @@ import java.util.UUID;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeCreateResponse;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.Assert;
@@ -151,8 +152,8 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     Assert.assertEquals(volumeInfo.getCreationTime(),
         omVolumeArgs.getCreationTime());
 
-    OzoneManagerProtocolProtos.UserVolumeInfo userVolumeInfo = omMetadataManager
-        .getUserTable().get(ownerKey);
+    OzoneManagerStorageProtos.PersistedUserVolumeInfo userVolumeInfo =
+        omMetadataManager.getUserTable().get(ownerKey);
     Assert.assertNotNull(userVolumeInfo);
     Assert.assertEquals(volumeName, userVolumeInfo.getVolumeNames(0));
 
