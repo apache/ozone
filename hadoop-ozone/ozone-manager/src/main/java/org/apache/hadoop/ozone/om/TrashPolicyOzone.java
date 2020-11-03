@@ -31,13 +31,13 @@ import java.util.Collection;
 import java.util.Date;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.TrashPolicyDefault;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
  *  of TrashPolicy ozone-specific trash optimizations are/will be made such as
  *  having a multithreaded TrashEmptier.
  */
-public class TrashPolicyOzone extends TrashPolicy {
+public class TrashPolicyOzone extends TrashPolicyDefault {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TrashPolicyOzone.class);
@@ -98,136 +98,6 @@ public class TrashPolicyOzone extends TrashPolicy {
           + "Changing to default value 0", deletionInterval);
       this.deletionInterval = 0;
     }
-  }
-
-  private Path makeTrashRelativePath(Path basePath, Path rmFilePath) {
-    return Path.mergePaths(basePath, rmFilePath);
-  }
-
-  @Override
-  public boolean isEnabled() {
-    return deletionInterval > 0;
-  }
-
-  @Override
-  public boolean moveToTrash(Path path) throws IOException {
-    if (!isEnabled()) {
-      return false;
-    }
-
-    if (!path.isAbsolute()) {                     // make path absolute
-      path = new Path(fs.getWorkingDirectory(), path);
-    }
-
-    // check that path exists
-    fs.getFileStatus(path);
-    String qpath = fs.makeQualified(path).toString();
-
-    Path trashRoot = fs.getTrashRoot(path);
-    Path trashCurrent = new Path(trashRoot, CURRENT);
-    if (qpath.startsWith(trashRoot.toString())) {
-      return false;                               // already in trash
-    }
-
-    if (trashRoot.getParent().toString().startsWith(qpath)) {
-      throw new IOException("Cannot move \"" + path +
-          "\" to the trash, as it contains the trash");
-    }
-
-    Path trashPath = makeTrashRelativePath(trashCurrent, path);
-    Path baseTrashPath = makeTrashRelativePath(trashCurrent, path.getParent());
-
-    IOException cause = null;
-
-    // try twice, in case checkpoint between the mkdirs() & rename()
-    for (int i = 0; i < 2; i++) {
-      try {
-        if (!fs.mkdirs(baseTrashPath, PERMISSION)) {      // create current
-          LOG.warn("Can't create(mkdir) trash directory: " + baseTrashPath);
-          return false;
-        }
-      } catch (FileAlreadyExistsException e) {
-        // find the path which is not a directory, and modify baseTrashPath
-        // & trashPath, then mkdirs
-        Path existsFilePath = baseTrashPath;
-        while (!fs.exists(existsFilePath)) {
-          existsFilePath = existsFilePath.getParent();
-        }
-        baseTrashPath = new Path(baseTrashPath.toString().replace(
-            existsFilePath.toString(), existsFilePath.toString() + Time.now())
-        );
-        trashPath = new Path(baseTrashPath, trashPath.getName());
-        // retry, ignore current failure
-        --i;
-        continue;
-      } catch (IOException e) {
-        LOG.warn("Can't create trash directory: " + baseTrashPath, e);
-        cause = e;
-        break;
-      }
-      try {
-        // if the target path in Trash already exists, then append with
-        // a current time in millisecs.
-        String orig = trashPath.toString();
-
-        while(fs.exists(trashPath)) {
-          trashPath = new Path(orig + Time.now());
-        }
-
-        // move to current trash
-        fs.rename(path, trashPath);
-        LOG.info("Moved: '" + path + "' to trash at: " + trashPath);
-        return true;
-      } catch (IOException e) {
-        cause = e;
-      }
-    }
-    throw (IOException)
-        new IOException("Failed to move to trash: " + path).initCause(cause);
-  }
-
-
-  @Override
-  public void createCheckpoint() throws IOException {
-    createCheckpoint(new Date());
-  }
-
-  public void createCheckpoint(Date date) throws IOException {
-    Collection<FileStatus> trashRoots = fs.getTrashRoots(false);
-    for (FileStatus trashRoot: trashRoots) {
-      LOG.info("TrashPolicyOzone#createCheckpoint for trashRoot: " +
-          trashRoot.getPath());
-      createCheckpoint(trashRoot.getPath(), date);
-    }
-  }
-
-  @Override
-  public void deleteCheckpoint() throws IOException {
-    deleteCheckpoint(false);
-  }
-
-  @Override
-  public void deleteCheckpointsImmediately() throws IOException {
-    deleteCheckpoint(true);
-  }
-
-  private void deleteCheckpoint(boolean deleteImmediately) throws IOException {
-    Collection<FileStatus> trashRoots = fs.getTrashRoots(false);
-    for (FileStatus trashRoot : trashRoots) {
-      LOG.info("TrashPolicyOzone#deleteCheckpoint for trashRoot: " +
-          trashRoot.getPath());
-      deleteCheckpoint(trashRoot.getPath(), deleteImmediately);
-    }
-  }
-
-  @Override
-  public Path getCurrentTrashDir() {
-    return new Path(fs.getTrashRoot(null), CURRENT);
-  }
-
-  @Override
-  public Path getCurrentTrashDir(Path path) throws IOException {
-    return new Path(fs.getTrashRoot(path), CURRENT);
   }
 
   @Override
