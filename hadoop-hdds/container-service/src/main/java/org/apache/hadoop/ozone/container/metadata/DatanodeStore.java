@@ -32,7 +32,7 @@ import java.io.IOException;
 /**
  * Interface for interacting with datanode databases.
  */
-public interface DatanodeStore {
+public interface DatanodeStore extends AutoCloseable {
 
   /**
    * Start datanode manager.
