@@ -39,7 +39,7 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
       NodeManager nodeManager, StateManager stateManager,
       ConfigurationSource conf, EventPublisher eventPublisher,
       boolean autoOpen) {
-    super(nodeManager, (PipelineStateManager) stateManager,
+    super(nodeManager, stateManager,
         conf, eventPublisher);
     autoOpenPipeline = autoOpen;
   }
@@ -47,14 +47,14 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
   public MockRatisPipelineProvider(NodeManager nodeManager,
       StateManager stateManager,
       ConfigurationSource conf) {
-    super(nodeManager, (PipelineStateManager) stateManager,
+    super(nodeManager, stateManager,
         conf, new EventQueue());
   }
 
   public MockRatisPipelineProvider(
       NodeManager nodeManager, StateManager stateManager,
       ConfigurationSource conf, EventPublisher eventPublisher) {
-    super(nodeManager, (PipelineStateManager) stateManager,
+    super(nodeManager, stateManager,
         conf, eventPublisher);
     autoOpenPipeline = true;
   }

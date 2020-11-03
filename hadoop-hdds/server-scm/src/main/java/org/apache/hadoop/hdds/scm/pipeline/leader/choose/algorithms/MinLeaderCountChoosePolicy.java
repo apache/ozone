@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
+import org.apache.hadoop.hdds.scm.pipeline.StateManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,7 +67,7 @@ public class MinLeaderCountChoosePolicy extends LeaderChoosePolicy {
 
   private Map<DatanodeDetails, Integer> getSuggestedLeaderCount(
       List<DatanodeDetails> dns, NodeManager nodeManager,
-      PipelineStateManager pipelineStateManager) {
+      StateManager pipelineStateManager) {
     Map<DatanodeDetails, Integer> suggestedLeaderCount = new HashMap<>();
     for (DatanodeDetails dn : dns) {
       suggestedLeaderCount.put(dn, 0);
