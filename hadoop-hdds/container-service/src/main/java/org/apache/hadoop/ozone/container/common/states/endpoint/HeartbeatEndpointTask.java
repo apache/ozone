@@ -147,8 +147,12 @@ public class HeartbeatEndpointTask
       rpcEndpoint.setLastSuccessfulHeartbeat(ZonedDateTime.now());
       rpcEndpoint.zeroMissedCount();
     } catch (IOException ex) {
-      // put back the reports which failed to be sent
-      putBackReports(requestBuilder);
+      // don't resend reports to recon as it could be down for days
+      // DN is expected to work fine without recon and not go OOM
+      if (!rpcEndpoint.isPassive()) {
+        // put back the reports which failed to be sent
+        putBackReports(requestBuilder);
+      }
 
       rpcEndpoint.logIfNeeded(ex);
     } finally {
