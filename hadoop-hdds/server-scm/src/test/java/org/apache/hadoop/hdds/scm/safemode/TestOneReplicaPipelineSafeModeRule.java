@@ -207,7 +207,7 @@ public class TestOneReplicaPipelineSafeModeRule {
         HddsProtos.PipelineID pipelineID = pipeline.getProtobuf();
         reports.add(PipelineReport.newBuilder()
                 .setPipelineID(pipelineID)
-                .setIsLeader(false)
+                .setIsLeader(true)
                 .setBytesWritten(0)
                 .build());
       }
