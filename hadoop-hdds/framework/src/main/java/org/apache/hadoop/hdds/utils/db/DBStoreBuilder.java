@@ -216,8 +216,8 @@ public final class DBStoreBuilder {
   }
 
   public DBStoreBuilder setDefaultCFOptions(
-      ColumnFamilyOptions cfOptions) {
-    defaultCfOptions = cfOptions;
+      ColumnFamilyOptions options) {
+    defaultCfOptions = options;
     return this;
   }
 
@@ -258,8 +258,7 @@ public final class DBStoreBuilder {
       if (options == null) {
         LOG.debug("using default column family options for table: {}", name);
         tableConfigs.add(new TableConfig(name, defaultCfOptions));
-      }
-      else {
+      } else {
         tableConfigs.add(new TableConfig(name, options));
       }
     }
