@@ -459,13 +459,13 @@ public class TestSCMSafeModeManager {
     for (DatanodeDetails dn : pipeline.getNodes()) {
       List<StorageContainerDatanodeProtocolProtos.
               PipelineReport> reports = new ArrayList<>();
-        HddsProtos.PipelineID pipelineID = pipeline.getId().getProtobuf();
-        reports.add(StorageContainerDatanodeProtocolProtos
-                .PipelineReport.newBuilder()
-                .setPipelineID(pipelineID)
-                .setIsLeader(true)
-                .setBytesWritten(0)
-                .build());
+      HddsProtos.PipelineID pipelineID = pipeline.getId().getProtobuf();
+      reports.add(StorageContainerDatanodeProtocolProtos
+              .PipelineReport.newBuilder()
+              .setPipelineID(pipelineID)
+              .setIsLeader(true)
+              .setBytesWritten(0)
+              .build());
       StorageContainerDatanodeProtocolProtos
               .PipelineReportsProto.Builder pipelineReportsProto =
               StorageContainerDatanodeProtocolProtos
