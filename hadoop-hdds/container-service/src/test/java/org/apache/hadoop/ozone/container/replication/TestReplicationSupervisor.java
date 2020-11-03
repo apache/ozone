@@ -188,7 +188,7 @@ public class TestReplicationSupervisor {
     SimpleContainerDownloader moc =
         Mockito.mock(SimpleContainerDownloader.class);
     CompletableFuture<Path> res = new CompletableFuture<>();
-    res.complete(Paths.get("file:/tmp/file"));
+    res.complete(Paths.get("file:/tmp/no-such-file"));
     Mockito.when(
         moc.getContainerDataFromReplicas(Mockito.anyLong(), Mockito.anyList()))
         .thenReturn(res);
@@ -205,7 +205,7 @@ public class TestReplicationSupervisor {
     Assert.assertEquals(1, supervisor.getReplicationFailureCount());
     Assert.assertEquals(0, supervisor.getReplicationSuccessCount());
     Assert.assertTrue(logCapturer.getOutput()
-        .contains("Container replication was unsuccessful."));
+        .contains("Container 1 replication was unsuccessful."));
   }
 
   private ReplicationSupervisor supervisorWithSuccessfulReplicator() {

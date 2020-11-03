@@ -87,11 +87,6 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
         containerSet.addContainer(container);
       }
 
-    } catch (Exception e) {
-      LOG.error(
-          "Can't import the downloaded container data id=" + containerID,
-          e);
-      throw e;
     } finally {
       try {
         Files.delete(tarFilePath);
@@ -125,7 +120,7 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
       LOG.info("Container {} is replicated successfully", containerID);
       task.setStatus(Status.DONE);
     } catch (Exception e) {
-      LOG.error("Container replication was unsuccessful.", e);
+      LOG.error("Container {} replication was unsuccessful.", containerID, e);
       task.setStatus(Status.FAILED);
     }
   }
