@@ -42,7 +42,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.header.AuthorizationHeaderV2;
 import org.apache.hadoop.ozone.s3.header.AuthorizationHeaderV4;
@@ -76,6 +75,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
   private AuthorizationHeaderV4 v4Header;
   private AuthorizationHeaderV2 v2Header;
   private String stringToSign;
+  private Exception exception;
 
   @PostConstruct
   public void init()
@@ -109,21 +109,31 @@ public class AWSSignatureProcessor implements SignatureProcessor {
 
     this.method = context.getMethod();
     String authHeader = headers.get(AUTHORIZATION_HEADER);
-    if (authHeader != null) {
-      String[] split = authHeader.split(" ");
-      if (split[0].equals(AuthorizationHeaderV2.IDENTIFIER)) {
-        if (v2Header == null) {
-          v2Header = new AuthorizationHeaderV2(authHeader);
+    try {
+      if (authHeader != null) {
+        String[] split = authHeader.split(" ");
+        if (split[0].equals(AuthorizationHeaderV2.IDENTIFIER)) {
+          if (v2Header == null) {
+            v2Header = new AuthorizationHeaderV2(authHeader);
+          }
+        } else {
+          if (v4Header == null) {
+            v4Header = new AuthorizationHeaderV4(authHeader);
+          }
+          parse();
         }
-      } else {
-        if (v4Header == null) {
-          v4Header = new AuthorizationHeaderV4(authHeader);
-        }
-        parse();
+      } else { // no auth header
+        v4Header = null;
+        v2Header = null;
       }
-    } else { // no auth header
-      v4Header = null;
-      v2Header = null;
+    } catch (Exception ex) {
+      // During validation of auth header, create instance and set Exception.
+      // This way it can be handled in OzoneClientProducer creation of
+      // SignatureProcessor instance failure.
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Error during Validation of Auth Header:{}", authHeader);
+      }
+      this.exception = ex;
     }
   }
 
@@ -362,6 +372,10 @@ public class AWSSignatureProcessor implements SignatureProcessor {
   @VisibleForTesting
   public void setV2Header(AuthorizationHeaderV2 v2Header) {
     this.v2Header = v2Header;
+  }
+
+  public Exception getException() {
+    return this.exception;
   }
 
   /**

@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.security.PrivilegedExceptionAction;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -81,6 +82,10 @@ public class OzoneClientProducer {
       throws OS3Exception {
     OzoneClient ozoneClient = null;
     try {
+      // Check if any error occurred during creation of signatureProcessor.
+      if (signatureParser.getException() != null) {
+        throw signatureParser.getException();
+      }
       String awsAccessId = signatureParser.getAwsAccessId();
       validateAccessId(awsAccessId);
 
@@ -143,5 +148,10 @@ public class OzoneClientProducer {
 
   public void setOzoneConfiguration(OzoneConfiguration config) {
     this.ozoneConfiguration = config;
+  }
+
+  @VisibleForTesting
+  public void setSignatureParser(SignatureProcessor signatureParser) {
+    this.signatureParser = signatureParser;
   }
 }
