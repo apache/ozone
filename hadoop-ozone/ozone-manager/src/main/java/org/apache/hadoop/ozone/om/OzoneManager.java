@@ -306,15 +306,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
 
-  // Epoch is used to generate the objectIDs. The most significant 2 bits of
-  // objectIDs is set to this epoch. For clusters before HDDS-4315 there is
-  // no epoch as such. But it can be safely assumed that the most significant
-  // 2 bits of the objectID will be 00. From HDDS-4315 onwards, the Epoch for
-  // non-ratis OM clusters will be binary 01 (= decimal 1)  and for ratis
-  // enabled OM cluster will be binary 10 (= decimal 2). This epoch is added
-  // to ensure uniqueness ofobjectIDs.
-  private final int omEpoch;
-
   private KeyProviderCryptoExtension kmsProvider = null;
   private static String keyProviderUriKeyName =
       CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH;
@@ -402,8 +393,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     isRatisEnabled = configuration.getBoolean(
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
-
-    omEpoch = OmUtils.getOMEpoch(isRatisEnabled);
 
     InetSocketAddress omNodeRpcAddr = omNodeDetails.getRpcAddress();
     omRpcAddressTxt = new Text(omNodeDetails.getRpcAddressString());
@@ -1296,7 +1285,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public long getObjectIdFromTxId(long trxnId) {
-    return OmUtils.getObjectIdFromTxId((long) omEpoch, trxnId);
+    return OmUtils.getObjectIdFromTxId((long) metadataManager.getOmEpoch(),
+        trxnId);
   }
 
   @VisibleForTesting
@@ -3617,7 +3607,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (!metadataManager.getVolumeTable().isExist(dbVolumeKey)) {
       // the highest transaction ID is reserved for this operation.
       long transactionID = MAX_TRXN_ID + 1;
-      long objectID = OmUtils.addEpochToObjectId(omEpoch, transactionID);
+      long objectID = OmUtils.addEpochToTxId(metadataManager.getOmEpoch(),
+          transactionID);
       String userName =
           UserGroupInformation.getCurrentUser().getShortUserName();
 

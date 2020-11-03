@@ -85,7 +85,8 @@ public final class OmUtils {
   // reserved for creating S3G volume on OM start {@link
   // OzoneManager#addS3GVolumeToDB()}.
   public static final long EPOCH_ID_SHIFT = 62; // 64 - 2
-  public static final long MAX_TRXN_ID = (long) (Math.pow(2, 54) - 2);
+  public static final long REVERSE_EPOCH_ID_SHIFT = 2; // 64 - EPOCH_ID_SHIFT
+  public static final long MAX_TRXN_ID = (long) ((1 << 54) - 2);
   public static final int EPOCH_WHEN_RATIS_NOT_ENABLED = 1;
   public static final int EPOCH_WHEN_RATIS_ENABLED = 2;
 
@@ -544,15 +545,15 @@ public final class OmUtils {
    * Get the valid base object id given the transaction id.
    * @param epoch a 2 bit epoch number. The 2 most significant bits of the
    *              object will be set to this epoch.
-   * @param id of the transaction. This value cannot exceed 2^54 - 1 as
+   * @param txId of the transaction. This value cannot exceed 2^54 - 1 as
    *           out of the 64 bits for a long, 2 are reserved for the epoch
    *           and 8 for recursive directory creation.
    * @return base object id allocated against the transaction
    */
-  public static long getObjectIdFromTxId(long epoch, long id) {
-    Preconditions.checkArgument(id <= MAX_TRXN_ID, "TransactionID " +
+  public static long getObjectIdFromTxId(long epoch, long txId) {
+    Preconditions.checkArgument(txId <= MAX_TRXN_ID, "TransactionID " +
         "exceeds max limit of " + MAX_TRXN_ID);
-    return addEpochToObjectId(epoch, id);
+    return addEpochToTxId(epoch, txId);
   }
 
   /**
@@ -561,8 +562,8 @@ public final class OmUtils {
    * when OM is started first time to add S3G volume. In call other cases,
    * getObjectIdFromTxId() should be called to append epoch to objectID.
    */
-  public static long addEpochToObjectId(long epoch, long id) {
-    long lsb54 = id << TRANSACTION_ID_SHIFT;
+  public static long addEpochToTxId(long epoch, long txId) {
+    long lsb54 = txId << TRANSACTION_ID_SHIFT;
     long msb2 = epoch << EPOCH_ID_SHIFT;
 
     return msb2 | lsb54;
@@ -574,7 +575,8 @@ public final class OmUtils {
    */
   @VisibleForTesting
   public static long getTxIdFromObjectId(long objectId) {
-    return ((Long.MAX_VALUE >> 2) & objectId) >> 8;
+    return ((Long.MAX_VALUE >> REVERSE_EPOCH_ID_SHIFT) & objectId)
+        >> TRANSACTION_ID_SHIFT;
   }
 
   /**

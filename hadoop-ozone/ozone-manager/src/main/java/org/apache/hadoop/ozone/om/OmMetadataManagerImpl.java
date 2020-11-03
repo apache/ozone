@@ -163,6 +163,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
 
+  // Epoch is used to generate the objectIDs. The most significant 2 bits of
+  // objectIDs is set to this epoch. For clusters before HDDS-4315 there is
+  // no epoch as such. But it can be safely assumed that the most significant
+  // 2 bits of the objectID will be 00. From HDDS-4315 onwards, the Epoch for
+  // non-ratis OM clusters will be binary 01 (= decimal 1)  and for ratis
+  // enabled OM cluster will be binary 10 (= decimal 2). This epoch is added
+  // to ensure uniqueness of objectIDs.
   private final int omEpoch;
 
   private Map<String, Table> tableMap = new HashMap<>();

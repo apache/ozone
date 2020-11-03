@@ -257,7 +257,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OMMetadataManager omMetadataManager =
         cluster.getOzoneManager().getMetadataManager();
     long transactionID = MAX_TRXN_ID + 1;
-    long objectID = OmUtils.addEpochToObjectId(omMetadataManager.getOmEpoch(),
+    long objectID = OmUtils.addEpochToTxId(omMetadataManager.getOmEpoch(),
         transactionID);
     OmVolumeArgs omVolumeArgs =
         cluster.getOzoneManager().getMetadataManager().getVolumeTable().get(
