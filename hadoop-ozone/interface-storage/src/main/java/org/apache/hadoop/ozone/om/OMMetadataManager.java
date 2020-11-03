@@ -75,7 +75,7 @@ public interface OMMetadataManager {
   /**
    * Returns the epoch associated with current OM process.
    */
-  int getOmEpoch();
+  long getOmEpoch();
 
   /**
    * Given a volume return the corresponding DB key.

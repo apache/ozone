@@ -1285,7 +1285,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public long getObjectIdFromTxId(long trxnId) {
-    return OmUtils.getObjectIdFromTxId((long) metadataManager.getOmEpoch(),
+    return OmUtils.getObjectIdFromTxId(metadataManager.getOmEpoch(),
         trxnId);
   }
 
