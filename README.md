@@ -28,7 +28,7 @@ Ozone is part of the [Apache Hadoop](https://hadoop.apache.org) project.
  * Chat: You can find the #ozone channel on the official ASF slack. Invite link is [here](http://s.apache.org/slack-invite).
  * There are Open [Weekly calls](https://cwiki.apache.org/confluence/display/HADOOP/Ozone+Community+Calls) where you can ask anything about Ozone.
      * Past meeting notes are also available from the wiki.
-
+ * Reporting security issues: Please consult with [SECURITY.md](./SECURITY.md) about reporting security vulerabilities and issues.
 
 ## Download
 
