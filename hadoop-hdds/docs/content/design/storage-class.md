@@ -213,7 +213,7 @@ The type of the Container can be defined with the implementation type (eg. Ratis
 
 Today's implementation of Ozone can be described with two storage-classes:
 
-![](https://i.imgur.com/02rmoFP.png)
+![Current replication with Storage class](storage-class-today.png)
 
 The definition of STANDARD Storage class:
 
@@ -272,9 +272,9 @@ REDUCED: (RATIS/ONE -- CLOSED/ONE) --> (RATIS/TWO -- CLOSED/TWO)
 
 There is a very specific use case the "temperature" of data. Key (and containers) can become COLD or HOT over the the time. As we need transitions between the different **state** of the containers, the COLD data should be a new state of a container not a storage class.
 
-Therefore the STANDARD storage class can be modified to support three states: OPEN, WARM(=CLOSED), COLD. Transitino between WARM and CLOSED can be managed by SCM (if container is not used, SCM can request to enable erasure coding). Or manually (one specific container can be forced to Erasure Coding / COLD state. Only useful for administrators)
+Therefore the STANDARD storage class can be modified to support three states: OPEN, WARM(=CLOSED), COLD. Transition between WARM and CLOSED can be managed by SCM (if container is not used, SCM can request to enable erasure coding). Or manually (one specific container can be forced to Erasure Coding / COLD state. Only useful for administrators)
 
-![](https://i.imgur.com/3NWzlm5.png)
+![Storage class transitions](storage-class-transition.png)
 
 ## Storage class on the user interface
 
@@ -297,7 +297,7 @@ But we can start to use the abstraction for the existing implementation:
  * `ofs://` and `o3fs://` doesn't require any modification
  * Storage class will be used as a custom String in RPC protocol (in storage-sensitive places it can be stored as an integer with an additional mapping)
  * All the replication logic (PipelineManager/ReplicationManager) will work exactly as before. Storage-class will be resolved to the required replication config. Pipelines will have the same type as before (eg. Ratis/THREE)
- * SCM allocateContainer logic should be changed. Right now it creates a predefined number of Open containers for each `owner` (high level applocation). It can be extended easily to create open containers for each storage-classes
+ * SCM allocateContainer logic should be changed. Right now it creates a predefined number of Open containers for each `owner` (high level application). It can be extended easily to create open containers for each storage-classes
  * Having slightly more open containers doesn't make any difference (5-10 more open containers per disk vs. the 5000-10000 existing containers)
 
 # Backward compatibility
