@@ -61,4 +61,6 @@ public interface SignatureProcessor {
   String getSignature();
 
   String getAwsAccessId();
+
+  Exception getException();
 }
