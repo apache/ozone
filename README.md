@@ -51,7 +51,7 @@ aws s3 --endpoint http://localhost:9878 cp --storage-class REDUCED_REDUNDANCY  /
 
 ### Run Ozone from released artifact
 
-If you need a more realistic cluster, you can [download](https://ozone.apache.org/downloads/) the last (binary) release package, and start a cluster with the help of docker-compose:
+If you need a more realistic cluster, you can [download](https://ozone.apache.org/downloads/) the latest (binary) release package, and start a cluster with the help of docker-compose:
 
 After you untar the binary:
 
