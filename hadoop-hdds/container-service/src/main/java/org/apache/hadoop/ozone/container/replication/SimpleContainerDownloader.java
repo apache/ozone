@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,21 +75,13 @@ public class SimpleContainerDownloader implements ContainerDownloader {
     for (DatanodeDetails datanode : sourceDatanodes) {
       try {
         if (result == null) {
-          GrpcReplicationClient grpcReplicationClient =
-              new GrpcReplicationClient(datanode.getIpAddress(),
-                  datanode.getPort(Name.STANDALONE).getValue(),
-                  workingDirectory, securityConfig, caCert);
-          result = grpcReplicationClient.download(containerId);
+          result = downloadContainer(containerId, datanode);
         } else {
           result = result.thenApply(CompletableFuture::completedFuture)
               .exceptionally(t -> {
                 LOG.error("Error on replicating container: " + containerId, t);
                 try {
-                  GrpcReplicationClient grpcReplicationClient =
-                      new GrpcReplicationClient(datanode.getIpAddress(),
-                          datanode.getPort(Name.STANDALONE).getValue(),
-                          workingDirectory, securityConfig, caCert);
-                  return grpcReplicationClient.download(containerId);
+                  return downloadContainer(containerId, datanode);
                 } catch (IOException e) {
                   LOG.error("Error on replicating container: " + containerId,
                       t);
@@ -105,6 +98,20 @@ public class SimpleContainerDownloader implements ContainerDownloader {
     }
     return result;
 
+  }
+
+  @VisibleForTesting
+  protected CompletableFuture<Path> downloadContainer(
+      long containerId,
+      DatanodeDetails datanode
+  ) throws IOException {
+    CompletableFuture<Path> result;
+    GrpcReplicationClient grpcReplicationClient =
+        new GrpcReplicationClient(datanode.getIpAddress(),
+            datanode.getPort(Name.STANDALONE).getValue(),
+            workingDirectory, securityConfig, caCert);
+    result = grpcReplicationClient.download(containerId);
+    return result;
   }
 
   @Override
