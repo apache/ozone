@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -197,7 +198,8 @@ public class TestSchemaOneBackwardsCompatibility {
   public void testReadWithoutMetadata() throws Exception {
     // Delete metadata keys from our copy of the DB.
     // This simulates them not being there to start with.
-    try (ReferenceCountedDB db = BlockUtils.getDB(newKvData(), conf)) {
+    KeyValueContainerData kvData = newKvData();
+    try (ReferenceCountedDB db = BlockUtils.getDB(kvData, conf)) {
       Table<String, Long> metadataTable = db.getStore().getMetadataTable();
 
       metadataTable.delete(OzoneConsts.BLOCK_COUNT);
@@ -237,7 +239,8 @@ public class TestSchemaOneBackwardsCompatibility {
     final long expectedRegularBlocks =
             TestDB.KEY_COUNT - numBlocksToDelete;
 
-    try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
+    KeyValueContainerData kvData = newKvData();
+    try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(kvData, conf)) {
       // Test results via block iteration.
       assertEquals(expectedDeletingBlocks,
               countDeletingBlocks(refCountedDB));
@@ -269,29 +272,29 @@ public class TestSchemaOneBackwardsCompatibility {
    */
   @Test
   public void testReadDeletedBlockChunkInfo() throws Exception {
-    try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
+    KeyValueContainerData kvData = newKvData();
+    List<? extends Table.KeyValue<String, ChunkInfoList>> deletedBlocks;
+    Set<String> preUpgradeBlocks = new HashSet<>();
+    try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(kvData, conf)) {
       // Read blocks that were already deleted before the upgrade.
-      List<? extends Table.KeyValue<String, ChunkInfoList>> deletedBlocks =
-              refCountedDB.getStore()
-                      .getDeletedBlocksTable().getRangeKVs(null, 100);
+       deletedBlocks = refCountedDB.getStore()
+           .getDeletedBlocksTable().getRangeKVs(null, 100);
 
-      Set<String> preUpgradeBlocks = new HashSet<>();
-
-      for(Table.KeyValue<String, ChunkInfoList> chunkListKV: deletedBlocks) {
+      for (Table.KeyValue<String, ChunkInfoList> chunkListKV : deletedBlocks) {
         preUpgradeBlocks.add(chunkListKV.getKey());
         try {
           chunkListKV.getValue();
           Assert.fail("No exception thrown when trying to retrieve old " +
-                  "deleted blocks values as chunk lists.");
-        } catch(IOException ex) {
+              "deleted blocks values as chunk lists.");
+        } catch (IOException ex) {
           // Exception thrown as expected.
         }
       }
+    }
 
-      Assert.assertEquals(TestDB.NUM_DELETED_BLOCKS, preUpgradeBlocks.size());
+    runBlockDeletingService();
 
-      runBlockDeletingService();
-
+    try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(kvData, conf)) {
       // After the block deleting service runs, get the updated list of
       // deleted blocks.
       deletedBlocks = refCountedDB.getStore()
@@ -494,6 +497,10 @@ public class TestSchemaOneBackwardsCompatibility {
    * @throws IOException
    */
   private KeyValueContainerData newKvData() throws IOException {
+    // The parseKVContainerData() method opens RocksDB without using the
+    // container cache, so we need to ensure the DB is not already open
+    // by purging the cache before opening it.
+    BlockUtils.shutdownCache(ContainerCache.getInstance(conf));
     KeyValueContainerData kvData = (KeyValueContainerData)
         ContainerDataYaml.readContainerFile(containerFile);
 
