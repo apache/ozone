@@ -245,9 +245,13 @@ public final class KeyValueContainerUtil {
       if (!isBlockMetadataSet) {
         initializeUsedBytesAndBlockCount(store, kvContainerData);
       }
+    } catch (IOException e) {
+      throw e;
     } catch (Exception e) {
-      LOG.error("Unexpected exception handling container {}", containerID, e);
-      throw new IOException(e);
+      LOG.error("Unexpected error closing the DatanodeStore for container {}",
+          containerID, e);
+      throw new RuntimeException("Unexpected error closing the DatanodeStore " +
+          "for container "+containerID, e);
     }
   }
 
