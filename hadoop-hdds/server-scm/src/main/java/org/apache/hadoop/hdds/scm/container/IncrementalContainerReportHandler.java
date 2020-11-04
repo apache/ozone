@@ -71,8 +71,10 @@ public class IncrementalContainerReportHandler extends
     for (ContainerReplicaProto replicaProto :
         report.getReport().getReportList()) {
       try {
+
         final ContainerID id = ContainerID.valueof(
             replicaProto.getContainerID());
+
         if (!replicaProto.getState().equals(
             ContainerReplicaProto.State.DELETED)) {
           nodeManager.addContainer(dd, id);
@@ -87,7 +89,7 @@ public class IncrementalContainerReportHandler extends
             report.getDatanodeDetails(), ex);
       } catch (IOException e) {
         success = false;
-        LOG.error("Exception while processing ICR for container {}",
+        LOG.warn("Exception while processing ICR for container {}",
             replicaProto.getContainerID(), e);
       }
     }
