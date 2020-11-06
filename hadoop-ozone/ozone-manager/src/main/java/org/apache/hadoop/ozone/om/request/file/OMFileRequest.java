@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -695,5 +696,92 @@ public final class OMFileRequest {
       return fileName;
     }
     return prefixName.concat(OzoneConsts.OZONE_URI_DELIMITER).concat(fileName);
+  }
+
+  /**
+   * Build DirectoryInfo from OmKeyInfo.
+   *
+   * @param keyInfo omKeyInfo
+   * @return omDirectoryInfo object
+   */
+  public static OmDirectoryInfo getDirectoryInfo(OmKeyInfo keyInfo){
+    OmDirectoryInfo.Builder builder = new OmDirectoryInfo.Builder();
+    builder.setParentObjectID(keyInfo.getParentObjectID());
+    builder.setAcls(keyInfo.getAcls());
+    builder.addAllMetadata(keyInfo.getMetadata());
+    builder.setCreationTime(keyInfo.getCreationTime());
+    builder.setModificationTime(keyInfo.getModificationTime());
+    builder.setObjectID(keyInfo.getObjectID());
+    builder.setUpdateID(keyInfo.getUpdateID());
+    builder.setName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
+    return builder.build();
+  }
+
+  /**
+   * Verify that the given toKey directory is a sub directory of fromKey
+   * directory.
+   * <p>
+   * For example, special case of renaming a directory to its own
+   * sub-directory is not allowed.
+   *
+   * @param fromKeyName source path
+   * @param toKeyName   destination path
+   * @throws OMException if the dest dir is a sub-dir of source dir.
+   */
+  public static void verifyToDirIsASubDirOfFromDirectory(String fromKeyName,
+      String toKeyName, boolean isDir) throws OMException {
+    if (!isDir) {
+      return;
+    }
+    Path dstParent = Paths.get(toKeyName).getParent();
+    while (dstParent != null) {
+      if (Paths.get(fromKeyName).equals(dstParent)) {
+        throw new OMException("Cannot rename a directory to its own " +
+                "subdirectory", OMException.ResultCodes.KEY_RENAME_ERROR);
+        // TODO: Existing rename throws java.lang.IllegalArgumentException.
+        //       Should we throw same exception ?
+      }
+      dstParent = dstParent.getParent();
+    }
+  }
+
+  /**
+   * Verify parent exists for the destination path and return destination
+   * path parent Id.
+   * <p>
+   * Check whether dst parent dir exists or not. If the parent exists, then the
+   * source can be renamed to dst path.
+   *
+   * @param volumeName  volume name
+   * @param bucketName  bucket name
+   * @param toKeyName   destination path
+   * @param fromKeyName source path
+   * @param metaMgr     metadata manager
+   * @throws IOException if the destination parent dir doesn't exists.
+   */
+  public static long getToKeyNameParentId(String volumeName,
+      String bucketName, String toKeyName, String fromKeyName,
+      OMMetadataManager metaMgr) throws IOException {
+
+    int totalDirsCount = OzoneFSUtils.getFileCount(toKeyName);
+    // skip parent is root '/'
+    if (totalDirsCount <= 1) {
+      String bucketKey = metaMgr.getBucketKey(volumeName, bucketName);
+      OmBucketInfo omBucketInfo =
+              metaMgr.getBucketTable().get(bucketKey);
+      return omBucketInfo.getObjectID();
+    }
+
+    String toKeyParentDir = OzoneFSUtils.getParentDir(toKeyName);
+
+    OzoneFileStatus toKeyParentDirStatus = getOMKeyInfoIfExists(metaMgr,
+            volumeName, bucketName, toKeyParentDir, 0);
+    // check if the immediate parent exists
+    if (toKeyParentDirStatus == null || toKeyParentDirStatus.isFile()) {
+      throw new IOException(String.format(
+              "Failed to rename %s to %s, %s is a file", fromKeyName, toKeyName,
+              toKeyParentDir));
+    }
+    return toKeyParentDirStatus.getKeyInfo().getObjectID();
   }
 }

@@ -31,8 +31,10 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Rule;
@@ -50,9 +52,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 /**
  * Ozone file system tests that are not covered by contract tests,
@@ -260,6 +260,44 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
             expectedFilesCount, actualCount);
   }
 
+
+  protected void testRenameDir() throws Exception {
+    final String root = "/root_dir";
+    final String dir = root + "/dir1";
+    final Path source = new Path(fs.getUri().toString() + dir);
+    final Path dest = new Path(source.toString() + ".renamed");
+    // Add a sub-dir to the directory to be moved.
+    final Path subdir = new Path(source, "sub_dir1");
+    fs.mkdirs(subdir);
+    LOG.info("Created dir {}", subdir);
+
+    // case-1) source is a sub-dir to destin
+    final Path sourceRoot = new Path(fs.getUri().toString() + root);
+    LOG.info("Rename op-> source:/root_dir to destin:/root_dir/dir1/sub_dir1");
+    try {
+      fs.rename(sourceRoot, subdir);
+      Assert.fail("Should throw exception : Cannot rename a directory to" +
+              " its own subdirectory");
+    } catch (OMException e) {
+      // expected
+    }
+
+    LOG.info("Will move {} to {}", source, dest);
+    fs.rename(source, dest);
+
+    assertTrue("Directory rename failed", fs.exists(dest));
+    // Verify that the subdir is also renamed i.e. keys corresponding to the
+    // sub-directories of the renamed directory have also been renamed.
+    assertTrue("Keys under the renamed directory not renamed",
+            fs.exists(new Path(dest, "sub_dir1")));
+
+    // Test if one path belongs to other FileSystem.
+    Path fakeDir = new Path(fs.getUri().toString() + "fake" + dir);
+    LambdaTestUtils.intercept(IllegalArgumentException.class, "Wrong FS",
+            () -> fs.rename(fakeDir, dest));
+  }
+
+
   @Test(timeout = 300_000)
   @Override
   public void testFileSystem() throws Exception {
@@ -291,6 +329,9 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
     testListStatusOnSubDirs();
     tableCleanup();
     testListStatusOnLargeDirectory();
+    tableCleanup();
+
+    testRenameDir();
     tableCleanup();
   }
 

@@ -653,7 +653,7 @@ public class TestOzoneFileSystem {
         interimPath.getName(), fileStatus.getPath().getName());
   }
 
-  private void testRenameDir() throws Exception {
+  protected void testRenameDir() throws Exception {
     final String dir = "/root_dir/dir1";
     final Path source = new Path(fs.getUri().toString() + dir);
     final Path dest = new Path(source.toString() + ".renamed");
