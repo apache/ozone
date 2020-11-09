@@ -94,7 +94,7 @@ services:
       - ../common-config
     environment:
       HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-hadoop3-@project.version@.jar
-      WAIT_FOR: rm:8088
+      WAITFOR: rm:8088
     command: ["yarn","nodemanager"]
 # Optional section: comment out this part to get DNS resolution for all the containers.
 #    Add 127.0.0.1 (or the ip of your docker machine) to the resolv.conf to get local DNS resolution
