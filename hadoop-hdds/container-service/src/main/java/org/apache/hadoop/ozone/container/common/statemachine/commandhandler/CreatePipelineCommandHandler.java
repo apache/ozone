@@ -19,12 +19,10 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CreatePipelineCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -79,23 +77,19 @@ public class CreatePipelineCommandHandler implements CommandHandler {
     final long startTime = Time.monotonicNow();
     final DatanodeDetails dn = context.getParent()
         .getDatanodeDetails();
-    final CreatePipelineCommandProto createCommand =
-        ((CreatePipelineCommand)command).getProto();
-    final HddsProtos.PipelineID pipelineID = createCommand.getPipelineID();
-    final List<DatanodeDetails> peers =
-        createCommand.getDatanodeList().stream()
-            .map(DatanodeDetails::getFromProtoBuf)
-            .collect(Collectors.toList());
+    final CreatePipelineCommand createCommand = (CreatePipelineCommand) command;
+    final PipelineID pipelineID = createCommand.getPipelineID();
+    final HddsProtos.PipelineID pipelineIdProto = pipelineID.getProtobuf();
+    final List<DatanodeDetails> peers = createCommand.getNodeList();
     final List<Integer> priorityList = createCommand.getPriorityList();
 
     try {
       XceiverServerSpi server = ozoneContainer.getWriteChannel();
-      if (!server.isExist(pipelineID)) {
-        final RaftGroupId groupId = RaftGroupId.valueOf(
-            PipelineID.getFromProtobuf(pipelineID).getId());
+      if (!server.isExist(pipelineIdProto)) {
+        final RaftGroupId groupId = RaftGroupId.valueOf(pipelineID.getId());
         final RaftGroup group =
             RatisHelper.newRaftGroup(groupId, peers, priorityList);
-        server.addGroup(pipelineID, peers, priorityList);
+        server.addGroup(pipelineIdProto, peers, priorityList);
         peers.stream().filter(
             d -> !d.getUuid().equals(dn.getUuid()))
             .forEach(d -> {
@@ -109,11 +103,13 @@ public class CreatePipelineCommandHandler implements CommandHandler {
                 LOG.warn("Add group failed for {}", d, ioe);
               }
             });
-        LOG.info("Created Pipeline {} {} #{}.",
-            createCommand.getType(), createCommand.getFactor(), pipelineID);
+        LOG.info("Created Pipeline {} {} {}.",
+            createCommand.getReplicationType(), createCommand.getFactor(),
+            pipelineID);
       }
     } catch (IOException e) {
-      LOG.error("Can't create pipeline {} {} #{}", createCommand.getType(),
+      LOG.error("Can't create pipeline {} {} {}",
+          createCommand.getReplicationType(),
           createCommand.getFactor(), pipelineID, e);
     } finally {
       long endTime = Time.monotonicNow();

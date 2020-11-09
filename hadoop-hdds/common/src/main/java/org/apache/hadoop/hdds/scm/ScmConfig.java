@@ -74,6 +74,18 @@ public class ScmConfig {
   )
   private String pipelineChoosePolicyName;
 
+  @Config(key = "block.deletion.per-interval.max",
+      type = ConfigType.INT,
+      defaultValue = "10000",
+      tags = { ConfigTag.SCM, ConfigTag.DELETION},
+      description =
+          "Maximum number of blocks which SCM processes during an interval. "
+              + "If SCM has 100000 blocks which need to be deleted and the "
+              + "configuration is 5000 then it would only send 5000 blocks "
+              + "for deletion to the datanodes."
+  )
+  private int blockDeletionLimit;
+
   public void setKerberosPrincipal(String kerberosPrincipal) {
     this.principal = kerberosPrincipal;
   }
@@ -91,6 +103,10 @@ public class ScmConfig {
     this.pipelineChoosePolicyName = pipelineChoosePolicyName;
   }
 
+  public void setBlockDeletionLimit(int blockDeletionLimit) {
+    this.blockDeletionLimit = blockDeletionLimit;
+  }
+
   public String getKerberosPrincipal() {
     return this.principal;
   }
@@ -105,6 +121,10 @@ public class ScmConfig {
 
   public String getPipelineChoosePolicyName() {
     return pipelineChoosePolicyName;
+  }
+
+  public int getBlockDeletionLimit() {
+    return blockDeletionLimit;
   }
 
   /**

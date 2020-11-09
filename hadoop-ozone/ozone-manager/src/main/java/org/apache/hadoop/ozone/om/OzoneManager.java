@@ -150,7 +150,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServicePort;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserVolumeInfo;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
@@ -3698,7 +3698,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           transactionID, objectID);
 
       String dbUserKey = metadataManager.getUserKey(userName);
-      UserVolumeInfo userVolumeInfo = UserVolumeInfo.newBuilder()
+      PersistedUserVolumeInfo userVolumeInfo =
+          PersistedUserVolumeInfo.newBuilder()
           .setObjectID(objectID)
           .setUpdateID(transactionID)
           .addVolumeNames(s3VolumeName).build();

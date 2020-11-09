@@ -154,7 +154,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       }
 
       bucketLockAcquired =
-          omMetadataManager.getLock().acquireLock(BUCKET_LOCK,
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
               volumeName, bucketName);
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
@@ -221,7 +221,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           omDoubleBufferHelper);
 
       if(bucketLockAcquired) {
-        omMetadataManager.getLock().releaseLock(BUCKET_LOCK, volumeName,
+        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
             bucketName);
       }
     }
