@@ -224,54 +224,49 @@ public class SCMBlockProtocolServer implements
     }
     List<DeleteBlockGroupResult> results = new ArrayList<>();
     Map<String, String> auditMap = Maps.newHashMap();
-    for (BlockGroup keyBlocks : keyBlocksInfoList) {
-      ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result resultCode;
-      try {
-        // We delete blocks in an atomic operation to prevent getting
-        // into state like only a partial of blocks are deleted,
-        // which will leave key in an inconsistent state.
-        auditMap.put("keyBlockToDelete", keyBlocks.toString());
-        scm.getScmBlockManager().deleteBlocks(keyBlocks.getBlockIDList());
-        resultCode = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
-            .Result.success;
-        AUDIT.logWriteSuccess(
-            buildAuditMessageForSuccess(SCMAction.DELETE_KEY_BLOCK, auditMap)
-        );
-      } catch (SCMException scmEx) {
-        LOG.warn("Fail to delete block: {}", keyBlocks.getGroupID(), scmEx);
-        AUDIT.logWriteFailure(
-            buildAuditMessageForFailure(SCMAction.DELETE_KEY_BLOCK, auditMap,
-                scmEx)
-        );
-        switch (scmEx.getResult()) {
-        case SAFE_MODE_EXCEPTION:
-          resultCode = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
-              .Result.safeMode;
-          break;
-        case FAILED_TO_FIND_BLOCK:
-          resultCode = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
-              .Result.errorNotFound;
-          break;
-        default:
-          resultCode = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
+    ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result codeResult;
+    try{
+      scm.getScmBlockManager().deleteBlocks(keyBlocksInfoList);
+      codeResult = ScmBlockLocationProtocolProtos.
+              DeleteScmBlockResult.Result.success;
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+              SCMAction.DELETE_KEY_BLOCK, auditMap));
+    } catch (SCMException scmEx){
+      LOG.warn("Fail to delete {} keys", keyBlocksInfoList.size(), scmEx);
+      AUDIT.logWriteFailure(
+              buildAuditMessageForFailure(SCMAction.DELETE_KEY_BLOCK, auditMap,
+                      scmEx)
+      );
+      switch (scmEx.getResult()) {
+      case SAFE_MODE_EXCEPTION:
+        codeResult = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
+                .Result.safeMode;
+        break;
+      case FAILED_TO_FIND_BLOCK:
+        codeResult = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
+                .Result.errorNotFound;
+        break;
+      default:
+        codeResult = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
+                .Result.unknownFailure;
+      }
+    } catch (IOException ex){
+      LOG.warn("Fail to delete {} keys", keyBlocksInfoList.size(), ex);
+      AUDIT.logWriteFailure(
+              buildAuditMessageForFailure(SCMAction.DELETE_KEY_BLOCK, auditMap,
+                      ex)
+      );
+      codeResult = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
               .Result.unknownFailure;
-        }
-      } catch (IOException ex) {
-        LOG.warn("Fail to delete blocks for object key: {}", keyBlocks
-            .getGroupID(), ex);
-        AUDIT.logWriteFailure(
-            buildAuditMessageForFailure(SCMAction.DELETE_KEY_BLOCK, auditMap,
-                ex)
-        );
-        resultCode = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
-            .Result.unknownFailure;
+    }
+    for(BlockGroup bg : keyBlocksInfoList){
+      auditMap.put("KeyBlockToDelete", bg.toString());
+      List<DeleteBlockResult> blockResult = new ArrayList<>();
+      for(BlockID b : bg.getBlockIDList()){
+        blockResult.add(new DeleteBlockResult(b, codeResult));
       }
-      List<DeleteBlockResult> blockResultList = new ArrayList<>();
-      for (BlockID blockKey : keyBlocks.getBlockIDList()) {
-        blockResultList.add(new DeleteBlockResult(blockKey, resultCode));
-      }
-      results.add(new DeleteBlockGroupResult(keyBlocks.getGroupID(),
-          blockResultList));
+      results.add(new DeleteBlockGroupResult(bg.getGroupID(),
+              blockResult));
     }
     return results;
   }
