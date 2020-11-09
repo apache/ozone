@@ -122,4 +122,21 @@ public class DatanodeRatisServerConfig {
   public void setLeaderNumPendingRequests(int leaderNumPendingRequests) {
     this.leaderNumPendingRequests = leaderNumPendingRequests;
   }
+
+  @Config(key = "delete.ratis.log.directory",
+          defaultValue = "true",
+          type = ConfigType.BOOLEAN,
+          tags = {OZONE, DATANODE, RATIS},
+          description = "Flag to indicate whether ratis log directory will be" +
+                  "cleaned up during pipeline remove."
+  )
+  private boolean shouldDeleteRatisLogDirectory;
+
+  public boolean shouldDeleteRatisLogDirectory() {
+    return shouldDeleteRatisLogDirectory;
+  }
+
+  public void setLeaderNumPendingRequests(boolean delete) {
+    this.shouldDeleteRatisLogDirectory = delete;
+  }
 }

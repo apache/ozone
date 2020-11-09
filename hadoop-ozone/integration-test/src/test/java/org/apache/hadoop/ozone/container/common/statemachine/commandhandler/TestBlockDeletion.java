@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -96,6 +97,7 @@ public class TestBlockDeletion {
   private static OzoneManager om = null;
   private static Set<Long> containerIdsWithDeletedBlocks;
   private static long maxTransactionId = 0;
+  private static File baseDir;
 
   @BeforeClass
   public static void init() throws Exception {
@@ -106,7 +108,7 @@ public class TestBlockDeletion {
 
     String path =
         GenericTestUtils.getTempPath(TestBlockDeletion.class.getSimpleName());
-    File baseDir = new File(path);
+    baseDir = new File(path);
     baseDir.mkdirs();
 
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
@@ -137,10 +139,11 @@ public class TestBlockDeletion {
   }
 
   @AfterClass
-  public static void cleanup() {
+  public static void cleanup() throws IOException {
     if (cluster != null) {
       cluster.shutdown();
     }
+    FileUtils.deleteDirectory(baseDir);
   }
 
   @Test

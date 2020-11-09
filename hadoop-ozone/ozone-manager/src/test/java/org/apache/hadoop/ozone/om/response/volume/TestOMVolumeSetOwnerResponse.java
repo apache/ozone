@@ -28,8 +28,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .CreateVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .UserVolumeInfo;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -78,7 +77,7 @@ public class TestOMVolumeSetOwnerResponse {
 
     String volumeName = UUID.randomUUID().toString();
     String oldOwner = "user1";
-    UserVolumeInfo volumeList = UserVolumeInfo.newBuilder()
+    PersistedUserVolumeInfo volumeList = PersistedUserVolumeInfo.newBuilder()
         .setObjectID(1)
         .setUpdateID(1)
         .addVolumeNames(volumeName).build();
@@ -99,11 +98,13 @@ public class TestOMVolumeSetOwnerResponse {
 
 
     String newOwner = "user2";
-    UserVolumeInfo newOwnerVolumeList = UserVolumeInfo.newBuilder()
+    PersistedUserVolumeInfo newOwnerVolumeList =
+        PersistedUserVolumeInfo.newBuilder()
         .setObjectID(1)
         .setUpdateID(1)
         .addVolumeNames(volumeName).build();
-    UserVolumeInfo oldOwnerVolumeList = UserVolumeInfo.newBuilder()
+    PersistedUserVolumeInfo oldOwnerVolumeList =
+        PersistedUserVolumeInfo.newBuilder()
         .setObjectID(2)
         .setUpdateID(2)
         .build();
