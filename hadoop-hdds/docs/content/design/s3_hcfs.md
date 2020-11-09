@@ -69,8 +69,8 @@ To solve the performance problems of the directory listing / rename, [HDDS-2939]
 # Goals
 
  * Out of the box Ozone should support both S3 and HCFS interfaces without any settings. (It's possible only for the regular, fs compatible key names)
- * As 100% compatibility couldn't be achieved on both side we need a configuration to set the expectations for incompatible key names
- * Default behavior of `o3fs` and `ofs` should be as close to `s3a` as possible (when s3 compatibilty is prefered)
+ * As 100% compatibility couldn't be achieved on both side we need a configuration to set the expectations for incompatible key names (which means that un-preferred should use forced normalization, strict validation or limited view)
+ * Default behavior of `o3fs` and `ofs` should be as close to `s3a` as possible (when s3 compatibility is preferred)
 
 # Possible cases to support
 
@@ -79,27 +79,29 @@ There are two main aspects of supporting both `ofs/o3fs` and `s3` together:
  1. `ofs/o3fs` require to create intermediate directory entries (for example `/a/b` for the key `/a/b/c`)
  2. Special file-system incompatible key names require special attention
 
-The second couldn't be done with compromise.
+The second couldn't be done with compromise! For example if uploading a key with name '../../a.txt' can work with S3, but it's not possible by handled by `ofs/o3fs` as it would escape from the file system hierarchy.
 
- 1. We either support all key names (including non fs compatible key names), which means `ofs/o3fs` can provide only a partial view
- 2. Or we can normalize the key names to be fs compatible (which makes it possible to create inconsistent S3 keys)
+At high level, we have two options:
+
+ 1. We either support all key names (including non fs compatible key names), which means `ofs/o3fs` can provide only a partial view. Some invalid key names couldn't be visible. (But all keys can be uploaded from S3)
+ 2. Or we can normalize the key names to always be HCFS compatible (which would break the S3 compatibility for some specific key names. For example a file (!) uploaded with name `a/b/` might be visible as `/a/b` after the creation after the normalization required by the `ofs/o3fs`).
 
 HDDS-3955 introduced `ozone.om.enable.filesystem.paths`, with this setting we will have two possible usage pattern:
 
 | ozone.om.enable.filesystem.paths= | true | false
 |-|-|-|
-| create itermediate dirs | YES | NO |
+| create intermediate dirs | YES | NO |
 | normalize key names from `ofs/o3fs` | YES | NO
 | force to normalize key names of `s3` interface | YES | NO 
 | `s3` key `/a/b/c` available from `ofs/o3fs` | YES | NO
 | `s3` key `/a/b//c` available from `ofs/o3fs` | YES | NO
 | `s3` key `/a/b//c` available from `s3` | AWS S3 incompatibility | YES
 
-This proposal suggest to use a 3rd option where 100% AWS compatiblity is guaranteed in exchange of a limited `ofs/o3fs` view:
+This proposal suggest to use a 3rd option where 100% AWS compatibility is guaranteed in exchange of a limited `ofs/o3fs` view:
 
 | ozone.om.intermediate.dir.generation= | true |
 |-|-|-|
-| create itermediate dirs | YES | 
+| create intermediate dirs | YES | 
 | normalize key names from `ofs/o3fs` | YES |
 | force to normalize key names of `s3` interface | **NO** |
 | `s3` key `/a/b/c` available from `ofs/o3fs` | YES | 
