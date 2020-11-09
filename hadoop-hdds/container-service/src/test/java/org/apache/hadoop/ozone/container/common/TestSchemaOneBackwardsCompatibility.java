@@ -277,8 +277,8 @@ public class TestSchemaOneBackwardsCompatibility {
     Set<String> preUpgradeBlocks = new HashSet<>();
     try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(kvData, conf)) {
       // Read blocks that were already deleted before the upgrade.
-       deletedBlocks = refCountedDB.getStore()
-           .getDeletedBlocksTable().getRangeKVs(null, 100);
+      deletedBlocks = refCountedDB.getStore()
+          .getDeletedBlocksTable().getRangeKVs(null, 100);
 
       for (Table.KeyValue<String, ChunkInfoList> chunkListKV : deletedBlocks) {
         preUpgradeBlocks.add(chunkListKV.getKey());

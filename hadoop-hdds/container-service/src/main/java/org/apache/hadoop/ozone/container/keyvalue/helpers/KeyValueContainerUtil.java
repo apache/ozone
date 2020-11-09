@@ -187,11 +187,22 @@ public final class KeyValueContainerUtil {
       kvContainerData.setSchemaVersion(OzoneConsts.SCHEMA_V1);
     }
 
-
     boolean isBlockMetadataSet = false;
-
-    try(DatanodeStore store =
-            BlockUtils.getUncachedDatanodeStore(kvContainerData, config)) {
+    ReferenceCountedDB cachedDB = null;
+    DatanodeStore store = null;
+    try {
+      try {
+        store = BlockUtils.getUncachedDatanodeStore(kvContainerData, config);
+      } catch (IOException e) {
+        // If an exception is thrown, then it may indicate the RocksDB is
+        // already open in the container cache. As this code is only executed at
+        // DN startup, this should only happen in the tests.
+        cachedDB = BlockUtils.getDB(kvContainerData, config);
+        store = cachedDB.getStore();
+        LOG.warn("Attempt to get an uncached RocksDB handle failed and an " +
+            "instance was retrieved from the cache. This should only happen " +
+            "in tests");
+      }
       Table<String, Long> metadataTable = store.getMetadataTable();
 
       // Set pending deleted block count.
@@ -245,13 +256,23 @@ public final class KeyValueContainerUtil {
       if (!isBlockMetadataSet) {
         initializeUsedBytesAndBlockCount(store, kvContainerData);
       }
-    } catch (IOException e) {
-      throw e;
-    } catch (Exception e) {
-      LOG.error("Unexpected error closing the DatanodeStore for container {}",
-          containerID, e);
-      throw new RuntimeException("Unexpected error closing the DatanodeStore " +
-          "for container "+containerID, e);
+    } finally {
+      if (cachedDB != null) {
+        // If we get a cached instance, calling close simply decrements the
+        // reference count.
+        cachedDB.close();
+      } else if (store != null) {
+        // We only stop the store if cacheDB is null, as otherwise we would
+        // close the rocksDB handle in the cache and the next reader would fail
+        try {
+          store.stop();
+        } catch (IOException e) {
+          throw e;
+        } catch (Exception e) {
+          throw new RuntimeException("Unexpected exception closing the " +
+              "RocksDB when loading containers", e);
+        }
+      }
     }
   }
 

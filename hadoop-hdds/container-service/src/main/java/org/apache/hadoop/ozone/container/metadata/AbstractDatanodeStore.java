@@ -128,11 +128,6 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
-  public void close() throws Exception {
-    stop();
-  }
-
-  @Override
   public DBStore getStore() {
     return this.store;
   }
