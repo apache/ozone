@@ -47,7 +47,7 @@ public interface DatanodeStore {
    */
   void stop() throws Exception;
 
-  /**TestSchemaOneBackwardsCompatibility.java
+  /**
    * Get datanode store.
    *
    * @return datanode store.
