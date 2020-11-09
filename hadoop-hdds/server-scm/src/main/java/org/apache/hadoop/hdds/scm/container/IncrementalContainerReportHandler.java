@@ -88,7 +88,8 @@ public class IncrementalContainerReportHandler extends
             report.getDatanodeDetails(), ex);
       } catch (ContainerReplicaNotFoundException e){
         success = false;
-        LOG.warn("Container {} replica not found!", replicaProto.getContainerID());
+        LOG.warn("Container {} replica not found!",
+            replicaProto.getContainerID());
       } catch (IOException e) {
         success = false;
         LOG.error("Exception while processing ICR for container {}",
