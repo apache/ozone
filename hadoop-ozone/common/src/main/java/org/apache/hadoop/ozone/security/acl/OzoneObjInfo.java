@@ -159,6 +159,16 @@ public final class OzoneObjInfo extends OzoneObj {
       return new Builder();
     }
 
+    public static Builder getBuilder(ResourceType resType,
+        StoreType storeType, String vol, String bucket, String key) {
+      return OzoneObjInfo.Builder.newBuilder()
+          .setResType(resType)
+          .setStoreType(storeType)
+          .setVolumeName(vol)
+          .setBucketName(bucket)
+          .setKeyName(key);
+    }
+
     public static Builder fromKeyArgs(OmKeyArgs args) {
       return new Builder()
           .setVolumeName(args.getVolumeName())

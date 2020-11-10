@@ -31,6 +31,8 @@ import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.storage.proto.
+    OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +54,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .VolumeInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserVolumeInfo;
 import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
@@ -148,7 +149,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
 
       String dbVolumeKey = omMetadataManager.getVolumeKey(volume);
 
-      UserVolumeInfo volumeList = null;
+      PersistedUserVolumeInfo volumeList = null;
       if (omMetadataManager.getVolumeTable().isExist(dbVolumeKey)) {
         LOG.debug("volume:{} already exists", omVolumeArgs.getVolume());
         throw new OMException("Volume already exists",

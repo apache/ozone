@@ -47,6 +47,7 @@ public class DatanodeDetails extends NodeImpl implements
    * DataNode's unique identifier in the cluster.
    */
   private final UUID uuid;
+  private final String uuidString;
 
   private String ipAddress;
   private String hostName;
@@ -84,6 +85,7 @@ public class DatanodeDetails extends NodeImpl implements
       long persistedOpStateExpiryEpochSec) {
     super(hostName, networkLocation, NetConstants.NODE_COST_DEFAULT);
     this.uuid = uuid;
+    this.uuidString = uuid.toString();
     this.ipAddress = ipAddress;
     this.hostName = hostName;
     this.ports = ports;
@@ -100,6 +102,7 @@ public class DatanodeDetails extends NodeImpl implements
     super(datanodeDetails.getHostName(), datanodeDetails.getNetworkLocation(),
         datanodeDetails.getCost());
     this.uuid = datanodeDetails.uuid;
+    this.uuidString = uuid.toString();
     this.ipAddress = datanodeDetails.ipAddress;
     this.hostName = datanodeDetails.hostName;
     this.ports = datanodeDetails.ports;
@@ -129,7 +132,7 @@ public class DatanodeDetails extends NodeImpl implements
    * @return UUID of DataNode
    */
   public String getUuidString() {
-    return uuid.toString();
+    return uuidString;
   }
 
   /**

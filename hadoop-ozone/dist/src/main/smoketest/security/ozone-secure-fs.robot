@@ -118,7 +118,7 @@ Test native authorizer
     Execute         kdestroy
     Run Keyword     Kinit test user     testuser2    testuser2.keytab
     ${result} =     Execute And Ignore Error         ozone sh bucket list /${volume3}/
-                    Should contain      ${result}    PERMISSION_DENIED org.apache.hadoop.ozone.om.exceptions.OMException: User testuser2/scm@EXAMPLE.COM doesn't have LIST permission to access volume
+                    Should contain      ${result}    PERMISSION_DENIED User testuser2/scm@EXAMPLE.COM doesn't have LIST permission to access volume
     Execute         ozone sh volume addacl ${volume3} -a user:testuser2/scm@EXAMPLE.COM:l
     Execute         ozone sh bucket list /${volume3}/
     Execute         ozone sh volume getacl /${volume3}/
