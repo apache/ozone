@@ -94,7 +94,7 @@ public class TestKeyValueContainer {
   // Use one configuration object across parameterized runs of tests.
   // This preserves the column family options in the container options
   // cache for testContainersShareColumnFamilyOptions.
-  private static final OzoneConfiguration conf = new OzoneConfiguration();
+  private static final OzoneConfiguration CONF = new OzoneConfiguration();
 
   public TestKeyValueContainer(ChunkLayOutVersion layout) {
     this.layout = layout;
@@ -109,7 +109,7 @@ public class TestKeyValueContainer {
   public void setUp() throws Exception {
     datanodeId = UUID.randomUUID();
     HddsVolume hddsVolume = new HddsVolume.Builder(folder.getRoot()
-        .getAbsolutePath()).conf(conf).datanodeUuid(datanodeId
+        .getAbsolutePath()).conf(CONF).datanodeUuid(datanodeId
         .toString()).build();
 
     volumeSet = mock(MutableVolumeSet.class);
@@ -122,14 +122,14 @@ public class TestKeyValueContainer {
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
 
-    keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
+    keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF);
   }
 
   private void addBlocks(int count) throws Exception {
     long containerId = keyValueContainerData.getContainerID();
 
     try(ReferenceCountedDB metadataStore = BlockUtils.getDB(keyValueContainer
-        .getContainerData(), conf)) {
+        .getContainerData(), CONF)) {
       for (int i = 0; i < count; i++) {
         // Creating BlockData
         BlockID blockID = new BlockID(containerId, i);
@@ -186,7 +186,7 @@ public class TestKeyValueContainer {
     long numberOfKeysToWrite = 12;
     //write one few keys to check the key count after import
     try(ReferenceCountedDB metadataStore =
-        BlockUtils.getDB(keyValueContainerData, conf)) {
+        BlockUtils.getDB(keyValueContainerData, CONF)) {
       Table<String, BlockData> blockDataTable =
               metadataStore.getStore().getBlockDataTable();
 
@@ -199,7 +199,7 @@ public class TestKeyValueContainer {
       metadataStore.getStore().getMetadataTable()
               .put(OzoneConsts.BLOCK_COUNT, numberOfKeysToWrite);
     }
-    BlockUtils.removeDB(keyValueContainerData, conf);
+    BlockUtils.removeDB(keyValueContainerData, CONF);
 
     Map<String, String> metadata = new HashMap<>();
     metadata.put("key1", "value1");
@@ -225,7 +225,7 @@ public class TestKeyValueContainer {
             keyValueContainerData.getLayOutVersion(),
             keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
             datanodeId.toString());
-    KeyValueContainer container = new KeyValueContainer(containerData, conf);
+    KeyValueContainer container = new KeyValueContainer(containerData, CONF);
 
     HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(volumeSet
         .getVolumesList(), 1);
@@ -297,7 +297,7 @@ public class TestKeyValueContainer {
     keyValueContainerData.setState(ContainerProtos.ContainerDataProto.State
         .CLOSED);
     keyValueContainer = new KeyValueContainer(
-        keyValueContainerData, conf);
+        keyValueContainerData, CONF);
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
     keyValueContainer.delete();
 
@@ -376,7 +376,7 @@ public class TestKeyValueContainer {
     try {
       keyValueContainerData.setState(
           ContainerProtos.ContainerDataProto.State.CLOSED);
-      keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
+      keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF);
       keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
       Map<String, String> metadata = new HashMap<>();
       metadata.put(OzoneConsts.VOLUME, OzoneConsts.OZONE);
@@ -399,7 +399,7 @@ public class TestKeyValueContainer {
     // Create Container 1
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
     Assert.assertEquals(1, cachedOptions.size());
-    ColumnFamilyOptions options1 = cachedOptions.get(conf);
+    ColumnFamilyOptions options1 = cachedOptions.get(CONF);
     Assert.assertNotNull(options1);
 
     // Create Container 2
@@ -407,11 +407,11 @@ public class TestKeyValueContainer {
         layout,
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
-    keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
+    keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF);
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
 
     Assert.assertEquals(1, cachedOptions.size());
-    ColumnFamilyOptions options2 = cachedOptions.get(conf);
+    ColumnFamilyOptions options2 = cachedOptions.get(CONF);
     Assert.assertNotNull(options2);
 
     // Column family options object should be reused.
