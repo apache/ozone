@@ -74,6 +74,11 @@ public class TestBucketPut {
       public String getAwsAccessId() {
         return OzoneConsts.OZONE;
       }
+
+      @Override
+      public Exception getException() {
+        return null;
+      }
     });
   }
 

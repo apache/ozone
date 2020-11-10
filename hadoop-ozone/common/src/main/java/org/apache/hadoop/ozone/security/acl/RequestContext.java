@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.security.acl;
 
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
@@ -32,16 +33,20 @@ public class RequestContext {
   private final String serviceId;
   private final ACLIdentityType aclType;
   private final ACLType aclRights;
+  private final String ownerName;
 
+  @SuppressWarnings("parameternumber")
   public RequestContext(String host, InetAddress ip,
       UserGroupInformation clientUgi, String serviceId,
-      ACLIdentityType aclType, ACLType aclRights) {
+      ACLIdentityType aclType, ACLType aclRights,
+      String ownerName) {
     this.host = host;
     this.ip = ip;
     this.clientUgi = clientUgi;
     this.serviceId = serviceId;
     this.aclType = aclType;
     this.aclRights = aclRights;
+    this.ownerName = ownerName;
   }
 
   /**
@@ -54,6 +59,12 @@ public class RequestContext {
     private String serviceId;
     private IAccessAuthorizer.ACLIdentityType aclType;
     private IAccessAuthorizer.ACLType aclRights;
+
+    /**
+     *  ownerName is specially added to allow
+     *  authorizer to honor owner privilege.
+     */
+    private String ownerName;
 
     public Builder setHost(String bHost) {
       this.host = bHost;
@@ -80,19 +91,49 @@ public class RequestContext {
       return this;
     }
 
+    public ACLType getAclRights() {
+      return this.aclRights;
+    }
+
     public Builder setAclRights(ACLType aclRight) {
       this.aclRights = aclRight;
       return this;
     }
 
+    public Builder setOwnerName(String owner) {
+      this.ownerName = owner;
+      return this;
+    }
+
     public RequestContext build() {
       return new RequestContext(host, ip, clientUgi, serviceId, aclType,
-          aclRights);
+          aclRights, ownerName);
     }
   }
 
   public static Builder newBuilder() {
     return new Builder();
+  }
+
+  public static RequestContext.Builder getBuilder(
+      UserGroupInformation ugi, InetAddress remoteAddress, String hostName,
+      ACLType aclType, String ownerName) {
+    RequestContext.Builder contextBuilder = RequestContext.newBuilder()
+        .setClientUgi(ugi)
+        .setIp(remoteAddress)
+        .setHost(hostName)
+        .setAclType(ACLIdentityType.USER)
+        .setAclRights(aclType)
+        .setOwnerName(ownerName);
+    return contextBuilder;
+  }
+
+  public static RequestContext.Builder getBuilder(UserGroupInformation ugi,
+      ACLType aclType, String ownerName) {
+    return getBuilder(ugi,
+        ProtobufRpcEngine.Server.getRemoteIp(),
+        ProtobufRpcEngine.Server.getRemoteIp().getHostName(),
+        aclType, ownerName);
   }
 
   public String getHost() {
@@ -119,4 +160,7 @@ public class RequestContext {
     return aclRights;
   }
 
+  public String getOwnerName() {
+    return ownerName;
+  }
 }

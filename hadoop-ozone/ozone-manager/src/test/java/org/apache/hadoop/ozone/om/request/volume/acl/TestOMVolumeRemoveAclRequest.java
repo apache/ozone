@@ -43,6 +43,8 @@ public class TestOMVolumeRemoveAclRequest extends TestOMVolumeRequest {
     OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:rw");
     OMRequest originalRequest =
         TestOMRequestUtils.createVolumeRemoveAclRequest(volumeName, acl);
+    long originModTime = originalRequest.getRemoveAclRequest()
+        .getModificationTime();
 
     OMVolumeRemoveAclRequest omVolumeRemoveAclRequest =
         new OMVolumeRemoveAclRequest(originalRequest);
@@ -50,6 +52,12 @@ public class TestOMVolumeRemoveAclRequest extends TestOMVolumeRequest {
     OMRequest modifiedRequest = omVolumeRemoveAclRequest.preExecute(
         ozoneManager);
     Assert.assertNotEquals(modifiedRequest, originalRequest);
+
+    long newModTime = modifiedRequest.getRemoveAclRequest()
+        .getModificationTime();
+    // When preExecute() of removing acl,
+    // the new modification time is greater than origin one.
+    Assert.assertTrue(newModTime > originModTime);
   }
 
   @Test

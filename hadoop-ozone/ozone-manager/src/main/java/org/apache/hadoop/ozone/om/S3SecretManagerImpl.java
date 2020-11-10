@@ -61,7 +61,7 @@ public class S3SecretManagerImpl implements S3SecretManager {
     Preconditions.checkArgument(Strings.isNotBlank(kerberosID),
         "kerberosID cannot be null or empty.");
     S3SecretValue result = null;
-    omMetadataManager.getLock().acquireLock(S3_SECRET_LOCK, kerberosID);
+    omMetadataManager.getLock().acquireWriteLock(S3_SECRET_LOCK, kerberosID);
     try {
       S3SecretValue s3Secret =
           omMetadataManager.getS3SecretTable().get(kerberosID);
@@ -73,7 +73,7 @@ public class S3SecretManagerImpl implements S3SecretManager {
         return s3Secret;
       }
     } finally {
-      omMetadataManager.getLock().releaseLock(S3_SECRET_LOCK, kerberosID);
+      omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK, kerberosID);
     }
     if (LOG.isTraceEnabled()) {
       LOG.trace("Secret for accessKey:{}, proto:{}", kerberosID, result);
@@ -89,7 +89,7 @@ public class S3SecretManagerImpl implements S3SecretManager {
     LOG.trace("Get secret for awsAccessKey:{}", kerberosID);
 
     S3SecretValue s3Secret;
-    omMetadataManager.getLock().acquireLock(S3_SECRET_LOCK, kerberosID);
+    omMetadataManager.getLock().acquireReadLock(S3_SECRET_LOCK, kerberosID);
     try {
       s3Secret = omMetadataManager.getS3SecretTable().get(kerberosID);
       if (s3Secret == null) {
@@ -97,7 +97,7 @@ public class S3SecretManagerImpl implements S3SecretManager {
             "awsAccessKeyId " + kerberosID, S3_SECRET_NOT_FOUND);
       }
     } finally {
-      omMetadataManager.getLock().releaseLock(S3_SECRET_LOCK, kerberosID);
+      omMetadataManager.getLock().releaseReadLock(S3_SECRET_LOCK, kerberosID);
     }
 
     return s3Secret.getAwsSecret();

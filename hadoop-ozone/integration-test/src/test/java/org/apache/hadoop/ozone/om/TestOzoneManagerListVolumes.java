@@ -201,16 +201,16 @@ public class TestOzoneManagerListVolumes {
 
     // Login as user1, list other users' volumes
     UserGroupInformation.setLoginUser(user1);
-    checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume5"),
-        true);
+    checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume4",
+        "volume5"), true);
 
     // Add "s3v" created default by OM.
     checkUser(cluster, adminUser, Arrays.asList("volume1", "volume2", "volume3",
         "volume4", "volume5", "s3v"), true);
 
     UserGroupInformation.setLoginUser(user2);
-    checkUser(cluster, user1, Arrays.asList("volume1", "volume4", "volume5"),
-        true);
+    checkUser(cluster, user1, Arrays.asList("volume1", "volume3", "volume4",
+        "volume5"), true);
     checkUser(cluster, adminUser, Arrays.asList("volume1", "volume2", "volume3",
         "volume4", "volume5", "s3v"), true);
 
@@ -229,18 +229,18 @@ public class TestOzoneManagerListVolumes {
 
     // Login as user1, list other users' volumes, expect failure
     UserGroupInformation.setLoginUser(user1);
-    checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume5"),
-        false);
+    checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume4",
+        "volume5"), false);
     // Add "s3v" created default by OM.
     checkUser(cluster, adminUser, Arrays.asList("volume1", "volume2", "volume3",
         "volume4", "volume5", "s3v"), false);
 
     // While admin should be able to list volumes just fine.
     UserGroupInformation.setLoginUser(adminUser);
-    checkUser(cluster, user1, Arrays.asList("volume1", "volume4", "volume5"),
-        true);
-    checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume5"),
-        true);
+    checkUser(cluster, user1, Arrays.asList("volume1", "volume3", "volume4",
+        "volume5"), true);
+    checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume4",
+        "volume5"), true);
 
     stopCluster(cluster);
   }
@@ -249,10 +249,10 @@ public class TestOzoneManagerListVolumes {
   public void testAclEnabledListAllAllowed() throws Exception {
     // ozone.acl.enabled = true, ozone.om.volume.listall.allowed = true
     MiniOzoneCluster cluster = startCluster(true, true);
-    checkUser(cluster, user1, Arrays.asList("volume1", "volume4", "volume5"),
-        true);
-    checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume5"),
-        true);
+    checkUser(cluster, user1, Arrays.asList("volume1", "volume3", "volume4",
+        "volume5"), true);
+    checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume4",
+        "volume5"), true);
 
     // Add "s3v" created default by OM.
     checkUser(cluster, adminUser, Arrays.asList("volume1", "volume2", "volume3",
@@ -267,11 +267,11 @@ public class TestOzoneManagerListVolumes {
     // The default user is adminUser as set in init(),
     // listall always succeeds if we use that UGI, we should use non-admin here
     UserGroupInformation.setLoginUser(user1);
-    checkUser(cluster, user1, Arrays.asList("volume1", "volume4", "volume5"),
-        false);
+    checkUser(cluster, user1, Arrays.asList("volume1", "volume3", "volume4",
+        "volume5"), false);
     UserGroupInformation.setLoginUser(user2);
-    checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume5"),
-        false);
+    checkUser(cluster, user2, Arrays.asList("volume2", "volume3", "volume4",
+        "volume5"), false);
     UserGroupInformation.setLoginUser(adminUser);
     // Add "s3v" created default by OM.
     checkUser(cluster, adminUser, Arrays.asList("volume1", "volume2",
