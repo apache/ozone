@@ -17,12 +17,15 @@
  */
 package org.apache.hadoop.ozone.container.metadata;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.*;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
@@ -40,7 +43,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
@@ -65,23 +71,11 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   private DBStore store;
   private final AbstractDatanodeDBDefinition dbDef;
   private final long containerID;
+  private final ColumnFamilyOptions cfOptions;
 
-  private static final ColumnFamilyOptions COLUMN_FAMILY_OPTIONS;
   private static final DBProfile DEFAULT_PROFILE = DBProfile.DISK;
-  private static final long CACHE_SIZE = 8 * SizeUnit.MB;
-
-  static {
-    // Enables static construction of RocksDB objects.
-    RocksDB.loadLibrary();
-
-    BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
-    tableConfig.setBlockCache(new LRUCache(CACHE_SIZE))
-        .setPinL0FilterAndIndexBlocksInCache(true)
-        .setFilterPolicy(new BloomFilter());
-
-    COLUMN_FAMILY_OPTIONS = DEFAULT_PROFILE.getColumnFamilyOptions();
-    COLUMN_FAMILY_OPTIONS.setTableFormatConfig(tableConfig);
-  }
+  private static final Map<ConfigurationSource, ColumnFamilyOptions>
+      OPTIONS_CACHE = new ConcurrentHashMap<>();
 
   /**
    * Constructs the metadata store and starts the DB services.
@@ -91,6 +85,15 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
    */
   protected AbstractDatanodeStore(ConfigurationSource config, long containerID,
       AbstractDatanodeDBDefinition dbDef) throws IOException {
+
+    // The same config instance is used on each datanode, so we can share the
+    // corresponding column family options, providing a single shared cache
+    // for all containers on a datanode.
+    if (!OPTIONS_CACHE.containsKey(config)) {
+      OPTIONS_CACHE.put(config, buildColumnFamilyOptions(config));
+    }
+    cfOptions = OPTIONS_CACHE.get(config);
+
     this.dbDef = dbDef;
     this.containerID = containerID;
     start(config);
@@ -116,7 +119,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
       this.store = DBStoreBuilder.newBuilder(config, dbDef)
               .setDBOptions(options)
-              .setDefaultCFOptions(COLUMN_FAMILY_OPTIONS)
+              .setDefaultCFOptions(cfOptions)
               .build();
 
       // Use the DatanodeTable wrapper to disable the table iterator on
@@ -202,6 +205,12 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
     store.compactDB();
   }
 
+  @VisibleForTesting
+  public static Map<ConfigurationSource, ColumnFamilyOptions>
+      getColumnFamilyOptionsCache() {
+    return Collections.unmodifiableMap(OPTIONS_CACHE);
+  }
+
   private static void checkTableStatus(Table<?, ?> table, String name)
           throws IOException {
     String logMessage = "Unable to get a reference to %s table. Cannot " +
@@ -212,6 +221,26 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       LOG.error(String.format(logMessage, name));
       throw new IOException(String.format(errMsg, name));
     }
+  }
+
+  private static ColumnFamilyOptions buildColumnFamilyOptions(
+      ConfigurationSource config) {
+    long cacheSize = (long) config.getStorageSize(
+        OzoneConfigKeys.HDDS_DATANODE_METADATA_CACHE_SIZE,
+        OzoneConfigKeys.HDDS_DATANODE_CACHE_SIZE_DEFAULT,
+        StorageUnit.BYTES);
+
+    // Enables static creation of RocksDB objects.
+    RocksDB.loadLibrary();
+
+    BlockBasedTableConfig tableConfig = new BlockBasedTableConfig();
+    tableConfig.setBlockCache(new LRUCache(cacheSize * SizeUnit.MB))
+        .setPinL0FilterAndIndexBlocksInCache(true)
+        .setFilterPolicy(new BloomFilter());
+
+    return DEFAULT_PROFILE
+        .getColumnFamilyOptions()
+        .setTableFormatConfig(tableConfig);
   }
 
   /**
