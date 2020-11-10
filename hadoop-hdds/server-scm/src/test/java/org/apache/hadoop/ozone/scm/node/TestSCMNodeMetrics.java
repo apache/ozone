@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 
+import static java.lang.Thread.sleep;
 import static org.apache.hadoop.test.MetricsAsserts.assertGauge;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
@@ -207,6 +208,17 @@ public class TestSCMNodeMetrics {
     assertGauge("SSDCapacity", 0L, metricsSource);
     assertGauge("SSDUsed", 0L, metricsSource);
     assertGauge("SSDRemaining", 0L, metricsSource);
+
+    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
+    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+        .build();
+    nodeManager.processHeartbeat(registeredDatanode, layoutInfo);
+    sleep(4000);
+    metricsSource = getMetrics(SCMNodeMetrics.SOURCE_NAME);
+    assertGauge("HealthyReadOnlyNodes", 0, metricsSource);
+    assertGauge("HealthyNodes", 1, metricsSource);
 
   }
 

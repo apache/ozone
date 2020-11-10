@@ -30,7 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handles Stale node event.
+ * Handles non healthy to healthy(ReadOnly) node event.
  */
 public class NonHealthyToReadOnlyHealthyNodeHandler
     implements EventHandler<DatanodeDetails> {
