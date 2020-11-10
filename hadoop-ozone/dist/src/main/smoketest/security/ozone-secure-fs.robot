@@ -46,7 +46,7 @@ Create volume with non-admin user
 Create bucket with non-admin owner(testuser2)
     Run Keyword   Kinit test user     testuser     testuser.keytab
     Execute       ozone sh volume create o3://om/${volume4} -u testuser2
-
+    Run Keyword         Setup volume names
     Run Keyword   Kinit test user     testuser2    testuser2.keytab
     ${result} =   Execute     ozone sh bucket create o3://om/${volume4}/bucket1
                   Should not contain  ${result}       PERMISSION_DENIED
