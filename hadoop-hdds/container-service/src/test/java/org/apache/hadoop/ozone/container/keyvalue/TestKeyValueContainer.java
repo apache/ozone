@@ -82,7 +82,6 @@ public class TestKeyValueContainer {
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
 
-  private OzoneConfiguration conf;
   private String scmId = UUID.randomUUID().toString();
   private VolumeSet volumeSet;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
@@ -91,6 +90,11 @@ public class TestKeyValueContainer {
   private UUID datanodeId;
 
   private final ChunkLayOutVersion layout;
+
+  // Use one configuration object across parameterized runs of tests.
+  // This preserves the column family options in the container options
+  // cache for testContainersShareColumnFamilyOptions.
+  private static final OzoneConfiguration conf = new OzoneConfiguration();
 
   public TestKeyValueContainer(ChunkLayOutVersion layout) {
     this.layout = layout;
@@ -103,7 +107,6 @@ public class TestKeyValueContainer {
 
   @Before
   public void setUp() throws Exception {
-    conf = new OzoneConfiguration();
     datanodeId = UUID.randomUUID();
     HddsVolume hddsVolume = new HddsVolume.Builder(folder.getRoot()
         .getAbsolutePath()).conf(conf).datanodeUuid(datanodeId
@@ -392,7 +395,6 @@ public class TestKeyValueContainer {
     // Get a read only view (not a copy) of the options cache.
     Map<ConfigurationSource, ColumnFamilyOptions> cachedOptions =
         AbstractDatanodeStore.getColumnFamilyOptionsCache();
-    Assert.assertTrue(cachedOptions.isEmpty());
 
     // Create Container 1
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
@@ -410,6 +412,7 @@ public class TestKeyValueContainer {
 
     Assert.assertEquals(1, cachedOptions.size());
     ColumnFamilyOptions options2 = cachedOptions.get(conf);
+    Assert.assertNotNull(options2);
 
     // Column family options object should be reused.
     Assert.assertSame(options1, options2);
