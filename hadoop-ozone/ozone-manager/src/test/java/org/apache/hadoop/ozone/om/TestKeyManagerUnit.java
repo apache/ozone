@@ -483,7 +483,6 @@ public class TestKeyManagerUnit {
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
         .setVolumeName(volume)
         .setBucketName(bucket)
-        .setRefreshPipeline(true)
         .setKeyName("");
     List<OzoneFileStatus> fileStatusList =
         keyManager.listStatus(builder.build(), false, null, Long.MAX_VALUE);
