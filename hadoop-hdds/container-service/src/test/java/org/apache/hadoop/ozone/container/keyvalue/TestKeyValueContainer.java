@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
@@ -37,6 +38,7 @@ import org.apache.hadoop.ozone.container.common.volume
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
@@ -50,6 +52,7 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
+import org.rocksdb.ColumnFamilyOptions;
 
 import java.io.File;
 
@@ -382,5 +385,33 @@ public class TestKeyValueContainer {
       assertEquals(ContainerProtos.Result.UNSUPPORTED_REQUEST, ex
           .getResult());
     }
+  }
+
+  @Test
+  public void testContainersShareColumnFamilyOptions() throws Exception {
+    // Get a read only view (not a copy) of the options cache.
+    Map<ConfigurationSource, ColumnFamilyOptions> cachedOptions =
+        AbstractDatanodeStore.getColumnFamilyOptionsCache();
+    Assert.assertTrue(cachedOptions.isEmpty());
+
+    // Create Container 1
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    Assert.assertEquals(1, cachedOptions.size());
+    ColumnFamilyOptions options1 = cachedOptions.get(conf);
+    Assert.assertNotNull(options1);
+
+    // Create Container 2
+    keyValueContainerData = new KeyValueContainerData(2L,
+        layout,
+        (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
+        datanodeId.toString());
+    keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+
+    Assert.assertEquals(1, cachedOptions.size());
+    ColumnFamilyOptions options2 = cachedOptions.get(conf);
+
+    // Column family options object should be reused.
+    Assert.assertSame(options1, options2);
   }
 }
