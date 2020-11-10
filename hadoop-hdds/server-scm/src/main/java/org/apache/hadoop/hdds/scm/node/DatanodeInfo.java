@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.scm.node;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
@@ -43,6 +45,7 @@ public class DatanodeInfo extends DatanodeDetails {
 
   private List<StorageReportProto> storageReports;
   private List<MetadataStorageReportProto> metadataStorageReports;
+  private LayoutVersionProto lastKnownLayoutVersion;
 
   /**
    * Constructs DatanodeInfo from DatanodeDetails.
@@ -53,6 +56,11 @@ public class DatanodeInfo extends DatanodeDetails {
     super(datanodeDetails);
     this.lock = new ReentrantReadWriteLock();
     this.lastHeartbeatTime = Time.monotonicNow();
+    lastKnownLayoutVersion =
+        LayoutVersionProto.newBuilder()
+            .setMetadataLayoutVersion(0)
+            .setSoftwareLayoutVersion(0)
+            .build();
     this.storageReports = Collections.emptyList();
     this.metadataStorageReports = Collections.emptyList();
   }
@@ -70,6 +78,24 @@ public class DatanodeInfo extends DatanodeDetails {
   }
 
   /**
+   * Updates the last LayoutVersion.
+   */
+  public void updateLastKnownLayoutVersion(LayoutVersionProto version) {
+    if (version == null) {
+      return;
+    }
+    try {
+      lock.writeLock().lock();
+      lastKnownLayoutVersion = LayoutVersionProto.newBuilder()
+          .setMetadataLayoutVersion(version.getMetadataLayoutVersion())
+          .setSoftwareLayoutVersion(version.getSoftwareLayoutVersion())
+          .build();
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  /**
    * Returns the last heartbeat time.
    *
    * @return last heartbeat time.
@@ -78,6 +104,20 @@ public class DatanodeInfo extends DatanodeDetails {
     try {
       lock.readLock().lock();
       return lastHeartbeatTime;
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+  /**
+   * Returns the last known Layout Version .
+   *
+   * @return last  Layout Version.
+   */
+  public LayoutVersionProto getLastKnownLayoutVersion() {
+    try {
+      lock.readLock().lock();
+      return lastKnownLayoutVersion;
     } finally {
       lock.readLock().unlock();
     }

@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.PathUtils;
@@ -69,6 +70,7 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.createDatanode
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.finalizeNewLayoutVersionCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto.ErrorCode.errorNodeNotPermitted;
@@ -170,12 +172,18 @@ public class TestSCMNodeManager {
       throws IOException, InterruptedException, AuthenticationException {
 
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      LayoutVersionManager versionManager =
+          nodeManager.getLayoutVersionManager();
+      LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+          .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+          .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+          .build();
       int registeredNodes = 5;
       // Send some heartbeats from different nodes.
       for (int x = 0; x < registeredNodes; x++) {
         DatanodeDetails datanodeDetails = TestUtils
             .createRandomDatanodeAndRegister(nodeManager);
-        nodeManager.processHeartbeat(datanodeDetails);
+        nodeManager.processHeartbeat(datanodeDetails, layoutInfo);
       }
 
       //TODO: wait for heartbeat to be processed
@@ -255,10 +263,15 @@ public class TestSCMNodeManager {
     SCMNodeManager nodeManager = createNodeManager(conf);
     DatanodeDetails datanodeDetails = TestUtils
         .createRandomDatanodeAndRegister(nodeManager);
+    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
+    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+        .build();
     nodeManager.close();
 
     // These should never be processed.
-    nodeManager.processHeartbeat(datanodeDetails);
+    nodeManager.processHeartbeat(datanodeDetails, layoutInfo);
 
     // Let us just wait for 2 seconds to prove that HBs are not processed.
     Thread.sleep(2 * 1000);
@@ -281,11 +294,17 @@ public class TestSCMNodeManager {
     final int count = 10;
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      LayoutVersionManager versionManager =
+          nodeManager.getLayoutVersionManager();
+      LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+          .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+          .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+          .build();
 
       for (int x = 0; x < count; x++) {
         DatanodeDetails datanodeDetails = TestUtils
             .createRandomDatanodeAndRegister(nodeManager);
-        nodeManager.processHeartbeat(datanodeDetails);
+        nodeManager.processHeartbeat(datanodeDetails, layoutInfo);
       }
       //TODO: wait for heartbeat to be processed
       Thread.sleep(4 * 1000);
@@ -339,6 +358,12 @@ public class TestSCMNodeManager {
 
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      LayoutVersionManager versionManager =
+          nodeManager.getLayoutVersionManager();
+      LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+          .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+          .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+          .build();
       List<DatanodeDetails> nodeList = createNodeSet(nodeManager, nodeCount);
 
 
@@ -346,18 +371,18 @@ public class TestSCMNodeManager {
           nodeManager);
 
       // Heartbeat once
-      nodeManager.processHeartbeat(staleNode);
+      nodeManager.processHeartbeat(staleNode, layoutInfo);
 
       // Heartbeat all other nodes.
       for (DatanodeDetails dn : nodeList) {
-        nodeManager.processHeartbeat(dn);
+        nodeManager.processHeartbeat(dn, layoutInfo);
       }
 
       // Wait for 2 seconds .. and heartbeat good nodes again.
       Thread.sleep(2 * 1000);
 
       for (DatanodeDetails dn : nodeList) {
-        nodeManager.processHeartbeat(dn);
+        nodeManager.processHeartbeat(dn, layoutInfo);
       }
 
       // Wait for 2 seconds, wait a total of 4 seconds to make sure that the
@@ -374,7 +399,7 @@ public class TestSCMNodeManager {
 
       // heartbeat good nodes again.
       for (DatanodeDetails dn : nodeList) {
-        nodeManager.processHeartbeat(dn);
+        nodeManager.processHeartbeat(dn, layoutInfo);
       }
 
       //  6 seconds is the dead window for this test , so we wait a total of
@@ -426,13 +451,19 @@ public class TestSCMNodeManager {
         deadNodeInterval, SECONDS);
 
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      LayoutVersionManager versionManager =
+          nodeManager.getLayoutVersionManager();
+      LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+          .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+          .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+          .build();
       DatanodeDetails node1 =
           TestUtils.createRandomDatanodeAndRegister(nodeManager);
       DatanodeDetails node2 =
           TestUtils.createRandomDatanodeAndRegister(nodeManager);
 
-      nodeManager.processHeartbeat(node1);
-      nodeManager.processHeartbeat(node2);
+      nodeManager.processHeartbeat(node1, layoutInfo);
+      nodeManager.processHeartbeat(node2, layoutInfo);
 
       // Sleep so that heartbeat processing thread gets to run.
       Thread.sleep(1000);
@@ -478,7 +509,7 @@ public class TestSCMNodeManager {
       assertEquals(2, nodeManager.getNodeCount(HEALTHY));
 
       // Step 5 : heartbeat for node1
-      nodeManager.processHeartbeat(node1);
+      nodeManager.processHeartbeat(node1, layoutInfo);
 
       // Step 6 : wait for health check process to run
       Thread.sleep(1000);
@@ -558,7 +589,7 @@ public class TestSCMNodeManager {
   public void testScmCheckForErrorOnNullDatanodeDetails()
       throws IOException, AuthenticationException {
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
-      nodeManager.processHeartbeat(null);
+      nodeManager.processHeartbeat(null, null);
     } catch (NullPointerException npe) {
       GenericTestUtils.assertExceptionContains("Heartbeat is missing " +
           "DatanodeDetails.", npe);
@@ -629,15 +660,21 @@ public class TestSCMNodeManager {
      * Cluster state: Healthy: All nodes are heartbeat-ing like normal.
      */
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      LayoutVersionManager versionManager =
+          nodeManager.getLayoutVersionManager();
+      LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+          .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+          .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+          .build();
       DatanodeDetails healthyNode =
           TestUtils.createRandomDatanodeAndRegister(nodeManager);
       DatanodeDetails staleNode =
           TestUtils.createRandomDatanodeAndRegister(nodeManager);
       DatanodeDetails deadNode =
           TestUtils.createRandomDatanodeAndRegister(nodeManager);
-      nodeManager.processHeartbeat(healthyNode);
-      nodeManager.processHeartbeat(staleNode);
-      nodeManager.processHeartbeat(deadNode);
+      nodeManager.processHeartbeat(healthyNode, layoutInfo);
+      nodeManager.processHeartbeat(staleNode, layoutInfo);
+      nodeManager.processHeartbeat(deadNode, layoutInfo);
 
       // Sleep so that heartbeat processing thread gets to run.
       Thread.sleep(500);
@@ -663,12 +700,12 @@ public class TestSCMNodeManager {
        * the 3 second windows.
        */
 
-      nodeManager.processHeartbeat(healthyNode);
-      nodeManager.processHeartbeat(staleNode);
-      nodeManager.processHeartbeat(deadNode);
+      nodeManager.processHeartbeat(healthyNode, layoutInfo);
+      nodeManager.processHeartbeat(staleNode, layoutInfo);
+      nodeManager.processHeartbeat(deadNode, layoutInfo);
 
       Thread.sleep(1500);
-      nodeManager.processHeartbeat(healthyNode);
+      nodeManager.processHeartbeat(healthyNode, layoutInfo);
       Thread.sleep(2 * 1000);
       assertEquals(1, nodeManager.getNodeCount(HEALTHY));
 
@@ -688,10 +725,10 @@ public class TestSCMNodeManager {
        * staleNode to move to stale state and deadNode to move to dead state.
        */
 
-      nodeManager.processHeartbeat(healthyNode);
-      nodeManager.processHeartbeat(staleNode);
+      nodeManager.processHeartbeat(healthyNode, layoutInfo);
+      nodeManager.processHeartbeat(staleNode, layoutInfo);
       Thread.sleep(1500);
-      nodeManager.processHeartbeat(healthyNode);
+      nodeManager.processHeartbeat(healthyNode, layoutInfo);
       Thread.sleep(2 * 1000);
 
       // 3.5 seconds have elapsed for stale node, so it moves into Stale.
@@ -724,9 +761,9 @@ public class TestSCMNodeManager {
        * Cluster State : let us heartbeat all the nodes and verify that we get
        * back all the nodes in healthy state.
        */
-      nodeManager.processHeartbeat(healthyNode);
-      nodeManager.processHeartbeat(staleNode);
-      nodeManager.processHeartbeat(deadNode);
+      nodeManager.processHeartbeat(healthyNode, layoutInfo);
+      nodeManager.processHeartbeat(staleNode, layoutInfo);
+      nodeManager.processHeartbeat(deadNode, layoutInfo);
       Thread.sleep(500);
       //Assert all nodes are healthy.
       assertEquals(3, nodeManager.getAllNodes().size());
@@ -745,9 +782,14 @@ public class TestSCMNodeManager {
   private void heartbeatNodeSet(SCMNodeManager manager,
                                 List<DatanodeDetails> list,
                                 int sleepDuration) throws InterruptedException {
+    LayoutVersionManager versionManager = manager.getLayoutVersionManager();
+    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+        .build();
     while (!Thread.currentThread().isInterrupted()) {
       for (DatanodeDetails dn : list) {
-        manager.processHeartbeat(dn);
+        manager.processHeartbeat(dn, layoutInfo);
       }
       Thread.sleep(sleepDuration);
     }
@@ -830,11 +872,17 @@ public class TestSCMNodeManager {
         }
       };
 
+      LayoutVersionManager versionManager =
+          nodeManager.getLayoutVersionManager();
+      LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+          .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+          .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+          .build();
 
       // No Thread just one time HBs the node manager, so that these will be
       // marked as dead nodes eventually.
       for (DatanodeDetails dn : deadNodeList) {
-        nodeManager.processHeartbeat(dn);
+        nodeManager.processHeartbeat(dn, layoutInfo);
       }
 
 
@@ -958,6 +1006,12 @@ public class TestSCMNodeManager {
     final long remaining = capacity - used;
     List<DatanodeDetails> dnList = new ArrayList<>(nodeCount);
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      LayoutVersionManager versionManager =
+          nodeManager.getLayoutVersionManager();
+      LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+          .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+          .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+          .build();
       EventQueue eventQueue = (EventQueue) scm.getEventQueue();
       for (int x = 0; x < nodeCount; x++) {
         DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
@@ -969,11 +1023,13 @@ public class TestSCMNodeManager {
             .createStorageReport(dnId, storagePath, capacity, used, free, null);
         nodeManager.register(dn, TestUtils.createNodeReport(report), null,
             null);
-        nodeManager.processHeartbeat(dn);
+        nodeManager.processHeartbeat(dn, layoutInfo);
       }
       //TODO: wait for EventQueue to be processed
       eventQueue.processAll(8000L);
 
+      assertEquals(nodeCount, nodeManager.getNodeCount(HEALTHY_READONLY));
+      Thread.sleep(3 * 1000);
       assertEquals(nodeCount, nodeManager.getNodeCount(HEALTHY));
       assertEquals(capacity * nodeCount, (long) nodeManager.getStats()
           .getCapacity().get());
@@ -1020,10 +1076,18 @@ public class TestSCMNodeManager {
         failed = !failed;
       }
       nodeManager.register(dn, TestUtils.createNodeReport(reports), null, null);
-      nodeManager.processHeartbeat(dn);
+      LayoutVersionManager versionManager =
+          nodeManager.getLayoutVersionManager();
+      LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+          .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+          .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+          .build();
+      nodeManager.processHeartbeat(dn, layoutInfo);
       //TODO: wait for EventQueue to be processed
       eventQueue.processAll(8000L);
 
+      assertEquals(1, nodeManager.getNodeCount(HEALTHY_READONLY));
+      Thread.sleep(3 * 1000);
       assertEquals(1, nodeManager.getNodeCount(HEALTHY));
       assertEquals(volumeCount / 2,
               nodeManager.minHealthyVolumeNum(dnList));
@@ -1073,7 +1137,13 @@ public class TestSCMNodeManager {
         nodeReportHandler.onMessage(
                 new NodeReportFromDatanode(datanodeDetails, nodeReportProto),
                 publisher);
-        nodeManager.processHeartbeat(datanodeDetails);
+        LayoutVersionManager versionManager =
+            nodeManager.getLayoutVersionManager();
+        LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+            .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+            .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+            .build();
+        nodeManager.processHeartbeat(datanodeDetails, layoutInfo);
         Thread.sleep(100);
       }
 
@@ -1148,7 +1218,14 @@ public class TestSCMNodeManager {
       foundRemaining = nodeManager.getStats().getRemaining().get();
       assertEquals(0, foundRemaining);
 
-      nodeManager.processHeartbeat(datanodeDetails);
+      LayoutVersionManager versionManager =
+          nodeManager.getLayoutVersionManager();
+      LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+          .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+          .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+          .build();
+
+      nodeManager.processHeartbeat(datanodeDetails, layoutInfo);
 
       // Wait up to 5 seconds so that the dead node becomes healthy
       // Verify usage info should be updated.
@@ -1196,9 +1273,15 @@ public class TestSCMNodeManager {
               new CloseContainerCommand(1L,
                   PipelineID.randomId())));
 
+      LayoutVersionManager versionManager =
+          nodemanager.getLayoutVersionManager();
+      LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+          .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+          .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+          .build();
       eq.processAll(1000L);
       List<SCMCommand> command =
-          nodemanager.processHeartbeat(datanodeDetails);
+          nodemanager.processHeartbeat(datanodeDetails, layoutInfo);
       // With dh registered, SCM will send create pipeline command to dn
       Assert.assertTrue(command.size() >= 1);
       Assert.assertTrue(command.get(0).getClass().equals(
