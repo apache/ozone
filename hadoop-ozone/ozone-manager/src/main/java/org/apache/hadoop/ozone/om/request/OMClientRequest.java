@@ -152,7 +152,7 @@ public abstract class OMClientRequest implements RequestAuditor {
       OzoneObj.StoreType storeType, IAccessAuthorizer.ACLType aclType,
       String vol, String bucket, String key) throws IOException {
     checkAcls(ozoneManager, resType, storeType, aclType, vol, bucket, key,
-        ozoneManager.getVolumeOwner(vol, aclType));
+        ozoneManager.getVolumeOwner(vol, aclType, resType));
   }
 
   /**

@@ -1629,7 +1629,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         ProtobufRpcEngine.Server.getRemoteUser(),
         ProtobufRpcEngine.Server.getRemoteIp(),
         ProtobufRpcEngine.Server.getRemoteIp().getHostName(),
-        true, getVolumeOwner(vol, acl));
+        true, getVolumeOwner(vol, acl, resType));
   }
 
   /**
@@ -1644,16 +1644,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           UserGroupInformation.createRemoteUser(userName),
           ProtobufRpcEngine.Server.getRemoteIp(),
           ProtobufRpcEngine.Server.getRemoteIp().getHostName(),
-          false, getVolumeOwner(vol, acl));
+          false, getVolumeOwner(vol, acl, resType));
     } catch (OMException ex) {
       // Should not trigger exception here at all
       return false;
     }
   }
 
-  public String getVolumeOwner(String vol, ACLType type) throws OMException {
+  public String getVolumeOwner(String vol, ACLType type, ResourceType resType)
+      throws OMException {
     String volOwnerName = null;
-    if (!vol.equals(OzoneConsts.OZONE_ROOT) && (type != ACLType.CREATE)) {
+    if (!vol.equals(OzoneConsts.OZONE_ROOT) &&
+        !(type == ACLType.CREATE && resType == ResourceType.VOLUME)) {
       volOwnerName = getVolumeOwner(vol);
     }
     return volOwnerName;
@@ -3578,7 +3580,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       checkAcls(ResourceType.BUCKET, StoreType.OZONE, type,
           volumeName, bucketName, null, userGroupInformation,
           remoteAddress, hostName, true,
-          getVolumeOwner(volumeName, type));
+          getVolumeOwner(volumeName, type, ResourceType.BUCKET));
     }
 
     return resolveBucketLink(
