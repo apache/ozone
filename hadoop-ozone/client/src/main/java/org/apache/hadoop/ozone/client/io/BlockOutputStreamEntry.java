@@ -96,10 +96,9 @@ public final class BlockOutputStreamEntry extends OutputStream {
    */
   private void checkStream() throws IOException {
     if (this.outputStream == null) {
-      if (getToken() != null) {                                                         │    │
-        UserGroupInformation.getCurrentUser().addToken(getToken());                     │    │
+      if (getToken() != null) {
+        UserGroupInformation.getCurrentUser().addToken(getToken());
       }
-
       this.outputStream =
           new BlockOutputStream(blockID, xceiverClientManager,
               pipeline, bufferPool, config, token);
