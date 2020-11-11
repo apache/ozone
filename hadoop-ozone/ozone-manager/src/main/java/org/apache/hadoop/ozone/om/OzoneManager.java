@@ -1246,7 +1246,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     //  Should be fixed after HDDS-4451.
     startTrashEmptier(configuration);
     registerMXBean();
-    
+
     startJVMPauseMonitor();
     setStartTime();
     omState = State.RUNNING;
