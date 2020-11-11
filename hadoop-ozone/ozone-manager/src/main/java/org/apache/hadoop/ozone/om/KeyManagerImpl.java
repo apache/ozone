@@ -2053,10 +2053,16 @@ public class KeyManagerImpl implements KeyManager {
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
-    OzoneFileStatus fileStatus = getOzoneFileStatus(volumeName, bucketName,
-            keyName, args.getRefreshPipeline(), args.getSortDatanodes(),
-            clientAddress);
-      //if key is not of type file or if key is not found we throw an exception
+    OzoneFileStatus fileStatus;
+    if (OzoneManagerRatisUtils.isOmLayoutVersionV1()) {
+      fileStatus = getOzoneFileStatusV1(volumeName, bucketName, keyName,
+              args.getSortDatanodes(), clientAddress, true);
+    } else {
+      fileStatus = getOzoneFileStatus(volumeName, bucketName,
+              keyName, args.getRefreshPipeline(), args.getSortDatanodes(),
+              clientAddress);
+    }
+    //if key is not of type file or if key is not found we throw an exception
     if (fileStatus.isFile()) {
       return fileStatus.getKeyInfo();
     }

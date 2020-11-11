@@ -115,45 +115,46 @@ public class OMKeyRenameRequestV1 extends OMKeyRenameRequest {
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
-      // Check if toKey exists
+      // Check if fromKey exists
       OzoneFileStatus fromKeyFileStatus =
               OMFileRequest.getOMKeyInfoIfExists(omMetadataManager, volumeName,
                       bucketName, fromKeyName, 0);
-      // fromKeyName should exist
+      // case-1) fromKeyName should exist, otw throws exception
       if (fromKeyFileStatus == null) {
         // TODO: Add support for renaming open key
         throw new OMException("Key not found " + fromKey, KEY_NOT_FOUND);
       }
 
-      // source exists
+      // source existed
       fromKeyValue = fromKeyFileStatus.getKeyInfo();
       boolean isRenameDirectory = fromKeyFileStatus.isDirectory();
 
-      // Cannot rename a directory to its own subdirectory
+      // case-2) Cannot rename a directory to its own subdirectory
       OMFileRequest.verifyToDirIsASubDirOfFromDirectory(fromKeyName,
               toKeyName, fromKeyFileStatus.isDirectory());
 
       OzoneFileStatus toKeyFileStatus =
               OMFileRequest.getOMKeyInfoIfExists(omMetadataManager,
                       volumeName, bucketName, toKeyName, 0);
-      OmKeyInfo toKeyValue;
 
-      // Destination exists cases:
+      // Check if toKey exists.
       if(toKeyFileStatus != null) {
-
-        toKeyValue = toKeyFileStatus.getKeyInfo();
+        // Destination exists and following are different cases:
+        OmKeyInfo toKeyValue = toKeyFileStatus.getKeyInfo();
 
         if (fromKeyValue.getKeyName().equals(toKeyValue.getKeyName())) {
-          // case-1) src == destin then check source and destin of same type
-          // If dst is a file then return true. Otherwise fail the operation.
-          if (!toKeyFileStatus.isDirectory()) {
+          // case-3) If src == destin then check source and destin of same type
+          // (a) If dst is a file then return true.
+          // (b) Otherwise throws exception.
+          // TODO: Discuss do we need to throw exception for file as well.
+          if (toKeyFileStatus.isFile()) {
             result = Result.SUCCESS;
           } else {
             throw new OMException("Key already exists " + toKeyName,
                     OMException.ResultCodes.KEY_ALREADY_EXISTS);
           }
         } else if (toKeyFileStatus.isDirectory()) {
-          // case-2) If dst is a directory, rename source as sub-path of it.
+          // case-4) If dst is a directory then rename source as sub-path of it
           // For example: rename /source to /dst will lead to /dst/source
           String fromFileName = OzoneFSUtils.getFileName(fromKeyName);
           String newToKeyName = OzoneFSUtils.appendFileNameToKeyPath(toKeyName,
@@ -163,7 +164,7 @@ public class OMKeyRenameRequestV1 extends OMKeyRenameRequest {
                           volumeName, bucketName, newToKeyName, 0);
 
           if (newToOzoneFileStatus != null) {
-            // If new destination '/dst/source' exists.
+            // case-5) If new destin '/dst/source' exists then throws exception
             throw new OMException(String.format(
                     "Failed to rename %s to %s, file already exists or not " +
                             "empty!", fromKeyName, newToKeyName),
@@ -175,14 +176,16 @@ public class OMKeyRenameRequestV1 extends OMKeyRenameRequest {
                   keyArgs.getModificationTime(), omResponse, ozoneManager);
           result = Result.SUCCESS;
         } else {
-          // case-3) destination is a file and should not exist
+          // case-6) If destination is a file type and if exists then throws
+          // key already exists exception.
           throw new OMException("Failed to rename, key already exists "
                   + toKeyName, OMException.ResultCodes.KEY_ALREADY_EXISTS);
         }
       } else {
-        // Destination doesn't exists cases:
-        // Check whether dst parent dir exists or not.
-        // If the parent exists, the source can still be renamed to dst path
+        // Destination doesn't exist and the cases are:
+        // case-7) Check whether dst parent dir exists or not. If parent
+        // doesn't exist then throw exception, otw the source can be renamed to
+        // destination path.
         long toKeyParentId = OMFileRequest.getToKeyNameParentId(volumeName,
                 bucketName, toKeyName, fromKeyName, omMetadataManager);
 

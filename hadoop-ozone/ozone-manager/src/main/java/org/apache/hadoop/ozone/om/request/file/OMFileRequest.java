@@ -778,9 +778,9 @@ public final class OMFileRequest {
             volumeName, bucketName, toKeyParentDir, 0);
     // check if the immediate parent exists
     if (toKeyParentDirStatus == null || toKeyParentDirStatus.isFile()) {
-      throw new IOException(String.format(
+      throw new OMException(String.format(
               "Failed to rename %s to %s, %s is a file", fromKeyName, toKeyName,
-              toKeyParentDir));
+              toKeyParentDir), OMException.ResultCodes.KEY_RENAME_ERROR);
     }
     return toKeyParentDirStatus.getKeyInfo().getObjectID();
   }
