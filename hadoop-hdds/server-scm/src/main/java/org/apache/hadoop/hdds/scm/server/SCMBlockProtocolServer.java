@@ -224,12 +224,12 @@ public class SCMBlockProtocolServer implements
     }
     List<DeleteBlockGroupResult> results = new ArrayList<>();
     Map<String, String> auditMap = Maps.newHashMap();
-    ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result codeResult;
+    ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result resultCode;
     try{
       scm.getScmBlockManager().deleteBlocks(keyBlocksInfoList);
-      codeResult = ScmBlockLocationProtocolProtos.
+      resultCode = ScmBlockLocationProtocolProtos.
               DeleteScmBlockResult.Result.success;
-      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
               SCMAction.DELETE_KEY_BLOCK, auditMap));
     } catch (SCMException scmEx){
       LOG.warn("Fail to delete {} keys", keyBlocksInfoList.size(), scmEx);
@@ -239,15 +239,15 @@ public class SCMBlockProtocolServer implements
       );
       switch (scmEx.getResult()) {
       case SAFE_MODE_EXCEPTION:
-        codeResult = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
+        resultCode = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
                 .Result.safeMode;
         break;
       case FAILED_TO_FIND_BLOCK:
-        codeResult = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
+        resultCode = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
                 .Result.errorNotFound;
         break;
       default:
-        codeResult = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
+        resultCode = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
                 .Result.unknownFailure;
       }
     } catch (IOException ex){
@@ -256,14 +256,14 @@ public class SCMBlockProtocolServer implements
               buildAuditMessageForFailure(SCMAction.DELETE_KEY_BLOCK, auditMap,
                       ex)
       );
-      codeResult = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
+      resultCode = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
               .Result.unknownFailure;
     }
     for(BlockGroup bg : keyBlocksInfoList){
       auditMap.put("KeyBlockToDelete", bg.toString());
       List<DeleteBlockResult> blockResult = new ArrayList<>();
       for(BlockID b : bg.getBlockIDList()){
-        blockResult.add(new DeleteBlockResult(b, codeResult));
+        blockResult.add(new DeleteBlockResult(b, resultCode));
       }
       results.add(new DeleteBlockGroupResult(bg.getGroupID(),
               blockResult));

@@ -318,8 +318,8 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     } catch (IOException e) {
       throw new IOException(
           "Skip writing the deleted blocks info to"
-              + " the delLog because addTransaction fails. Keys skipped: "
-              + keyBlocksInfoList.size(), e);
+              + " the delLog because addTransaction fails. "
+              + keyBlocksInfoList.size() + "Keys skipped", e);
     }
     // TODO: Container report handling of the deleted blocks:
     // Remove tombstone and update open container usage.
