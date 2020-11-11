@@ -385,8 +385,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   }
 
   /**
-   * Intercept rename to trash calls from TrashPolicyDefault,
-   * convert them to delete calls instead.
+   * Intercept rename to trash calls from TrashPolicyDefault.
    */
   @Deprecated
   protected void rename(final Path src, final Path dst,
@@ -404,11 +403,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       // if doesn't have TO_TRASH option, just pass the call to super
       super.rename(src, dst, options);
     } else {
-      // intercept when TO_TRASH is found
-      LOG.info("Move to trash is disabled for ofs, deleting instead: {}. "
-          + "Files or directories will NOT be retained in trash. "
-          + "Ignore the following TrashPolicyDefault message, if any.", src);
-      delete(src, true);
+      rename(src, dst);
     }
   }
 

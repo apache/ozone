@@ -30,6 +30,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.KeyPair;
 import java.security.PrivateKey;
+import java.security.PrivilegedExceptionAction;
 import java.security.PublicKey;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
@@ -48,11 +49,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -185,6 +189,8 @@ import com.google.protobuf.ProtocolMessageEnum;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_DEFAULT;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForBlockClients;
@@ -334,6 +340,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   // Used in MiniOzoneCluster testing
   private State omState;
+
+  private Thread emptier;
 
   private OzoneManager(OzoneConfiguration conf) throws IOException,
       AuthenticationException {
@@ -1176,6 +1184,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     omRpcServer.start();
     isOmRpcServerRunning = true;
+    // TODO: Start this thread only on the leader node.
+    //  Should be fixed after HDDS-4451.
+    startTrashEmptier(configuration);
 
     registerMXBean();
 
@@ -1230,15 +1241,56 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // Allow OM to start as Http Server failure is not fatal.
       LOG.error("OM HttpServer failed to start.", ex);
     }
-
     omRpcServer.start();
     isOmRpcServerRunning = true;
 
+    // TODO: Start this thread only on the leader node.
+    //  Should be fixed after HDDS-4451.
+    startTrashEmptier(configuration);
     registerMXBean();
 
     startJVMPauseMonitor();
     setStartTime();
     omState = State.RUNNING;
+  }
+
+
+  /**
+   * Starts a Trash Emptier thread that does an fs.trashRoots and performs
+   * checkpointing & deletion.
+   * @param conf
+   * @throws IOException
+   */
+  private void startTrashEmptier(Configuration conf) throws IOException {
+    long trashInterval =
+            conf.getLong(FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT);
+    if (trashInterval == 0) {
+      LOG.info("Trash Interval set to 0. Files deleted will not move to trash");
+      return;
+    } else if (trashInterval < 0) {
+      throw new IOException("Cannot start trash emptier with negative interval."
+              + " Set " + FS_TRASH_INTERVAL_KEY + " to a positive value.");
+    }
+
+    // configuration for the FS instance that  points to a root OFS uri.
+    // This will ensure that it will cover all volumes and buckets
+    Configuration fsconf = new Configuration();
+    String rootPath = String.format("%s://%s/",
+            OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
+
+    fsconf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    FileSystem fs = SecurityUtil.doAsLoginUser(
+            new PrivilegedExceptionAction<FileSystem>() {
+          @Override
+          public FileSystem run() throws IOException {
+            return FileSystem.get(fsconf);
+          }
+        });
+
+    this.emptier = new Thread(new Trash(fs, conf).
+      getEmptier(), "Trash Emptier");
+    this.emptier.setDaemon(true);
+    this.emptier.start();
   }
 
   /**
@@ -1321,6 +1373,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       stopSecretManager();
       if (httpServer != null) {
         httpServer.stop();
+      }
+      // TODO:Also stop this thread if an OM switches from leader to follower.
+      //  Should be fixed after HDDS-4451.
+      if (this.emptier != null) {
+        emptier.interrupt();
+        emptier = null;
       }
       metadataManager.stop();
       metrics.unRegister();
