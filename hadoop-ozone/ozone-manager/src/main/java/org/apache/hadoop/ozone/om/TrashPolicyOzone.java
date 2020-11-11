@@ -17,11 +17,6 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_DEFAULT;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_DEFAULT;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
-
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.DateFormat;
@@ -69,35 +64,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
   }
 
   private TrashPolicyOzone(FileSystem fs, Configuration conf){
-    initialize(conf, fs);
-  }
-
-  @Override
-  public void initialize(Configuration conf, FileSystem fs, Path path) {
-    this.fs = fs;
-    this.deletionInterval = (long)(conf.getFloat(
-        FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT)
-        * MSECS_PER_MINUTE);
-    this.emptierInterval = (long)(conf.getFloat(
-        FS_TRASH_CHECKPOINT_INTERVAL_KEY, FS_TRASH_CHECKPOINT_INTERVAL_DEFAULT)
-        * MSECS_PER_MINUTE);
-  }
-
-  @Override
-  public void initialize(Configuration conf, FileSystem fs) {
-    this.fs = fs;
-    this.deletionInterval = (long)(conf.getFloat(
-        FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT)
-        * MSECS_PER_MINUTE);
-    this.emptierInterval = (long)(conf.getFloat(
-        FS_TRASH_CHECKPOINT_INTERVAL_KEY, FS_TRASH_CHECKPOINT_INTERVAL_DEFAULT)
-        * MSECS_PER_MINUTE);
-    if (deletionInterval < 0) {
-      LOG.warn("Invalid value {} for deletion interval,"
-          + " deletion interaval can not be negative."
-          + "Changing to default value 0", deletionInterval);
-      this.deletionInterval = 0;
-    }
+    super.initialize(conf, fs);
   }
 
   @Override
