@@ -1182,10 +1182,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     omRpcServer.start();
     isOmRpcServerRunning = true;
-    // Run the trash Emptier only on the leader node
-    if (isLeader()){
-      startTrashEmptier(configuration);
-    }
+    // TODO: Start this thread only on the leader node.
+    //  Should be fixed after HDDS-4451.
+    startTrashEmptier(configuration);
+
     registerMXBean();
 
     startJVMPauseMonitor();
@@ -1230,8 +1230,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omRatisServer.start();
     }
 
-
-
     omRpcServer = getRpcServer(configuration);
 
     try {
@@ -1242,15 +1240,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("OM HttpServer failed to start.", ex);
     }
     omRpcServer.start();
-
     isOmRpcServerRunning = true;
 
-    if (isLeader()) {
-      startTrashEmptier(configuration);
-    }
-
+    // TODO: Start this thread only on the leader node.
+    //  Should be fixed after HDDS-4451.
+    startTrashEmptier(configuration);
     registerMXBean();
-
+    
     startJVMPauseMonitor();
     setStartTime();
     omState = State.RUNNING;
@@ -1376,6 +1372,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (httpServer != null) {
         httpServer.stop();
       }
+      // TODO:Also stop this thread if an OM switches from leader to follower.
+      //  Should be fixed after HDDS-4451.
       if (this.emptier != null) {
         emptier.interrupt();
         emptier = null;
