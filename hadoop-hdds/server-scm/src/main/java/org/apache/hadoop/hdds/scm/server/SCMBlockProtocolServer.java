@@ -65,6 +65,7 @@ import com.google.protobuf.ProtocolMessageEnum;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
@@ -225,19 +226,16 @@ public class SCMBlockProtocolServer implements
     List<DeleteBlockGroupResult> results = new ArrayList<>();
     Map<String, String> auditMap = Maps.newHashMap();
     ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result resultCode;
+    Exception e = null;
     try{
       scm.getScmBlockManager().deleteBlocks(keyBlocksInfoList);
       resultCode = ScmBlockLocationProtocolProtos.
               DeleteScmBlockResult.Result.success;
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-              SCMAction.DELETE_KEY_BLOCK, auditMap));
-    } catch (SCMException scmEx){
-      LOG.warn("Fail to delete {} keys", keyBlocksInfoList.size(), scmEx);
-      AUDIT.logWriteFailure(
-              buildAuditMessageForFailure(SCMAction.DELETE_KEY_BLOCK, auditMap,
-                      scmEx)
-      );
-      switch (scmEx.getResult()) {
+    } catch (IOException ioe){
+      e = ioe;
+      LOG.warn("Fail to delete {} keys", keyBlocksInfoList.size(), ioe);
+      switch (ioe instanceof SCMException ? ((SCMException) ioe).getResult() :
+              IO_EXCEPTION) {
       case SAFE_MODE_EXCEPTION:
         resultCode = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
                 .Result.safeMode;
@@ -250,14 +248,6 @@ public class SCMBlockProtocolServer implements
         resultCode = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
                 .Result.unknownFailure;
       }
-    } catch (IOException ex){
-      LOG.warn("Fail to delete {} keys", keyBlocksInfoList.size(), ex);
-      AUDIT.logWriteFailure(
-              buildAuditMessageForFailure(SCMAction.DELETE_KEY_BLOCK, auditMap,
-                      ex)
-      );
-      resultCode = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
-              .Result.unknownFailure;
     }
     for(BlockGroup bg : keyBlocksInfoList){
       auditMap.put("KeyBlockToDelete", bg.toString());
@@ -267,6 +257,15 @@ public class SCMBlockProtocolServer implements
       }
       results.add(new DeleteBlockGroupResult(bg.getGroupID(),
               blockResult));
+    }
+    if(e == null){
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+              SCMAction.DELETE_KEY_BLOCK, auditMap));
+    } else{
+      AUDIT.logWriteFailure(
+              buildAuditMessageForFailure(SCMAction.DELETE_KEY_BLOCK, auditMap,
+                      e)
+      );
     }
     return results;
   }
