@@ -149,7 +149,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @param index index which is being updated
    */
   @Override
-  public void notifyIndexUpdate(long currentTerm, long index) {
+  public void notifyTermIndexUpdated(long currentTerm, long index) {
     // SnapshotInfo should be updated when the term changes.
     // The index here refers to the log entry index and the index in
     // SnapshotInfo represents the snapshotIndex i.e. the index of the last
