@@ -23,7 +23,6 @@ import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -360,14 +359,14 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
         if (statuses != null && statuses.length > 0) {
           // If dst exists and not a directory not empty
-          throw new FileAlreadyExistsException(String.format(
-              "Failed to rename %s to %s, file already exists or not empty!",
-              src, dst));
+          LOG.warn("Failed to rename {} to {}, file already exists" +
+              " or not empty!", src, dst);
+          return false;
         }
       } else {
         // If dst is not a directory
-        throw new FileAlreadyExistsException(String.format(
-            "Failed to rename %s to %s, file already exists!", src, dst));
+        LOG.warn("Failed to rename {} to {}, file already exists!", src, dst);
+        return false;
       }
     }
 
