@@ -22,12 +22,14 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
+import java.util.Arrays;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -60,6 +62,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   private Map<String, OzoneManager> ozoneManagerMap;
   private List<OzoneManager> ozoneManagers;
+  private List<StorageContainerManager> storageContainerManagers;
   private String omServiceId;
 
   // Active OMs denote OMs which are up and running
@@ -82,11 +85,11 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       OzoneConfiguration conf,
       List<OzoneManager> activeOMList,
       List<OzoneManager> inactiveOMList,
-      StorageContainerManager scm,
+      List<StorageContainerManager> scms,
       List<HddsDatanodeService> hddsDatanodes,
       String omServiceId,
       ReconServer reconServer) {
-    super(conf, scm, hddsDatanodes, reconServer);
+    super(conf, hddsDatanodes, reconServer);
 
     this.ozoneManagerMap = Maps.newHashMap();
     if (activeOMList != null) {
@@ -102,6 +105,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     this.ozoneManagers = new ArrayList<>(ozoneManagerMap.values());
     this.activeOMs = activeOMList;
     this.inactiveOMs = inactiveOMList;
+    this.storageContainerManagers = scms;
     this.omServiceId = omServiceId;
 
     // If the serviceID is null, then this should be a non-HA cluster.
@@ -120,7 +124,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       StorageContainerManager scm,
       List<HddsDatanodeService> hddsDatanodes,
       String omServiceId) {
-    this(conf, omList, null, scm, hddsDatanodes, omServiceId, null);
+    this(conf, omList, null, Arrays.asList(scm), hddsDatanodes, omServiceId, null);
   }
 
   @Override
@@ -179,6 +183,26 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         }
         // Found a leader
         res = ozoneManager;
+      }
+    }
+    return res;
+  }
+
+  public StorageContainerManager getSCMLeader() {
+    return getSCMLeader(this.storageContainerManagers);
+  }
+
+  private static StorageContainerManager getSCMLeader(List<StorageContainerManager> scms) {
+    StorageContainerManager res = null;
+    for (StorageContainerManager scm : scms) {
+      if (scm.getScmHAManager().isLeader()) {
+        if (res != null) {
+          // Found more than one leader
+          // Return null, expect the caller to retry in a while
+          return null;
+        }
+        // Found a leader
+        res = scm;
       }
     }
     return res;
@@ -253,6 +277,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     private final String nodeIdBaseStr = "omNode-";
     private List<OzoneManager> activeOMs = new ArrayList<>();
     private List<OzoneManager> inactiveOMs = new ArrayList<>();
+    private List<StorageContainerManager> scms = new ArrayList<>();
 
     /**
      * Creates a new Builder.
@@ -278,11 +303,9 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       DefaultMetricsSystem.setMiniClusterMode(true);
       initializeConfiguration();
       initOMRatisConf();
-      StorageContainerManager scm;
       ReconServer reconServer = null;
       try {
-        scm = createSCM();
-        scm.start();
+        createSCMService();
         createOMService();
         if (includeRecon) {
           configureRecon();
@@ -293,11 +316,12 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         throw new IOException("Unable to build MiniOzoneCluster. ", ex);
       }
 
+      StorageContainerManager leaderSCM = getSCMLeader(scms);
       final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(
-          scm, reconServer);
+              leaderSCM, reconServer);
 
       MiniOzoneHAClusterImpl cluster = new MiniOzoneHAClusterImpl(conf,
-          activeOMs, inactiveOMs, scm, hddsDatanodes, omServiceId, reconServer);
+          activeOMs, inactiveOMs, scms, hddsDatanodes, omServiceId, reconServer);
 
       if (startDataNodes) {
         cluster.startHddsDatanodes();
@@ -334,6 +358,17 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
           curNodeFailureTimeout == defaultNodeFailureTimeout ?
               NODE_FAILURE_TIMEOUT : curNodeFailureTimeout,
           TimeUnit.MILLISECONDS);
+    }
+
+    protected List<StorageContainerManager> createSCMService() throws IOException, AuthenticationException {
+      int numSCM = 3;
+      for (int i = 0; i < numSCM; i++) {
+        scms.add(StorageContainerManager.createSCM(conf));
+      }
+      for (StorageContainerManager scm : scms) {
+        scm.start();
+      }
+      return scms;
     }
 
     /**

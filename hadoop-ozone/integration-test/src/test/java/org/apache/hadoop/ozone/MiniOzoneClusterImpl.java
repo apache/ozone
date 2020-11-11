@@ -155,6 +155,13 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     this.reconServer = reconServer;
   }
 
+  MiniOzoneClusterImpl(OzoneConfiguration conf, List<HddsDatanodeService> hddsDatanodes,
+      ReconServer reconServer) {
+    this.conf = conf;
+    this.hddsDatanodes = hddsDatanodes;
+    this.reconServer = reconServer;
+  }
+
   public OzoneConfiguration getConf() {
     return conf;
   }
