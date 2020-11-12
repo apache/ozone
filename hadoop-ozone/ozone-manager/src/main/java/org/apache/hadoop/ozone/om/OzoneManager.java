@@ -3044,6 +3044,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         checkAcls(obj.getResourceType(), obj.getStoreType(), ACLType.WRITE_ACL,
             obj.getVolumeName(), obj.getBucketName(), obj.getKeyName());
       }
+      metrics.incNumAddAcl();
       switch (obj.getResourceType()) {
       case VOLUME:
         return volumeManager.addAcl(obj, acl);
@@ -3085,6 +3086,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         checkAcls(obj.getResourceType(), obj.getStoreType(), ACLType.WRITE_ACL,
             obj.getVolumeName(), obj.getBucketName(), obj.getKeyName());
       }
+      metrics.incNumRemoveAcl();
       switch (obj.getResourceType()) {
       case VOLUME:
         return volumeManager.removeAcl(obj, acl);
@@ -3127,6 +3129,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         checkAcls(obj.getResourceType(), obj.getStoreType(), ACLType.WRITE_ACL,
             obj.getVolumeName(), obj.getBucketName(), obj.getKeyName());
       }
+      metrics.incNumSetAcl();
       switch (obj.getResourceType()) {
       case VOLUME:
         return volumeManager.setAcl(obj, acls);
@@ -3166,6 +3169,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         checkAcls(obj.getResourceType(), obj.getStoreType(), ACLType.READ_ACL,
             obj.getVolumeName(), obj.getBucketName(), obj.getKeyName());
       }
+      metrics.incNumGetAcl();
       switch (obj.getResourceType()) {
       case VOLUME:
         return volumeManager.getAcl(obj);
