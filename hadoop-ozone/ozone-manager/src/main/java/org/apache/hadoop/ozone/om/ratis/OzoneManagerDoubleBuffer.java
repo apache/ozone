@@ -267,26 +267,25 @@ public final class OzoneManagerDoubleBuffer {
               }
             });
 
-            // Only when ratis is enabled commit transaction info to DB.
-            if (isRatisEnabled) {
-              flushedEpochs =
-                  readyBuffer.stream().map(DoubleBufferEntry::getTrxLogIndex)
-                      .sorted().collect(Collectors.toList());
-              long lastRatisTransactionIndex =
-                  flushedEpochs.get(flushedEpochs.size() - 1);
-              long term = indexToTerm.apply(lastRatisTransactionIndex);
+            // Commit transaction info to DB.
+            flushedEpochs = readyBuffer.stream().map(
+                DoubleBufferEntry::getTrxLogIndex)
+                .sorted().collect(Collectors.toList());
+            long lastRatisTransactionIndex = flushedEpochs.get(
+                flushedEpochs.size() - 1);
+            long term = isRatisEnabled ?
+                indexToTerm.apply(lastRatisTransactionIndex) : -1;
 
-              addToBatchTransactionInfoWithTrace(lastTraceId.get(),
-                  lastRatisTransactionIndex,
-                  (SupplierWithIOException<Void>) () -> {
+            addToBatchTransactionInfoWithTrace(lastTraceId.get(),
+                lastRatisTransactionIndex,
+                (SupplierWithIOException<Void>) () -> {
                   omMetadataManager.getTransactionInfoTable().putWithBatch(
                       batchOperation, TRANSACTION_INFO_KEY,
                       new OMTransactionInfo.Builder()
-                      .setTransactionIndex(lastRatisTransactionIndex)
-                      .setCurrentTerm(term).build());
+                          .setTransactionIndex(lastRatisTransactionIndex)
+                          .setCurrentTerm(term).build());
                   return null;
                 });
-            }
 
             long startTime = Time.monotonicNowNanos();
             flushBatchWithTrace(lastTraceId.get(), readyBuffer.size(),
