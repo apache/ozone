@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
@@ -37,6 +38,7 @@ import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -44,6 +46,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.junit.After;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -360,6 +363,64 @@ public class TestOmMetrics {
     } finally {
       cluster.getClient().getObjectStore().deleteVolume("volumeacl");
     }
+  }
+
+  @Test
+  public void testAclOperationsHA() throws Exception {
+    ObjectStore objectStore = cluster.getClient().getObjectStore();
+    // Create a volume.
+    objectStore.createVolume("volumeacl");
+    // Create a bucket.
+    objectStore.getVolume("volumeacl").createBucket("bucketacl");
+    // Create a key.
+    objectStore.getVolume("volumeacl").getBucket("bucketacl")
+        .createKey("keyacl", 0).close();
+
+    OzoneObj volObj =
+        new OzoneObjInfo.Builder().setVolumeName("volumeacl").setResType(VOLUME)
+            .setStoreType(OZONE).build();
+
+    OzoneObj buckObj = new OzoneObjInfo.Builder().setVolumeName("volumeacl")
+        .setBucketName("bucketacl").setResType(BUCKET).setStoreType(OZONE)
+        .build();
+
+    OzoneObj keyObj = new OzoneObjInfo.Builder().setVolumeName("volumeacl")
+        .setBucketName("bucketacl").setResType(BUCKET).setKeyName("keyacl")
+        .setStoreType(OZONE).build();
+
+    List<OzoneAcl> acls = ozoneManager.getAcl(volObj);
+
+    // Test Acl's for volume.
+    testAclMetricsInternal(objectStore, volObj, acls);
+
+    // Test Acl's for bucket.
+    testAclMetricsInternal(objectStore, buckObj, acls);
+
+    // Test Acl's for key.
+    testAclMetricsInternal(objectStore, keyObj, acls);
+  }
+
+  private void testAclMetricsInternal(ObjectStore objectStore, OzoneObj volObj,
+      List<OzoneAcl> acls) throws IOException {
+    // Test addAcl
+    OMMetrics metrics = ozoneManager.getMetrics();
+    long initialValue = metrics.getNumAddAcl();
+    objectStore.addAcl(volObj,
+        new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, "ozoneuser",
+            IAccessAuthorizer.ACLType.ALL, ACCESS));
+
+    Assert.assertEquals(initialValue + 1, metrics.getNumAddAcl());
+
+    // Test setAcl
+    initialValue = metrics.getNumSetAcl();
+
+    objectStore.setAcl(volObj, acls);
+    Assert.assertEquals(initialValue + 1, metrics.getNumSetAcl());
+
+    // Test removeAcl
+    initialValue = metrics.getNumRemoveAcl();
+    objectStore.removeAcl(volObj, acls.get(0));
+    Assert.assertEquals(initialValue + 1, metrics.getNumRemoveAcl());
   }
 
   /**
