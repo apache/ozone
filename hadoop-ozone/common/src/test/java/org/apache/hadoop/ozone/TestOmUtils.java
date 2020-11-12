@@ -151,7 +151,7 @@ public class TestOmUtils {
 
   @Test
   public void checkMaxTransactionID() {
-    Assert.assertEquals((long) (Math.pow(2, 54) - 2 ), OmUtils.MAX_TRXN_ID);
+    Assert.assertEquals((long) (Math.pow(2, 54) - 2), OmUtils.MAX_TRXN_ID);
   }
 }
 
