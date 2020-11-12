@@ -34,8 +34,12 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_SPLIT_KEY;
  */
 public final class OMTransactionInfo {
 
+  // Term associated with Ratis Log index in Ratis enabled cluster. In
+  // non-Ratis cluster, term is set to -1.
   private long term; // term associated with the ratis log index.
-  // Transaction index corresponds to ratis log index
+  // Ratis Log index in Ratis enabled cluster or the unique transaction
+  // index {@link OzoneManagerServerSideTransalatorPB#transactionIndex} in
+  // non-Ratis cluster
   private long transactionIndex;
 
   private OMTransactionInfo(String transactionInfo) {
