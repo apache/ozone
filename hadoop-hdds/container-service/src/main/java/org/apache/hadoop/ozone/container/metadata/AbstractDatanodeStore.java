@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.*;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
@@ -51,6 +50,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT;
 
 /**
  * Implementation of the {@link DatanodeStore} interface that contains
@@ -226,8 +227,8 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   private static ColumnFamilyOptions buildColumnFamilyOptions(
       ConfigurationSource config) {
     long cacheSize = (long) config.getStorageSize(
-        OzoneConfigKeys.HDDS_DATANODE_METADATA_CACHE_SIZE,
-        OzoneConfigKeys.HDDS_DATANODE_CACHE_SIZE_DEFAULT,
+        HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE,
+        HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT,
         StorageUnit.BYTES);
 
     // Enables static creation of RocksDB objects.
