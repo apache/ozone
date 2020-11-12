@@ -84,7 +84,7 @@ public class SimpleContainerDownloader implements ContainerDownloader {
                   return downloadContainer(containerId, datanode);
                 } catch (IOException e) {
                   LOG.error("Error on replicating container: " + containerId,
-                      t);
+                      e);
                   return null;
                 }
               }).thenCompose(Function.identity());
