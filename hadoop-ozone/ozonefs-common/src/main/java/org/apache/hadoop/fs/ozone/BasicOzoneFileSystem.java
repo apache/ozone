@@ -817,7 +817,7 @@ public class BasicOzoneFileSystem extends FileSystem {
     if (OzoneFSUtils.isValidName(key)) {
       key = path.toUri().getPath();
     } else {
-      throw new InvalidPathException("Invalid path Name" + key);
+      throw new InvalidPathException("Invalid path Name " + key);
     }
     LOG.trace("path for key:{} is:{}", key, path);
     return key.substring(1);
