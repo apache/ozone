@@ -42,8 +42,8 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.StorageType;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -104,7 +104,6 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 
@@ -130,31 +129,24 @@ public class RpcClient implements ClientProtocol {
   private final OzoneManagerProtocol ozoneManagerClient;
   private final XceiverClientManager xceiverClientManager;
   private final int chunkSize;
-  private final ChecksumType checksumType;
-  private final int bytesPerChecksum;
-  private final boolean unsafeByteBufferConversion;
-  private boolean verifyChecksum;
   private final UserGroupInformation ugi;
   private final ACLType userRights;
   private final ACLType groupRights;
-  private final int streamBufferSize;
-  private final long streamBufferFlushSize;
-  private boolean streamBufferFlushDelay;
-  private final long streamBufferMaxSize;
   private final long blockSize;
   private final ClientId clientId = ClientId.randomId();
-  private final int maxRetryCount;
-  private final long retryInterval;
+  private final boolean unsafeByteBufferConversion;
   private Text dtService;
   private final boolean topologyAwareReadEnabled;
   private final boolean checkKeyNameEnabled;
+  private final OzoneClientConfig clientConfig;
 
   /**
-    * Creates RpcClient instance with the given configuration.
-    * @param conf Configuration
-    * @param omServiceId OM HA Service ID, set this to null if not HA
-    * @throws IOException
-    */
+   * Creates RpcClient instance with the given configuration.
+   *
+   * @param conf        Configuration
+   * @param omServiceId OM HA Service ID, set this to null if not HA
+   * @throws IOException
+   */
   public RpcClient(ConfigurationSource conf, String omServiceId)
       throws IOException {
     Preconditions.checkNotNull(conf);
@@ -164,6 +156,8 @@ public class RpcClient implements ClientProtocol {
     OzoneAclConfig aclConfig = this.conf.getObject(OzoneAclConfig.class);
     this.userRights = aclConfig.getUserDefaultRights();
     this.groupRights = aclConfig.getGroupDefaultRights();
+
+    this.clientConfig = conf.getObject(OzoneClientConfig.class);
 
     OmTransport omTransport = OmTransportFactory.create(conf, ugi, omServiceId);
 
@@ -194,57 +188,14 @@ public class RpcClient implements ClientProtocol {
     } else {
       chunkSize = configuredChunkSize;
     }
-    streamBufferSize = (int) conf
-        .getStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_SIZE,
-            OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_SIZE_DEFAULT,
-            StorageUnit.BYTES);
-    streamBufferFlushSize = (long) conf
-        .getStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_SIZE,
-            OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_SIZE_DEFAULT,
-            StorageUnit.BYTES);
-    streamBufferFlushDelay = conf.getBoolean(
-        OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY,
-        OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_FLUSH_DELAY_DEFAULT);
-    streamBufferMaxSize = (long) conf
-        .getStorageSize(OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_MAX_SIZE,
-            OzoneConfigKeys.OZONE_CLIENT_STREAM_BUFFER_MAX_SIZE_DEFAULT,
-            StorageUnit.BYTES);
+
     blockSize = (long) conf.getStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
         OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT, StorageUnit.BYTES);
 
     unsafeByteBufferConversion = conf.getBoolean(
             OzoneConfigKeys.OZONE_UNSAFEBYTEOPERATIONS_ENABLED,
             OzoneConfigKeys.OZONE_UNSAFEBYTEOPERATIONS_ENABLED_DEFAULT);
-        
-    int configuredChecksumSize = (int) conf.getStorageSize(
-        OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM,
-        OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_DEFAULT,
-        StorageUnit.BYTES);
-    if(configuredChecksumSize <
-        OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE) {
-      LOG.warn("The checksum size ({}) is not allowed to be less than the " +
-              "minimum size ({}), resetting to the minimum size.",
-          configuredChecksumSize,
-          OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE);
-      bytesPerChecksum =
-          OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE;
-    } else {
-      bytesPerChecksum = configuredChecksumSize;
-    }
 
-    String checksumTypeStr = conf.get(
-        OzoneConfigKeys.OZONE_CLIENT_CHECKSUM_TYPE,
-        OzoneConfigKeys.OZONE_CLIENT_CHECKSUM_TYPE_DEFAULT);
-    checksumType = ChecksumType.valueOf(checksumTypeStr);
-    this.verifyChecksum =
-        conf.getBoolean(OzoneConfigKeys.OZONE_CLIENT_VERIFY_CHECKSUM,
-            OzoneConfigKeys.OZONE_CLIENT_VERIFY_CHECKSUM_DEFAULT);
-    maxRetryCount =
-        conf.getInt(OzoneConfigKeys.OZONE_CLIENT_MAX_RETRIES, OzoneConfigKeys.
-            OZONE_CLIENT_MAX_RETRIES_DEFAULT);
-    retryInterval = OzoneUtils.getTimeDurationInMS(conf,
-        OzoneConfigKeys.OZONE_CLIENT_RETRY_INTERVAL,
-        OzoneConfigKeys.OZONE_CLIENT_RETRY_INTERVAL_DEFAULT);
     topologyAwareReadEnabled = conf.getBoolean(
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY,
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT);
@@ -715,7 +666,7 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
-    if(checkKeyNameEnabled) {
+    if (clientConfig.isStreamBufferFlushDelay()) {
       HddsClientUtils.verifyKeyName(keyName);
     }
     HddsClientUtils.checkNotNull(keyName, type, factor);
@@ -963,21 +914,14 @@ public class RpcClient implements ClientProtocol {
             .setHandler(openKey)
             .setXceiverClientManager(xceiverClientManager)
             .setOmClient(ozoneManagerClient)
-            .setChunkSize(chunkSize)
             .setRequestID(requestId)
             .setType(openKey.getKeyInfo().getType())
             .setFactor(openKey.getKeyInfo().getFactor())
-            .setStreamBufferSize(streamBufferSize)
-            .setStreamBufferFlushSize(streamBufferFlushSize)
-            .setStreamBufferMaxSize(streamBufferMaxSize)
-            .setBlockSize(blockSize)
-            .setBytesPerChecksum(bytesPerChecksum)
-            .setChecksumType(checksumType)
             .setMultipartNumber(partNumber)
             .setMultipartUploadID(uploadID)
             .setIsMultipartKey(true)
-            .setMaxRetryCount(maxRetryCount)
-            .setRetryInterval(retryInterval)
+            .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
+            .setConfig(clientConfig)
             .build();
     keyOutputStream.addPreallocateBlocks(
         openKey.getKeyInfo().getLatestVersionLocations(),
@@ -1234,7 +1178,7 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     LengthInputStream lengthInputStream = KeyInputStream
         .getFromOmKeyInfo(keyInfo, xceiverClientManager,
-            verifyChecksum, retryFunction);
+            clientConfig.isChecksumVerify(), retryFunction);
     FileEncryptionInfo feInfo = keyInfo.getFileEncryptionInfo();
     if (feInfo != null) {
       final KeyProvider.KeyVersion decrypted = getDEK(feInfo);
@@ -1271,20 +1215,11 @@ public class RpcClient implements ClientProtocol {
             .setHandler(openKey)
             .setXceiverClientManager(xceiverClientManager)
             .setOmClient(ozoneManagerClient)
-            .setChunkSize(chunkSize)
             .setRequestID(requestId)
             .setType(HddsProtos.ReplicationType.valueOf(type.toString()))
             .setFactor(HddsProtos.ReplicationFactor.valueOf(factor.getValue()))
-            .setStreamBufferSize(streamBufferSize)
-            .setStreamBufferFlushSize(streamBufferFlushSize)
-            .setStreamBufferFlushDelay(streamBufferFlushDelay)
-            .setStreamBufferMaxSize(streamBufferMaxSize)
-            .setBlockSize(blockSize)
-            .setChecksumType(checksumType)
-            .setBytesPerChecksum(bytesPerChecksum)
-            .setMaxRetryCount(maxRetryCount)
-            .setRetryInterval(retryInterval)
             .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
+            .setConfig(clientConfig)
             .build();
     keyOutputStream
         .addPreallocateBlocks(openKey.getKeyInfo().getLatestVersionLocations(),
