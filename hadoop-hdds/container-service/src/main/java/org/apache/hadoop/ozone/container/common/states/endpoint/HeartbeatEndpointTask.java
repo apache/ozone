@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 
+import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -330,6 +331,17 @@ public class HeartbeatEndpointTask
               closePipelineCommand.getPipelineID());
         }
         this.context.addCommand(closePipelineCommand);
+        break;
+      case setNodeOperationalStateCommand:
+        SetNodeOperationalStateCommand setNodeOperationalStateCommand =
+            SetNodeOperationalStateCommand.getFromProtobuf(
+                commandResponseProto.getSetNodeOperationalStateCommandProto());
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Received SCM set operational state command. State: {} " +
+              "Expiry: {}", setNodeOperationalStateCommand.getOpState(),
+              setNodeOperationalStateCommand.getStateExpiryEpochSeconds());
+        }
+        this.context.addCommand(setNodeOperationalStateCommand);
         break;
       default:
         throw new IllegalArgumentException("Unknown response : "
