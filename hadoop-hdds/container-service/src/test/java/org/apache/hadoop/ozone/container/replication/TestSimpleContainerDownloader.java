@@ -47,7 +47,7 @@ public class TestSimpleContainerDownloader {
     List<DatanodeDetails> datanodes = createDatanodes();
 
     SimpleContainerDownloader downloader =
-        createDownloaderWithPredefinedFailures();
+        createDownloaderWithPredefinedFailures(true);
 
     //WHEN
     final Path result =
@@ -59,13 +59,33 @@ public class TestSimpleContainerDownloader {
   }
 
   @Test
-  public void testGetContainerDataFromReplicasOneFailure() throws Exception {
+  public void testGetContainerDataFromReplicasDirectFailure()
+      throws Exception {
 
     //GIVEN
     List<DatanodeDetails> datanodes = createDatanodes();
 
     SimpleContainerDownloader downloader =
-        createDownloaderWithPredefinedFailures(datanodes.get(0));
+        createDownloaderWithPredefinedFailures(true, datanodes.get(0));
+
+    //WHEN
+    final Path result =
+        downloader.getContainerDataFromReplicas(1L, datanodes)
+            .get(1L, TimeUnit.SECONDS);
+
+    //THEN
+    //first datanode is failed, second worked
+    Assert.assertEquals(datanodes.get(1).getUuidString(), result.toString());
+  }
+
+  @Test
+  public void testGetContainerDataFromReplicasAsyncFailure() throws Exception {
+
+    //GIVEN
+    List<DatanodeDetails> datanodes = createDatanodes();
+
+    SimpleContainerDownloader downloader =
+        createDownloaderWithPredefinedFailures(false, datanodes.get(0));
 
     //WHEN
     final Path result =
@@ -79,8 +99,12 @@ public class TestSimpleContainerDownloader {
 
   /**
    * Creates downloader which fails with datanodes in the arguments.
+   *
+   * @param directException if false the exception will be wrapped in the
+   *                        returning future.
    */
   private SimpleContainerDownloader createDownloaderWithPredefinedFailures(
+      boolean directException,
       DatanodeDetails... failedDatanodes
   ) {
 
@@ -98,7 +122,13 @@ public class TestSimpleContainerDownloader {
       ) throws IOException {
 
         if (datanodes.contains(datanode)) {
-          throw new IOException("Unavailable datanode");
+          if (directException) {
+            throw new IOException("Unavailable datanode");
+          } else {
+            return CompletableFuture.supplyAsync(() -> {
+              throw new RuntimeException("Unavailable datanode");
+            });
+          }
         } else {
 
           //path includes the dn id to make it possible to assert.
