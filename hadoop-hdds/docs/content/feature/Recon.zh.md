@@ -29,7 +29,7 @@ Recon 从 Ozone 集群中**收集**所有数据，并将其存储在 SQL数据�
 
 1.Ozone Manager 的数据是通过异步过程在后台下载的。OM 会定期创建 RocksDB 快照，并将增量数据复制到 Recon 进行处理。
 
-2.数据节点不仅可以将心跳发送到 SCM，也能发送到 Recon。Recon 可以成为心跳的唯读（read-only）监听器，并根据收到的信息更新本地数据库。
+2.数据节点不仅可以将心跳发送到 SCM，也能发送到 Recon。Recon 可以成为心跳的唯读（Read-only）监听器，并根据收到的信息更新本地数据库。
 
 当 Recon 配置完成时，我们便可以启动服务。
 
@@ -46,6 +46,4 @@ ozone.recon.address | 0.0.0.0:9891 | Recon 的 RPC 地址。
 ozone.recon.db.dir | none | Recon Server 存储其元数据的目录。
 ozone.recon.om.db.dir | none | Recon Server 存储其 OM 快照 DB 的目录。
 ozone.recon.om.snapshot.task.interval.delay | 10m | Recon 以分钟间隔请求 OM DB 快照。
-
-
 
