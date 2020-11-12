@@ -406,6 +406,7 @@ public class TestOzoneManagerHAMetadataOnly extends TestOzoneManagerHA {
     Assert.assertTrue(logCapturer.getOutput().contains("created volume:"
         + volumeName));
 
+    Thread.sleep(100L);
     logCapturer.clearOutput();
 
     raftClientReply =
