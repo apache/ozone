@@ -13,7 +13,7 @@ Ozone is a scalable, redundant, and distributed object store for Hadoop and Clou
 
 ## Documentation
 
-The latest documentation is generated together with the releases and hosted on the apache side.
+The latest documentation is generated together with the releases and hosted on the apache site.
 
 Please check [the documentation page](https://ozone.apache.org/docs/) for more information.
 
