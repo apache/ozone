@@ -1226,6 +1226,16 @@
   </property>
 
   <property>
+    <name>hdds.datanode.metadata.rocksdb.cache.size</name>
+    <value>64MB</value>
+    <tag>OZONE, DATANODE, MANAGEMENT</tag>
+    <description>
+        Size of the block metadata cache shared among RocksDB instances on each
+        datanode. All containers on a datanode will share this cache.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.command.status.report.interval</name>
     <value>30s</value>
     <tag>OZONE, DATANODE, MANAGEMENT</tag>
