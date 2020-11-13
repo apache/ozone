@@ -77,12 +77,14 @@ public final class PipelineManagerV2Impl implements PipelineManager {
   private long pipelineWaitDefaultTimeout;
   private final AtomicBoolean isInSafeMode;
   private SCMHAManager scmhaManager;
+  private NodeManager nodeManager;
   // Used to track if the safemode pre-checks have completed. This is designed
   // to prevent pipelines being created until sufficient nodes have registered.
   private final AtomicBoolean pipelineCreationAllowed;
 
   private PipelineManagerV2Impl(ConfigurationSource conf,
                                 SCMHAManager scmhaManager,
+                                NodeManager nodeManager,
                                 StateManager pipelineStateManager,
                                 PipelineFactory pipelineFactory,
                                 EventPublisher eventPublisher) {
@@ -91,6 +93,7 @@ public final class PipelineManagerV2Impl implements PipelineManager {
     this.stateManager = pipelineStateManager;
     this.conf = conf;
     this.scmhaManager = scmhaManager;
+    this.nodeManager = nodeManager;
     this.eventPublisher = eventPublisher;
     this.pmInfoBean = MBeans.register("SCMPipelineManager",
         "SCMPipelineManagerInfo", this);
@@ -123,7 +126,8 @@ public final class PipelineManagerV2Impl implements PipelineManager {
         nodeManager, stateManager, conf, eventPublisher);
     // Create PipelineManager
     PipelineManagerV2Impl pipelineManager = new PipelineManagerV2Impl(conf,
-        scmhaManager, stateManager, pipelineFactory, eventPublisher);
+        scmhaManager, nodeManager, stateManager, pipelineFactory,
+        eventPublisher);
 
     // Create background thread.
     Scheduler scheduler = new Scheduler(
@@ -462,14 +466,12 @@ public final class PipelineManagerV2Impl implements PipelineManager {
 
   @Override
   public int minHealthyVolumeNum(Pipeline pipeline) {
-    // TODO:
-    throw new UnsupportedOperationException();
+    return nodeManager.minHealthyVolumeNum(pipeline.getNodes());
   }
 
   @Override
   public int minPipelineLimit(Pipeline pipeline) {
-    // TODO:
-    throw new UnsupportedOperationException();
+    return nodeManager.minPipelineLimit(pipeline.getNodes());
   }
 
   /**
