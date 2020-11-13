@@ -17,12 +17,16 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
+import java.time.Instant;
+
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.container.replication.ReplicationTask.Status;
+
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * ContainerReplicator wrapper with additional metrics.
@@ -31,16 +35,23 @@ import org.apache.hadoop.ozone.container.replication.ReplicationTask.Status;
 public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
 
   private static final String NAME = ContainerReplicator.class.toString();
-  private @Metric
-  MutableCounterLong success;
 
-  private @Metric
-  MutableCounterLong failure;
+  private final ContainerReplicator delegate;
 
-  private @Metric
-  MutableGaugeLong successTime;
+  @Metric
+  private MutableCounterLong success;
 
-  private ContainerReplicator delegate;
+  @Metric
+  private MutableGaugeLong successTime;
+
+  @Metric
+  private MutableCounterLong failure;
+
+  @Metric
+  private MutableGaugeLong queueTime;
+
+  @Metric
+  private MutableGaugeLong transferredBytes;
 
   public MeasuredReplicator(ContainerReplicator delegate) {
     this.delegate = delegate;
@@ -51,21 +62,48 @@ public class MeasuredReplicator implements ContainerReplicator, AutoCloseable {
   @Override
   public void replicate(ReplicationTask task) {
     long start = System.currentTimeMillis();
-    try {
-      delegate.replicate(task);
-    } finally {
-      successTime.incr(System.currentTimeMillis() - start);
-    }
+
+    long msInQueue =
+        Instant.now().getNano() - task.getQueued().getNano() / 1_000_000;
+    queueTime.incr(msInQueue);
+    delegate.replicate(task);
     if (task.getStatus() == Status.FAILED) {
       failure.incr();
     } else if (task.getStatus() == Status.DONE) {
+      transferredBytes.incr(task.getTransferredBytes());
       success.incr();
+      successTime.incr(System.currentTimeMillis() - start);
     }
   }
 
   @Override
   public void close() throws Exception {
     DefaultMetricsSystem.instance().unregisterSource(NAME);
+  }
+
+  @VisibleForTesting
+  public MutableCounterLong getSuccess() {
+    return success;
+  }
+
+  @VisibleForTesting
+  public MutableGaugeLong getSuccessTime() {
+    return successTime;
+  }
+
+  @VisibleForTesting
+  public MutableCounterLong getFailure() {
+    return failure;
+  }
+
+  @VisibleForTesting
+  public MutableGaugeLong getQueueTime() {
+    return queueTime;
+  }
+
+  @VisibleForTesting
+  public MutableGaugeLong getTransferredBytes() {
+    return transferredBytes;
   }
 
 }
