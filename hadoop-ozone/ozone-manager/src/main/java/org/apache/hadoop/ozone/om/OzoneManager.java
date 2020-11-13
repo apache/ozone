@@ -57,6 +57,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Trash;
+import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -1286,7 +1287,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             return FileSystem.get(fsconf);
           }
         });
-
+    conf.setClass("fs.trash.classname", TrashPolicyOzone.class,
+        TrashPolicy.class);
     this.emptier = new Thread(new Trash(fs, conf).
       getEmptier(), "Trash Emptier");
     this.emptier.setDaemon(true);
