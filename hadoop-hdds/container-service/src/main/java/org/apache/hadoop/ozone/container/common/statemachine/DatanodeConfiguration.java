@@ -16,7 +16,11 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine;
 
-import org.apache.hadoop.hdds.conf.*;
+import org.apache.hadoop.hdds.conf.Config;
+import org.apache.hadoop.hdds.conf.ConfigGroup;
+import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.PostConstruct;
+import org.apache.hadoop.hdds.conf.ConfigTag;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 import org.slf4j.Logger;
