@@ -843,7 +843,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       path = new Path(workingDir, path);
     }
     String key = path.toUri().getPath();
-    if (!OzoneFSUtils.isValidName(path.toUri().getPath())) {
+    if (!OzoneFSUtils.isValidName(key)) {
       throw new InvalidPathException("Invalid path Name " + key);
     }
     // removing leading '/' char

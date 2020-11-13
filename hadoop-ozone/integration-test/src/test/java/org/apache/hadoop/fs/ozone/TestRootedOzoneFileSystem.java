@@ -1230,15 +1230,7 @@ public class TestRootedOzoneFileSystem {
   }
 
   private void checkInvalidPath(Path path) throws Exception {
-    FSDataOutputStream outputStream = null;
-    try {
-      LambdaTestUtils.intercept(InvalidPathException.class, "Invalid path Name",
-          () -> fs.create(path, false));
-    } finally {
-      if (outputStream != null) {
-        outputStream.close();
-      }
-    }
+    LambdaTestUtils.intercept(InvalidPathException.class, "Invalid path Name",
+        () -> fs.create(path, false));
   }
-
 }
