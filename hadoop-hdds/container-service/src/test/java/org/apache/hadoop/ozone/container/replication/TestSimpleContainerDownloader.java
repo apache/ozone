@@ -18,13 +18,13 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -35,10 +35,12 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.junit.Assert;
 import org.junit.Test;
 
-/**
+/*
  * Test SimpleContainerDownloader.
  */
 public class TestSimpleContainerDownloader {
+
+  private static final String SUCCESS_PATH = "downloaded";
 
   @Test
   public void testGetContainerDataFromReplicasHappyPath() throws Exception {
@@ -98,6 +100,45 @@ public class TestSimpleContainerDownloader {
   }
 
   /**
+   * Test if different datanode is used for each download attempt.
+   */
+  @Test(timeout = 1000L)
+  public void testRandomSelection()
+      throws ExecutionException, InterruptedException {
+
+    //GIVEN
+    final List<DatanodeDetails> datanodes = createDatanodes();
+
+    SimpleContainerDownloader downloader =
+        new SimpleContainerDownloader(new OzoneConfiguration(), null) {
+
+          @Override
+          protected CompletableFuture<Path> downloadContainer(
+              long containerId, DatanodeDetails datanode
+          ) throws Exception {
+            //download is always successful.
+            return CompletableFuture
+                .completedFuture(Paths.get(datanode.getUuidString()));
+          }
+        };
+
+    //WHEN executed, THEN at least once the second datanode should be
+    //returned.
+    for (int i = 0; i < 10000; i++) {
+      Path path =
+          downloader.getContainerDataFromReplicas(1L, datanodes).get();
+      if (path.toString().equals(datanodes.get(1).getUuidString())) {
+        return;
+      }
+    }
+
+    //there is 1/3^10_000 chance for false positive, which is practically 0.
+    Assert.fail(
+        "Datanodes are selected 10000 times but second datanode was never "
+            + "used.");
+  }
+
+  /**
    * Creates downloader which fails with datanodes in the arguments.
    *
    * @param directException if false the exception will be wrapped in the
@@ -119,11 +160,11 @@ public class TestSimpleContainerDownloader {
       protected CompletableFuture<Path> downloadContainer(
           long containerId,
           DatanodeDetails datanode
-      ) throws IOException {
+      ) throws Exception {
 
         if (datanodes.contains(datanode)) {
           if (directException) {
-            throw new IOException("Unavailable datanode");
+            throw new RuntimeException("Unavailable datanode");
           } else {
             return CompletableFuture.supplyAsync(() -> {
               throw new RuntimeException("Unavailable datanode");

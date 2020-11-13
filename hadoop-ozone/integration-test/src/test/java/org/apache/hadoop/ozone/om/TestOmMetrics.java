@@ -16,6 +16,9 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 import static org.mockito.Matchers.any;
@@ -24,6 +27,7 @@ import static org.mockito.Matchers.anyLong;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.client.BlockID;
@@ -32,9 +36,13 @@ import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -316,6 +324,42 @@ public class TestOmMetrics {
     cluster.restartOzoneManager();
     assertCounter("NumKeys", 2L, omMetrics);
 
+  }
+
+  @Test
+  public void testAclOperations() throws IOException {
+    try {
+      // Create a volume.
+      cluster.getClient().getObjectStore().createVolume("volumeacl");
+
+      OzoneObj volObj = new OzoneObjInfo.Builder().setVolumeName("volumeacl")
+          .setResType(VOLUME).setStoreType(OZONE).build();
+
+      // Test getAcl
+      List<OzoneAcl> acls = ozoneManager.getAcl(volObj);
+      MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
+      assertCounter("NumGetAcl", 1L, omMetrics);
+
+      // Test addAcl
+      ozoneManager.addAcl(volObj,
+          new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, "ozoneuser",
+              IAccessAuthorizer.ACLType.ALL, ACCESS));
+      omMetrics = getMetrics("OMMetrics");
+      assertCounter("NumAddAcl", 1L, omMetrics);
+
+      // Test setAcl
+      ozoneManager.setAcl(volObj, acls);
+      omMetrics = getMetrics("OMMetrics");
+      assertCounter("NumSetAcl", 1L, omMetrics);
+
+      // Test removeAcl
+      ozoneManager.removeAcl(volObj, acls.get(0));
+      omMetrics = getMetrics("OMMetrics");
+      assertCounter("NumRemoveAcl", 1L, omMetrics);
+
+    } finally {
+      cluster.getClient().getObjectStore().deleteVolume("volumeacl");
+    }
   }
 
   /**

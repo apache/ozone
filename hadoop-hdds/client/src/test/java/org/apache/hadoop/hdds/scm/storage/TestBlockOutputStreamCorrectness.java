@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockRe
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -97,17 +98,21 @@ public class TestBlockOutputStreamCorrectness {
     Mockito.when(xcm.acquireClient(Mockito.any()))
         .thenReturn(new MockXceiverClientSpi(pipeline));
 
+    OzoneClientConfig config = new OzoneClientConfig();
+    config.setStreamBufferSize(4 * 1024 * 1024);
+    config.setStreamBufferMaxSize(32 * 1024 * 1024);
+    config.setStreamBufferFlushDelay(true);
+    config.setStreamBufferFlushSize(16 * 1024 * 1024);
+    config.setChecksumType(ChecksumType.NONE);
+    config.setBytesPerChecksum(256 * 1024);
+
     BlockOutputStream outputStream = new BlockOutputStream(
         new BlockID(1L, 1L),
         xcm,
         pipeline,
-        4 * 1024 * 1024,
-        16 * 1024 * 1024,
-        true,
-        32 * 1024 * 1024,
         bufferPool,
-        ChecksumType.NONE,
-        256 * 1024, null);
+        config,
+        null);
     return outputStream;
   }
 

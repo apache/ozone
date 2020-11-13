@@ -18,10 +18,11 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -54,6 +55,7 @@ public class SimpleContainerDownloader implements ContainerDownloader {
 
   public SimpleContainerDownloader(ConfigurationSource conf,
       X509Certificate caCert) {
+
     String workDirString =
         conf.get(OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR);
 
@@ -72,7 +74,15 @@ public class SimpleContainerDownloader implements ContainerDownloader {
       List<DatanodeDetails> sourceDatanodes) {
 
     CompletableFuture<Path> result = null;
-    for (DatanodeDetails datanode : sourceDatanodes) {
+
+    //There is a chance for the download is successful but import is failed,
+    //due to data corruption. We need a random selected datanode to have a
+    //chance to succeed next time.
+    final ArrayList<DatanodeDetails> shuffledDatanodes =
+        new ArrayList<>(sourceDatanodes);
+    Collections.shuffle(shuffledDatanodes);
+
+    for (DatanodeDetails datanode : shuffledDatanodes) {
       try {
         if (result == null) {
           result = downloadContainer(containerId, datanode);
@@ -82,7 +92,7 @@ public class SimpleContainerDownloader implements ContainerDownloader {
                 LOG.error("Error on replicating container: " + containerId, t);
                 try {
                   return downloadContainer(containerId, datanode);
-                } catch (IOException e) {
+                } catch (Exception e) {
                   LOG.error("Error on replicating container: " + containerId,
                       e);
                   return null;
@@ -94,7 +104,6 @@ public class SimpleContainerDownloader implements ContainerDownloader {
             "Container %s download from datanode %s was unsuccessful. "
                 + "Trying the next datanode", containerId, datanode), ex);
       }
-
     }
     return result;
 
@@ -104,13 +113,14 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   protected CompletableFuture<Path> downloadContainer(
       long containerId,
       DatanodeDetails datanode
-  ) throws IOException {
+  ) throws Exception {
     CompletableFuture<Path> result;
-    GrpcReplicationClient grpcReplicationClient =
+    try (GrpcReplicationClient grpcReplicationClient =
         new GrpcReplicationClient(datanode.getIpAddress(),
             datanode.getPort(Name.STANDALONE).getValue(),
-            workingDirectory, securityConfig, caCert);
-    result = grpcReplicationClient.download(containerId);
+            workingDirectory, securityConfig, caCert)) {
+      result = grpcReplicationClient.download(containerId);
+    }
     return result;
   }
 

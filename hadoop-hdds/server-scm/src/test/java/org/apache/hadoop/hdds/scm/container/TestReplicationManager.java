@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.lock.LockManager;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -53,6 +54,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -480,7 +482,7 @@ public class TestReplicationManager {
   @Test
   public void testUnderReplicatedQuasiClosedContainerWithUnhealthyReplica()
       throws SCMException, ContainerNotFoundException, InterruptedException,
-      ContainerReplicaNotFoundException {
+      ContainerReplicaNotFoundException, TimeoutException {
     final ContainerInfo container = getContainer(LifeCycleState.QUASI_CLOSED);
     final ContainerID id = container.containerID();
     final UUID originNodeId = UUID.randomUUID();
@@ -500,10 +502,10 @@ public class TestReplicationManager {
 
     replicationManager.processContainersNow();
     // Wait for EventQueue to call the event handler
-    Thread.sleep(100L);
-    Assert.assertEquals(currentReplicateCommandCount + 1,
-        datanodeCommandHandler.getInvocationCount(
-            SCMCommandProto.Type.replicateContainerCommand));
+    GenericTestUtils.waitFor(
+        () -> (currentReplicateCommandCount + 1) == datanodeCommandHandler
+            .getInvocationCount(SCMCommandProto.Type.replicateContainerCommand),
+        50, 5000);
 
     Optional<CommandForDatanode> replicateCommand = datanodeCommandHandler
         .getReceivedCommands().stream()

@@ -29,9 +29,9 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -66,6 +66,8 @@ import org.slf4j.LoggerFactory;
  * TODO : currently not support multi-thread access.
  */
 public class KeyOutputStream extends OutputStream {
+
+  private OzoneClientConfig config;
 
   /**
    * Defines stream action while calling handleFlushOrClose.
@@ -126,29 +128,33 @@ public class KeyOutputStream extends OutputStream {
   }
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
-  public KeyOutputStream(OpenKeySession handler,
+  public KeyOutputStream(
+      OzoneClientConfig config,
+      OpenKeySession handler,
       XceiverClientFactory xceiverClientManager,
       OzoneManagerProtocol omClient, int chunkSize,
       String requestId, ReplicationFactor factor, ReplicationType type,
-      int bufferSize, long bufferFlushSize, boolean isBufferFlushDelay,
-      long bufferMaxSize, long size, long watchTimeout,
-      ChecksumType checksumType, int bytesPerChecksum,
       String uploadID, int partNumber, boolean isMultipart,
-      int maxRetryCount, long retryInterval,
-      boolean unsafeByteBufferConversion) {
+      boolean unsafeByteBufferConversion
+  ) {
+    this.config = config;
     OmKeyInfo info = handler.getKeyInfo();
     blockOutputStreamEntryPool =
-        new BlockOutputStreamEntryPool(omClient, chunkSize, requestId, factor,
-            type, bufferSize, bufferFlushSize, isBufferFlushDelay,
-            bufferMaxSize, size,
-            watchTimeout, checksumType, bytesPerChecksum, uploadID, partNumber,
-            isMultipart, info, unsafeByteBufferConversion,
-            xceiverClientManager, handler.getId());
+        new BlockOutputStreamEntryPool(
+            config,
+            omClient,
+            requestId, factor, type,
+            uploadID, partNumber,
+            isMultipart, info,
+            unsafeByteBufferConversion,
+            xceiverClientManager,
+            handler.getId());
+
     // Retrieve the file encryption key info, null if file is not in
     // encrypted bucket.
     this.feInfo = info.getFileEncryptionInfo();
     this.retryPolicyMap = HddsClientUtils.getRetryPolicyByException(
-        maxRetryCount, retryInterval);
+        config.getMaxRetryCount(), config.getRetryInterval());
     this.retryCount = 0;
     this.isException = false;
     this.writeOffset = 0;
@@ -258,8 +264,8 @@ public class KeyOutputStream extends OutputStream {
       // to or less than the max length of the buffer allocated.
       // The len specified here is the combined sum of the data length of
       // the buffers
-      Preconditions.checkState(!retry || len <= blockOutputStreamEntryPool
-              .getStreamBufferMaxSize());
+      Preconditions.checkState(!retry || len <= config
+          .getStreamBufferMaxSize());
       int dataWritten = (int) (current.getWrittenDataLength() - currentPos);
       writeLen = retry ? (int) len : dataWritten;
       // In retry path, the data written is already accounted in offset.
@@ -310,7 +316,7 @@ public class KeyOutputStream extends OutputStream {
           pipeline, totalSuccessfulFlushedData, bufferedDataLen, retryCount);
     }
     Preconditions.checkArgument(
-        bufferedDataLen <= blockOutputStreamEntryPool.getStreamBufferMaxSize());
+        bufferedDataLen <= config.getStreamBufferMaxSize());
     Preconditions.checkArgument(
         offset - blockOutputStreamEntryPool.getKeyLength() == bufferedDataLen);
     long containerId = streamEntry.getBlockID().getContainerID();
@@ -549,20 +555,11 @@ public class KeyOutputStream extends OutputStream {
     private String requestID;
     private ReplicationType type;
     private ReplicationFactor factor;
-    private int streamBufferSize;
-    private long streamBufferFlushSize;
-    private boolean streamBufferFlushDelay;
-    private long streamBufferMaxSize;
-    private long blockSize;
-    private long watchTimeout;
-    private ChecksumType checksumType;
-    private int bytesPerChecksum;
     private String multipartUploadID;
     private int multipartNumber;
     private boolean isMultipartKey;
-    private int maxRetryCount;
-    private long retryInterval;
     private boolean unsafeByteBufferConversion;
+    private OzoneClientConfig clientConfig;
 
     public Builder setMultipartUploadID(String uploadID) {
       this.multipartUploadID = uploadID;
@@ -609,53 +606,13 @@ public class KeyOutputStream extends OutputStream {
       return this;
     }
 
-    public Builder setStreamBufferSize(int size) {
-      this.streamBufferSize = size;
-      return this;
-    }
-
-    public Builder setStreamBufferFlushSize(long size) {
-      this.streamBufferFlushSize = size;
-      return this;
-    }
-
-    public Builder setStreamBufferFlushDelay(boolean isDelay) {
-      this.streamBufferFlushDelay = isDelay;
-      return this;
-    }
-
-    public Builder setStreamBufferMaxSize(long size) {
-      this.streamBufferMaxSize = size;
-      return this;
-    }
-
-    public Builder setBlockSize(long size) {
-      this.blockSize = size;
-      return this;
-    }
-
-    public Builder setChecksumType(ChecksumType cType) {
-      this.checksumType = cType;
-      return this;
-    }
-
-    public Builder setBytesPerChecksum(int bytes) {
-      this.bytesPerChecksum = bytes;
-      return this;
-    }
-
     public Builder setIsMultipartKey(boolean isMultipart) {
       this.isMultipartKey = isMultipart;
       return this;
     }
 
-    public Builder setMaxRetryCount(int maxCount) {
-      this.maxRetryCount = maxCount;
-      return this;
-    }
-
-    public Builder setRetryInterval(long retryIntervalInMS) {
-      this.retryInterval = retryIntervalInMS;
+    public Builder setConfig(OzoneClientConfig config) {
+      this.clientConfig = config;
       return this;
     }
 
@@ -665,13 +622,19 @@ public class KeyOutputStream extends OutputStream {
     }
 
     public KeyOutputStream build() {
-      return new KeyOutputStream(openHandler, xceiverManager, omClient,
-          chunkSize, requestID, factor, type,
-          streamBufferSize, streamBufferFlushSize, streamBufferFlushDelay,
-          streamBufferMaxSize,
-          blockSize, watchTimeout, checksumType,
-          bytesPerChecksum, multipartUploadID, multipartNumber, isMultipartKey,
-          maxRetryCount, retryInterval, unsafeByteBufferConversion);
+      return new KeyOutputStream(
+          clientConfig,
+          openHandler,
+          xceiverManager,
+          omClient,
+          chunkSize,
+          requestID,
+          factor,
+          type,
+          multipartUploadID,
+          multipartNumber,
+          isMultipartKey,
+          unsafeByteBufferConversion);
     }
   }
 
