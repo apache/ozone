@@ -51,15 +51,19 @@ public class DatanodeInfo extends DatanodeDetails {
    * Constructs DatanodeInfo from DatanodeDetails.
    *
    * @param datanodeDetails Details about the datanode
+   * @param layoutInfo Details about the LayoutVersionProto
    */
-  public DatanodeInfo(DatanodeDetails datanodeDetails) {
+  public DatanodeInfo(DatanodeDetails datanodeDetails,
+                      LayoutVersionProto layoutInfo) {
     super(datanodeDetails);
     this.lock = new ReentrantReadWriteLock();
     this.lastHeartbeatTime = Time.monotonicNow();
     lastKnownLayoutVersion =
         LayoutVersionProto.newBuilder()
-            .setMetadataLayoutVersion(0)
-            .setSoftwareLayoutVersion(0)
+            .setMetadataLayoutVersion(layoutInfo == null ?
+                layoutInfo.getMetadataLayoutVersion() : 0)
+            .setSoftwareLayoutVersion(layoutInfo == null ?
+                layoutInfo.getSoftwareLayoutVersion() : 0)
             .build();
     this.storageReports = Collections.emptyList();
     this.metadataStorageReports = Collections.emptyList();

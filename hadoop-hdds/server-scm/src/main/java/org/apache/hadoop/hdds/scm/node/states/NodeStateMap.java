@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.scm.node.states;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 
@@ -76,10 +78,12 @@ public class NodeStateMap {
    *
    * @param datanodeDetails DatanodeDetails
    * @param nodeState initial NodeState
+   * @param layoutInfo initial LayoutVersionProto
    *
    * @throws NodeAlreadyExistsException if the node already exist
    */
-  public void addNode(DatanodeDetails datanodeDetails, NodeState nodeState)
+  public void addNode(DatanodeDetails datanodeDetails, NodeState nodeState,
+                      LayoutVersionProto layoutInfo)
       throws NodeAlreadyExistsException {
     lock.writeLock().lock();
     try {
@@ -87,7 +91,7 @@ public class NodeStateMap {
       if (nodeMap.containsKey(id)) {
         throw new NodeAlreadyExistsException("Node UUID: " + id);
       }
-      nodeMap.put(id, new DatanodeInfo(datanodeDetails));
+      nodeMap.put(id, new DatanodeInfo(datanodeDetails, layoutInfo));
       nodeToContainer.put(id, ConcurrentHashMap.newKeySet());
       stateMap.get(nodeState).add(id);
     } finally {

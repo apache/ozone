@@ -329,12 +329,15 @@ public class NodeStateManager implements Runnable, Closeable {
    * Adds a new node to the state manager.
    *
    * @param datanodeDetails DatanodeDetails
+   * @param layoutInfo LayoutVersionProto
    *
    * @throws NodeAlreadyExistsException if the node is already present
    */
-  public void addNode(DatanodeDetails datanodeDetails)
+  public void addNode(DatanodeDetails datanodeDetails,
+                      LayoutVersionProto layoutInfo)
       throws NodeAlreadyExistsException {
-    nodeStateMap.addNode(datanodeDetails, stateMachine.getInitialState());
+    nodeStateMap.addNode(datanodeDetails, stateMachine.getInitialState(),
+        layoutInfo);
     eventPublisher.fireEvent(SCMEvents.NEW_NODE, datanodeDetails);
   }
 
