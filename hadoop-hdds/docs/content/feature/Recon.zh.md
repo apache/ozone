@@ -1,9 +1,6 @@
 ---
 title: "Recon"
 weight: 7
-menu:
-   main:
-      parent: GDPR
 summary: Recon 是 Ozone 中用于分析服务的网页用户界面（Web UI）
 ---
 <!---
@@ -37,10 +34,10 @@ Recon 从 Ozone 集群中**收集**所有数据，并将其存储在 SQL数据�
 ozone --daemon start recon
 {{< /highlight >}}
 
-## 重要的配置
+## 需要关注的配置项
 
-配置 | 默认值 | 描述
-----|-------|------
+配置项 | 默认值 | 描述
+-------|--------|-----
 ozone.recon.http-address | 0.0.0.0:9888 | Recon web UI 监听的地址和基本端口。
 ozone.recon.address | 0.0.0.0:9891 | Recon 的 RPC 地址。
 ozone.recon.db.dir | none | Recon Server 存储其元数据的目录。
