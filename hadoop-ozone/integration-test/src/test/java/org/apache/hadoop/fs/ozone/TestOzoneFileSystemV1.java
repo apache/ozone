@@ -325,8 +325,8 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
     final Path bDestinPath = new Path(fs.getUri().toString() + "/b");
     fs.mkdirs(bDestinPath);
 
-    // Add a sub-directory '/a/c' to '/a'. This is to verify that after
-    // rename sub-directory also be moved.
+    // Add a sub-directory '/b/a' to '/b'. This is to verify that rename
+    // throws exception as new destin /b/a already exists.
     final Path baPath = new Path(fs.getUri().toString() + "/b/a");
     fs.mkdirs(baPath);
 
@@ -463,6 +463,8 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
     testRenameToNewSubDirShouldNotExist();
     tableCleanup();
     testRenameDirToFile();
+    tableCleanup();
+    testRenameFileToDir();
     tableCleanup();
     testRenameDestinationParentDoesntExist();
     tableCleanup();

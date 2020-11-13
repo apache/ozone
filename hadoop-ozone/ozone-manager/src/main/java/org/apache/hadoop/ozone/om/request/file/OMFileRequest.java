@@ -726,6 +726,7 @@ public final class OMFileRequest {
    *
    * @param fromKeyName source path
    * @param toKeyName   destination path
+   * @param isDir       true represents a directory type otw a file type
    * @throws OMException if the dest dir is a sub-dir of source dir.
    */
   public static void verifyToDirIsASubDirOfFromDirectory(String fromKeyName,
@@ -777,7 +778,12 @@ public final class OMFileRequest {
     OzoneFileStatus toKeyParentDirStatus = getOMKeyInfoIfExists(metaMgr,
             volumeName, bucketName, toKeyParentDir, 0);
     // check if the immediate parent exists
-    if (toKeyParentDirStatus == null || toKeyParentDirStatus.isFile()) {
+    if (toKeyParentDirStatus == null) {
+      throw new OMException(String.format(
+              "Failed to rename %s to %s, %s doesn't exist", fromKeyName,
+              toKeyName, toKeyParentDir),
+              OMException.ResultCodes.KEY_RENAME_ERROR);
+    } else if (toKeyParentDirStatus.isFile()){
       throw new OMException(String.format(
               "Failed to rename %s to %s, %s is a file", fromKeyName, toKeyName,
               toKeyParentDir), OMException.ResultCodes.KEY_RENAME_ERROR);

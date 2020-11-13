@@ -273,6 +273,7 @@ public class TestOzoneFileSystem {
     testRenameToExistingDir();
     testRenameToNewSubDirShouldNotExist();
     testRenameDirToFile();
+    testRenameFileToDir();
     testRenameDestinationParentDoesntExist();
     testRenameToParentDir();
     testSeekOnFileLength();
@@ -766,8 +767,8 @@ public class TestOzoneFileSystem {
     final Path bDestinPath = new Path(fs.getUri().toString() + "/b");
     fs.mkdirs(bDestinPath);
 
-    // Add a sub-directory '/a/c' to '/a'. This is to verify that after
-    // rename sub-directory also be moved.
+    // Add a sub-directory '/b/a' to '/b'. This is to verify that rename
+    // throws exception as new destin /b/a already exists.
     final Path baPath = new Path(fs.getUri().toString() + "/b/a");
     fs.mkdirs(baPath);
 
@@ -817,6 +818,24 @@ public class TestOzoneFileSystem {
       // expected
     }
   }
+
+
+  /**
+   * Rename file to an existed directory.
+   */
+  protected void testRenameFileToDir() throws Exception {
+    final String root = "/root";
+    Path rootPath = new Path(fs.getUri().toString() + root);
+    fs.mkdirs(rootPath);
+
+    Path file1Destin = new Path(fs.getUri().toString() + root + "/file1");
+    ContractTestUtils.touch(fs, file1Destin);
+    Path abcRootPath = new Path(fs.getUri().toString() + "/a/b/c");
+    fs.mkdirs(abcRootPath);
+    assertTrue("Renamed failed", fs.rename(file1Destin, abcRootPath));
+    assertTrue("Rename failed", fs.exists(new Path(abcRootPath, "file1")));
+  }
+
 
   /**
    * Fails if the (a) parent of dst does not exist or (b) parent is a file.
@@ -907,6 +926,14 @@ public class TestOzoneFileSystem {
     // Renaming to same path when src is specified with scheme.
     assertTrue("Renaming to same path should be success.",
         fs.rename(source, new Path(dir)));
+
+    // rename root directory
+    Path rootDir = new Path(fs.getUri().toString() +  "/root_dir");
+    Path rootDestinDir = new Path(fs.getUri().toString() +  "/root_dir" +
+            ".renamed");
+    fs.rename(rootDir, rootDestinDir);
+    assertTrue("Directory rename failed", fs.exists(rootDestinDir));
+    assertFalse("Directory rename failed", fs.exists(rootDir));
   }
   private OzoneKeyDetails getKey(Path keyPath, boolean isDirectory)
       throws IOException {

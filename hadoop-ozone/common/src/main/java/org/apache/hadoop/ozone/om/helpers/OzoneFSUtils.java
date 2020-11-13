@@ -169,13 +169,14 @@ public final class OzoneFSUtils {
    * directory name as 'e'.
    *
    * @param keyName key name
+   * @return parent directory. If not found then return keyName itself.
    */
   public static String getParentDir(@Nonnull String keyName) {
     java.nio.file.Path fileName = Paths.get(keyName).getParent();
     if (fileName != null) {
       return fileName.toString();
     }
-    // failed to converts a path key
+    // failed to find a parent directory.
     return keyName;
   }
 
