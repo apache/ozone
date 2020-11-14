@@ -60,9 +60,9 @@ public class DatanodeInfo extends DatanodeDetails {
     this.lastHeartbeatTime = Time.monotonicNow();
     lastKnownLayoutVersion =
         LayoutVersionProto.newBuilder()
-            .setMetadataLayoutVersion(layoutInfo == null ?
+            .setMetadataLayoutVersion(layoutInfo != null ?
                 layoutInfo.getMetadataLayoutVersion() : 0)
-            .setSoftwareLayoutVersion(layoutInfo == null ?
+            .setSoftwareLayoutVersion(layoutInfo != null ?
                 layoutInfo.getSoftwareLayoutVersion() : 0)
             .build();
     this.storageReports = Collections.emptyList();
