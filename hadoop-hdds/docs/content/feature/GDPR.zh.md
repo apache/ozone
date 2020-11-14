@@ -4,6 +4,9 @@ date: "2019-September-17"
 weight: 5
 summary: Ozone 中的 GDPR
 icon: user
+menu:
+   main:
+      parent: 特点
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
