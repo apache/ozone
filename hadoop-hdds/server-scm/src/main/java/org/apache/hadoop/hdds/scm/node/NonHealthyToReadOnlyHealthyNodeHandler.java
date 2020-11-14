@@ -17,31 +17,49 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
+import java.util.Set;
+
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * Handles Stale node event.
+ * Handles non healthy to healthy(ReadOnly) node event.
  */
-public class NonHealthyToHealthyNodeHandler
+public class NonHealthyToReadOnlyHealthyNodeHandler
     implements EventHandler<DatanodeDetails> {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(NonHealthyToReadOnlyHealthyNodeHandler.class);
   private final PipelineManager pipelineManager;
+  private final NodeManager nodeManager;
   private final ConfigurationSource conf;
 
-  public NonHealthyToHealthyNodeHandler(
-      PipelineManager pipelineManager, OzoneConfiguration conf) {
+  public NonHealthyToReadOnlyHealthyNodeHandler(
+      NodeManager nodeManager, PipelineManager pipelineManager,
+      OzoneConfiguration conf) {
     this.pipelineManager = pipelineManager;
+    this.nodeManager = nodeManager;
     this.conf = conf;
   }
 
   @Override
   public void onMessage(DatanodeDetails datanodeDetails,
       EventPublisher publisher) {
-    pipelineManager.triggerPipelineCreation();
+    Set<PipelineID> pipelineIds =
+        nodeManager.getPipelines(datanodeDetails);
+    LOG.info("Datanode {} moved to HEALTH READ ONLY state.",
+        datanodeDetails);
+    if (!pipelineIds.isEmpty()) {
+      LOG.error("Datanode {} is part of pipelines {} in HEALTH READ ONLY " +
+              "state.",
+          datanodeDetails, pipelineIds);
+    }
   }
 }

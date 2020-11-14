@@ -123,7 +123,8 @@ public class SCMNodeManager implements NodeManager {
                         NetworkTopology networkTopology,
                         HDDSLayoutVersionManager layoutVersionManager) {
     this.scmNodeEventPublisher = eventPublisher;
-    this.nodeStateManager = new NodeStateManager(conf, eventPublisher);
+    this.nodeStateManager = new NodeStateManager(conf, eventPublisher,
+        layoutVersionManager);
     this.version = VersionInfo.getLatestVersion();
     this.commandQueue = new CommandQueue();
     this.scmStorageConfig = scmStorageConfig;
@@ -294,7 +295,7 @@ public class SCMNodeManager implements NodeManager {
         }
 
         clusterMap.add(datanodeDetails);
-        nodeStateManager.addNode(datanodeDetails);
+        nodeStateManager.addNode(datanodeDetails, layoutInfo);
         // Check that datanode in nodeStateManager has topology parent set
         DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
         Preconditions.checkState(dn.getParent() != null);
@@ -344,14 +345,18 @@ public class SCMNodeManager implements NodeManager {
    * Send heartbeat to indicate the datanode is alive and doing well.
    *
    * @param datanodeDetails - DatanodeDetailsProto.
+   * @param layoutInfo - Layout Version Proto.
    * @return SCMheartbeat response.
    */
   @Override
-  public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails) {
+  public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
+                                           LayoutVersionProto layoutInfo) {
     Preconditions.checkNotNull(datanodeDetails, "Heartbeat is missing " +
         "DatanodeDetails.");
     try {
       nodeStateManager.updateLastHeartbeatTime(datanodeDetails);
+      nodeStateManager.updateLastKnownLayoutVersion(datanodeDetails,
+          layoutInfo);
       metrics.incNumHBProcessed();
     } catch (NodeNotFoundException e) {
       metrics.incNumHBProcessingFailed();
@@ -445,12 +450,7 @@ public class SCMNodeManager implements NodeManager {
                 "MetadataLayoutVersion = {}",
             datanodeDetails.getHostName(), dnMlv, scmMlv);
 
-        // TBD: Add NEED_UPGRADE state and fill out state transitions
-        // around this state. Fire event to move this data node to
-        // NEED_UPGRADE state. The DataNode will be considered HEALTHY in
-        // this state but it can not be made part of any Pipeline.
-
-        // Also send Finalize command to the data node. Its OK to
+        // Send Finalize command to the data node. Its OK to
         // send Finalize command multiple times.
         scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
             new CommandForDatanode<>(datanodeDetails.getUuid(),
@@ -493,9 +493,12 @@ public class SCMNodeManager implements NodeManager {
 
     final List<DatanodeInfo> healthyNodes = nodeStateManager
         .getNodes(NodeState.HEALTHY);
+    final List<DatanodeInfo> healthyReadOnlyNodes = nodeStateManager
+        .getNodes(NodeState.HEALTHY_READONLY);
     final List<DatanodeInfo> staleNodes = nodeStateManager
         .getNodes(NodeState.STALE);
     final List<DatanodeInfo> datanodes = new ArrayList<>(healthyNodes);
+    datanodes.addAll(healthyReadOnlyNodes);
     datanodes.addAll(staleNodes);
 
     for (DatanodeInfo dnInfo : datanodes) {
@@ -566,10 +569,13 @@ public class SCMNodeManager implements NodeManager {
 
     List<DatanodeInfo> healthyNodes = nodeStateManager
         .getNodes(NodeState.HEALTHY);
+    List<DatanodeInfo> healthyReadOnlyNodes = nodeStateManager
+        .getNodes(NodeState.HEALTHY_READONLY);
     List<DatanodeInfo> staleNodes = nodeStateManager
         .getNodes(NodeState.STALE);
 
     List<DatanodeInfo> datanodes = new ArrayList<>(healthyNodes);
+    datanodes.addAll(healthyReadOnlyNodes);
     datanodes.addAll(staleNodes);
 
     for (DatanodeInfo dnInfo : datanodes) {

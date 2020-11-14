@@ -28,6 +28,8 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.TestUtils;
@@ -45,6 +47,7 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.test.PathUtils;
 
 import org.apache.commons.io.IOUtils;
@@ -162,9 +165,14 @@ public class TestContainerPlacement {
     List<DatanodeDetails> datanodes =
         TestUtils.getListOfRegisteredDatanodeDetails(nodeManager, nodeCount);
     XceiverClientManager xceiverClientManager = null;
+    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
+    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+        .build();
     try {
       for (DatanodeDetails datanodeDetails : datanodes) {
-        nodeManager.processHeartbeat(datanodeDetails);
+        nodeManager.processHeartbeat(datanodeDetails, layoutInfo);
       }
 
       //TODO: wait for heartbeat to be processed
