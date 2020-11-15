@@ -52,7 +52,9 @@ public class TestMiniOzoneHACluster {
   private String clusterId;
   private String scmId;
   private String omServiceId;
+  private String scmServiceId;
   private int numOfOMs = 3;
+  private int numOfSCMs = 3;
 
   @Rule
   public ExpectedException exception = ExpectedException.none();
@@ -71,6 +73,7 @@ public class TestMiniOzoneHACluster {
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
     omServiceId = "omServiceId1";
+    scmServiceId = "scmServiceId2";
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS,
         OZONE_ADMINISTRATORS_WILDCARD);
@@ -79,7 +82,9 @@ public class TestMiniOzoneHACluster {
         .setClusterId(clusterId)
         .setScmId(scmId)
         .setOMServiceId(omServiceId)
+        .setSCMServiceId(scmServiceId)
         .setNumOfOzoneManagers(numOfOMs)
+        .setNumOfStorageContainerManagers(numOfSCMs)
         .build();
     cluster.waitForClusterToBeReady();
     objectStore = OzoneClientFactory.getRpcClient(omServiceId, conf)

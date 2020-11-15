@@ -23,16 +23,25 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 import java.util.Arrays;
+import java.util.Optional;
+import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.scm.ScmUtils;
+import org.apache.hadoop.hdds.scm.TestUtils;
+import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.Storage;
+import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -275,6 +284,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   public static class Builder extends MiniOzoneClusterImpl.Builder {
 
     private final String nodeIdBaseStr = "omNode-";
+    private final String scmNodeIdBaseStr = "scmNode-";
     private List<OzoneManager> activeOMs = new ArrayList<>();
     private List<OzoneManager> inactiveOMs = new ArrayList<>();
     private List<StorageContainerManager> scms = new ArrayList<>();
@@ -303,6 +313,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       DefaultMetricsSystem.setMiniClusterMode(true);
       initializeConfiguration();
       initOMRatisConf();
+      initSCMRatisConf();
       ReconServer reconServer = null;
       try {
         createSCMService();
@@ -327,6 +338,23 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         cluster.startHddsDatanodes();
       }
       return cluster;
+    }
+
+    private StorageContainerManager createSCM(OzoneConfiguration conf)
+        throws IOException, AuthenticationException {
+      SCMStorageConfig scmStore = new SCMStorageConfig(conf);
+      initializeScmStorage(scmStore);
+      return TestUtils.getScmSimple(conf);
+    }
+
+    private void initializeScmStorage(SCMStorageConfig scmStore)
+        throws IOException {
+      if (scmStore.getState() == StorageState.INITIALIZED) {
+        return;
+      }
+      scmStore.setClusterId(clusterId);
+      scmStore.setScmId(scmServiceId);
+      scmStore.initialize();
     }
 
     protected void initOMRatisConf() {
@@ -360,15 +388,45 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
           TimeUnit.MILLISECONDS);
     }
 
-    protected List<StorageContainerManager> createSCMService() throws IOException, AuthenticationException {
-      int numSCM = 3;
-      for (int i = 0; i < numSCM; i++) {
-        scms.add(StorageContainerManager.createSCM(conf));
+    protected void initSCMRatisConf() {
+      conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+    }
+
+    protected List<StorageContainerManager> createSCMService()
+        throws IOException, AuthenticationException {
+      List<StorageContainerManager> scmList = Lists.newArrayList();
+
+      int retryCount = 0;
+      int basePort;
+
+      while (true) {
+        try {
+          basePort = 10000 + RANDOM.nextInt(1000) * 4;
+          initSCMHAConfig(basePort);
+          for (int i = 0; i < numOfSCMs; i++) {
+            scmList.add(createSCM(conf));
+          }
+          for (StorageContainerManager scm : scmList) {
+            scm.start();
+          }
+          break;
+        } catch (BindException e) {
+          for (StorageContainerManager scm : scmList) {
+            scm.stop();
+            scm.join();
+            LOG.info("Stopping SCM server at client Rpc: {}, Datanode Rpc:{}",
+                scm.getClientRpcAddress(), scm.getDatanodeRpcAddress());
+          }
+          scmList.clear();
+          ++retryCount;
+          LOG.info("MiniOzoneHACluster port conflicts, retried {} times",
+              retryCount);
+        }
       }
-      for (StorageContainerManager scm : scms) {
-        scm.start();
-      }
-      return scms;
+
+      scms.clear();
+      scms.addAll(scmList);
+      return scmList;
     }
 
     /**
@@ -441,6 +499,41 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         }
       }
       return omList;
+    }
+
+    private void initSCMHAConfig(int basePort) throws IOException {
+      // Set configurations required for starting SCM HA service.
+      conf.set(ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);
+      conf.set(ScmConfigKeys.OZONE_SCM_INTERNAL_SERVICE_ID, scmServiceId);
+      String scmNodesKey = OmUtils.addKeySuffixes(
+          ScmConfigKeys.OZONE_SCM_NODES_KEY, scmServiceId);
+      StringBuilder scmNodesKeyValue = new StringBuilder();
+      int port = basePort;
+      for (int i = 1; i <= numOfSCMs; i++, port+=6) {
+        String scmNodeId = scmNodeIdBaseStr + i;
+        scmNodesKeyValue.append(",").append(scmNodeId);
+        String scmClientAddrKey = OmUtils.addKeySuffixes(
+            ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, scmServiceId, scmNodeId);
+        String scmBlockClientAddrKey = OmUtils.addKeySuffixes(
+            ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY, scmServiceId, scmNodeId);
+        String scmDatanodeAddrKey = OmUtils.addKeySuffixes(
+            ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, scmServiceId, scmNodeId);
+        String scmHttpAddrKey = OmUtils.addKeySuffixes(
+            ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY, scmServiceId, scmNodeId);
+        String scmHttpsAddrKey = OmUtils.addKeySuffixes(
+            ScmConfigKeys.OZONE_SCM_HTTPS_ADDRESS_KEY, scmServiceId, scmNodeId);
+        String scmRatisProtKey = OmUtils.addKeySuffixes(
+            ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY, scmServiceId, scmNodeId);
+
+        conf.set(scmClientAddrKey, "127.0.0.1:" + port);
+        conf.set(scmBlockClientAddrKey, "127.0.0.1:" + (port + 2));
+        conf.set(scmDatanodeAddrKey, "127.0.0.1:" + (port + 3));
+        conf.setInt(scmHttpAddrKey, port + 4);
+        conf.setInt(scmHttpsAddrKey, port + 5);
+        conf.setInt(scmRatisProtKey, port + 6);
+      }
+
+      conf.set(scmNodesKey, scmNodesKeyValue.substring(1));
     }
 
     /**
