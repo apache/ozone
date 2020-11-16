@@ -218,7 +218,7 @@ public class TestOzoneFileSystem {
     testCreateWithInvalidPaths();
     testListStatusWithIntermediateDir();
 
-    testRenameToTrashDisabled();
+    testRenameToTrashEnabled();
 
     testGetTrashRoots();
     testGetTrashRoot();
@@ -748,10 +748,10 @@ public class TestOzoneFileSystem {
   }
 
   /**
-   * Check that no files are actually moved to trash since it is disabled by
-   * fs.rename(src, dst, options).
+   * Check that files are moved to trash.
+   * since fs.rename(src,dst,options) is enabled.
    */
-  public void testRenameToTrashDisabled() throws IOException {
+  public void testRenameToTrashEnabled() throws Exception {
     // Create a file
     String testKeyName = "testKey1";
     Path path = new Path(OZONE_URI_DELIMITER, testKeyName);
@@ -771,9 +771,8 @@ public class TestOzoneFileSystem {
 
     // Trash Current directory should still have been created.
     Assert.assertTrue(o3fs.exists(userTrashCurrent));
-    // Check under trash, the key should be deleted instead
-    Assert.assertFalse(o3fs.exists(trashPath));
-
+    // Check under trash, the key should be present
+    Assert.assertTrue(o3fs.exists(trashPath));
     // Cleanup
     o3fs.delete(trashRoot, true);
   }

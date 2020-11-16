@@ -28,18 +28,14 @@ import java.security.cert.X509Certificate;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .CopyContainerRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .CopyContainerResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto
-    .IntraDatanodeProtocolServiceGrpc;
-import org.apache.hadoop.hdds.protocol.datanode.proto
-    .IntraDatanodeProtocolServiceGrpc.IntraDatanodeProtocolServiceStub;
-
-import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc;
+import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc.IntraDatanodeProtocolServiceStub;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
+
+import com.google.common.base.Preconditions;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyChannelBuilder;
@@ -51,7 +47,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Client to read container data from gRPC.
  */
-public class GrpcReplicationClient {
+public class GrpcReplicationClient implements AutoCloseable{
 
   private static final Logger LOG =
       LoggerFactory.getLogger(GrpcReplicationClient.class);
@@ -116,6 +112,11 @@ public class GrpcReplicationClient {
     } catch (Exception e) {
       LOG.error("failed to shutdown replication channel", e);
     }
+  }
+
+  @Override
+  public void close() throws Exception {
+    shutdown();
   }
 
   /**

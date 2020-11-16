@@ -107,6 +107,7 @@ function ozonecmd_case
       # exception as mentioned in HDDS-3812
       hadoop_deprecate_envvar HDDS_DN_OPTS OZONE_DATANODE_OPTS
       OZONE_DATANODE_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false -Dorg.apache.ratis.thirdparty.io.netty.leakDetection.level=disabled -Dlog4j.configurationFile=${HADOOP_CONF_DIR}/dn-audit-log4j2.properties ${OZONE_DATANODE_OPTS}"
+      OZONE_DATANODE_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_DATANODE_OPTS}"
       HADOOP_CLASSNAME=org.apache.hadoop.ozone.HddsDatanodeService
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-datanode"
     ;;
@@ -156,6 +157,7 @@ function ozonecmd_case
       HADOOP_CLASSNAME=org.apache.hadoop.ozone.om.OzoneManagerStarter
       hadoop_deprecate_envvar HDFS_OM_OPTS OZONE_OM_OPTS
       OZONE_OM_OPTS="${OZONE_OM_OPTS} -Dlog4j.configurationFile=${HADOOP_CONF_DIR}/om-audit-log4j2.properties"
+      OZONE_OM_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_OM_OPTS}"
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-ozone-manager"
     ;;
     sh | shell)
@@ -174,6 +176,7 @@ function ozonecmd_case
       HADOOP_CLASSNAME='org.apache.hadoop.hdds.scm.server.StorageContainerManagerStarter'
       hadoop_deprecate_envvar HDFS_STORAGECONTAINERMANAGER_OPTS OZONE_SCM_OPTS
       OZONE_SCM_OPTS="${OZONE_SCM_OPTS} -Dlog4j.configurationFile=${HADOOP_CONF_DIR}/scm-audit-log4j2.properties"
+      OZONE_SCM_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_SCM_OPTS}"
       OZONE_RUN_ARTIFACT_NAME="hadoop-hdds-server-scm"
     ;;
     s3g)

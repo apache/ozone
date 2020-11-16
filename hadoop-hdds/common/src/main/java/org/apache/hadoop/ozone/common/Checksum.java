@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.ozone.common;
 
-import com.google.common.annotations.VisibleForTesting;
-
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -27,11 +25,11 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import com.google.common.primitives.Ints;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ChecksumType;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.primitives.Ints;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -108,18 +106,6 @@ public class Checksum {
   public Checksum(ChecksumType type, int bytesPerChecksum) {
     this.checksumType = type;
     this.bytesPerChecksum = bytesPerChecksum;
-  }
-
-  /**
-   * Constructs a Checksum object with default ChecksumType and default
-   * BytesPerChecksum.
-   */
-  @VisibleForTesting
-  public Checksum() {
-    this.checksumType = ChecksumType.valueOf(
-        OzoneConfigKeys.OZONE_CLIENT_CHECKSUM_TYPE_DEFAULT);
-    this.bytesPerChecksum = OzoneConfigKeys
-        .OZONE_CLIENT_BYTES_PER_CHECKSUM_DEFAULT_BYTES; // Default is 1MB
   }
 
   /**
