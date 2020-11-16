@@ -89,7 +89,7 @@ public final class OmUtils {
   // OzoneManager#addS3GVolumeToDB()}.
   public static final long EPOCH_ID_SHIFT = 62; // 64 - 2
   public static final long REVERSE_EPOCH_ID_SHIFT = 2; // 64 - EPOCH_ID_SHIFT
-  public static final long MAX_TRXN_ID = (long) ((1 << 54) - 2);
+  public static final long MAX_TRXN_ID = (1L << 54) - 2;
   public static final int EPOCH_WHEN_RATIS_NOT_ENABLED = 1;
   public static final int EPOCH_WHEN_RATIS_ENABLED = 2;
 
