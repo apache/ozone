@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.admin.scm;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
+import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
@@ -35,7 +37,8 @@ import picocli.CommandLine.Spec;
     subcommands = {
         GetScmRatisRolesSubcommand.class
     })
-public class ScmAdmin extends GenericCli {
+@MetaInfServices(SubcommandWithParent.class)
+public class ScmAdmin extends GenericCli  implements SubcommandWithParent {
 
   @CommandLine.ParentCommand
   private OzoneAdmin parent;
@@ -51,6 +54,11 @@ public class ScmAdmin extends GenericCli {
   public Void call() throws Exception {
     GenericCli.missingSubcommand(spec);
     return null;
+  }
+
+  @Override
+  public Class<?> getParentType() {
+    return OzoneAdmin.class;
   }
 
 }

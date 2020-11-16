@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManager;
+import org.apache.hadoop.hdds.scm.pipeline.StateManager;
 
 import java.util.List;
 
@@ -29,10 +29,10 @@ import java.util.List;
 public abstract class LeaderChoosePolicy {
 
   private final NodeManager nodeManager;
-  private final PipelineStateManager pipelineStateManager;
+  private final StateManager pipelineStateManager;
 
   public LeaderChoosePolicy(
-      NodeManager nodeManager, PipelineStateManager pipelineStateManager) {
+      NodeManager nodeManager, StateManager pipelineStateManager) {
     this.nodeManager = nodeManager;
     this.pipelineStateManager = pipelineStateManager;
   }
@@ -49,7 +49,7 @@ public abstract class LeaderChoosePolicy {
     return nodeManager;
   }
 
-  protected PipelineStateManager getPipelineStateManager() {
+  protected StateManager getPipelineStateManager() {
     return pipelineStateManager;
   }
 }
