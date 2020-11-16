@@ -112,6 +112,9 @@ public class BucketEndpoint extends EndpointBase {
     ContinueToken decodedToken =
         ContinueToken.decodeFromString(continueToken);
 
+    if (startAfter == null) {
+      startAfter = marker;
+    }
     if (startAfter != null && continueToken != null) {
       // If continuation token and start after both are provided, then we
       // ignore start After
@@ -187,6 +190,7 @@ public class BucketEndpoint extends EndpointBase {
       response.setTruncated(true);
       ContinueToken nextToken = new ContinueToken(lastKey, prevDir);
       response.setNextToken(nextToken.encodeToString());
+      response.setNextMarker(lastKey);
     } else {
       response.setTruncated(false);
     }
