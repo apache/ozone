@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.upgrade;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeatureCatalog;
 import org.junit.Before;
@@ -37,22 +38,13 @@ import java.nio.file.StandardOpenOption;
 
 public class TestStartupWithLargerMLV {
   @Rule
-  public TemporaryFolder dataDir;
+  public TemporaryFolder dataDir = new TemporaryFolder();
 
   @Rule
   public ExpectedException thrown = ExpectedException.none();
 
-  // Base version file contents:
-  /*
-  #Tue Nov 10 19:51:26 UTC 2020
-cTime=1605037869816
-clusterID=CID-bf14896a-524e-46e3-951c-fbceec67a03a
-omUuid=6c0f492a-876d-429a-a2d3-ff3244ca93e7
-nodeType=OM
-scmUuid=27ff2467-c314-43e8-9080-bc938bb673d2
-   */
-
   private static final String VERSION_FILE_NAME = "VERSION";
+
   private int slv;
   private int mlv;
   private String mlvSpecifier;
@@ -66,9 +58,10 @@ scmUuid=27ff2467-c314-43e8-9080-bc938bb673d2
         getLargestVersion(OMLayoutFeature.values())
     );
     mlv = slv + 1;
+    // Line added to the base version file to set the MLV.
     mlvSpecifier = "layoutVersion=" + mlv;
 
-    // Load version file from resources.
+    // Load base version file from resources.
     URL baseVersionFileURL =
         getClass().getClassLoader().getResource(VERSION_FILE_NAME);
     baseVersionFile = new File(baseVersionFileURL.toURI());
@@ -83,25 +76,34 @@ scmUuid=27ff2467-c314-43e8-9080-bc938bb673d2
   }
 
   @Test
-  void testSCMStartup() {
-    OzoneConfiguration conf = createVersionFile(OMConfigKeys.HDDS_SCM_DB_DIRS,
+  public void testSCMStartup() throws Exception {
+    OzoneConfiguration conf = createVersionFile(ScmConfigKeys.OZONE_SCM_DB_DIRS,
         "scm");
     registerExpectedException();
     new StorageContainerManager(conf);
   }
 
   @Test
-  void testDatanodeStartup() {
+  public void testDatanodeStartup() throws Exception {
     OzoneConfiguration conf =
-        createVersionFile(OMConfigKeys.HDDS_DATANODE_DB_DIRS,
+        createVersionFile(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
         "hdds");
     registerExpectedException();
     new DatanodeStateMachine(null, conf, null, null);
   }
 
+  /**
+   * Copies the base version file for this test from the test resources to
+   * {@code subdir} in the test's temporary folder, adds the test's metadata
+   * layout version to the file, and returns a configuration with {@code
+   * configKey} pointing to the temporary folder.
+   *
+   * @return A new {@link OzoneConfiguration} with the configuration key
+   * {@code dirConfigKey} set to the test's temporary folder.
+   * @throws Exception
+   */
   private OzoneConfiguration createVersionFile(String dirConfigKey,
       String subdirName) throws Exception {
-    // Copy version file to om, scm, and hdds subdirs of dataDir.
     File subdir = dataDir.newFolder(subdirName);
     FileUtils.copyFileToDirectory(baseVersionFile, subdir);
     File versionFile = new File(subdir, baseVersionFile.getName());
@@ -113,7 +115,7 @@ scmUuid=27ff2467-c314-43e8-9080-bc938bb673d2
         StandardOpenOption.APPEND);
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(dirConfigKey, subdirName);
+    conf.set(dirConfigKey, subdir.getPath());
 
     return conf;
   }
@@ -125,6 +127,9 @@ scmUuid=27ff2467-c314-43e8-9080-bc938bb673d2
         "(%d) > software layout version (%d)", mlv, slv));
   }
 
+  /**
+   * @return The largest software layout version from a list of layout features.
+   */
   private int getLargestVersion(LayoutFeature[] features) {
     int maxVersion = 0;
     for (LayoutFeature f : features) {
