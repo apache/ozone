@@ -365,7 +365,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <goal>build-classpath</goal>
                 </goals>
                 <configuration>
-                  <outputFile>${project.build.directory}/${project.artifactId}.classpath</outputFile>
+                  <outputFile>${project.build.outputDirectory}/${project.artifactId}.classpath</outputFile>
                   <prefix>$HDDS_LIB_JARS_DIR</prefix>
                   <outputFilterFile>true</outputFilterFile>
                   <includeScope>runtime</includeScope>
