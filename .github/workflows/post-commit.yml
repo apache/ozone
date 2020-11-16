@@ -195,7 +195,9 @@ jobs:
         with:
           name: ozone-bin
       - name: Untar binaries
-        run: tar xzvf hadoop-ozone*.tar.gz -C /mnt/ozone
+        run: |
+          mkdir -p /mnt/ozone/hadoop-ozone/dist/target
+          tar xzvf hadoop-ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
       - name: Install robotframework
         run: sudo pip install robotframework
       - name: Execute tests
@@ -307,7 +309,9 @@ jobs:
         with:
           name: ozone-bin
       - name: Untar binaries
-        run: tar xvf ozone-bin.tar -C /mnt/ozone
+        run: |
+          mkdir -p /mnt/ozone/hadoop-ozone/dist/target
+          tar xzvf hadoop-ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
       - name: Install robotframework
         run: sudo pip install robotframework
       - name: Install k3s
