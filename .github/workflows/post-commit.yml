@@ -48,17 +48,13 @@ jobs:
         with:
           java-version: ${{ matrix.java }}
       - name: Run a full build
-        run: hadoop-ozone/dev-support/checks/build.sh -Pcoverage
-      - name: Tar binaries
-        # to maintain permissions (needed for executables)
-        if: matrix.java == '8'
-        run: tar cvf ozone-bin.tar hadoop-ozone/dist/target/ozone-*
+        run: hadoop-ozone/dev-support/checks/build.sh -Pcoverage -Pdist
       - name: Store binaries for tests
         uses: actions/upload-artifact@v2
         if: matrix.java == '8'
         with:
           name: ozone-bin
-          path: ozone-bin.tar
+          path: hadoop-ozone/dist/target/hadoop-ozone*.tar.gz
   bats:
     runs-on: ubuntu-18.04
     steps:
@@ -199,7 +195,7 @@ jobs:
         with:
           name: ozone-bin
       - name: Untar binaries
-        run: tar xvf ozone-bin.tar -C /mnt/ozone
+        run: tar xzvf hadoop-ozone*.tar.gz -C /mnt/ozone
       - name: Install robotframework
         run: sudo pip install robotframework
       - name: Execute tests
