@@ -104,7 +104,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private ReconServer reconServer;
 
   // Timeout for the cluster to be ready
-  private int waitForClusterToBeReadyTimeout = 120000; // 2 min
+  protected int waitForClusterToBeReadyTimeout = 120000; // 2 min
   private CertificateClient caClient;
 
   /**

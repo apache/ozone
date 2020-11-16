@@ -22,9 +22,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
-import java.util.Arrays;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
+
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmUtils;
@@ -50,14 +49,11 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.BindException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 
 /**
  * MiniOzoneHAClusterImpl creates a complete in-process Ozone cluster
@@ -317,7 +313,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       ReconServer reconServer = null;
       try {
         createSCMService();
-        createOMService();
+//        createOMService();
         if (includeRecon) {
           configureRecon();
           reconServer = new ReconServer();
@@ -327,16 +323,16 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         throw new IOException("Unable to build MiniOzoneCluster. ", ex);
       }
 
-      StorageContainerManager leaderSCM = getSCMLeader(scms);
-      final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(
-              leaderSCM, reconServer);
-
+//      StorageContainerManager leaderSCM = getSCMLeader(scms);
+//      final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(
+//              leaderSCM, reconServer);
+      final List<HddsDatanodeService> hddsDatanodes = Collections.emptyList();
       MiniOzoneHAClusterImpl cluster = new MiniOzoneHAClusterImpl(conf,
           activeOMs, inactiveOMs, scms, hddsDatanodes, omServiceId, reconServer);
 
-      if (startDataNodes) {
-        cluster.startHddsDatanodes();
-      }
+//      if (startDataNodes) {
+//        cluster.startHddsDatanodes();
+//      }
       return cluster;
     }
 
@@ -401,26 +397,60 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
       while (true) {
         try {
-          basePort = 10000 + RANDOM.nextInt(1000) * 4;
-          initSCMHAConfig(basePort);
-          for (int i = 0; i < numOfSCMs; i++) {
-            scmList.add(createSCM(conf));
+          basePort = 20000 + RANDOM.nextInt(1000) * 4;
+//          initSCMHAConfig(basePort);
+          int port = basePort;
+          for (int i = 1; i <= numOfSCMs; i++, port+=6) {
+            String scmNodeId = scmNodeIdBaseStr + i;
+            OzoneConfiguration config = new OzoneConfiguration(conf);
+            config.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "127.0.0.1:" + port);
+            config.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY, "127.0.0.1:" + (port + 2));
+            config.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "127.0.0.1:" + (port + 3));
+            config.set(ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY, "127.0.0.1:" + (port + 4));
+            config.set(ScmConfigKeys.OZONE_SCM_HTTPS_ADDRESS_KEY, "127.0.0.1:" + (port + 5));
+            config.set(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY, "127.0.0.1:" + (port + 6));
+
+
+            String metaDirPath = path + "/" + scmNodeId;
+            config.set(OZONE_METADATA_DIRS, metaDirPath);
+
+            scmList.add(createSCM(config));
           }
+//          for (int i = 0; i < numOfSCMs; i++) {
+//            String nodeId =  scmNodeIdBaseStr + i;
+//            OzoneConfiguration config = new OzoneConfiguration(conf);
+
+//            config.set(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY, nodeId);
+//            // Set the OM http(s) address to null so that the cluster picks
+//            // up the address set with service ID and node ID in initHAConfig
+//            config.set(ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY, "");
+//            config.set(ScmConfigKeys.OZONE_SCM_HTTPS_ADDRESS_KEY, "");
+//            config.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "");
+//            config.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY, "");
+//            config.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "");
+//            config.set(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY, "");
+//
+//            String metaDirPath = path + "/" + nodeId;
+//            config.set(OZONE_METADATA_DIRS, metaDirPath);
+//
+//            scmList.add(createSCM(config));
+//          }
           for (StorageContainerManager scm : scmList) {
             scm.start();
           }
           break;
         } catch (BindException e) {
-          for (StorageContainerManager scm : scmList) {
-            scm.stop();
-            scm.join();
-            LOG.info("Stopping SCM server at client Rpc: {}, Datanode Rpc:{}",
-                scm.getClientRpcAddress(), scm.getDatanodeRpcAddress());
-          }
-          scmList.clear();
-          ++retryCount;
-          LOG.info("MiniOzoneHACluster port conflicts, retried {} times",
-              retryCount);
+          throw new RuntimeException(e);
+//          for (StorageContainerManager scm : scmList) {
+//            scm.stop();
+//            scm.join();
+//            LOG.info("Stopping SCM server at client Rpc: {}, Datanode Rpc:{}",
+//                scm.getClientRpcAddress(), scm.getDatanodeRpcAddress());
+//          }
+//          scmList.clear();
+//          ++retryCount;
+//          LOG.info("MiniOzoneHACluster port conflicts, retried {} times",
+//              retryCount);
         }
       }
 
@@ -572,5 +602,23 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
       conf.set(omNodesKey, omNodesKeyValue.substring(1));
     }
+  }
+
+  @Override
+  public void waitForClusterToBeReady()
+          throws TimeoutException, InterruptedException {
+    GenericTestUtils.waitFor(() -> {
+      boolean status = true;
+      for (StorageContainerManager scm : storageContainerManagers) {
+        final int healthy = scm.getNodeCount(HEALTHY);
+        final boolean exitSafeMode = !scm.isInSafeMode();
+        LOG.info(exitSafeMode ? "Cluster exits safe mode" :
+                        "Waiting for cluster to exit safe mode",
+                healthy);
+        status &= exitSafeMode;
+      }
+
+      return status;
+    }, 1000, waitForClusterToBeReadyTimeout);
   }
 }
