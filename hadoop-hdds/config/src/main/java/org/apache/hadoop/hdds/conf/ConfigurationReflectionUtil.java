@@ -97,6 +97,7 @@ public final class ConfigurationReflectionUtil {
           case SIZE:
             forcedFieldSet(field, configuration,
                 from.getStorageSize(key, "0B", configAnnotation.sizeUnit()));
+            break;
           case CLASS:
             forcedFieldSet(field, configuration,
                 from.getClass(key, Object.class));

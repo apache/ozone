@@ -59,7 +59,7 @@ public class RatisPipelineProvider extends PipelineProvider {
 
   @VisibleForTesting
   public RatisPipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager, ConfigurationSource conf,
+      StateManager stateManager, ConfigurationSource conf,
       EventPublisher eventPublisher) {
     super(nodeManager, stateManager);
     this.conf = conf;
