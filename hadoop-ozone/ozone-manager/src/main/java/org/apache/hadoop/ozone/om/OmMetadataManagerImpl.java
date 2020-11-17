@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheImpl;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.om.codec.OMTransactionInfoCodec;
@@ -70,8 +71,8 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
-import org.apache.hadoop.ozone.protocol.proto
-    .OzoneManagerProtocolProtos.UserVolumeInfo;
+import org.apache.hadoop.ozone.storage.proto
+    .OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -162,6 +163,15 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   private boolean isRatisEnabled;
   private boolean ignorePipelineinKey;
 
+  // Epoch is used to generate the objectIDs. The most significant 2 bits of
+  // objectIDs is set to this epoch. For clusters before HDDS-4315 there is
+  // no epoch as such. But it can be safely assumed that the most significant
+  // 2 bits of the objectID will be 00. From HDDS-4315 onwards, the Epoch for
+  // non-ratis OM clusters will be binary 01 (= decimal 1)  and for ratis
+  // enabled OM cluster will be binary 10 (= decimal 2). This epoch is added
+  // to ensure uniqueness of objectIDs.
+  private final long omEpoch;
+
   private Map<String, Table> tableMap = new HashMap<>();
 
   public OmMetadataManagerImpl(OzoneConfiguration conf) throws IOException {
@@ -176,6 +186,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     isRatisEnabled = conf.getBoolean(
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
         OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
+    this.omEpoch = OmUtils.getOMEpoch(isRatisEnabled);
     // For test purpose only
     ignorePipelineinKey = conf.getBoolean(
         "ozone.om.ignore.pipeline", Boolean.TRUE);
@@ -189,10 +200,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     this.lock = new OzoneManagerLock(new OzoneConfiguration());
     this.openKeyExpireThresholdMS =
         OZONE_OPEN_KEY_EXPIRE_THRESHOLD_SECONDS_DEFAULT;
+    this.omEpoch = 0;
   }
 
   @Override
-  public Table<String, UserVolumeInfo> getUserTable() {
+  public Table<String, PersistedUserVolumeInfo> getUserTable() {
     return userTable;
   }
 
@@ -234,7 +246,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   public Table<String, OmMultipartKeyInfo> getMultipartInfoTable() {
     return multipartInfoTable;
   }
-
 
   private void checkTableStatus(Table table, String name) throws IOException {
     String logMessage = "Unable to get a reference to %s table. Cannot " +
@@ -330,7 +341,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
             new RepeatedOmKeyInfoCodec(true))
         .addCodec(OmBucketInfo.class, new OmBucketInfoCodec())
         .addCodec(OmVolumeArgs.class, new OmVolumeArgsCodec())
-        .addCodec(UserVolumeInfo.class, new UserVolumeInfoCodec())
+        .addCodec(PersistedUserVolumeInfo.class, new UserVolumeInfoCodec())
         .addCodec(OmMultipartKeyInfo.class, new OmMultipartKeyInfoCodec())
         .addCodec(S3SecretValue.class, new S3SecretValueCodec())
         .addCodec(OmPrefixInfo.class, new OmPrefixInfoCodec())
@@ -344,7 +355,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
    */
   protected void initializeOmTables() throws IOException {
     userTable =
-        this.store.getTable(USER_TABLE, String.class, UserVolumeInfo.class);
+        this.store.getTable(USER_TABLE, String.class,
+            PersistedUserVolumeInfo.class);
     checkTableStatus(userTable, USER_TABLE);
 
     TableCacheImpl.CacheCleanupPolicy cleanupPolicy =
@@ -496,6 +508,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
   @Override
   public org.apache.hadoop.ozone.om.lock.OzoneManagerLock getLock() {
     return lock;
+  }
+
+  @Override
+  public long getOmEpoch() {
+    return omEpoch;
   }
 
   /**
@@ -948,13 +965,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager {
     return result;
   }
 
-  private UserVolumeInfo getVolumesByUser(String userNameKey)
+  private PersistedUserVolumeInfo getVolumesByUser(String userNameKey)
       throws OMException {
     try {
-      UserVolumeInfo userVolInfo = getUserTable().get(userNameKey);
+      PersistedUserVolumeInfo userVolInfo = getUserTable().get(userNameKey);
       if (userVolInfo == null) {
         // No volume found for this user, return an empty list
-        return UserVolumeInfo.newBuilder().build();
+        return PersistedUserVolumeInfo.newBuilder().build();
       } else {
         return userVolInfo;
       }

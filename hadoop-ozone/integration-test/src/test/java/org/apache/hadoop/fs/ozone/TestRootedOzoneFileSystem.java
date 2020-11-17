@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.Trash;
@@ -47,6 +48,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -70,6 +72,7 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
+import static org.apache.hadoop.fs.FileSystem.LOG;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
@@ -1102,13 +1105,13 @@ public class TestRootedOzoneFileSystem {
   }
 
   /**
-   * Check that no files are actually moved to trash since it is disabled by
+   * Check that  files are moved to trash since it is enabled by
    * fs.rename(src, dst, options).
    */
   @Test
-  public void testRenameToTrashDisabled() throws IOException {
+  public void testRenameToTrashEnabled() throws IOException {
     // Create a file
-    String testKeyName = "testKey1";
+    String testKeyName = "testKey2";
     Path path = new Path(bucketPath, testKeyName);
     try (FSDataOutputStream stream = fs.create(path)) {
       stream.write(1);
@@ -1122,12 +1125,12 @@ public class TestRootedOzoneFileSystem {
     Path trashRoot = new Path(bucketPath, TRASH_PREFIX);
     Path userTrash = new Path(trashRoot, username);
     Path userTrashCurrent = new Path(userTrash, "Current");
-    Path trashPath = new Path(userTrashCurrent, testKeyName);
-
+    String key = path.toString().substring(1);
+    Path trashPath = new Path(userTrashCurrent, key);
     // Trash Current directory should still have been created.
     Assert.assertTrue(ofs.exists(userTrashCurrent));
-    // Check under trash, the key should be deleted instead
-    Assert.assertFalse(ofs.exists(trashPath));
+    // Check under trash, the key should be present
+    Assert.assertTrue(ofs.exists(trashPath));
 
     // Cleanup
     ofs.delete(trashRoot, true);
@@ -1169,5 +1172,65 @@ public class TestRootedOzoneFileSystem {
     // This will return false.
     Boolean falseResult = fs.delete(parent, true);
     assertFalse(falseResult);
+  }
+
+  /**
+   * 1.Move a Key to Trash
+   * 2.Verify that the key gets deleted by the trash emptier.
+   * @throws Exception
+   */
+  @Test
+  public void testTrash() throws Exception {
+    String testKeyName = "keyToBeDeleted";
+    Path path = new Path(bucketPath, testKeyName);
+    try (FSDataOutputStream stream = fs.create(path)) {
+      stream.write(1);
+    }
+    // Call moveToTrash. We can't call protected fs.rename() directly
+    trash.moveToTrash(path);
+
+    // Construct paths
+    String username = UserGroupInformation.getCurrentUser().getShortUserName();
+    Path trashRoot = new Path(bucketPath, TRASH_PREFIX);
+    Path userTrash = new Path(trashRoot, username);
+    Path userTrashCurrent = new Path(userTrash, "Current");
+    String key = path.toString().substring(1);
+    Path trashPath = new Path(userTrashCurrent, key);
+
+    // Wait until the TrashEmptier purges the key
+    GenericTestUtils.waitFor(()-> {
+      try {
+        return !ofs.exists(trashPath);
+      } catch (IOException e) {
+        LOG.error("Delete from Trash Failed");
+        Assert.fail("Delete from Trash Failed");
+        return false;
+      }
+    }, 1000, 180000);
+
+    // Cleanup
+    ofs.delete(trashRoot, true);
+
+  }
+
+  @Test
+  public void testCreateWithInvalidPaths() throws Exception {
+    // Test for path with ..
+    Path parent = new Path("../../../../../d1/d2/");
+    Path file1 = new Path(parent, "key1");
+    checkInvalidPath(file1);
+
+    // Test for path with :
+    file1 = new Path("/:/:");
+    checkInvalidPath(file1);
+
+    // Test for path with scheme and authority.
+    file1 = new Path(fs.getUri() + "/:/:");
+    checkInvalidPath(file1);
+  }
+
+  private void checkInvalidPath(Path path) throws Exception {
+    LambdaTestUtils.intercept(InvalidPathException.class, "Invalid path Name",
+        () -> fs.create(path, false));
   }
 }

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.Striped;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -33,6 +34,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,6 +48,7 @@ public final class ContainerCache extends LRUMap {
   private static ContainerCache cache;
   private static final float LOAD_FACTOR = 0.75f;
   private final Striped<Lock> rocksDBLock;
+  private static ContainerCacheMetrics metrics;
   /**
    * Constructs a cache that holds DBHandle references.
    */
@@ -53,6 +56,11 @@ public final class ContainerCache extends LRUMap {
       scanUntilRemovable) {
     super(maxSize, loadFactor, scanUntilRemovable);
     rocksDBLock = Striped.lazyWeakLock(stripes);
+  }
+
+  @VisibleForTesting
+  public ContainerCacheMetrics getMetrics() {
+    return metrics;
   }
 
   /**
@@ -71,6 +79,7 @@ public final class ContainerCache extends LRUMap {
           OzoneConfigKeys.OZONE_CONTAINER_CACHE_LOCK_STRIPES,
           OzoneConfigKeys.OZONE_CONTAINER_CACHE_LOCK_STRIPES_DEFAULT);
       cache = new ContainerCache(cacheSize, stripes, LOAD_FACTOR, true);
+      metrics = ContainerCacheMetrics.create();
     }
     return cache;
   }
@@ -86,7 +95,7 @@ public final class ContainerCache extends LRUMap {
       while (iterator.hasNext()) {
         iterator.next();
         ReferenceCountedDB db = (ReferenceCountedDB) iterator.getValue();
-        Preconditions.checkArgument(db.cleanup(), "refCount:",
+        Preconditions.checkArgument(cleanupDb(db), "refCount:",
             db.getReferenceCount());
       }
       // reset the cache
@@ -104,7 +113,8 @@ public final class ContainerCache extends LRUMap {
     ReferenceCountedDB db = (ReferenceCountedDB) entry.getValue();
     lock.lock();
     try {
-      return db.cleanup();
+      metrics.incNumCacheEvictions();
+      return cleanupDb(db);
     } finally {
       lock.unlock();
     }
@@ -130,19 +140,24 @@ public final class ContainerCache extends LRUMap {
     ReferenceCountedDB db;
     Lock containerLock = rocksDBLock.get(containerDBPath);
     containerLock.lock();
+    metrics.incNumDbGetOps();
     try {
       lock.lock();
       try {
         db = (ReferenceCountedDB) this.get(containerDBPath);
         if (db != null) {
+          metrics.incNumCacheHits();
           db.incrementReference();
           return db;
+        } else {
+          metrics.incNumCacheMisses();
         }
       } finally {
         lock.unlock();
       }
 
       try {
+        long start = Time.monotonicNow();
         DatanodeStore store;
 
         if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
@@ -157,6 +172,7 @@ public final class ContainerCache extends LRUMap {
         }
 
         db = new ReferenceCountedDB(store, containerDBPath);
+        metrics.incDbOpenLatency(Time.monotonicNow() - start);
       } catch (Exception e) {
         LOG.error("Error opening DB. Container:{} ContainerPath:{}",
             containerID, containerDBPath, e);
@@ -171,7 +187,7 @@ public final class ContainerCache extends LRUMap {
           // increment the reference before returning the object
           currentDB.incrementReference();
           // clean the db created in previous step
-          db.cleanup();
+          cleanupDb(db);
           return currentDB;
         } else {
           this.put(containerDBPath, db);
@@ -197,13 +213,22 @@ public final class ContainerCache extends LRUMap {
     try {
       ReferenceCountedDB db = (ReferenceCountedDB)this.get(containerDBPath);
       if (db != null) {
-        Preconditions.checkArgument(db.cleanup(), "refCount:",
+        Preconditions.checkArgument(cleanupDb(db), "refCount:",
             db.getReferenceCount());
       }
       this.remove(containerDBPath);
     } finally {
       lock.unlock();
     }
+  }
+
+  private boolean cleanupDb(ReferenceCountedDB db) {
+    long time = Time.monotonicNow();
+    boolean ret = db.cleanup();
+    if (ret) {
+      metrics.incDbCloseLatency(Time.monotonicNow() - time);
+    }
+    return ret;
   }
 
   /**

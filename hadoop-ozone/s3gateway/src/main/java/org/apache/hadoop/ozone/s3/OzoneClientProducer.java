@@ -23,7 +23,9 @@ import javax.enterprise.inject.Produces;
 import javax.inject.Inject;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.security.PrivilegedExceptionAction;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -36,6 +38,8 @@ import org.apache.hadoop.security.token.Token;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 import static org.apache.hadoop.ozone.s3.SignatureProcessor.UTF_8;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INTERNAL_ERROR;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,7 +68,7 @@ public class OzoneClientProducer {
 
 
   @Produces
-  public OzoneClient createClient() throws IOException {
+  public OzoneClient createClient() throws OS3Exception, IOException {
     client = getClient(ozoneConfiguration);
     return client;
   }
@@ -74,15 +78,22 @@ public class OzoneClientProducer {
     client.close();
   }
 
-  private OzoneClient getClient(OzoneConfiguration config) throws IOException {
+  private OzoneClient getClient(OzoneConfiguration config)
+      throws OS3Exception {
+    OzoneClient ozoneClient = null;
     try {
+      // Check if any error occurred during creation of signatureProcessor.
+      if (signatureParser.getException() != null) {
+        throw signatureParser.getException();
+      }
       String awsAccessId = signatureParser.getAwsAccessId();
+      validateAccessId(awsAccessId);
+
       UserGroupInformation remoteUser =
           UserGroupInformation.createRemoteUser(awsAccessId);
       if (OzoneSecurityUtil.isSecurityEnabled(config)) {
         LOG.debug("Creating s3 auth info for client.");
         try {
-
           OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
           identifier.setTokenType(S3AUTHINFO);
           identifier.setStrToSign(signatureParser.getStringToSign());
@@ -98,25 +109,49 @@ public class OzoneClientProducer {
               omService);
           remoteUser.addToken(token);
         } catch (OS3Exception | URISyntaxException ex) {
-          LOG.error("S3 auth info creation failed.");
           throw S3_AUTHINFO_CREATION_ERROR;
         }
-
       }
-      UserGroupInformation.setLoginUser(remoteUser);
-    } catch (Exception e) {
-      LOG.error("Error: ", e);
+      ozoneClient =
+          remoteUser.doAs((PrivilegedExceptionAction<OzoneClient>)() -> {
+            if (omServiceID == null) {
+              return OzoneClientFactory.getRpcClient(ozoneConfiguration);
+            } else {
+              // As in HA case, we need to pass om service ID.
+              return OzoneClientFactory.getRpcClient(omServiceID,
+                  ozoneConfiguration);
+            }
+          });
+    } catch (OS3Exception ex) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Error during Client Creation: ", ex);
+      }
+      throw ex;
+    } catch (Throwable t) {
+      // For any other critical errors during object creation throw Internal
+      // error.
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Error during Client Creation: ", t);
+      }
+      throw INTERNAL_ERROR;
     }
+    return ozoneClient;
+  }
 
-    if (omServiceID == null) {
-      return OzoneClientFactory.getRpcClient(ozoneConfiguration);
-    } else {
-      // As in HA case, we need to pass om service ID.
-      return OzoneClientFactory.getRpcClient(omServiceID, ozoneConfiguration);
+  // ONLY validate aws access id when needed.
+  private void validateAccessId(String awsAccessId) throws Exception {
+    if (awsAccessId == null || awsAccessId.equals("")) {
+      LOG.error("Malformed s3 header. awsAccessID: ", awsAccessId);
+      throw MALFORMED_HEADER;
     }
   }
 
   public void setOzoneConfiguration(OzoneConfiguration config) {
     this.ozoneConfiguration = config;
+  }
+
+  @VisibleForTesting
+  public void setSignatureParser(SignatureProcessor signatureParser) {
+    this.signatureParser = signatureParser;
   }
 }
