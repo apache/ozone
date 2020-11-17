@@ -118,8 +118,9 @@ public class TestCleanupTableInfo {
         anOmFileCreateRequest(blockID, volume, bucket, key);
 
     OMMetadataManager omMetaMgr = createOMMetadataManagerSpy();
+    OMMetrics omMetrics = mock(OMMetrics.class);
     OzoneManager om =
-        createOzoneManagerMock(volume, bucket, request, omMetaMgr);
+        createOzoneManagerMock(volume, bucket, request, omMetaMgr, omMetrics);
 
     OmVolumeArgs volumeArgs = aVolumeArgs(volume);
     OmBucketInfo bucketInfo = aBucketInfo(volume, bucket);
@@ -151,7 +152,7 @@ public class TestCleanupTableInfo {
       }
     }
 
-    verify(mock(OMMetrics.class), times(1)).incNumCreateFile();
+    verify(omMetrics, times(1)).incNumCreateFile();
   }
 
   private void addBucketToMetaTable(String volume, String bucket,
@@ -175,10 +176,11 @@ public class TestCleanupTableInfo {
   }
 
   private OzoneManager createOzoneManagerMock(String volume, String bucket,
-      OMFileCreateRequest request, OMMetadataManager omMetaMgr)
-      throws IOException {
+      OMFileCreateRequest request, OMMetadataManager omMetaMgr,
+      OMMetrics metrics
+  ) throws IOException {
     OzoneManager om = mock(OzoneManager.class);
-    when(om.getMetrics()).thenReturn(mock(OMMetrics.class));
+    when(om.getMetrics()).thenReturn(metrics);
     when(om.getMetadataManager()).thenReturn(omMetaMgr);
     when(om.resolveBucketLink(any(KeyArgs.class), refEq(request))).thenAnswer(
         invocationOnMock -> {
