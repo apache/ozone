@@ -107,8 +107,7 @@ public class TestCleanupTableInfo {
   }
 
   @Test
-  public void testHDDS_4478()
-      throws Exception {
+  public void testHDDS4478() throws Exception {
     HddsProtos.BlockID blockID = new BlockID(1, 1).getProtobuf();
     String volume = "testVol";
     String bucket = "testBuck";

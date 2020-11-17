@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.response.file;
 
 import javax.annotation.Nonnull;
 
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
