@@ -31,7 +31,7 @@ import java.util.concurrent.Callable;
  */
 @CommandLine.Command(
     name = "datanode",
-    description = "run chaos cluster across all daemons",
+    description = "run chaos cluster across Ozone Datanodes",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class TestDatanodeMiniChaosOzoneCluster extends

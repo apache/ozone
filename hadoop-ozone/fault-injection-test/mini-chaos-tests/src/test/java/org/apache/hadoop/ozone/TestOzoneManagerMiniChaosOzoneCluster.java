@@ -32,7 +32,7 @@ import java.util.concurrent.Callable;
  */
 @CommandLine.Command(
     name = "ozonemanager",
-    description = "run chaos cluster across all daemons",
+    description = "run chaos cluster across Ozone Managers",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class TestOzoneManagerMiniChaosOzoneCluster extends
