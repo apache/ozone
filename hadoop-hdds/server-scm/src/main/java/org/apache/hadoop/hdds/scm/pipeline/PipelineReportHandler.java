@@ -114,9 +114,11 @@ public class PipelineReportHandler implements
       }
       if (pipeline.isHealthy()) {
         pipelineManager.openPipeline(pipelineID);
-        if (pipelineAvailabilityCheck && scmSafeModeManager.getInSafeMode()) {
-          publisher.fireEvent(SCMEvents.OPEN_PIPELINE, pipeline);
-        }
+      }
+    }
+    if (pipeline.isHealthy()) {
+      if (pipelineAvailabilityCheck && scmSafeModeManager.getInSafeMode()) {
+        publisher.fireEvent(SCMEvents.OPEN_PIPELINE, pipeline);
       }
     }
   }
