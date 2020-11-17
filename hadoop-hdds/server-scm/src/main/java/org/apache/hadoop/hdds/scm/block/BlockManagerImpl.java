@@ -292,16 +292,16 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
    */
   @Override
   public void deleteBlocks(List<BlockGroup> keyBlocksInfoList)
-          throws IOException {
+      throws IOException {
     ScmUtils.preCheck(ScmOps.deleteBlock, safeModePrecheck);
 
     Map<Long, List<Long>> containerBlocks = new HashMap<>();
     // TODO: track the block size info so that we can reclaim the container
     // TODO: used space when the block is deleted.
-    for(BlockGroup bg : keyBlocksInfoList){
-      LOG.info("Deleting blocks {}", StringUtils.join(
-              ",", bg.getBlockIDList()));
-      for(BlockID block : bg.getBlockIDList()){
+    for (BlockGroup bg : keyBlocksInfoList) {
+      LOG.info("Deleting blocks {}",
+          StringUtils.join(",", bg.getBlockIDList()));
+      for (BlockID block : bg.getBlockIDList()) {
         long containerID = block.getContainerID();
         if (containerBlocks.containsKey(containerID)) {
           containerBlocks.get(containerID).add(block.getLocalID());
@@ -316,10 +316,9 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     try {
       deletedBlockLog.addTransactions(containerBlocks);
     } catch (IOException e) {
-      throw new IOException(
-          "Skip writing the deleted blocks info to"
-              + " the delLog because addTransaction fails. "
-              + keyBlocksInfoList.size() + "Keys skipped", e);
+      throw new IOException("Skip writing the deleted blocks info to"
+          + " the delLog because addTransaction fails. " + keyBlocksInfoList
+          .size() + "Keys skipped", e);
     }
     // TODO: Container report handling of the deleted blocks:
     // Remove tombstone and update open container usage.

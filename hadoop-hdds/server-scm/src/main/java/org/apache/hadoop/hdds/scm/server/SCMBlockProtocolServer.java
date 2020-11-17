@@ -227,45 +227,44 @@ public class SCMBlockProtocolServer implements
     Map<String, String> auditMap = Maps.newHashMap();
     ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result resultCode;
     Exception e = null;
-    try{
+    try {
       scm.getScmBlockManager().deleteBlocks(keyBlocksInfoList);
       resultCode = ScmBlockLocationProtocolProtos.
-              DeleteScmBlockResult.Result.success;
-    } catch (IOException ioe){
+          DeleteScmBlockResult.Result.success;
+    } catch (IOException ioe) {
       e = ioe;
       LOG.warn("Fail to delete {} keys", keyBlocksInfoList.size(), ioe);
       switch (ioe instanceof SCMException ? ((SCMException) ioe).getResult() :
-              IO_EXCEPTION) {
+          IO_EXCEPTION) {
       case SAFE_MODE_EXCEPTION:
-        resultCode = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
-                .Result.safeMode;
+        resultCode =
+            ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result.safeMode;
         break;
       case FAILED_TO_FIND_BLOCK:
-        resultCode = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
-                .Result.errorNotFound;
+        resultCode =
+            ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result.
+                errorNotFound;
         break;
       default:
-        resultCode = ScmBlockLocationProtocolProtos.DeleteScmBlockResult
-                .Result.unknownFailure;
+        resultCode =
+            ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result.
+                unknownFailure;
       }
     }
-    for(BlockGroup bg : keyBlocksInfoList){
+    for (BlockGroup bg : keyBlocksInfoList) {
       auditMap.put("KeyBlockToDelete", bg.toString());
       List<DeleteBlockResult> blockResult = new ArrayList<>();
-      for(BlockID b : bg.getBlockIDList()){
+      for (BlockID b : bg.getBlockIDList()) {
         blockResult.add(new DeleteBlockResult(b, resultCode));
       }
-      results.add(new DeleteBlockGroupResult(bg.getGroupID(),
-              blockResult));
+      results.add(new DeleteBlockGroupResult(bg.getGroupID(), blockResult));
     }
-    if(e == null){
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-              SCMAction.DELETE_KEY_BLOCK, auditMap));
-    } else{
+    if (e == null) {
+      AUDIT.logWriteSuccess(
+          buildAuditMessageForSuccess(SCMAction.DELETE_KEY_BLOCK, auditMap));
+    } else {
       AUDIT.logWriteFailure(
-              buildAuditMessageForFailure(SCMAction.DELETE_KEY_BLOCK, auditMap,
-                      e)
-      );
+          buildAuditMessageForFailure(SCMAction.DELETE_KEY_BLOCK, auditMap, e));
     }
     return results;
   }
