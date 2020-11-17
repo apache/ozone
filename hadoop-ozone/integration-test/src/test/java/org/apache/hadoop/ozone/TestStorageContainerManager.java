@@ -38,7 +38,9 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -59,6 +61,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.TestUtils;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
@@ -74,6 +77,7 @@ import org.apache.hadoop.hdds.scm.server.SCMClientProtocolServer;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeatureCatalog;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.StaticMapping;
@@ -85,6 +89,7 @@ import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
@@ -650,6 +655,24 @@ public class TestStorageContainerManager {
     } finally {
       cluster.shutdown();
     }
+  }
+
+  @Test
+  public void testStartupSlvLessThanMlv() throws Exception {
+    File scmSubdir = folder.newFolder("scm", "current");
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS, folder.getRoot().getAbsolutePath());
+
+    int largestSlv = 0;
+    for (LayoutFeature f : HDDSLayoutFeatureCatalog.HDDSLayoutFeature.values()) {
+      largestSlv = Math.max(largestSlv, f.layoutVersion());
+    }
+
+    TestUtils.createVersionFile(scmSubdir, largestSlv + 1);
+
+    // TODO: Expect exception to be thrown here.
+    new StorageContainerManager(conf);
   }
 
   @SuppressWarnings("visibilitymodifier")

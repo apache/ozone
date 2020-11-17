@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.scm;
 
 import com.google.common.base.Preconditions;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -70,6 +71,10 @@ import org.apache.hadoop.security.authentication.client
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -567,5 +572,36 @@ public final class TestUtils {
         .setState(Pipeline.PipelineState.OPEN)
         .setType(HddsProtos.ReplicationType.RATIS)
         .build();
+  }
+
+  /**
+   * Copies the base version file for this test from the test resources to
+   * {@code subdir} in the test's temporary folder, adds the test's metadata
+   * layout version to the file, and returns a configuration with {@code
+   * configKey} pointing to the temporary folder.
+   *
+   * @return A new {@link OzoneConfiguration} with the configuration key
+   * {@code dirConfigKey} set to the test's temporary folder.
+   * @throws Exception
+   */
+  public static  File createVersionFile(File parentDir, int mlv) throws Exception {
+    final String versionFileName = "VERSION";
+    String mlvSpecifier = "layoutVersion=" + mlv;
+
+    // Load base version file from resources.
+    URL baseVersionFileURL =
+        TestUtils.class.getClassLoader().getResource(versionFileName);
+    File baseVersionFile = new File(baseVersionFileURL.toURI());
+
+    FileUtils.copyFileToDirectory(baseVersionFile, parentDir);
+    File versionFile = new File(parentDir, baseVersionFile.getName());
+
+    // Append metadata layout version.
+    Files.write(
+        Paths.get(versionFile.toURI()),
+        mlvSpecifier.getBytes(),
+        StandardOpenOption.APPEND);
+
+    return versionFile;
   }
 }
