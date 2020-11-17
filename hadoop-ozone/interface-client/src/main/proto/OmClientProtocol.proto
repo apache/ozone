@@ -74,6 +74,7 @@ enum Type {
   DBUpdates = 53;
   FinalizeUpgrade = 54;
   FinalizeUpgradeProgress = 55;
+  PrepareForUpgrade = 56;
 
   GetDelegationToken = 61;
   RenewDelegationToken = 62;
@@ -145,6 +146,7 @@ message OMRequest {
   optional DBUpdatesRequest                  dbUpdatesRequest              = 53;
   optional FinalizeUpgradeRequest           finalizeUpgradeRequest         = 54;
   optional FinalizeUpgradeProgressRequest   finalizeUpgradeProgressRequest = 55;
+  optional PrepareForUpgradeRequest         finalizeUpgradeProgressRequest = 56;
 
   optional hadoop.common.GetDelegationTokenRequestProto getDelegationTokenRequest = 61;
   optional hadoop.common.RenewDelegationTokenRequestProto renewDelegationTokenRequest= 62;
@@ -1073,6 +1075,14 @@ message FinalizeUpgradeProgressRequest {
 
 message FinalizeUpgradeProgressResponse {
     required UpgradeFinalizationStatus status = 1;
+}
+
+message PrepareUpgradeRequest {
+
+}
+
+message PrepareUpgradeResponse {
+    required uint64 txnID = 1;
 }
 
 message ServicePort {
