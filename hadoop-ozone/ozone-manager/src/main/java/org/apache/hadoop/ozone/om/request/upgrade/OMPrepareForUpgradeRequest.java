@@ -6,6 +6,7 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.upgrade.OMFinalizeUpgradeResponse;
+import org.apache.hadoop.ozone.om.response.upgrade.OMPrepareForUpgradeResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
