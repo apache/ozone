@@ -112,6 +112,7 @@ public class BucketEndpoint extends EndpointBase {
     ContinueToken decodedToken =
         ContinueToken.decodeFromString(continueToken);
 
+    // stand for startAfter
     if (startAfter == null) {
       startAfter = marker;
     }
@@ -190,6 +191,7 @@ public class BucketEndpoint extends EndpointBase {
       response.setTruncated(true);
       ContinueToken nextToken = new ContinueToken(lastKey, prevDir);
       response.setNextToken(nextToken.encodeToString());
+      // For aws api v1 compatibility purpose, set nextMarker with lastKey
       response.setNextMarker(lastKey);
     } else {
       response.setTruncated(false);
