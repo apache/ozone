@@ -17,11 +17,13 @@
 package org.apache.hadoop.ozone.freon;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
@@ -75,7 +77,7 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
       description = "Pipeline to use. By default the first RATIS/THREE "
           + "pipeline will be used.",
       defaultValue = "")
-  private String pipelineId;
+  private String pipelineIds;
 
   private XceiverClientSpi xceiverClientSpi;
 
@@ -84,10 +86,11 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
   private ByteString dataToWrite;
   private ChecksumData checksumProtobuf;
 
+  boolean isThreeNodePipeline = false;
+
   @Override
   public Void call() throws Exception {
 
-    init();
 
     OzoneConfiguration ozoneConf = createOzoneConfiguration();
     if (OzoneSecurityUtil.isSecurityEnabled(ozoneConf)) {
@@ -95,47 +98,56 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
           "Datanode chunk generator is not supported in secure environment");
     }
 
-    try (StorageContainerLocationProtocol scmLocationClient =
-        createStorageContainerLocationClient(ozoneConf)) {
-      List<Pipeline> pipelines = scmLocationClient.listPipelines();
-      Pipeline pipeline;
-      if (pipelineId != null && pipelineId.length() > 0) {
-        pipeline = pipelines.stream()
-            .filter(p -> p.getId().toString().equals(pipelineId))
-            .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException(
-                "Pipeline ID is defined, but there is no such pipeline: "
-                    + pipelineId));
+    List<String> pips = Arrays.asList(pipelineIds.split(","));
 
-      } else {
-        pipeline = pipelines.stream()
-            .filter(p -> p.getFactor() == ReplicationFactor.THREE)
-            .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException(
-                "Pipeline ID is NOT defined, and no pipeline " +
-                    "has been found with factor=THREE"));
-        LOG.info("Using pipeline {}", pipeline.getId());
-      }
+    for (String pipelineId: pips) {
+      init();
+      LOG.info("Writing block for pipeline:" + pipelineId);
+      try (StorageContainerLocationProtocol scmLocationClient =
+               createStorageContainerLocationClient(ozoneConf)) {
+        List<Pipeline> pipelines = scmLocationClient.listPipelines();
+        Pipeline pipeline;
+        if (pipelineId != null && pipelineId.length() > 0) {
+          pipeline = pipelines.stream()
+              .filter(p -> p.getId().toString().equals("PipelineID=" + pipelineId))
+              .findFirst()
+              .orElseThrow(() -> new IllegalArgumentException(
+                  "Pipeline ID is defined, but there is no such pipeline: "
+                      + pipelineId));
+          if (pipeline.getFactor()== ReplicationFactor.THREE){
+            isThreeNodePipeline = true;
+          }
 
-      try (XceiverClientManager xceiverClientManager =
-               new XceiverClientManager(ozoneConf)) {
-        xceiverClientSpi = xceiverClientManager.acquireClient(pipeline);
+        } else {
+          pipeline = pipelines.stream()
+              .filter(p -> p.getFactor() == ReplicationFactor.THREE)
+              .findFirst()
+              .orElseThrow(() -> new IllegalArgumentException(
+                  "Pipeline ID is NOT defined, and no pipeline " +
+                      "has been found with factor=THREE"));
+          LOG.info("Using pipeline {}", pipeline.getId());
+        }
 
-        timer = getMetrics().timer("chunk-write");
+        try (XceiverClientManager xceiverClientManager =
+                 new XceiverClientManager(ozoneConf)) {
+          xceiverClientSpi = xceiverClientManager.acquireClient(pipeline);
 
-        byte[] data = RandomStringUtils.randomAscii(chunkSize)
-            .getBytes(StandardCharsets.UTF_8);
+          timer = getMetrics().timer("chunk-write");
 
-        dataToWrite = ByteString.copyFrom(data);
+          byte[] data = RandomStringUtils.randomAscii(chunkSize)
+              .getBytes(StandardCharsets.UTF_8);
 
-        Checksum checksum = new Checksum(ChecksumType.CRC32, chunkSize);
-        checksumProtobuf = checksum.computeChecksum(data).getProtoBufMessage();
+          dataToWrite = ByteString.copyFrom(data);
 
-        runTests(this::writeChunk);
-      }
-    } finally {
-      if (xceiverClientSpi != null) {
-        xceiverClientSpi.close();
+          Checksum checksum = new Checksum(ChecksumType.CRC32, chunkSize);
+          checksumProtobuf = checksum.computeChecksum(data).getProtoBufMessage();
+
+          runTests(this::writeChunk);
+        }
+      } finally {
+        if (xceiverClientSpi != null) {
+          xceiverClientSpi.close();
+        }
       }
     }
     return null;
@@ -165,7 +177,20 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
             .setChunkData(chunkInfo)
             .setData(dataToWrite);
 
-    String id = xceiverClientSpi.getPipeline().getFirstNode().getUuidString();
+    if (isThreeNodePipeline){
+      for (DatanodeDetails dn: xceiverClientSpi.getPipeline().getNodes()){
+        sendWriteChunkRequest(blockId, writeChunkRequest, dn);
+      }
+    }
+    else {
+      sendWriteChunkRequest(blockId, writeChunkRequest, xceiverClientSpi.getPipeline().getFirstNode());
+    }
+  }
+
+  private void sendWriteChunkRequest(DatanodeBlockID blockId,
+     WriteChunkRequestProto.Builder writeChunkRequest,
+     DatanodeDetails datanodeDetails) throws Exception {
+    String id = datanodeDetails.getUuidString();
 
     ContainerCommandRequestProto.Builder builder =
         ContainerCommandRequestProto
@@ -188,7 +213,6 @@ public class DatanodeChunkGenerator extends BaseFreonGenerator implements
       }
       return null;
     });
-
   }
 
 }
