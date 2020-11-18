@@ -3796,18 +3796,4 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public boolean isPrepared() {
     return isPrepared;
   }
-
-  public boolean requestAllowed(OzoneManagerProtocolProtos.Type cmdType) {
-    // In prepare mode, only prepare and cancel requests are allowed to go
-    // through.
-    boolean trxnAllowed = true;
-    if (isPrepared()) {
-      trxnAllowed =
-          (cmdType != OzoneManagerProtocolProtos.Type.PrepareForUpgrade);
-      // TODO: When cancel prepare is implemented, turn off prepare when
-      //  cancel received, and allow transaction.
-    }
-
-    return trxnAllowed;
-  }
 }
