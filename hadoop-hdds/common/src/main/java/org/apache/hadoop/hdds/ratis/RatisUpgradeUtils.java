@@ -18,11 +18,11 @@
 package org.apache.hadoop.hdds.ratis;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.server.impl.RaftServerImpl;
-import org.apache.ratis.server.impl.RaftServerProxy;
+import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.statemachine.StateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,16 +41,15 @@ public final class RatisUpgradeUtils {
   /**
    * Flush all committed transactions in a given Raft Server for a given group.
    * @param stateMachine state machine to use
-   * @param raftGroup raft group
-   * @param server Raft server proxy instance.
+   * @param impl RaftServerImpl instance
    * @param maxTimeToWaitSeconds Max time to wait before declaring failure.
+   * @param timeBetweenRetryInSeconds interval time to retry.
    * @throws InterruptedException when interrupted
    * @throws IOException on error while waiting
    */
   public static void waitForAllTxnsApplied(
       StateMachine stateMachine,
-      RaftGroup raftGroup,
-      RaftServerProxy server,
+      RaftServerImpl impl,
       long maxTimeToWaitSeconds,
       long timeBetweenRetryInSeconds)
       throws InterruptedException, IOException {
@@ -60,7 +59,7 @@ public final class RatisUpgradeUtils {
         TimeUnit.SECONDS.toMillis(maxTimeToWaitSeconds);
     boolean success = false;
     while (System.currentTimeMillis() < endTime) {
-      success = checkIfAllTransactionsApplied(stateMachine, server, raftGroup);
+      success = checkIfAllTransactionsApplied(stateMachine, impl);
       if (success) {
         break;
       }
@@ -69,26 +68,52 @@ public final class RatisUpgradeUtils {
 
     if (!success) {
       throw new IOException(String.format("After waiting for %d seconds, " +
-          "State Machine has not applied  all the transactions.",
+              "State Machine has not applied  all the transactions.",
           maxTimeToWaitSeconds));
     }
+  }
+
+  /**
+   * Take a snapshot of the state machine at the last index, and purge ALL logs.
+   * @param impl RaftServerImpl instance
+   * @param stateMachine state machine to use
+   * @throws IOException on Error.
+   */
+  public static long takeSnapshotAndPurgeLogs(RaftServerImpl impl,
+                                              StateMachine stateMachine)
+      throws IOException {
 
     long snapshotIndex = stateMachine.takeSnapshot();
     if (snapshotIndex != stateMachine.getLastAppliedTermIndex().getIndex()) {
       throw new IOException("Index from Snapshot does not match last applied " +
           "Index");
     }
+
+    RaftLog raftLog = impl.getState().getLog();
+    long lastIndex = Math.max(snapshotIndex,
+        raftLog.getLastEntryTermIndex().getIndex());
+
+    CompletableFuture<Long> purgeFuture =
+        raftLog.syncWithSnapshot(lastIndex);
+    try {
+      Long purgeIndex = purgeFuture.get();
+      if (purgeIndex != lastIndex) {
+        throw new IOException("Purge index " + purgeIndex +
+            " does not match last index " + lastIndex);
+      }
+    } catch (Exception e) {
+      throw new IOException("Unable to purge logs.", e);
+    }
+    return lastIndex;
   }
 
   private static boolean checkIfAllTransactionsApplied(
       StateMachine stateMachine,
-      RaftServerProxy serverProxy,
-      RaftGroup raftGroup) throws IOException {
+      RaftServerImpl impl) {
     LOG.info("Checking for pending transactions to be applied.");
-    RaftServerImpl impl = serverProxy.getImpl(raftGroup.getGroupId());
     long lastCommittedIndex = impl.getState().getLog().getLastCommittedIndex();
     long appliedIndex = stateMachine.getLastAppliedTermIndex().getIndex();
-    LOG.info("lastCommittedIndex = {}, appliedIndex = {}",
+    LOG.info("committedIndex = {}, appliedIndex = {}",
         lastCommittedIndex, appliedIndex);
     return (lastCommittedIndex == appliedIndex);
   }
