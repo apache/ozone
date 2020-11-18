@@ -21,12 +21,12 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 
-import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.server.events.EventHandler;
+import org.apache.hadoop.ozone.common.BlockGroup;
 
 /**
  *
@@ -59,7 +59,7 @@ public interface BlockManager extends Closeable,
    *                 a particular object key.
    * @throws IOException if exception happens, non of the blocks is deleted.
    */
-  void deleteBlocks(List<BlockID> blockIDs) throws IOException;
+  void deleteBlocks(List<BlockGroup> blockIDs) throws IOException;
 
   /**
    * @return the block deletion transaction log maintained by SCM.

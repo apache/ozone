@@ -52,6 +52,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.metrics2.util.MBeans;
+import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.util.StringUtils;
 
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.INVALID_BLOCK_SIZE;
@@ -283,38 +284,39 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
    * successful, given blocks are
    * entering pending deletion state and becomes invisible from SCM namespace.
    *
-   * @param blockIDs block IDs. This is often the list of blocks of a
-   * particular object key.
+   * @param keyBlocksInfoList . This is the list of BlockGroup which contains
+   * groupID of keys and list of BlockIDs associated with them.
    * @throws IOException if exception happens, non of the blocks is deleted.
    */
   @Override
-  public void deleteBlocks(List<BlockID> blockIDs) throws IOException {
+  public void deleteBlocks(List<BlockGroup> keyBlocksInfoList)
+      throws IOException {
     ScmUtils.preCheck(ScmOps.deleteBlock, safeModePrecheck);
 
-    LOG.info("Deleting blocks {}", StringUtils.join(",", blockIDs));
     Map<Long, List<Long>> containerBlocks = new HashMap<>();
     // TODO: track the block size info so that we can reclaim the container
     // TODO: used space when the block is deleted.
-    for (BlockID block : blockIDs) {
-      // Merge blocks to a container to blocks mapping,
-      // prepare to persist this info to the deletedBlocksLog.
-      long containerID = block.getContainerID();
-      if (containerBlocks.containsKey(containerID)) {
-        containerBlocks.get(containerID).add(block.getLocalID());
-      } else {
-        List<Long> item = new ArrayList<>();
-        item.add(block.getLocalID());
-        containerBlocks.put(containerID, item);
+    for (BlockGroup bg : keyBlocksInfoList) {
+      LOG.info("Deleting blocks {}",
+          StringUtils.join(",", bg.getBlockIDList()));
+      for (BlockID block : bg.getBlockIDList()) {
+        long containerID = block.getContainerID();
+        if (containerBlocks.containsKey(containerID)) {
+          containerBlocks.get(containerID).add(block.getLocalID());
+        } else {
+          List<Long> item = new ArrayList<>();
+          item.add(block.getLocalID());
+          containerBlocks.put(containerID, item);
+        }
       }
     }
 
     try {
       deletedBlockLog.addTransactions(containerBlocks);
     } catch (IOException e) {
-      throw new IOException(
-          "Skip writing the deleted blocks info to"
-              + " the delLog because addTransaction fails. Batch skipped: "
-              + StringUtils.join(",", blockIDs), e);
+      throw new IOException("Skip writing the deleted blocks info to"
+          + " the delLog because addTransaction fails. " + keyBlocksInfoList
+          .size() + "Keys skipped", e);
     }
     // TODO: Container report handling of the deleted blocks:
     // Remove tombstone and update open container usage.
