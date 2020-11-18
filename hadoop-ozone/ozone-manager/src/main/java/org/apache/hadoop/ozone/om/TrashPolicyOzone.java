@@ -37,7 +37,8 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** TrashPolicy for Ozone Specific Trash Operations.Through this implementation
+/**
+ * TrashPolicy for Ozone Specific Trash Operations.Through this implementation
  *  of TrashPolicy ozone-specific trash optimizations are/will be made such as
  *  having a multithreaded TrashEmptier.
  */

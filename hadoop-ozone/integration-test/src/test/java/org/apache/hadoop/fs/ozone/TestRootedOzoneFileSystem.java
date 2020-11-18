@@ -28,7 +28,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.TrashPolicy;
-import org.apache.hadoop.fs.TrashPolicyDefault;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -1190,7 +1189,7 @@ public class TestRootedOzoneFileSystem {
       stream.write(1);
     }
     Assert.assertTrue(trash.getConf().getClass(
-        "fs.trash.classname", TrashPolicyDefault.class).
+        "fs.trash.classname", TrashPolicy.class).
         isAssignableFrom(TrashPolicyOzone.class));
 
     // Call moveToTrash. We can't call protected fs.rename() directly
