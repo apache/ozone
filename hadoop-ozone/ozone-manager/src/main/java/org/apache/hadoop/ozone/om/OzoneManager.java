@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.ratis.RatisUpgradeUtils;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -194,7 +195,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForBlockClients;
 import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
-import static org.apache.hadoop.hdds.ratis.RatisUpgradeUtils.waitForAllTxnsApplied;
+import org.apache.hadoop.hdds.ratis.RatisUpgradeUtils;
 import static org.apache.hadoop.hdds.security.x509.certificates.utils.CertificateSignRequest.getEncodedString;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
@@ -239,6 +240,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
+import org.apache.ratis.server.impl.RaftServerImpl;
 import org.apache.ratis.server.impl.RaftServerProxy;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.ExitUtils;
@@ -334,7 +336,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean useRatisForReplication;
 
   private boolean isNativeAuthorizerEnabled;
-  private boolean prepareForUpgrade;
+  private boolean isPrepared;
 
   private ExitManager exitManager;
 
@@ -348,6 +350,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   // Used in MiniOzoneCluster testing
   private State omState;
 
+  // TODO: Utilize the forUpgrade parameter to remove the marker file and
+  //  take the OM out of prepare mode on startup.
   private OzoneManager(OzoneConfiguration conf, boolean forUpgrade)
       throws IOException, AuthenticationException {
     super(OzoneVersionInfo.OZONE_VERSION_INFO);
@@ -496,8 +500,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     };
     ShutdownHookManager.get().addShutdownHook(shutdownHook,
         SHUTDOWN_HOOK_PRIORITY);
-    this.prepareForUpgrade = forUpgrade;
     omState = State.INITIALIZED;
+
+    // TODO: When marker file is added, check for that on startup to
+    //  determine prepare mode.
+    this.isPrepared = false;
   }
 
   private void logVersionMismatch(OzoneConfiguration conf, ScmInfo scmInfo) {
@@ -1012,17 +1019,31 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  public boolean applyAllPendingTransactions()
+  /**
+   * Wait for this OM instance to apply all committed transactions, and the
+   * purge the log after that.
+   * @return success / failure.
+   * @throws InterruptedException
+   * @throws IOException
+   */
+  public boolean prepare()
       throws InterruptedException, IOException {
+
+    LOG.info("Preparing {} for upgrade/downgrade.", getOMNodeId());
+    // Setting this flag disallwos all requests except preapre and cancel
+    // prepare in the OzoneManagerStateMachine and OzoneManagerRatisServer.
+    isPrepared = true;
 
     if (!isRatisEnabled) {
       LOG.info("Ratis not enabled. Nothing to do.");
       return true;
     }
 
-    waitForAllTxnsApplied(omRatisServer.getOmStateMachine(),
-        omRatisServer.getRaftGroup(),
-        (RaftServerProxy) omRatisServer.getServer(),
+    RaftServerProxy server = (RaftServerProxy) omRatisServer.getServer();
+    RaftServerImpl impl =
+        server.getImpl(omRatisServer.getRaftGroup().getGroupId());
+    RatisUpgradeUtils.waitForAllTxnsApplied(omRatisServer.getOmStateMachine(),
+        impl,
         OZONE_OM_MAX_TIME_TO_WAIT_FLUSH_TXNS,
         OZONE_OM_FLUSH_TXNS_RETRY_INTERVAL_SECONDS);
 
@@ -1034,14 +1055,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (index != appliedIndexFromRatis) {
       throw new IllegalStateException(
           String.format("Cannot prepare OM for Upgrade " +
-          "since transaction info table index %d does not match ratis %s",
+                  "since transaction info table index %d does not match ratis %s",
               index, appliedIndexFromRatis));
     }
 
+    long lastIndex = RatisUpgradeUtils.takeSnapshotAndPurgeLogs(server.getImpl(
+        omRatisServer.getRaftGroup().getGroupId()),
+        omRatisServer.getOmStateMachine());
+
     LOG.info("OM has been prepared for upgrade. All transactions " +
         "upto {} have been flushed to the state machine, " +
-        "and a snapshot has been taken.",
-        omRatisServer.getOmStateMachine().getLastAppliedTermIndex().getIndex());
+        "and a snapshot has been taken.", lastIndex);
     return true;
   }
 
@@ -1231,7 +1255,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("OM HttpServer failed to start.", ex);
     }
 
-    if (!prepareForUpgrade) {
+    if (!isPrepared) {
       omRpcServer.start();
       isOmRpcServerRunning = true;
     }
@@ -1240,7 +1264,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     startJVMPauseMonitor();
     setStartTime();
 
-    if (!prepareForUpgrade) {
+    if (!isPrepared) {
       omState = State.RUNNING;
     } else {
       omState = State.PREPARING_FOR_UPGRADE;
@@ -3767,5 +3791,23 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public OmLayoutVersionManager getVersionManager() {
     return versionManager;
+  }
+
+  public boolean isPrepared() {
+    return isPrepared;
+  }
+
+  public boolean requestAllowed(OzoneManagerProtocolProtos.Type cmdType) {
+    // In prepare mode, only prepare and cancel requests are allowed to go
+    // through.
+    boolean trxnAllowed = true;
+    if (isPrepared()) {
+      trxnAllowed =
+          (cmdType != OzoneManagerProtocolProtos.Type.PrepareForUpgrade);
+      // TODO: When cancel prepare is implemented, turn off prepare when
+      //  cancel received, and allow transaction.
+    }
+
+    return trxnAllowed;
   }
 }
