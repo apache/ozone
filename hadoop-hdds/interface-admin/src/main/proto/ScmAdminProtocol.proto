@@ -100,6 +100,7 @@ message ScmContainerLocationResponse {
     OK = 1;
     CONTAINER_ALREADY_EXISTS = 2;
     CONTAINER_IS_MISSING = 3;
+    SCM_NOT_LEADER = 4;
   }
 }
 
@@ -147,6 +148,7 @@ message ContainerResponseProto {
     success = 1;
     errorContainerAlreadyExists = 2;
     errorContainerMissing = 3;
+    scmNotLeader = 4;
   }
   required Error errorCode = 1;
   required ContainerWithPipeline containerWithPipeline = 2;
