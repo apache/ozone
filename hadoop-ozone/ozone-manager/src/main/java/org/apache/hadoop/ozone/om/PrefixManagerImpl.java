@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om;
 
 import com.google.common.base.Strings;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -101,7 +102,7 @@ public class PrefixManagerImpl implements PrefixManager {
     validateOzoneObj(obj);
 
     String prefixPath = obj.getPath();
-    metadataManager.getLock().acquireLock(PREFIX_LOCK, prefixPath);
+    metadataManager.getLock().acquireWriteLock(PREFIX_LOCK, prefixPath);
     try {
       OmPrefixInfo prefixInfo =
           metadataManager.getPrefixTable().get(prefixPath);
@@ -117,7 +118,7 @@ public class PrefixManagerImpl implements PrefixManager {
       }
       throw ex;
     } finally {
-      metadataManager.getLock().releaseLock(PREFIX_LOCK, prefixPath);
+      metadataManager.getLock().releaseWriteLock(PREFIX_LOCK, prefixPath);
     }
   }
 
@@ -133,7 +134,7 @@ public class PrefixManagerImpl implements PrefixManager {
   public boolean removeAcl(OzoneObj obj, OzoneAcl acl) throws IOException {
     validateOzoneObj(obj);
     String prefixPath = obj.getPath();
-    metadataManager.getLock().acquireLock(PREFIX_LOCK, prefixPath);
+    metadataManager.getLock().acquireWriteLock(PREFIX_LOCK, prefixPath);
     try {
       OmPrefixInfo prefixInfo =
           metadataManager.getPrefixTable().get(prefixPath);
@@ -156,7 +157,7 @@ public class PrefixManagerImpl implements PrefixManager {
       }
       throw ex;
     } finally {
-      metadataManager.getLock().releaseLock(PREFIX_LOCK, prefixPath);
+      metadataManager.getLock().releaseWriteLock(PREFIX_LOCK, prefixPath);
     }
   }
 
@@ -172,7 +173,7 @@ public class PrefixManagerImpl implements PrefixManager {
   public boolean setAcl(OzoneObj obj, List<OzoneAcl> acls) throws IOException {
     validateOzoneObj(obj);
     String prefixPath = obj.getPath();
-    metadataManager.getLock().acquireLock(PREFIX_LOCK, prefixPath);
+    metadataManager.getLock().acquireWriteLock(PREFIX_LOCK, prefixPath);
     try {
       OmPrefixInfo prefixInfo =
           metadataManager.getPrefixTable().get(prefixPath);
@@ -188,7 +189,7 @@ public class PrefixManagerImpl implements PrefixManager {
       }
       throw ex;
     } finally {
-      metadataManager.getLock().releaseLock(PREFIX_LOCK, prefixPath);
+      metadataManager.getLock().releaseWriteLock(PREFIX_LOCK, prefixPath);
     }
   }
 
@@ -202,7 +203,7 @@ public class PrefixManagerImpl implements PrefixManager {
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
     validateOzoneObj(obj);
     String prefixPath = obj.getPath();
-    metadataManager.getLock().acquireLock(PREFIX_LOCK, prefixPath);
+    metadataManager.getLock().acquireReadLock(PREFIX_LOCK, prefixPath);
     try {
       String longestPrefix = prefixTree.getLongestPrefix(prefixPath);
       if (prefixPath.equals(longestPrefix)) {
@@ -213,7 +214,7 @@ public class PrefixManagerImpl implements PrefixManager {
         }
       }
     } finally {
-      metadataManager.getLock().releaseLock(PREFIX_LOCK, prefixPath);
+      metadataManager.getLock().releaseReadLock(PREFIX_LOCK, prefixPath);
     }
     return EMPTY_ACL_LIST;
   }
@@ -232,7 +233,7 @@ public class PrefixManagerImpl implements PrefixManager {
     Objects.requireNonNull(context);
 
     String prefixPath = ozObject.getPath();
-    metadataManager.getLock().acquireLock(PREFIX_LOCK, prefixPath);
+    metadataManager.getLock().acquireReadLock(PREFIX_LOCK, prefixPath);
     try {
       String longestPrefix = prefixTree.getLongestPrefix(prefixPath);
       if (prefixPath.equals(longestPrefix)) {
@@ -253,18 +254,18 @@ public class PrefixManagerImpl implements PrefixManager {
         return true;
       }
     } finally {
-      metadataManager.getLock().releaseLock(PREFIX_LOCK, prefixPath);
+      metadataManager.getLock().releaseReadLock(PREFIX_LOCK, prefixPath);
     }
   }
 
   @Override
   public List<OmPrefixInfo> getLongestPrefixPath(String path) {
     String prefixPath = prefixTree.getLongestPrefix(path);
-    metadataManager.getLock().acquireLock(PREFIX_LOCK, prefixPath);
+    metadataManager.getLock().acquireReadLock(PREFIX_LOCK, prefixPath);
     try {
       return getLongestPrefixPathHelper(prefixPath);
     } finally {
-      metadataManager.getLock().releaseLock(PREFIX_LOCK, prefixPath);
+      metadataManager.getLock().releaseReadLock(PREFIX_LOCK, prefixPath);
     }
   }
 
@@ -315,7 +316,8 @@ public class PrefixManagerImpl implements PrefixManager {
           new OmPrefixInfo.Builder()
           .setName(ozoneObj.getPath());
       if (transactionLogIndex > 0) {
-        prefixInfoBuilder.setObjectID(transactionLogIndex);
+        prefixInfoBuilder.setObjectID(OmUtils.getObjectIdFromTxId(
+            metadataManager.getOmEpoch(), transactionLogIndex));
         prefixInfoBuilder.setUpdateID(transactionLogIndex);
       }
       prefixInfo = prefixInfoBuilder.build();
@@ -365,7 +367,8 @@ public class PrefixManagerImpl implements PrefixManager {
           new OmPrefixInfo.Builder()
               .setName(ozoneObj.getPath());
       if (transactionLogIndex > 0) {
-        prefixInfoBuilder.setObjectID(transactionLogIndex);
+        prefixInfoBuilder.setObjectID(OmUtils.getObjectIdFromTxId(
+            metadataManager.getOmEpoch(), transactionLogIndex));
         prefixInfoBuilder.setUpdateID(transactionLogIndex);
       }
       prefixInfo = prefixInfoBuilder.build();

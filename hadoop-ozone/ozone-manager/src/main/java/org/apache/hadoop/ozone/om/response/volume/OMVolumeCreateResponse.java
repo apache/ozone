@@ -27,7 +27,8 @@ import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserVolumeInfo;
+import org.apache.hadoop.ozone.storage.proto.
+    OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
@@ -41,12 +42,12 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 @CleanupTableInfo(cleanupTables = VOLUME_TABLE)
 public class OMVolumeCreateResponse extends OMClientResponse {
 
-  private UserVolumeInfo userVolumeInfo;
+  private PersistedUserVolumeInfo userVolumeInfo;
   private OmVolumeArgs omVolumeArgs;
 
   public OMVolumeCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmVolumeArgs omVolumeArgs,
-      @Nonnull UserVolumeInfo userVolumeInfo) {
+      @Nonnull PersistedUserVolumeInfo userVolumeInfo) {
     super(omResponse);
     this.omVolumeArgs = omVolumeArgs;
     this.userVolumeInfo = userVolumeInfo;

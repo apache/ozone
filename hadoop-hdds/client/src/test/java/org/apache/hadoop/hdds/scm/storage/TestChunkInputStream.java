@@ -18,18 +18,17 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
+import java.io.EOFException;
+import java.util.Random;
+
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.test.GenericTestUtils;
 
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-
-import java.io.EOFException;
-import java.util.Random;
 
 /**
  * Tests for {@link ChunkInputStream}'s functionality.
@@ -48,9 +47,7 @@ public class TestChunkInputStream {
 
   @Before
   public void setup() throws Exception {
-    checksum = new Checksum(ChecksumType.valueOf(
-        OzoneConfigKeys.OZONE_CLIENT_CHECKSUM_TYPE_DEFAULT),
-        BYTES_PER_CHECKSUM);
+    checksum = new Checksum(ChecksumType.CRC32, BYTES_PER_CHECKSUM);
 
     chunkData = generateRandomData(CHUNK_SIZE);
 

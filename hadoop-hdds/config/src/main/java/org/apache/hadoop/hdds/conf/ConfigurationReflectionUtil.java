@@ -94,6 +94,16 @@ public final class ConfigurationReflectionUtil {
             forcedFieldSet(field, configuration,
                 from.getTimeDuration(key, "0s", configAnnotation.timeUnit()));
             break;
+          case SIZE:
+            final long value =
+                Math.round(from.getStorageSize(key, "0b", StorageUnit.BYTES));
+            if (field.getType() == int.class) {
+              forcedFieldSet(field, configuration, (int) value);
+            } else {
+              forcedFieldSet(field, configuration, value);
+
+            }
+            break;
           case CLASS:
             forcedFieldSet(field, configuration,
                 from.getClass(key, Object.class));
@@ -232,6 +242,10 @@ public final class ConfigurationReflectionUtil {
           case TIME:
             config.setTimeDuration(key, field.getLong(configObject),
                 configAnnotation.timeUnit());
+            break;
+          case SIZE:
+            config.setStorageSize(key, field.getLong(configObject),
+                StorageUnit.BYTES);
             break;
           case CLASS:
             Object valueClass = field.get(configObject);

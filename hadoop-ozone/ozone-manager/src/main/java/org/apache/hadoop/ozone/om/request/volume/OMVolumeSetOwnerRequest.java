@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolu
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,12 +65,12 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
     long modificationTime = Time.now();
-    SetVolumePropertyRequest modifiedRequest = getOmRequest()
+    SetVolumePropertyRequest.Builder setPropertyRequestBuilder = getOmRequest()
         .getSetVolumePropertyRequest().toBuilder()
-        .setModificationTime(modificationTime).build();
+        .setModificationTime(modificationTime);
 
     return getOmRequest().toBuilder()
-        .setSetVolumePropertyRequest(modifiedRequest.toBuilder())
+        .setSetVolumePropertyRequest(setPropertyRequestBuilder)
         .setUserInfo(getUserInfo())
         .build();
   }
@@ -118,8 +119,8 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
       }
 
       long maxUserVolumeCount = ozoneManager.getMaxUserVolumeCount();
-      OzoneManagerProtocolProtos.UserVolumeInfo oldOwnerVolumeList = null;
-      OzoneManagerProtocolProtos.UserVolumeInfo newOwnerVolumeList = null;
+      OzoneManagerStorageProtos.PersistedUserVolumeInfo oldOwnerVolumeList;
+      OzoneManagerStorageProtos.PersistedUserVolumeInfo newOwnerVolumeList;
       OmVolumeArgs omVolumeArgs = null;
 
       acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
@@ -133,7 +134,7 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
         omResponse.setStatus(OzoneManagerProtocolProtos.Status.OK)
           .setMessage(
             "Volume '" + volume + "' owner is already '" + newOwner + "'.")
-          .setSuccess(false);
+            .setSuccess(false);
         omResponse.setSetVolumePropertyResponse(
             SetVolumePropertyResponse.newBuilder().setResponse(false).build());
         omClientResponse = new OMVolumeSetOwnerResponse(omResponse.build());

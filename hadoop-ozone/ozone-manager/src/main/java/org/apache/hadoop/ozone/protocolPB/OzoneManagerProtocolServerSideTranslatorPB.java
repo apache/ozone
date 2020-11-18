@@ -58,7 +58,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   private final boolean isRatisEnabled;
   private final OzoneManager ozoneManager;
   private final OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
-  private final AtomicLong transactionIndex = new AtomicLong(0L);
+  private final AtomicLong transactionIndex;
   private final OzoneProtocolMessageDispatcher<OMRequest, OMResponse,
       ProtocolMessageEnum> dispatcher;
 
@@ -71,9 +71,14 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       OzoneManager impl,
       OzoneManagerRatisServer ratisServer,
       ProtocolMessageMetrics<ProtocolMessageEnum> metrics,
-      boolean enableRatis) {
+      boolean enableRatis,
+      long lastTransactionIndexForNonRatis) {
     this.ozoneManager = impl;
     this.isRatisEnabled = enableRatis;
+    // Update the transactionIndex with the last TransactionIndex read from DB.
+    // New requests should have transactionIndex incremented from this index
+    // onwards to ensure unique objectIDs.
+    this.transactionIndex = new AtomicLong(lastTransactionIndexForNonRatis);
 
     if (isRatisEnabled) {
       // In case of ratis is enabled, handler in ServerSideTransaltorPB is used

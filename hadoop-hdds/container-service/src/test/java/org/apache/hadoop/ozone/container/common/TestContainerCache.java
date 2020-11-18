@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
+import org.apache.hadoop.ozone.container.common.utils.ContainerCacheMetrics;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
@@ -84,15 +85,22 @@ public class TestContainerCache {
     createContainerDB(conf, containerDir3);
     createContainerDB(conf, containerDir4);
 
+    ContainerCacheMetrics metrics = cache.getMetrics();
+    long numDbGetCount = metrics.getNumDbGetOps();
+    long numCacheMisses = metrics.getNumCacheMisses();
     // Get 2 references out of the same db and verify the objects are same.
     ReferenceCountedDB db1 = cache.getDB(1, "RocksDB",
             containerDir1.getPath(), OzoneConsts.SCHEMA_LATEST, conf);
     Assert.assertEquals(1, db1.getReferenceCount());
+    Assert.assertEquals(numDbGetCount + 1, metrics.getNumDbGetOps());
     ReferenceCountedDB db2 = cache.getDB(1, "RocksDB",
             containerDir1.getPath(), OzoneConsts.SCHEMA_LATEST, conf);
     Assert.assertEquals(2, db2.getReferenceCount());
+    Assert.assertEquals(numCacheMisses + 1, metrics.getNumCacheMisses());
     Assert.assertEquals(2, db1.getReferenceCount());
     Assert.assertEquals(db1, db2);
+    Assert.assertEquals(numDbGetCount + 2, metrics.getNumDbGetOps());
+    Assert.assertEquals(numCacheMisses + 1, metrics.getNumCacheMisses());
 
     // add one more references to ContainerCache.
     ReferenceCountedDB db3 = cache.getDB(2, "RocksDB",
