@@ -191,7 +191,7 @@ public class BucketEndpoint extends EndpointBase {
       response.setTruncated(true);
       ContinueToken nextToken = new ContinueToken(lastKey, prevDir);
       response.setNextToken(nextToken.encodeToString());
-      // For aws api v1 compatibility purpose, set nextMarker with lastKey
+      // Set nextMarker to be lastKey. for the compatibility of aws api v1
       response.setNextMarker(lastKey);
     } else {
       response.setTruncated(false);
