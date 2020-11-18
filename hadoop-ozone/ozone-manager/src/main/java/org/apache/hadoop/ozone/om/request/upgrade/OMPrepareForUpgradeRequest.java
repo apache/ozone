@@ -1,12 +1,15 @@
 package org.apache.hadoop.ozone.om.request.upgrade;
 
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.upgrade.OMFinalizeUpgradeResponse;
 import org.apache.hadoop.ozone.om.response.upgrade.OMPrepareForUpgradeResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,12 +39,12 @@ public class OMPrepareForUpgradeRequest extends OMClientRequest {
       OMPrepareForUpgradeRequest request =
           getOmRequest().getPrepareForUgradeRequest();
 
-      // TODO:
-      //  Set in memory upgrade flag
-      //  Take snapshot at index and purge
-      //  Create marker file with txn index.
+      // Flush the Ratis log and take a snapshot.
+      ozoneManager.prepare();
 
-      // TODO: Determine if upgrade client ID should be pressent in
+      // TODO: Create marker file with txn index.
+
+      // TODO: Determine if upgrade client ID should be present in
       //  request/response.
       PrepareForUpgraddeResponse omResponse =
           PrepareForUpgradeResponse.newBuilder()
@@ -53,6 +56,11 @@ public class OMPrepareForUpgradeRequest extends OMClientRequest {
     } catch (IOException e) {
       response = new OMFinalizeUpgradeResponse(
           createErrorOMResponse(responseBuilder, e));
+    } catch (InterruptedException e) {
+      OMException omEx = new OMException(e,
+          OMException.ResultCodes.INTERNAL_ERROR);
+      response = new OMFinalizeUpgradeResponse(
+          createErrorOMResponse(responseBuilder, omEx));
     }
 
     return response;
