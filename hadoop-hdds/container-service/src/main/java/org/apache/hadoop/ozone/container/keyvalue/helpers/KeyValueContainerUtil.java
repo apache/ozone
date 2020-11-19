@@ -187,14 +187,23 @@ public final class KeyValueContainerUtil {
       kvContainerData.setSchemaVersion(OzoneConsts.SCHEMA_V1);
     }
 
-
     boolean isBlockMetadataSet = false;
-
-    try(ReferenceCountedDB containerDB = BlockUtils.getDB(kvContainerData,
-        config)) {
-
-      Table<String, Long> metadataTable =
-              containerDB.getStore().getMetadataTable();
+    ReferenceCountedDB cachedDB = null;
+    DatanodeStore store = null;
+    try {
+      try {
+        store = BlockUtils.getUncachedDatanodeStore(kvContainerData, config);
+      } catch (IOException e) {
+        // If an exception is thrown, then it may indicate the RocksDB is
+        // already open in the container cache. As this code is only executed at
+        // DN startup, this should only happen in the tests.
+        cachedDB = BlockUtils.getDB(kvContainerData, config);
+        store = cachedDB.getStore();
+        LOG.warn("Attempt to get an uncached RocksDB handle failed and an " +
+            "instance was retrieved from the cache. This should only happen " +
+            "in tests");
+      }
+      Table<String, Long> metadataTable = store.getMetadataTable();
 
       // Set pending deleted block count.
       Long pendingDeleteBlockCount =
@@ -207,7 +216,7 @@ public final class KeyValueContainerUtil {
         MetadataKeyFilters.KeyPrefixFilter filter =
                 MetadataKeyFilters.getDeletingKeyFilter();
         int numPendingDeletionBlocks =
-            containerDB.getStore().getBlockDataTable()
+            store.getBlockDataTable()
             .getSequentialRangeKVs(null, Integer.MAX_VALUE, filter)
             .size();
         kvContainerData.incrPendingDeletionBlocks(numPendingDeletionBlocks);
@@ -244,61 +253,69 @@ public final class KeyValueContainerUtil {
         isBlockMetadataSet = true;
         kvContainerData.setKeyCount(blockCount);
       }
-    }
-
-    if (!isBlockMetadataSet) {
-      initializeUsedBytesAndBlockCount(kvContainerData, config);
+      if (!isBlockMetadataSet) {
+        initializeUsedBytesAndBlockCount(store, kvContainerData);
+      }
+    } finally {
+      if (cachedDB != null) {
+        // If we get a cached instance, calling close simply decrements the
+        // reference count.
+        cachedDB.close();
+      } else if (store != null) {
+        // We only stop the store if cacheDB is null, as otherwise we would
+        // close the rocksDB handle in the cache and the next reader would fail
+        try {
+          store.stop();
+        } catch (IOException e) {
+          throw e;
+        } catch (Exception e) {
+          throw new RuntimeException("Unexpected exception closing the " +
+              "RocksDB when loading containers", e);
+        }
+      }
     }
   }
-
 
   /**
    * Initialize bytes used and block count.
    * @param kvData
    * @throws IOException
    */
-  private static void initializeUsedBytesAndBlockCount(
-      KeyValueContainerData kvData, ConfigurationSource config)
-          throws IOException {
-
+  private static void initializeUsedBytesAndBlockCount(DatanodeStore store,
+      KeyValueContainerData kvData) throws IOException {
     final String errorMessage = "Failed to parse block data for" +
-            " Container " + kvData.getContainerID();
-
+        " Container " + kvData.getContainerID();
     long blockCount = 0;
     long usedBytes = 0;
 
-    try(ReferenceCountedDB db = BlockUtils.getDB(kvData, config)) {
-      // Count all regular blocks.
-      try (BlockIterator<BlockData> blockIter =
-                   db.getStore().getBlockIterator(
-                           MetadataKeyFilters.getUnprefixedKeyFilter())) {
+    try (BlockIterator<BlockData> blockIter =
+             store.getBlockIterator(
+                 MetadataKeyFilters.getUnprefixedKeyFilter())) {
 
-        while (blockIter.hasNext()) {
-          blockCount++;
-          try {
-            usedBytes += getBlockLength(blockIter.nextBlock());
-          } catch (IOException ex) {
-            LOG.error(errorMessage);
-          }
-        }
-      }
-
-      // Count all deleting blocks.
-      try (BlockIterator<BlockData> blockIter =
-                   db.getStore().getBlockIterator(
-                           MetadataKeyFilters.getDeletingKeyFilter())) {
-
-        while (blockIter.hasNext()) {
-          blockCount++;
-          try {
-            usedBytes += getBlockLength(blockIter.nextBlock());
-          } catch (IOException ex) {
-            LOG.error(errorMessage);
-          }
+      while (blockIter.hasNext()) {
+        blockCount++;
+        try {
+          usedBytes += getBlockLength(blockIter.nextBlock());
+        } catch (IOException ex) {
+          LOG.error(errorMessage);
         }
       }
     }
 
+    // Count all deleting blocks.
+    try (BlockIterator<BlockData> blockIter =
+             store.getBlockIterator(
+                 MetadataKeyFilters.getDeletingKeyFilter())) {
+
+      while (blockIter.hasNext()) {
+        blockCount++;
+        try {
+          usedBytes += getBlockLength(blockIter.nextBlock());
+        } catch (IOException ex) {
+          LOG.error(errorMessage);
+        }
+      }
+    }
     kvData.setBytesUsed(usedBytes);
     kvData.setKeyCount(blockCount);
   }
