@@ -162,4 +162,47 @@ public final class OzoneFSUtils {
 
     return parentPath.equals(childParent);
   }
+
+  /**
+   * The function returns parent directory from the given absolute path. For
+   * example, the given key path '/a/b/c/d/e/file1' then it returns parent
+   * directory name as 'e'.
+   *
+   * @param keyName key name
+   * @return parent directory. If not found then return keyName itself.
+   */
+  public static String getParentDir(@Nonnull String keyName) {
+    java.nio.file.Path fileName = Paths.get(keyName).getParent();
+    if (fileName != null) {
+      return fileName.toString();
+    }
+    // failed to find a parent directory.
+    return keyName;
+  }
+
+  /**
+   * This function appends the given file name to the given key name path.
+   *
+   * @param keyName key name
+   * @param fileName  file name
+   * @return full path
+   */
+  public static String appendFileNameToKeyPath(String keyName,
+                                               String fileName) {
+    StringBuilder newToKeyName = new StringBuilder(keyName);
+    newToKeyName.append(OZONE_URI_DELIMITER);
+    newToKeyName.append(fileName);
+    return newToKeyName.toString();
+  }
+
+  /**
+   * Returns the number of path components in the given keyName.
+   *
+   * @param keyName keyname
+   * @return path components count
+   */
+  public static int getFileCount(String keyName) {
+    java.nio.file.Path keyPath = Paths.get(keyName);
+    return keyPath.getNameCount();
+  }
 }

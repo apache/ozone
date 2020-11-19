@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -1030,5 +1031,11 @@ public class BasicRootedOzoneClientAdapterImpl
         FsPermission.getDirDefault().toShort(),
         null, null, null, new BlockLocation[0]
     );
+  }
+
+  @Override
+  public String getBucketLayoutVersion() {
+    // TODO: Need to refine this part.
+    return OMConfigKeys.OZONE_OM_LAYOUT_VERSION_DEFAULT;
   }
 }
