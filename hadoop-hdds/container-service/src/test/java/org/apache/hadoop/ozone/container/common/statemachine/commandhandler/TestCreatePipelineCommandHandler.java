@@ -122,7 +122,8 @@ public class TestCreatePipelineCommandHandler {
         .addGroup(pipelineID.getProtobuf(), datanodes, priorityList);
 
     Mockito.verify(raftClient, Mockito.times(2))
-        .groupAdd(Mockito.any(RaftGroup.class), Mockito.any(RaftPeerId.class));
+        .getGroupManagementApi(Mockito.any(RaftPeerId.class))
+        .add(Mockito.any(RaftGroup.class));
   }
 
   @Test
@@ -151,7 +152,8 @@ public class TestCreatePipelineCommandHandler {
         .addGroup(pipelineID.getProtobuf(), datanodes);
 
     Mockito.verify(raftClient, Mockito.times(0))
-        .groupAdd(Mockito.any(RaftGroup.class), Mockito.any(RaftPeerId.class));
+        .getGroupManagementApi(Mockito.any(RaftPeerId.class))
+        .add(Mockito.any(RaftGroup.class));
   }
 
   private List<DatanodeDetails> getDatanodes() {
