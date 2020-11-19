@@ -267,6 +267,7 @@ public class TestOzoneFileSystem {
     testNonExplicitlyCreatedPathExistsAfterItsLeafsWereRemoved();
 
     testRenameDir();
+    testRenameFile();
     testRenameWithNonExistentSource();
     testRenameDirToItsOwnSubDir();
     testRenameSourceAndDestinAreSame();
@@ -630,6 +631,16 @@ public class TestOzoneFileSystem {
       stream.seek(fileLength);
       assertEquals(-1, stream.read());
     }
+
+    // non-existent file
+    Path fileNotExists = new Path("/file_notexist");
+    try {
+      fs.open(fileNotExists);
+      Assert.fail("Should throw FILE_NOT_FOUND error as file doesn't exist!");
+    } catch (FileNotFoundException fnfe) {
+      Assert.assertTrue("Expected FILE_NOT_FOUND error",
+              fnfe.getMessage().contains("FILE_NOT_FOUND"));
+    }
   }
 
   public void testDeleteRoot() throws IOException {
@@ -819,6 +830,32 @@ public class TestOzoneFileSystem {
     }
   }
 
+  /**
+   * Rename file to a non-existent destin file.
+   */
+  protected void testRenameFile() throws Exception {
+    final String root = "/root";
+    Path rootPath = new Path(fs.getUri().toString() + root);
+    fs.mkdirs(rootPath);
+
+    Path file1Source = new Path(fs.getUri().toString() + root
+            + "/file1_Copy");
+    ContractTestUtils.touch(fs, file1Source);
+    Path file1Destin = new Path(fs.getUri().toString() + root + "/file1");
+    assertTrue("Renamed failed", fs.rename(file1Source, file1Destin));
+    assertTrue("Renamed failed: /root/file1", fs.exists(file1Destin));
+
+    /**
+     * Reading several times, this is to verify that OmKeyInfo#keyName cached
+     * entry is not modified. While reading back, OmKeyInfo#keyName will be
+     * prepared and assigned to fullkeyPath name.
+     */
+    for (int i = 0; i < 10; i++) {
+      FileStatus[] fStatus = fs.listStatus(rootPath);
+      assertEquals("Renamed failed", 1, fStatus.length);
+      assertEquals("Wrong path name!", file1Destin, fStatus[0].getPath());
+    }
+  }
 
   /**
    * Rename file to an existed directory.
@@ -833,7 +870,8 @@ public class TestOzoneFileSystem {
     Path abcRootPath = new Path(fs.getUri().toString() + "/a/b/c");
     fs.mkdirs(abcRootPath);
     assertTrue("Renamed failed", fs.rename(file1Destin, abcRootPath));
-    assertTrue("Rename failed", fs.exists(new Path(abcRootPath, "file1")));
+    assertTrue("Renamed filed: /a/b/c/file1", fs.exists(new Path(abcRootPath,
+            "file1")));
   }
 
 
@@ -905,6 +943,7 @@ public class TestOzoneFileSystem {
 
   protected void testRenameDir() throws Exception {
     final String dir = "/root_dir/dir1";
+    Path rootDir = new Path(fs.getUri().toString() +  "/root_dir");
     final Path source = new Path(fs.getUri().toString() + dir);
     final Path dest = new Path(source.toString() + ".renamed");
     // Add a sub-dir to the directory to be moved.
@@ -928,7 +967,6 @@ public class TestOzoneFileSystem {
         fs.rename(source, new Path(dir)));
 
     // rename root directory
-    Path rootDir = new Path(fs.getUri().toString() +  "/root_dir");
     Path rootDestinDir = new Path(fs.getUri().toString() +  "/root_dir" +
             ".renamed");
     fs.rename(rootDir, rootDestinDir);

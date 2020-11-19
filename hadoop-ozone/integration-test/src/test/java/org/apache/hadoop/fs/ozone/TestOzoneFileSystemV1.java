@@ -452,6 +452,8 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
 
     testRenameDir();
     tableCleanup();
+    testRenameFile();
+    tableCleanup();
     testRenameWithNonExistentSource();
     tableCleanup();
     testRenameDirToItsOwnSubDir();

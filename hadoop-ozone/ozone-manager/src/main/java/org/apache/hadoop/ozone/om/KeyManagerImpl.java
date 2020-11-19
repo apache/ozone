@@ -2056,7 +2056,7 @@ public class KeyManagerImpl implements KeyManager {
     OzoneFileStatus fileStatus;
     if (OzoneManagerRatisUtils.isOmLayoutVersionV1()) {
       fileStatus = getOzoneFileStatusV1(volumeName, bucketName, keyName,
-              args.getSortDatanodes(), clientAddress, true);
+              args.getSortDatanodes(), clientAddress, false);
     } else {
       fileStatus = getOzoneFileStatus(volumeName, bucketName,
               keyName, args.getRefreshPipeline(), args.getSortDatanodes(),
@@ -2542,13 +2542,18 @@ public class KeyManagerImpl implements KeyManager {
         continue;
       }
 
-      cacheOmKeyInfo.setFileName(cacheOmKeyInfo.getKeyName());
+      // make OmKeyInfo local copy to reset keyname to "fullKeyPath".
+      // In DB keyName stores only the leaf node but the list
+      // returning to the user should have full path.
+      OmKeyInfo omKeyInfo = cacheOmKeyInfo.copyObject();
+
+      omKeyInfo.setFileName(omKeyInfo.getKeyName());
       String fullKeyPath = OMFileRequest.getAbsolutePath(prefixKeyPath,
-              cacheOmKeyInfo.getKeyName());
-      cacheOmKeyInfo.setKeyName(fullKeyPath);
+              omKeyInfo.getKeyName());
+      omKeyInfo.setKeyName(fullKeyPath);
 
       countEntries = addKeyInfoToFileStatusList(fileStatusList, prefixKeyInDB,
-              seekKeyInDB, startKey, countEntries, cacheKey, cacheOmKeyInfo,
+              seekKeyInDB, startKey, countEntries, cacheKey, omKeyInfo,
               false);
     }
     return countEntries;

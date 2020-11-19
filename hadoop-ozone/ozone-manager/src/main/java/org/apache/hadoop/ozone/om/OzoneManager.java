@@ -3609,7 +3609,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     boolean omLayoutVersionV1 =
             StringUtils.equalsIgnoreCase(version, "V1");
     OzoneManagerRatisUtils.setOmLayoutVersionV1(omLayoutVersionV1);
-    LOG.info("Configured {}:{}:{} and enabled optimized OM FS operations",
+    LOG.info("Configured {}={} and enabled:{} optimized OM FS operations",
             OZONE_OM_LAYOUT_VERSION, version, omLayoutVersionV1);
   }
 
