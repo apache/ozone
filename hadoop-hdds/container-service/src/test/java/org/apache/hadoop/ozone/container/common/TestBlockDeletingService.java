@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.common;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +51,7 @@ import org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletio
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
@@ -67,7 +69,6 @@ import org.apache.hadoop.test.GenericTestUtils.LogCapturer;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -282,8 +283,10 @@ public class TestBlockDeletingService {
   @SuppressWarnings("java:S2699") // waitFor => assertion with timeout
   public void testShutdownService() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 500,
-        TimeUnit.MILLISECONDS);
+    DatanodeConfiguration datanodeConfiguration = conf.getObject(
+            DatanodeConfiguration.class);
+    datanodeConfiguration.setBlockDeletionInterval(Duration.ofMillis(500));
+    conf.setFromObject(datanodeConfiguration);
     conf.setInt(OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL, 10);
     conf.setInt(OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER, 10);
     ContainerSet containerSet = new ContainerSet();

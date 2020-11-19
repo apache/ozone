@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CloseContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -330,7 +331,8 @@ public final class ContainerProtocolCalls  {
     KeyValue keyValue =
         KeyValue.newBuilder().setKey("OverWriteRequested").setValue("true")
             .build();
-    Checksum checksum = new Checksum();
+
+    Checksum checksum = new Checksum(ChecksumType.CRC32, 256);
     final ChecksumData checksumData = checksum.computeChecksum(data);
     ChunkInfo chunk =
         ChunkInfo.newBuilder()
