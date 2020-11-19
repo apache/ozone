@@ -229,8 +229,8 @@ public final class DBStoreBuilder {
     return this;
   }
 
-  public DBStoreBuilder setOpenReadOnly(boolean openReadOnly) {
-    this.openReadOnly = openReadOnly;
+  public DBStoreBuilder setOpenReadOnly(boolean readOnly) {
+    this.openReadOnly = readOnly;
     return this;
   }
 
