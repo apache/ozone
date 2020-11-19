@@ -2048,10 +2048,16 @@ public class KeyManagerImpl implements KeyManager {
     String volumeName = args.getVolumeName();
     String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
-    OzoneFileStatus fileStatus = getOzoneFileStatus(volumeName, bucketName,
-            keyName, args.getRefreshPipeline(), args.getSortDatanodes(),
-            clientAddress);
-      //if key is not of type file or if key is not found we throw an exception
+    OzoneFileStatus fileStatus;
+    if (OzoneManagerRatisUtils.isOmLayoutVersionV1()) {
+      fileStatus = getOzoneFileStatusV1(volumeName, bucketName, keyName,
+              args.getSortDatanodes(), clientAddress, false);
+    } else {
+      fileStatus = getOzoneFileStatus(volumeName, bucketName,
+              keyName, args.getRefreshPipeline(), args.getSortDatanodes(),
+              clientAddress);
+    }
+    //if key is not of type file or if key is not found we throw an exception
     if (fileStatus.isFile()) {
       // add block token for read.
       addBlockToken4Read(fileStatus.getKeyInfo());
@@ -2534,13 +2540,18 @@ public class KeyManagerImpl implements KeyManager {
         continue;
       }
 
-      cacheOmKeyInfo.setFileName(cacheOmKeyInfo.getKeyName());
+      // make OmKeyInfo local copy to reset keyname to "fullKeyPath".
+      // In DB keyName stores only the leaf node but the list
+      // returning to the user should have full path.
+      OmKeyInfo omKeyInfo = cacheOmKeyInfo.copyObject();
+
+      omKeyInfo.setFileName(omKeyInfo.getKeyName());
       String fullKeyPath = OMFileRequest.getAbsolutePath(prefixKeyPath,
-              cacheOmKeyInfo.getKeyName());
-      cacheOmKeyInfo.setKeyName(fullKeyPath);
+              omKeyInfo.getKeyName());
+      omKeyInfo.setKeyName(fullKeyPath);
 
       countEntries = addKeyInfoToFileStatusList(fileStatusList, prefixKeyInDB,
-              seekKeyInDB, startKey, countEntries, cacheKey, cacheOmKeyInfo,
+              seekKeyInDB, startKey, countEntries, cacheKey, omKeyInfo,
               false);
     }
     return countEntries;
