@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -523,4 +524,8 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     return blockLocations;
   }
 
+  @Override
+  public String getBucketLayoutVersion() {
+    return bucket.getMetadata().get(OMConfigKeys.OZONE_OM_LAYOUT_VERSION);
+  }
 }

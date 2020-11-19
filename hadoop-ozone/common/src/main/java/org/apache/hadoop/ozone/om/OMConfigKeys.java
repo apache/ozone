@@ -251,4 +251,6 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_LAYOUT_VERSION =
           "ozone.om.layout.version";
   public static final String OZONE_OM_LAYOUT_VERSION_DEFAULT = "V0";
+
+  public static final String OZONE_OM_LAYOUT_VERSION_V1 = "V1";
 }
