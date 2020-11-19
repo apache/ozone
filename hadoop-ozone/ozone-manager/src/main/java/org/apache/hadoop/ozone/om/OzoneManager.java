@@ -1030,7 +1030,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws InterruptedException, IOException {
 
     LOG.info("Preparing {} for upgrade/downgrade.", getOMNodeId());
-    // Setting this flag disallwos all requests except preapre and cancel
+    // Setting this flag disallows all requests except prepare and cancel
     // prepare in the OzoneManagerStateMachine and OzoneManagerRatisServer.
     isPrepared = true;
 
