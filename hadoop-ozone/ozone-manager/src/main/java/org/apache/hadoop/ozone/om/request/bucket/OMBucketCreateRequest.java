@@ -20,14 +20,18 @@ package org.apache.hadoop.ozone.om.request.bucket;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
@@ -154,6 +158,9 @@ public class OMBucketCreateRequest extends OMClientRequest {
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     OmBucketInfo omBucketInfo = OmBucketInfo.getFromProtobuf(bucketInfo);
+
+    // Add layout version V1 to bucket info
+    addLayoutVersionToBucket(ozoneManager, omBucketInfo);
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
@@ -360,4 +367,21 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
   }
 
+  private void addLayoutVersionToBucket(OzoneManager ozoneManager,
+                                        OmBucketInfo omBucketInfo) {
+    Map<String, String> metadata = omBucketInfo.getMetadata();
+    if (metadata == null) {
+      metadata = new HashMap<>();
+    }
+    OzoneConfiguration configuration = ozoneManager.getConfiguration();
+    // TODO: Many unit test cases has null config and done a simple null
+    //  check now. It can be done later, to avoid massive test code changes.
+    if (configuration != null) {
+      String layOutVersion = configuration
+              .get(OMConfigKeys.OZONE_OM_LAYOUT_VERSION,
+                      OMConfigKeys.OZONE_OM_LAYOUT_VERSION_DEFAULT);
+      metadata.put(OMConfigKeys.OZONE_OM_LAYOUT_VERSION, layOutVersion);
+      omBucketInfo.setMetadata(metadata);
+    }
+  }
 }
