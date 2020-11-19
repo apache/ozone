@@ -10,10 +10,9 @@ import org.apache.hadoop.ozone.om.response.upgrade.OMFinalizeUpgradeResponse;
 import org.apache.hadoop.ozone.om.response.upgrade.OMPrepareForUpgradeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.PrepareForUpgrade;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.PrepareForUpgrade;
 
 import java.io.IOException;
 
@@ -46,7 +45,7 @@ public class OMPrepareForUpgradeRequest extends OMClientRequest {
 
       // TODO: Determine if upgrade client ID should be present in
       //  request/response.
-      PrepareForUpgraddeResponse omResponse =
+      PrepareForUpgradeResponse omResponse =
           PrepareForUpgradeResponse.newBuilder()
               .setTrxnID(transactionLogIndex)
               .build();
