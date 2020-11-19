@@ -39,16 +39,16 @@ ozone.acl.authorizer.class| org.apache.ranger.authorization.ozone.authorizer.Ran
 
 Ozone各类操作对应ranger权限如下：
 
-   | Volume  permission | Bucket permission | Key permission
----- | -------------------| ------------------| --------------
-Create  volume | CREATE | | 
-List volume | LIST | | 
-Get volume Info | READ | | 
-Delete volume | DELETE | | 
-Create  bucket | READ | CREATE | 
-List bucket | LIST, READ | | 
-Get bucket info | READ | READ | 
-Delete bucket | READ | DELETE | 
-List key | READ | LIST, READ | 
-Write key | READ | READ | CREATE, WRITE
-Read key | READ | READ | READ
+| operation&permission | Volume  permission | Bucket permission | Key permission |
+| :--- | :--- | :--- | :--- |
+| Create  volume | CREATE | | |
+| List volume | LIST | | |
+| Get volume Info | READ | | |
+| Delete volume | DELETE | | |
+| Create  bucket | READ | CREATE | |
+| List bucket | LIST, READ | | |
+| Get bucket info | READ | READ | |
+| Delete bucket | READ | DELETE | |
+| List key | READ | LIST, READ | |
+| Write key | READ | READ | CREATE, WRITE |
+| Read key | READ | READ | READ |
