@@ -25,6 +25,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.net.InetSocketAddress;
 import java.util.List;
@@ -37,6 +38,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.protobuf.Descriptors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
@@ -64,8 +66,14 @@ public class TestStateContext {
     InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
     InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
 
-    // Try to add report with endpoint. Should not be stored.
-    stateContext.addReport(mock(GeneratedMessage.class));
+    GeneratedMessage generatedMessage = mock(GeneratedMessage.class);
+    when(generatedMessage.getDescriptorForType()).thenReturn(
+        mock(Descriptors.Descriptor.class));
+    when(generatedMessage.getDescriptorForType().getFullName()).thenReturn(
+        "hadoop.hdds.CommandStatusReportsProto");
+
+    // Try to add report with zero endpoint. Should not be stored.
+    stateContext.addReport(generatedMessage);
     assertTrue(stateContext.getAllAvailableReports(scm1).isEmpty());
 
     // Add 2 scm endpoints.
@@ -73,7 +81,7 @@ public class TestStateContext {
     stateContext.addEndpoint(scm2);
 
     // Add report. Should be added to all endpoints.
-    stateContext.addReport(mock(GeneratedMessage.class));
+    stateContext.addReport(generatedMessage);
     List<GeneratedMessage> allAvailableReports =
         stateContext.getAllAvailableReports(scm1);
     assertEquals(1, allAvailableReports.size());
