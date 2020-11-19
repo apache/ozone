@@ -70,4 +70,15 @@ public class OMKeyRenameResponse extends OMClientResponse {
         renameKeyInfo);
   }
 
+  public OmKeyInfo getRenameKeyInfo() {
+    return renameKeyInfo;
+  }
+
+  public String getFromKeyName() {
+    return fromKeyName;
+  }
+
+  public String getToKeyName() {
+    return toKeyName;
+  }
 }
