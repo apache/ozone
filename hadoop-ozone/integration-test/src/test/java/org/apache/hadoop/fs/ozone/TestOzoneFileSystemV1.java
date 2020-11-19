@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -31,6 +32,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.jetbrains.annotations.NotNull;
@@ -50,9 +52,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 /**
  * Ozone file system tests that are not covered by contract tests,
@@ -260,6 +260,160 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
             expectedFilesCount, actualCount);
   }
 
+  /**
+   * Case-1) fromKeyName should exist, otw throws exception.
+   */
+  protected void testRenameWithNonExistentSource() throws Exception {
+    final String root = "/root";
+    final String dir1 = root + "/dir1";
+    final String dir2 = root + "/dir2";
+    final Path source = new Path(fs.getUri().toString() + dir1);
+    final Path destin = new Path(fs.getUri().toString() + dir2);
+
+    // creates destin
+    fs.mkdirs(destin);
+    LOG.info("Created destin dir: {}", destin);
+
+    LOG.info("Rename op-> source:{} to destin:{}}", source, destin);
+    try {
+      fs.rename(source, destin);
+      Assert.fail("Should throw exception : Source doesn't exist!");
+    } catch (OMException ome) {
+      // expected
+      assertEquals(ome.getResult(), OMException.ResultCodes.KEY_NOT_FOUND);
+    }
+  }
+
+  /**
+   * Case-2) Cannot rename a directory to its own subdirectory.
+   */
+  protected void testRenameDirToItsOwnSubDir() throws Exception {
+    final String root = "/root";
+    final String dir1 = root + "/dir1";
+    final Path dir1Path = new Path(fs.getUri().toString() + dir1);
+    // Add a sub-dir1 to the directory to be moved.
+    final Path subDir1 = new Path(dir1Path, "sub_dir1");
+    fs.mkdirs(subDir1);
+    LOG.info("Created dir1 {}", subDir1);
+
+    final Path sourceRoot = new Path(fs.getUri().toString() + root);
+    LOG.info("Rename op-> source:{} to destin:{}", sourceRoot, subDir1);
+    try {
+      fs.rename(sourceRoot, subDir1);
+      Assert.fail("Should throw exception : Cannot rename a directory to" +
+              " its own subdirectory");
+    } catch (OMException ome) {
+      // expected
+      assertEquals(ome.getResult(), OMException.ResultCodes.KEY_RENAME_ERROR);
+    }
+  }
+
+  /**
+   * Case-5) If new destin '/dst/source' exists then throws exception.
+   * If destination is a directory then rename source as sub-path of it.
+   * <p>
+   * For example: rename /a to /b will lead to /b/a. This new path should
+   * not exist.
+   */
+  protected void testRenameToNewSubDirShouldNotExist() throws Exception {
+    // Case-5.a) Rename directory from /a to /b.
+    // created /a
+    final Path aSourcePath = new Path(fs.getUri().toString() + "/a");
+    fs.mkdirs(aSourcePath);
+
+    // created /b
+    final Path bDestinPath = new Path(fs.getUri().toString() + "/b");
+    fs.mkdirs(bDestinPath);
+
+    // Add a sub-directory '/b/a' to '/b'. This is to verify that rename
+    // throws exception as new destin /b/a already exists.
+    final Path baPath = new Path(fs.getUri().toString() + "/b/a");
+    fs.mkdirs(baPath);
+
+    try {
+      fs.rename(aSourcePath, bDestinPath);
+      Assert.fail("Should fail as new destination dir exists!");
+    } catch (OMException ome) {
+      // expected as new sub-path /b/a already exists.
+      assertEquals(ome.getResult(), OMException.ResultCodes.KEY_ALREADY_EXISTS);
+    }
+
+    // Case-5.b) Rename file from /a/b/c/file1 to /a.
+    // Should be failed since /a/file1 exists.
+    final Path abcPath = new Path(fs.getUri().toString() + "/a/b/c");
+    fs.mkdirs(abcPath);
+    Path abcFile1 = new Path(abcPath, "/file1");
+    ContractTestUtils.touch(fs, abcFile1);
+
+    final Path aFile1 = new Path(fs.getUri().toString() + "/a/file1");
+    ContractTestUtils.touch(fs, aFile1);
+
+    final Path aDestinPath = new Path(fs.getUri().toString() + "/a");
+
+    try {
+      fs.rename(abcFile1, aDestinPath);
+      Assert.fail("Should fail as new destination file exists!");
+    } catch (OMException ome) {
+      // expected as new sub-path /b/a already exists.
+      assertEquals(ome.getResult(), OMException.ResultCodes.KEY_ALREADY_EXISTS);
+    }
+  }
+
+  /**
+   * Case-6) Rename directory to an existed file, should be failed.
+   */
+  protected void testRenameDirToFile() throws Exception {
+    final String root = "/root";
+    Path rootPath = new Path(fs.getUri().toString() + root);
+    fs.mkdirs(rootPath);
+
+    Path file1Destin = new Path(fs.getUri().toString() + root + "/file1");
+    ContractTestUtils.touch(fs, file1Destin);
+    Path abcRootPath = new Path(fs.getUri().toString() + "/a/b/c");
+    fs.mkdirs(abcRootPath);
+    try {
+      fs.rename(abcRootPath, file1Destin);
+      Assert.fail("key already exists /root_dir/file1");
+    } catch (OMException ome) {
+      // expected
+      assertEquals(ome.getResult(), OMException.ResultCodes.KEY_ALREADY_EXISTS);
+    }
+  }
+
+  /**
+   * Fails if the (a) parent of dst does not exist or (b) parent is a file.
+   */
+  protected void testRenameDestinationParentDoesntExist() throws Exception {
+    final String root = "/root_dir";
+    final String dir1 = root + "/dir1";
+    final String dir2 = dir1 + "/dir2";
+    final Path dir2SourcePath = new Path(fs.getUri().toString() + dir2);
+    fs.mkdirs(dir2SourcePath);
+
+    // (a) parent of dst does not exist.  /root_dir/b/c
+    final Path destinPath = new Path(fs.getUri().toString() + root + "/b/c");
+    try {
+      fs.rename(dir2SourcePath, destinPath);
+      Assert.fail("Should fail as parent of dst does not exist!");
+    } catch (OMException ome) {
+      // expected
+      assertEquals(ome.getResult(), OMException.ResultCodes.KEY_RENAME_ERROR);
+    }
+
+    // (b) parent of dst is a file. /root_dir/file1/c
+    Path filePath = new Path(fs.getUri().toString() + root + "/file1");
+    ContractTestUtils.touch(fs, filePath);
+
+    Path newDestinPath = new Path(filePath, "c");
+    try {
+      fs.rename(dir2SourcePath, newDestinPath);
+      Assert.fail("Should fail as parent of dst is a file!");
+    } catch (OMException ome) {
+      // expected
+      assertEquals(ome.getResult(), OMException.ResultCodes.KEY_RENAME_ERROR);
+    }
+  }
+
   @Test(timeout = 300_000)
   @Override
   public void testFileSystem() throws Exception {
@@ -291,6 +445,35 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
     testListStatusOnSubDirs();
     tableCleanup();
     testListStatusOnLargeDirectory();
+    tableCleanup();
+
+    testNonExplicitlyCreatedPathExistsAfterItsLeafsWereRemoved();
+    tableCleanup();
+
+    testRenameDir();
+    tableCleanup();
+    testRenameFile();
+    tableCleanup();
+    testRenameWithNonExistentSource();
+    tableCleanup();
+    testRenameDirToItsOwnSubDir();
+    tableCleanup();
+    testRenameSourceAndDestinAreSame();
+    tableCleanup();
+    testRenameToExistingDir();
+    tableCleanup();
+    testRenameToNewSubDirShouldNotExist();
+    tableCleanup();
+    testRenameDirToFile();
+    tableCleanup();
+    testRenameFileToDir();
+    tableCleanup();
+    testRenameDestinationParentDoesntExist();
+    tableCleanup();
+    testRenameToParentDir();
+    tableCleanup();
+
+    testSeekOnFileLength();
     tableCleanup();
   }
 
@@ -348,8 +531,8 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
       keyTableIterator.next();
     }
 
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>>>
-            keyCacheIterator = metadataMgr.getDirectoryTable().cacheIterator();
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
+            keyCacheIterator = metadataMgr.getKeyTable().cacheIterator();
     while(keyCacheIterator.hasNext()){
       keyCacheIterator.next();
       keyCacheIterator.remove();

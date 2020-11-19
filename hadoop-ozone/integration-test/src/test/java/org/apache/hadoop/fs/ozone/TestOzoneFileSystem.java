@@ -275,6 +275,16 @@ public class TestOzoneFileSystem {
     testNonExplicitlyCreatedPathExistsAfterItsLeafsWereRemoved();
 
     testRenameDir();
+    testRenameFile();
+    testRenameWithNonExistentSource();
+    testRenameDirToItsOwnSubDir();
+    testRenameSourceAndDestinAreSame();
+    testRenameToExistingDir();
+    testRenameToNewSubDirShouldNotExist();
+    testRenameDirToFile();
+    testRenameFileToDir();
+    testRenameDestinationParentDoesntExist();
+    testRenameToParentDir();
     testSeekOnFileLength();
     testDeleteRoot();
 
@@ -633,6 +643,16 @@ public class TestOzoneFileSystem {
       stream.seek(fileLength);
       assertEquals(-1, stream.read());
     }
+
+    // non-existent file
+    Path fileNotExists = new Path("/file_notexist");
+    try {
+      fs.open(fileNotExists);
+      Assert.fail("Should throw FILE_NOT_FOUND error as file doesn't exist!");
+    } catch (FileNotFoundException fnfe) {
+      Assert.assertTrue("Expected FILE_NOT_FOUND error",
+              fnfe.getMessage().contains("FILE_NOT_FOUND"));
+    }
   }
 
   public void testDeleteRoot() throws IOException {
@@ -665,8 +685,277 @@ public class TestOzoneFileSystem {
         interimPath.getName(), fileStatus.getPath().getName());
   }
 
-  private void testRenameDir() throws Exception {
+  /**
+   * Case-1) fromKeyName should exist, otw throws exception.
+   */
+  protected void testRenameWithNonExistentSource() throws Exception {
+    final String root = "/root";
+    final String dir1 = root + "/dir1";
+    final String dir2 = root + "/dir2";
+    final Path source = new Path(fs.getUri().toString() + dir1);
+    final Path destin = new Path(fs.getUri().toString() + dir2);
+
+    // creates destin
+    fs.mkdirs(destin);
+    LOG.info("Created destin dir: {}", destin);
+
+    LOG.info("Rename op-> source:{} to destin:{}}", source, destin);
+    assertFalse("Expected to fail rename as src doesn't exist",
+            fs.rename(source, destin));
+  }
+
+  /**
+   * Case-2) Cannot rename a directory to its own subdirectory.
+   */
+  protected void testRenameDirToItsOwnSubDir() throws Exception {
+    final String root = "/root";
+    final String dir1 = root + "/dir1";
+    final Path dir1Path = new Path(fs.getUri().toString() + dir1);
+    // Add a sub-dir1 to the directory to be moved.
+    final Path subDir1 = new Path(dir1Path, "sub_dir1");
+    fs.mkdirs(subDir1);
+    LOG.info("Created dir1 {}", subDir1);
+
+    final Path sourceRoot = new Path(fs.getUri().toString() + root);
+    LOG.info("Rename op-> source:{} to destin:{}", sourceRoot, subDir1);
+    try {
+      fs.rename(sourceRoot, subDir1);
+      Assert.fail("Should throw exception : Cannot rename a directory to" +
+              " its own subdirectory");
+    } catch (IllegalArgumentException iae) {
+      // expected
+    }
+  }
+
+  /**
+   * Case-3) If src == destin then check source and destin of same type.
+   */
+  protected void testRenameSourceAndDestinAreSame() throws Exception {
+    final String root = "/root";
+    final String dir1 = root + "/dir1";
+    final String dir2 = dir1 + "/dir2";
+    final Path dir2Path = new Path(fs.getUri().toString() + dir2);
+    fs.mkdirs(dir2Path);
+
+    // File rename
+    Path file1 = new Path(fs.getUri().toString() + dir2 + "/file1");
+    ContractTestUtils.touch(fs, file1);
+
+    assertTrue(fs.rename(file1, file1));
+    assertTrue(fs.rename(dir2Path, dir2Path));
+  }
+
+  /**
+   * Case-4) Rename from /a, to /b.
+   * <p>
+   * Expected Result: After rename the directory structure will be /b/a.
+   */
+  protected void testRenameToExistingDir() throws Exception {
+    // created /a
+    final Path aSourcePath = new Path(fs.getUri().toString() + "/a");
+    fs.mkdirs(aSourcePath);
+
+    // created /b
+    final Path bDestinPath = new Path(fs.getUri().toString() + "/b");
+    fs.mkdirs(bDestinPath);
+
+    // Add a sub-directory '/a/c' to '/a'. This is to verify that after
+    // rename sub-directory also be moved.
+    final Path acPath = new Path(fs.getUri().toString() + "/a/c");
+    fs.mkdirs(acPath);
+
+    // Rename from /a to /b.
+    assertTrue("Rename failed", fs.rename(aSourcePath, bDestinPath));
+
+    final Path baPath = new Path(fs.getUri().toString() + "/b/a");
+    final Path bacPath = new Path(fs.getUri().toString() + "/b/a/c");
+    assertTrue("Rename failed", fs.exists(baPath));
+    assertTrue("Rename failed", fs.exists(bacPath));
+  }
+
+  /**
+   * Case-5) If new destin '/dst/source' exists then throws exception.
+   * If destination is a directory then rename source as sub-path of it.
+   * <p>
+   * For example: rename /a to /b will lead to /b/a. This new path should
+   * not exist.
+   */
+  protected void testRenameToNewSubDirShouldNotExist() throws Exception {
+    // Case-5.a) Rename directory from /a to /b.
+    // created /a
+    final Path aSourcePath = new Path(fs.getUri().toString() + "/a");
+    fs.mkdirs(aSourcePath);
+
+    // created /b
+    final Path bDestinPath = new Path(fs.getUri().toString() + "/b");
+    fs.mkdirs(bDestinPath);
+
+    // Add a sub-directory '/b/a' to '/b'. This is to verify that rename
+    // throws exception as new destin /b/a already exists.
+    final Path baPath = new Path(fs.getUri().toString() + "/b/a");
+    fs.mkdirs(baPath);
+
+    try {
+      fs.rename(aSourcePath, bDestinPath);
+      Assert.fail("Should fail as new destination dir exists!");
+    } catch (FileAlreadyExistsException faee) {
+      // expected as new sub-path /b/a already exists.
+    }
+
+    // Case-5.b) Rename file from /a/b/c/file1 to /a.
+    // Should be failed since /a/file1 exists.
+    final Path abcPath = new Path(fs.getUri().toString() + "/a/b/c");
+    fs.mkdirs(abcPath);
+    Path abcFile1 = new Path(abcPath, "/file1");
+    ContractTestUtils.touch(fs, abcFile1);
+
+    final Path aFile1 = new Path(fs.getUri().toString() + "/a/file1");
+    ContractTestUtils.touch(fs, aFile1);
+
+    final Path aDestinPath = new Path(fs.getUri().toString() + "/a");
+
+    try {
+      fs.rename(abcFile1, aDestinPath);
+      Assert.fail("Should fail as new destination file exists!");
+    } catch (FileAlreadyExistsException faee) {
+      // expected as new sub-path /a/file1 already exists.
+    }
+  }
+
+  /**
+   * Case-6) Rename directory to an existed file, should be failed.
+   */
+  protected void testRenameDirToFile() throws Exception {
+    final String root = "/root";
+    Path rootPath = new Path(fs.getUri().toString() + root);
+    fs.mkdirs(rootPath);
+
+    Path file1Destin = new Path(fs.getUri().toString() + root + "/file1");
+    ContractTestUtils.touch(fs, file1Destin);
+    Path abcRootPath = new Path(fs.getUri().toString() + "/a/b/c");
+    fs.mkdirs(abcRootPath);
+    try {
+      fs.rename(abcRootPath, file1Destin);
+      Assert.fail("key already exists /root_dir/file1");
+    } catch (FileAlreadyExistsException faee) {
+      // expected
+    }
+  }
+
+  /**
+   * Rename file to a non-existent destin file.
+   */
+  protected void testRenameFile() throws Exception {
+    final String root = "/root";
+    Path rootPath = new Path(fs.getUri().toString() + root);
+    fs.mkdirs(rootPath);
+
+    Path file1Source = new Path(fs.getUri().toString() + root
+            + "/file1_Copy");
+    ContractTestUtils.touch(fs, file1Source);
+    Path file1Destin = new Path(fs.getUri().toString() + root + "/file1");
+    assertTrue("Renamed failed", fs.rename(file1Source, file1Destin));
+    assertTrue("Renamed failed: /root/file1", fs.exists(file1Destin));
+
+    /**
+     * Reading several times, this is to verify that OmKeyInfo#keyName cached
+     * entry is not modified. While reading back, OmKeyInfo#keyName will be
+     * prepared and assigned to fullkeyPath name.
+     */
+    for (int i = 0; i < 10; i++) {
+      FileStatus[] fStatus = fs.listStatus(rootPath);
+      assertEquals("Renamed failed", 1, fStatus.length);
+      assertEquals("Wrong path name!", file1Destin, fStatus[0].getPath());
+    }
+  }
+
+  /**
+   * Rename file to an existed directory.
+   */
+  protected void testRenameFileToDir() throws Exception {
+    final String root = "/root";
+    Path rootPath = new Path(fs.getUri().toString() + root);
+    fs.mkdirs(rootPath);
+
+    Path file1Destin = new Path(fs.getUri().toString() + root + "/file1");
+    ContractTestUtils.touch(fs, file1Destin);
+    Path abcRootPath = new Path(fs.getUri().toString() + "/a/b/c");
+    fs.mkdirs(abcRootPath);
+    assertTrue("Renamed failed", fs.rename(file1Destin, abcRootPath));
+    assertTrue("Renamed filed: /a/b/c/file1", fs.exists(new Path(abcRootPath,
+            "file1")));
+  }
+
+
+  /**
+   * Fails if the (a) parent of dst does not exist or (b) parent is a file.
+   */
+  protected void testRenameDestinationParentDoesntExist() throws Exception {
+    final String root = "/root_dir";
+    final String dir1 = root + "/dir1";
+    final String dir2 = dir1 + "/dir2";
+    final Path dir2SourcePath = new Path(fs.getUri().toString() + dir2);
+    fs.mkdirs(dir2SourcePath);
+
+    // (a) parent of dst does not exist.  /root_dir/b/c
+    final Path destinPath = new Path(fs.getUri().toString() + root + "/b/c");
+    try {
+      fs.rename(dir2SourcePath, destinPath);
+      Assert.fail("Should fail as parent of dst does not exist!");
+    } catch (FileNotFoundException fnfe) {
+      // expected
+    }
+
+    // (b) parent of dst is a file. /root_dir/file1/c
+    Path filePath = new Path(fs.getUri().toString() + root + "/file1");
+    ContractTestUtils.touch(fs, filePath);
+
+    Path newDestinPath = new Path(filePath, "c");
+    try {
+      fs.rename(dir2SourcePath, newDestinPath);
+      Assert.fail("Should fail as parent of dst is a file!");
+    } catch (IOException ioe) {
+      // expected
+    }
+  }
+
+  /**
+   * Rename to the source's parent directory, it will succeed.
+   * 1. Rename from /root_dir/dir1/dir2 to /root_dir.
+   * Expected result : /root_dir/dir2
+   * <p>
+   * 2. Rename from /root_dir/dir1/file1 to /root_dir.
+   * Expected result : /root_dir/file1.
+   */
+  protected void testRenameToParentDir() throws Exception {
+    final String root = "/root_dir";
+    final String dir1 = root + "/dir1";
+    final String dir2 = dir1 + "/dir2";
+    final Path dir2SourcePath = new Path(fs.getUri().toString() + dir2);
+    fs.mkdirs(dir2SourcePath);
+    final Path destRootPath = new Path(fs.getUri().toString() + root);
+
+    Path file1Source = new Path(fs.getUri().toString() + dir1 + "/file2");
+    ContractTestUtils.touch(fs, file1Source);
+
+    // rename source directory to its parent directory(destination).
+    assertTrue("Rename failed", fs.rename(dir2SourcePath, destRootPath));
+    final Path expectedPathAfterRename =
+            new Path(fs.getUri().toString() + root + "/dir2");
+    assertTrue("Rename failed",
+            fs.exists(expectedPathAfterRename));
+
+    // rename source file to its parent directory(destination).
+    assertTrue("Rename failed", fs.rename(file1Source, destRootPath));
+    final Path expectedFilePathAfterRename =
+            new Path(fs.getUri().toString() + root + "/file2");
+    assertTrue("Rename failed",
+            fs.exists(expectedFilePathAfterRename));
+  }
+
+  protected void testRenameDir() throws Exception {
     final String dir = "/root_dir/dir1";
+    Path rootDir = new Path(fs.getUri().toString() +  "/root_dir");
     final Path source = new Path(fs.getUri().toString() + dir);
     final Path dest = new Path(source.toString() + ".renamed");
     // Add a sub-dir to the directory to be moved.
@@ -688,6 +977,13 @@ public class TestOzoneFileSystem {
     // Renaming to same path when src is specified with scheme.
     assertTrue("Renaming to same path should be success.",
         fs.rename(source, new Path(dir)));
+
+    // rename root directory
+    Path rootDestinDir = new Path(fs.getUri().toString() +  "/root_dir" +
+            ".renamed");
+    fs.rename(rootDir, rootDestinDir);
+    assertTrue("Directory rename failed", fs.exists(rootDestinDir));
+    assertFalse("Directory rename failed", fs.exists(rootDir));
   }
   private OzoneKeyDetails getKey(Path keyPath, boolean isDirectory)
       throws IOException {
