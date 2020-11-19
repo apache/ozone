@@ -96,10 +96,6 @@ public class StateContext {
       NodeReportProto.getDescriptor().getFullName();
   private static final String PIPELINE_REPORTS_PROTO_NAME =
       PipelineReportsProto.getDescriptor().getFullName();
-  private static final String COMMAND_STATUS_REPORTS_PROTO_NAME =
-      CommandStatusReportsProto.getDescriptor().getFullName();
-  private static final String INCREMENTAL_CONTAINER_REPORT_PROTO_NAME =
-      IncrementalContainerReportProto.getDescriptor().getFullName();
 
   /**
    * Starting with a 2 sec heartbeat frequency which will be updated to the
@@ -225,24 +221,21 @@ public class StateContext {
    */
   public void addReport(GeneratedMessage report) {
     if (report != null) {
+      // TODO: Check report.getDescriptorForType() != null as well?
       final String reportType = report.getDescriptorForType().getFullName();
       for (InetSocketAddress endpoint : endpoints) {
-        // Check report type
+        // We only keep the latest container, node and pipeline report
         if (reportType.equals(CONTAINER_REPORTS_PROTO_NAME)) {
           containerReport = report;
         } else if (reportType.equals(NODE_REPORT_PROTO_NAME)) {
           nodeReport = report;
         } else if (reportType.equals(PIPELINE_REPORTS_PROTO_NAME)) {
           pipelineReport = report;
-        } else if (reportType.equals(COMMAND_STATUS_REPORTS_PROTO_NAME) ||
-            reportType.equals(INCREMENTAL_CONTAINER_REPORT_PROTO_NAME)) {
-          // report type is CommandStatusReports or IncrementalContainerReport
+        } else {
+          // CommandStatusReports and IncrementalContainerReport will be queued
           synchronized (reports) {
             reports.get(endpoint).add(report);
           }
-        } else {
-          throw new IllegalArgumentException(
-              "Unidentified report message type: " + reportType);
         }
       }
     }
