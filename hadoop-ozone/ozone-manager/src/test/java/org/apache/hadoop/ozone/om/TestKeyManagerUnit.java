@@ -43,12 +43,14 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs.Builder;
@@ -61,6 +63,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadListParts;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.TestOMRequestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.OzoneBlockTokenSecretManager;
@@ -73,6 +76,9 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import static java.util.Collections.singletonList;
+import static org.mockito.Mockito.verify;
+
 /**
  * Unit test key manager.
  */
@@ -80,6 +86,7 @@ public class TestKeyManagerUnit {
 
   private OzoneConfiguration configuration;
   private OmMetadataManagerImpl metadataManager;
+  private StorageContainerLocationProtocol containerClient;
   private KeyManagerImpl keyManager;
 
   private Instant startDate;
@@ -92,8 +99,10 @@ public class TestKeyManagerUnit {
     configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         testDir.toString());
     metadataManager = new OmMetadataManagerImpl(configuration);
+    containerClient = Mockito.mock(StorageContainerLocationProtocol.class);
     keyManager = new KeyManagerImpl(
         Mockito.mock(ScmBlockLocationProtocol.class),
+        containerClient,
         metadataManager,
         configuration,
         "omtest",
@@ -332,13 +341,6 @@ public class TestKeyManagerUnit {
 
   @Test
   public void testLookupFileWithDnFailure() throws IOException {
-    final StorageContainerLocationProtocol containerClient =
-        Mockito.mock(StorageContainerLocationProtocol.class);
-    final KeyManager manager = new KeyManagerImpl(null,
-        new ScmClient(Mockito.mock(ScmBlockLocationProtocol.class),
-            containerClient), metadataManager, configuration, "test-om",
-        Mockito.mock(OzoneBlockTokenSecretManager.class), null, null);
-
     final DatanodeDetails dnOne = MockDatanodeDetails.randomDatanodeDetails();
     final DatanodeDetails dnTwo = MockDatanodeDetails.randomDatanodeDetails();
     final DatanodeDetails dnThree = MockDatanodeDetails.randomDatanodeDetails();
@@ -400,9 +402,9 @@ public class TestKeyManagerUnit {
         .setVolumeName("volumeOne")
         .setBucketName("bucketOne")
         .setKeyName("keyOne")
-        .setOmKeyLocationInfos(Collections.singletonList(
+        .setOmKeyLocationInfos(singletonList(
             new OmKeyLocationInfoGroup(0,
-                Collections.singletonList(keyLocationInfo))))
+                singletonList(keyLocationInfo))))
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(256000)
@@ -417,7 +419,7 @@ public class TestKeyManagerUnit {
         .setBucketName("bucketOne")
         .setKeyName("keyOne");
 
-    final OmKeyInfo newKeyInfo = manager
+    final OmKeyInfo newKeyInfo = keyManager
         .lookupFile(keyArgs.build(), "test");
 
     final OmKeyLocationInfo newBlockLocation = newKeyInfo
@@ -434,6 +436,59 @@ public class TestKeyManagerUnit {
         .getNodes().contains(dnFive));
     Assert.assertTrue(newBlockLocation.getPipeline()
         .getNodes().contains(dnSix));
+  }
+
+  @Test
+  public void listStatus() throws Exception {
+    String volume = "vol";
+    String bucket = "bucket";
+    String keyPrefix = "key";
+
+    TestOMRequestUtils.addVolumeToDB(volume, OzoneConsts.OZONE,
+        metadataManager);
+
+    TestOMRequestUtils.addBucketToDB(volume, bucket, metadataManager);
+
+    final Pipeline pipeline = MockPipeline.createPipeline(3);
+
+    OmKeyInfo.Builder keyInfoBuilder = new OmKeyInfo.Builder()
+        .setVolumeName(volume)
+        .setBucketName(bucket)
+        .setCreationTime(Time.now())
+        .setOmKeyLocationInfos(singletonList(
+            new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+        .setReplicationFactor(ReplicationFactor.THREE)
+        .setReplicationType(ReplicationType.RATIS);
+
+    List<Long> containerIDs = new ArrayList<>();
+    for (long i = 1; i <= 10; i++) {
+      final OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
+          .setBlockID(new BlockID(i, 1L))
+          .setPipeline(pipeline)
+          .setOffset(0)
+          .setLength(256000)
+          .build();
+
+      containerIDs.add(i);
+
+      OmKeyInfo keyInfo = keyInfoBuilder
+          .setKeyName(keyPrefix + i)
+          .setObjectID(i)
+          .setUpdateID(i)
+          .build();
+      keyInfo.appendNewBlocks(singletonList(keyLocationInfo), false);
+      TestOMRequestUtils.addKeyToOM(metadataManager, keyInfo);
+    }
+
+    OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
+        .setVolumeName(volume)
+        .setBucketName(bucket)
+        .setKeyName("");
+    List<OzoneFileStatus> fileStatusList =
+        keyManager.listStatus(builder.build(), false, null, Long.MAX_VALUE);
+
+    Assert.assertEquals(10, fileStatusList.size());
+    verify(containerClient).getContainerWithPipelineBatch(containerIDs);
   }
 
 }

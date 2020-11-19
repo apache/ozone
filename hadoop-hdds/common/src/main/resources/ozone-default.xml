@@ -386,59 +386,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.client.stream.buffer.flush.delay</name>
-    <value>true</value>
-    <tag>OZONE, CLIENT</tag>
-    <description>
-      Default true, when call flush() and determine whether the data in the
-      current buffer is greater than ozone.client.stream.buffer.size, if
-      greater than then send buffer to the datanode. You can turn this off
-      by setting this configuration to false.
-    </description>
-  </property>
-  <property>
-    <name>ozone.client.stream.buffer.size</name>
-    <value>4MB</value>
-    <tag>OZONE, CLIENT</tag>
-    <description>The size of chunks the client will send to the server.
-    </description>
-  </property>
-  <property>
-    <name>ozone.client.stream.buffer.flush.size</name>
-    <value>16MB</value>
-    <tag>OZONE, CLIENT</tag>
-    <description>Size which determines at what buffer position a partial
-      flush will be initiated during write. It should be a multiple
-      of ozone.client.stream.buffer.size.
-    </description>
-  </property>
-  <property>
-    <name>ozone.client.stream.buffer.max.size</name>
-    <value>32MB</value>
-    <tag>OZONE, CLIENT</tag>
-    <description>Size which determines at what buffer position
-      write call be blocked till acknowledgement of the first partial flush
-      happens by all servers.
-    </description>
-  </property>
-  <property>
-    <name>ozone.client.max.retries</name>
-    <value>5</value>
-    <tag>OZONE, CLIENT</tag>
-    <description>Maximum number of retries by Ozone Client on encountering
-      exception while writing a key.
-    </description>
-  </property>
-  <property>
-    <name>ozone.client.retry.interval</name>
-    <value>0ms</value>
-    <tag>OZONE, CLIENT</tag>
-    <description>Indicates the time duration a client will wait before
-      retrying a write key request on encountering an exception. By default
-      there is no wait.
-    </description>
-  </property>
-  <property>
     <name>ozone.client.socket.timeout</name>
     <value>5000ms</value>
     <tag>OZONE, CLIENT</tag>
@@ -1279,6 +1226,16 @@
   </property>
 
   <property>
+    <name>hdds.datanode.metadata.rocksdb.cache.size</name>
+    <value>64MB</value>
+    <tag>OZONE, DATANODE, MANAGEMENT</tag>
+    <description>
+        Size of the block metadata cache shared among RocksDB instances on each
+        datanode. All containers on a datanode will share this cache.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.command.status.report.interval</name>
     <value>30s</value>
     <tag>OZONE, DATANODE, MANAGEMENT</tag>
@@ -1543,34 +1500,6 @@
     </description>
   </property>
 
-  <property>
-    <name>ozone.client.checksum.type</name>
-    <value>CRC32</value>
-    <tag>OZONE, CLIENT, MANAGEMENT</tag>
-    <description>The checksum type [NONE/ CRC32/ CRC32C/ SHA256/ MD5] determines
-      which algorithm would be used to compute checksum for chunk data.
-      Default checksum type is CRC32.
-    </description>
-  </property>
-
-  <property>
-    <name>ozone.client.bytes.per.checksum</name>
-    <value>1MB</value>
-    <tag>OZONE, CLIENT, MANAGEMENT</tag>
-    <description>Checksum will be computed for every bytes per checksum number
-      of bytes and stored sequentially. The minimum value for this config is
-      256KB.
-    </description>
-  </property>
-
-  <property>
-    <name>ozone.client.verify.checksum</name>
-    <value>true</value>
-    <tag>OZONE, CLIENT, MANAGEMENT</tag>
-    <description>
-      Ozone client to verify checksum of the checksum blocksize data.
-    </description>
-  </property>
 
   <property>
     <name>ozone.client.read.timeout</name>
