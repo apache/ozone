@@ -90,15 +90,15 @@ public class StateContext {
   private boolean shutdownGracefully = false;
   private final AtomicLong threadPoolNotAvailableCount;
 
-  private static final String containerReportsProtoName =
+  private static final String CONTAINER_REPORTS_PROTO_NAME =
       ContainerReportsProto.getDescriptor().getFullName();
-  private static final String nodeReportProtoName =
+  private static final String NODE_REPORT_PROTO_NAME =
       NodeReportProto.getDescriptor().getFullName();
-  private static final String pipelineReportsProtoName =
+  private static final String PIPELINE_REPORTS_PROTO_NAME =
       PipelineReportsProto.getDescriptor().getFullName();
-  private static final String commandStatusReportsProtoName =
+  private static final String COMMAND_STATUS_REPORTS_PROTO_NAME =
       CommandStatusReportsProto.getDescriptor().getFullName();
-  private static final String incrementalContainerReportProtoName =
+  private static final String INCREMENTAL_CONTAINER_REPORT_PROTO_NAME =
       IncrementalContainerReportProto.getDescriptor().getFullName();
 
   /**
@@ -228,14 +228,14 @@ public class StateContext {
       final String reportType = report.getDescriptorForType().getFullName();
       for (InetSocketAddress endpoint : endpoints) {
         // Check report type
-        if (reportType.equals(containerReportsProtoName)) {
+        if (reportType.equals(CONTAINER_REPORTS_PROTO_NAME)) {
           containerReport = report;
-        } else if (reportType.equals(nodeReportProtoName)) {
+        } else if (reportType.equals(NODE_REPORT_PROTO_NAME)) {
           nodeReport = report;
-        } else if (reportType.equals(pipelineReportsProtoName)) {
+        } else if (reportType.equals(PIPELINE_REPORTS_PROTO_NAME)) {
           pipelineReport = report;
-        } else if (reportType.equals(commandStatusReportsProtoName) ||
-            reportType.equals(incrementalContainerReportProtoName)) {
+        } else if (reportType.equals(COMMAND_STATUS_REPORTS_PROTO_NAME) ||
+            reportType.equals(INCREMENTAL_CONTAINER_REPORT_PROTO_NAME)) {
           // report type is CommandStatusReports or IncrementalContainerReport
           synchronized (reports) {
             reports.get(endpoint).add(report);
