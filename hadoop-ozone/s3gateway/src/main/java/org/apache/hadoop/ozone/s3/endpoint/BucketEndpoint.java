@@ -112,8 +112,8 @@ public class BucketEndpoint extends EndpointBase {
     ContinueToken decodedToken =
         ContinueToken.decodeFromString(continueToken);
 
-    // stand for startAfter
-    if (startAfter == null) {
+    // Assign marker to startAfter. for the compatibility of aws api v1
+    if (startAfter == null && marker != null) {
       startAfter = marker;
     }
     if (startAfter != null && continueToken != null) {
