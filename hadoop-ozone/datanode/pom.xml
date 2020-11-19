@@ -64,4 +64,27 @@
       <artifactId>activation</artifactId>
     </dependency>
   </dependencies>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>add-classpath-descriptor</id>
+            <phase>prepare-package</phase>
+            <goals>
+              <goal>build-classpath</goal>
+            </goals>
+            <configuration>
+              <outputFile>${project.build.outputDirectory}/${project.artifactId}.classpath</outputFile>
+              <prefix>$HDDS_LIB_JARS_DIR</prefix>
+              <outputFilterFile>true</outputFilterFile>
+              <includeScope>runtime</includeScope>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>
