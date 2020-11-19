@@ -39,8 +39,13 @@ import java.util.function.Consumer;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.InitDatanodeState;
@@ -72,6 +77,11 @@ public class StateContext {
   private final AtomicLong stateExecutionCount;
   private final ConfigurationSource conf;
   private final Set<InetSocketAddress> endpoints;
+  // Only keeps the latest Container/Node/PipelineReport
+  private GeneratedMessage containerReport;
+  private GeneratedMessage nodeReport;
+  private GeneratedMessage pipelineReport;
+  // CommandStatusReport and IncrementalContainerReport queued in the map below
   private final Map<InetSocketAddress, List<GeneratedMessage>> reports;
   private final Map<InetSocketAddress, Queue<ContainerAction>> containerActions;
   private final Map<InetSocketAddress, Queue<PipelineAction>> pipelineActions;
@@ -79,6 +89,17 @@ public class StateContext {
   private boolean shutdownOnError = false;
   private boolean shutdownGracefully = false;
   private final AtomicLong threadPoolNotAvailableCount;
+
+  private static final String containerReportsProtoName =
+      ContainerReportsProto.getDescriptor().getFullName();
+  private static final String nodeReportProtoName =
+      NodeReportProto.getDescriptor().getFullName();
+  private static final String pipelineReportsProtoName =
+      PipelineReportsProto.getDescriptor().getFullName();
+  private static final String commandStatusReportsProtoName =
+      CommandStatusReportsProto.getDescriptor().getFullName();
+  private static final String incrementalContainerReportProtoName =
+      IncrementalContainerReportProto.getDescriptor().getFullName();
 
   /**
    * Starting with a 2 sec heartbeat frequency which will be updated to the
@@ -103,6 +124,12 @@ public class StateContext {
     commandQueue = new LinkedList<>();
     cmdStatusMap = new ConcurrentHashMap<>();
     reports = new HashMap<>();
+    // TODO: Even better, is there a way to initialize those as
+    //  empty GeneratedMessage? In protobuf 3 there is Empty.Builder, not in 2?
+    containerReport = null;
+    nodeReport = null;
+    pipelineReport = null;
+
     endpoints = new HashSet<>();
     containerActions = new HashMap<>();
     pipelineActions = new HashMap<>();
@@ -190,6 +217,7 @@ public class StateContext {
   public boolean getShutdownOnError() {
     return shutdownOnError;
   }
+
   /**
    * Adds the report to report queue.
    *
@@ -197,9 +225,24 @@ public class StateContext {
    */
   public void addReport(GeneratedMessage report) {
     if (report != null) {
-      synchronized (reports) {
-        for (InetSocketAddress endpoint : endpoints) {
-          reports.get(endpoint).add(report);
+      final String reportType = report.getDescriptorForType().getFullName();
+      for (InetSocketAddress endpoint : endpoints) {
+        // Check report type
+        if (reportType.equals(containerReportsProtoName)) {
+          containerReport = report;
+        } else if (reportType.equals(nodeReportProtoName)) {
+          nodeReport = report;
+        } else if (reportType.equals(pipelineReportsProtoName)) {
+          pipelineReport = report;
+        } else if (reportType.equals(commandStatusReportsProtoName) ||
+            reportType.equals(incrementalContainerReportProtoName)) {
+          // report type is CommandStatusReports or IncrementalContainerReport
+          synchronized (reports) {
+            reports.get(endpoint).add(report);
+          }
+        } else {
+          throw new IllegalArgumentException(
+              "Unidentified report message type: " + reportType);
         }
       }
     }
@@ -241,6 +284,15 @@ public class StateContext {
   public List<GeneratedMessage> getReports(InetSocketAddress endpoint,
                                            int maxLimit) {
     List<GeneratedMessage> reportsToReturn = new LinkedList<>();
+    if (containerReport != null) {
+      reportsToReturn.add(containerReport);
+    }
+    if (nodeReport != null) {
+      reportsToReturn.add(nodeReport);
+    }
+    if (pipelineReport != null) {
+      reportsToReturn.add(pipelineReport);
+    }
     synchronized (reports) {
       List<GeneratedMessage> reportsForEndpoint = reports.get(endpoint);
       if (reportsForEndpoint != null) {
@@ -582,5 +634,17 @@ public class StateContext {
       this.pipelineActions.put(endpoint, new LinkedList<>());
       this.reports.put(endpoint, new LinkedList<>());
     }
+  }
+
+  public GeneratedMessage getContainerReport() {
+    return containerReport;
+  }
+
+  public GeneratedMessage getNodeReport() {
+    return nodeReport;
+  }
+
+  public GeneratedMessage getPipelineReport() {
+    return pipelineReport;
   }
 }
