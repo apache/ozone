@@ -286,6 +286,10 @@ public final class OmKeyInfo extends WithObjectID {
     return OzoneAclUtil.setAcl(acls, newAcls);
   }
 
+  public void setParentObjectID(long parentObjectID) {
+    this.parentObjectID = parentObjectID;
+  }
+
   /**
    * Builder of OmKeyInfo.
    */
