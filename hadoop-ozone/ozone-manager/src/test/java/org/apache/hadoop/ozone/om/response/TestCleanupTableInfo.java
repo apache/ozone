@@ -78,8 +78,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * This tests check whether {@link OMClientResponse} have defined
+ * The test checks whether all {@link OMClientResponse} have defined the
  * {@link CleanupTableInfo} annotation.
+ * For certain requests it check whether it is properly defined not just the
+ * fact that it is defined.
  */
 @RunWith(MockitoJUnitRunner.class)
 public class TestCleanupTableInfo {
@@ -95,12 +97,12 @@ public class TestCleanupTableInfo {
   public TemporaryFolder folder = new TemporaryFolder();
 
   @Mock
-  public OMMetrics omMetrics;
+  private OMMetrics omMetrics;
 
   @Mock
-  public OzoneManagerDoubleBufferHelper dbh;
+  private OzoneManagerDoubleBufferHelper dbh;
 
-  public OzoneManager om;
+  private OzoneManager om;
 
   /**
    * Creates a mock Ozone Manager object.
@@ -199,8 +201,8 @@ public class TestCleanupTableInfo {
   }
 
   private void assertCacheItemCounts(Map<String, Integer> cacheItemCount,
-      Class<? extends OMClientResponse> responseClass)
-  {
+      Class<? extends OMClientResponse> responseClass
+  ) {
     CleanupTableInfo ann = responseClass.getAnnotation(CleanupTableInfo.class);
     List<String> cleanup = Arrays.asList(ann.cleanupTables());
     for (String tableName : om.getMetadataManager().listTableNames()) {
