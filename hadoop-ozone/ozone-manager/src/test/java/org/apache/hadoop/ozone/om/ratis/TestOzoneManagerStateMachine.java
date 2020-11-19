@@ -61,7 +61,7 @@ public class TestOzoneManagerStateMachine {
         Mockito.mock(OMRatisSnapshotInfo.class));
     ozoneManagerStateMachine =
         new OzoneManagerStateMachine(ozoneManagerRatisServer, false);
-    ozoneManagerStateMachine.notifyIndexUpdate(0, 0);
+    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 0);
   }
 
   @Test
@@ -70,7 +70,7 @@ public class TestOzoneManagerStateMachine {
     // Happy scenario.
 
     // Conf/metadata transaction.
-    ozoneManagerStateMachine.notifyIndexUpdate(0, 1);
+    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 1);
     Assert.assertEquals(0,
         ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
     Assert.assertEquals(1,
@@ -94,7 +94,7 @@ public class TestOzoneManagerStateMachine {
         ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
 
     // Conf/metadata transaction.
-    ozoneManagerStateMachine.notifyIndexUpdate(0L, 4L);
+    ozoneManagerStateMachine.notifyTermIndexUpdated(0L, 4L);
 
     Assert.assertEquals(0L,
         ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
@@ -123,12 +123,12 @@ public class TestOzoneManagerStateMachine {
   public void testApplyTransactionsUpdateLastAppliedIndexCalledLate() {
     // Now try a scenario where 1,2,3 transactions are in applyTransactionMap
     // and updateLastAppliedIndex is not called for them, and before that
-    // notifyIndexUpdate is called with transaction 4. And see now at the end
+    // notifyTermIndexUpdated is called with transaction 4. And see now at the end
     // when updateLastAppliedIndex is called with epochs we have
     // lastAppliedIndex as 4 or not.
 
     // Conf/metadata transaction.
-    ozoneManagerStateMachine.notifyIndexUpdate(0, 1);
+    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 1);
     Assert.assertEquals(0,
         ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
     Assert.assertEquals(1,
@@ -143,7 +143,7 @@ public class TestOzoneManagerStateMachine {
 
 
     // Conf/metadata transaction.
-    ozoneManagerStateMachine.notifyIndexUpdate(0L, 5L);
+    ozoneManagerStateMachine.notifyTermIndexUpdated(0L, 5L);
 
   // Still it should be zero, as for 2,3,4 updateLastAppliedIndex is not yet
     // called so the lastAppliedIndex will be at older value.
