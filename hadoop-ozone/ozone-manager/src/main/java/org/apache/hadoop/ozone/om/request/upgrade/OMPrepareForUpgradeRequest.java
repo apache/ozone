@@ -8,6 +8,7 @@ import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.upgrade.OMFinalizeUpgradeResponse;
 import org.apache.hadoop.ozone.om.response.upgrade.OMPrepareForUpgradeResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.PrepareForUpgrade;
@@ -35,9 +36,6 @@ public class OMPrepareForUpgradeRequest extends OMClientRequest {
     OMClientResponse response = null;
 
     try {
-      OMPrepareForUpgradeRequest request =
-          getOmRequest().getPrepareForUgradeRequest();
-
       // Flush the Ratis log and take a snapshot.
       ozoneManager.prepare();
 
@@ -45,9 +43,9 @@ public class OMPrepareForUpgradeRequest extends OMClientRequest {
 
       // TODO: Determine if upgrade client ID should be present in
       //  request/response.
-      PrepareForUpgradeResponse omResponse =
-          PrepareForUpgradeResponse.newBuilder()
-              .setTrxnID(transactionLogIndex)
+      OzoneManagerProtocolProtos.PrepareForUpgradeResponse omResponse =
+          OzoneManagerProtocolProtos.PrepareForUpgradeResponse.newBuilder()
+              .setTxnID(transactionLogIndex)
               .build();
       responseBuilder.setPrepareForUpgradeResponse(omResponse);
       response = new OMPrepareForUpgradeResponse(responseBuilder.build());
