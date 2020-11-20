@@ -104,12 +104,18 @@ public final class RatisHelper {
   }
 
   public static RaftPeer toRaftPeer(DatanodeDetails id) {
-    return new RaftPeer(toRaftPeerId(id), toRaftPeerAddressString(id));
+    return RaftPeer.newBuilder()
+        .setId(toRaftPeerId(id))
+        .setAddress(toRaftPeerAddressString(id))
+        .build();
   }
 
   public static RaftPeer toRaftPeer(DatanodeDetails id, int priority) {
-    return new RaftPeer(
-        toRaftPeerId(id), toRaftPeerAddressString(id), priority);
+    return RaftPeer.newBuilder()
+        .setId(toRaftPeerId(id))
+        .setAddress(toRaftPeerAddressString(id))
+        .setPriority(priority)
+        .build();
   }
 
   private static List<RaftPeer> toRaftPeers(Pipeline pipeline) {

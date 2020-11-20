@@ -88,7 +88,7 @@ public class DatanodeRatisServerConfig {
     this.noLeaderTimeout = duration.toMillis();
   }
 
-  @Config(key = "rpcslowness.timeout",
+  @Config(key = "rpc.slowness.timeout",
       defaultValue = "300s",
       type = ConfigType.TIME,
       tags = {OZONE, DATANODE, RATIS},
