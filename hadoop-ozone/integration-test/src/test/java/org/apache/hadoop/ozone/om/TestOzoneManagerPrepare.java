@@ -23,8 +23,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Paths;
-import java.util.Random;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -37,9 +37,10 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.test.GenericTestUtils;
-import org.apache.hadoop.test.LambdaTestUtils;
+import org.junit.Assert;
 import org.junit.Test;
 
 /**
@@ -52,8 +53,14 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    * Checks that it is brought into prepare mode successfully.
    */
   @Test
-  public void testPrepareWithoutTransactions() {
+  public void testPrepareWithoutTransactions() throws Exception {
+    MiniOzoneHAClusterImpl cluster = getCluster();
+    OzoneManager leader = cluster.getOMLeader();
+    leader.prepare();
 
+    Assert.assertFalse(logFilesPresentInRatisPeer(leader));
+    Assert.assertEquals(0, getAppliedIndexFromDB(leader));
+    Assert.assertEquals(0, getAppliedIndexFromRatis(leader));
   }
 
   /**
@@ -207,4 +214,26 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     return omRequest;
   }
 
+  private long getAppliedIndexFromRatis(OzoneManager om)
+      throws IOException {
+    return om.getOmRatisServer()
+        .getOmStateMachine()
+        .getLastAppliedTermIndex()
+        .getIndex();
+  }
+
+  // TODO: This is the same as OzoneManager#getRatisSnapshotIndex, but
+  //  returns 0 if no transactions, instead of NPE.
+  private long getAppliedIndexFromDB(OzoneManager om)
+      throws IOException {
+    OMTransactionInfo info =
+        OMTransactionInfo.readTransactionInfo(om.getMetadataManager());
+
+      if (info == null) {
+        return 0;
+      }
+      else {
+        return info.getTransactionIndex();
+      }
+  }
 }
