@@ -181,29 +181,15 @@ public class HeartbeatEndpointTask
     for (GeneratedMessage report :
         context.getAllAvailableReports(rpcEndpoint.getAddress())) {
       String reportName = report.getDescriptorForType().getFullName();
-      // Example reportName = hadoop.hdds.NodeReportProto
-
       for (Descriptors.FieldDescriptor descriptor :
           SCMHeartbeatRequestProto.getDescriptor().getFields()) {
-
         String heartbeatFieldName = descriptor.getMessageType().getFullName();
-        // Possible heartbeatFieldName =
-        //  hadoop.hdds.DatanodeDetailsProto
-        //  hadoop.hdds.NodeReportProto
-        //  hadoop.hdds.ContainerReportsProto
-        //  hadoop.hdds.IncrementalContainerReportProto
-        //  hadoop.hdds.CommandStatusReportsProto
-        //  hadoop.hdds.ContainerActionsProto
-        //  hadoop.hdds.PipelineActionsProto
-        //  hadoop.hdds.PipelineReportsProto
         if (heartbeatFieldName.equals(reportName)) {
           if (descriptor.isRepeated()) {
             requestBuilder.addRepeatedField(descriptor, report);
           } else {
             requestBuilder.setField(descriptor, report);
           }
-          // TODO: We can exit loop early here since we have a match already,
-          //  right? Double check.
           break;
         }
       }

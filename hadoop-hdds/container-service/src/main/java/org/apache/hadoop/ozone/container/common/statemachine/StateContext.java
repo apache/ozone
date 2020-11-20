@@ -37,6 +37,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.Descriptors.Descriptor;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
@@ -121,12 +122,9 @@ public class StateContext {
     commandQueue = new LinkedList<>();
     cmdStatusMap = new ConcurrentHashMap<>();
     reports = new HashMap<>();
-    // TODO: Even better, is there a way to initialize those as
-    //  empty GeneratedMessage? In protobuf 3 there is Empty.Builder, not in 2?
     containerReports = null;
     nodeReport = null;
     pipelineReports = null;
-
     endpoints = new HashSet<>();
     containerActions = new HashMap<>();
     pipelineActions = new HashMap<>();
@@ -221,22 +219,26 @@ public class StateContext {
    * @param report report to be added
    */
   public void addReport(GeneratedMessage report) {
-    if (report != null) {
-      // TODO: Check report.getDescriptorForType() != null as well?
-      final String reportType = report.getDescriptorForType().getFullName();
-      for (InetSocketAddress endpoint : endpoints) {
-        // We only keep the latest container, node and pipeline report
-        if (reportType.equals(CONTAINER_REPORTS_PROTO_NAME)) {
-          containerReports = report;
-        } else if (reportType.equals(NODE_REPORT_PROTO_NAME)) {
-          nodeReport = report;
-        } else if (reportType.equals(PIPELINE_REPORTS_PROTO_NAME)) {
-          pipelineReports = report;
-        } else {
-          // CommandStatusReports and IncrementalContainerReport will be queued
-          synchronized (reports) {
-            reports.get(endpoint).add(report);
-          }
+    if (report == null) {
+      return;
+    }
+    final Descriptor descriptor = report.getDescriptorForType();
+    if (descriptor == null) {
+      return;
+    }
+    final String reportType = descriptor.getFullName();
+    for (InetSocketAddress endpoint : endpoints) {
+      // We only keep the latest container, node and pipeline report
+      if (reportType.equals(CONTAINER_REPORTS_PROTO_NAME)) {
+        containerReports = report;
+      } else if (reportType.equals(NODE_REPORT_PROTO_NAME)) {
+        nodeReport = report;
+      } else if (reportType.equals(PIPELINE_REPORTS_PROTO_NAME)) {
+        pipelineReports = report;
+      } else {
+        // CommandStatusReports and IncrementalContainerReport will be queued
+        synchronized (reports) {
+          reports.get(endpoint).add(report);
         }
       }
     }
