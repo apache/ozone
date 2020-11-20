@@ -90,6 +90,8 @@ public final class RatisUpgradeUtils {
     }
 
     RaftLog raftLog = impl.getState().getLog();
+    // In order to get rid of all logs, make sure we also account for
+    // intermediate Ratis entries that do not pertain to OM.
     long lastIndex = Math.max(snapshotIndex,
         raftLog.getLastEntryTermIndex().getIndex());
 
