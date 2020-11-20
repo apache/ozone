@@ -106,10 +106,10 @@ public final class KeyValueContainerUtil {
     DatanodeStore store;
     if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
       store = new DatanodeStoreSchemaOneImpl(conf,
-              containerID, dbFile.getAbsolutePath());
+              containerID, dbFile.getAbsolutePath(), false);
     } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
       store = new DatanodeStoreSchemaTwoImpl(conf,
-              containerID, dbFile.getAbsolutePath());
+              containerID, dbFile.getAbsolutePath(), false);
     } else {
       throw new IllegalArgumentException(
               "Unrecognized schema version for container: " + schemaVersion);
@@ -192,7 +192,8 @@ public final class KeyValueContainerUtil {
     DatanodeStore store = null;
     try {
       try {
-        store = BlockUtils.getUncachedDatanodeStore(kvContainerData, config);
+        store = BlockUtils.getUncachedDatanodeStore(
+            kvContainerData, config, true);
       } catch (IOException e) {
         // If an exception is thrown, then it may indicate the RocksDB is
         // already open in the container cache. As this code is only executed at
