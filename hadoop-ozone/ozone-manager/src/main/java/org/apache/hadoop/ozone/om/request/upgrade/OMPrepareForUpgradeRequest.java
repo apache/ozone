@@ -40,9 +40,6 @@ public class OMPrepareForUpgradeRequest extends OMClientRequest {
       ozoneManager.prepare();
 
       // TODO: Create marker file with txn index.
-
-      // TODO: Determine if upgrade client ID should be present in
-      //  request/response.
       OzoneManagerProtocolProtos.PrepareForUpgradeResponse omResponse =
           OzoneManagerProtocolProtos.PrepareForUpgradeResponse.newBuilder()
               .setTxnID(transactionLogIndex)
