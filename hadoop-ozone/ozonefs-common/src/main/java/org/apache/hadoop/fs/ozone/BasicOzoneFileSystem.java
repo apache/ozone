@@ -498,6 +498,14 @@ public class BasicOzoneFileSystem extends FileSystem {
     incrementCounter(Statistic.INVOCATION_DELETE, 1);
     statistics.incrementWriteOps(1);
     LOG.debug("Delete path {} - recursive {}", f, recursive);
+
+    String layOutVersion = adapter.getBucketLayoutVersion();
+    if (layOutVersion != null &&
+            OMConfigKeys.OZONE_OM_LAYOUT_VERSION_V1.equals(layOutVersion)) {
+      String key = pathToKey(f);
+      return adapter.deleteObject(key);
+    }
+
     FileStatus status;
     try {
       status = getFileStatus(f);

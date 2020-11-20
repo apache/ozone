@@ -475,6 +475,15 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
 
     testSeekOnFileLength();
     tableCleanup();
+
+    testFileDelete();
+    tableCleanup();
+
+    testDeleteRoot();
+    tableCleanup();
+
+    testRecursiveDelete();
+    tableCleanup();
   }
 
   /**
@@ -484,69 +493,23 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
    * @throws IOException DB failure
    */
   protected void tableCleanup() throws IOException {
-    OMMetadataManager metadataMgr = cluster.getOzoneManager()
-            .getMetadataManager();
-    TableIterator<String, ? extends
-            Table.KeyValue<String, OmDirectoryInfo>> dirTableIterator =
-            metadataMgr.getDirectoryTable().iterator();
-    dirTableIterator.seekToFirst();
-    ArrayList <String> dirList = new ArrayList<>();
-    while (dirTableIterator.hasNext()) {
-      String key = dirTableIterator.key();
-      if (StringUtils.isNotBlank(key)) {
-        dirList.add(key);
-      }
-      dirTableIterator.next();
+    Path root = new Path("/");
+    FileStatus[] fileStatuses = fs.listStatus(root);
+
+    if (fileStatuses == null) {
+      return;
     }
 
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>>>
-            cacheIterator = metadataMgr.getDirectoryTable().cacheIterator();
-    while(cacheIterator.hasNext()){
-      cacheIterator.next();
-      cacheIterator.remove();
+    for (FileStatus fStatus : fileStatuses) {
+      fs.delete(fStatus.getPath(), true);
     }
 
-    for (String dirKey : dirList) {
-      metadataMgr.getDirectoryTable().delete(dirKey);
-      Assert.assertNull("Unexpected entry!",
-              metadataMgr.getDirectoryTable().get(dirKey));
+    fileStatuses = fs.listStatus(root);
+    if (fileStatuses != null) {
+      Assert.assertEquals("Delete root failed!", 0, fileStatuses.length);
+      rootItemCount = 0;
+      return;
     }
-
-    Assert.assertTrue("DirTable is not empty",
-            metadataMgr.getDirectoryTable().isEmpty());
-
-    Assert.assertFalse(metadataMgr.getDirectoryTable().cacheIterator()
-            .hasNext());
-
-    TableIterator<String, ? extends
-            Table.KeyValue<String, OmKeyInfo>> keyTableIterator =
-            metadataMgr.getKeyTable().iterator();
-    keyTableIterator.seekToFirst();
-    ArrayList <String> fileList = new ArrayList<>();
-    while (keyTableIterator.hasNext()) {
-      String key = keyTableIterator.key();
-      if (StringUtils.isNotBlank(key)) {
-        fileList.add(key);
-      }
-      keyTableIterator.next();
-    }
-
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
-            keyCacheIterator = metadataMgr.getKeyTable().cacheIterator();
-    while(keyCacheIterator.hasNext()){
-      keyCacheIterator.next();
-      keyCacheIterator.remove();
-    }
-
-    for (String fileKey : fileList) {
-      metadataMgr.getKeyTable().delete(fileKey);
-      Assert.assertNull("Unexpected entry!",
-              metadataMgr.getKeyTable().get(fileKey));
-    }
-
-    Assert.assertTrue("KeyTable is not empty",
-            metadataMgr.getKeyTable().isEmpty());
-
     rootItemCount = 0;
   }
 

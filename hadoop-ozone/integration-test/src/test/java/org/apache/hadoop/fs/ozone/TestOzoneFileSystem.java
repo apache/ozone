@@ -380,7 +380,7 @@ public class TestOzoneFileSystem {
   }
 
 
-  private void testRecursiveDelete() throws Exception {
+  protected void testRecursiveDelete() throws Exception {
     Path grandparent = new Path("/gdir1");
 
     for (int i = 1; i <= 10; i++) {
@@ -451,7 +451,7 @@ public class TestOzoneFileSystem {
     }
   }
 
-  private void testFileDelete() throws Exception {
+  protected void testFileDelete() throws Exception {
     Path grandparent = new Path("/testBatchDelete");
     Path parent = new Path(grandparent, "parent");
     Path childFolder = new Path(parent, "childFolder");
