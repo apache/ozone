@@ -464,7 +464,7 @@ public class BlockInputStream extends InputStream
     }
   }
 
-  private void storePosition() {
+  private synchronized void storePosition() {
     blockPosition = getPos();
   }
 
