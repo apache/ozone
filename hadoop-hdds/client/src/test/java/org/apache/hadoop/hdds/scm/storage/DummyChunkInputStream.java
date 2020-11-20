@@ -32,19 +32,18 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
  */
 public class DummyChunkInputStream extends ChunkInputStream {
 
-  private byte[] chunkData;
+  private final byte[] chunkData;
 
   // Stores the read chunk data in each readChunk call
-  private List<ByteString> readByteBuffers = new ArrayList<>();
+  private final List<ByteString> readByteBuffers = new ArrayList<>();
 
-  public DummyChunkInputStream(TestChunkInputStream testChunkInputStream,
-      ChunkInfo chunkInfo,
+  public DummyChunkInputStream(ChunkInfo chunkInfo,
       BlockID blockId,
       XceiverClientFactory xceiverClientFactory,
       boolean verifyChecksum,
       byte[] data, Pipeline pipeline) {
-    super(chunkInfo, blockId, xceiverClientFactory, pipeline, verifyChecksum,
-        null);
+    super(chunkInfo, blockId, xceiverClientFactory, () -> pipeline,
+        verifyChecksum, null);
     this.chunkData = data;
   }
 

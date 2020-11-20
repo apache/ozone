@@ -20,15 +20,25 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import java.io.EOFException;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
+import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.test.GenericTestUtils;
 
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests for {@link ChunkInputStream}'s functionality.
@@ -59,7 +69,7 @@ public class TestChunkInputStream {
             chunkData, 0, CHUNK_SIZE).getProtoBufMessage())
         .build();
 
-    chunkStream = new DummyChunkInputStream(this, chunkInfo, null, null, true,
+    chunkStream = new DummyChunkInputStream(chunkInfo, null, null, true,
         chunkData, null);
   }
 
@@ -189,5 +199,35 @@ public class TestChunkInputStream {
     byte[] b2 = new byte[20];
     chunkStream.read(b2, 0, 20);
     matchWithInputData(b2, 20, 20);
+  }
+
+  @Test
+  public void connectsToNewPipeline() throws Exception {
+    // GIVEN
+    Pipeline pipeline = MockPipeline.createSingleNodePipeline();
+    Pipeline newPipeline = MockPipeline.createSingleNodePipeline();
+    XceiverClientFactory clientFactory = mock(XceiverClientFactory.class);
+    XceiverClientSpi client = mock(XceiverClientSpi.class);
+    when(clientFactory.acquireClientForReadData(pipeline))
+        .thenReturn(client);
+
+    AtomicReference<Pipeline> pipelineRef = new AtomicReference<>(pipeline);
+
+    ChunkInputStream subject = new ChunkInputStream(chunkInfo, null,
+        clientFactory, pipelineRef::get, false, null) {
+      @Override
+      protected ByteString readChunk(ChunkInfo readChunkInfo) {
+        return ByteString.copyFrom(chunkData);
+      }
+    };
+
+    // WHEN
+    subject.unbuffer();
+    pipelineRef.set(newPipeline);
+    int b = subject.read();
+
+    // THEN
+    Assert.assertNotEquals(-1, b);
+    verify(clientFactory).acquireClientForReadData(newPipeline);
   }
 }

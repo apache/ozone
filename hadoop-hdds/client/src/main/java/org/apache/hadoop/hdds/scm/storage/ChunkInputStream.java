@@ -43,6 +43,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * An {@link InputStream} called from BlockInputStream to read a chunk from the
@@ -57,7 +58,7 @@ public class ChunkInputStream extends InputStream
   private final BlockID blockID;
   private final XceiverClientFactory xceiverClientFactory;
   private XceiverClientSpi xceiverClient;
-  private final Pipeline pipeline;
+  private final Supplier<Pipeline> pipelineSupplier;
   private boolean verifyChecksum;
   private boolean allocated = false;
   // Buffer to store the chunk data read from the DN container
@@ -85,18 +86,19 @@ public class ChunkInputStream extends InputStream
   private static final int EOF = -1;
 
   ChunkInputStream(ChunkInfo chunkInfo, BlockID blockId,
-      XceiverClientFactory xceiverClientFactory, Pipeline pipeline,
+      XceiverClientFactory xceiverClientFactory,
+      Supplier<Pipeline> pipelineSupplier,
       boolean verifyChecksum, Token<? extends TokenIdentifier> token) {
     this.chunkInfo = chunkInfo;
     this.length = chunkInfo.getLen();
     this.blockID = blockId;
     this.xceiverClientFactory = xceiverClientFactory;
-    this.pipeline = pipeline;
+    this.pipelineSupplier = pipelineSupplier;
     this.verifyChecksum = verifyChecksum;
     this.token = token;
   }
 
-  public synchronized long getRemaining() throws IOException {
+  public synchronized long getRemaining() {
     return length - getPos();
   }
 
@@ -229,8 +231,7 @@ public class ChunkInputStream extends InputStream
     releaseClient();
   }
 
-  @VisibleForTesting
-  protected void releaseClient() {
+  protected synchronized void releaseClient() {
     if (xceiverClientFactory != null && xceiverClient != null) {
       xceiverClientFactory.releaseClient(xceiverClient, false);
       xceiverClient = null;
@@ -242,7 +243,8 @@ public class ChunkInputStream extends InputStream
    */
   protected synchronized void acquireClient() throws IOException {
     if (xceiverClientFactory != null && xceiverClient == null) {
-      xceiverClient = xceiverClientFactory.acquireClientForReadData(pipeline);
+      xceiverClient = xceiverClientFactory.acquireClientForReadData(
+          pipelineSupplier.get());
     }
   }
 
