@@ -29,6 +29,7 @@ import java.util.UUID;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -40,6 +41,7 @@ import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -80,16 +82,23 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
 
-    for (int i = 1; i <= 50; i++) {
+    for (int i = 1; i <= 10; i++) {
       String keyName = "Test-Key-" + i;
       writeTestData(store, volumeName, bucketName, keyName);
     }
 
     OzoneManager leader = cluster.getOMLeader();
-    leader.prepare();
+    OzoneManagerProtocolProtos.OMResponse omResponse =
+        leader.getOmRatisServer().submitRequest(buildPrepareRequest());
+    long prepareRequestLogIndex =
+        omResponse.getPrepareForUpgradeResponse().getTxnID();
+
+    // TODO: Determine if prepare request can still be in the log.
     assertFalse(logFilesPresentInRatisPeer(leader));
-    // TODO: Check snapshot index.
-    System.err.println("log index: " + leader.getRatisSnapshotIndex());
+    // Prepare request took snapshot excluding itself, wait for prepare
+    // request to be flushed.
+    LambdaTestUtils.await(3000, 500,
+        () -> leader.getRatisSnapshotIndex() == prepareRequestLogIndex);
   }
 
   /**

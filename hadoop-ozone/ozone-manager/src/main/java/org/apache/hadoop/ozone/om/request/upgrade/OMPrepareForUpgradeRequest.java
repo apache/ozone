@@ -1,7 +1,9 @@
 package org.apache.hadoop.ozone.om.request.upgrade;
 
+import org.apache.hadoop.hdds.ratis.RatisUpgradeUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -12,6 +14,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.PrepareForUpgrade;
+
+import org.apache.ratis.server.impl.RaftServerProxy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,7 +33,10 @@ public class OMPrepareForUpgradeRequest extends OMClientRequest {
   public OMClientResponse validateAndUpdateCache(
       OzoneManager ozoneManager, long transactionLogIndex,
       OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+
+    LOG.info("Received prepare request with log index {}", transactionLogIndex);
     LOG.trace("Request: {}", getOmRequest());
+
     OMResponse.Builder responseBuilder =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
     responseBuilder.setCmdType(PrepareForUpgrade);
@@ -37,24 +44,27 @@ public class OMPrepareForUpgradeRequest extends OMClientRequest {
 
     try {
       // Flush the Ratis log and take a snapshot.
-      ozoneManager.prepare();
+      OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
+      RaftServerProxy server = (RaftServerProxy) omRatisServer.getServer();
+      RatisUpgradeUtils.takeSnapshotAndPurgeLogs(server.getImpl(
+          omRatisServer.getRaftGroup().getGroupId()),
+          omRatisServer.getOmStateMachine());
 
       // TODO: Create marker file with txn index.
+
+      // Create response.
       OzoneManagerProtocolProtos.PrepareForUpgradeResponse omResponse =
           OzoneManagerProtocolProtos.PrepareForUpgradeResponse.newBuilder()
               .setTxnID(transactionLogIndex)
               .build();
       responseBuilder.setPrepareForUpgradeResponse(omResponse);
       response = new OMPrepareForUpgradeResponse(responseBuilder.build());
+      ozoneManagerDoubleBufferHelper.add(response, transactionLogIndex);
+
       LOG.trace("Returning response: {}", response);
     } catch (IOException e) {
       response = new OMFinalizeUpgradeResponse(
           createErrorOMResponse(responseBuilder, e));
-    } catch (InterruptedException e) {
-      OMException omEx = new OMException(e,
-          OMException.ResultCodes.INTERNAL_ERROR);
-      response = new OMFinalizeUpgradeResponse(
-          createErrorOMResponse(responseBuilder, omEx));
     }
 
     return response;

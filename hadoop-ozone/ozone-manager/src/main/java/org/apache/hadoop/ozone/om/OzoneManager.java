@@ -1032,6 +1032,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     LOG.info("Preparing {} for upgrade/downgrade.", getOMNodeId());
     // TODO: set a flag disallowing all requests except prepare and cancel
     //  prepare in the OzoneManagerStateMachine and OzoneManagerRatisServer.
+    //  This will be enabled as soon as prepare is seen in preAppend.
 
     if (!isRatisEnabled) {
       LOG.info("Ratis not enabled. Nothing to do.");
@@ -1039,12 +1040,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     RaftServerProxy server = (RaftServerProxy) omRatisServer.getServer();
-    RaftServerImpl impl =
-        server.getImpl(omRatisServer.getRaftGroup().getGroupId());
-    RatisUpgradeUtils.waitForAllTxnsApplied(omRatisServer.getOmStateMachine(),
-        impl,
-        OZONE_OM_MAX_TIME_TO_WAIT_FLUSH_TXNS,
-        OZONE_OM_FLUSH_TXNS_RETRY_INTERVAL_SECONDS);
+//    RaftServerImpl impl =
+//        server.getImpl(omRatisServer.getRaftGroup().getGroupId());
+//    RatisUpgradeUtils.waitForAllTxnsApplied(omRatisServer.getOmStateMachine(),
+//        impl,
+//        OZONE_OM_MAX_TIME_TO_WAIT_FLUSH_TXNS,
+//        OZONE_OM_FLUSH_TXNS_RETRY_INTERVAL_SECONDS);
+
+    long lastIndex = RatisUpgradeUtils.takeSnapshotAndPurgeLogs(server.getImpl(
+        omRatisServer.getRaftGroup().getGroupId()),
+        omRatisServer.getOmStateMachine());
 
     long appliedIndexFromRatis =
         omRatisServer.getOmStateMachine().getLastAppliedTermIndex().getIndex();
@@ -1064,10 +1069,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                   "since transaction info table index %d does not match ratis %s",
               dbIndex, appliedIndexFromRatis));
     }
-
-    long lastIndex = RatisUpgradeUtils.takeSnapshotAndPurgeLogs(server.getImpl(
-        omRatisServer.getRaftGroup().getGroupId()),
-        omRatisServer.getOmStateMachine());
 
     LOG.info("OM has been prepared for upgrade. All transactions " +
         "upto {} have been flushed to the state machine, " +
