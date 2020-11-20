@@ -37,6 +37,8 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.Test;
 
@@ -45,68 +47,101 @@ import org.junit.Test;
  */
 public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
+  /**
+   * Calls prepare on the leader OM which has no transaction information.
+   * Checks that it is brought into prepare mode successfully.
+   */
   @Test
-  public void testPrepare() throws Exception {
+  public void testPrepareWithoutTransactions() {
+
+  }
+
+  /**
+   * Writes data to the cluster via the leader OM, and then prepares it.
+   * Checks that the OM is prepared successfully.
+   */
+  @Test
+  public void testPrepareWithTransactions() throws Exception {
+
+  }
+
+  /**
+   * Writes data to the cluster.
+   * Shuts down one OM.
+   * Writes more data to the cluster.
+   * Submits prepare as ratis request.
+   * Checks that two live OMs are prepared.
+   * Revives the third OM
+   * Checks that third OM received all transactions and is prepared.
+   * @throws Exception
+   */
+  @Test
+  public void testPrepareDownedOM() throws Exception {
+    // Index of the OM that will be shut down during this test.
+    final int shutdownOMIndex = 1;
+
     MiniOzoneHAClusterImpl cluster = getCluster();
     OzoneClient ozClient = OzoneClientFactory.getRpcClient(getConf());
 
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     ObjectStore store = ozClient.getObjectStore();
-    String keyName = "Test-Key-1";
 
-//    // Create a key with all 3 OMs up.
-//    store.createVolume(volumeName);
-//    OzoneVolume volume = store.getVolume(volumeName);
-//    volume.createBucket(bucketName);
+    // Create keys with all 3 OMs up.
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
 
-//    for (int i = 1; i <= 50; i++) {
-//      keyName = "Test-Key-" + i;
-//      writeTestData(store, volumeName, bucketName, keyName);
-//    }
-
-//    // Shutdown any random OM.
-//    int index = new Random().nextInt(3);
-//    cluster.stopOzoneManager(index);
-//    OzoneManager downedOM = cluster.getOzoneManager(index);
-//
-//    // Write a Key with the remaining OMs up.
-//    for (int i = 51; i <= 100; i++) {
-//      keyName = "Test-Key-" + i;
-//      writeTestData(store, volumeName, bucketName, keyName);
-//      assertNotNull(getObjectStore().getVolume(volumeName)
-//          .getBucket(bucketName)
-//          .getKey(keyName));
-//    }
-
-    // TODO: Get log index to check snapshot.
-
-    for (int i = 0; i < cluster.getOzoneManagersList().size(); i++) {
-      OzoneManager om = cluster.getOzoneManager(i);
-      assertTrue(logFilesPresentInRatisPeer(om));
-      assertFalse(om.isPrepared());
-      om.prepare();
-      assertTrue(om.isPrepared());
-      assertFalse(logFilesPresentInRatisPeer(om));
+    for (int i = 1; i <= 50; i++) {
+      String keyName = "Test-Key-" + i;
+      writeTestData(store, volumeName, bucketName, keyName);
     }
 
-//    // Restart the downed OM and wait for it to catch up.
-//    cluster.restartOzoneManager(downedOM, true);
-//    String finalKeyName = keyName;
-//    LambdaTestUtils.await(20000, 5000, () -> {
-//      OMMetadataManager metadataManager = downedOM.getMetadataManager();
-//      String ozoneKey =
-//          metadataManager.getOzoneKey(volumeName, bucketName, finalKeyName);
-//      return (metadataManager.getKeyTable().isExist(ozoneKey));
-//    });
-//
-//    // Make sure downed OM has all data.
-//    for (int i = 1; i <= 100; i++) {
-//      OMMetadataManager metadataManager = downedOM.getMetadataManager();
-//      String ozoneKey =
-//          metadataManager.getOzoneKey(volumeName, bucketName, finalKeyName);
-//      assertTrue(metadataManager.getKeyTable().isExist(ozoneKey));
-//    }
+    // Shut down one OM.
+    cluster.stopOzoneManager(shutdownOMIndex);
+    OzoneManager downedOM = cluster.getOzoneManager(shutdownOMIndex);
+
+    // Write keys with the remaining OMs up.
+    for (int i = 51; i <= 100; i++) {
+      String keyName = "Test-Key-" + i;
+      writeTestData(store, volumeName, bucketName, keyName);
+      assertNotNull(getObjectStore().getVolume(volumeName)
+          .getBucket(bucketName)
+          .getKey(keyName));
+    }
+
+    // Check that running OMs have log data.
+    for (int i = 0; i < cluster.getOzoneManagersList().size(); i++) {
+      if (i != shutdownOMIndex) {
+        OzoneManager om = cluster.getOzoneManager(i);
+        assertTrue(logFilesPresentInRatisPeer(om));
+        assertFalse(om.isPrepared());
+      }
+    }
+
+    // Submit prepare request via Ratis.
+    OzoneManager leaderOM = cluster.getOzoneManager();
+    // TODO: Check index of response.
+    leaderOM.getOmRatisServer().submitRequest(buildPrepareRequest());
+
+    // Check that the two live OMs are prepared.
+    for (int i = 0; i < cluster.getOzoneManagersList().size(); i++) {
+      if (i != shutdownOMIndex) {
+        OzoneManager om = cluster.getOzoneManager(i);
+        // Wait for Ratis request to complete on this OM.
+        GenericTestUtils.waitFor(om::isPrepared, 500, 3000);
+        assertFalse(logFilesPresentInRatisPeer(om));
+        // TODO: Check snapshot index.
+      }
+    }
+
+    // Restart the downed OM and wait for it to catch up.
+    // Since prepare was the last Ratis transaction, it should have all data
+    // it missed once it receives the prepare transaction.
+    cluster.restartOzoneManager(downedOM, true);
+    GenericTestUtils.waitFor(downedOM::isPrepared, 500, 3000);
+    assertFalse(logFilesPresentInRatisPeer(downedOM));
+    // TODO: Check snapshot index.
   }
 
   private boolean logFilesPresentInRatisPeer(OzoneManager om) {
@@ -137,6 +172,19 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
         100, store, volumeName, bucketName);
     keyStream.write(data);
     keyStream.close();
+  }
+
+  private OzoneManagerProtocolProtos.OMRequest buildPrepareRequest() {
+    OzoneManagerProtocolProtos.PrepareForUpgradeRequest requestProto =
+        OzoneManagerProtocolProtos.PrepareForUpgradeRequest.newBuilder().build();
+
+    OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+        .setPrepareForUpgradeRequest(requestProto)
+        .setCmdType(OzoneManagerProtocolProtos.Type.PrepareForUpgrade)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+
+    return omRequest;
   }
 
 }
