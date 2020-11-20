@@ -62,7 +62,27 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    */
   @Test
   public void testPrepareWithTransactions() throws Exception {
+    MiniOzoneHAClusterImpl cluster = getCluster();
+    OzoneClient ozClient = OzoneClientFactory.getRpcClient(getConf());
 
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    ObjectStore store = ozClient.getObjectStore();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+
+    for (int i = 1; i <= 50; i++) {
+      String keyName = "Test-Key-" + i;
+      writeTestData(store, volumeName, bucketName, keyName);
+    }
+
+    OzoneManager leader = cluster.getOMLeader();
+    leader.prepare();
+    assertFalse(logFilesPresentInRatisPeer(leader));
+    // TODO: Check snapshot index.
+    System.err.println("log index: " + leader.getRatisSnapshotIndex());
   }
 
   /**
@@ -120,7 +140,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     }
 
     // Submit prepare request via Ratis.
-    OzoneManager leaderOM = cluster.getOzoneManager();
+    OzoneManager leaderOM = cluster.getOMLeader();
     // TODO: Check index of response.
     leaderOM.getOmRatisServer().submitRequest(buildPrepareRequest());
 
