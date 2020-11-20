@@ -35,9 +35,10 @@ public class DatanodeStoreSchemaOneImpl extends AbstractDatanodeStore {
    * @throws IOException - on Failure.
    */
   public DatanodeStoreSchemaOneImpl(ConfigurationSource config,
-                                    long containerID, String dbPath)
-          throws IOException {
-    super(config, containerID, new DatanodeSchemaOneDBDefinition(dbPath));
+      long containerID, String dbPath, boolean openReadOnly)
+      throws IOException {
+    super(config, containerID, new DatanodeSchemaOneDBDefinition(dbPath),
+        openReadOnly);
   }
 
   @Override
