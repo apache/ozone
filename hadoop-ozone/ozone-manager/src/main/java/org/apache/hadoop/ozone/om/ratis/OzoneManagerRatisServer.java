@@ -126,15 +126,32 @@ public final class OzoneManagerRatisServer {
   public OMResponse submitRequest(OMRequest omRequest) throws ServiceException {
     RaftClientRequest raftClientRequest =
         createWriteRaftClientRequest(omRequest);
-    RaftClientReply raftClientReply;
+    RaftClientReply raftClientReply = submitRequestToRatis(raftClientRequest);
+    return processReply(omRequest, raftClientReply);
+  }
+
+  /**
+   * API used internally from OzoneManager Server when requests needs to be
+   * submitted to ratis, where the crafted RaftClientRequest is passed along.
+   * @param omRequest
+   * @param raftClientRequest
+   * @return OMResponse
+   * @throws ServiceException
+   */
+  public OMResponse submitRequest(OMRequest omRequest,
+      RaftClientRequest raftClientRequest) throws ServiceException {
+    RaftClientReply raftClientReply = submitRequestToRatis(raftClientRequest);
+    return processReply(omRequest, raftClientReply);
+  }
+
+  private RaftClientReply submitRequestToRatis(
+      RaftClientRequest raftClientRequest) throws ServiceException {
     try {
-      raftClientReply = server.submitClientRequestAsync(raftClientRequest)
+      return server.submitClientRequestAsync(raftClientRequest)
           .get();
     } catch (Exception ex) {
       throw new ServiceException(ex.getMessage(), ex);
     }
-
-    return processReply(omRequest, raftClientReply);
   }
 
   /**
@@ -713,5 +730,9 @@ public final class OzoneManagerRatisServer {
 
   public TermIndex getLastAppliedTermIndex() {
     return omStateMachine.getLastAppliedTermIndex();
+  }
+
+  public RaftGroupId getRaftGroupId() {
+    return raftGroupId;
   }
 }
