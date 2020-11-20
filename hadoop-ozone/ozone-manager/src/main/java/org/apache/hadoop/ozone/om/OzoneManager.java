@@ -1026,17 +1026,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @throws InterruptedException
    * @throws IOException
    */
-  public boolean prepare()
+  public void prepare()
       throws InterruptedException, IOException {
 
     LOG.info("Preparing {} for upgrade/downgrade.", getOMNodeId());
-    // Setting this flag disallows all requests except prepare and cancel
-    // prepare in the OzoneManagerStateMachine and OzoneManagerRatisServer.
-    isPrepared = true;
+    // TODO: set a flag disallowing all requests except prepare and cancel
+    //  prepare in the OzoneManagerStateMachine and OzoneManagerRatisServer.
 
     if (!isRatisEnabled) {
       LOG.info("Ratis not enabled. Nothing to do.");
-      return true;
+      return;
     }
 
     RaftServerProxy server = (RaftServerProxy) omRatisServer.getServer();
@@ -1051,12 +1050,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         omRatisServer.getOmStateMachine().getLastAppliedTermIndex().getIndex();
     OMTransactionInfo omTransactionInfo =
         OMTransactionInfo.readTransactionInfo(metadataManager);
-    long index = omTransactionInfo.getTermIndex().getIndex();
-    if (index != appliedIndexFromRatis) {
+
+    // If there is no transaction info in the DB, Ratis's applied index
+    // should be 0.
+    long dbIndex = 0;
+    if (omTransactionInfo != null) {
+      dbIndex = omTransactionInfo.getTermIndex().getIndex();
+    }
+
+    if (dbIndex != appliedIndexFromRatis) {
       throw new IllegalStateException(
           String.format("Cannot prepare OM for Upgrade " +
                   "since transaction info table index %d does not match ratis %s",
-              index, appliedIndexFromRatis));
+              dbIndex, appliedIndexFromRatis));
     }
 
     long lastIndex = RatisUpgradeUtils.takeSnapshotAndPurgeLogs(server.getImpl(
@@ -1066,7 +1072,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     LOG.info("OM has been prepared for upgrade. All transactions " +
         "upto {} have been flushed to the state machine, " +
         "and a snapshot has been taken.", lastIndex);
-    return true;
+
+    // TODO: Determine if this needs to be thread safe.
+    isPrepared = true;
   }
 
   /**
