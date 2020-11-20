@@ -311,7 +311,10 @@ public final class OzoneManagerRatisServer {
     InetSocketAddress ratisAddr = new InetSocketAddress(
         omNodeDetails.getInetAddress(), omNodeDetails.getRatisPort());
 
-    RaftPeer localRaftPeer = new RaftPeer(localRaftPeerId, ratisAddr);
+    RaftPeer localRaftPeer = RaftPeer.newBuilder()
+        .setId(localRaftPeerId)
+        .setAddress(ratisAddr)
+        .build();
 
     List<RaftPeer> raftPeers = new ArrayList<>();
     // Add this Ratis server to the Ratis ring
@@ -322,11 +325,17 @@ public final class OzoneManagerRatisServer {
       RaftPeerId raftPeerId = RaftPeerId.valueOf(peerNodeId);
       RaftPeer raftPeer;
       if (peerInfo.isHostUnresolved()) {
-        raftPeer = new RaftPeer(raftPeerId, peerInfo.getRatisHostPortStr());
+        raftPeer = RaftPeer.newBuilder()
+            .setId(raftPeerId)
+            .setAddress(peerInfo.getRatisHostPortStr())
+            .build();
       } else {
         InetSocketAddress peerRatisAddr = new InetSocketAddress(
             peerInfo.getInetAddress(), peerInfo.getRatisPort());
-        raftPeer = new RaftPeer(raftPeerId, peerRatisAddr);
+        raftPeer = RaftPeer.newBuilder()
+            .setId(raftPeerId)
+            .setAddress(peerRatisAddr)
+            .build();
       }
 
       // Add other OM nodes belonging to the same OM service to the Ratis ring
