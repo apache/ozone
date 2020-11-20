@@ -75,10 +75,10 @@ public class StateContext {
   private final AtomicLong stateExecutionCount;
   private final ConfigurationSource conf;
   private final Set<InetSocketAddress> endpoints;
-  // Only keeps the latest Container/Node/PipelineReport
-  private GeneratedMessage containerReport;
+  // Only keeps the latest Container, Node and Pipeline report
+  private GeneratedMessage containerReports;
   private GeneratedMessage nodeReport;
-  private GeneratedMessage pipelineReport;
+  private GeneratedMessage pipelineReports;
   // CommandStatusReport and IncrementalContainerReport queued in the map below
   private final Map<InetSocketAddress, List<GeneratedMessage>> reports;
   private final Map<InetSocketAddress, Queue<ContainerAction>> containerActions;
@@ -88,11 +88,14 @@ public class StateContext {
   private boolean shutdownGracefully = false;
   private final AtomicLong threadPoolNotAvailableCount;
 
-  private static final String CONTAINER_REPORTS_PROTO_NAME =
+  @VisibleForTesting
+  static final String CONTAINER_REPORTS_PROTO_NAME =
       ContainerReportsProto.getDescriptor().getFullName();
-  private static final String NODE_REPORT_PROTO_NAME =
+  @VisibleForTesting
+  static final String NODE_REPORT_PROTO_NAME =
       NodeReportProto.getDescriptor().getFullName();
-  private static final String PIPELINE_REPORTS_PROTO_NAME =
+  @VisibleForTesting
+  static final String PIPELINE_REPORTS_PROTO_NAME =
       PipelineReportsProto.getDescriptor().getFullName();
 
   /**
@@ -120,9 +123,9 @@ public class StateContext {
     reports = new HashMap<>();
     // TODO: Even better, is there a way to initialize those as
     //  empty GeneratedMessage? In protobuf 3 there is Empty.Builder, not in 2?
-    containerReport = null;
+    containerReports = null;
     nodeReport = null;
-    pipelineReport = null;
+    pipelineReports = null;
 
     endpoints = new HashSet<>();
     containerActions = new HashMap<>();
@@ -224,11 +227,11 @@ public class StateContext {
       for (InetSocketAddress endpoint : endpoints) {
         // We only keep the latest container, node and pipeline report
         if (reportType.equals(CONTAINER_REPORTS_PROTO_NAME)) {
-          containerReport = report;
+          containerReports = report;
         } else if (reportType.equals(NODE_REPORT_PROTO_NAME)) {
           nodeReport = report;
         } else if (reportType.equals(PIPELINE_REPORTS_PROTO_NAME)) {
-          pipelineReport = report;
+          pipelineReports = report;
         } else {
           // CommandStatusReports and IncrementalContainerReport will be queued
           synchronized (reports) {
@@ -275,14 +278,14 @@ public class StateContext {
   public List<GeneratedMessage> getReports(InetSocketAddress endpoint,
                                            int maxLimit) {
     List<GeneratedMessage> reportsToReturn = new LinkedList<>();
-    if (containerReport != null) {
-      reportsToReturn.add(containerReport);
+    if (containerReports != null) {
+      reportsToReturn.add(containerReports);
     }
     if (nodeReport != null) {
       reportsToReturn.add(nodeReport);
     }
-    if (pipelineReport != null) {
-      reportsToReturn.add(pipelineReport);
+    if (pipelineReports != null) {
+      reportsToReturn.add(pipelineReports);
     }
     synchronized (reports) {
       List<GeneratedMessage> reportsForEndpoint = reports.get(endpoint);
@@ -627,15 +630,15 @@ public class StateContext {
     }
   }
 
-  public GeneratedMessage getContainerReport() {
-    return containerReport;
+  public GeneratedMessage getContainerReports() {
+    return containerReports;
   }
 
   public GeneratedMessage getNodeReport() {
     return nodeReport;
   }
 
-  public GeneratedMessage getPipelineReport() {
-    return pipelineReport;
+  public GeneratedMessage getPipelineReports() {
+    return pipelineReports;
   }
 }

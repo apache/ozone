@@ -23,6 +23,8 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.test.GenericTestUtils.waitFor;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -38,7 +40,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.protobuf.Descriptors;
+import com.google.protobuf.Descriptors.Descriptor;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
@@ -55,6 +57,75 @@ import com.google.protobuf.GeneratedMessage;
  */
 public class TestStateContext {
 
+  /**
+   * Check if Container, Node and Pipeline report APIs work as expected.
+   */
+  @Test
+  public void testContainerNodePipelineReportAPIs() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine datanodeStateMachineMock =
+        mock(DatanodeStateMachine.class);
+
+    // ContainerReports
+    StateContext context1 = newStateContext(conf, datanodeStateMachineMock);
+    assertNull(context1.getContainerReports());
+    assertNull(context1.getNodeReport());
+    assertNull(context1.getPipelineReports());
+    GeneratedMessage containerReports =
+        newMockGeneratedMessage(StateContext.CONTAINER_REPORTS_PROTO_NAME);
+    context1.addReport(containerReports);
+
+    assertNotNull(context1.getContainerReports());
+    assertEquals(StateContext.CONTAINER_REPORTS_PROTO_NAME,
+        context1.getContainerReports().getDescriptorForType().getFullName());
+    assertNull(context1.getNodeReport());
+    assertNull(context1.getPipelineReports());
+
+    // NodeReport
+    StateContext context2 = newStateContext(conf, datanodeStateMachineMock);
+    GeneratedMessage nodeReport =
+        newMockGeneratedMessage(StateContext.NODE_REPORT_PROTO_NAME);
+    context2.addReport(nodeReport);
+
+    assertNull(context2.getContainerReports());
+    assertNotNull(context2.getNodeReport());
+    assertEquals(StateContext.NODE_REPORT_PROTO_NAME,
+        context2.getNodeReport().getDescriptorForType().getFullName());
+    assertNull(context2.getPipelineReports());
+
+    // PipelineReports
+    StateContext context3 = newStateContext(conf, datanodeStateMachineMock);
+    GeneratedMessage pipelineReports =
+        newMockGeneratedMessage(StateContext.PIPELINE_REPORTS_PROTO_NAME);
+    context3.addReport(pipelineReports);
+
+    assertNull(context3.getContainerReports());
+    assertNull(context3.getNodeReport());
+    assertNotNull(context3.getPipelineReports());
+    assertEquals(StateContext.PIPELINE_REPORTS_PROTO_NAME,
+        context3.getPipelineReports().getDescriptorForType().getFullName());
+  }
+
+  private StateContext newStateContext(OzoneConfiguration conf,
+      DatanodeStateMachine datanodeStateMachineMock) {
+    StateContext stateContext = new StateContext(conf,
+        DatanodeStates.getInitState(), datanodeStateMachineMock);
+    InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
+    stateContext.addEndpoint(scm1);
+    InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
+    stateContext.addEndpoint(scm2);
+    return stateContext;
+  }
+
+  private GeneratedMessage newMockGeneratedMessage(String messageType) {
+    GeneratedMessage pipelineReports = mock(GeneratedMessage.class);
+    when(pipelineReports.getDescriptorForType()).thenReturn(
+        mock(Descriptor.class));
+    when(pipelineReports.getDescriptorForType().getFullName()).thenReturn(
+        messageType);
+    return pipelineReports;
+  }
+
   @Test
   public void testReportAPIs() {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -68,7 +139,7 @@ public class TestStateContext {
 
     GeneratedMessage generatedMessage = mock(GeneratedMessage.class);
     when(generatedMessage.getDescriptorForType()).thenReturn(
-        mock(Descriptors.Descriptor.class));
+        mock(Descriptor.class));
     when(generatedMessage.getDescriptorForType().getFullName()).thenReturn(
         "hadoop.hdds.CommandStatusReportsProto");
 
