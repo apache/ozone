@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -29,7 +28,6 @@ import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
@@ -79,7 +77,7 @@ public class KeyDeletingService extends BackgroundService {
   private final OzoneManager ozoneManager;
   private final ScmBlockLocationProtocol scmClient;
   private final KeyManager manager;
-  private ClientId clientId = ClientId.randomId();
+  private static ClientId clientId = ClientId.randomId();
   private final int keyLimitPerTask;
   private final AtomicLong deletedKeyCount;
   private final AtomicLong runCount;
@@ -271,7 +269,8 @@ public class KeyDeletingService extends BackgroundService {
       try {
         RaftClientRequest raftClientRequest =
             createRaftClientRequestForPurge(omRequest);
-        ozoneManager.getOmRatisServer().submitRequest(omRequest, raftClientRequest);
+        ozoneManager.getOmRatisServer().submitRequest(omRequest,
+            raftClientRequest);
       } catch (ServiceException e) {
         LOG.error("PurgeKey request failed. Will retry at next run.");
         return 0;
@@ -281,12 +280,13 @@ public class KeyDeletingService extends BackgroundService {
     }
   }
 
-  private RaftClientRequest createRaftClientRequestForPurge(OMRequest omRequest) {
-   return new RaftClientRequest(clientId,
-       ozoneManager.getOmRatisServer().getRaftPeerId(),
-       ozoneManager.getOmRatisServer().getRaftGroupId(), runCount.get(),
-       Message.valueOf(OMRatisHelper.convertRequestToByteString(omRequest)),
-       RaftClientRequest.writeRequestType(), null);
+  private RaftClientRequest createRaftClientRequestForPurge(
+      OMRequest omRequest) {
+    return new RaftClientRequest(clientId,
+        ozoneManager.getOmRatisServer().getRaftPeerId(),
+        ozoneManager.getOmRatisServer().getRaftGroupId(), runCount.get(),
+        Message.valueOf(OMRatisHelper.convertRequestToByteString(omRequest)),
+        RaftClientRequest.writeRequestType(), null);
   }
 
   /**
