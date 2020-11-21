@@ -185,6 +185,34 @@ public abstract class TestOzoneManagerHA {
     return keyName;
   }
 
+  protected OzoneBucket setupBucket() throws Exception {
+    String userName = "user" + RandomStringUtils.randomNumeric(5);
+    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+
+    VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
+        .setOwner(userName)
+        .setAdmin(adminName)
+        .build();
+
+    objectStore.createVolume(volumeName, createVolumeArgs);
+    OzoneVolume retVolumeinfo = objectStore.getVolume(volumeName);
+
+    Assert.assertTrue(retVolumeinfo.getName().equals(volumeName));
+    Assert.assertTrue(retVolumeinfo.getOwner().equals(userName));
+    Assert.assertTrue(retVolumeinfo.getAdmin().equals(adminName));
+
+    String bucketName = UUID.randomUUID().toString();
+    retVolumeinfo.createBucket(bucketName);
+
+    OzoneBucket ozoneBucket = retVolumeinfo.getBucket(bucketName);
+
+    Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
+    Assert.assertTrue(ozoneBucket.getVolumeName().equals(volumeName));
+
+    return ozoneBucket;
+  }
+
   /**
    * Stop the current leader OM.
    * @throws Exception
@@ -278,34 +306,6 @@ public abstract class TestOzoneManagerHA {
     byte[] fileContent = new byte[data.getBytes().length];
     ozoneInputStream.read(fileContent);
     Assert.assertEquals(data, new String(fileContent));
-  }
-
-  protected OzoneBucket setupBucket() throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-
-    VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
-        .setOwner(userName)
-        .setAdmin(adminName)
-        .build();
-
-    objectStore.createVolume(volumeName, createVolumeArgs);
-    OzoneVolume retVolumeinfo = objectStore.getVolume(volumeName);
-
-    Assert.assertTrue(retVolumeinfo.getName().equals(volumeName));
-    Assert.assertTrue(retVolumeinfo.getOwner().equals(userName));
-    Assert.assertTrue(retVolumeinfo.getAdmin().equals(adminName));
-
-    String bucketName = UUID.randomUUID().toString();
-    retVolumeinfo.createBucket(bucketName);
-
-    OzoneBucket ozoneBucket = retVolumeinfo.getBucket(bucketName);
-
-    Assert.assertTrue(ozoneBucket.getName().equals(bucketName));
-    Assert.assertTrue(ozoneBucket.getVolumeName().equals(volumeName));
-
-    return ozoneBucket;
   }
 
 }
