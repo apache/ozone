@@ -122,7 +122,7 @@ public class SimpleContainerDownloader implements ContainerDownloader {
     CompletableFuture<Path> result;
     try (GrpcReplicationClient grpcReplicationClient =
         new GrpcReplicationClient(datanode.getIpAddress(),
-            datanode.getPort(Name.STANDALONE).getValue(),
+            datanode.getPort(Name.INTRA_SERVER).getValue(),
             workingDirectory, securityConfig, caCert)) {
       result = grpcReplicationClient.download(containerId);
     }
