@@ -26,6 +26,7 @@ public class SetSpaceQuotaOptions {
 
   @CommandLine.Option(names = {"--space-quota"},
       description = "The maximum space quota can be used (eg. 1GB)")
+
   private String quotaInBytes;
 
   @CommandLine.Option(names = {"--count-quota"},
@@ -33,8 +34,13 @@ public class SetSpaceQuotaOptions {
           "buckets, and for buckets represents the number of keys (eg. 5)")
   private long quotaInCounts;
 
+  // Hidden option, added for backward compatibility.
+  @CommandLine.Option(names = {"--quota"}, hidden = true,
+      description = "Deprecated use --space-quota")
+  private String quotaInBytesDep;
+
   public String getQuotaInBytes() {
-    return quotaInBytes;
+    return quotaInBytes != null ? quotaInBytes : quotaInBytesDep;
   }
 
   public long getQuotaInCounts() {
