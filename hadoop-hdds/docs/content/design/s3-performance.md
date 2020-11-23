@@ -52,7 +52,7 @@ There are two problems with this approach:
 
 [CDI](http://cdi-spec.org/) is the specification of *Contexts and  Dependency Injection* for Java. Can be used for both JavaEE and JavaSE and it's integrated with most web frameworks. Ozone S3g uses this specification to inject different services to to REST handlers using `@Inject` annotation.
 
-`OzoneClient` is created by the `OzoneClientProduced`:
+`OzoneClient` is created by the `OzoneClientProducer`:
 
 ```
 @RequestScoped
