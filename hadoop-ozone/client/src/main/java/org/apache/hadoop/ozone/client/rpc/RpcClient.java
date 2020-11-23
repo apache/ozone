@@ -666,7 +666,7 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
-    if (clientConfig.isStreamBufferFlushDelay()) {
+    if (checkKeyNameEnabled) {
       HddsClientUtils.verifyKeyName(keyName);
     }
     HddsClientUtils.checkNotNull(keyName, type, factor);
