@@ -115,7 +115,7 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
     // Reprocess could be called from table having existing entries. Adding
     // an entry to simulate that.
     fileCountBySizeDao.insert(
-        new FileCountBySize("vol1", "bucket1", 1024L, 10L ));
+        new FileCountBySize("vol1", "bucket1", 1024L, 10L));
 
     Pair<String, Boolean> result =
         fileSizeCountTask.reprocess(omMetadataManager);
