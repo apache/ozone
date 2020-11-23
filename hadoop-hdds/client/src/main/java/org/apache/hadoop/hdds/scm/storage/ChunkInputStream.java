@@ -305,6 +305,11 @@ public class ChunkInputStream extends InputStream
       startByteIndex = bufferOffset + bufferLength;
     }
 
+    // bufferOffset and bufferLength are updated below, but if read fails
+    // and is retried, we need the previous position.  Position is reset after
+    // successful read in adjustBufferPosition()
+    storePosition();
+
     if (verifyChecksum) {
       // Update the bufferOffset and bufferLength as per the checksum
       // boundary requirement.

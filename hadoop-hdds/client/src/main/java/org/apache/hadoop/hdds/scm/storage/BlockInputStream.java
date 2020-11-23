@@ -29,7 +29,6 @@ import java.util.function.Function;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
@@ -37,7 +36,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
@@ -287,16 +285,9 @@ public class BlockInputStream extends InputStream
       int numBytesRead;
       try {
         numBytesRead = current.read(b, off, numBytesToRead);
-      } catch (ContainerNotFoundException e) {
-        handleContainerNotFound(e);
+      } catch (IOException e) {
+        handleReadError(e);
         continue;
-      } catch (StorageContainerException e) {
-        if (e.getResult() == ContainerProtos.Result.CONTAINER_NOT_FOUND) {
-          handleContainerNotFound(e);
-          continue;
-        } else {
-          throw e;
-        }
       }
 
       if (numBytesRead != numBytesToRead) {
@@ -468,7 +459,7 @@ public class BlockInputStream extends InputStream
     blockPosition = getPos();
   }
 
-  private void handleContainerNotFound(IOException cause) throws IOException {
+  private void handleReadError(IOException cause) throws IOException {
     releaseClient();
     final List<ChunkInputStream> inputStreams = this.chunkStreams;
     if (inputStreams != null) {
