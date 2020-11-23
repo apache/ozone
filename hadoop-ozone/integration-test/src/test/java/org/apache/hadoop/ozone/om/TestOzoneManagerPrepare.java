@@ -37,10 +37,10 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareForUpgradeRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareRequest;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -226,12 +226,11 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   }
 
   private OMRequest buildPrepareRequest() {
-    PrepareForUpgradeRequest requestProto =
-        PrepareForUpgradeRequest.newBuilder().build();
+    PrepareRequest requestProto = PrepareRequest.newBuilder().build();
 
     return OMRequest.newBuilder()
-        .setPrepareForUpgradeRequest(requestProto)
-        .setCmdType(OzoneManagerProtocolProtos.Type.PrepareForUpgrade)
+        .setPrepareRequest(requestProto)
+        .setCmdType(Type.Prepare)
         .setClientId(UUID.randomUUID().toString())
         .build();
   }

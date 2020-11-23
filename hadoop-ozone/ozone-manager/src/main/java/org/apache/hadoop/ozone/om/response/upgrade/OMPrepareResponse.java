@@ -29,8 +29,8 @@ import java.io.IOException;
  * Response for prepare request.
  */
 @CleanupTableInfo(cleanupAll = true)
-public class OMPrepareForUpgradeResponse extends OMClientResponse {
-  public OMPrepareForUpgradeResponse(
+public class OMPrepareResponse extends OMClientResponse {
+  public OMPrepareResponse(
       OzoneManagerProtocolProtos.OMResponse omResponse) {
     super(omResponse);
   }

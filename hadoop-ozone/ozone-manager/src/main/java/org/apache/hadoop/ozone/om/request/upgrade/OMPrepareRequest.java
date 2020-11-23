@@ -9,11 +9,12 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.upgrade.OMPrepareForUpgradeResponse;
+import org.apache.hadoop.ozone.om.response.upgrade.OMPrepareResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.PrepareForUpgrade;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
 import org.apache.ratis.server.impl.RaftServerImpl;
 import org.apache.ratis.server.impl.RaftServerProxy;
@@ -29,9 +30,9 @@ import java.io.IOException;
  * in the log is applied to the database in the old version of the code in one
  * OM, and the new version of the code on another OM.
  */
-public class OMPrepareForUpgradeRequest extends OMClientRequest {
+public class OMPrepareRequest extends OMClientRequest {
   private static final Logger LOG =
-      LoggerFactory.getLogger(OMPrepareForUpgradeRequest.class);
+      LoggerFactory.getLogger(OMPrepareRequest.class);
 
   // Allow double buffer this many seconds to flush all transactions before
   // returning an error to the caller.
@@ -39,7 +40,7 @@ public class OMPrepareForUpgradeRequest extends OMClientRequest {
   // Time between checks to see if double buffer finished flushing.
   private static final long DOUBLE_BUFFER_FLUSH_CHECK_SECONDS = 1;
 
-  public OMPrepareForUpgradeRequest(OMRequest omRequest) {
+  public OMPrepareRequest(OMRequest omRequest) {
     super(omRequest);
   }
 
@@ -52,17 +53,16 @@ public class OMPrepareForUpgradeRequest extends OMClientRequest {
 
     OMResponse.Builder responseBuilder =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
-    responseBuilder.setCmdType(PrepareForUpgrade);
+    responseBuilder.setCmdType(Type.Prepare);
     OMClientResponse response = null;
 
     try {
       // Create response.
-      OzoneManagerProtocolProtos.PrepareForUpgradeResponse omResponse =
-          OzoneManagerProtocolProtos.PrepareForUpgradeResponse.newBuilder()
+      PrepareResponse omResponse = PrepareResponse.newBuilder()
               .setTxnID(transactionLogIndex)
               .build();
       responseBuilder.setPrepareForUpgradeResponse(omResponse);
-      response = new OMPrepareForUpgradeResponse(responseBuilder.build());
+      response = new OMPrepareResponse(responseBuilder.build());
 
       // Add response to double buffer before clearing logs.
       // This guarantees the log index of this request will be the same as
@@ -92,10 +92,10 @@ public class OMPrepareForUpgradeRequest extends OMClientRequest {
       LOG.info("OM prepared at log index {}. Returning response {}",
           ozoneManager.getRatisSnapshotIndex(), omResponse);
     } catch (IOException e) {
-      response = new OMPrepareForUpgradeResponse(
+      response = new OMPrepareResponse(
           createErrorOMResponse(responseBuilder, e));
     } catch (InterruptedException e) {
-      response = new OMPrepareForUpgradeResponse(
+      response = new OMPrepareResponse(
           createErrorOMResponse(responseBuilder, new OMException(e,
               OMException.ResultCodes.INTERNAL_ERROR)));
     }
@@ -104,6 +104,6 @@ public class OMPrepareForUpgradeRequest extends OMClientRequest {
   }
 
   public static String getRequestType() {
-    return PrepareForUpgrade.name();
+    return Type.Prepare.name();
   }
 }

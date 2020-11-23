@@ -20,32 +20,32 @@ package org.apache.hadoop.ozone.om.request.upgrade;
 
 import org.apache.hadoop.ozone.om.request.key.TestOMKeyRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareForUpgradeRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareRequest;
 import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.UUID;
 
-public class TestOMPrepareForUpgradeRequest extends TestOMKeyRequest {
+public class TestOMPrepareRequest extends TestOMKeyRequest {
   @Test
   public void testRequest() {
     final int trxnLogIndex = 1;
 
-    PrepareForUpgradeRequest requestProto =
-        PrepareForUpgradeRequest.newBuilder().build();
+    PrepareRequest requestProto =
+        PrepareRequest.newBuilder().build();
 
     OMRequest omRequest = OMRequest.newBuilder()
-        .setPrepareForUpgradeRequest(requestProto)
-        .setCmdType(OzoneManagerProtocolProtos.Type.PrepareForUpgrade)
+        .setPrepareRequest(requestProto)
+        .setCmdType(Type.Prepare)
         .setClientId(UUID.randomUUID().toString())
         .build();
 
-    OMPrepareForUpgradeRequest prepareRequest =
-        new OMPrepareForUpgradeRequest(omRequest);
+    OMPrepareRequest prepareRequest =
+        new OMPrepareRequest(omRequest);
 
     OMClientResponse omClientResponse =
         prepareRequest.validateAndUpdateCache(ozoneManager,
