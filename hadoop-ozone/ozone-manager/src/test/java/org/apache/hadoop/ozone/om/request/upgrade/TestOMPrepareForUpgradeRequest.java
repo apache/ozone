@@ -21,6 +21,10 @@ package org.apache.hadoop.ozone.om.request.upgrade;
 import org.apache.hadoop.ozone.om.request.key.TestOMKeyRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareForUpgradeRequest;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -31,10 +35,10 @@ public class TestOMPrepareForUpgradeRequest extends TestOMKeyRequest {
   public void testRequest() {
     final int trxnLogIndex = 1;
 
-    OzoneManagerProtocolProtos.PrepareForUpgradeRequest requestProto =
-        OzoneManagerProtocolProtos.PrepareForUpgradeRequest.newBuilder().build();
+    PrepareForUpgradeRequest requestProto =
+        PrepareForUpgradeRequest.newBuilder().build();
 
-    OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+    OMRequest omRequest = OMRequest.newBuilder()
         .setPrepareForUpgradeRequest(requestProto)
         .setCmdType(OzoneManagerProtocolProtos.Type.PrepareForUpgrade)
         .setClientId(UUID.randomUUID().toString())
@@ -46,9 +50,9 @@ public class TestOMPrepareForUpgradeRequest extends TestOMKeyRequest {
     OMClientResponse omClientResponse =
         prepareRequest.validateAndUpdateCache(ozoneManager,
             trxnLogIndex, ozoneManagerDoubleBufferHelper);
-    OzoneManagerProtocolProtos.OMResponse omResponse = omClientResponse.getOMResponse();
+    OMResponse omResponse = omClientResponse.getOMResponse();
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK, omResponse.getStatus());
+    Assert.assertEquals(Status.OK, omResponse.getStatus());
     Assert.assertEquals(trxnLogIndex,
         omResponse.getPrepareForUpgradeResponse().getTxnID());
   }
