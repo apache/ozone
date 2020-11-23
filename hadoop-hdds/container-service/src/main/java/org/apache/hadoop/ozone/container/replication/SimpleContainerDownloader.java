@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,12 +76,8 @@ public class SimpleContainerDownloader implements ContainerDownloader {
 
     CompletableFuture<Path> result = null;
 
-    //There is a chance for the download is successful but import is failed,
-    //due to data corruption. We need a random selected datanode to have a
-    //chance to succeed next time.
-    final ArrayList<DatanodeDetails> shuffledDatanodes =
-        new ArrayList<>(sourceDatanodes);
-    Collections.shuffle(shuffledDatanodes);
+    final List<DatanodeDetails> shuffledDatanodes =
+        shuffleDatanodes(sourceDatanodes);
 
     for (DatanodeDetails datanode : shuffledDatanodes) {
       try {
@@ -107,6 +104,22 @@ public class SimpleContainerDownloader implements ContainerDownloader {
     }
     return result;
 
+  }
+
+  //There is a chance for the download is successful but import is failed,
+  //due to data corruption. We need a random selected datanode to have a
+  //chance to succeed next time.
+  @NotNull
+  protected List<DatanodeDetails> shuffleDatanodes(
+      List<DatanodeDetails> sourceDatanodes
+  ) {
+
+    final ArrayList<DatanodeDetails> shuffledDatanodes =
+        new ArrayList<>(sourceDatanodes);
+
+    Collections.shuffle(shuffledDatanodes);
+
+    return shuffledDatanodes;
   }
 
   @VisibleForTesting

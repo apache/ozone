@@ -156,6 +156,15 @@ public class TestSimpleContainerDownloader {
 
     return new SimpleContainerDownloader(conf, null) {
 
+      //for retry testing we use predictable list of datanodes.
+      @Override
+      protected List<DatanodeDetails> shuffleDatanodes(
+          List<DatanodeDetails> sourceDatanodes
+      ) {
+        //turn off randomization
+        return sourceDatanodes;
+      }
+
       @Override
       protected CompletableFuture<Path> downloadContainer(
           long containerId,
