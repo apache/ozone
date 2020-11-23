@@ -15,21 +15,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.exceptions;
+package org.apache.hadoop.ozone.upgrade;
 
 import java.io.IOException;
 
 /**
- * Exception thrown by SCM.
+ * Exception thrown when upgrade fails.
  */
-public class SCMException extends IOException {
-  private final ResultCodes result;
+public class UpgradeException extends IOException {
+
+  public static final String STATUS_CODE = "STATUS_CODE=";
+  private final UpgradeException.ResultCodes result;
 
   /**
    * Constructs an {@code IOException} with {@code null}
    * as its error detail message.
    */
-  public SCMException(ResultCodes result) {
+  public UpgradeException(UpgradeException.ResultCodes result) {
     this.result = result;
   }
 
@@ -40,7 +42,7 @@ public class SCMException extends IOException {
    * the
    * {@link #getMessage()} method)
    */
-  public SCMException(String message, ResultCodes result) {
+  public UpgradeException(String message, UpgradeException.ResultCodes result) {
     super(message);
     this.result = result;
   }
@@ -61,7 +63,8 @@ public class SCMException extends IOException {
    * cause is nonexistent or unknown.)
    * @since 1.6
    */
-  public SCMException(String message, Throwable cause, ResultCodes result) {
+  public UpgradeException(String message, Throwable cause,
+                          UpgradeException.ResultCodes result) {
     super(message, cause);
     this.result = result;
   }
@@ -78,7 +81,8 @@ public class SCMException extends IOException {
    * cause is nonexistent or unknown.)
    * @since 1.6
    */
-  public SCMException(Throwable cause, ResultCodes result) {
+  public UpgradeException(Throwable cause,
+                          UpgradeException.ResultCodes result) {
     super(cause);
     this.result = result;
   }
@@ -87,44 +91,26 @@ public class SCMException extends IOException {
    * Returns resultCode.
    * @return ResultCode
    */
-  public ResultCodes getResult() {
+  public UpgradeException.ResultCodes getResult() {
     return result;
   }
 
+  @Override
+  public String toString() {
+    return result + " " + super.toString();
+  }
   /**
    * Error codes to make it easy to decode these exceptions.
    */
   public enum ResultCodes {
+
     OK,
-    FAILED_TO_LOAD_NODEPOOL,
-    FAILED_TO_FIND_NODE_IN_POOL,
-    FAILED_TO_FIND_HEALTHY_NODES,
-    FAILED_TO_FIND_NODES_WITH_SPACE,
-    FAILED_TO_FIND_SUITABLE_NODE,
-    INVALID_CAPACITY,
-    INVALID_BLOCK_SIZE,
-    SAFE_MODE_EXCEPTION,
-    FAILED_TO_LOAD_OPEN_CONTAINER,
-    FAILED_TO_ALLOCATE_CONTAINER,
-    FAILED_TO_CHANGE_CONTAINER_STATE,
-    FAILED_TO_CHANGE_PIPELINE_STATE,
-    CONTAINER_EXISTS,
-    FAILED_TO_FIND_CONTAINER,
-    FAILED_TO_FIND_CONTAINER_WITH_SPACE,
-    BLOCK_EXISTS,
-    FAILED_TO_FIND_BLOCK,
-    IO_EXCEPTION,
-    UNEXPECTED_CONTAINER_STATE,
-    SCM_NOT_INITIALIZED,
-    DUPLICATE_DATANODE,
-    NO_SUCH_DATANODE,
-    NO_REPLICA_FOUND,
-    FAILED_TO_FIND_ACTIVE_PIPELINE,
-    FAILED_TO_INIT_CONTAINER_PLACEMENT_POLICY,
-    FAILED_TO_ALLOCATE_ENOUGH_BLOCKS,
-    INTERNAL_ERROR,
-    FAILED_TO_INIT_PIPELINE_CHOOSE_POLICY,
-    FAILED_TO_INIT_LEADER_CHOOSE_POLICY,
-    FAILED_TO_FINALIZE_UPGRADE
+
+    INVALID_REQUEST,
+
+    PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED,
+    REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED,
+    UPDATE_LAYOUT_VERSION_FAILED,
+    LAYOUT_FEATURE_FINALIZATION_FAILED;
   }
 }

@@ -56,6 +56,9 @@ import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
@@ -197,7 +200,7 @@ public class NodeStateManager implements Runnable, Closeable {
     state2EventMap.put(NodeState.STALE, SCMEvents.STALE_NODE);
     state2EventMap.put(NodeState.DEAD, SCMEvents.DEAD_NODE);
     state2EventMap
-        .put(NodeState.HEALTHY, SCMEvents.READ_ONLY_HEALTHY_TO_HEALTHY_NODE);
+        .put(HEALTHY, SCMEvents.READ_ONLY_HEALTHY_TO_HEALTHY_NODE);
     state2EventMap
         .put(NodeState.HEALTHY_READONLY,
             SCMEvents.NON_HEALTHY_TO_READONLY_HEALTHY_NODE);
@@ -289,7 +292,7 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   private void initializeStateMachine() {
     stateMachine.addTransition(
-        NodeState.HEALTHY_READONLY, NodeState.HEALTHY,
+        NodeState.HEALTHY_READONLY, HEALTHY,
         NodeLifeCycleEvent.LAYOUT_MATCH);
     stateMachine.addTransition(
         NodeState.HEALTHY_READONLY, NodeState.STALE,
@@ -298,9 +301,9 @@ public class NodeStateManager implements Runnable, Closeable {
         NodeState.HEALTHY_READONLY, NodeState.DECOMMISSIONING,
         NodeLifeCycleEvent.DECOMMISSION);
     stateMachine.addTransition(
-        NodeState.HEALTHY, NodeState.STALE, NodeLifeCycleEvent.TIMEOUT);
+        HEALTHY, NodeState.STALE, NodeLifeCycleEvent.TIMEOUT);
     stateMachine.addTransition(
-        NodeState.HEALTHY, NodeState.HEALTHY_READONLY,
+        HEALTHY, NodeState.HEALTHY_READONLY,
         NodeLifeCycleEvent.LAYOUT_MISMATCH);
     stateMachine.addTransition(
         NodeState.STALE, NodeState.DEAD, NodeLifeCycleEvent.TIMEOUT);
@@ -311,7 +314,7 @@ public class NodeStateManager implements Runnable, Closeable {
         NodeState.DEAD, NodeState.HEALTHY_READONLY,
         NodeLifeCycleEvent.RESURRECT);
     stateMachine.addTransition(
-        NodeState.HEALTHY, NodeState.DECOMMISSIONING,
+        HEALTHY, NodeState.DECOMMISSIONING,
         NodeLifeCycleEvent.DECOMMISSION);
     stateMachine.addTransition(
         NodeState.STALE, NodeState.DECOMMISSIONING,
@@ -418,7 +421,7 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   public List<DatanodeInfo> getHealthyNodes() {
     List<DatanodeInfo> allHealthyNodes;
-    allHealthyNodes = getNodes(NodeState.HEALTHY);
+    allHealthyNodes = getNodes(HEALTHY);
     allHealthyNodes.addAll(getNodes(NodeState.HEALTHY_READONLY));
     return allHealthyNodes;
   }
@@ -500,7 +503,7 @@ public class NodeStateManager implements Runnable, Closeable {
    * @return healthy node count
    */
   public int getHealthyNodeCount() {
-    return getNodeCount(NodeState.HEALTHY) +
+    return getNodeCount(HEALTHY) +
         getNodeCount(NodeState.HEALTHY_READONLY);
   }
 
@@ -627,6 +630,24 @@ public class NodeStateManager implements Runnable, Closeable {
     // 4. And the most important reason, heartbeats are not blocked even if
     // this thread does not run, they will go into the processing queue.
     scheduleNextHealthCheck();
+  }
+
+  public void forceNodesToHealthyReadOnly() {
+    try {
+      List<UUID> nodes = nodeStateMap.getNodes(HEALTHY);
+      for (UUID id : nodes) {
+        DatanodeInfo node = nodeStateMap.getNodeInfo(id);
+        nodeStateMap.updateNodeState(node.getUuid(), HEALTHY,
+            HEALTHY_READONLY);
+        if (state2EventMap.containsKey(HEALTHY_READONLY)) {
+          eventPublisher.fireEvent(state2EventMap.get(HEALTHY_READONLY),
+              node);
+        }
+      }
+    } catch (NodeNotFoundException ex) {
+      LOG.error("Inconsistent NodeStateMap! {}", nodeStateMap);
+      ex.printStackTrace();
+    }
   }
 
   private void checkNodesHealth() {

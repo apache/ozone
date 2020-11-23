@@ -235,4 +235,6 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   default HDDSLayoutVersionManager getLayoutVersionManager(){
     return null;
   }
+
+  default void forceNodesToHealthyReadOnly() { }
 }

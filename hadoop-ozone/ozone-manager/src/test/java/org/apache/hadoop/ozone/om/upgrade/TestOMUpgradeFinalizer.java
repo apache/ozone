@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.upgrade;
 
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.junit.Rule;
@@ -38,7 +38,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED;
+import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.ALREADY_FINALIZED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.STARTING_FINALIZATION;
@@ -137,7 +137,7 @@ public class TestOMUpgradeFinalizer {
     OMUpgradeFinalizer finalizer = new OMUpgradeFinalizer(versionManager);
     finalizer.finalize(CLIENT_ID, mockOzoneManager(2));
 
-    exception.expect(OMException.class);
+    exception.expect(UpgradeException.class);
     exception.expectMessage("Unknown client");
 
     finalizer.reportStatus(OTHER_CLIENT_ID, false);
@@ -199,10 +199,10 @@ public class TestOMUpgradeFinalizer {
       finalizer.finalize(CLIENT_ID, om);
       fail();
     } catch (Exception e) {
-      assertThat(e, instanceOf(OMException.class));
+      assertThat(e, instanceOf(UpgradeException.class));
       assertThat(e.getMessage(), containsString(lfs.iterator().next().name()));
       assertEquals(
-          ((OMException) e).getResult(),
+          ((UpgradeException) e).getResult(),
           LAYOUT_FEATURE_FINALIZATION_FAILED
       );
     }
