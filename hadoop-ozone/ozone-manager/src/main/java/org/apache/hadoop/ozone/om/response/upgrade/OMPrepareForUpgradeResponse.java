@@ -26,7 +26,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import java.io.IOException;
 
 /**
- * Response for finalizeUpgrade request.
+ * Response for prepare request.
  */
 @CleanupTableInfo(cleanupAll = true)
 public class OMPrepareForUpgradeResponse extends OMClientResponse {
