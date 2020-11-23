@@ -55,6 +55,7 @@ jobs:
         with:
           name: ozone-bin
           path: hadoop-ozone/dist/target/hadoop-ozone*.tar.gz
+          retention-days: 1
   bats:
     runs-on: ubuntu-18.04
     steps:
