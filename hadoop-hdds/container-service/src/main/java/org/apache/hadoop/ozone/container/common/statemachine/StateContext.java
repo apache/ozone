@@ -632,14 +632,17 @@ public class StateContext {
     }
   }
 
+  @VisibleForTesting
   public GeneratedMessage getContainerReports() {
     return containerReports;
   }
 
+  @VisibleForTesting
   public GeneratedMessage getNodeReport() {
     return nodeReport;
   }
 
+  @VisibleForTesting
   public GeneratedMessage getPipelineReports() {
     return pipelineReports;
   }
