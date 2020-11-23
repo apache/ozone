@@ -37,7 +37,7 @@ public class OMPrepareResponse extends OMClientResponse {
 
   @Override
   protected void addToDBBatch(OMMetadataManager omMetadataManager,
-                              BatchOperation batchOperation) throws IOException {
+      BatchOperation batchOperation) throws IOException {
 
   }
 }
