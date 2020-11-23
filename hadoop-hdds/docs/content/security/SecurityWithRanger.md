@@ -46,7 +46,7 @@ Property|Value
 ozone.acl.enabled         | true
 ozone.acl.authorizer.class| org.apache.ranger.authorization.ozone.authorizer.RangerOzoneAuthorizer
 
-The ranger permissions corresponding to the Ozone operations are as follows:
+The Ranger permissions corresponding to the Ozone operations are as follows:
 
 | operation&permission | Volume  permission | Bucket permission | Key permission |
 | :--- | :--- | :--- | :--- |

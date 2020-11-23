@@ -26,7 +26,7 @@ icon: user
 -->
 
 
-Apache Ranger™ 是一个用于管理和监控 Hadoop 平台复杂数据权限的框架。Apache Ranger 从2.0版本开始支持ozone鉴权。但由于在2.0中存在一些bug，因此我们更推荐使用Apache Ranger 2.1及以后版本。
+Apache Ranger™ 是一个用于管理和监控 Hadoop 平台复杂数据权限的框架。Apache Ranger 从2.0版本开始支持Ozone鉴权。但由于在2.0中存在一些bug，因此我们更推荐使用Apache Ranger 2.1及以后版本。
 
 你需要先在你的 Hadoop 集群上安装 Apache Ranger，安装指南可以参考 [Apache Ranger 官网](https://ranger.apache.org/index.html).
 
@@ -37,11 +37,11 @@ Apache Ranger™ 是一个用于管理和监控 Hadoop 平台复杂数据权限�
 ozone.acl.enabled         | true
 ozone.acl.authorizer.class| org.apache.ranger.authorization.ozone.authorizer.RangerOzoneAuthorizer
 
-Ozone各类操作对应ranger权限如下：
+Ozone各类操作对应Ranger权限如下：
 
 | operation&permission | Volume  permission | Bucket permission | Key permission |
 | :--- | :--- | :--- | :--- |
-| Create  volume | CREATE | | |
+| Create volume | CREATE | | |
 | List volume | LIST | | |
 | Get volume Info | READ | | |
 | Delete volume | DELETE | | |
