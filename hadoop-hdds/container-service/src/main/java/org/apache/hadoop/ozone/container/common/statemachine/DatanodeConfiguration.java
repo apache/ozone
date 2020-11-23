@@ -20,10 +20,13 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.PostConstruct;
+import org.apache.hadoop.hdds.conf.ConfigTag;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.time.Duration;
 
 /**
  * Configuration class used for high level datanode configuration parameters.
@@ -68,6 +71,27 @@ public class DatanodeConfiguration {
           "on a datanode"
   )
   private int containerDeleteThreads = CONTAINER_DELETE_THREADS_DEFAULT;
+
+  @Config(key = "block.deleting.service.interval",
+          defaultValue = "60s",
+          type = ConfigType.TIME,
+          tags = { ConfigTag.SCM, ConfigTag.DELETION },
+          description =
+                  "Time interval of the Datanode block deleting service. The "
+                          + "block deleting service runs on Datanode "
+                          + "periodically and deletes blocks queued for "
+                          + "deletion. Unit could be defined with "
+                          + "postfix (ns,ms,s,m,h,d). "
+  )
+  private long blockDeletionInterval = Duration.ofSeconds(60).toMillis();
+
+  public Duration getBlockDeletionInterval() {
+    return Duration.ofMillis(blockDeletionInterval);
+  }
+
+  public void setBlockDeletionInterval(Duration duration) {
+    this.blockDeletionInterval = duration.toMillis();
+  }
 
   @PostConstruct
   public void validate() {

@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -43,6 +44,7 @@ import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
@@ -56,8 +58,6 @@ import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import org.apache.ratis.grpc.GrpcTlsConfig;
@@ -141,16 +141,14 @@ public class OzoneContainer {
     readChannel = new XceiverServerGrpc(
         datanodeDetails, config, hddsDispatcher, certClient,
         createReplicationService());
-    long svcInterval = config
-        .getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
-            OZONE_BLOCK_DELETING_SERVICE_INTERVAL_DEFAULT,
-            TimeUnit.MILLISECONDS);
+    Duration svcInterval = conf.getObject(
+            DatanodeConfiguration.class).getBlockDeletionInterval();
     long serviceTimeout = config
         .getTimeDuration(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
             OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT,
             TimeUnit.MILLISECONDS);
     blockDeletingService =
-        new BlockDeletingService(this, svcInterval, serviceTimeout,
+        new BlockDeletingService(this, svcInterval.toMillis(), serviceTimeout,
             TimeUnit.MILLISECONDS, config);
     tlsClientConfig = RatisHelper.createTlsClientConfig(
         secConf, certClient != null ? certClient.getCACertificate() : null);

@@ -101,9 +101,9 @@ hdfs dfs -ls ofs://cluster1/volume/bucket/prefix/
 
 ## Implementation details
 
-Raft can guarantee the replication of any request if the request is persisted to the RAFT log on the majority of the nodes. To achive high throghput with Ozone Manager, it returns with the response even if the request is persisted only to the RAFT logs.
+Raft can guarantee the replication of any request if the request is persisted to the RAFT log on the majority of the nodes. To achieve high throughput with Ozone Manager, it returns with the response even if the request is persisted only to the RAFT logs.
 
-RocksDB instaces are updated by a background thread with batching transactions (so called "double buffer" as when one of the buffers is used to commit the data the other one collects all the new requests for the next commit.) To make all data available for the next request even if the background process is not yet wrote them the key data is cached in the memory.
+RocksDB instance are updated by a background thread with batching transactions (so called "double buffer" as when one of the buffers is used to commit the data the other one collects all the new requests for the next commit.) To make all data available for the next request even if the background process is not yet wrote them the key data is cached in the memory.
 
 ![Double buffer](HA-OM-doublebuffer.png)
 

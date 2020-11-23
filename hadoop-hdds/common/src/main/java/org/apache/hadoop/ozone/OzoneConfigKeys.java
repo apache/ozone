@@ -304,6 +304,11 @@ public final class OzoneConfigKeys {
   public static final double
       HDDS_DATANODE_STORAGE_UTILIZATION_CRITICAL_THRESHOLD_DEFAULT = 0.95;
 
+  public static final String HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE =
+      "hdds.datanode.metadata.rocksdb.cache.size";
+  public static final String
+      HDDS_DATANODE_METADATA_ROCKSDB_CACHE_SIZE_DEFAULT = "64MB";
+
   public static final String OZONE_SECURITY_ENABLED_KEY =
       "ozone.security.enabled";
   public static final boolean OZONE_SECURITY_ENABLED_DEFAULT = false;
