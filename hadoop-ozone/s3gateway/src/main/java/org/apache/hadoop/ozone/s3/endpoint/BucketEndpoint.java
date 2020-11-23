@@ -133,7 +133,7 @@ public class BucketEndpoint extends EndpointBase {
     response.setDelimiter(delimiter);
     response.setName(bucketName);
     response.setPrefix(prefix);
-    response.setMarker("");
+    response.setMarker(marker == null ? "" : marker);
     response.setMaxKeys(maxKeys);
     response.setEncodingType(ENCODING_TYPE);
     response.setTruncated(false);
