@@ -49,7 +49,7 @@ import org.junit.Test;
  */
 public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
-  private final String KEY_PREFIX = "key";
+  private final String keyPrefix = "key";
 
   /**
    * Calls prepare on the leader OM which has no transaction information.
@@ -83,7 +83,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
     Set<String> writtenKeys = new HashSet<>();
     for (int i = 1; i <= 10; i++) {
-      String keyName = KEY_PREFIX + i;
+      String keyName = keyPrefix + i;
       writeTestData(store, volumeName, bucketName, keyName);
       writtenKeys.add(keyName);
     }
@@ -99,7 +99,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
     // Make sure leader still has data.
     List<OmKeyInfo> keys = leader.getMetadataManager().listKeys(volumeName,
-        bucketName, null, KEY_PREFIX, 100);
+        bucketName, null, keyPrefix, 100);
 
     Assert.assertEquals(writtenKeys.size(), keys.size());
     for (OmKeyInfo keyInfo: keys) {
