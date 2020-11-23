@@ -54,70 +54,80 @@ public final class ConfigurationReflectionUtil {
       String prefix) {
     for (Field field : configurationClass.getDeclaredFields()) {
       if (field.isAnnotationPresent(Config.class)) {
-        if ((field.getModifiers() & Modifier.FINAL) != 0) {
-          throw new ConfigurationException(String.format(
-              "Trying to set final field %s#%s, probably indicates misplaced " +
-                  "@Config annotation",
-              configurationClass.getSimpleName(), field.getName()));
-        }
-
-        String fieldLocation =
-            configurationClass + "." + field.getName();
-
-        Config configAnnotation = field.getAnnotation(Config.class);
-
-        String key = prefix + "." + configAnnotation.key();
-
-        ConfigType type = configAnnotation.type();
-
-        if (type == ConfigType.AUTO) {
-          type = detectConfigType(field.getType(), fieldLocation);
-        }
-
-        //Note: default value is handled by ozone-default.xml. Here we can
-        //use any default.
-        try {
-          switch (type) {
-          case STRING:
-            forcedFieldSet(field, configuration, from.get(key));
-            break;
-          case INT:
-            forcedFieldSet(field, configuration, from.getInt(key, 0));
-            break;
-          case BOOLEAN:
-            forcedFieldSet(field, configuration, from.getBoolean(key, false));
-            break;
-          case LONG:
-            forcedFieldSet(field, configuration, from.getLong(key, 0));
-            break;
-          case TIME:
-            forcedFieldSet(field, configuration,
-                from.getTimeDuration(key, "0s", configAnnotation.timeUnit()));
-            break;
-          case SIZE:
-            final long value =
-                Math.round(from.getStorageSize(key, "0b", StorageUnit.BYTES));
-            if (field.getType() == int.class) {
-              forcedFieldSet(field, configuration, (int) value);
-            } else {
-              forcedFieldSet(field, configuration, value);
-
-            }
-            break;
-          case CLASS:
-            forcedFieldSet(field, configuration,
-                from.getClass(key, Object.class));
-            break;
-          default:
-            throw new ConfigurationException(
-                "Unsupported ConfigType " + type + " on " + fieldLocation);
-          }
-        } catch (IllegalAccessException e) {
-          throw new ConfigurationException(
-              "Can't inject configuration to " + fieldLocation, e);
-        }
+        injectField(from, configurationClass, configuration, prefix, field);
 
       }
+    }
+  }
+
+  public static <T> void injectField(
+      ConfigurationSource config,
+      Class<T> configurationClass,
+      T configuration,
+      String prefix,
+      Field field
+  ) {
+    if ((field.getModifiers() & Modifier.FINAL) != 0) {
+      throw new ConfigurationException(String.format(
+          "Trying to set final field %s#%s, probably indicates misplaced " +
+              "@Config annotation",
+          configurationClass.getSimpleName(), field.getName()));
+    }
+
+    String fieldLocation =
+        configurationClass + "." + field.getName();
+
+    Config configAnnotation = field.getAnnotation(Config.class);
+
+    String key = prefix + "." + configAnnotation.key();
+
+    ConfigType type = configAnnotation.type();
+
+    if (type == ConfigType.AUTO) {
+      type = detectConfigType(field.getType(), fieldLocation);
+    }
+
+    //Note: default value is handled by ozone-default.xml. Here we can
+    //use any default.
+    try {
+      switch (type) {
+      case STRING:
+        forcedFieldSet(field, configuration, config.get(key));
+        break;
+      case INT:
+        forcedFieldSet(field, configuration, config.getInt(key, 0));
+        break;
+      case BOOLEAN:
+        forcedFieldSet(field, configuration, config.getBoolean(key, false));
+        break;
+      case LONG:
+        forcedFieldSet(field, configuration, config.getLong(key, 0));
+        break;
+      case TIME:
+        forcedFieldSet(field, configuration,
+            config.getTimeDuration(key, "0s", configAnnotation.timeUnit()));
+        break;
+      case SIZE:
+        final long value =
+            Math.round(config.getStorageSize(key, "0b", StorageUnit.BYTES));
+        if (field.getType() == int.class) {
+          forcedFieldSet(field, configuration, (int) value);
+        } else {
+          forcedFieldSet(field, configuration, value);
+
+        }
+        break;
+      case CLASS:
+        forcedFieldSet(field, configuration,
+            config.getClass(key, Object.class));
+        break;
+      default:
+        throw new ConfigurationException(
+            "Unsupported ConfigType " + type + " on " + fieldLocation);
+      }
+    } catch (IllegalAccessException e) {
+      throw new ConfigurationException(
+          "Can't inject configuration to " + fieldLocation, e);
     }
   }
 

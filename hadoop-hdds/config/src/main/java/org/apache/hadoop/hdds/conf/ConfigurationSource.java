@@ -117,6 +117,23 @@ public interface ConfigurationSource {
     return configMap;
   }
 
+  default <T> void inject(T configObject) {
+    Class<T> configurationClass = (Class<T>) configObject.getClass();
+
+    ConfigGroup configGroup =
+        configurationClass.getAnnotation(ConfigGroup.class);
+
+    String prefix = configGroup.prefix();
+
+    ConfigurationReflectionUtil
+        .injectConfiguration(this, configurationClass, configObject,
+            prefix);
+
+    ConfigurationReflectionUtil
+        .callPostConstruct(configurationClass, configObject);
+
+  }
+
   /**
    * Create a Configuration object and inject the required configuration values.
    *
