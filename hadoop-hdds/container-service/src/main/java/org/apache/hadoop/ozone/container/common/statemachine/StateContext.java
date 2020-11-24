@@ -87,6 +87,10 @@ public class StateContext {
   @VisibleForTesting
   final static String INCREMENTAL_CONTAINER_REPORT_PROTO_NAME =
       IncrementalContainerReportProto.getDescriptor().getFullName();
+  // Accepted types of reports that can be queued to incrementalReportsQueue
+  private final static Set<String> ACCEPTED_INCREMENTAL_REPORT_TYPE_SET =
+      Sets.newHashSet(COMMAND_STATUS_REPORTS_PROTO_NAME,
+          INCREMENTAL_CONTAINER_REPORT_PROTO_NAME);
 
   static final Logger LOG =
       LoggerFactory.getLogger(StateContext.class);
@@ -104,10 +108,6 @@ public class StateContext {
   // Incremental reports are queued in the map below
   private final Map<InetSocketAddress, List<GeneratedMessage>>
       incrementalReportsQueue;
-  // Define accepted types of reports that can be queued to incrementalReports
-  private final static Set<String> ACCEPTED_INCREMENTAL_REPORT_TYPE_SET =
-      Sets.newHashSet(COMMAND_STATUS_REPORTS_PROTO_NAME,
-          INCREMENTAL_CONTAINER_REPORT_PROTO_NAME);
   private final Map<InetSocketAddress, Queue<ContainerAction>> containerActions;
   private final Map<InetSocketAddress, Queue<PipelineAction>> pipelineActions;
   private DatanodeStateMachine.DatanodeStates state;
