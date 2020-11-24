@@ -21,26 +21,29 @@ import javax.annotation.PreDestroy;
 import javax.enterprise.context.RequestScoped;
 import javax.enterprise.inject.Produces;
 import javax.inject.Inject;
+import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.core.Context;
 import java.io.IOException;
-import java.net.URISyntaxException;
+import java.nio.charset.Charset;
 import java.security.PrivilegedExceptionAction;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
+import org.apache.hadoop.ozone.s3.signature.SignatureProcessor;
+import org.apache.hadoop.ozone.s3.signature.StringToSignProducer;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 
+import com.google.common.annotations.VisibleForTesting;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
-import static org.apache.hadoop.ozone.s3.SignatureProcessor.UTF_8;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,12 +53,14 @@ import org.slf4j.LoggerFactory;
 @RequestScoped
 public class OzoneClientProducer {
 
+  private static final Charset UTF_8 = Charset.forName("utf-8");
+
   private final static Logger LOG =
       LoggerFactory.getLogger(OzoneClientProducer.class);
   private OzoneClient client;
 
   @Inject
-  private SignatureProcessor signatureParser;
+  private SignatureProcessor signatureProcessor;
 
   @Inject
   private OzoneConfiguration ozoneConfiguration;
@@ -66,15 +71,17 @@ public class OzoneClientProducer {
   @Inject
   private String omServiceID;
 
+  @Context
+  private ContainerRequestContext context;
 
   @Produces
   public OzoneClient createClient() throws OS3Exception, IOException {
     client = getClient(ozoneConfiguration);
     return client;
   }
-  
+
   @PreDestroy
-  public void destory() throws IOException {
+  public void destroy() throws IOException {
     client.close();
   }
 
@@ -82,35 +89,38 @@ public class OzoneClientProducer {
       throws OS3Exception {
     OzoneClient ozoneClient = null;
     try {
-      // Check if any error occurred during creation of signatureProcessor.
-      if (signatureParser.getException() != null) {
-        throw signatureParser.getException();
+      SignatureInfo signatureInfo = signatureProcessor.parseSignature();
+
+      String stringToSign = "";
+      if (signatureInfo.getAwsAccessId() != null
+          && signatureInfo.getAwsAccessId().length() > 0) {
+        stringToSign =
+            StringToSignProducer.createSignatureBase(signatureInfo, context);
       }
-      String awsAccessId = signatureParser.getAwsAccessId();
+
+      String awsAccessId = signatureInfo.getAwsAccessId();
       validateAccessId(awsAccessId);
 
       UserGroupInformation remoteUser =
           UserGroupInformation.createRemoteUser(awsAccessId);
       if (OzoneSecurityUtil.isSecurityEnabled(config)) {
         LOG.debug("Creating s3 auth info for client.");
-        try {
-          OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
-          identifier.setTokenType(S3AUTHINFO);
-          identifier.setStrToSign(signatureParser.getStringToSign());
-          identifier.setSignature(signatureParser.getSignature());
-          identifier.setAwsAccessId(awsAccessId);
-          identifier.setOwner(new Text(awsAccessId));
-          if (LOG.isTraceEnabled()) {
-            LOG.trace("Adding token for service:{}", omService);
-          }
-          Token<OzoneTokenIdentifier> token = new Token(identifier.getBytes(),
-              identifier.getSignature().getBytes(UTF_8),
-              identifier.getKind(),
-              omService);
-          remoteUser.addToken(token);
-        } catch (OS3Exception | URISyntaxException ex) {
-          throw S3_AUTHINFO_CREATION_ERROR;
+
+        OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
+        identifier.setTokenType(S3AUTHINFO);
+        identifier.setStrToSign(stringToSign);
+        identifier.setSignature(signatureInfo.getSignature());
+        identifier.setAwsAccessId(awsAccessId);
+        identifier.setOwner(new Text(awsAccessId));
+        if (LOG.isTraceEnabled()) {
+          LOG.trace("Adding token for service:{}", omService);
         }
+        Token<OzoneTokenIdentifier> token = new Token(identifier.getBytes(),
+            identifier.getSignature().getBytes(UTF_8),
+            identifier.getKind(),
+            omService);
+        remoteUser.addToken(token);
+
       }
       ozoneClient =
           remoteUser.doAs((PrivilegedExceptionAction<OzoneClient>)() -> {
@@ -130,12 +140,15 @@ public class OzoneClientProducer {
     } catch (Throwable t) {
       // For any other critical errors during object creation throw Internal
       // error.
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Error during Client Creation: ", t);
-      }
+      //      if (LOG.isDebugEnabled()) {
+      LOG.error("Error during Client Creation: ", t);
+      //      }
       throw INTERNAL_ERROR;
     }
     return ozoneClient;
+  }
+
+  private void getSignatureInfo() {
   }
 
   // ONLY validate aws access id when needed.
@@ -151,7 +164,7 @@ public class OzoneClientProducer {
   }
 
   @VisibleForTesting
-  public void setSignatureParser(SignatureProcessor signatureParser) {
-    this.signatureParser = signatureParser;
+  public void setSignatureParser(SignatureProcessor awsSignatureProcessor) {
+    this.signatureProcessor = awsSignatureProcessor;
   }
 }

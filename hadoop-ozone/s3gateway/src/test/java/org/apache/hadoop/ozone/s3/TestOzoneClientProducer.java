@@ -29,13 +29,15 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor;
 
-import static org.apache.hadoop.ozone.s3.SignatureProcessor.AUTHORIZATION_HEADER;
-import static org.apache.hadoop.ozone.s3.SignatureProcessor.CONTENT_MD5;
-import static org.apache.hadoop.ozone.s3.SignatureProcessor.CONTENT_TYPE;
-import static org.apache.hadoop.ozone.s3.SignatureProcessor.HOST_HEADER;
-import static org.apache.hadoop.ozone.s3.SignatureProcessor.X_AMAZ_DATE;
-import static org.apache.hadoop.ozone.s3.SignatureProcessor.X_AMZ_CONTENT_SHA256;
+//import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.AUTHORIZATION_HEADER;
+import static org.apache.hadoop.ozone.s3.signature.SignatureParser.AUTHORIZATION_HEADER;
+import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.CONTENT_MD5;
+import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.CONTENT_TYPE;
+import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.HOST_HEADER;
+import static org.apache.hadoop.ozone.s3.signature.StringToSignProducer.X_AMAZ_DATE;
+import static org.apache.hadoop.ozone.s3.signature.StringToSignProducer.X_AMZ_CONTENT_SHA256;
 import static org.junit.Assert.fail;
 
 import org.junit.Assert;
@@ -115,7 +117,6 @@ public class TestOzoneClientProducer {
 
     AWSSignatureProcessor awsSignatureProcessor = new AWSSignatureProcessor();
     awsSignatureProcessor.setContext(context);
-    awsSignatureProcessor.init();
 
     producer.setSignatureParser(awsSignatureProcessor);
   }

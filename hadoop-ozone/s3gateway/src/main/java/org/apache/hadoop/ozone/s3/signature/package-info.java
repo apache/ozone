@@ -19,4 +19,4 @@
 /**
  * This package contains Ozone S3 Authorization header.
  */
-package org.apache.hadoop.ozone.s3.header;
+package org.apache.hadoop.ozone.s3.signature;

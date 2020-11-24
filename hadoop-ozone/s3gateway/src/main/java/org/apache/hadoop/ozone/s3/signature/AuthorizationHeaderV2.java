@@ -16,12 +16,12 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3.header;
+package org.apache.hadoop.ozone.s3.signature;
 
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
+import com.google.common.base.Preconditions;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 /**
@@ -30,9 +30,13 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 public class AuthorizationHeaderV2 {
 
   public final static String IDENTIFIER = "AWS";
+
   private String authHeader;
+
   private String identifier;
+
   private String accessKeyID;
+
   private String signature;
 
   public AuthorizationHeaderV2(String auth) throws OS3Exception {
