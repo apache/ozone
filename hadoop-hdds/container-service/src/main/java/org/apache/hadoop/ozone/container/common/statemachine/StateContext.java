@@ -32,6 +32,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
@@ -97,9 +98,9 @@ public class StateContext {
   private final ConfigurationSource conf;
   private final Set<InetSocketAddress> endpoints;
   // Only the latest full report of each type is kept
-  private GeneratedMessage containerReports;
-  private GeneratedMessage nodeReport;
-  private GeneratedMessage pipelineReports;
+  private final AtomicReference<GeneratedMessage> containerReports;
+  private final AtomicReference<GeneratedMessage> nodeReport;
+  private final AtomicReference<GeneratedMessage> pipelineReports;
   // Incremental reports are queued in the map below
   private final Map<InetSocketAddress, List<GeneratedMessage>>
       incrementalReportsQueue;
@@ -137,9 +138,9 @@ public class StateContext {
     commandQueue = new LinkedList<>();
     cmdStatusMap = new ConcurrentHashMap<>();
     incrementalReportsQueue = new HashMap<>();
-    containerReports = null;
-    nodeReport = null;
-    pipelineReports = null;
+    containerReports = new AtomicReference<>();
+    nodeReport = new AtomicReference<>();
+    pipelineReports = new AtomicReference<>();
     endpoints = new HashSet<>();
     containerActions = new HashMap<>();
     pipelineActions = new HashMap<>();
@@ -241,11 +242,11 @@ public class StateContext {
     Preconditions.checkState(reportType != null);
     for (InetSocketAddress endpoint : endpoints) {
       if (reportType.equals(CONTAINER_REPORTS_PROTO_NAME)) {
-        containerReports = report;
+        containerReports.set(report);
       } else if (reportType.equals(NODE_REPORT_PROTO_NAME)) {
-        nodeReport = report;
+        nodeReport.set(report);
       } else if (reportType.equals(PIPELINE_REPORTS_PROTO_NAME)) {
-        pipelineReports = report;
+        pipelineReports.set(report);
       } else if (acceptedIncrementalReportTypeSet.contains(reportType)) {
         synchronized (incrementalReportsQueue) {
           incrementalReportsQueue.get(endpoint).add(report);
@@ -325,14 +326,17 @@ public class StateContext {
                                            int maxLimit) {
     List<GeneratedMessage> reportsToReturn =
         getIncrementalReports(endpoint, maxLimit);
-    if (containerReports != null) {
-      reportsToReturn.add(containerReports);
+    GeneratedMessage report = containerReports.get();
+    if (report != null) {
+      reportsToReturn.add(report);
     }
-    if (nodeReport != null) {
-      reportsToReturn.add(nodeReport);
+    report = nodeReport.get();
+    if (report != null) {
+      reportsToReturn.add(report);
     }
-    if (pipelineReports != null) {
-      reportsToReturn.add(pipelineReports);
+    report = pipelineReports.get();
+    if (report != null) {
+      reportsToReturn.add(report);
     }
     return reportsToReturn;
   }
@@ -670,16 +674,16 @@ public class StateContext {
 
   @VisibleForTesting
   public GeneratedMessage getContainerReports() {
-    return containerReports;
+    return containerReports.get();
   }
 
   @VisibleForTesting
   public GeneratedMessage getNodeReport() {
-    return nodeReport;
+    return nodeReport.get();
   }
 
   @VisibleForTesting
   public GeneratedMessage getPipelineReports() {
-    return pipelineReports;
+    return pipelineReports.get();
   }
 }
