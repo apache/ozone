@@ -163,6 +163,9 @@ public class HeartbeatEndpointTask
     // We only put back CommandStatusReports and IncrementalContainerReport
     // because those are incremental. Container/Node/PipelineReport are
     // accumulative so we can keep only the latest of each.
+    Preconditions.checkState(!requestBuilder.hasContainerReport());
+    Preconditions.checkState(!requestBuilder.hasNodeReport());
+    Preconditions.checkState(!requestBuilder.hasPipelineReports());
     if (requestBuilder.getCommandStatusReportsCount() != 0) {
       reports.addAll(requestBuilder.getCommandStatusReportsList());
     }
