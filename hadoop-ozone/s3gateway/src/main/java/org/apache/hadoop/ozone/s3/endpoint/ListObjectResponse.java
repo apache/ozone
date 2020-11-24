@@ -63,6 +63,9 @@ public class ListObjectResponse {
   @XmlElement(name = "NextContinuationToken")
   private String nextToken;
 
+  @XmlElement(name = "NextMarker")
+  private String nextMarker;
+
   @XmlElement(name = "continueToken")
   private String continueToken;
 
@@ -176,5 +179,13 @@ public class ListObjectResponse {
 
   public void setKeyCount(int keyCount) {
     this.keyCount = keyCount;
+  }
+
+  public void setNextMarker(String nextMarker) {
+    this.nextMarker = nextMarker;
+  }
+
+  public String getNextMarker() {
+    return nextMarker;
   }
 }

@@ -3,7 +3,7 @@ title: "高可用"
 weight: 1
 menu:
    main:
-      parent: 特性
+      parent: 特点
 summary: Ozone 用于避免单点故障的高可用设置
 ---
 
@@ -87,7 +87,7 @@ Ozone 有两个leader节点（用于键管理的 *Ozone Manager* 和用于块空
 </property>
 ```
 
-基于 [客户端接口]({{< ref path="interface/_index.md" lang="en">}}) ，定义好的 `serviceId` 就可用于替代单个 OM 主机。
+基于 [客户端接口]({{< ref path="interface/_index.zh.md" lang="zh">}}) ，定义好的 `serviceId` 就可用于替代单个 OM 主机。
 
 例如，使用 `o3fs://`
 
@@ -114,4 +114,4 @@ RocksDB 由后台的批处理事务线程负责更新（这也就是所谓的"�
 ## 参考文档
 
 * 查看 [该页面]({{< ref path="design/omha.md" lang="en">}}) 以获取详细设计文档；
-* Ozone 的分发包中的 compose/ozone-om-ha 目录下提供了一个配置 OM 高可用的示例，可以借助 [docker-compose]({{< ref path="start/RunningViaDocker.md" lang="en">}}) 进行测试。
+* Ozone 的分发包中的 `compose/ozone-om-ha` 目录下提供了一个配置 OM 高可用的示例，可以借助 [docker-compose]({{< ref path="start/RunningViaDocker.md" lang="en">}}) 进行测试。

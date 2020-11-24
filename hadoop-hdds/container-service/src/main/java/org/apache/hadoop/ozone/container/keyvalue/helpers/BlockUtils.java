@@ -61,15 +61,15 @@ public final class BlockUtils {
    */
   public static DatanodeStore getUncachedDatanodeStore(long containerID,
       String containerDBPath, String schemaVersion,
-      ConfigurationSource conf) throws IOException {
+      ConfigurationSource conf, boolean readOnly) throws IOException {
 
     DatanodeStore store;
     if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
       store = new DatanodeStoreSchemaOneImpl(conf,
-          containerID, containerDBPath);
+          containerID, containerDBPath, readOnly);
     } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
       store = new DatanodeStoreSchemaTwoImpl(conf,
-          containerID, containerDBPath);
+          containerID, containerDBPath, readOnly);
     } else {
       throw new IllegalArgumentException(
           "Unrecognized database schema version: " + schemaVersion);
@@ -88,11 +88,11 @@ public final class BlockUtils {
    * @throws IOException
    */
   public static DatanodeStore getUncachedDatanodeStore(
-      KeyValueContainerData containerData, ConfigurationSource conf)
-      throws IOException {
+      KeyValueContainerData containerData, ConfigurationSource conf,
+      boolean readOnly) throws IOException {
     return getUncachedDatanodeStore(containerData.getContainerID(),
         containerData.getDbFile().getAbsolutePath(),
-        containerData.getSchemaVersion(), conf);
+        containerData.getSchemaVersion(), conf, readOnly);
   }
 
   /**
