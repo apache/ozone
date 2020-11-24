@@ -36,6 +36,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.ratis.RatisUpgradeUtils;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ipc.ProtobufRpcEngine.Server;
@@ -77,6 +78,8 @@ import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
+import org.apache.ratis.server.impl.RaftServerImpl;
+import org.apache.ratis.server.impl.RaftServerProxy;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.LifeCycle;
@@ -85,6 +88,8 @@ import org.apache.ratis.util.StringUtils;
 import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.xml.ws.Response;
 
 /**
  * Creates a Ratis server endpoint for OM.
@@ -208,8 +213,18 @@ public final class OzoneManagerRatisServer {
     }
 
     try {
-      return OMRatisHelper.getOMResponseFromRaftClientReply(reply);
-    } catch (InvalidProtocolBufferException ex) {
+      OMResponse response =
+          OMRatisHelper.getOMResponseFromRaftClientReply(reply);
+
+      if (response.getCmdType() == OzoneManagerProtocolProtos.Type.Prepare) {
+        RaftServerProxy serverProxy = (RaftServerProxy) getServer();
+        RaftServerImpl serverImpl =
+            serverProxy.getImpl(raftGroup.getGroupId());
+        RatisUpgradeUtils.takeSnapshotAndPurgeLogs(serverImpl, omStateMachine);
+      }
+
+      return response;
+    } catch (IOException ex) {
       if (ex.getMessage() != null) {
         throw new ServiceException(ex.getMessage(), ex);
       } else {

@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -34,6 +35,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -41,6 +43,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareRequest;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -113,92 +116,99 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   }
 
   // TODO: Fix this test so it passes.
-//  /**
-//   * Writes data to the cluster.
-//   * Shuts down one OM.
-//   * Writes more data to the cluster.
-//   * Submits prepare as ratis request.
-//   * Checks that two live OMs are prepared.
-//   * Revives the third OM
-//   * Checks that third OM received all transactions and is prepared.
-//   * @throws Exception
-//   */
-//  @Test
-//  public void testPrepareDownedOM() throws Exception {
-//    // Index of the OM that will be shut down during this test.
-//    final int shutdownOMIndex = 1;
-//
-//    MiniOzoneHAClusterImpl cluster = getCluster();
-//    OzoneClient ozClient = OzoneClientFactory.getRpcClient(getConf());
-//
-//    String volumeName = UUID.randomUUID().toString();
-//    String bucketName = UUID.randomUUID().toString();
-//    ObjectStore store = ozClient.getObjectStore();
-//
-//    // Create keys with all 3 OMs up.
-//    store.createVolume(volumeName);
-//    OzoneVolume volume = store.getVolume(volumeName);
-//    volume.createBucket(bucketName);
-//
-//    Set<String> writtenKeys = new HashSet<>();
-//    for (int i = 1; i <= 50; i++) {
-//      String keyName = KEY_PREFIX + i;
-//      writeTestData(store, volumeName, bucketName, keyName);
-//      writtenKeys.add(keyName);
-//    }
-//
-//    // Shut down one OM.
-//    cluster.stopOzoneManager(shutdownOMIndex);
-//    OzoneManager downedOM = cluster.getOzoneManager(shutdownOMIndex);
-//
-//    // Write keys with the remaining OMs up.
-//    for (int i = 51; i <= 100; i++) {
-//      String keyName = KEY_PREFIX + i;
-//      writeTestData(store, volumeName, bucketName, keyName);
-//      writtenKeys.add(keyName);
-//    }
-//
-//    // Check that running OMs have log data.
-//    for (int i = 0; i < cluster.getOzoneManagersList().size(); i++) {
-//      if (i != shutdownOMIndex) {
-//        OzoneManager om = cluster.getOzoneManager(i);
-//        assertTrue(logFilesPresentInRatisPeer(om));
-//        assertFalse(om.isPrepared());
-//      }
-//    }
-//
-//    // Submit prepare request via Ratis.
-//    OzoneManager leaderOM = cluster.getOMLeader();
-//    long prepareIndex =
-//        leaderOM.getOmRatisServer().submitRequest(buildPrepareRequest())
-//            .getPrepareForResponse()
-//            .getTxnID();
-//
-//    // Check that the two live OMs are prepared.
+  /**
+   * Writes data to the cluster.
+   * Shuts down one OM.
+   * Writes more data to the cluster.
+   * Submits prepare as ratis request.
+   * Checks that two live OMs are prepared.
+   * Revives the third OM
+   * Checks that third OM received all transactions and is prepared.
+   * @throws Exception
+   */
+  @Test
+  public void testPrepareDownedOM() throws Exception {
+    // Index of the OM that will be shut down during this test.
+    final int shutdownOMIndex = 2;
+
+    MiniOzoneHAClusterImpl cluster = getCluster();
+    OzoneClient ozClient = OzoneClientFactory.getRpcClient(getConf());
+
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    ObjectStore store = ozClient.getObjectStore();
+
+    // Create keys with all 3 OMs up.
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+
+    Set<String> writtenKeys = new HashSet<>();
+    for (int i = 1; i <= 50; i++) {
+      String keyName = keyPrefix + i;
+      writeTestData(store, volumeName, bucketName, keyName);
+      writtenKeys.add(keyName);
+    }
+
+    // Shut down one OM.
+    // TODO: This call goes down to OzoneManagerRatisServer#stop, which
+    //  sometimes throws an exception on RaftServer#close:
+    //  SegmentedRaftLog is expected to be opened but it is CLOSED
+    //  For some reason, this happens on the two OMs we are not trying to
+    //  shut down.
+    cluster.stopOzoneManager(shutdownOMIndex);
+    OzoneManager downedOM = cluster.getOzoneManager(shutdownOMIndex);
+    Assert.assertFalse(downedOM.isRunning());
+
+    // Write keys with the remaining OMs up.
+    for (int i = 51; i <= 100; i++) {
+      String keyName = keyPrefix + i;
+      writeTestData(store, volumeName, bucketName, keyName);
+      writtenKeys.add(keyName);
+    }
+
+    // Submit prepare request via Ratis.
+    OzoneManager leaderOM = cluster.getOMLeader();
+    long prepareIndex =
+        leaderOM.getOmRatisServer().submitRequest(buildPrepareRequest())
+            .getPrepareResponse()
+            .getTxnID();
+
+    // Check that the two live OMs are prepared.
+    // TODO: Wait for followers to apply transaction (don't wait for leader).
 //    for (int i = 0; i < cluster.getOzoneManagersList().size(); i++) {
 //      if (i != shutdownOMIndex) {
 //        OzoneManager om = cluster.getOzoneManager(i);
 //        checkPrepared(om, prepareIndex);
 //      }
 //    }
-//
-//    // Restart the downed OM and wait for it to catch up.
-//    // Since prepare was the last Ratis transaction, it should have all data
-//    // it missed once it receives the prepare transaction.
-//    cluster.restartOzoneManager(downedOM, true);
-//    checkPrepared(downedOM, prepareIndex);
-//
-//    // Make sure all OMs still have data.
-//    for (OzoneManager om: cluster.getOzoneManagersList()) {
-//      List<OmKeyInfo> keys = om.getMetadataManager().listKeys(volumeName,
-//          bucketName, null, KEY_PREFIX, 100);
-//
-//      Assert.assertEquals(writtenKeys.size(), keys.size());
-//      for (OmKeyInfo keyInfo: keys) {
-//        Assert.assertTrue(writtenKeys.contains(keyInfo.getKeyName()));
-//      }
-//    }
-//  }
+
+    // Restart the downed OM and wait for it to catch up.
+    // Since prepare was the last Ratis transaction, it should have all data
+    // it missed once it receives the prepare transaction.
+    cluster.restartOzoneManager(downedOM, true);
+    // Wait for other OMs to catch this one up on transactions.
+    try {
+      LambdaTestUtils.await(3000, 1000,
+          () -> downedOM.getRatisSnapshotIndex() == prepareIndex);
+    } catch (TimeoutException e) {
+      // DEBUG
+      long i = downedOM.getRatisSnapshotIndex();
+      throw e;
+    }
+    checkPrepared(downedOM, prepareIndex);
+
+    // Make sure all OMs still have data.
+    for (OzoneManager om: cluster.getOzoneManagersList()) {
+      List<OmKeyInfo> readKeys = om.getMetadataManager().listKeys(volumeName,
+          bucketName, null, keyPrefix, 100);
+
+      Assert.assertEquals(writtenKeys.size(), readKeys.size());
+      for (OmKeyInfo keyInfo: readKeys) {
+        Assert.assertTrue(writtenKeys.contains(keyInfo.getKeyName()));
+      }
+    }
+  }
 
   private boolean logFilesPresentInRatisPeer(OzoneManager om) {
     String ratisDir = om.getOmRatisServer().getServer().getProperties()

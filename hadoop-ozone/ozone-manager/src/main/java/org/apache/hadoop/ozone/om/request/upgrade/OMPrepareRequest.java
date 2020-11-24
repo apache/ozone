@@ -34,10 +34,12 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 
 import org.apache.ratis.server.impl.RaftServerImpl;
 import org.apache.ratis.server.impl.RaftServerProxy;
+import org.apache.ratis.statemachine.StateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 /**
  * OM Request used to flush all transactions to disk, take a DB snapshot, and
@@ -85,23 +87,12 @@ public class OMPrepareRequest extends OMClientRequest {
       // the snapshot index in the prepared state.
       ozoneManagerDoubleBufferHelper.add(response, transactionLogIndex);
 
-      OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
-      OzoneManagerStateMachine omStateMachine =
-          omRatisServer.getOmStateMachine();
-      RaftServerProxy server = (RaftServerProxy) omRatisServer.getServer();
-      RaftServerImpl serverImpl =
-          server.getImpl(omRatisServer.getRaftGroup().getGroupId());
-
       // Wait for outstanding double buffer entries to flush to disk,
       // so they will not be purged from the log before being persisted to
       // the DB.
-      RatisUpgradeUtils.waitForAllTxnsApplied(omStateMachine, serverImpl,
+      waitForDoubleBufferFlush(ozoneManager, transactionLogIndex,
           DOUBLE_BUFFER_FLUSH_TIMEOUT_SECONDS,
           DOUBLE_BUFFER_FLUSH_CHECK_SECONDS);
-
-      // Take a snapshot, then purge the Ratis log.
-      RatisUpgradeUtils.takeSnapshotAndPurgeLogs(server.getImpl(
-          omRatisServer.getRaftGroup().getGroupId()), omStateMachine);
 
       // TODO: Create marker file with txn index.
 
@@ -117,6 +108,32 @@ public class OMPrepareRequest extends OMClientRequest {
     }
 
     return response;
+  }
+
+  private static void waitForDoubleBufferFlush(
+      OzoneManager ozoneManager,
+      long txnLogIndex,
+      long maxTimeToWaitSeconds,
+      long timeBetweenRetryInSeconds)
+      throws InterruptedException, IOException {
+
+    long intervalTime = TimeUnit.SECONDS.toMillis(timeBetweenRetryInSeconds);
+    long endTime = System.currentTimeMillis() +
+        TimeUnit.SECONDS.toMillis(maxTimeToWaitSeconds);
+    boolean success = false;
+    while (System.currentTimeMillis() < endTime) {
+      success = (ozoneManager.getRatisSnapshotIndex() == txnLogIndex);
+      if (ozoneManager.getRatisSnapshotIndex() == txnLogIndex) {
+        break;
+      }
+      Thread.sleep(intervalTime);
+    }
+
+    if (!success) {
+      throw new IOException(String.format("After waiting for %d seconds, " +
+              "State Machine has not applied  all the transactions.",
+          maxTimeToWaitSeconds));
+    }
   }
 
   public static String getRequestType() {
