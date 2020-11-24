@@ -696,22 +696,12 @@ public class KeyManagerImpl implements KeyManager {
     // Refresh container pipeline info from SCM
     // based on OmKeyArgs.refreshPipeline flag
     // value won't be null as the check is done inside try/catch block.
-    refreshPipeline(value);
+    refresh(value);
 
     if (args.getSortDatanodes()) {
       sortDatanodeInPipeline(value, clientAddress);
     }
     return value;
-  }
-
-  /**
-   * Refresh pipeline info in OM by asking SCM.
-   * @param value OmKeyInfo
-   */
-  @VisibleForTesting
-  protected void refreshPipeline(OmKeyInfo value) throws IOException {
-    Preconditions.checkNotNull(value, "OMKeyInfo cannot be null");
-    refreshPipeline(Arrays.asList(value));
   }
 
   /**
@@ -1825,7 +1815,7 @@ public class KeyManagerImpl implements KeyManager {
         // refreshPipeline flag check has been removed as part of
         // https://issues.apache.org/jira/browse/HDDS-3658.
         // Please refer this jira for more details.
-        refreshPipeline(fileKeyInfo);
+        refresh(fileKeyInfo);
         if (sortDatanodes) {
           sortDatanodeInPipeline(fileKeyInfo, clientAddress);
         }
