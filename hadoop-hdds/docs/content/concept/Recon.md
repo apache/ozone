@@ -63,7 +63,7 @@ requested again to keep the local db in sync with OM db. Due to this, Recon can
 show stale information since the local db will not always be in sync.
 
 The db updates retrieved from OM is then converted into a batch of events for 
-further processing by OM db tasks via [Recon Tasks Framework](#tasks-framework). 
+further processing by OM db tasks via [Recon Task Framework](#task-framework). 
 
 
 ## Recon and Storage Container Manager
@@ -77,14 +77,11 @@ cluster, all the datanodes register with Recon and send heartbeats, container
 reports, incremental container reports etc. to Recon similar to SCM. Recon uses
 all the information it gets from datanodes to construct its own copy of SCM rocks db 
 locally. Recon never sends any command to datanodes in response and just acts as
-a passive SCM for faster querying of SCM database.  
+a passive SCM for faster lookup of SCM metadata.
 
-The data in local SCM db is consumed by all the SCM db tasks triggered at 
-defined intervals via [Recon Tasks Framework](#tasks-framework).
+## <a name="task-framework"></a> Task Framework
 
-## <a name="tasks-framework"></a> Tasks Framework
-
-Recon has its own Tasks framework to enable batch processing of data obtained 
+Recon has its own Task framework to enable batch processing of data obtained 
 from OM and SCM. A task can listen to and act upon db events such as `PUT`, `DELETE`,
 `UPDATE`, etc. on either OM db or SCM db. Based on this, a task either implements 
 `org.apache.hadoop.ozone.recon.tasks.ReconOmTask` or extends 
@@ -139,7 +136,7 @@ to the Prometheus endpoint like `ozone.recon.prometheus.http.endpoint=localhost:
        * Keeps track of the number of files present within a file size range in the cluster
      * ReconTaskStatus table
        * Keeps track of the status and last run timestamp of the registered OM and SCM 
-       db tasks in the [Recon Tasks Framework](#tasks-framework)
+       db tasks in the [Recon Task Framework](#task-framework)
      * ContainerHistory table
        * Stores ContainerReplica -> Datanode mapping with last known timestamp. This 
        is used to determine the last known datanodes when a container is reported missing 
@@ -156,7 +153,7 @@ ozone.recon.http-address | 0.0.0.0:9888 | The address and the base port where th
 ozone.recon.address | 0.0.0.0:9891 | RPC address of the Recon.
 ozone.recon.db.dir | none | Directory where the Recon Server stores its metadata.
 ozone.recon.om.db.dir | none | Directory where the Recon Server stores its OM snapshot DB.
-ozone.recon.om.snapshot<br>.task.interval.delay | 10m | Interval in MINUTES by Recon to request OM DB Snapshot.
+ozone.recon.om.snapshot<br>.task.interval.delay | 10m | Interval in MINUTES by Recon to request OM DB Snapshot / delta updates.
 ozone.recon.task<br>.missingcontainer.interval | 300s | Time interval of the periodic check for Unhealthy Containers in the cluster.
 ozone.recon.sql.db.jooq.dialect | DERBY | Please refer to [SQL Dialect](https://www.jooq.org/javadoc/latest/org.jooq/org/jooq/SQLDialect.html) to specify a different dialect.
 ozone.recon.sql.db.jdbc.url | jdbc:derby:${ozone.recon.db.dir}<br>/ozone_recon_derby.db | Recon SQL database jdbc url.
