@@ -309,7 +309,6 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           new CacheValue<>(Optional.of(omKeyInfo), trxnLogIndex));
 
       omBucketInfo.incrUsedBytes(preAllocatedSpace);
-      OmBucketInfo copyBucketInfo = omBucketInfo.copyObject();
 
       // Prepare response
       omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
@@ -319,7 +318,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           .setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponse(omResponse.build(),
           omKeyInfo, missingParentInfos, clientID, omVolumeArgs,
-          copyBucketInfo);
+          omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

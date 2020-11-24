@@ -195,7 +195,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       int factor = omKeyInfo.getFactor().getNumber();
       omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
-      // update usedBytes atomically.
       // Block was pre-requested and UsedBytes updated when createKey and
       // AllocatedBlock. The space occupied by the Key shall be based on
       // the actual Key size, and the total Block size applied before should
@@ -203,10 +202,10 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       long correctedSpace = omKeyInfo.getDataSize() * factor -
           locationInfoList.size() * scmBlockSize * factor;
       omBucketInfo.incrUsedBytes(correctedSpace);
-      OmBucketInfo copyBucketInfo = omBucketInfo.copyObject();
 
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
-          omKeyInfo, dbOzoneKey, dbOpenKey, omVolumeArgs, copyBucketInfo);
+          omKeyInfo, dbOzoneKey, dbOpenKey, omVolumeArgs,
+          omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

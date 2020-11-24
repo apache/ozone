@@ -153,7 +153,6 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
             iterPartKeyInfo.getPartKeyInfo().getDataSize() * keyFactor;
       }
       omBucketInfo.incrUsedBytes(-quotaReleased);
-      OmBucketInfo copyBucketInfo = omBucketInfo.copyObject();
 
       // Update cache of openKeyTable and multipartInfo table.
       // No need to add the cache entries to delete table, as the entries
@@ -169,7 +168,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
           omResponse.setAbortMultiPartUploadResponse(
               MultipartUploadAbortResponse.newBuilder()).build(),
           multipartKey, multipartKeyInfo, ozoneManager.isRatisEnabled(),
-          omVolumeArgs, copyBucketInfo);
+          omVolumeArgs, omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {

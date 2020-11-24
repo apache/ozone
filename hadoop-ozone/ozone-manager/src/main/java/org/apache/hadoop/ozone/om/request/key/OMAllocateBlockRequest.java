@@ -220,14 +220,12 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
           new CacheKey<>(openKeyName),
           new CacheValue<>(Optional.of(openKeyInfo), trxnLogIndex));
 
-      // update usedBytes atomically.
       omBucketInfo.incrUsedBytes(preAllocatedSpace);
-      OmBucketInfo copyBucketInfo = omBucketInfo.copyObject();
 
       omResponse.setAllocateBlockResponse(AllocateBlockResponse.newBuilder()
           .setKeyLocation(blockLocation).build());
       omClientResponse = new OMAllocateBlockResponse(omResponse.build(),
-          openKeyInfo, clientID, omVolumeArgs, copyBucketInfo);
+          openKeyInfo, clientID, omVolumeArgs, omBucketInfo.copyObject());
 
       LOG.debug("Allocated block for Volume:{}, Bucket:{}, OpenKey:{}",
           volumeName, bucketName, openKeyName);

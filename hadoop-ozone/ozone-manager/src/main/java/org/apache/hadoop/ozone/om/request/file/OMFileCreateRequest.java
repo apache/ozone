@@ -298,9 +298,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
           bucketName, Optional.absent(), Optional.of(missingParentInfos),
           trxnLogIndex);
 
-      // update usedBytes atomically.
       omBucketInfo.incrUsedBytes(preAllocatedSpace);
-      OmBucketInfo copyBucketInfo = omBucketInfo.copyObject();
 
       // Prepare response
       omResponse.setCreateFileResponse(CreateFileResponse.newBuilder()
@@ -310,7 +308,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
           .setCmdType(Type.CreateFile);
       omClientResponse = new OMFileCreateResponse(omResponse.build(),
           omKeyInfo, missingParentInfos, clientID, omVolumeArgs,
-          copyBucketInfo);
+          omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
