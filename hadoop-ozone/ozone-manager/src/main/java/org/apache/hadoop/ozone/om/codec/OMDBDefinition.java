@@ -69,15 +69,6 @@ public class OMDBDefinition implements DBDefinition {
                     OmVolumeArgs.class,
                     new OmVolumeArgsCodec());
 
-  public static final DBColumnFamilyDefinition<String, String>
-            S3_TABLE=
-            new DBColumnFamilyDefinition<>(
-                    "s3Table",
-                    String.class,
-                    new StringCodec(),
-                    String.class,
-                    new StringCodec());
-
   public static final DBColumnFamilyDefinition<String, OmKeyInfo>
             OPEN_KEY_TABLE =
             new DBColumnFamilyDefinition<>(
