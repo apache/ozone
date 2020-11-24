@@ -19,12 +19,12 @@ package org.apache.hadoop.ozone.freon;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.Callable;
 
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumData;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutBlockRequestProto;
@@ -34,9 +34,10 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.ozone.common.Checksum;
 
 import com.codahale.metrics.Timer;
-import org.apache.hadoop.ozone.common.Checksum;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -105,7 +106,7 @@ public class DatanodeBlockPutter extends BaseFreonGenerator implements
 
         byte[] data = RandomStringUtils.randomAscii(chunkSize)
             .getBytes(StandardCharsets.UTF_8);
-        Checksum checksum = new Checksum();
+        Checksum checksum = new Checksum(ChecksumType.CRC32, 1024 * 1024);
         checksumProtobuf = checksum.computeChecksum(data).getProtoBufMessage();
 
         runTests(this::putBlock);

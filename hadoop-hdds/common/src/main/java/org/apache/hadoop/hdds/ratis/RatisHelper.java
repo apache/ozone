@@ -104,14 +104,14 @@ public final class RatisHelper {
   }
 
   public static RaftPeer toRaftPeer(DatanodeDetails id) {
-    return new RaftPeer.Builder()
+    return RaftPeer.newBuilder()
         .setId(toRaftPeerId(id))
         .setAddress(toRaftPeerAddressString(id))
         .build();
   }
 
   public static RaftPeer toRaftPeer(DatanodeDetails id, int priority) {
-    return new RaftPeer.Builder()
+    return RaftPeer.newBuilder()
         .setId(toRaftPeerId(id))
         .setAddress(toRaftPeerAddressString(id))
         .setPriority(priority)

@@ -327,10 +327,7 @@ public class FollowerAppendLogEntryGenerator extends BaseAppendLogGenerator
         RaftPeerId.getRaftPeerId(serverId);
 
     RaftGroup group = RaftGroup.valueOf(groupId,
-        RaftPeer.newBuilder()
-            .setId(RaftPeerId.valueOf(serverId))
-            .setAddress(serverAddress)
-            .build(),
+        RaftPeer.newBuilder().setId(serverId).setAddress(serverAddress).build(),
         RaftPeer.newBuilder()
             .setId(RaftPeerId.valueOf(FAKE_LEADER_ID))
             .setAddress(FAKE_LEADER_ADDDRESS)
@@ -341,8 +338,8 @@ public class FollowerAppendLogEntryGenerator extends BaseAppendLogGenerator
         .setRaftGroup(group)
         .build();
 
-    RaftClientReply raftClientReply =
-        client.getGroupManagementApi(peerId).add(group);
+    RaftClientReply raftClientReply = client.getGroupManagementApi(peerId)
+        .add(group);
 
     LOG.info(
         "Group is configured in the RAFT server (one follower, one fake "

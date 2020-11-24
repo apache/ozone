@@ -258,8 +258,8 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     }
     RaftClientReply reply;
     try {
-      CompletableFuture<RaftClientReply> replyFuture = getClient()
-          .async().watch(index, RaftProtos.ReplicationLevel.ALL_COMMITTED);
+      CompletableFuture<RaftClientReply> replyFuture = getClient().async()
+          .watch(index, RaftProtos.ReplicationLevel.ALL_COMMITTED);
       replyFuture.get();
     } catch (Exception e) {
       Throwable t = HddsClientUtils.checkForException(e);
@@ -267,8 +267,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       if (t instanceof GroupMismatchException) {
         throw e;
       }
-      reply = getClient()
-          .async()
+      reply = getClient().async()
           .watch(index, RaftProtos.ReplicationLevel.MAJORITY_COMMITTED)
           .get();
       List<RaftProtos.CommitInfoProto> commitInfoProtoList =

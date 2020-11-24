@@ -252,7 +252,7 @@ public class LeaderAppendLogEntryGenerator extends BaseAppendLogGenerator
 
     RaftGroup group = RaftGroup.valueOf(groupId,
         RaftPeer.newBuilder()
-            .setId(RaftPeerId.valueOf(serverId))
+            .setId(serverId)
             .setAddress(serverAddress)
             .build(),
         RaftPeer.newBuilder()
@@ -269,8 +269,8 @@ public class LeaderAppendLogEntryGenerator extends BaseAppendLogGenerator
         .setRaftGroup(group)
         .build();
 
-    RaftClientReply raftClientReply =
-        client.getGroupManagementApi(peerId).add(group);
+    RaftClientReply raftClientReply = client.getGroupManagementApi(peerId)
+        .add(group);
 
     LOG.info(
         "Group is configured in the RAFT server (with two fake leader leader)"

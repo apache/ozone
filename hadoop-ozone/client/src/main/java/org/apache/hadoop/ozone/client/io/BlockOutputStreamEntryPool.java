@@ -23,14 +23,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.BufferPool;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -53,20 +53,12 @@ public class BlockOutputStreamEntryPool {
       LoggerFactory.getLogger(BlockOutputStreamEntryPool.class);
 
   private final List<BlockOutputStreamEntry> streamEntries;
+  private final OzoneClientConfig config;
   private int currentStreamIndex;
   private final OzoneManagerProtocol omClient;
   private final OmKeyArgs keyArgs;
   private final XceiverClientFactory xceiverClientFactory;
-  private final int chunkSize;
   private final String requestID;
-  private final int streamBufferSize;
-  private final long streamBufferFlushSize;
-  private final boolean streamBufferFlushDelay;
-  private final long streamBufferMaxSize;
-  private final long watchTimeout;
-  private final long blockSize;
-  private final int bytesPerChecksum;
-  private final ContainerProtos.ChecksumType checksumType;
   private final BufferPool bufferPool;
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
   private final long openID;
@@ -74,17 +66,17 @@ public class BlockOutputStreamEntryPool {
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public BlockOutputStreamEntryPool(
+      OzoneClientConfig config,
       OzoneManagerProtocol omClient,
-      int chunkSize, String requestId, HddsProtos.ReplicationFactor factor,
+      String requestId, HddsProtos.ReplicationFactor factor,
       HddsProtos.ReplicationType type,
-      int bufferSize, long bufferFlushSize,
-      boolean bufferFlushDelay, long bufferMaxSize,
-      long size, long watchTimeout, ContainerProtos.ChecksumType checksumType,
-      int bytesPerChecksum, String uploadID, int partNumber,
+      String uploadID, int partNumber,
       boolean isMultipart, OmKeyInfo info,
       boolean unsafeByteBufferConversion,
       XceiverClientFactory xceiverClientFactory, long openID
   ) {
+    this.config = config;
+    this.xceiverClientFactory = xceiverClientFactory;
     streamEntries = new ArrayList<>();
     currentStreamIndex = 0;
     this.omClient = omClient;
@@ -93,38 +85,14 @@ public class BlockOutputStreamEntryPool {
         .setType(type).setFactor(factor).setDataSize(info.getDataSize())
         .setIsMultipartKey(isMultipart).setMultipartUploadID(uploadID)
         .setMultipartUploadPartNumber(partNumber).build();
-    this.xceiverClientFactory = xceiverClientFactory;
-    this.chunkSize = chunkSize;
     this.requestID = requestId;
-    this.streamBufferSize = bufferSize;
-    this.streamBufferFlushSize = bufferFlushSize;
-    this.streamBufferFlushDelay = bufferFlushDelay;
-    this.streamBufferMaxSize = bufferMaxSize;
-    this.blockSize = size;
-    this.watchTimeout = watchTimeout;
-    this.bytesPerChecksum = bytesPerChecksum;
-    this.checksumType = checksumType;
     this.openID = openID;
     this.excludeList = new ExcludeList();
 
-    Preconditions.checkState(chunkSize > 0);
-    Preconditions.checkState(streamBufferSize > 0);
-    Preconditions.checkState(streamBufferFlushSize > 0);
-    Preconditions.checkState(streamBufferMaxSize > 0);
-    Preconditions.checkState(blockSize > 0);
-    Preconditions.checkState(blockSize >= streamBufferMaxSize);
-    Preconditions.checkState(streamBufferMaxSize % streamBufferFlushSize == 0,
-        "expected max. buffer size (%s) to be a multiple of flush size (%s)",
-        streamBufferMaxSize, streamBufferFlushSize);
-    Preconditions.checkState(streamBufferFlushSize % streamBufferSize == 0,
-        "expected flush size (%s) to be a multiple of buffer size (%s)",
-        streamBufferFlushSize, streamBufferSize);
-    Preconditions.checkState(chunkSize % streamBufferSize == 0,
-        "expected chunk size (%s) to be a multiple of buffer size (%s)",
-        chunkSize, streamBufferSize);
     this.bufferPool =
-        new BufferPool(streamBufferSize,
-            (int) (streamBufferMaxSize / streamBufferSize),
+        new BufferPool(config.getStreamBufferSize(),
+            (int) (config.getStreamBufferMaxSize() / config
+                .getStreamBufferSize()),
             ByteStringConversion
                 .createByteBufferConversion(unsafeByteBufferConversion));
   }
@@ -140,19 +108,16 @@ public class BlockOutputStreamEntryPool {
     omClient = null;
     keyArgs = null;
     xceiverClientFactory = null;
-    chunkSize = 0;
+    config =
+        new OzoneConfiguration().getObject(OzoneClientConfig.class);
+    config.setStreamBufferSize(0);
+    config.setStreamBufferMaxSize(0);
+    config.setStreamBufferFlushSize(0);
+    config.setStreamBufferFlushDelay(false);
     requestID = null;
-    streamBufferSize = 0;
-    streamBufferFlushSize = 0;
-    streamBufferFlushDelay = false;
-    streamBufferMaxSize = 0;
+    int chunkSize = 0;
     bufferPool = new BufferPool(chunkSize, 1);
-    watchTimeout = 0;
-    blockSize = 0;
-    this.checksumType = ContainerProtos.ChecksumType.valueOf(
-        OzoneConfigKeys.OZONE_CLIENT_CHECKSUM_TYPE_DEFAULT);
-    this.bytesPerChecksum = OzoneConfigKeys
-        .OZONE_CLIENT_BYTES_PER_CHECKSUM_DEFAULT_BYTES; // Default is 1MB
+
     currentStreamIndex = 0;
     openID = -1;
     excludeList = new ExcludeList();
@@ -189,17 +154,9 @@ public class BlockOutputStreamEntryPool {
             .setKey(keyArgs.getKeyName())
             .setXceiverClientManager(xceiverClientFactory)
             .setPipeline(subKeyInfo.getPipeline())
-            .setRequestId(requestID)
-            .setChunkSize(chunkSize)
+            .setConfig(config)
             .setLength(subKeyInfo.getLength())
-            .setStreamBufferSize(streamBufferSize)
-            .setStreamBufferFlushSize(streamBufferFlushSize)
-            .setStreamBufferFlushDelay(streamBufferFlushDelay)
-            .setStreamBufferMaxSize(streamBufferMaxSize)
-            .setWatchTimeout(watchTimeout)
-            .setbufferPool(bufferPool)
-            .setChecksumType(checksumType)
-            .setBytesPerChecksum(bytesPerChecksum)
+            .setBufferPool(bufferPool)
             .setToken(subKeyInfo.getToken());
     streamEntries.add(builder.build());
   }
@@ -361,10 +318,6 @@ public class BlockOutputStreamEntryPool {
 
   public ExcludeList getExcludeList() {
     return excludeList;
-  }
-
-  public long getStreamBufferMaxSize() {
-    return streamBufferMaxSize;
   }
 
   boolean isEmpty() {

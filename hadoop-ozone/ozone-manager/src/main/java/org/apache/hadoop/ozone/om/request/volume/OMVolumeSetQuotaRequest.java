@@ -72,12 +72,12 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
 
     long modificationTime = Time.now();
-    SetVolumePropertyRequest modifiedRequest = getOmRequest()
+    SetVolumePropertyRequest.Builder setPropertyRequestBuilde = getOmRequest()
         .getSetVolumePropertyRequest().toBuilder()
-        .setModificationTime(modificationTime).build();
+        .setModificationTime(modificationTime);
 
     return getOmRequest().toBuilder()
-        .setSetVolumePropertyRequest(modifiedRequest.toBuilder())
+        .setSetVolumePropertyRequest(setPropertyRequestBuilde)
         .setUserInfo(getUserInfo())
         .build();
   }

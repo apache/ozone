@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -66,9 +67,9 @@ public class SCMBlockDeletingService extends BackgroundService {
 
   public SCMBlockDeletingService(DeletedBlockLog deletedBlockLog,
       ContainerManager containerManager, NodeManager nodeManager,
-      EventPublisher eventPublisher, long interval, long serviceTimeout,
+      EventPublisher eventPublisher, Duration interval, long serviceTimeout,
       ConfigurationSource conf) {
-    super("SCMBlockDeletingService", interval, TimeUnit.MILLISECONDS,
+    super("SCMBlockDeletingService", interval.toMillis(), TimeUnit.MILLISECONDS,
         BLOCK_DELETING_SERVICE_CORE_POOL_SIZE, serviceTimeout);
     this.deletedBlockLog = deletedBlockLog;
     this.containerManager = containerManager;
