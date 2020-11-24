@@ -22,24 +22,17 @@ import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.MiniOzoneChaosCluster.FailureService;
 import org.apache.hadoop.ozone.failure.Failures;
-import org.apache.hadoop.ozone.loadgenerators.RandomLoadGenerator;
-import org.apache.hadoop.ozone.loadgenerators.ReadOnlyLoadGenerator;
-import org.apache.hadoop.ozone.loadgenerators.FilesystemLoadGenerator;
-import org.apache.hadoop.ozone.loadgenerators.AgedLoadGenerator;
-import org.apache.hadoop.ozone.loadgenerators.AgedDirLoadGenerator;
-import org.apache.hadoop.ozone.loadgenerators.RandomDirLoadGenerator;
-import org.apache.hadoop.ozone.loadgenerators.NestedDirLoadGenerator;
+import org.apache.hadoop.ozone.loadgenerators.LoadGenerator;
 import org.junit.BeforeClass;
 import org.junit.AfterClass;
 import org.junit.Ignore;
 import org.junit.Test;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -49,8 +42,12 @@ import java.util.concurrent.TimeUnit;
 @Command(description = "Starts IO with MiniOzoneChaosCluster",
     name = "chaos", mixinStandardHelpOptions = true)
 public class TestMiniChaosOzoneCluster extends GenericCli {
-  static final Logger LOG =
-      LoggerFactory.getLogger(TestMiniChaosOzoneCluster.class);
+
+  private static List<Class<? extends Failures>> failureClasses
+      = new ArrayList<>();
+
+  private static List<Class<? extends LoadGenerator>> loadClasses
+      = new ArrayList<>();
 
   @Option(names = {"-d", "--num-datanodes", "--numDatanodes"},
       description = "num of datanodes. Full name --numDatanodes will be" +
@@ -61,12 +58,6 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
       description = "num of ozoneManagers. Full name --numOzoneManager will" +
           " be removed in later versions.")
   private static int numOzoneManagers = 1;
-
-  @Option(names = {"-s", "--failure-service", "--failureService"},
-      description = "service (datanode or ozoneManager) to test chaos on. " +
-          "Full --failureService name will be removed in later versions.",
-      defaultValue = "datanode")
-  private static String failureService = "datanode";
 
   @Option(names = {"-t", "--num-threads", "--numThreads"},
       description = "num of IO threads. Full name --numThreads will be" +
@@ -96,41 +87,25 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
   private static MiniOzoneChaosCluster cluster;
   private static MiniOzoneLoadGenerator loadGenerator;
 
+  private static String omServiceId = null;
+
   private static final String OM_SERVICE_ID = "ozoneChaosTest";
 
   @BeforeClass
   public static void init() throws Exception {
     OzoneConfiguration configuration = new OzoneConfiguration();
-    FailureService service = FailureService.of(failureService);
-    String omServiceID;
 
-    MiniOzoneChaosCluster.Builder builder =
+    MiniOzoneChaosCluster.Builder chaosBuilder =
         new MiniOzoneChaosCluster.Builder(configuration);
 
-    switch (service) {
-    case DATANODE:
-      omServiceID = null;
-      builder
-          .addFailures(Failures.DatanodeRestartFailure.class)
-          .addFailures(Failures.DatanodeStartStopFailure.class);
-      break;
-    case OZONE_MANAGER:
-      omServiceID = OM_SERVICE_ID;
-      builder
-          .addFailures(Failures.OzoneManagerStartStopFailure.class)
-          .addFailures(Failures.OzoneManagerRestartFailure.class);
-      break;
-    default:
-      throw new IllegalArgumentException();
-    }
-
-    builder
+    chaosBuilder
         .setNumDatanodes(numDatanodes)
         .setNumOzoneManagers(numOzoneManagers)
-        .setOMServiceID(omServiceID)
+        .setOMServiceID(omServiceId)
         .setNumDataVolumes(numDataVolumes);
+    failureClasses.forEach(chaosBuilder::addFailures);
 
-    cluster = builder.build();
+    cluster = chaosBuilder.build();
     cluster.waitForClusterToBeReady();
 
     String volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
@@ -138,20 +113,35 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
 
-    loadGenerator = new MiniOzoneLoadGenerator.Builder()
+    MiniOzoneLoadGenerator.Builder loadBuilder =
+        new MiniOzoneLoadGenerator.Builder()
         .setVolume(volume)
         .setConf(configuration)
         .setNumBuffers(numBuffers)
         .setNumThreads(numThreads)
-        .setOMServiceId(omServiceID)
-        .addLoadGenerator(RandomLoadGenerator.class)
-        .addLoadGenerator(AgedLoadGenerator.class)
-        .addLoadGenerator(FilesystemLoadGenerator.class)
-        .addLoadGenerator(ReadOnlyLoadGenerator.class)
-        .addLoadGenerator(RandomDirLoadGenerator.class)
-        .addLoadGenerator(AgedDirLoadGenerator.class)
-        .addLoadGenerator(NestedDirLoadGenerator.class)
-        .build();
+        .setOMServiceId(omServiceId);
+    loadClasses.forEach(loadBuilder::addLoadGenerator);
+    loadGenerator = loadBuilder.build();
+  }
+
+  static void addFailureClasses(Class<? extends Failures> clz) {
+    failureClasses.add(clz);
+  }
+
+  static void addLoadClasses(Class<? extends LoadGenerator> clz) {
+    loadClasses.add(clz);
+  }
+
+  static void setNumDatanodes(int nDns) {
+    numDatanodes = nDns;
+  }
+
+  static void setNumOzoneManagers(int nOms, boolean enableHA) {
+
+    if (nOms > 1 || enableHA) {
+      omServiceId = OM_SERVICE_ID;
+    }
+    numOzoneManagers = nOms;
   }
 
   /**
@@ -168,8 +158,7 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
     }
   }
 
-  @Override
-  public Void call() throws Exception {
+  public void startChaosCluster() throws Exception {
     try {
       init();
       cluster.startChaos(failureInterval, failureInterval, TimeUnit.SECONDS);
@@ -177,11 +166,6 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
     } finally {
       shutdown();
     }
-    return null;
-  }
-
-  public static void main(String... args) {
-    new TestMiniChaosOzoneCluster().run(args);
   }
 
   @Test
