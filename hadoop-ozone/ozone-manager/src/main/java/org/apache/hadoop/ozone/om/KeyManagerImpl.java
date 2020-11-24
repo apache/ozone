@@ -2188,13 +2188,9 @@ public class KeyManagerImpl implements KeyManager {
 
       countEntries = 0;
       // Convert results in cacheKeyMap to List
-      for (Map.Entry<String, OzoneFileStatus> entry : cacheKeyMap.entrySet()) {
+      for (OzoneFileStatus fileStatus : cacheKeyMap.values()) {
         // No need to check if a key is deleted or not here, this is handled
         // when adding entries to cacheKeyMap from DB.
-        OzoneFileStatus fileStatus = entry.getValue();
-        if (fileStatus.isFile()) {
-          refreshPipeline(fileStatus.getKeyInfo());
-        }
         fileStatusList.add(fileStatus);
         countEntries++;
         if (countEntries >= numEntries) {
@@ -2209,14 +2205,18 @@ public class KeyManagerImpl implements KeyManager {
           bucketName);
     }
 
+    List<OmKeyInfo> keyInfoList = new ArrayList<>(fileStatusList.size());
     for (OzoneFileStatus fileStatus : fileStatusList) {
-      if (args.getRefreshPipeline()) {
-        refreshPipeline(fileStatus.getKeyInfo());
-      }
-      if (args.getSortDatanodes()) {
+      keyInfoList.add(fileStatus.getKeyInfo());
+    }
+    refreshPipeline(keyInfoList);
+
+    if (args.getSortDatanodes()) {
+      for (OzoneFileStatus fileStatus : fileStatusList) {
         sortDatanodeInPipeline(fileStatus.getKeyInfo(), clientAddress);
       }
     }
+
     return fileStatusList;
   }
 

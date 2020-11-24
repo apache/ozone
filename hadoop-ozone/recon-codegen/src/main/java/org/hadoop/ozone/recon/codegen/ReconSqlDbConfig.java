@@ -97,7 +97,7 @@ public class ReconSqlDbConfig {
 
   @Config(key = "auto.commit",
       type = ConfigType.BOOLEAN,
-      defaultValue = "false",
+      defaultValue = "true",
       tags = {ConfigTag.STORAGE, ConfigTag.RECON, ConfigTag.OZONE},
       description = "Sets the Ozone Recon database connection property of " +
           "auto-commit to true/false."

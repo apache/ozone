@@ -1,7 +1,7 @@
 ---
 title: "GDPR in Ozone"
 date: "2019-September-17"
-weight: 4
+weight: 3
 summary: GDPR in Ozone
 icon: user
 menu:

@@ -18,7 +18,9 @@
 # The name of the script being executed.
 HADOOP_SHELL_EXECNAME="ozone"
 MYNAME="${BASH_SOURCE-$0}"
+bin=$(cd -P -- "$(dirname -- "${MYNAME}")" >/dev/null && pwd -P)
 JVM_PID="$$"
+
 ## @description  build up the hdfs command's usage text.
 ## @audience     public
 ## @stability    stable
@@ -107,6 +109,7 @@ function ozonecmd_case
       # exception as mentioned in HDDS-3812
       hadoop_deprecate_envvar HDDS_DN_OPTS OZONE_DATANODE_OPTS
       OZONE_DATANODE_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false -Dorg.apache.ratis.thirdparty.io.netty.leakDetection.level=disabled -Dlog4j.configurationFile=${HADOOP_CONF_DIR}/dn-audit-log4j2.properties ${OZONE_DATANODE_OPTS}"
+      OZONE_DATANODE_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_DATANODE_OPTS}"
       HADOOP_CLASSNAME=org.apache.hadoop.ozone.HddsDatanodeService
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-datanode"
     ;;
@@ -156,6 +159,7 @@ function ozonecmd_case
       HADOOP_CLASSNAME=org.apache.hadoop.ozone.om.OzoneManagerStarter
       hadoop_deprecate_envvar HDFS_OM_OPTS OZONE_OM_OPTS
       OZONE_OM_OPTS="${OZONE_OM_OPTS} -Dlog4j.configurationFile=${HADOOP_CONF_DIR}/om-audit-log4j2.properties"
+      OZONE_OM_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_OM_OPTS}"
       OZONE_RUN_ARTIFACT_NAME="hadoop-ozone-ozone-manager"
     ;;
     sh | shell)
@@ -174,6 +178,7 @@ function ozonecmd_case
       HADOOP_CLASSNAME='org.apache.hadoop.hdds.scm.server.StorageContainerManagerStarter'
       hadoop_deprecate_envvar HDFS_STORAGECONTAINERMANAGER_OPTS OZONE_SCM_OPTS
       OZONE_SCM_OPTS="${OZONE_SCM_OPTS} -Dlog4j.configurationFile=${HADOOP_CONF_DIR}/scm-audit-log4j2.properties"
+      OZONE_SCM_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_SCM_OPTS}"
       OZONE_RUN_ARTIFACT_NAME="hadoop-hdds-server-scm"
     ;;
     s3g)
@@ -233,7 +238,6 @@ function ozonecmd_case
 if [[ -n "${HADOOP_HOME}" ]]; then
   HADOOP_DEFAULT_LIBEXEC_DIR="${HADOOP_HOME}/libexec"
 else
-  bin=$(cd -P -- "$(dirname -- "${MYNAME}")" >/dev/null && pwd -P)
   HADOOP_DEFAULT_LIBEXEC_DIR="${bin}/../libexec"
 fi
 
@@ -242,6 +246,11 @@ HADOOP_LIBEXEC_DIR="${HADOOP_LIBEXEC_DIR:-$HADOOP_DEFAULT_LIBEXEC_DIR}"
 HADOOP_NEW_CONFIG=true
 if [[ -f "${HADOOP_LIBEXEC_DIR}/ozone-config.sh" ]]; then
   # shellcheck source=./hadoop-ozone/common/src/main/bin/ozone-config.sh
+  . "${HADOOP_LIBEXEC_DIR}/ozone-config.sh"
+elif [[ -f "${bin}/../libexec/ozone-config.sh" ]]; then
+  HADOOP_HOME="${bin}/../"
+  HADOOP_LIBEXEC_DIR="${HADOOP_HOME}/libexec"
+  HADOOP_DEFAULT_LIBEXEC_DIR="${HADOOP_HOME}/libexec"
   . "${HADOOP_LIBEXEC_DIR}/ozone-config.sh"
 else
   echo "ERROR: Cannot execute ${HADOOP_LIBEXEC_DIR}/ozone-config.sh." 2>&1
