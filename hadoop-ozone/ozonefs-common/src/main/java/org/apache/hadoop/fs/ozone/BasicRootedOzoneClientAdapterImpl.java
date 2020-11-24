@@ -638,8 +638,8 @@ public class BasicRootedOzoneClientAdapterImpl
 
     OFSPath ofsStartPath = new OFSPath(startPath);
     // list volumes
-    Iterator<? extends OzoneVolume> iter = objectStore.listVolumesByUser(
-        username, null, ofsStartPath.getVolumeName());
+    Iterator<? extends OzoneVolume> iter =
+        objectStore.listVolumes(null, ofsStartPath.getVolumeName());
     List<FileStatusAdapter> res = new ArrayList<>();
     while (iter.hasNext() && res.size() < numEntries) {
       OzoneVolume volume = iter.next();
