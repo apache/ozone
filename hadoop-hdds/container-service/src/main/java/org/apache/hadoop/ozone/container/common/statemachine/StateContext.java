@@ -105,7 +105,7 @@ public class StateContext {
   private final Map<InetSocketAddress, List<GeneratedMessage>>
       incrementalReportsQueue;
   // Define accepted types of reports that can be queued to incrementalReports
-  private final static Set<String> acceptedIncrementalReportTypeSet =
+  private final static Set<String> ACCEPTED_INCREMENTAL_REPORT_TYPE_SET =
       Sets.newHashSet(COMMAND_STATUS_REPORTS_PROTO_NAME,
           INCREMENTAL_CONTAINER_REPORT_PROTO_NAME);
   private final Map<InetSocketAddress, Queue<ContainerAction>> containerActions;
@@ -247,7 +247,7 @@ public class StateContext {
         nodeReport.set(report);
       } else if (reportType.equals(PIPELINE_REPORTS_PROTO_NAME)) {
         pipelineReports.set(report);
-      } else if (acceptedIncrementalReportTypeSet.contains(reportType)) {
+      } else if (ACCEPTED_INCREMENTAL_REPORT_TYPE_SET.contains(reportType)) {
         synchronized (incrementalReportsQueue) {
           incrementalReportsQueue.get(endpoint).add(report);
         }
@@ -277,7 +277,7 @@ public class StateContext {
       Preconditions.checkState(descriptor != null);
       final String reportType = descriptor.getFullName();
       Preconditions.checkState(reportType != null);
-      if (!acceptedIncrementalReportTypeSet.contains(reportType)) {
+      if (!ACCEPTED_INCREMENTAL_REPORT_TYPE_SET.contains(reportType)) {
         throw new IllegalArgumentException(
             "Unaccepted report message type: " + reportType);
       }
