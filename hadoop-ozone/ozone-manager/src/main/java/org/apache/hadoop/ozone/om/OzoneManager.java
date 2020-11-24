@@ -3332,7 +3332,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           FileUtils.deleteFully(dbBackup);
         }
       } catch (Exception e) {
-        LOG.error("Failed to delete the backup of the original DB {}", dbBackup);
+        LOG.error("Failed to delete the backup of the original DB {}",
+            dbBackup);
       }
       exitManager.exitSystem(1, errorMsg, ex, LOG);
     }
