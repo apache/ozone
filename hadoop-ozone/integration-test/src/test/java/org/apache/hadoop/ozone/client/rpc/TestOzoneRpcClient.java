@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.client.rpc;
 import java.io.IOException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 
 import org.junit.AfterClass;
@@ -51,7 +50,6 @@ public class TestOzoneRpcClient extends TestOzoneRpcClientAbstract {
   @BeforeClass
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setFromObject(new OzoneClientConfig());
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
     startCluster(conf);
   }

@@ -77,6 +77,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   private static final DBProfile DEFAULT_PROFILE = DBProfile.DISK;
   private static final Map<ConfigurationSource, ColumnFamilyOptions>
       OPTIONS_CACHE = new ConcurrentHashMap<>();
+  private final boolean openReadOnly;
 
   /**
    * Constructs the metadata store and starts the DB services.
@@ -85,7 +86,8 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
    * @throws IOException - on Failure.
    */
   protected AbstractDatanodeStore(ConfigurationSource config, long containerID,
-      AbstractDatanodeDBDefinition dbDef) throws IOException {
+      AbstractDatanodeDBDefinition dbDef, boolean openReadOnly)
+      throws IOException {
 
     // The same config instance is used on each datanode, so we can share the
     // corresponding column family options, providing a single shared cache
@@ -97,6 +99,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
     this.dbDef = dbDef;
     this.containerID = containerID;
+    this.openReadOnly = openReadOnly;
     start(config);
   }
 
@@ -121,6 +124,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       this.store = DBStoreBuilder.newBuilder(config, dbDef)
               .setDBOptions(options)
               .setDefaultCFOptions(cfOptions)
+              .setOpenReadOnly(openReadOnly)
               .build();
 
       // Use the DatanodeTable wrapper to disable the table iterator on

@@ -87,6 +87,8 @@ public final class DBStoreBuilder {
   private CodecRegistry registry;
   private String rocksDbStat;
   private RocksDBConfiguration rocksDBConfiguration;
+  // Flag to indicate if the RocksDB should be opened readonly.
+  private boolean openReadOnly = false;
 
   /**
    * Create DBStoreBuilder from a generic DBDefinition.
@@ -187,7 +189,7 @@ public final class DBStoreBuilder {
     }
 
     return new RDBStore(dbFile, rocksDBOption, writeOptions, tableConfigs,
-        registry);
+        registry, openReadOnly);
   }
 
   public DBStoreBuilder setName(String name) {
@@ -224,6 +226,11 @@ public final class DBStoreBuilder {
   public DBStoreBuilder setPath(Path path) {
     Preconditions.checkNotNull(path);
     dbPath = path;
+    return this;
+  }
+
+  public DBStoreBuilder setOpenReadOnly(boolean readOnly) {
+    this.openReadOnly = readOnly;
     return this;
   }
 
