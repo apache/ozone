@@ -59,9 +59,14 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   public void testPrepareWithoutTransactions() throws Exception {
     MiniOzoneHAClusterImpl cluster = getCluster();
     OzoneManager leader = cluster.getOMLeader();
-    leader.prepare();
+    OMResponse omResponse =
+        leader.getOmRatisServer().submitRequest(buildPrepareRequest());
+    // Get the log index of the prepare request.
+    long prepareRequestLogIndex =
+        omResponse.getPrepareResponse().getTxnID();
 
-    checkPrepared(leader, 0);
+    Assert.assertEquals(0, prepareRequestLogIndex);
+    checkPrepared(leader, prepareRequestLogIndex);
   }
 
   /**
@@ -93,7 +98,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
         leader.getOmRatisServer().submitRequest(buildPrepareRequest());
     // Get the log index of the prepare request.
     long prepareRequestLogIndex =
-        omResponse.getPrepareForUpgradeResponse().getTxnID();
+        omResponse.getPrepareResponse().getTxnID();
 
     checkPrepared(leader, prepareRequestLogIndex);
 
@@ -166,7 +171,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 //    OzoneManager leaderOM = cluster.getOMLeader();
 //    long prepareIndex =
 //        leaderOM.getOmRatisServer().submitRequest(buildPrepareRequest())
-//            .getPrepareForUpgradeResponse()
+//            .getPrepareForResponse()
 //            .getTxnID();
 //
 //    // Check that the two live OMs are prepared.

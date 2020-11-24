@@ -38,6 +38,7 @@ public class OMPrepareResponse extends OMClientResponse {
   @Override
   protected void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
-
+    // The Prepare request will create a marker file to indicate the OM is
+    // prepared, so there is no DB update for the prepare operation.
   }
 }

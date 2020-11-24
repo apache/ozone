@@ -68,7 +68,7 @@ public final class RatisUpgradeUtils {
 
     if (!success) {
       throw new IOException(String.format("After waiting for %d seconds, " +
-              "State Machine has not applied  all the transactions.",
+          "State Machine has not applied  all the transactions.",
           maxTimeToWaitSeconds));
     }
   }
@@ -80,8 +80,7 @@ public final class RatisUpgradeUtils {
    * @throws IOException on Error.
    */
   public static long takeSnapshotAndPurgeLogs(RaftServerImpl impl,
-                                              StateMachine stateMachine)
-      throws IOException {
+      StateMachine stateMachine) throws IOException {
 
     long snapshotIndex = stateMachine.takeSnapshot();
     if (snapshotIndex != stateMachine.getLastAppliedTermIndex().getIndex()) {
@@ -110,8 +109,7 @@ public final class RatisUpgradeUtils {
   }
 
   private static boolean checkIfAllTransactionsApplied(
-      StateMachine stateMachine,
-      RaftServerImpl impl) {
+      StateMachine stateMachine, RaftServerImpl impl) {
     LOG.info("Checking for pending transactions to be applied.");
     long lastCommittedIndex = impl.getState().getLog().getLastCommittedIndex();
     long appliedIndex = stateMachine.getLastAppliedTermIndex().getIndex();

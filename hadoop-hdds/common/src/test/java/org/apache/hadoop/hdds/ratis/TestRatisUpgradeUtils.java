@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.hdds.ratis;
 
-import static org.apache.hadoop.hdds.ratis.RatisUpgradeUtils.takeSnapshotAndPurgeLogs;
-import static org.apache.hadoop.hdds.ratis.RatisUpgradeUtils.waitForAllTxnsApplied;
-import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -34,6 +31,7 @@ import org.apache.ratis.server.impl.ServerState;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.statemachine.StateMachine;
+import org.junit.Assert;
 import org.junit.Test;
 
 /**
@@ -59,14 +57,13 @@ public class TestRatisUpgradeUtils {
     when(stateMachine.getLastAppliedTermIndex()).thenReturn(termIndex);
     when(stateMachine.takeSnapshot()).thenReturn(1L);
 
-    waitForAllTxnsApplied(stateMachine, raftServer, 10, 2);
+    RatisUpgradeUtils.waitForAllTxnsApplied(stateMachine, raftServer, 10, 2);
     verify(stateMachine.getLastAppliedTermIndex(),
         times(4)); // 3 checks + 1 after snapshot
   }
 
   @Test
   public void testWaitForAllTxnsAppliedTimeOut() throws Exception {
-
     StateMachine stateMachine = mock(StateMachine.class);
     RaftServerImpl raftServer = mock(RaftServerImpl.class);
     ServerState serverState = mock(ServerState.class);
@@ -83,13 +80,13 @@ public class TestRatisUpgradeUtils {
 
     LambdaTestUtils.intercept(IOException.class, "State Machine has not " +
         "applied  all the transactions", () ->
-        waitForAllTxnsApplied(stateMachine, raftServer, 10, 2));
+        RatisUpgradeUtils.waitForAllTxnsApplied(stateMachine, raftServer,
+            10, 2));
   }
 
 
   @Test
   public void testPurgeLogsAfterWait() throws IOException {
-
     StateMachine stateMachine = mock(StateMachine.class);
     RaftServerImpl raftServer = mock(RaftServerImpl.class);
     ServerState serverState = mock(ServerState.class);
@@ -105,7 +102,7 @@ public class TestRatisUpgradeUtils {
     when(stateMachine.getLastAppliedTermIndex()).thenReturn(termIndex);
     when(stateMachine.takeSnapshot()).thenReturn(1L);
 
-    assertEquals(1, takeSnapshotAndPurgeLogs(raftServer, stateMachine));
+    Assert.assertEquals(1,
+        RatisUpgradeUtils.takeSnapshotAndPurgeLogs(raftServer, stateMachine));
   }
-
 }

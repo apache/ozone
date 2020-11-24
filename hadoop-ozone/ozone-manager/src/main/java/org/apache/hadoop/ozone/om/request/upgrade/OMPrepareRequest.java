@@ -60,7 +60,7 @@ public class OMPrepareRequest extends OMClientRequest {
       PrepareResponse omResponse = PrepareResponse.newBuilder()
               .setTxnID(transactionLogIndex)
               .build();
-      responseBuilder.setPrepareForUpgradeResponse(omResponse);
+      responseBuilder.setPrepareResponse(omResponse);
       response = new OMPrepareResponse(responseBuilder.build());
 
       // Add response to double buffer before clearing logs.

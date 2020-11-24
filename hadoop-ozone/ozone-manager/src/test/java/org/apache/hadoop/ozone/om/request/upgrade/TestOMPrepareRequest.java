@@ -31,6 +31,13 @@ import org.junit.Test;
 import java.util.UUID;
 
 public class TestOMPrepareRequest extends TestOMKeyRequest {
+  /**
+   * Tests that the {@link OMPrepareRequest} returns the transaction log
+   * index it is provided in its response. This test does not use Ratis, and
+   * therefore the internal prepared state of the OM cannot be verified in
+   * this test. OM's internal prepared state is tested in
+   * {@link org.apache.hadoop.ozone.om.TestOzoneManagerPrepare}.
+   */
   @Test
   public void testRequest() {
     final int trxnLogIndex = 1;
@@ -52,8 +59,9 @@ public class TestOMPrepareRequest extends TestOMKeyRequest {
             trxnLogIndex, ozoneManagerDoubleBufferHelper);
     OMResponse omResponse = omClientResponse.getOMResponse();
 
+    // TODO: When marker files are implemented, check that one is created here.
     Assert.assertEquals(Status.OK, omResponse.getStatus());
     Assert.assertEquals(trxnLogIndex,
-        omResponse.getPrepareForUpgradeResponse().getTxnID());
+        omResponse.getPrepareResponse().getTxnID());
   }
 }
