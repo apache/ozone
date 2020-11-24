@@ -146,7 +146,7 @@ public class OzoneContainer {
     writeChannel = XceiverServerRatis.newXceiverServerRatis(
         datanodeDetails, config, hddsDispatcher, controller, certClient,
         context);
-    ;
+
     replicationServer = new ReplicationServer(
         controller,
         conf.getObject(ReplicationConfig.class),
