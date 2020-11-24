@@ -37,6 +37,11 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_DEFAULT;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_DEFAULT;
+
 /**
  * TrashPolicy for Ozone Specific Trash Operations.Through this implementation
  *  of TrashPolicy ozone-specific trash optimizations are/will be made such as
@@ -61,23 +66,39 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
 
   private long emptierInterval;
 
+  private Configuration configuration;
+
   private OzoneManager om;
 
   public TrashPolicyOzone(){
   }
 
-  private TrashPolicyOzone(FileSystem fs, Configuration conf){
-    super.initialize(conf, fs);
+  @Override
+  public void initialize(Configuration conf, FileSystem fs) {
+    this.fs = fs;
+    this.configuration = conf;
+    this.deletionInterval = (long)(conf.getFloat(
+        FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT)
+        * MSECS_PER_MINUTE);
+    this.emptierInterval = (long)(conf.getFloat(
+        FS_TRASH_CHECKPOINT_INTERVAL_KEY, FS_TRASH_CHECKPOINT_INTERVAL_DEFAULT)
+        * MSECS_PER_MINUTE);
+    if (deletionInterval < 0) {
+      LOG.warn("Invalid value {} for deletion interval,"
+          + " deletion interaval can not be negative."
+          + "Changing to default value 0", deletionInterval);
+      this.deletionInterval = 0;
+    }
   }
 
   TrashPolicyOzone(FileSystem fs, Configuration conf, OzoneManager om){
-    super.initialize(conf, fs);
+    initialize(conf, fs);
     this.om = om;
   }
 
   @Override
   public Runnable getEmptier() throws IOException {
-    return new TrashPolicyOzone.Emptier(getConf(), emptierInterval);
+    return new TrashPolicyOzone.Emptier(configuration, emptierInterval);
   }
 
   protected class Emptier implements Runnable {
@@ -115,6 +136,9 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
         end = ceiling(now, emptierInterval);
         try {                                     // sleep for interval
           Thread.sleep(end - now);
+          if (!om.isLeader()){
+            return;
+          }
         } catch (InterruptedException e) {
           break;                                  // exit on interrupt
         }
@@ -130,7 +154,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
                 continue;
               }
               try {
-                TrashPolicyOzone trash = new TrashPolicyOzone(fs, conf);
+                TrashPolicyOzone trash = new TrashPolicyOzone(fs, conf, om);
                 trash.deleteCheckpoint(trashRoot.getPath(), false);
                 trash.createCheckpoint(trashRoot.getPath(), new Date(now));
               } catch (IOException e) {

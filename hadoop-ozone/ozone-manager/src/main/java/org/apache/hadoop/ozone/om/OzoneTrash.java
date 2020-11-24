@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Trash;
+import org.apache.hadoop.fs.TrashPolicy;
 
 import java.io.IOException;
 
@@ -29,11 +30,15 @@ import java.io.IOException;
  */
 public class OzoneTrash extends Trash {
 
-  private TrashPolicyOzone trashPolicy;
+  private TrashPolicy trashPolicy;
   public OzoneTrash(FileSystem fs, Configuration conf, OzoneManager om)
       throws IOException {
     super(fs, conf);
     this.trashPolicy = new TrashPolicyOzone(fs, conf, om);
+  }
+  @Override
+  public Runnable getEmptier() throws IOException {
+    return this.trashPolicy.getEmptier();
   }
 
 }
