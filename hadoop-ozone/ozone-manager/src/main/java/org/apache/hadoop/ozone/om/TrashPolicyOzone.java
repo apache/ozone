@@ -61,11 +61,18 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
 
   private long emptierInterval;
 
+  private OzoneManager om;
+
   public TrashPolicyOzone(){
   }
 
   private TrashPolicyOzone(FileSystem fs, Configuration conf){
     super.initialize(conf, fs);
+  }
+
+  TrashPolicyOzone(FileSystem fs, Configuration conf, OzoneManager om){
+    super.initialize(conf, fs);
+    this.om = om;
   }
 
   @Override
@@ -98,7 +105,8 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
 
     @Override
     public void run() {
-      if (emptierInterval == 0) {
+      // if this is not the leader node,don't run the emptier
+      if (emptierInterval == 0 || !om.isLeader()) {
         return;                                   // trash disabled
       }
       long now, end;
