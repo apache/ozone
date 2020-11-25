@@ -102,7 +102,7 @@ public class TestSimpleContainerDownloader {
   /**
    * Test if different datanode is used for each download attempt.
    */
-  @Test(timeout = 1000L)
+  @Test(timeout = 10_000L)
   public void testRandomSelection()
       throws ExecutionException, InterruptedException {
 
