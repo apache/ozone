@@ -118,7 +118,7 @@
               <goal>npx</goal>
             </goals>
             <configuration>
-              <arguments>pnpm install</arguments>
+              <arguments>pnpm install --frozen-lockfile</arguments>
             </configuration>
           </execution>
           <execution>

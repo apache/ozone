@@ -67,9 +67,11 @@ public interface StorageContainerNodeProtocol {
   /**
    * Send heartbeat to indicate the datanode is alive and doing well.
    * @param datanodeDetails - Datanode ID.
+   * @param layoutVersionInfo - Layout Version Proto.
    * @return SCMheartbeat response list
    */
-  List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails);
+  List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
+                                    LayoutVersionProto layoutVersionInfo);
 
   /**
    * Check if node is registered or not.

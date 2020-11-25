@@ -76,7 +76,8 @@ import org.apache.hadoop.hdds.scm.node.DeadNodeHandler;
 import org.apache.hadoop.hdds.scm.node.NewNodeHandler;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeReportHandler;
-import org.apache.hadoop.hdds.scm.node.NonHealthyToHealthyNodeHandler;
+import org.apache.hadoop.hdds.scm.node.NonHealthyToReadOnlyHealthyNodeHandler;
+import org.apache.hadoop.hdds.scm.node.ReadOnlyHealthyToHealthyNodeHandler;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.StaleNodeHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineActionHandler;
@@ -304,8 +305,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         new StaleNodeHandler(scmNodeManager, pipelineManager, conf);
     DeadNodeHandler deadNodeHandler = new DeadNodeHandler(scmNodeManager,
         pipelineManager, containerManager);
-    NonHealthyToHealthyNodeHandler nonHealthyToHealthyNodeHandler =
-        new NonHealthyToHealthyNodeHandler(pipelineManager, conf);
+    ReadOnlyHealthyToHealthyNodeHandler readOnlyHealthyToHealthyNodeHandler =
+        new ReadOnlyHealthyToHealthyNodeHandler(pipelineManager, conf);
+    NonHealthyToReadOnlyHealthyNodeHandler
+        nonHealthyToReadOnlyHealthyNodeHandler =
+        new NonHealthyToReadOnlyHealthyNodeHandler(scmNodeManager,
+            pipelineManager, conf);
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
     PendingDeleteHandler pendingDeleteHandler =
         new PendingDeleteHandler(scmBlockManager.getSCMBlockDeletingService());
@@ -351,8 +356,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
     eventQueue.addHandler(SCMEvents.NEW_NODE, newNodeHandler);
     eventQueue.addHandler(SCMEvents.STALE_NODE, staleNodeHandler);
-    eventQueue.addHandler(SCMEvents.NON_HEALTHY_TO_HEALTHY_NODE,
-        nonHealthyToHealthyNodeHandler);
+    eventQueue.addHandler(SCMEvents.READ_ONLY_HEALTHY_TO_HEALTHY_NODE,
+        readOnlyHealthyToHealthyNodeHandler);
+    eventQueue.addHandler(SCMEvents.NON_HEALTHY_TO_READONLY_HEALTHY_NODE,
+        nonHealthyToReadOnlyHealthyNodeHandler);
     eventQueue.addHandler(SCMEvents.DEAD_NODE, deadNodeHandler);
     eventQueue.addHandler(SCMEvents.CMD_STATUS_REPORT, cmdStatusReportHandler);
     eventQueue

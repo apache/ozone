@@ -80,7 +80,9 @@ public class ClusterStateEndpoint {
     List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
     int containers = this.containerManager.getContainerIDs().size();
     int pipelines = this.pipelineManager.getPipelines().size();
-    int healthyDatanodes = nodeManager.getNodeCount(NodeState.HEALTHY);
+    int healthyDatanodes =
+        nodeManager.getNodeCount(NodeState.HEALTHY) +
+            nodeManager.getNodeCount(NodeState.HEALTHY_READONLY);
     SCMNodeStat stats = nodeManager.getStats();
     DatanodeStorageReport storageReport =
         new DatanodeStorageReport(stats.getCapacity().get(),

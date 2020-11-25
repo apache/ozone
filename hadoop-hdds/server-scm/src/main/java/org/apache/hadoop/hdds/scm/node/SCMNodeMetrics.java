@@ -37,6 +37,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 
 /**
@@ -126,6 +127,10 @@ public final class SCMNodeMetrics implements MetricsSource {
                 "HealthyNodes",
                 "Number of healthy datanodes"),
                 nodeCount.get(HEALTHY.toString()))
+            .addGauge(Interns.info(
+                "HealthyReadOnlyNodes",
+                "Number of healthy and read only datanodes"),
+                nodeCount.get(HEALTHY_READONLY.toString()))
             .addGauge(Interns.info("StaleNodes",
                 "Number of stale datanodes"),
                 nodeCount.get(STALE.toString()))

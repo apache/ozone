@@ -29,7 +29,6 @@ import java.util.Map;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
@@ -84,6 +83,11 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMDirectoryCreateRequest.class);
+
+  // The maximum number of directories which can be created through a single
+  // transaction (recursive directory creations) is 2^8 - 1 as only 8
+  // bits are set aside for this in ObjectID.
+  private static final long MAX_NUM_OF_RECURSIVE_DIRS = 255;
 
   /**
    * Stores the result of request execution in
@@ -187,7 +191,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       } else if (omDirectoryResult == DIRECTORY_EXISTS_IN_GIVENPATH ||
           omDirectoryResult == NONE) {
         List<String> missingParents = omPathInfo.getMissingParents();
-        long baseObjId = OMFileRequest.getObjIDFromTxId(trxnLogIndex);
+        long baseObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
         List<OzoneAcl> inheritAcls = omPathInfo.getAcls();
 
         dirKeyInfo = createDirectoryKeyInfoWithACL(keyName,
@@ -248,11 +252,12 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     List<OmKeyInfo> missingParentInfos = new ArrayList<>();
 
-    ImmutablePair<Long, Long> objIdRange = OMFileRequest
-        .getObjIdRangeFromTxId(trxnLogIndex);
-    long baseObjId = objIdRange.getLeft();
-    long maxObjId = objIdRange.getRight();
-    long maxLevels = maxObjId - baseObjId;
+    // The base id is left shifted by 8 bits for creating space to
+    // create (2^8 - 1) object ids in every request.
+    // maxObjId represents the largest object id allocation possible inside
+    // the transaction.
+    long baseObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
+    long maxObjId = baseObjId + MAX_NUM_OF_RECURSIVE_DIRS;
     long objectCount = 1; // baseObjID is used by the leaf directory
 
     String volumeName = keyArgs.getVolumeName();
@@ -263,8 +268,8 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       long nextObjId = baseObjId + objectCount;
       if (nextObjId > maxObjId) {
         throw new OMException("Too many directories in path. Exceeds limit of "
-            + maxLevels + ". Unable to create directory: " + keyName
-            + " in volume/bucket: " + volumeName + "/" + bucketName,
+            + MAX_NUM_OF_RECURSIVE_DIRS + ". Unable to create directory: "
+            + keyName + " in volume/bucket: " + volumeName + "/" + bucketName,
             INVALID_KEY_NAME);
       }
 

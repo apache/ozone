@@ -26,6 +26,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.hdds.protocol.proto
+    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -38,9 +40,12 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 
+import static java.lang.Thread.sleep;
 import static org.apache.hadoop.test.MetricsAsserts.assertGauge;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+
+import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import static org.junit.Assert.assertEquals;
@@ -102,7 +107,12 @@ public class TestSCMNodeMetrics {
 
     NodeReportProto nodeReport = createNodeReport();
 
-    nodeManager.processHeartbeat(registeredDatanode);
+    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
+    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+        .build();
+    nodeManager.processHeartbeat(registeredDatanode, layoutInfo);
 
     assertEquals("NumHBProcessed", hbProcessed + 1,
         getCounter("NumHBProcessed"));
@@ -116,8 +126,13 @@ public class TestSCMNodeMetrics {
 
     long hbProcessedFailed = getCounter("NumHBProcessingFailed");
 
+    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
+    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+        .build();
     nodeManager.processHeartbeat(MockDatanodeDetails
-        .randomDatanodeDetails());
+        .randomDatanodeDetails(), layoutInfo);
 
     assertEquals("NumHBProcessingFailed", hbProcessedFailed + 1,
         getCounter("NumHBProcessingFailed"));
@@ -182,7 +197,7 @@ public class TestSCMNodeMetrics {
 
     MetricsRecordBuilder metricsSource = getMetrics(SCMNodeMetrics.SOURCE_NAME);
 
-    assertGauge("HealthyNodes", 1, metricsSource);
+    assertGauge("HealthyReadOnlyNodes", 1, metricsSource);
     assertGauge("StaleNodes", 0, metricsSource);
     assertGauge("DeadNodes", 0, metricsSource);
     assertGauge("DecommissioningNodes", 0, metricsSource);
@@ -193,6 +208,17 @@ public class TestSCMNodeMetrics {
     assertGauge("SSDCapacity", 0L, metricsSource);
     assertGauge("SSDUsed", 0L, metricsSource);
     assertGauge("SSDRemaining", 0L, metricsSource);
+
+    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
+    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
+        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
+        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
+        .build();
+    nodeManager.processHeartbeat(registeredDatanode, layoutInfo);
+    sleep(4000);
+    metricsSource = getMetrics(SCMNodeMetrics.SOURCE_NAME);
+    assertGauge("HealthyReadOnlyNodes", 0, metricsSource);
+    assertGauge("HealthyNodes", 1, metricsSource);
 
   }
 

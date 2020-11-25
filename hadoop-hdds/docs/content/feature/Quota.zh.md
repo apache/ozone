@@ -4,6 +4,9 @@ date: "2020-October-22"
 weight: 4
 summary: Ozone中的配额
 icon: user
+menu:
+   main:
+      parent: 特点
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more

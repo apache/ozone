@@ -325,20 +325,17 @@ public class DeletedBlockLogImpl
   private void getTransaction(DeletedBlocksTransaction tx,
       DatanodeDeletedBlockTransactions transactions) {
     try {
-      final ContainerID id = ContainerID.valueof(tx.getContainerID());
-      if (!containerManager.getContainer(id).isOpen()) {
-        Set<ContainerReplica> replicas = containerManager
-            .getContainerReplicas(ContainerID.valueof(tx.getContainerID()));
-        for (ContainerReplica replica : replicas) {
-          UUID dnID = replica.getDatanodeDetails().getUuid();
-          Set<UUID> dnsWithTransactionCommitted =
-              transactionToDNsCommitMap.get(tx.getTxID());
-          if (dnsWithTransactionCommitted == null
-              || !dnsWithTransactionCommitted.contains(dnID)) {
-            // Transaction need not be sent to dns which have
-            // already committed it
-            transactions.addTransactionToDN(dnID, tx);
-          }
+      Set<ContainerReplica> replicas = containerManager
+          .getContainerReplicas(ContainerID.valueof(tx.getContainerID()));
+      for (ContainerReplica replica : replicas) {
+        UUID dnID = replica.getDatanodeDetails().getUuid();
+        Set<UUID> dnsWithTransactionCommitted =
+            transactionToDNsCommitMap.get(tx.getTxID());
+        if (dnsWithTransactionCommitted == null || !dnsWithTransactionCommitted
+            .contains(dnID)) {
+          // Transaction need not be sent to dns which have
+          // already committed it
+          transactions.addTransactionToDN(dnID, tx);
         }
       }
     } catch (IOException e) {
@@ -361,7 +358,9 @@ public class DeletedBlockLogImpl
           Table.KeyValue<Long, DeletedBlocksTransaction> keyValue =
               iter.next();
           DeletedBlocksTransaction txn = keyValue.getValue();
-          if (txn.getCount() > -1 && txn.getCount() <= maxRetry) {
+          final ContainerID id = ContainerID.valueof(txn.getContainerID());
+          if (txn.getCount() > -1 && txn.getCount() <= maxRetry
+              && !containerManager.getContainer(id).isOpen()) {
             numBlocksAdded += txn.getLocalIDCount();
             getTransaction(txn, transactions);
             transactionToDNsCommitMap

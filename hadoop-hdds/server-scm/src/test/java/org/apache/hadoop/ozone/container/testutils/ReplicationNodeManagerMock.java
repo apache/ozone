@@ -276,10 +276,12 @@ public class ReplicationNodeManagerMock implements NodeManager {
    * Send heartbeat to indicate the datanode is alive and doing well.
    *
    * @param dd - Datanode Details.
+   * @param layoutInfo - Layout Version Proto
    * @return SCMheartbeat response list
    */
   @Override
-  public List<SCMCommand> processHeartbeat(DatanodeDetails dd) {
+  public List<SCMCommand> processHeartbeat(DatanodeDetails dd,
+                                           LayoutVersionProto layoutInfo) {
     return null;
   }
 

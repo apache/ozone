@@ -25,11 +25,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import com.google.common.base.Strings;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto.Builder;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverSe
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.impl.RaftServerImpl;
 import org.apache.ratis.server.impl.RaftServerProxy;
@@ -109,7 +110,8 @@ public final class ContainerTestHelper {
    */
   public static void setDataChecksum(ChunkInfo info, ChunkBuffer data)
       throws OzoneChecksumException {
-    Checksum checksum = new Checksum();
+    Checksum checksum = new Checksum(ChecksumType.CRC32,
+        1024 * 1024);
     info.setChecksumData(checksum.computeChecksum(data));
     data.rewind();
   }
