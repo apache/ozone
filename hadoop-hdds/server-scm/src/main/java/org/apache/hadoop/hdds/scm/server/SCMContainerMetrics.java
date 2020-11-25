@@ -82,8 +82,11 @@ public class SCMContainerMetrics implements MetricsSource {
             stateCount.get(DELETED.toString()))
         .addGauge(Interns.info("TotalContainers",
             "Number of all containers"),
-          stateCount.get(OPEN.toString())+stateCount.get(CLOSING.toString())+
-             stateCount.get(QUASI_CLOSED.toString())+stateCount.get(CLOSED.toString())+
-              stateCount.get(DELETING.toString())+stateCount.get(DELETED.toString()));
+          stateCount.get(OPEN.toString())+
+              stateCount.get(CLOSING.toString())+
+                stateCount.get(QUASI_CLOSED.toString())+
+                  stateCount.get(CLOSED.toString())+
+                    stateCount.get(DELETING.toString())+
+                      stateCount.get(DELETED.toString()));
   }
 }
