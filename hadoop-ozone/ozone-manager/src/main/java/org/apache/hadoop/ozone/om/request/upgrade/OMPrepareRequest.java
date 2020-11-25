@@ -17,11 +17,9 @@
 
 package org.apache.hadoop.ozone.om.request.upgrade;
 
-import org.apache.hadoop.hdds.ratis.RatisUpgradeUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -34,12 +32,15 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 
 import org.apache.ratis.server.impl.RaftServerImpl;
 import org.apache.ratis.server.impl.RaftServerProxy;
+import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.statemachine.StateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.concurrent.TimeUnit;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * OM Request used to flush all transactions to disk, take a DB snapshot, and
@@ -54,9 +55,11 @@ public class OMPrepareRequest extends OMClientRequest {
 
   // Allow double buffer this many seconds to flush all transactions before
   // returning an error to the caller.
-  private static final long DOUBLE_BUFFER_FLUSH_TIMEOUT_SECONDS = 5 * 60;
+  private static final Duration DOUBLE_BUFFER_FLUSH_TIMEOUT =
+      Duration.of(5, ChronoUnit.MINUTES);
   // Time between checks to see if double buffer finished flushing.
-  private static final long DOUBLE_BUFFER_FLUSH_CHECK_SECONDS = 1;
+  private static final Duration DOUBLE_BUFFER_FLUSH_CHECK_INTERVAL =
+      Duration.of(1, ChronoUnit.SECONDS);
 
   public OMPrepareRequest(OMRequest omRequest) {
     super(omRequest);
@@ -90,9 +93,17 @@ public class OMPrepareRequest extends OMClientRequest {
       // Wait for outstanding double buffer entries to flush to disk,
       // so they will not be purged from the log before being persisted to
       // the DB.
-      waitForDoubleBufferFlush(ozoneManager, transactionLogIndex,
-          DOUBLE_BUFFER_FLUSH_TIMEOUT_SECONDS,
-          DOUBLE_BUFFER_FLUSH_CHECK_SECONDS);
+      // Since the response for this request was added to the double buffer
+      // already, once this index reaches the state machine, we know all
+      // transactions have been flushed.
+      waitForDoubleBufferFlush(ozoneManager, transactionLogIndex);
+
+      OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
+      RaftServerProxy server = (RaftServerProxy) omRatisServer.getServer();
+      RaftServerImpl serverImpl =
+          server.getImpl(omRatisServer.getRaftGroup().getGroupId());
+
+      takeSnapshotAndPurgeLogs(serverImpl);
 
       // TODO: Create marker file with txn index.
 
@@ -111,29 +122,60 @@ public class OMPrepareRequest extends OMClientRequest {
   }
 
   private static void waitForDoubleBufferFlush(
-      OzoneManager ozoneManager,
-      long txnLogIndex,
-      long maxTimeToWaitSeconds,
-      long timeBetweenRetryInSeconds)
+      OzoneManager ozoneManager, long txnLogIndex)
       throws InterruptedException, IOException {
 
-    long intervalTime = TimeUnit.SECONDS.toMillis(timeBetweenRetryInSeconds);
     long endTime = System.currentTimeMillis() +
-        TimeUnit.SECONDS.toMillis(maxTimeToWaitSeconds);
+        DOUBLE_BUFFER_FLUSH_TIMEOUT.toMillis();
     boolean success = false;
     while (System.currentTimeMillis() < endTime) {
       success = (ozoneManager.getRatisSnapshotIndex() == txnLogIndex);
       if (ozoneManager.getRatisSnapshotIndex() == txnLogIndex) {
         break;
       }
-      Thread.sleep(intervalTime);
+      Thread.sleep(DOUBLE_BUFFER_FLUSH_CHECK_INTERVAL.toMillis());
     }
 
     if (!success) {
       throw new IOException(String.format("After waiting for %d seconds, " +
               "State Machine has not applied  all the transactions.",
-          maxTimeToWaitSeconds));
+          DOUBLE_BUFFER_FLUSH_TIMEOUT.toMillis() * 1000));
     }
+  }
+
+  /**
+   * Take a snapshot of the state machine at the last index, and purge ALL logs.
+   * @param impl RaftServerImpl instance
+   * @throws IOException on Error.
+   */
+  public static long takeSnapshotAndPurgeLogs(RaftServerImpl impl)
+      throws IOException {
+
+    StateMachine stateMachine = impl.getStateMachine();
+    long snapshotIndex = stateMachine.takeSnapshot();
+    if (snapshotIndex != stateMachine.getLastAppliedTermIndex().getIndex()) {
+      throw new IOException("Index from Snapshot does not match last applied " +
+          "Index");
+    }
+
+    RaftLog raftLog = impl.getState().getLog();
+    // In order to get rid of all logs, make sure we also account for
+    // intermediate Ratis entries that do not pertain to OM.
+    long lastIndex = Math.max(snapshotIndex,
+        raftLog.getLastEntryTermIndex().getIndex());
+
+    CompletableFuture<Long> purgeFuture =
+        raftLog.syncWithSnapshot(lastIndex);
+    try {
+      Long purgeIndex = purgeFuture.get();
+      if (purgeIndex != lastIndex) {
+        throw new IOException("Purge index " + purgeIndex +
+            " does not match last index " + lastIndex);
+      }
+    } catch (Exception e) {
+      throw new IOException("Unable to purge logs.", e);
+    }
+    return lastIndex;
   }
 
   public static String getRequestType() {
