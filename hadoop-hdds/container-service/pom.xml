@@ -102,6 +102,12 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>hadoop-hdds-hadoop-dependency-test</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-log4j12</artifactId>
+      <scope>test</scope>
+    </dependency>
+
   </dependencies>
 
   <build>
