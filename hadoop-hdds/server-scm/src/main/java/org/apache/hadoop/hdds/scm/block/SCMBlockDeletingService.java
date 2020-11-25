@@ -141,7 +141,7 @@ public class SCMBlockDeletingService extends BackgroundService {
               // We should stop caching new commands if num of un-processed
               // command is bigger than a limit, e.g 50. In case datanode goes
               // offline for sometime, the cached commands be flooded.
-              eventPublisher.fireEvent(SCMEvents.RETRIABLE_DATANODE_COMMAND,
+              eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
                   new CommandForDatanode<>(dnId,
                       new DeleteBlocksCommand(dnTXs)));
               if (LOG.isDebugEnabled()) {
