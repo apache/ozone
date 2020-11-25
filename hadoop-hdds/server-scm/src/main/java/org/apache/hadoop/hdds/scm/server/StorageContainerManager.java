@@ -314,14 +314,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     PipelineActionHandler pipelineActionHandler =
         new PipelineActionHandler(pipelineManager, conf);
 
-
-    RetriableDatanodeEventWatcher retriableDatanodeEventWatcher =
-        new RetriableDatanodeEventWatcher<>(
-            SCMEvents.RETRIABLE_DATANODE_COMMAND,
-            SCMEvents.DELETE_BLOCK_STATUS,
-            commandWatcherLeaseManager);
-    retriableDatanodeEventWatcher.start(eventQueue);
-
     scmAdminUsernames = conf.getTrimmedStringCollection(OzoneConfigKeys
         .OZONE_ADMINISTRATORS);
     String scmUsername = UserGroupInformation.getCurrentUser().getUserName();
