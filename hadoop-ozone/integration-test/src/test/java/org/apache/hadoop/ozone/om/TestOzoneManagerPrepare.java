@@ -53,6 +53,7 @@ import org.junit.Test;
 public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
   private final String keyPrefix = "key";
+  private final int TIMEOUT_MILLIS = 30000;
 
   /**
    * Calls prepare on all OMs when they have no transaction information.
@@ -103,6 +104,13 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
       String keyName = keyPrefix + i;
       writeTestData(store, volumeName, bucketName, keyName);
       writtenKeys.add(keyName);
+    }
+
+    // Make sure all OMs have logs from writing data, so we can check that
+    // they are purged after prepare.
+    for (OzoneManager om: cluster.getOzoneManagersList()) {
+      LambdaTestUtils.await(TIMEOUT_MILLIS, 1000,
+          () -> logFilesPresentInRatisPeer(om));
     }
 
     OzoneManager leader = cluster.getOMLeader();
@@ -166,6 +174,13 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
       writtenKeys.add(keyName);
     }
 
+    // Make sure all OMs have logs from writing data, so we can check that
+    // they are purged after prepare.
+    for (OzoneManager om: cluster.getOzoneManagersList()) {
+      LambdaTestUtils.await(TIMEOUT_MILLIS, 1000,
+          () -> logFilesPresentInRatisPeer(om));
+    }
+
     // Shut down one OM.
     cluster.stopOzoneManager(shutdownOMIndex);
     OzoneManager downedOM = cluster.getOzoneManager(shutdownOMIndex);
@@ -201,7 +216,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     // it missed once it receives the prepare transaction.
     cluster.restartOzoneManager(downedOM, true);
     // Wait for other OMs to catch this one up on transactions.
-    LambdaTestUtils.await(3000, 1000,
+    LambdaTestUtils.await(TIMEOUT_MILLIS, 1000,
         () -> downedOM.getRatisSnapshotIndex() == prepareIndex);
     checkPrepared(downedOM, prepareIndex);
 
@@ -263,7 +278,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
       long prepareRequestLogIndex) throws Exception {
     // Log files are deleted after the snapshot is taken,
     // So once log files have been deleted, OM should be prepared.
-    LambdaTestUtils.await(3000, 1000,
+    LambdaTestUtils.await(TIMEOUT_MILLIS, 1000,
         () -> !logFilesPresentInRatisPeer(om));
     checkPrepared(om, prepareRequestLogIndex);
   }
