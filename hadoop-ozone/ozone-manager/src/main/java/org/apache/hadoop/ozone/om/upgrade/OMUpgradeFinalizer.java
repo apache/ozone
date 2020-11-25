@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
+
 import org.apache.hadoop.ozone.om.OzoneManager;
 
 import java.io.IOException;
@@ -38,12 +41,10 @@ public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
   @Override
   public StatusAndMessages finalize(String upgradeClientID, OzoneManager om)
       throws IOException {
-    if (!versionManager.needsFinalization()) {
-      return FINALIZED_MSG;
+    StatusAndMessages response = preFinalize(upgradeClientID, om);
+    if (response.status() != FINALIZATION_REQUIRED) {
+      return response;
     }
-    clientID = upgradeClientID;
-    component = om;
-
     // This requires some more investigation on how to do it properly while
     // requests are on the fly, and post finalize features one by one.
     // Until that is done, monitoring is not really doing anything meaningful
@@ -91,20 +92,17 @@ public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
 
     @Override
     public Void call() throws IOException {
-      try {
-        emitStartingMsg();
+      emitStartingMsg();
+      versionManager.setUpgradeState(FINALIZATION_IN_PROGRESS);
 
-        for (OMLayoutFeature f : versionManager.unfinalizedFeatures()) {
-          finalizeFeature(f);
-          updateLayoutVersionInVersionFile(f, ozoneManager.getOmStorage());
-          versionManager.finalized(f);
-        }
-
-        versionManager.completeFinalization();
-        emitFinishedMsg();
-      } finally {
-        isDone = true;
+      for (OMLayoutFeature f : versionManager.unfinalizedFeatures()) {
+        finalizeFeature(f);
+        updateLayoutVersionInVersionFile(f, ozoneManager.getOmStorage());
+        versionManager.finalized(f);
       }
+
+      versionManager.completeFinalization();
+      emitFinishedMsg();
       return null;
     }
 

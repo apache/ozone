@@ -25,6 +25,8 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.REMOV
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.UPDATE_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.STARTING_FINALIZATION;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -55,18 +57,45 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
     this.versionManager = versionManager;
   }
 
+  public StatusAndMessages preFinalize(String upgradeClientID, T id)
+      throws UpgradeException {
+    switch (versionManager.getUpgradeState()) {
+    case STARTING_FINALIZATION:
+      return STARTING_MSG;
+    case FINALIZATION_IN_PROGRESS:
+      return FINALIZATION_IN_PROGRESS_MSG;
+    case FINALIZATION_DONE:
+    case ALREADY_FINALIZED:
+      return FINALIZED_MSG;
+    default:
+      if (!versionManager.needsFinalization()) {
+        throw new UpgradeException("Upgrade found in inconsistent state. " +
+            "Upgrade state is FINALIZATION_REQUIRED while MLV has been " +
+            "upgraded to SLV.", INVALID_REQUEST);
+      }
+      versionManager.setUpgradeState(STARTING_FINALIZATION);
+
+      clientID = upgradeClientID;
+      this.component = id;
+      return FINALIZATION_REQUIRED_MSG;
+    }
+  }
+
   /*
    * This method must be overriden by the component implementing the
    * finalization logic.
    */
   public StatusAndMessages finalize(String upgradeClientID, T id)
       throws IOException {
-    if (!versionManager.needsFinalization()) {
-      return FINALIZED_MSG;
+    StatusAndMessages response = preFinalize(upgradeClientID, id);
+    if (response.status() != FINALIZATION_REQUIRED) {
+      return response;
     }
-    clientID = upgradeClientID;
-    this.component = id;
 
+    /**
+     * Overriding class should schedule actual finalization logic
+     * in a separate thread here.
+     */
     return STARTING_MSG;
   }
 

@@ -18,6 +18,9 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
+
 import java.io.IOException;
 import java.util.concurrent.Callable;
 
@@ -41,12 +44,10 @@ public class SCMUpgradeFinalizer extends
   public StatusAndMessages finalize(String upgradeClientID,
                                     StorageContainerManager scm)
       throws IOException {
-    if (!versionManager.needsFinalization()) {
-      return FINALIZED_MSG;
+    StatusAndMessages response = preFinalize(upgradeClientID, scm);
+    if (response.status() != FINALIZATION_REQUIRED) {
+      return response;
     }
-    clientID = upgradeClientID;
-    component = scm;
-
     new Worker(scm).call();
     return STARTING_MSG;
   }
@@ -65,27 +66,24 @@ public class SCMUpgradeFinalizer extends
 
     @Override
     public Void call() throws IOException {
-      try {
-        emitStartingMsg();
-        /*
-         * Before we can call finalize the feature, we need to make sure that
-         * all existing pipelines are closed and pipeline Manger would freeze
-         * all new pipeline creation.
-         */
-        storageContainerManager.preFinalizeUpgrade();
+      emitStartingMsg();
+      versionManager.setUpgradeState(FINALIZATION_IN_PROGRESS);
+      /*
+       * Before we can call finalize the feature, we need to make sure that
+       * all existing pipelines are closed and pipeline Manger would freeze
+       * all new pipeline creation.
+       */
+      storageContainerManager.preFinalizeUpgrade();
 
-        for (HDDSLayoutFeature f : versionManager.unfinalizedFeatures()) {
-          finalizeFeature(f, storageContainerManager.getScmStorageConfig());
-          updateLayoutVersionInVersionFile(f,
-              storageContainerManager.getScmStorageConfig());
-          versionManager.finalized(f);
-        }
-        versionManager.completeFinalization();
-        storageContainerManager.postFinalizeUpgrade();
-        emitFinishedMsg();
-      } finally {
-        isDone = true;
+      for (HDDSLayoutFeature f : versionManager.unfinalizedFeatures()) {
+        finalizeFeature(f, storageContainerManager.getScmStorageConfig());
+        updateLayoutVersionInVersionFile(f,
+            storageContainerManager.getScmStorageConfig());
+        versionManager.finalized(f);
       }
+      versionManager.completeFinalization();
+      storageContainerManager.postFinalizeUpgrade();
+      emitFinishedMsg();
       return null;
     }
   }

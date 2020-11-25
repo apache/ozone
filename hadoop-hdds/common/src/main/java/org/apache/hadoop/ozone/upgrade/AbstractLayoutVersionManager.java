@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.metrics2.util.MBeans;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status;
 
 /**
  * Layout Version Manager containing generic method implementations.
@@ -44,7 +45,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   protected TreeMap<Integer, T> features = new TreeMap<>();
   protected Map<String, T> featureMap = new HashMap<>();
   protected volatile boolean isInitialized = false;
-  protected volatile UpgradeFinalizer.Status currentUpgradeState =
+  protected volatile Status currentUpgradeState =
       FINALIZATION_REQUIRED;
 
   protected void init(int version, T[] lfs) throws IOException {
@@ -68,8 +69,12 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
         "AbstractLayoutVersionManager", this);
   }
 
-  public UpgradeFinalizer.Status getUpgradeState() {
+  public Status getUpgradeState() {
     return currentUpgradeState;
+  }
+
+  public void setUpgradeState(Status status) {
+    currentUpgradeState = status;
   }
 
   private void initializeFeatures(T[] lfs) {

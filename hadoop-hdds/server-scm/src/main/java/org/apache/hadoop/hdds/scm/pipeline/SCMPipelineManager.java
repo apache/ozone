@@ -725,14 +725,16 @@ public class SCMPipelineManager implements PipelineManager {
   @Override
   public void freezePipelineCreation() {
     lock.writeLock().lock();
-    this.freezePipelineCreation.set(true);
+    freezePipelineCreation.set(true);
+    backgroundPipelineCreator.pause();
     lock.writeLock().unlock();
   }
 
   @Override
   public void resumePipelineCreation() {
     lock.writeLock().lock();
-    this.freezePipelineCreation.set(false);
+    freezePipelineCreation.set(false);
+    backgroundPipelineCreator.resume();
     lock.writeLock().unlock();
   }
 
