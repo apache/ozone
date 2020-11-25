@@ -574,25 +574,4 @@ public final class TestUtils {
         .setType(HddsProtos.ReplicationType.RATIS)
         .build();
   }
-
-  /**
-   * Creates a VERSION file for the specified node type under the directory
-   * {@code parentDir}.
-   */
-  public static File createVersionFile(File parentDir,
-      HddsProtos.NodeType nodeType, int mlv) throws IOException {
-
-    final String versionFileName = "VERSION";
-
-    StorageInfo info = new StorageInfo(
-        nodeType,
-        UUID.randomUUID().toString(),
-        System.currentTimeMillis(),
-        mlv);
-
-    File versionFile = new File(parentDir, versionFileName);
-    info.writeTo(versionFile);
-
-    return versionFile;
-  }
 }

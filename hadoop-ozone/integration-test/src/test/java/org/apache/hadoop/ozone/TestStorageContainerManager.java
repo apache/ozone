@@ -52,6 +52,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.TestHddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -95,6 +96,7 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
+import org.apache.hadoop.ozone.upgrade.TestUpgradeUtils;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
@@ -689,7 +691,7 @@ public class TestStorageContainerManager {
     }
 
     int mlv = largestSlv + 1;
-    TestUtils.createVersionFile(scmSubdir, NodeType.SCM, mlv);
+    TestUpgradeUtils.createVersionFile(scmSubdir, NodeType.SCM, mlv);
 
     try {
       new StorageContainerManager(conf);
