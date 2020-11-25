@@ -372,7 +372,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <prefix>$HDDS_LIB_JARS_DIR</prefix>
                   <outputFilterFile>true</outputFilterFile>
                   <includeScope>runtime</includeScope>
-<!--                  <excludeScope>test,provided</excludeScope>-->
                 </configuration>
               </execution>
             </executions>
