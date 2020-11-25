@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Matchers.eq;
@@ -659,20 +660,30 @@ public class TestStorageContainerManager {
 
   @Test
   public void testStartupSlvLessThanMlv() throws Exception {
+    // Add subdirectories under the temporary folder where the version file
+    // will be placed.
     File scmSubdir = folder.newFolder("scm", "current");
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS, folder.getRoot().getAbsolutePath());
+    conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS,
+        folder.getRoot().getAbsolutePath());
 
     int largestSlv = 0;
-    for (LayoutFeature f : HDDSLayoutFeatureCatalog.HDDSLayoutFeature.values()) {
+    for (LayoutFeature f: HDDSLayoutFeatureCatalog.HDDSLayoutFeature.values()) {
       largestSlv = Math.max(largestSlv, f.layoutVersion());
     }
 
-    TestUtils.createVersionFile(scmSubdir, largestSlv + 1);
+    int mlv = largestSlv + 1;
+    TestUtils.createVersionFile(scmSubdir, NodeType.SCM, mlv);
 
-    // TODO: Expect exception to be thrown here.
-    new StorageContainerManager(conf);
+    try {
+      new StorageContainerManager(conf);
+      Assert.fail("Expected IOException due to incorrect MLV on SCM creation.");
+    } catch(IOException e) {
+      Assert.assertTrue(e.getMessage()
+          .contains(String.format("Metadata layout version (%s) > " +
+              "software layout version (%s)", mlv, largestSlv)));
+    }
   }
 
   @SuppressWarnings("visibilitymodifier")
