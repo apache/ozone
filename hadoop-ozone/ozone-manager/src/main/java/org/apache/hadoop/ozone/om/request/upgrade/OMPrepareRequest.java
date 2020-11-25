@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.request.upgrade;
 
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -28,6 +29,8 @@ import org.apache.hadoop.ozone.om.response.upgrade.OMPrepareResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
 import org.apache.ratis.server.impl.RaftServerImpl;
@@ -128,11 +131,20 @@ public class OMPrepareRequest extends OMClientRequest {
     long endTime = System.currentTimeMillis() +
         DOUBLE_BUFFER_FLUSH_TIMEOUT.toMillis();
     boolean success = false;
-    while (System.currentTimeMillis() < endTime) {
-      success = (ozoneManager.getRatisSnapshotIndex() == txnLogIndex);
-      if (ozoneManager.getRatisSnapshotIndex() == txnLogIndex) {
-        break;
+
+    while (!success && System.currentTimeMillis() < endTime) {
+      // If no transactions have been persisted to the DB, transaction info
+      // will be null, not zero, causing a null pointer exception within
+      // ozoneManager#getRatisSnaphotIndex.
+      // Get the transaction directly instead.
+      OMTransactionInfo txnInfo = ozoneManager.getMetadataManager()
+          .getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
+      if (txnInfo == null) {
+        success = (txnLogIndex == 0);
+      } else {
+        success = (txnInfo.getTransactionIndex() == txnLogIndex);
       }
+
       Thread.sleep(DOUBLE_BUFFER_FLUSH_CHECK_INTERVAL.toMillis());
     }
 
