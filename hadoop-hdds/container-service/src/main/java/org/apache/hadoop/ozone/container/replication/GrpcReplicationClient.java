@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -68,7 +69,7 @@ public class GrpcReplicationClient implements AutoCloseable{
             .usePlaintext()
             .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
 
-    if (secConfig.isGrpcTlsEnabled()) {
+    if (secConfig.isSecurityEnabled()) {
       channelBuilder.useTransportSecurity();
 
       SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
@@ -76,11 +77,10 @@ public class GrpcReplicationClient implements AutoCloseable{
         sslContextBuilder.trustManager(caCert);
       }
 
-      if (secConfig.isSecurityEnabled()) {
-        sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
-        sslContextBuilder.trustManager();
-      }
-
+      sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
+      sslContextBuilder.keyManager(
+          new File(secConfig.getCertificateFileName()),
+          new File(secConfig.getPrivateKeyFileName()));
       if (secConfig.useTestCert()) {
         channelBuilder.overrideAuthority("localhost");
       }

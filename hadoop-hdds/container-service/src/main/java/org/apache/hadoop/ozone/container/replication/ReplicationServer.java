@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
+import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
@@ -34,6 +35,8 @@ import org.apache.ratis.thirdparty.io.grpc.ServerBuilder;
 import org.apache.ratis.thirdparty.io.grpc.ServerInterceptors;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyServerBuilder;
+import org.apache.ratis.thirdparty.io.grpc.protobuf.services.ProtoReflectionService;
+import org.apache.ratis.thirdparty.io.netty.handler.ssl.ClientAuth;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,9 +76,11 @@ public class ReplicationServer {
 
     GrpcServerInterceptor tracingInterceptor = new GrpcServerInterceptor();
     nettyServerBuilder
+        .addService(ProtoReflectionService.newInstance())
         .addService(ServerInterceptors.intercept(new GrpcReplicationService(
             new OnDemandContainerReplicationSource(controller)
         ), tracingInterceptor));
+
 
     if (secConf.isSecurityEnabled()) {
       try {
@@ -84,8 +89,10 @@ public class ReplicationServer {
         SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(
             sslClientContextBuilder, secConf.getGrpcSslProvider());
         nettyServerBuilder.sslContext(sslContextBuilder.build());
-      } catch (Exception ex) {
-        LOG.error(
+        sslClientContextBuilder.clientAuth(ClientAuth.REQUIRE);
+        sslClientContextBuilder.trustManager(caClient.getCACertificate());
+      } catch (SSLException ex) {
+        throw new IllegalArgumentException(
             "Unable to setup TLS for secure datanode replication GRPC "
                 + "endpoint.", ex);
       }
