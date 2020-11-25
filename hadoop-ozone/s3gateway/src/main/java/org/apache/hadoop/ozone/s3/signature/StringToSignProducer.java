@@ -243,7 +243,9 @@ public final class StringToSignProducer {
     }
   }
 
-  private static String getQueryParamString(MultivaluedMap<String, String> queryMap) {
+  private static String getQueryParamString(
+      MultivaluedMap<String, String> queryMap
+  ) {
     List<String> params = new ArrayList<>(queryMap.keySet());
 
     // Sort by name, then by value
