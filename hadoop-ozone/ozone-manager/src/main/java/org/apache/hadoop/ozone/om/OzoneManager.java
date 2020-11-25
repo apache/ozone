@@ -3505,18 +3505,23 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   /**
    * Checks the Leader status of OM Ratis Server.
-   * Note that this status has a small window of error. It should not be used
-   * to determine the absolute leader status.
-   * If it is the leader, the role status is cached till Ratis server
-   * notifies of leader change. If it is not leader, the role information is
-   * retrieved through by submitting a GroupInfoRequest to Ratis server.
-   * <p>
    * If ratis is not enabled, then it always returns true.
    *
    * @return Return true if this node is the leader, false otherwsie.
    */
   public boolean isLeader() {
     return isRatisEnabled ? omRatisServer.isLeader() : true;
+  }
+
+  /**
+   * Return true, if the current OM node is leader and in ready state to
+   * process the requests.
+   *
+   * If ratis is not enabled, then it always returns true.
+   * @return
+   */
+  public boolean isLeaderReady() {
+    return isRatisEnabled ? omRatisServer.isLeaderReady() : true;
   }
 
   /**
