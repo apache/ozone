@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -86,6 +87,9 @@ import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.ipc.RpcConstants.DUMMY_CLIENT_ID;
+import static org.apache.hadoop.ipc.RpcConstants.INVALID_CALL_ID;
+
 /**
  * Creates a Ratis server endpoint for OM.
  */
@@ -126,15 +130,32 @@ public final class OzoneManagerRatisServer {
   public OMResponse submitRequest(OMRequest omRequest) throws ServiceException {
     RaftClientRequest raftClientRequest =
         createWriteRaftClientRequest(omRequest);
-    RaftClientReply raftClientReply;
+    RaftClientReply raftClientReply = submitRequestToRatis(raftClientRequest);
+    return processReply(omRequest, raftClientReply);
+  }
+
+  /**
+   * API used internally from OzoneManager Server when requests needs to be
+   * submitted to ratis, where the crafted RaftClientRequest is passed along.
+   * @param omRequest
+   * @param raftClientRequest
+   * @return OMResponse
+   * @throws ServiceException
+   */
+  public OMResponse submitRequest(OMRequest omRequest,
+      RaftClientRequest raftClientRequest) throws ServiceException {
+    RaftClientReply raftClientReply = submitRequestToRatis(raftClientRequest);
+    return processReply(omRequest, raftClientReply);
+  }
+
+  private RaftClientReply submitRequestToRatis(
+      RaftClientRequest raftClientRequest) throws ServiceException {
     try {
-      raftClientReply = server.submitClientRequestAsync(raftClientRequest)
+      return server.submitClientRequestAsync(raftClientRequest)
           .get();
     } catch (Exception ex) {
       throw new ServiceException(ex.getMessage(), ex);
     }
-
-    return processReply(omRequest, raftClientReply);
   }
 
   /**
@@ -144,6 +165,8 @@ public final class OzoneManagerRatisServer {
    * ratis server.
    */
   private RaftClientRequest createWriteRaftClientRequest(OMRequest omRequest) {
+    Preconditions.checkArgument(Server.getClientId() != DUMMY_CLIENT_ID);
+    Preconditions.checkArgument(Server.getCallId() != INVALID_CALL_ID);
     return new RaftClientRequest(
         ClientId.valueOf(UUID.nameUUIDFromBytes(Server.getClientId())),
         server.getId(), raftGroupId, Server.getCallId(),
@@ -713,5 +736,9 @@ public final class OzoneManagerRatisServer {
 
   public TermIndex getLastAppliedTermIndex() {
     return omStateMachine.getLastAppliedTermIndex();
+  }
+
+  public RaftGroupId getRaftGroupId() {
+    return raftGroupId;
   }
 }
