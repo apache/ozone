@@ -78,8 +78,11 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.*;
-import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.*;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.container.common.impl.ChunkLayOutVersion.FILE_PER_BLOCK;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -168,7 +171,7 @@ public class TestBlockDeletingService {
       containerSet.addContainer(container);
       data = (KeyValueContainerData) containerSet.getContainer(
           containerID).getContainerData();
-      long blockLength = 100;
+      long chunkLength = 100;
       try(ReferenceCountedDB metadata = BlockUtils.getDB(data, conf)) {
         for (int j = 0; j < numOfBlocksPerContainer; j++) {
           BlockID blockID =
@@ -179,17 +182,17 @@ public class TestBlockDeletingService {
           List<ContainerProtos.ChunkInfo> chunks = Lists.newArrayList();
           for (int k = 0; k < numOfChunksPerBlock; k++) {
             final String chunkName = String.format("block.%d.chunk.%d", j, k);
-            final long offset = k * blockLength;
+            final long offset = k * chunkLength;
             ContainerProtos.ChunkInfo info =
                 ContainerProtos.ChunkInfo.newBuilder()
                     .setChunkName(chunkName)
-                    .setLen(blockLength)
+                    .setLen(chunkLength)
                     .setOffset(offset)
                     .setChecksumData(Checksum.getNoChecksumDataProto())
                     .build();
             chunks.add(info);
-            ChunkInfo chunkInfo = new ChunkInfo(chunkName, offset, blockLength);
-            ChunkBuffer chunkData = buffer.duplicate(0, (int) blockLength);
+            ChunkInfo chunkInfo = new ChunkInfo(chunkName, offset, chunkLength);
+            ChunkBuffer chunkData = buffer.duplicate(0, (int) chunkLength);
             chunkManager.writeChunk(container, blockID, chunkInfo, chunkData,
                 WRITE_STAGE);
             chunkManager.writeChunk(container, blockID, chunkInfo, chunkData,
@@ -206,7 +209,7 @@ public class TestBlockDeletingService {
                 OzoneConsts.BLOCK_COUNT, (long)numOfBlocksPerContainer);
         metadata.getStore().getMetadataTable().put(
                 OzoneConsts.CONTAINER_BYTES_USED,
-                blockLength * numOfBlocksPerContainer);
+            chunkLength * numOfChunksPerBlock * numOfBlocksPerContainer);
         metadata.getStore().getMetadataTable().put(
                 OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
                 (long)numOfBlocksPerContainer);
@@ -287,6 +290,12 @@ public class TestBlockDeletingService {
 
       // An interval will delete 1 * 2 blocks
       deleteAndWait(svc, 1);
+
+      // After first interval 2 blocks will be deleted. Hence, current space
+      // used by the container should be less than the space used by the
+      // container initially(before running deletion services).
+      Assert.assertTrue(containerData.get(0).getBytesUsed() < containerSpace);
+
       deleteAndWait(svc, 2);
 
       // After deletion of all 3 blocks, space used by the containers
