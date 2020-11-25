@@ -190,8 +190,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
       if (om == leaderOM) {
         // Leader should have been prepared after we got the response.
         checkPrepared(om, prepareIndex);
-      }
-      else if (om != downedOM) {
+      } else if (om != downedOM) {
         // Follower may still be applying transactions.
         waitAndCheckPrepared(om, prepareIndex);
       }
