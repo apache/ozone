@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -85,6 +86,9 @@ import org.apache.ratis.util.StringUtils;
 import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.ipc.RpcConstants.DUMMY_CLIENT_ID;
+import static org.apache.hadoop.ipc.RpcConstants.INVALID_CALL_ID;
 
 /**
  * Creates a Ratis server endpoint for OM.
@@ -161,6 +165,8 @@ public final class OzoneManagerRatisServer {
    * ratis server.
    */
   private RaftClientRequest createWriteRaftClientRequest(OMRequest omRequest) {
+    Preconditions.checkArgument(Server.getClientId() != DUMMY_CLIENT_ID);
+    Preconditions.checkArgument(Server.getCallId() != INVALID_CALL_ID);
     return new RaftClientRequest(
         ClientId.valueOf(UUID.nameUUIDFromBytes(Server.getClientId())),
         server.getId(), raftGroupId, Server.getCallId(),
