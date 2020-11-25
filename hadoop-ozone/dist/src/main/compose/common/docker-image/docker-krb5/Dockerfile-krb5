@@ -20,7 +20,7 @@ FROM openjdk:8u191-jdk-alpine3.9
 RUN apk add --no-cache bash ca-certificates openssl krb5-server krb5 wget && update-ca-certificates
 RUN wget -O /usr/local/bin/dumb-init https://github.com/Yelp/dumb-init/releases/download/v1.2.0/dumb-init_1.2.0_amd64
 RUN chmod +x /usr/local/bin/dumb-init
-RUN wget -O /root/issuer https://github.com/ajayydv/docker/raw/kdc/issuer
+RUN wget -c https://github.com/flokkr/issuer/releases/download/1.0.3/issuer_1.0.3_linux_amd64.tar.gz  -O - |  tar -xz -C /root
 RUN chmod +x /root/issuer
 WORKDIR /opt
 COPY krb5.conf /etc/

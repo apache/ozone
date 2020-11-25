@@ -28,6 +28,6 @@ public class ExitManager {
 
   public void exitSystem(int status, String message, Throwable throwable,
       Logger log) {
-    ExitUtils.terminate(1, message, throwable, log);
+    ExitUtils.terminate(status, message, throwable, log);
   }
 }
