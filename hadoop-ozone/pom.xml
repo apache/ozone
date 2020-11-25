@@ -161,6 +161,13 @@
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-common</artifactId>
+        <version>${hdds.version}</version>
+        <type>test-jar</type>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-ozone-integration-test</artifactId>
         <version>${ozone.version}</version>
         <type>test-jar</type>
