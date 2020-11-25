@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo.Version;
 import org.apache.hadoop.ozone.s3.signature.SignatureProcessor;
 import org.apache.hadoop.ozone.s3.signature.StringToSignProducer;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -44,6 +45,7 @@ import com.google.common.annotations.VisibleForTesting;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,8 +94,7 @@ public class OzoneClientProducer {
       SignatureInfo signatureInfo = signatureProcessor.parseSignature();
 
       String stringToSign = "";
-      if (signatureInfo.getAwsAccessId() != null
-          && signatureInfo.getAwsAccessId().length() > 0) {
+      if (signatureInfo.getVersion() == Version.V4) {
         stringToSign =
             StringToSignProducer.createSignatureBase(signatureInfo, context);
       }
@@ -105,6 +106,10 @@ public class OzoneClientProducer {
           UserGroupInformation.createRemoteUser(awsAccessId);
       if (OzoneSecurityUtil.isSecurityEnabled(config)) {
         LOG.debug("Creating s3 auth info for client.");
+
+        if (signatureInfo.getVersion() == Version.NONE) {
+          throw MALFORMED_HEADER;
+        }
 
         OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
         identifier.setTokenType(S3AUTHINFO);
@@ -124,13 +129,7 @@ public class OzoneClientProducer {
       }
       ozoneClient =
           remoteUser.doAs((PrivilegedExceptionAction<OzoneClient>)() -> {
-            if (omServiceID == null) {
-              return OzoneClientFactory.getRpcClient(ozoneConfiguration);
-            } else {
-              // As in HA case, we need to pass om service ID.
-              return OzoneClientFactory.getRpcClient(omServiceID,
-                  ozoneConfiguration);
-            }
+            return createOzoneClient();
           });
     } catch (OS3Exception ex) {
       if (LOG.isDebugEnabled()) {
@@ -146,6 +145,18 @@ public class OzoneClientProducer {
       throw INTERNAL_ERROR;
     }
     return ozoneClient;
+  }
+
+  @NotNull
+  @VisibleForTesting
+  OzoneClient createOzoneClient() throws IOException {
+    if (omServiceID == null) {
+      return OzoneClientFactory.getRpcClient(ozoneConfiguration);
+    } else {
+      // As in HA case, we need to pass om service ID.
+      return OzoneClientFactory.getRpcClient(omServiceID,
+          ozoneConfiguration);
+    }
   }
 
   private void getSignatureInfo() {

@@ -1,3 +1,20 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.hadoop.ozone.s3.signature;
 
 import java.time.LocalDate;
@@ -5,6 +22,7 @@ import java.util.Collection;
 
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo.Version;
 import org.apache.hadoop.util.StringUtils;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -19,6 +37,9 @@ import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMA
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Class to parse v4 auth information from header.
+ */
 public class AuthorizationV4HeaderParser implements SignatureParser {
 
   private static final Logger LOG =
@@ -31,12 +52,7 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
   private String authHeader;
 
   public AuthorizationV4HeaderParser(String authHeader) {
-    if (authHeader != null) {
-      String[] split = authHeader.split(" ");
-      if (!split[0].equals(AuthorizationHeaderV2.IDENTIFIER)) {
-        this.authHeader = authHeader;
-      }
-    }
+    this.authHeader = authHeader;
   }
 
   /**
@@ -53,7 +69,8 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
   @SuppressWarnings("StringSplitter")
   @Override
   public SignatureInfo parseSignature() throws OS3Exception {
-    if (authHeader == null) {
+    if (authHeader == null || authHeader
+        .startsWith(AuthorizationV2HeaderParser.IDENTIFIER + " ")) {
       return null;
     }
     int firstSep = authHeader.indexOf(' ');
@@ -73,13 +90,12 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
     String signedHeaders = parseSignedHeaders(split[1]);
     String signature = parseSignature(split[2]);
     return new SignatureInfo(
+        Version.V4,
         credentialObj.getDate(),
         credentialObj.getAccessKeyID(),
         signature,
         signedHeaders,
-        String.format("%s/%s/%s/%s", credentialObj.getDate(),
-            credentialObj.getAwsRegion(), credentialObj.getAwsService(),
-            credentialObj.getAwsRequest()),
+        credentialObj.createScope(),
         algorithm
     );
   }
@@ -94,7 +110,7 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
       String parsedSignedHeaders =
           signedHeadersStr.substring(SIGNEDHEADERS.length());
       Collection<String> signedHeaders =
-          StringUtils.getStringCollection(signedHeadersStr, ";");
+          StringUtils.getStringCollection(parsedSignedHeaders, ";");
       if (signedHeaders.size() == 0) {
         LOG.error("No signed headers found. Authheader:{}", authHeader);
         throw S3ErrorTable.newError(MALFORMED_HEADER, authHeader);

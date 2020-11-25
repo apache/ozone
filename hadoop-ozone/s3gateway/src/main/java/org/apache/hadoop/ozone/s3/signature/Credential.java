@@ -107,4 +107,10 @@ public class Credential {
   public String getCredential() {
     return credential;
   }
+
+  public String createScope() {
+    return String.format("%s/%s/%s/%s", getDate(),
+        getAwsRegion(), getAwsService(),
+        getAwsRequest());
+  }
 }

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -21,7 +21,9 @@ package org.apache.hadoop.ozone.s3.signature;
 import java.time.LocalDate;
 
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.test.LambdaTestUtils;
 
+import static java.time.temporal.ChronoUnit.DAYS;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -70,285 +72,284 @@ public class TestAuthorizationV4HeaderParser {
     }
   }
 
-    @Test
-    public void testV4HeaderInvalidCredential() {
-      try {
-        String auth = "AWS4-HMAC-SHA256 " +
-            "Credential=" + curDate + "/us-east-1/s3/aws4_request, " +
-            "SignedHeaders=host;range;x-amz-date, " +
-            "Signature=fe5f80f77d5fa3beca038a248ff027";
-        AuthorizationV4HeaderParser v4 = new AuthorizationV4HeaderParser(auth);
-        v4.parseSignature();
-        fail("Exception is expected in case of malformed header");
-      } catch (OS3Exception ex) {
-        assertEquals("AuthorizationHeaderMalformed", ex.getCode());
-      }
+  @Test
+  public void testV4HeaderInvalidCredential() {
+    try {
+      String auth = "AWS4-HMAC-SHA256 " +
+          "Credential=" + curDate + "/us-east-1/s3/aws4_request, " +
+          "SignedHeaders=host;range;x-amz-date, " +
+          "Signature=fe5f80f77d5fa3beca038a248ff027";
+      AuthorizationV4HeaderParser v4 = new AuthorizationV4HeaderParser(auth);
+      v4.parseSignature();
+      fail("Exception is expected in case of malformed header");
+    } catch (OS3Exception ex) {
+      assertEquals("AuthorizationHeaderMalformed", ex.getCode());
     }
+  }
 
-  //  @Test
-  //  public void testV4HeaderWithoutSpace() throws OS3Exception {
-  //
-  //    String auth =
-  //        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
-  //            "/aws4_request,"
-  //            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
-  //            + "Signature"
-  //            + "=fe5f80f77d5fa3beca038a248ff027";
-  //    AuthorizationHeaderV4 v4 = new AuthorizationHeaderV4(auth);
-  //
-  //    assertEquals("AWS4-HMAC-SHA256", v4.getAlgorithm());
-  //    assertEquals("ozone", v4.getAccessKeyID());
-  //    assertEquals(curDate, v4.getDate());
-  //    assertEquals("us-east-1", v4.getAwsRegion());
-  //    assertEquals("aws4_request", v4.getAwsRequest());
-  //    assertEquals("host;x-amz-content-sha256;x-amz-date",
-  //        v4.getSignedHeaderString());
-  //    assertEquals("fe5f80f77d5fa3beca038a248ff027", v4.getSignature());
-  //
-  //  }
-  //
-  //  @Test
-  //  public void testV4HeaderDateValidationSuccess() throws OS3Exception {
-  //    // Case 1: valid date within range.
-  //    LocalDate now = LocalDate.now();
-  //    String dateStr = DATE_FORMATTER.format(now);
-  //    validateResponse(dateStr);
-  //
-  //    // Case 2: Valid date with in range.
-  //    dateStr = DATE_FORMATTER.format(now.plus(1, DAYS));
-  //    validateResponse(dateStr);
-  //
-  //    // Case 3: Valid date with in range.
-  //    dateStr = DATE_FORMATTER.format(now.minus(1, DAYS));
-  //    validateResponse(dateStr);
-  //  }
-  //
-  //  @Test
-  //  public void testV4HeaderDateValidationFailure() throws Exception {
-  //    // Case 1: Empty date.
-  //    LocalDate now = LocalDate.now();
-  //    String dateStr = "";
-  //    LambdaTestUtils.intercept(OS3Exception.class, "",
-  //        () -> validateResponse(dateStr));
-  //
-  //    // Case 2: Date after yesterday.
-  //    String dateStr2 = DATE_FORMATTER.format(now.plus(2, DAYS));
-  //    LambdaTestUtils.intercept(OS3Exception.class, "",
-  //        () -> validateResponse(dateStr2));
-  //
-  //    // Case 3: Date before yesterday.
-  //    String dateStr3 = DATE_FORMATTER.format(now.minus(2, DAYS));
-  //    LambdaTestUtils.intercept(OS3Exception.class, "",
-  //        () -> validateResponse(dateStr3));
-  //  }
-  //
-  //  private void validateResponse(String dateStr) throws OS3Exception {
-  //    String auth =
-  //        "AWS4-HMAC-SHA256 Credential=ozone/" + dateStr + "/us-east-1/s3" +
-  //            "/aws4_request,"
-  //            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
-  //            + "Signature"
-  //            + "=fe5f80f77d5fa3beca038a248ff027";
-  //    AuthorizationHeaderV4 v4 = new AuthorizationHeaderV4(auth);
-  //
-  //    assertEquals("AWS4-HMAC-SHA256", v4.getAlgorithm());
-  //    assertEquals("ozone", v4.getAccessKeyID());
-  //    assertEquals(dateStr, v4.getDate());
-  //    assertEquals("us-east-1", v4.getAwsRegion());
-  //    assertEquals("aws4_request", v4.getAwsRequest());
-  //    assertEquals("host;x-amz-content-sha256;x-amz-date",
-  //        v4.getSignedHeaderString());
-  //    assertEquals("fe5f80f77d5fa3beca038a248ff027", v4.getSignature());
-  //  }
-  //
-  //  @Test
-  //  public void testV4HeaderRegionValidationFailure() throws Exception {
-  //    String auth =
-  //        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate +
-  //       "//s3/aws4_request,"
-  //            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
-  //            + "Signature"
-  //            + "=fe5f80f77d5fa3beca038a248ff027%";
-  //    LambdaTestUtils.intercept(OS3Exception.class, "",
-  //        () -> new AuthorizationHeaderV4(auth));
-  //    String auth2 =
-  //        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "s3/aws4_request,"
-  //            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
-  //            + "Signature"
-  //            + "=fe5f80f77d5fa3beca038a248ff027%";
-  //    LambdaTestUtils.intercept(OS3Exception.class, "",
-  //        () -> new AuthorizationHeaderV4(auth2));
-  //  }
-  //
-  //  @Test
-  //  public void testV4HeaderServiceValidationFailure() throws Exception {
-  //    String auth =
-  //        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1" +
-  //            "//aws4_request,"
-  //            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
-  //            + "Signature"
-  //            + "=fe5f80f77d5fa3beca038a248ff027";
-  //    LambdaTestUtils.intercept(OS3Exception.class, "",
-  //        () -> new AuthorizationHeaderV4(auth));
-  //
-  //    String auth2 =
-  //        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1" +
-  //            "/aws4_request,"
-  //            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
-  //            + "Signature"
-  //            + "=fe5f80f77d5fa3beca038a248ff027";
-  //    LambdaTestUtils.intercept(OS3Exception.class, "",
-  //        () -> new AuthorizationHeaderV4(auth2));
-  //  }
-  //
-  //  @Test
-  //  public void testV4HeaderRequestValidationFailure() throws Exception {
-  //    String auth =
-  //        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
-  //            "/   ,"
-  //            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
-  //            + "Signature"
-  //            + "=fe5f80f77d5fa3beca038a248ff027";
-  //    LambdaTestUtils.intercept(OS3Exception.class, "",
-  //        () -> new AuthorizationHeaderV4(auth));
-  //
-  //    String auth2 =
-  //        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
-  //            "/,"
-  //            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
-  //            + "Signature"
-  //            + "=fe5f80f77d5fa3beca038a248ff027";
-  //    LambdaTestUtils.intercept(OS3Exception.class, "",
-  //        () -> new AuthorizationHeaderV4(auth2));
-  //
-  //    String auth3 =
-  //        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
-  //            ","
-  //            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
-  //            + "Signature"
-  //            + "=fe5f80f77d5fa3beca038a248ff027";
-  //    LambdaTestUtils.intercept(OS3Exception.class, "",
-  //        () -> new AuthorizationHeaderV4(auth3));
-  //  }
-  //
-  //  @Test
-  //  public void testV4HeaderSignedHeaderValidationFailure() throws Exception {
-  //    String auth =
-  //        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
-  //            "/aws4_request,"
-  //            + "SignedHeaders=;;,"
-  //            + "Signature"
-  //            + "=fe5f80f77d5fa3beca038a248ff027";
-  //    LambdaTestUtils.intercept(OS3Exception.class, "",
-  //        () -> new AuthorizationHeaderV4(auth));
-  //
-  //    String auth2 =
-  //        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
-  //            "/aws4_request,"
-  //            + "SignedHeaders=,"
-  //            + "Signature"
-  //            + "=fe5f80f77d5fa3beca038a248ff027";
-  //    LambdaTestUtils.intercept(OS3Exception.class, "",
-  //        () -> new AuthorizationHeaderV4(auth2));
-  //
-  //    String auth3 =
-  //        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
-  //            "/aws4_request,"
-  //            + "=x-amz-content-sha256;x-amz-date,"
-  //            + "Signature"
-  //            + "=fe5f80f77d5fa3beca038a248ff027";
-  //    LambdaTestUtils.intercept(OS3Exception.class, "",
-  //        () -> new AuthorizationHeaderV4(auth3));
-  //
-  //    String auth4 =
-  //        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
-  //            "/aws4_request,"
-  //            + "=,"
-  //            + "Signature"
-  //            + "=fe5f80f77d5fa3beca038a248ff027";
-  //    LambdaTestUtils.intercept(OS3Exception.class, "",
-  //        () -> new AuthorizationHeaderV4(auth4));
-  //  }
-  //
-  //  @Test
-  //  public void testV4HeaderSignatureValidationFailure() throws Exception {
-  //    String auth =
-  //        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
-  //            "/aws4_request,"
-  //            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
-  //            + "Signature"
-  //            + "=fe5f80f77d5fa3beca038a248ff027%";
-  //    LambdaTestUtils.intercept(OS3Exception.class, "",
-  //        () -> new AuthorizationHeaderV4(auth));
-  //
-  //    String auth2 =
-  //        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
-  //            "/aws4_request,"
-  //            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
-  //            + "Signature"
-  //            + "=";
-  //    LambdaTestUtils.intercept(OS3Exception.class, "",
-  //        () -> new AuthorizationHeaderV4(auth2));
-  //
-  //    String auth3 =
-  //        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
-  //            "/aws4_request,"
-  //            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
-  //            + ""
-  //            + "=";
-  //    LambdaTestUtils.intercept(OS3Exception.class, "",
-  //        () -> new AuthorizationHeaderV4(auth3));
-  //  }
-  //
-  //  @Test
-  //  public void testV4HeaderHashAlgoValidationFailure() throws Exception {
-  //    String auth =
-  //        "AWS4-HMAC-SHA Credential=ozone/" + curDate + "/us-east-1/s3" +
-  //            "/aws4_request,"
-  //            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
-  //            + "Signature"
-  //            + "=fe5f80f77d5fa3beca038a248ff027";
-  //    LambdaTestUtils.intercept(OS3Exception.class, "",
-  //        () -> new AuthorizationHeaderV4(auth));
-  //
-  //    String auth2 =
-  //        "SHA-256 Credential=ozone/" + curDate + "/us-east-1/s3" +
-  //            "/aws4_request,"
-  //            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
-  //            + "Signature"
-  //            + "=fe5f80f77d5fa3beca038a248ff027";
-  //    LambdaTestUtils.intercept(OS3Exception.class, "",
-  //        () -> new AuthorizationHeaderV4(auth2));
-  //
-  //    String auth3 =
-  //        " Credential=ozone/" + curDate + "/us-east-1/s3" +
-  //            "/aws4_request,"
-  //            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
-  //            + "Signature"
-  //            + "=fe5f80f77d5fa3beca038a248ff027";
-  //    LambdaTestUtils.intercept(OS3Exception.class, "",
-  //        () -> new AuthorizationHeaderV4(auth3));
-  //  }
-  //
-  //  @Test
-  //  public void testV4HeaderCredentialValidationFailure() throws Exception {
-  //    String auth =
-  //        "AWS4-HMAC-SHA Credential=/" + curDate + "//" +
-  //            "/,"
-  //            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
-  //            + "Signature"
-  //            + "=fe5f80f77d5fa3beca038a248ff027";
-  //    LambdaTestUtils.intercept(OS3Exception.class, "",
-  //        () -> new AuthorizationHeaderV4(auth));
-  //
-  //    String auth2 =
-  //        "AWS4-HMAC-SHA =/" + curDate + "//" +
-  //            "/,"
-  //            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
-  //            + "Signature"
-  //            + "=fe5f80f77d5fa3beca038a248ff027";
-  //    LambdaTestUtils.intercept(OS3Exception.class, "",
-  //        () -> new AuthorizationHeaderV4(auth2));
-  //  }
+  @Test
+  public void testV4HeaderWithoutSpace() throws OS3Exception {
+
+    String auth =
+        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
+            "/aws4_request,"
+            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
+            + "Signature"
+            + "=fe5f80f77d5fa3beca038a248ff027";
+
+    AuthorizationV4HeaderParser v4 = new AuthorizationV4HeaderParser(auth);
+    SignatureInfo signature = v4.parseSignature();
+
+    assertEquals("AWS4-HMAC-SHA256", signature.getAlgorithm());
+    assertEquals("ozone", signature.getAwsAccessId());
+    assertEquals(curDate, signature.getDate());
+    assertEquals("host;x-amz-content-sha256;x-amz-date",
+        signature.getSignedHeaders());
+    assertEquals("fe5f80f77d5fa3beca038a248ff027", signature.getSignature());
+
+  }
+
+  @Test
+  public void testV4HeaderDateValidationSuccess() throws OS3Exception {
+    // Case 1: valid date within range.
+    LocalDate now = LocalDate.now();
+    String dateStr = DATE_FORMATTER.format(now);
+    testRequestWithSpecificDate(dateStr);
+
+    // Case 2: Valid date with in range.
+    dateStr = DATE_FORMATTER.format(now.plus(1, DAYS));
+    testRequestWithSpecificDate(dateStr);
+
+    // Case 3: Valid date with in range.
+    dateStr = DATE_FORMATTER.format(now.minus(1, DAYS));
+    testRequestWithSpecificDate(dateStr);
+  }
+
+  @Test
+  public void testV4HeaderDateValidationFailure() throws Exception {
+    // Case 1: Empty date.
+    LocalDate now = LocalDate.now();
+    String dateStr = "";
+    LambdaTestUtils.intercept(OS3Exception.class, "",
+        () -> testRequestWithSpecificDate(dateStr));
+
+    // Case 2: Date after yesterday.
+    String dateStr2 = DATE_FORMATTER.format(now.plus(2, DAYS));
+    LambdaTestUtils.intercept(OS3Exception.class, "",
+        () -> testRequestWithSpecificDate(dateStr2));
+
+    // Case 3: Date before yesterday.
+    String dateStr3 = DATE_FORMATTER.format(now.minus(2, DAYS));
+    LambdaTestUtils.intercept(OS3Exception.class, "",
+        () -> testRequestWithSpecificDate(dateStr3));
+  }
+
+  private void testRequestWithSpecificDate(String dateStr) throws OS3Exception {
+    String auth =
+        "AWS4-HMAC-SHA256 Credential=ozone/" + dateStr + "/us-east-1/s3" +
+            "/aws4_request,"
+            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
+            + "Signature"
+            + "=fe5f80f77d5fa3beca038a248ff027";
+    AuthorizationV4HeaderParser v4 = new AuthorizationV4HeaderParser(auth);
+    SignatureInfo signature = v4.parseSignature();
+
+    assertEquals("AWS4-HMAC-SHA256", signature.getAlgorithm());
+    assertEquals("ozone", signature.getAwsAccessId());
+    assertEquals(dateStr, signature.getDate());
+    assertEquals("host;x-amz-content-sha256;x-amz-date",
+        signature.getSignedHeaders());
+    assertEquals("fe5f80f77d5fa3beca038a248ff027", signature.getSignature());
+  }
+
+  @Test
+  public void testV4HeaderRegionValidationFailure() throws Exception {
+    String auth =
+        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate +
+            "//s3/aws4_request,"
+            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
+            + "Signature"
+            + "=fe5f80f77d5fa3beca038a248ff027%";
+    LambdaTestUtils.intercept(OS3Exception.class, "",
+        () -> new AuthorizationV4HeaderParser(auth).parseSignature());
+    String auth2 =
+        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "s3/aws4_request,"
+            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
+            + "Signature"
+            + "=fe5f80f77d5fa3beca038a248ff027%";
+    LambdaTestUtils.intercept(OS3Exception.class, "",
+        () -> new AuthorizationV4HeaderParser(auth2).parseSignature());
+  }
+
+  @Test
+  public void testV4HeaderServiceValidationFailure() throws Exception {
+    String auth =
+        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1" +
+            "//aws4_request,"
+            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
+            + "Signature"
+            + "=fe5f80f77d5fa3beca038a248ff027";
+    LambdaTestUtils.intercept(OS3Exception.class, "",
+        () -> new AuthorizationV4HeaderParser(auth).parseSignature());
+
+    String auth2 =
+        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1" +
+            "/aws4_request,"
+            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
+            + "Signature"
+            + "=fe5f80f77d5fa3beca038a248ff027";
+    LambdaTestUtils.intercept(OS3Exception.class, "",
+        () -> new AuthorizationV4HeaderParser(auth2).parseSignature());
+  }
+
+  @Test
+  public void testV4HeaderRequestValidationFailure() throws Exception {
+    String auth =
+        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
+            "/   ,"
+            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
+            + "Signature"
+            + "=fe5f80f77d5fa3beca038a248ff027";
+    LambdaTestUtils.intercept(OS3Exception.class, "",
+        () -> new AuthorizationV4HeaderParser(auth).parseSignature());
+
+    String auth2 =
+        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
+            "/,"
+            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
+            + "Signature"
+            + "=fe5f80f77d5fa3beca038a248ff027";
+    LambdaTestUtils.intercept(OS3Exception.class, "",
+        () -> new AuthorizationV4HeaderParser(auth2).parseSignature());
+
+    String auth3 =
+        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
+            ","
+            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
+            + "Signature"
+            + "=fe5f80f77d5fa3beca038a248ff027";
+    LambdaTestUtils.intercept(OS3Exception.class, "",
+        () -> new AuthorizationV4HeaderParser(auth3).parseSignature());
+  }
+
+  @Test
+  public void testV4HeaderSignedHeaderValidationFailure() throws Exception {
+    String auth =
+        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
+            "/aws4_request,"
+            + "SignedHeaders=;;,"
+            + "Signature"
+            + "=fe5f80f77d5fa3beca038a248ff027";
+    LambdaTestUtils.intercept(OS3Exception.class, "",
+        () -> new AuthorizationV4HeaderParser(auth).parseSignature());
+
+    String auth2 =
+        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
+            "/aws4_request,"
+            + "SignedHeaders=,"
+            + "Signature"
+            + "=fe5f80f77d5fa3beca038a248ff027";
+    LambdaTestUtils.intercept(OS3Exception.class, "",
+        () -> new AuthorizationV4HeaderParser(auth2).parseSignature());
+
+    String auth3 =
+        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
+            "/aws4_request,"
+            + "=x-amz-content-sha256;x-amz-date,"
+            + "Signature"
+            + "=fe5f80f77d5fa3beca038a248ff027";
+    LambdaTestUtils.intercept(OS3Exception.class, "",
+        () -> new AuthorizationV4HeaderParser(auth3).parseSignature());
+
+    String auth4 =
+        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
+            "/aws4_request,"
+            + "=,"
+            + "Signature"
+            + "=fe5f80f77d5fa3beca038a248ff027";
+    LambdaTestUtils.intercept(OS3Exception.class, "",
+        () -> new AuthorizationV4HeaderParser(auth4).parseSignature());
+  }
+
+  @Test
+  public void testV4HeaderSignatureValidationFailure() throws Exception {
+    String auth =
+        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
+            "/aws4_request,"
+            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
+            + "Signature"
+            + "=fe5f80f77d5fa3beca038a248ff027%";
+    LambdaTestUtils.intercept(OS3Exception.class, "",
+        () -> new AuthorizationV4HeaderParser(auth).parseSignature());
+
+    String auth2 =
+        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
+            "/aws4_request,"
+            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
+            + "Signature"
+            + "=";
+    LambdaTestUtils.intercept(OS3Exception.class, "",
+        () -> new AuthorizationV4HeaderParser(auth2).parseSignature());
+
+    String auth3 =
+        "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "/us-east-1/s3" +
+            "/aws4_request,"
+            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
+            + ""
+            + "=";
+    LambdaTestUtils.intercept(OS3Exception.class, "",
+        () -> new AuthorizationV4HeaderParser(auth3).parseSignature());
+  }
+
+  @Test
+  public void testV4HeaderHashAlgoValidationFailure() throws Exception {
+    String auth =
+        "AWS4-HMAC-SHA Credential=ozone/" + curDate + "/us-east-1/s3" +
+            "/aws4_request,"
+            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
+            + "Signature"
+            + "=fe5f80f77d5fa3beca038a248ff027";
+    LambdaTestUtils.intercept(OS3Exception.class, "",
+        () -> new AuthorizationV4HeaderParser(auth).parseSignature());
+
+    String auth2 =
+        "SHA-256 Credential=ozone/" + curDate + "/us-east-1/s3" +
+            "/aws4_request,"
+            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
+            + "Signature"
+            + "=fe5f80f77d5fa3beca038a248ff027";
+    LambdaTestUtils.intercept(OS3Exception.class, "",
+        () -> new AuthorizationV4HeaderParser(auth2).parseSignature());
+
+    String auth3 =
+        " Credential=ozone/" + curDate + "/us-east-1/s3" +
+            "/aws4_request,"
+            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
+            + "Signature"
+            + "=fe5f80f77d5fa3beca038a248ff027";
+    LambdaTestUtils.intercept(OS3Exception.class, "",
+        () -> new AuthorizationV4HeaderParser(auth3).parseSignature());
+  }
+
+  @Test
+  public void testV4HeaderCredentialValidationFailure() throws Exception {
+    String auth =
+        "AWS4-HMAC-SHA Credential=/" + curDate + "//" +
+            "/,"
+            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
+            + "Signature"
+            + "=fe5f80f77d5fa3beca038a248ff027";
+    LambdaTestUtils.intercept(OS3Exception.class, "",
+        () -> new AuthorizationV4HeaderParser(auth).parseSignature());
+
+    String auth2 =
+        "AWS4-HMAC-SHA =/" + curDate + "//" +
+            "/,"
+            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
+            + "Signature"
+            + "=fe5f80f77d5fa3beca038a248ff027";
+    LambdaTestUtils.intercept(OS3Exception.class, "",
+        () -> new AuthorizationV4HeaderParser(auth2).parseSignature());
+  }
 
 }

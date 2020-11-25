@@ -30,6 +30,7 @@ import java.util.Set;
 
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo.Version;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
@@ -45,25 +46,24 @@ public class AWSSignatureProcessor implements SignatureProcessor {
 
   private final static Logger LOG =
       LoggerFactory.getLogger(AWSSignatureProcessor.class);
-  String AUTHORIZATION_HEADER = "Authorization";
 
   @Context
   private ContainerRequestContext context;
-
-  private SignatureInfo signatureInfo;
 
   public SignatureInfo parseSignature() throws OS3Exception {
 
     LowerCaseKeyStringMap headers =
         LowerCaseKeyStringMap.fromHeaderMap(context.getHeaders());
 
-    String authHeader = headers.get(AUTHORIZATION_HEADER);
+    String authHeader = headers.get("Authorization");
 
     List<SignatureParser> signatureParsers = new ArrayList<>();
     signatureParsers.add(new AuthorizationV4HeaderParser(authHeader));
-    signatureParsers.add(new AuthorizationV4QueryParser(context.getUriInfo().getQueryParameters()));
+    signatureParsers.add(new AuthorizationV4QueryParser(
+        context.getUriInfo().getQueryParameters()));
+    signatureParsers.add(new AuthorizationV2HeaderParser(authHeader));
 
-    signatureInfo = null;
+    SignatureInfo signatureInfo = null;
     for (SignatureParser parser : signatureParsers) {
       signatureInfo = parser.parseSignature();
       if (signatureInfo != null) {
@@ -72,6 +72,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
     }
     if (signatureInfo == null) {
       signatureInfo = new SignatureInfo(
+          Version.NONE,
           "", "", "", "", "", ""
       );
     }

@@ -1,3 +1,20 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.hadoop.ozone.s3.signature;
 
 import javax.ws.rs.container.ContainerRequestContext;
@@ -9,6 +26,7 @@ import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
@@ -32,13 +50,16 @@ import org.apache.kerby.util.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class StringToSignProducer {
+/**
+ * Stateless utility to create stringToSign, the base of the signature.
+ */
+public final class StringToSignProducer {
 
   public static final String X_AMZ_CONTENT_SHA256 = "X-Amz-Content-SHA256";
   public static final String X_AMAZ_DATE = "X-Amz-Date";
   private static final Logger LOG =
       LoggerFactory.getLogger(StringToSignProducer.class);
-  private static final Charset UTF_8 = Charset.forName("utf-8");
+  private static final Charset UTF_8 = StandardCharsets.UTF_8;
   private static final String NEWLINE = "\n";
   private static final String HOST = "host";
   private static final String UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
@@ -50,6 +71,9 @@ public class StringToSignProducer {
   private static final DateTimeFormatter TIME_FORMATTER =
       DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
           .withZone(ZoneOffset.UTC);
+
+  private StringToSignProducer() {
+  }
 
   public static String createSignatureBase(
       SignatureInfo signatureInfo,
