@@ -51,7 +51,7 @@ public class TestSCMContainerMetrics {
         put(HddsProtos.LifeCycleState.DELETING.toString(), 6);
         put(HddsProtos.LifeCycleState.DELETED.toString(), 7);
         put(HddsProtos.LifeCycleState.TOTAL.toString(), 27);
-        }};
+      }};
 
 
     when(scmmxBean.getContainerStateCount()).thenReturn(stateInfo);
