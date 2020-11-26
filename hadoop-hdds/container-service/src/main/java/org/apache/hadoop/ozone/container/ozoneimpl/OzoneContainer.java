@@ -256,7 +256,7 @@ public class OzoneContainer {
     startContainerScrub();
 
     replicationServer.start();
-    datanodeDetails.setPort(Name.INTRA_SERVER, replicationServer.getPort());
+    datanodeDetails.setPort(Name.REPLICATION, replicationServer.getPort());
 
     writeChannel.start();
     readChannel.start();

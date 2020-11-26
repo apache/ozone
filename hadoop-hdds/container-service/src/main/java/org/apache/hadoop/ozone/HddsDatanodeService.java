@@ -396,7 +396,8 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
         dnCertClient.getPrivateKey());
 
     String hostname = InetAddress.getLocalHost().getCanonicalHostName();
-    String subject = hostname;
+    String subject = UserGroupInformation.getCurrentUser()
+        .getShortUserName() + "@" + hostname;
 
     builder.setCA(false)
         .setKey(keyPair)
