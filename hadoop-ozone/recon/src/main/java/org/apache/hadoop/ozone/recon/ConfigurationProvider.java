@@ -47,9 +47,7 @@ public class ConfigurationProvider implements
             ReconServerConfigKeys.OZONE_RECON_HTTP_KEYTAB_FILE),
         new DeprecationDelta("ozone.recon.authentication.kerberos.principal",
             ReconServerConfigKeys.
-                OZONE_RECON_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL),
-        new DeprecationDelta("rpcslowness.timeout",
-            "rpc.slowness.timeout")
+                OZONE_RECON_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL)
     });
   }
 
