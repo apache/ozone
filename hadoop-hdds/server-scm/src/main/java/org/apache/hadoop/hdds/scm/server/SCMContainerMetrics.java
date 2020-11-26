@@ -17,6 +17,13 @@
  */
 package org.apache.hadoop.hdds.scm.server;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
+
 import java.util.Map;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -27,8 +34,6 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.ozone.OzoneConsts;
-
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.*;
 
 /**
  * Metrics source to report number of containers in different states.
@@ -83,10 +88,10 @@ public class SCMContainerMetrics implements MetricsSource {
         .addGauge(Interns.info("TotalContainers",
             "Number of all containers"),
           stateCount.get(OPEN.toString())+
-              stateCount.get(CLOSING.toString())+
-                stateCount.get(QUASI_CLOSED.toString())+
-                  stateCount.get(CLOSED.toString())+
-                    stateCount.get(DELETING.toString())+
-                      stateCount.get(DELETED.toString()));
+            stateCount.get(CLOSING.toString())+
+            stateCount.get(QUASI_CLOSED.toString())+
+            stateCount.get(CLOSED.toString())+
+            stateCount.get(DELETING.toString())+
+            stateCount.get(DELETED.toString()));
   }
 }
