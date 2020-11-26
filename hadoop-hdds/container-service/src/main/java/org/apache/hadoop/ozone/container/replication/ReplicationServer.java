@@ -35,7 +35,6 @@ import org.apache.ratis.thirdparty.io.grpc.ServerBuilder;
 import org.apache.ratis.thirdparty.io.grpc.ServerInterceptors;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyServerBuilder;
-import org.apache.ratis.thirdparty.io.grpc.protobuf.services.ProtoReflectionService;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.ClientAuth;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
@@ -79,7 +78,6 @@ public class ReplicationServer {
 
     GrpcServerInterceptor tracingInterceptor = new GrpcServerInterceptor();
     nettyServerBuilder
-        .addService(ProtoReflectionService.newInstance())
         .addService(ServerInterceptors.intercept(new GrpcReplicationService(
             new OnDemandContainerReplicationSource(controller)
         ), tracingInterceptor));
