@@ -33,6 +33,8 @@ services:
       - 9600:9600
     env_file:
       - ./docker-config
+    environment:
+      HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
     command: ["hadoop", "kms"]
     networks:
       ozone_net:
