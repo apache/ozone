@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -55,7 +56,7 @@ public class TestSimpleContainerDownloader {
           @Override
           protected CompletableFuture<Path> downloadContainer(
               long containerId, DatanodeDetails datanode
-          ) throws Exception {
+          ) throws IOException {
             //download is always successful.
             return CompletableFuture
                 .completedFuture(Paths.get(datanode.getUuidString()));

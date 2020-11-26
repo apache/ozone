@@ -605,7 +605,7 @@ public class ReplicationManager
    */
   private void handleUnderReplicatedContainer(final ContainerInfo container,
       final Set<ContainerReplica> replicas) {
-    LOG.debug("Handling under-replicated container: {}",
+    LOG.info("Handling under-replicated container: {}",
         container.getContainerID());
     try {
       final ContainerID id = container.containerID();
