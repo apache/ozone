@@ -27,6 +27,28 @@ summary: Ozone has a set of Native RPC based APIs. This is the lowest level API'
 Ozone ships with its own client library that supports RPC. For generic use cases the S3
 compatible REST interface also can be used instead of the Ozone client.
 
+## Initializes the Ozone configuration
+
+Before creating an ozone client, you need to initialize the configuration by creating OzoneConfiguration:
+
+{{< highlight java >}}
+OzoneConfiguration conf = new OzoneConfiguration();
+{{< /highlight >}}
+
+If HA not enabled, just set the OM address (you need to change the host in the example to the address of your OM):
+
+{{< highlight java >}}
+conf.set("ozone.om.address", "ozone.master.host:9862");
+{{< /highlight >}}
+
+If HA enabled, all OM addresses need to be set (you need to change the host in the example to the address of your OM)：
+
+{{< highlight java >}}
+conf.set("ozone.om.service.ids", omServiceId);
+conf.set("ozone.om.address.ozone1.om1", "ozone.master1.host:9862");
+conf.set("ozone.om.address.ozone1.om2", "ozone.master2.host:9862");
+conf.set("ozone.om.address.ozone1.om3", "ozone.master3.host:9862");
+{{< /highlight >}}
 
 ## Creating an Ozone client
 The Ozone client factory creates the ozone client. To get a RPC client we can call

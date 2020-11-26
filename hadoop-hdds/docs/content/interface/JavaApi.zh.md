@@ -26,6 +26,28 @@ summary: Ozone 有一套基于原生 RPC 的 API，其它协议都由这个最�
 
 Ozone 自带了支持 RPC 的客户端库，对于一般的应用场景也可以使用兼容 AWS S3 的 REST 接口替代 Ozone 客户端 API。
 
+## 初始化 Ozone 配置
+
+创建ozone客户端之前需要提前初始化配置，首先创建OzoneConfiguration对象：
+
+{{< highlight java >}}
+OzoneConfiguration conf = new OzoneConfiguration();
+{{< /highlight >}}
+
+如果未启用HA只需要设置om地址(需要将示例中的host改成目标om的地址)：
+
+{{< highlight java >}}
+conf.set("ozone.om.address", "ozone.master.host:9862");
+{{< /highlight >}}
+
+如果启用了HA需要设置多个om的地址(需要将示例中的host改成目标om的地址)：
+
+{{< highlight java >}}
+conf.set("ozone.om.service.ids", omServiceId);
+conf.set("ozone.om.address.ozone1.om1", "ozone.master1.host:9862");
+conf.set("ozone.om.address.ozone1.om2", "ozone.master1.host:9862");
+conf.set("ozone.om.address.ozone1.om3", "ozone.master1.host:9862");
+{{< /highlight >}}
 
 ## 创建 Ozone 客户端
 
