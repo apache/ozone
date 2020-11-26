@@ -41,6 +41,9 @@ import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Separated network server for server2server container replication.
+ */
 public class ReplicationServer {
 
   private static final Logger LOG =
@@ -54,7 +57,7 @@ public class ReplicationServer {
 
   private ContainerController controller;
 
-  private int port = 1111;
+  private int port;
 
   public ReplicationServer(
       ContainerController controller,
@@ -81,16 +84,18 @@ public class ReplicationServer {
             new OnDemandContainerReplicationSource(controller)
         ), tracingInterceptor));
 
-
     if (secConf.isSecurityEnabled()) {
       try {
-        SslContextBuilder sslClientContextBuilder = SslContextBuilder.forServer(
+        SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(
             caClient.getPrivateKey(), caClient.getCertificate());
-        SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(
-            sslClientContextBuilder, secConf.getGrpcSslProvider());
+
+        sslContextBuilder = GrpcSslContexts.configure(
+            sslContextBuilder, secConf.getGrpcSslProvider());
+
+        sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
+        sslContextBuilder.trustManager(caClient.getCACertificate());
+
         nettyServerBuilder.sslContext(sslContextBuilder.build());
-        sslClientContextBuilder.clientAuth(ClientAuth.REQUIRE);
-        sslClientContextBuilder.trustManager(caClient.getCACertificate());
       } catch (SSLException ex) {
         throw new IllegalArgumentException(
             "Unable to setup TLS for secure datanode replication GRPC "
