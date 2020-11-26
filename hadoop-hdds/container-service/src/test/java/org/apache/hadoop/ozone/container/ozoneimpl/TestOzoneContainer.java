@@ -148,6 +148,7 @@ public class TestOzoneContainer {
       Preconditions.checkState(freeBytes >= 0);
       commitSpaceMap.put(getVolumeKey(myVolume),
           Long.valueOf(volCommitBytes + freeBytes));
+      BlockUtils.removeDB(keyValueContainerData, conf);
     }
 
     DatanodeStateMachine stateMachine = Mockito.mock(
@@ -290,6 +291,7 @@ public class TestOzoneContainer {
     metadataTable.put(OzoneConsts.CONTAINER_BYTES_USED, usedBytes);
 
     // remaining available capacity of the container
+    db.close();
     return (freeBytes - usedBytes);
   }
 

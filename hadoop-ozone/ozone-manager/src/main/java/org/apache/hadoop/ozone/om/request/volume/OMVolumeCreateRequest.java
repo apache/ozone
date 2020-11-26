@@ -27,7 +27,6 @@ import com.google.common.base.Preconditions;
 
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -126,7 +125,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
       // The Object ID will never change, but update
       // ID will be set to transactionID each time we update the object.
       omVolumeArgs.setObjectID(
-          OMFileRequest.getObjIDFromTxId(transactionLogIndex));
+          ozoneManager.getObjectIdFromTxId(transactionLogIndex));
       omVolumeArgs.setUpdateID(transactionLogIndex,
           ozoneManager.isRatisEnabled());
 

@@ -30,19 +30,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
-import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
-import org.apache.hadoop.hdds.scm.pipeline.SCMPipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.*;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -364,8 +363,10 @@ public class TestSCMSafeModeManager {
     pipelineManager.allowPipelineCreation();
 
     for (int i=0; i < pipelineCount; i++) {
-      pipelineManager.createPipeline(HddsProtos.ReplicationType.RATIS,
+      Pipeline pipeline = pipelineManager.
+              createPipeline(HddsProtos.ReplicationType.RATIS,
           HddsProtos.ReplicationFactor.THREE);
+      pipelineManager.openPipeline(pipeline.getId());
     }
 
     for (ContainerInfo container : containers) {
@@ -454,6 +455,27 @@ public class TestSCMSafeModeManager {
     pipelineManager.openPipeline(pipeline.getId());
     queue.fireEvent(SCMEvents.OPEN_PIPELINE,
         pipelineManager.getPipeline(pipeline.getId()));
+
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      List<StorageContainerDatanodeProtocolProtos.
+              PipelineReport> reports = new ArrayList<>();
+      HddsProtos.PipelineID pipelineID = pipeline.getId().getProtobuf();
+      reports.add(StorageContainerDatanodeProtocolProtos
+              .PipelineReport.newBuilder()
+              .setPipelineID(pipelineID)
+              .setIsLeader(true)
+              .setBytesWritten(0)
+              .build());
+      StorageContainerDatanodeProtocolProtos
+              .PipelineReportsProto.Builder pipelineReportsProto =
+              StorageContainerDatanodeProtocolProtos
+                      .PipelineReportsProto.newBuilder();
+      pipelineReportsProto.addAllPipelineReport(reports);
+      queue.fireEvent(SCMEvents.PIPELINE_REPORT, new
+              SCMDatanodeHeartbeatDispatcher
+                      .PipelineReportFromDatanode(dn,
+              pipelineReportsProto.build()));
+    }
   }
 
 
