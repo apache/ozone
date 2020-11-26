@@ -35,19 +35,19 @@ Before creating an ozone client, you need to initialize the configuration by cre
 OzoneConfiguration conf = new OzoneConfiguration();
 {{< /highlight >}}
 
-If HA not enabled, just set the OM address (you need to change the host in the example to the address of your OM):
+If HA not enabled, just set the OM address (Need to change the correct host):
 
 {{< highlight java >}}
 conf.set("ozone.om.address", "ozone.master.host:9862");
 {{< /highlight >}}
 
-If HA enabled, all OM addresses need to be set (you need to change the host in the example to the address of your OM)：
+If HA enabled, all OM addresses need to be set (Need to change the correct service id and host)：
 
 {{< highlight java >}}
 conf.set("ozone.om.service.ids", omServiceId);
-conf.set("ozone.om.address.ozone1.om1", "ozone.master1.host:9862");
-conf.set("ozone.om.address.ozone1.om2", "ozone.master2.host:9862");
-conf.set("ozone.om.address.ozone1.om3", "ozone.master3.host:9862");
+conf.set("ozone.om.address.ozone.om1", "ozone.master1.host:9862");
+conf.set("ozone.om.address.ozone.om2", "ozone.master2.host:9862");
+conf.set("ozone.om.address.ozone.om3", "ozone.master3.host:9862");
 {{< /highlight >}}
 
 ## Creating an Ozone client
