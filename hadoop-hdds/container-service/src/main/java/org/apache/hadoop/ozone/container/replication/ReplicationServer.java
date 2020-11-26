@@ -140,8 +140,8 @@ public class ReplicationServer {
       return port;
     }
 
-    public ReplicationConfig setPort(int port) {
-      this.port = port;
+    public ReplicationConfig setPort(int portParam) {
+      this.port = portParam;
       return this;
     }
   }
