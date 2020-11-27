@@ -441,8 +441,8 @@ public class ReplicationManager
    */
   private boolean isContainerUnderReplicated(final ContainerInfo container,
       final Set<ContainerReplica> replicas) {
-    if (container.getState() != LifeCycleState.CLOSED &&
-        container.getState() != LifeCycleState.QUASI_CLOSED) {
+    if (container.getState() == LifeCycleState.DELETING ||
+        container.getState() == LifeCycleState.DELETED) {
       return false;
     }
     boolean misReplicated = !getPlacementStatus(
