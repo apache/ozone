@@ -128,7 +128,7 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
       throws UpgradeException {
     Optional<? extends UpgradeAction> action = feature.onFinalizeAction();
 
-    if (action.isPresent()) {
+    if (!action.isPresent()) {
       emitNOOPMsg(feature.name());
       return;
     }

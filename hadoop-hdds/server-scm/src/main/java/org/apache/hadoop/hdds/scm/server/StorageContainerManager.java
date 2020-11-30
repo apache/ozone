@@ -1247,7 +1247,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
      * destroy existing pipelines
      */
     waitForAllPipelinesToDestroy();
-    waitForAllContainersToClose();
 
     /**
      * We can not yet move all the existing data nodes to HEALTHY-READONLY
