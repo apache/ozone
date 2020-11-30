@@ -542,9 +542,12 @@ public final class OzoneManagerRatisServer {
     return properties;
   }
 
+  /**
+   * Defines RaftServer Status.
+   */
   public enum RaftServerStatus {
     NOT_LEADER,
-    LEADER_AND_NOTREADY,
+    LEADER_AND_NOT_READY,
     LEADER_AND_READY;
   }
 
@@ -555,7 +558,7 @@ public final class OzoneManagerRatisServer {
    */
   public RaftServerStatus checkLeaderStatus() {
     Preconditions.checkState(server instanceof RaftServerProxy);
-    RaftServerImpl serverImpl = null;
+    RaftServerImpl serverImpl;
     try {
       serverImpl = ((RaftServerProxy) server).getImpl(raftGroupId);
       if (serverImpl != null) {
@@ -564,7 +567,7 @@ public final class OzoneManagerRatisServer {
         } else if (serverImpl.isLeaderReady()) {
           return RaftServerStatus.LEADER_AND_READY;
         } else {
-          return RaftServerStatus.LEADER_AND_NOTREADY;
+          return RaftServerStatus.LEADER_AND_NOT_READY;
         }
       }
     } catch (IOException ioe) {
