@@ -675,6 +675,12 @@ public class TestStorageContainerManager {
     }
   }
 
+  /**
+   * Tests that SCM will throw an exception on creation when it reads in a
+   * VERSION file indicating a metadata layout version larger than its
+   * software layout version.
+   * @throws Exception
+   */
   @Test
   public void testStartupSlvLessThanMlv() throws Exception {
     // Add subdirectories under the temporary folder where the version file
@@ -685,12 +691,15 @@ public class TestStorageContainerManager {
     conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS,
         folder.getRoot().getAbsolutePath());
 
+    // Set metadata layout version larger then software layout version.
     int largestSlv = 0;
     for (LayoutFeature f: HDDSLayoutFeatureCatalog.HDDSLayoutFeature.values()) {
       largestSlv = Math.max(largestSlv, f.layoutVersion());
     }
-
     int mlv = largestSlv + 1;
+
+    // Create version file with MLV > SLV, which should fail the SCM
+    // construction.
     TestUpgradeUtils.createVersionFile(scmSubdir, NodeType.SCM, mlv);
 
     try {

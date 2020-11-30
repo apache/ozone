@@ -430,6 +430,12 @@ public class TestDatanodeStateMachine {
     });
   }
 
+  /**
+   * Tests that {@link DatanodeStateMachine} will throw an exception on
+   * creation when it reads in a VERSION file indicating a metadata layout
+   * version larger than its software layout version.
+   * @throws Exception
+   */
   @Test
   public void testStartupSlvLessThanMlv() throws Exception {
     // Add subdirectories under the temporary folder where the version file
@@ -440,19 +446,22 @@ public class TestDatanodeStateMachine {
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
         tempFolder.getRoot().getAbsolutePath());
 
+    // Set metadata layout version larger then software layout version.
     int largestSlv = 0;
     for (LayoutFeature f: HDDSLayoutFeatureCatalog.HDDSLayoutFeature.values()) {
       largestSlv = Math.max(largestSlv, f.layoutVersion());
     }
-
     int mlv = largestSlv + 1;
+
+    // Create version file with MLV > SLV, which should fail datanode state
+    // machine construction.
     TestUpgradeUtils.createVersionFile(datanodeSubdir,
         HddsProtos.NodeType.DATANODE, mlv);
 
     try {
       new DatanodeStateMachine(getNewDatanodeDetails(), conf, null, null);
-      Assert.fail("Expected IOException due to incorrect MLV on datanode " +
-          "creation.");
+      Assert.fail("Expected InconsistentStorageStateException due to " +
+          "incorrect MLV on DatanodeStateMachine creation.");
     } catch(InconsistentStorageStateException e) {
       String expectedMessage = String.format("Invalid layOutVersion. Version " +
               "file has layOutVersion as %s and latest Datanode layOutVersion" +
