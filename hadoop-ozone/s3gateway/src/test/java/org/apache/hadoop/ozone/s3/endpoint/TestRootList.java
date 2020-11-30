@@ -69,6 +69,11 @@ public class TestRootList {
       public String getAwsAccessId() {
         return OzoneConsts.OZONE;
       }
+
+      @Override
+      public Exception getException() {
+        return null;
+      }
     });
     // List operation should succeed even there is no bucket.
     ListBucketResponse response =

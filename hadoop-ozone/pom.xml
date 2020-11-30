@@ -161,6 +161,13 @@
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-hdds-common</artifactId>
+        <version>${hdds.version}</version>
+        <type>test-jar</type>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-ozone-integration-test</artifactId>
         <version>${ozone.version}</version>
         <type>test-jar</type>
@@ -318,25 +325,6 @@
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-dependency-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>add-classpath-descriptor</id>
-            <phase>prepare-package</phase>
-            <goals>
-              <goal>build-classpath</goal>
-            </goals>
-            <configuration>
-              <outputFile>${project.build.outputDirectory}/${project.artifactId}.classpath</outputFile>
-              <prefix>$HDDS_LIB_JARS_DIR</prefix>
-              <outputFilterFile>true</outputFilterFile>
-              <includeScope>runtime</includeScope>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
         <configuration>
           <excludes>
@@ -430,6 +418,37 @@
                 <test.unique.fork.id>fork-${surefire.forkNumber}</test.unique.fork.id>
               </systemPropertyVariables>
             </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>add-classpath-descriptor</id>
+      <activation>
+        <file>
+          <exists>src/main/java</exists>
+        </file>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-dependency-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>add-classpath-descriptor</id>
+                <phase>prepare-package</phase>
+                <goals>
+                  <goal>build-classpath</goal>
+                </goals>
+                <configuration>
+                  <outputFile>${project.build.outputDirectory}/${project.artifactId}.classpath</outputFile>
+                  <prefix>$HDDS_LIB_JARS_DIR</prefix>
+                  <outputFilterFile>true</outputFilterFile>
+                  <includeScope>runtime</includeScope>
+                </configuration>
+              </execution>
+            </executions>
           </plugin>
         </plugins>
       </build>

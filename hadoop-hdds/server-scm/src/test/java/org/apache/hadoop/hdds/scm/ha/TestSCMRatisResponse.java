@@ -45,9 +45,17 @@ public class TestSCMRatisResponse {
 
   @Test
   public void testEncodeAndDecodeSuccess() throws Exception {
-    SCMRatisResponse response = SCMRatisResponse.decode(new RaftClientReply(
-        ClientId.randomId(), raftId, 1L, true, Message.EMPTY,
-        null, 1L, null));
+    RaftClientReply reply = RaftClientReply.newBuilder()
+        .setClientId(ClientId.randomId())
+        .setServerId(raftId)
+        .setGroupId(RaftGroupId.emptyGroupId())
+        .setCallId(1L)
+        .setSuccess(true)
+        .setMessage(Message.EMPTY)
+        .setException(null)
+        .setLogIndex(1L)
+        .build();
+    SCMRatisResponse response = SCMRatisResponse.decode(reply);
     Assert.assertTrue(response.isSuccess());
     Assert.assertEquals(Message.EMPTY,
         SCMRatisResponse.encode(response.getResult()));
@@ -55,9 +63,17 @@ public class TestSCMRatisResponse {
 
   @Test
   public void testDecodeOperationFailureWithException() throws Exception {
-    SCMRatisResponse response = SCMRatisResponse.decode(new RaftClientReply(
-        ClientId.randomId(), raftId, 1L, false, Message.EMPTY,
-        new LeaderNotReadyException(raftId), 1L, null));
+    RaftClientReply reply = RaftClientReply.newBuilder()
+        .setClientId(ClientId.randomId())
+        .setServerId(raftId)
+        .setGroupId(RaftGroupId.emptyGroupId())
+        .setCallId(1L)
+        .setSuccess(false)
+        .setMessage(Message.EMPTY)
+        .setException(new LeaderNotReadyException(raftId))
+        .setLogIndex(1L)
+        .build();
+    SCMRatisResponse response = SCMRatisResponse.decode(reply);
     Assert.assertFalse(response.isSuccess());
     Assert.assertTrue(response.getException() instanceof RaftException);
     Assert.assertNull(response.getResult());

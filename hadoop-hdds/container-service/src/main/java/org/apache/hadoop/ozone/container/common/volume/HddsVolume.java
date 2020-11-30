@@ -27,6 +27,8 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
@@ -40,8 +42,6 @@ import org.apache.hadoop.util.DiskChecker;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.base.Preconditions;
-import org.apache.yetus.audience.InterfaceAudience;
-import org.apache.yetus.audience.InterfaceStability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -165,7 +165,7 @@ public class HddsVolume
       this.state = VolumeState.NOT_INITIALIZED;
       this.clusterID = b.clusterID;
       this.datanodeUuid = b.datanodeUuid;
-      this.volumeIOStats = new VolumeIOStats();
+      this.volumeIOStats = new VolumeIOStats(b.volumeRootStr);
 
       volumeInfo = new VolumeInfo.Builder(b.volumeRootStr, b.conf)
           .storageType(b.storageType)
@@ -400,12 +400,18 @@ public class HddsVolume
     if (volumeInfo != null) {
       volumeInfo.shutdownUsageThread();
     }
+    if (volumeIOStats != null) {
+      volumeIOStats.unregister();
+    }
   }
 
   public void shutdown() {
     this.state = VolumeState.NON_EXISTENT;
     if (volumeInfo != null) {
       volumeInfo.shutdownUsageThread();
+    }
+    if (volumeIOStats != null) {
+      volumeIOStats.unregister();
     }
   }
 

@@ -41,11 +41,11 @@ public interface DeletedBlockLog extends Closeable {
    * Scan entire log once and returns TXs to DatanodeDeletedBlockTransactions.
    * Once DatanodeDeletedBlockTransactions is full, the scan behavior will
    * stop.
-   * @param transactions a list of TXs will be set into.
+   * @param blockDeletionLimit Maximum number of blocks to fetch
    * @return Mapping from containerId to latest transactionId for the container.
    * @throws IOException
    */
-  Map<Long, Long> getTransactions(DatanodeDeletedBlockTransactions transactions)
+  DatanodeDeletedBlockTransactions getTransactions(int blockDeletionLimit)
       throws IOException;
 
   /**

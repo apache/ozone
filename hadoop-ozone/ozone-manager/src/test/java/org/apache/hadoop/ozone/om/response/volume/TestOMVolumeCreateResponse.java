@@ -28,8 +28,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .CreateVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .UserVolumeInfo;
+import org.apache.hadoop.ozone.storage.proto.
+    OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.junit.After;
@@ -76,7 +76,7 @@ public class TestOMVolumeCreateResponse {
 
     String volumeName = UUID.randomUUID().toString();
     String userName = "user1";
-    UserVolumeInfo volumeList = UserVolumeInfo.newBuilder()
+    PersistedUserVolumeInfo volumeList = PersistedUserVolumeInfo.newBuilder()
         .setObjectID(1).setUpdateID(1)
         .addVolumeNames(volumeName).build();
 

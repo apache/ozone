@@ -17,8 +17,13 @@
  */
 package org.apache.hadoop.hdds.ratis;
 
+import java.util.Random;
+import java.util.UUID;
+import java.util.function.BiFunction;
+
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
@@ -29,13 +34,10 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunk
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
+
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.Assert;
 import org.junit.Test;
-
-import java.util.Random;
-import java.util.UUID;
-import java.util.function.BiFunction;
 
 /** Testing {@link ContainerCommandRequestMessage}. */
 public class TestContainerCommandRequestMessage {
@@ -51,7 +53,8 @@ public class TestContainerCommandRequestMessage {
 
   static ChecksumData checksum(ByteString data) {
     try {
-      return new Checksum().computeChecksum(data.asReadOnlyByteBuffer());
+      return new Checksum(ChecksumType.CRC32, 1024 * 1024)
+          .computeChecksum(data.asReadOnlyByteBuffer());
     } catch (OzoneChecksumException e) {
       throw new IllegalStateException(e);
     }

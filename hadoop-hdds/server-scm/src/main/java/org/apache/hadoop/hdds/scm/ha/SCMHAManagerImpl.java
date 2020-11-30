@@ -104,6 +104,11 @@ public class SCMHAManagerImpl implements SCMHAManager {
   }
 
   private RaftPeerId getPeerIdFromRoleInfo(RaftServerImpl serverImpl) {
+    /*
+      TODO: Fix Me
+              Ratis API has changed.
+              RaftServerImpl#getRoleInfoProto is no more public.
+
     if (serverImpl.isLeader()) {
       return RaftPeerId.getRaftPeerId(
           serverImpl.getRoleInfoProto().getLeaderInfo().toString());
@@ -114,6 +119,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
     } else {
       return null;
     }
+     */
+    return null;
   }
 
   @Override
@@ -128,7 +135,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
       if (serverImpl != null) {
         RaftPeerId peerId =  getPeerIdFromRoleInfo(serverImpl);
         if (peerId != null) {
-          return new RaftPeer(peerId);
+          return RaftPeer.newBuilder().setId(peerId).build();
         }
         return null;
       }

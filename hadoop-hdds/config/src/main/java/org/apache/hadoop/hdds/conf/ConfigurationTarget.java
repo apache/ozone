@@ -44,6 +44,10 @@ public interface ConfigurationTarget {
     set(name, value + ParsedTimeDuration.unitFor(unit).suffix());
   }
 
+  default void setStorageSize(String name, long value, StorageUnit unit) {
+    set(name, value + unit.getShortName());
+  }
+
   default <T> void setFromObject(T object) {
     ConfigGroup configGroup =
         object.getClass().getAnnotation(ConfigGroup.class);

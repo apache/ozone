@@ -94,6 +94,20 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
 
       // Update only when
       if (applyAcl) {
+        // Update the modification time when updating ACLs of Volume.
+        long modificationTime = omVolumeArgs.getModificationTime();
+        if (getOmRequest().getAddAclRequest().hasObj()) {
+          modificationTime = getOmRequest().getAddAclRequest()
+              .getModificationTime();
+        } else if (getOmRequest().getSetAclRequest().hasObj()){
+          modificationTime = getOmRequest().getSetAclRequest()
+              .getModificationTime();
+        } else if (getOmRequest().getRemoveAclRequest().hasObj()) {
+          modificationTime = getOmRequest().getRemoveAclRequest()
+              .getModificationTime();
+        }
+        omVolumeArgs.setModificationTime(modificationTime);
+
         omVolumeArgs.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
         // update cache.

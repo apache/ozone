@@ -56,7 +56,7 @@ token infrastructure depends on this certificate infrastructure.
 
 For a detailed view of Storage Container Manager this section gives a quick overview about the provided network services and the stored persisted data.
 
-**Network services provided by Storage Container Manager:**
+### Network services provided by Storage Container Manager:
 
  * Pipelines: List/Delete/Activate/Deactivate
    * pipelines are set of datanodes to form replication groups
@@ -74,8 +74,7 @@ For a detailed view of Storage Container Manager this section gives a quick over
 
 Note: client doesn't connect directly to the SCM
 
-**Persisted state**
-
+### Persisted state
 
 The following data is persisted in Storage Container Manager side in a specific RocksDB directory
 

@@ -149,13 +149,29 @@ public final class MockSCMHAManager implements SCMHAManager {
       RaftClientReply reply;
       try {
         final Message result = process(request);
-        return SCMRatisResponse.decode(new RaftClientReply(ClientId.randomId(),
-            raftId, 1L, true, result, null, 1L, null));
+        reply = RaftClientReply.newBuilder()
+            .setClientId(ClientId.randomId())
+            .setServerId(raftId)
+            .setGroupId(RaftGroupId.emptyGroupId())
+            .setCallId(1L)
+            .setSuccess(true)
+            .setMessage(result)
+            .setException(null)
+            .setLogIndex(1L)
+            .build();
       } catch (Exception ex) {
-        return SCMRatisResponse.decode(new RaftClientReply(ClientId.randomId(),
-            raftId, 1L, false, null,
-            new StateMachineException(raftId, ex), 1L, null));
+        reply = RaftClientReply.newBuilder()
+            .setClientId(ClientId.randomId())
+            .setServerId(raftId)
+            .setGroupId(RaftGroupId.emptyGroupId())
+            .setCallId(1L)
+            .setSuccess(false)
+            .setMessage(Message.EMPTY)
+            .setException(new StateMachineException(raftId, ex))
+            .setLogIndex(1L)
+            .build();
       }
+      return SCMRatisResponse.decode(reply);
     }
 
     private Message process(final SCMRatisRequest request)

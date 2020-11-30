@@ -22,6 +22,9 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
 
+import java.time.Duration;
+
+
 /**
  * The configuration class for the SCM service.
  */
@@ -74,6 +77,38 @@ public class ScmConfig {
   )
   private String pipelineChoosePolicyName;
 
+  @Config(key = "block.deletion.per-interval.max",
+      type = ConfigType.INT,
+      defaultValue = "10000",
+      tags = { ConfigTag.SCM, ConfigTag.DELETION},
+      description =
+          "Maximum number of blocks which SCM processes during an interval. "
+              + "If SCM has 100000 blocks which need to be deleted and the "
+              + "configuration is 5000 then it would only send 5000 blocks "
+              + "for deletion to the datanodes."
+  )
+  private int blockDeletionLimit;
+
+  @Config(key = "block.deleting.service.interval",
+      defaultValue = "60s",
+      type = ConfigType.TIME,
+      tags = { ConfigTag.SCM, ConfigTag.DELETION },
+      description =
+          "Time interval of the scm block deleting service. The block deleting"
+              + "service runs on SCM periodically and deletes blocks "
+              + "queued for deletion. Unit could be defined with "
+              + "postfix (ns,ms,s,m,h,d). "
+  )
+  private long blockDeletionInterval = Duration.ofSeconds(60).toMillis();
+
+  public Duration getBlockDeletionInterval() {
+    return Duration.ofMillis(blockDeletionInterval);
+  }
+
+  public void setBlockDeletionInterval(Duration duration) {
+    this.blockDeletionInterval = duration.toMillis();
+  }
+
   public void setKerberosPrincipal(String kerberosPrincipal) {
     this.principal = kerberosPrincipal;
   }
@@ -91,6 +126,10 @@ public class ScmConfig {
     this.pipelineChoosePolicyName = pipelineChoosePolicyName;
   }
 
+  public void setBlockDeletionLimit(int blockDeletionLimit) {
+    this.blockDeletionLimit = blockDeletionLimit;
+  }
+
   public String getKerberosPrincipal() {
     return this.principal;
   }
@@ -105,6 +144,10 @@ public class ScmConfig {
 
   public String getPipelineChoosePolicyName() {
     return pipelineChoosePolicyName;
+  }
+
+  public int getBlockDeletionLimit() {
+    return blockDeletionLimit;
   }
 
   /**

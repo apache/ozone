@@ -115,7 +115,7 @@ public class CommitWatcher {
 
   public void updateCommitInfoMap(long index, List<ChunkBuffer> buffers) {
     commitIndex2flushedDataMap.computeIfAbsent(index, k -> new LinkedList<>())
-      .addAll(buffers);
+        .addAll(buffers);
   }
 
   int getCommitInfoMapSize() {

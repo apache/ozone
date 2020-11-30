@@ -128,7 +128,8 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
   @Override
   public List<RaftPeer> getRaftPeers() {
-    return Collections.singletonList(new RaftPeer(raftPeerId));
+    return Collections.singletonList(RaftPeer.newBuilder()
+        .setId(raftPeerId).build());
   }
 
 
@@ -201,7 +202,10 @@ public class SCMRatisServerImpl implements SCMRatisServer {
           selfPeerId = peerId;
         }
 
-        raftPeers.add(new RaftPeer(peerId, host + ":" + port));
+        raftPeers.add(RaftPeer.newBuilder()
+            .setId(peerId)
+            .setAddress(host + ":" + port)
+            .build());
       }
 
       if (selfPeerId == null) {

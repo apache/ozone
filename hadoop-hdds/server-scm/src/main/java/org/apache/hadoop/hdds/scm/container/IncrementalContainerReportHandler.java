@@ -85,6 +85,10 @@ public class IncrementalContainerReportHandler extends
         success = false;
         LOG.error("Received ICR from unknown datanode {}",
             report.getDatanodeDetails(), ex);
+      } catch (ContainerReplicaNotFoundException e){
+        success = false;
+        LOG.warn("Container {} replica not found!",
+            replicaProto.getContainerID());
       } catch (IOException e) {
         success = false;
         LOG.error("Exception while processing ICR for container {}",

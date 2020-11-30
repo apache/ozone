@@ -25,7 +25,6 @@ import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.CreateFlag;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -381,14 +380,14 @@ public class BasicOzoneFileSystem extends FileSystem {
 
         if (statuses != null && statuses.length > 0) {
           // If dst exists and not a directory not empty
-          throw new FileAlreadyExistsException(String.format(
-              "Failed to rename %s to %s, file already exists or not empty!",
-              src, dst));
+          LOG.warn("Failed to rename {} to {}, file already exists" +
+              " or not empty!", src, dst);
+          return false;
         }
       } else {
         // If dst is not a directory
-        throw new FileAlreadyExistsException(String.format(
-            "Failed to rename %s to %s, file already exists!", src, dst));
+        LOG.warn("Failed to rename {} to {}, file already exists!", src, dst);
+        return false;
       }
     }
 
@@ -408,8 +407,7 @@ public class BasicOzoneFileSystem extends FileSystem {
   }
 
   /**
-   * Intercept rename to trash calls from TrashPolicyDefault,
-   * convert them to delete calls instead.
+   * Intercept rename to trash calls from TrashPolicyDefault.
    */
   @Deprecated
   protected void rename(final Path src, final Path dst,
@@ -427,11 +425,7 @@ public class BasicOzoneFileSystem extends FileSystem {
       // if doesn't have TO_TRASH option, just pass the call to super
       super.rename(src, dst, options);
     } else {
-      // intercept when TO_TRASH is found
-      LOG.info("Move to trash is disabled for o3fs, deleting instead: {}. "
-          + "Files or directories will NOT be retained in trash. "
-          + "Ignore the following TrashPolicyDefault message, if any.", src);
-      delete(src, true);
+      rename(src, dst);
     }
   }
 
@@ -820,10 +814,8 @@ public class BasicOzoneFileSystem extends FileSystem {
     // removing leading '/' char
     String key = path.toUri().getPath();
 
-    if (OzoneFSUtils.isValidName(key)) {
-      key = path.toUri().getPath();
-    } else {
-      throw new InvalidPathException("Invalid path Name" + key);
+    if (!OzoneFSUtils.isValidName(key)) {
+      throw new InvalidPathException("Invalid path Name " + key);
     }
     LOG.trace("path for key:{} is:{}", key, path);
     return key.substring(1);
