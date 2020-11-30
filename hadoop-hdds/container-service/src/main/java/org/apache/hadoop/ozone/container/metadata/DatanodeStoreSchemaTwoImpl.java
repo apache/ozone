@@ -37,8 +37,9 @@ public class DatanodeStoreSchemaTwoImpl extends AbstractDatanodeStore {
    * @throws IOException - on Failure.
    */
   public DatanodeStoreSchemaTwoImpl(ConfigurationSource config,
-                                    long containerID, String dbPath)
-          throws IOException {
-    super(config, containerID, new DatanodeSchemaTwoDBDefinition(dbPath));
+      long containerID, String dbPath, boolean openReadOnly)
+      throws IOException {
+    super(config, containerID, new DatanodeSchemaTwoDBDefinition(dbPath),
+        openReadOnly);
   }
 }

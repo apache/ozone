@@ -25,6 +25,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Set;
+import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Implementation of all the failures.
@@ -40,6 +42,17 @@ public abstract class Failures {
   public abstract void fail(MiniOzoneChaosCluster cluster);
 
   public abstract void validateFailure(MiniOzoneChaosCluster cluster);
+
+  public static List<Class<? extends Failures>> getClassList() {
+    List<Class<? extends Failures>> classList = new ArrayList<>();
+
+    classList.add(OzoneManagerRestartFailure.class);
+    classList.add(OzoneManagerStartStopFailure.class);
+    classList.add(DatanodeRestartFailure.class);
+    classList.add(DatanodeStartStopFailure.class);
+
+    return classList;
+  }
 
   /**
    * Ozone Manager failures.
