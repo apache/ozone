@@ -41,9 +41,7 @@ import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.replication.ContainerReplicator;
 import org.apache.hadoop.ozone.container.replication.DownloadAndImportReplicator;
-import org.apache.hadoop.ozone.container.replication.MeasuredReplicator;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
-import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor.TaskRunner;
 import org.apache.hadoop.ozone.container.replication.ReplicationTask;
 import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 
@@ -57,7 +55,7 @@ import picocli.CommandLine.Option;
  */
 @Command(name = "cr",
     aliases = "container-replicator",
-    description = "Replicate / download containers in the name of a namenode.",
+    description = "Replicate / download closed containers.",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
@@ -67,7 +65,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
   @Option(names = {"--datanode"},
       description = "Replicate only containers on this specific datanode.",
       defaultValue = "")
-  private String dataNode;
+  private String datanode;
 
   private ReplicationSupervisor supervisor;
 
@@ -106,7 +104,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
                 .collect(Collectors.toList());
 
         //if datanode is specific replicate only container if has a replica.
-        if (dataNode.equals("") || datanodeUUIDs.contains(dataNode)) {
+        if (datanode.equals("") || datanodeUUIDs.contains(datanode)) {
           replicationTasks.add(new ReplicationTask(container.getContainerID(),
               datanodesWithContainer));
         }
@@ -127,10 +125,10 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
   @NotNull
   private OzoneConfiguration initializeReplicationSupervisor()
       throws IOException {
-    String fakeDatanodeUuid = dataNode;
+    String fakeDatanodeUuid = datanode;
 
     if (fakeDatanodeUuid.equals("")) {
-      UUID.randomUUID().toString();
+      fakeDatanodeUuid = UUID.randomUUID().toString();
     }
 
     OzoneConfiguration conf = createOzoneConfiguration();
@@ -162,11 +160,10 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
         new ContainerController(containerSet, handlers);
 
     ContainerReplicator replicator =
-        new MeasuredReplicator(
-            new DownloadAndImportReplicator(containerSet,
-                controller,
-                new SimpleContainerDownloader(conf, null),
-                new TarContainerPacker()));
+        new DownloadAndImportReplicator(containerSet,
+            controller,
+            new SimpleContainerDownloader(conf, null),
+            new TarContainerPacker());
 
     supervisor = new ReplicationSupervisor(containerSet, replicator, 10);
     return conf;
@@ -176,8 +173,7 @@ public class ClosedContainerReplicator extends BaseFreonGenerator implements
     timer.time(() -> {
       final ReplicationTask replicationTask =
           replicationTasks.get((int) counter);
-      final TaskRunner taskRunner = supervisor.new TaskRunner(replicationTask);
-      taskRunner.run();
+      supervisor.new TaskRunner(replicationTask).run();
       return null;
     });
   }
