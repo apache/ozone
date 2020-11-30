@@ -55,7 +55,7 @@ public class OzoneClientConfig {
   private int streamBufferSize = 4 * 1024 * 1024;
 
   @Config(key = "stream.buffer.increment",
-      defaultValue = "0",
+      defaultValue = "0B",
       type = ConfigType.SIZE,
       description = "Buffer (defined by ozone.client.stream.buffer.size) "
           + "will be incremented with this steps. If zero, the full buffer "
