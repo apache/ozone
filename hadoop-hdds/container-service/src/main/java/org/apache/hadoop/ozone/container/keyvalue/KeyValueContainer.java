@@ -528,6 +528,9 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
               + getContainerData().getContainerID() + " is in state " + state);
     }
     compactDB();
+    // Close DB (and remove from cache) to avoid concurrent modification while
+    // packing it.
+    BlockUtils.removeDB(containerData, config);
     packer.pack(this, destination);
   }
 

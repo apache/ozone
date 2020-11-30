@@ -19,8 +19,7 @@ on:
   schedule:
     - cron: 30 0,12 * * *
 jobs:
-  build:
-    name: compile
+  compile:
     runs-on: ubuntu-18.04
     strategy:
       matrix:
@@ -49,7 +48,14 @@ jobs:
         with:
           java-version: ${{ matrix.java }}
       - name: Run a full build
-        run: hadoop-ozone/dev-support/checks/build.sh
+        run: hadoop-ozone/dev-support/checks/build.sh -Pcoverage -Pdist
+      - name: Store binaries for tests
+        uses: actions/upload-artifact@v2
+        if: matrix.java == '8'
+        with:
+          name: ozone-bin
+          path: hadoop-ozone/dist/target/hadoop-ozone*.tar.gz
+          retention-days: 1
   bats:
     runs-on: ubuntu-18.04
     steps:
@@ -167,6 +173,7 @@ jobs:
           path: target/findbugs
         continue-on-error: true
   acceptance:
+    needs: compile
     runs-on: ubuntu-18.04
     strategy:
       matrix:
@@ -178,37 +185,20 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
-      - name: Cache for maven dependencies
-        uses: actions/cache@v2
         with:
-          path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}
-          restore-keys: maven-repo-
-      - name: Cache for npm dependencies
-        uses: actions/cache@v2
-        with:
-            path: |
-              ~/.pnpm-store
-              **/node_modules
-            key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
-            restore-keys: |
-              ${{ runner.os }}-pnpm-
-      - name: Checkout to /mnt/ozone
+          path: ozone
+      - name: Move Ozone to /mnt
         run: |
           sudo chmod 777 /mnt
-          git clone 'https://github.com/${{ github.repository }}.git' /mnt/ozone
-          cd /mnt/ozone
-          if [[ '${{ github.event_name }}' == 'pull_request' ]]; then
-            git fetch --verbose origin '${{ github.ref }}'
-          else
-            git fetch --verbose origin '${{ github.sha }}'
-          fi
-          git checkout FETCH_HEAD
-          git reset --hard
-      - name: Run a full build
+          mv ozone /mnt/
+      - name: Download compiled Ozone binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: ozone-bin
+      - name: Untar binaries
         run: |
-          cd /mnt/ozone
-          hadoop-ozone/dev-support/checks/build.sh -Pcoverage
+          mkdir -p /mnt/ozone/hadoop-ozone/dist/target
+          tar xzvf hadoop-ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
       - name: Install robotframework
         run: sudo pip install robotframework
       - name: Execute tests
@@ -304,37 +294,25 @@ jobs:
           path: target/coverage
         continue-on-error: true
   kubernetes:
+    needs: compile
     runs-on: ubuntu-18.04
     steps:
       - name: Checkout project
         uses: actions/checkout@v2
-      - name: Cache for maven dependencies
-        uses: actions/cache@v2
         with:
-          path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}
-          restore-keys: maven-repo-
-      - name: Cache for npm dependencies
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.pnpm-store
-            **/node_modules
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-
-      - name: Checkout to /mnt/ozone
+          path: ozone
+      - name: Move Ozone to /mnt
         run: |
           sudo chmod 777 /mnt
-          git clone 'https://github.com/${{ github.repository }}.git' /mnt/ozone
-          cd /mnt/ozone
-          if [[ '${{ github.event_name }}' == 'pull_request' ]]; then
-            git fetch --verbose origin '${{ github.ref }}'
-          else
-            git fetch --verbose origin '${{ github.sha }}'
-          fi
-          git checkout FETCH_HEAD
-          git reset --hard
+          mv ozone /mnt/
+      - name: Download compiled Ozone binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: ozone-bin
+      - name: Untar binaries
+        run: |
+          mkdir -p /mnt/ozone/hadoop-ozone/dist/target
+          tar xzvf hadoop-ozone*.tar.gz -C /mnt/ozone/hadoop-ozone/dist/target
       - name: Install robotframework
         run: sudo pip install robotframework
       - name: Install k3s
@@ -350,10 +328,6 @@ jobs:
           wget https://github.com/elek/flekszible/releases/download/v1.8.1/flekszible_1.8.1_Linux_x86_64.tar.gz -O - | tar -zx
           chmod +x flekszible
           sudo mv flekszible /usr/bin/flekszible
-      - name: Run a full build
-        run: |
-          cd /mnt/ozone
-          hadoop-ozone/dev-support/checks/build.sh -Pcoverage
       - name: Execute tests
         run: |
           cd /mnt/ozone/hadoop-ozone/dist/target/ozone-* && sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
