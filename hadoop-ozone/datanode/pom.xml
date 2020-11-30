@@ -40,7 +40,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdfs</artifactId>
+      <artifactId>hadoop-hdds-hadoop-dependency-server</artifactId>
       <scope>compile</scope>
     </dependency>
     <dependency>

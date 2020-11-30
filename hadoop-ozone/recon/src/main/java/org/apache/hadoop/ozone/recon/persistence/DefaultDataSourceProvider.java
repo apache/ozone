@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.recon.persistence;
 import javax.sql.DataSource;
 
 import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.inject.Inject;
 import com.google.inject.Provider;
@@ -29,6 +31,9 @@ import com.jolbox.bonecp.BoneCPDataSource;
  * Provide a {@link javax.sql.DataSource} for the application.
  */
 public class DefaultDataSourceProvider implements Provider<DataSource> {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(DefaultDataSourceProvider.class);
 
   @Inject
   private DataSourceConfiguration configuration;
@@ -43,6 +48,7 @@ public class DefaultDataSourceProvider implements Provider<DataSource> {
   @Override
   public DataSource get() {
     String jdbcUrl = configuration.getJdbcUrl();
+    LOG.info("JDBC Url for Recon : {} ", jdbcUrl);
     if (StringUtils.contains(jdbcUrl, "derby")) {
       return new DerbyDataSourceProvider(configuration).get();
     } else if (StringUtils.contains(jdbcUrl, "sqlite")) {

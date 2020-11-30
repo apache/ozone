@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.ContainerStateMachine;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -130,9 +131,15 @@ public class TestDeleteWithSlowFollower {
 
     conf.setTimeDuration(OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
             1, TimeUnit.SECONDS);
+
     ScmConfig scmConfig = conf.getObject(ScmConfig.class);
     scmConfig.setBlockDeletionInterval(Duration.ofSeconds(1));
     conf.setFromObject(scmConfig);
+
+    DatanodeConfiguration datanodeConfiguration = conf.getObject(
+        DatanodeConfiguration.class);
+    datanodeConfiguration.setBlockDeletionInterval(Duration.ofMillis(100));
+    conf.setFromObject(datanodeConfiguration);
 
     RatisClientConfig ratisClientConfig =
         conf.getObject(RatisClientConfig.class);

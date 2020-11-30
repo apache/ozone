@@ -3365,7 +3365,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
       LOG.info("Reloaded OM state with Term: {} and Index: {}", term,
           lastAppliedIndex);
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       String errorMsg = "Failed to reload OM state and instantiate services.";
       exitManager.exitSystem(1, errorMsg, ex, LOG);
     }
@@ -3375,7 +3375,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (dbBackup != null) {
         FileUtils.deleteFully(dbBackup);
       }
-    } catch (IOException e) {
+    } catch (Exception e) {
       LOG.error("Failed to delete the backup of the original DB {}", dbBackup);
     }
 

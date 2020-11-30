@@ -104,10 +104,6 @@ public class S3MultipartUploadAbortResponse extends OMClientResponse {
       omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
           partKeyInfo.getPartName(), repeatedOmKeyInfo);
 
-      // update volume usedBytes.
-      omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
-          omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
-          omVolumeArgs);
       // update bucket usedBytes.
       omMetadataManager.getBucketTable().putWithBatch(batchOperation,
           omMetadataManager.getBucketKey(omVolumeArgs.getVolume(),

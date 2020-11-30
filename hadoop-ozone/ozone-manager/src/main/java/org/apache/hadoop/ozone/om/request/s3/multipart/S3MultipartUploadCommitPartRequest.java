@@ -119,6 +119,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
     Result result = null;
     OmVolumeArgs omVolumeArgs = null;
     OmBucketInfo omBucketInfo = null;
+    OmBucketInfo copyBucketInfo = null;
     try {
       keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
       volumeName = keyArgs.getVolumeName();
@@ -216,15 +217,13 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       int factor = omKeyInfo.getFactor().getNumber();
       omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
-      // update usedBytes atomically.
       // Block was pre-requested and UsedBytes updated when createKey and
       // AllocatedBlock. The space occupied by the Key shall be based on
       // the actual Key size, and the total Block size applied before should
       // be subtracted.
       long correctedSpace = omKeyInfo.getDataSize() * factor -
           keyArgs.getKeyLocationsList().size() * scmBlockSize * factor;
-      omVolumeArgs.getUsedBytes().add(correctedSpace);
-      omBucketInfo.getUsedBytes().add(correctedSpace);
+      omBucketInfo.incrUsedBytes(correctedSpace);
 
       omResponse.setCommitMultiPartUploadResponse(
           MultipartCommitUploadPartResponse.newBuilder()
@@ -232,7 +231,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       omClientResponse = new S3MultipartUploadCommitPartResponse(
           omResponse.build(), multipartKey, openKey,
           multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
-          ozoneManager.isRatisEnabled(), omVolumeArgs, omBucketInfo);
+          ozoneManager.isRatisEnabled(), omVolumeArgs,
+          omBucketInfo.copyObject());
 
       result = Result.SUCCESS;
     } catch (IOException ex) {
@@ -241,7 +241,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       omClientResponse = new S3MultipartUploadCommitPartResponse(
           createErrorOMResponse(omResponse, exception), multipartKey, openKey,
           multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
-          ozoneManager.isRatisEnabled(), omVolumeArgs, omBucketInfo);
+          ozoneManager.isRatisEnabled(), omVolumeArgs, copyBucketInfo);
     } finally {
       addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
           omDoubleBufferHelper);
