@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Function;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -54,8 +53,10 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   private final SecurityConfig securityConfig;
   private final X509Certificate caCert;
 
-  public SimpleContainerDownloader(ConfigurationSource conf,
-      X509Certificate caCert) {
+  public SimpleContainerDownloader(
+      ConfigurationSource conf,
+      X509Certificate caCert
+  ) {
 
     String workDirString =
         conf.get(OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR);
@@ -71,8 +72,10 @@ public class SimpleContainerDownloader implements ContainerDownloader {
   }
 
   @Override
-  public CompletableFuture<Path> getContainerDataFromReplicas(long containerId,
-      List<DatanodeDetails> sourceDatanodes) {
+  public CompletableFuture<Path> getContainerDataFromReplicas(
+      long containerId,
+      List<DatanodeDetails> sourceDatanodes
+  ) {
 
     CompletableFuture<Path> result = null;
 
@@ -84,17 +87,16 @@ public class SimpleContainerDownloader implements ContainerDownloader {
         if (result == null) {
           result = downloadContainer(containerId, datanode);
         } else {
-          result = result.thenApply(CompletableFuture::completedFuture)
-              .exceptionally(t -> {
-                LOG.error("Error on replicating container: " + containerId, t);
-                try {
-                  return downloadContainer(containerId, datanode);
-                } catch (Exception e) {
-                  LOG.error("Error on replicating container: " + containerId,
-                      e);
-                  return null;
-                }
-              }).thenCompose(Function.identity());
+          result = result.exceptionally(t -> {
+            LOG.error("Error on replicating container: " + containerId, t);
+            try {
+              return downloadContainer(containerId, datanode).join();
+            } catch (Exception e) {
+              LOG.error("Error on replicating container: " + containerId,
+                  e);
+              return null;
+            }
+          });
         }
       } catch (Exception ex) {
         LOG.error(String.format(
@@ -128,12 +130,20 @@ public class SimpleContainerDownloader implements ContainerDownloader {
       DatanodeDetails datanode
   ) throws Exception {
     CompletableFuture<Path> result;
-    try (GrpcReplicationClient grpcReplicationClient =
+    GrpcReplicationClient grpcReplicationClient =
         new GrpcReplicationClient(datanode.getIpAddress(),
             datanode.getPort(Name.STANDALONE).getValue(),
-            workingDirectory, securityConfig, caCert)) {
-      result = grpcReplicationClient.download(containerId);
-    }
+            workingDirectory, securityConfig, caCert);
+    result = grpcReplicationClient.download(containerId)
+        .thenApply(r -> {
+          try {
+            grpcReplicationClient.close();
+          } catch (Exception e) {
+            LOG.error("Couldn't close Grpc replication client", e);
+          }
+          return r;
+        });
+
     return result;
   }
 
