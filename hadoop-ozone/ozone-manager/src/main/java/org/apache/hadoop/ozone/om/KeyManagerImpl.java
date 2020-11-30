@@ -2331,7 +2331,8 @@ public class KeyManagerImpl implements KeyManager {
               LOG.warn("No datanodes in pipeline {}", pipeline.getId());
               continue;
             }
-            sortedNodes = sortDatanodes(clientMachine, nodes, keyInfo, uuidList);
+            sortedNodes = sortDatanodes(clientMachine, nodes, keyInfo,
+                uuidList);
             if (sortedNodes != null) {
               sortedPipelines.put(uuidSet, sortedNodes);
             }
