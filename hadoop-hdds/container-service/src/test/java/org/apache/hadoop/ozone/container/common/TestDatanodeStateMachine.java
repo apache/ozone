@@ -457,10 +457,7 @@ public class TestDatanodeStateMachine {
       String expectedMessage = String.format("Invalid layOutVersion. Version " +
               "file has layOutVersion as %s and latest Datanode layOutVersion" +
               " is %s", mlv, largestSlv);
-      String failMessage = String.format("Exception message '%s' does not " +
-          "contain expected message '%s'.", e.getMessage(), expectedMessage);
-
-      Assert.assertTrue(failMessage, e.getMessage().contains(expectedMessage));
+      GenericTestUtils.assertExceptionContains(expectedMessage, e);
     }
   }
 
