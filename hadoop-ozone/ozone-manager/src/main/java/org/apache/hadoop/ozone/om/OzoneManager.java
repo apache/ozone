@@ -3503,17 +3503,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public long getMaxUserVolumeCount() {
     return maxUserVolumeCount;
   }
-
-  /**
-   * Checks the Leader status of OM Ratis Server.
-   * If ratis is not enabled, then it always returns true.
-   *
-   * @return Return true if this node is the leader, false otherwsie.
-   */
-  public boolean isLeader() {
-    return isRatisEnabled ? omRatisServer.checkLeaderStatus() == LEADER_AND_READY : true;
-  }
-
   /**
    * Return true, if the current OM node is leader and in ready state to
    * process the requests.
@@ -3522,7 +3511,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @return
    */
   public boolean isLeaderReady() {
-    return isRatisEnabled ? omRatisServer.checkLeaderStatus() == LEADER_AND_READY : true;
+    return isRatisEnabled ?
+        omRatisServer.checkLeaderStatus() == LEADER_AND_READY : true;
   }
 
   /**

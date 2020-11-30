@@ -17,7 +17,6 @@
 package org.apache.hadoop.ozone.protocolPB;
 
 import java.io.IOException;
-import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -210,7 +209,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     return new ServiceException(notLeaderException);
   }
 
-  private ServiceException createLeaderErrorException(RaftServerStatus raftServerStatus) {
+  private ServiceException createLeaderErrorException(
+      RaftServerStatus raftServerStatus) {
     if (raftServerStatus == NOT_LEADER) {
       return createNotLeaderException();
     } else {
