@@ -46,7 +46,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
-import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -198,6 +197,19 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
   }
 
+  // For keys batch delete and rename only
+  protected String getVolumeOwner(OMMetadataManager omMetadataManager,
+      String volumeName) throws IOException {
+    String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);
+    OmVolumeArgs volumeArgs =
+        omMetadataManager.getVolumeTable().get(dbVolumeKey);
+    if (volumeArgs == null) {
+      throw new OMException("Volume not found " + volumeName,
+          VOLUME_NOT_FOUND);
+    }
+    return volumeArgs.getOwnerName();
+  }
+
   protected static Optional<FileEncryptionInfo> getFileEncryptionInfo(
       OzoneManager ozoneManager, OmBucketInfo bucketInfo) throws IOException {
     Optional<FileEncryptionInfo> encInfo = Optional.absent();
@@ -250,9 +262,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nullable FileEncryptionInfo encInfo,
       @Nonnull PrefixManager prefixManager,
       @Nullable OmBucketInfo omBucketInfo,
-        long transactionLogIndex) {
-    long objectID = OMFileRequest.getObjIDFromTxId(transactionLogIndex);
-
+      long transactionLogIndex, long objectID) {
     return new OmKeyInfo.Builder()
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
@@ -323,12 +333,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nullable FileEncryptionInfo encInfo,
       @Nonnull PrefixManager prefixManager,
       @Nullable OmBucketInfo omBucketInfo,
-      long transactionLogIndex, boolean isRatisEnabled)
+      long transactionLogIndex,
+      @Nonnull long objectID,
+      boolean isRatisEnabled)
       throws IOException {
     if (keyArgs.getIsMultipartKey()) {
       return prepareMultipartKeyInfo(omMetadataManager, keyArgs,
           size, locations, encInfo, prefixManager, omBucketInfo,
-          transactionLogIndex);
+          transactionLogIndex, objectID);
       //TODO args.getMetadata
     }
     if (dbKeyInfo != null) {
@@ -350,7 +362,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // Blocks will be appended as version 0.
     return createKeyInfo(keyArgs, locations, keyArgs.getFactor(),
         keyArgs.getType(), keyArgs.getDataSize(), encInfo, prefixManager,
-        omBucketInfo, transactionLogIndex);
+        omBucketInfo, transactionLogIndex, objectID);
   }
 
   /**
@@ -365,7 +377,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
       @Nonnull KeyArgs args, long size,
       @Nonnull List<OmKeyLocationInfo> locations,
       FileEncryptionInfo encInfo,  @Nonnull PrefixManager prefixManager,
-      @Nullable OmBucketInfo omBucketInfo, @Nonnull long transactionLogIndex)
+      @Nullable OmBucketInfo omBucketInfo, @Nonnull long transactionLogIndex,
+      @Nonnull long objectId)
       throws IOException {
     HddsProtos.ReplicationFactor factor;
     HddsProtos.ReplicationType type;
@@ -394,7 +407,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // For this upload part we don't need to check in KeyTable. As this
     // is not an actual key, it is a part of the key.
     return createKeyInfo(args, locations, factor, type, size, encInfo,
-        prefixManager, omBucketInfo, transactionLogIndex);
+        prefixManager, omBucketInfo, transactionLogIndex, objectId);
   }
 
   /**
@@ -433,6 +446,27 @@ public abstract class OMKeyRequest extends OMClientRequest {
     if (ozoneManager.getAclsEnabled()) {
       checkAcls(ozoneManager, resourceType, OzoneObj.StoreType.OZONE, aclType,
           volume, bucket, key);
+    }
+  }
+
+  /**
+   * Check Acls for the ozone key with volumeOwner.
+   * @param ozoneManager
+   * @param volume
+   * @param bucket
+   * @param key
+   * @param aclType
+   * @param resourceType
+   * @throws IOException
+   */
+  @SuppressWarnings("parameternumber")
+  protected void checkKeyAcls(OzoneManager ozoneManager, String volume,
+      String bucket, String key, IAccessAuthorizer.ACLType aclType,
+      OzoneObj.ResourceType resourceType, String volumeOwner)
+      throws IOException {
+    if (ozoneManager.getAclsEnabled()) {
+      checkAcls(ozoneManager, resourceType, OzoneObj.StoreType.OZONE, aclType,
+          volume, bucket, key, volumeOwner);
     }
   }
 
@@ -536,27 +570,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
-   * Check volume quota in bytes.
-   * @param omVolumeArgs
-   * @param allocateSize
-   * @throws IOException
-   */
-  protected void checkVolumeQuotaInBytes(OmVolumeArgs omVolumeArgs,
-      long allocateSize) throws IOException {
-    if (omVolumeArgs.getQuotaInBytes() > OzoneConsts.QUOTA_RESET) {
-      long usedBytes = omVolumeArgs.getUsedBytes().sum();
-      long quotaInBytes = omVolumeArgs.getQuotaInBytes();
-      if (quotaInBytes - usedBytes < allocateSize) {
-        throw new OMException("The DiskSpace quota of volume:"
-            + omVolumeArgs.getVolume() + "exceeded: quotaInBytes: "
-            + quotaInBytes + " Bytes but diskspace consumed: " + (usedBytes
-            + allocateSize) + " Bytes.",
-            OMException.ResultCodes.QUOTA_EXCEEDED);
-      }
-    }
-  }
-
-  /**
    * Check bucket quota in bytes.
    * @param omBucketInfo
    * @param allocateSize
@@ -565,7 +578,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected void checkBucketQuotaInBytes(OmBucketInfo omBucketInfo,
       long allocateSize) throws IOException {
     if (omBucketInfo.getQuotaInBytes() > OzoneConsts.QUOTA_RESET) {
-      long usedBytes = omBucketInfo.getUsedBytes().sum();
+      long usedBytes = omBucketInfo.getUsedBytes();
       long quotaInBytes = omBucketInfo.getQuotaInBytes();
       if (quotaInBytes - usedBytes < allocateSize) {
         throw new OMException("The DiskSpace quota of bucket:"

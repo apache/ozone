@@ -27,7 +27,7 @@ services:
     volumes:
       - ../..:/opt/hadoop
   kms:
-    image: apache/hadoop:${HADOOP_VERSION}
+    image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
     networks:
       - ozone
     ports:
@@ -100,7 +100,7 @@ services:
       HADOOP_OPTS: ${HADOOP_OPTS}
     command: ["/opt/hadoop/bin/ozone","scm"]
   rm:
-    image: apache/hadoop:${HADOOP_VERSION}
+    image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
     hostname: rm
     networks:
       - ozone
@@ -115,7 +115,7 @@ services:
       KERBEROS_KEYTABS: rm HTTP hadoop
     command: ["yarn", "resourcemanager"]
   nm:
-    image: apache/hadoop:${HADOOP_VERSION}
+    image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
     hostname: nm
     networks:
       - ozone
@@ -125,11 +125,11 @@ services:
       - ./docker-config
     environment:
       HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-hadoop3-@project.version@.jar
-      WAIT_FOR: rm:8088
+      WAITFOR: rm:8088
       KERBEROS_KEYTABS: nm HTTP
     command: ["yarn","nodemanager"]
   jhs:
-    image: apache/hadoop:${HADOOP_VERSION}
+    image: ${HADOOP_IMAGE}:${HADOOP_VERSION}
     container_name: jhs
     hostname: jhs
     networks:
@@ -143,7 +143,7 @@ services:
     environment:
       KERBEROS_KEYTABS: jhs HTTP
       HADOOP_CLASSPATH: /opt/ozone/share/ozone/lib/hadoop-ozone-filesystem-hadoop3-@project.version@.jar
-      WAIT_FOR: rm:8088
+      WAITFOR: rm:8088
     command: ["yarn","timelineserver"]
 networks:
   ozone:

@@ -195,7 +195,6 @@ public class SCMStateMachine extends BaseStateMachine {
    * processed in raft Server. This keep state machine to keep a track of index
    * updates.
    */
-  @Override
   public void notifyIndexUpdate(long currentTerm, long index) {
     applyTransactionMap.put(index, currentTerm);
     updateLastApplied();

@@ -148,7 +148,8 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     } catch (IllegalArgumentException ex) {
       countException++;
       GenericTestUtils.assertExceptionContains(
-          "Total buckets quota in this volume should not be", ex);
+          "Total buckets quota in this volume should not be " +
+              "greater than volume quota", ex);
     }
     Assert.assertEquals(1, countException);
   }

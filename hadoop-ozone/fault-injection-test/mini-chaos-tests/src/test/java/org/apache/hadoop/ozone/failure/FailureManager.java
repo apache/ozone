@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -46,7 +47,7 @@ public class FailureManager {
   private final ScheduledExecutorService executorService;
   public FailureManager(MiniOzoneChaosCluster cluster,
                         Configuration conf,
-                        List<Class<? extends Failures>> clazzes) {
+                        Set<Class<? extends Failures>> clazzes) {
     this.cluster = cluster;
     this.executorService = Executors.newSingleThreadScheduledExecutor();
 

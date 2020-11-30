@@ -169,7 +169,10 @@ public final class SCMRatisServer {
     InetSocketAddress ratisAddr = new InetSocketAddress(
         scmNodeDetails.getAddress(), scmNodeDetails.getRatisPort());
 
-    RaftPeer localRaftPeer = new RaftPeer(localRaftPeerId, ratisAddr);
+    RaftPeer localRaftPeer = RaftPeer.newBuilder()
+        .setId(localRaftPeerId)
+        .setAddress(ratisAddr)
+        .build();
 
     List<RaftPeer> raftPeers = new ArrayList<>();
     raftPeers.add(localRaftPeer);
@@ -179,7 +182,10 @@ public final class SCMRatisServer {
       InetSocketAddress peerRatisAddr = new InetSocketAddress(
           peer.getAddress(), peer.getRatisPort());
       RaftPeerId raftPeerId = RaftPeerId.valueOf(peerNodeId);
-      RaftPeer raftPeer = new RaftPeer(raftPeerId, peerRatisAddr);
+      RaftPeer raftPeer = RaftPeer.newBuilder()
+          .setId(raftPeerId)
+          .setAddress(peerRatisAddr)
+          .build();
       // Add other SCMs in Ratis ring
       raftPeers.add(raftPeer);
     }

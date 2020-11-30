@@ -116,7 +116,14 @@ public class TestOmAcls {
 
     String volumeName = RandomStringUtils.randomAlphabetic(5).toLowerCase();
     String bucketName = RandomStringUtils.randomAlphabetic(5).toLowerCase();
-    cluster.getClient().getObjectStore().createVolume(volumeName);
+
+    VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
+        .setOwner("user" + RandomStringUtils.randomNumeric(5))
+        .setAdmin("admin" + RandomStringUtils.randomNumeric(5))
+        .build();
+
+    cluster.getClient().getObjectStore().createVolume(volumeName,
+        createVolumeArgs);
     OzoneVolume volume =
         cluster.getClient().getObjectStore().getVolume(volumeName);
 

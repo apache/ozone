@@ -20,9 +20,9 @@ package org.apache.hadoop.ozone.om.request;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
@@ -45,11 +45,9 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.nio.file.Paths;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 
 /**
@@ -148,12 +146,36 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @param key
    * @throws IOException
    */
+  @SuppressWarnings("parameternumber")
   public void checkAcls(OzoneManager ozoneManager,
       OzoneObj.ResourceType resType,
       OzoneObj.StoreType storeType, IAccessAuthorizer.ACLType aclType,
       String vol, String bucket, String key) throws IOException {
+    checkAcls(ozoneManager, resType, storeType, aclType, vol, bucket, key,
+        ozoneManager.getVolumeOwner(vol, aclType, resType));
+  }
+
+  /**
+   * Check Acls of ozone object with volOwner given.
+   * @param ozoneManager
+   * @param resType
+   * @param storeType
+   * @param aclType
+   * @param vol
+   * @param bucket
+   * @param key
+   * @param volOwner
+   * @throws IOException
+   */
+  @SuppressWarnings("parameternumber")
+  public void checkAcls(OzoneManager ozoneManager,
+      OzoneObj.ResourceType resType,
+      OzoneObj.StoreType storeType, IAccessAuthorizer.ACLType aclType,
+      String vol, String bucket, String key, String volOwner)
+      throws IOException {
     ozoneManager.checkAcls(resType, storeType, aclType, vol, bucket, key,
-        createUGI(), getRemoteAddress(), getHostName());
+        createUGI(), getRemoteAddress(), getHostName(), true,
+        volOwner);
   }
 
   /**
@@ -298,21 +320,11 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
   }
 
-  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
+
   public static String validateAndNormalizeKey(String keyName)
       throws OMException {
-    String normalizedKeyName;
-    if (keyName.startsWith(OM_KEY_PREFIX)) {
-      normalizedKeyName = Paths.get(keyName).toUri().normalize().getPath();
-    } else {
-      normalizedKeyName = Paths.get(OM_KEY_PREFIX, keyName).toUri()
-          .normalize().getPath();
-    }
-    if (!keyName.equals(normalizedKeyName)) {
-      LOG.debug("Normalized key {} to {} ", keyName,
-          normalizedKeyName.substring(1));
-    }
-    return isValidKeyPath(normalizedKeyName.substring(1));
+    String normalizedKeyName = OmUtils.normalizeKey(keyName, false);
+    return isValidKeyPath(normalizedKeyName);
   }
 
   /**
