@@ -96,18 +96,15 @@ public class TestOzoneClientRetriesOnException {
     maxFlushSize = 2 * flushSize;
     blockSize = 2 * maxFlushSize;
 
-    OzoneClientConfig config = new OzoneClientConfig();
-    config.setMaxRetryCount(3);
-    config.setChecksumType(ChecksumType.NONE);
-    conf.setFromObject(config);
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setMaxRetryCount(3);
+    clientConfig.setChecksumType(ChecksumType.NONE);
+    clientConfig.setStreamBufferFlushDelay(false);
+    conf.setFromObject(clientConfig);
 
     conf.setTimeDuration(HDDS_SCM_WATCHER_TIMEOUT, 1000, TimeUnit.MILLISECONDS);
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 3);
     conf.setQuietMode(false);
-
-    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-    clientConfig.setStreamBufferFlushDelay(false);
-    conf.setFromObject(clientConfig);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(7)

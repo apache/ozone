@@ -41,8 +41,7 @@ public class PipelineCodec implements Codec<Pipeline> {
   public Pipeline fromPersistedFormat(byte[] rawData) throws IOException {
     HddsProtos.Pipeline.Builder pipelineBuilder = HddsProtos.Pipeline
         .newBuilder(HddsProtos.Pipeline.PARSER.parseFrom(rawData));
-    Pipeline pipeline = Pipeline.getFromProtobuf(pipelineBuilder.setState(
-        HddsProtos.PipelineState.PIPELINE_ALLOCATED).build());
+    Pipeline pipeline = Pipeline.getFromProtobuf(pipelineBuilder.build());
     // When SCM is restarted, set Creation time with current time.
     pipeline.setCreationTimestamp(Instant.now());
     Preconditions.checkNotNull(pipeline);

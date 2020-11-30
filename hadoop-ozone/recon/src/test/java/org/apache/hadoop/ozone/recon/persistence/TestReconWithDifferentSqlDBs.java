@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.persistence;
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.ozone.recon.ReconControllerModule.ReconDaoBindingModule.RECON_DAO_LIST;
 import static org.hadoop.ozone.recon.codegen.SqlDbUtils.SQLITE_DRIVER_CLASS;
+import static org.hadoop.ozone.recon.schema.Tables.RECON_TASK_STATUS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
@@ -76,6 +77,10 @@ public class TestReconWithDifferentSqlDBs extends AbstractReconSqlDBTest {
     ReconTaskStatusDao dao = getDao(ReconTaskStatusDao.class);
     dao.insert(new ReconTaskStatus("TestTask", 1L, 2L));
     assertEquals(1, dao.findAll().size());
+
+    int numRows = getDslContext().delete(RECON_TASK_STATUS).execute();
+    assertEquals(1, numRows);
+    assertEquals(0, dao.findAll().size());
   }
 
   /**

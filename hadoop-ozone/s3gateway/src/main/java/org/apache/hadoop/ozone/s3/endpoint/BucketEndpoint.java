@@ -112,6 +112,10 @@ public class BucketEndpoint extends EndpointBase {
     ContinueToken decodedToken =
         ContinueToken.decodeFromString(continueToken);
 
+    // Assign marker to startAfter. for the compatibility of aws api v1
+    if (startAfter == null && marker != null) {
+      startAfter = marker;
+    }
     if (startAfter != null && continueToken != null) {
       // If continuation token and start after both are provided, then we
       // ignore start After
@@ -129,7 +133,7 @@ public class BucketEndpoint extends EndpointBase {
     response.setDelimiter(delimiter);
     response.setName(bucketName);
     response.setPrefix(prefix);
-    response.setMarker("");
+    response.setMarker(marker == null ? "" : marker);
     response.setMaxKeys(maxKeys);
     response.setEncodingType(ENCODING_TYPE);
     response.setTruncated(false);
@@ -187,6 +191,8 @@ public class BucketEndpoint extends EndpointBase {
       response.setTruncated(true);
       ContinueToken nextToken = new ContinueToken(lastKey, prevDir);
       response.setNextToken(nextToken.encodeToString());
+      // Set nextMarker to be lastKey. for the compatibility of aws api v1
+      response.setNextMarker(lastKey);
     } else {
       response.setTruncated(false);
     }

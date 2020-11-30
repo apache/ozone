@@ -24,6 +24,7 @@ import java.util.List;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.util.BooleanBiFunction;
 import org.apache.hadoop.util.Time;
@@ -130,5 +131,12 @@ public class OMBucketAddAclRequest extends OMBucketAclRequest {
     }
   }
 
+  @Override
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
+      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+    ozoneManager.getMetrics().incNumAddAcl();
+    return super.validateAndUpdateCache(ozoneManager, trxnLogIndex,
+        omDoubleBufferHelper);
+  }
 }
 

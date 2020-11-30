@@ -24,9 +24,11 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.InvalidPathException;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
 import org.apache.hadoop.fs.Trash;
+import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -41,12 +43,14 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.test.GenericTestUtils;
+import org.apache.hadoop.test.LambdaTestUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -146,6 +150,8 @@ public class TestRootedOzoneFileSystem {
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
     // fs.ofs.impl would be loaded from META-INF, no need to manually set it
     fs = FileSystem.get(conf);
+    conf.setClass("fs.trash.classname", TrashPolicyOzone.class,
+        TrashPolicy.class);
     trash = new Trash(conf);
     ofs = (RootedOzoneFileSystem) fs;
     adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
@@ -1184,6 +1190,10 @@ public class TestRootedOzoneFileSystem {
     try (FSDataOutputStream stream = fs.create(path)) {
       stream.write(1);
     }
+    Assert.assertTrue(trash.getConf().getClass(
+        "fs.trash.classname", TrashPolicy.class).
+        isAssignableFrom(TrashPolicyOzone.class));
+
     // Call moveToTrash. We can't call protected fs.rename() directly
     trash.moveToTrash(path);
 
@@ -1209,5 +1219,26 @@ public class TestRootedOzoneFileSystem {
     // Cleanup
     ofs.delete(trashRoot, true);
 
+  }
+
+  @Test
+  public void testCreateWithInvalidPaths() throws Exception {
+    // Test for path with ..
+    Path parent = new Path("../../../../../d1/d2/");
+    Path file1 = new Path(parent, "key1");
+    checkInvalidPath(file1);
+
+    // Test for path with :
+    file1 = new Path("/:/:");
+    checkInvalidPath(file1);
+
+    // Test for path with scheme and authority.
+    file1 = new Path(fs.getUri() + "/:/:");
+    checkInvalidPath(file1);
+  }
+
+  private void checkInvalidPath(Path path) throws Exception {
+    LambdaTestUtils.intercept(InvalidPathException.class, "Invalid path Name",
+        () -> fs.create(path, false));
   }
 }

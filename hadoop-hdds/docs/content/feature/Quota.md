@@ -31,7 +31,12 @@ So far, we know that Ozone allows users to create volumes, buckets, and keys. A 
 ## Currently supported
 1. Storage Space level quota
 
-Administrators should be able to define how much storage space a Volume or Bucket can use.
+Administrators should be able to define how much storage space a Volume or Bucket can use. The following Settings for Storage space quota are currently supported：
+a. By default, the quota for volume and bucket is not enabled.
+b. When volume quota is enabled, the total size of bucket quota cannot exceed volume.
+c. Bucket quota can be set separately without enabling Volume quota. The size of bucket quota is unrestricted at this point.
+d. Volume quota is not currently supported separately, and volume quota takes effect only if bucket quota is set. Because ozone only check the usedBytes of the bucket when we write the key.
+
 
 ## Client usage
 ### Storage Space level quota
@@ -59,7 +64,7 @@ bin/ozone sh bucket setquota  --space-quota 10GB /volume1/bucket1
 ```
 This behavior changes the quota for Bucket1 to 10GB
 
-A bucket quota should not be greater than its Volume quota. Let's look at an example. If we have a 10MB Volume and create five buckets under that Volume with a quota of 5MB, the total quota is 25MB. In this case, the bucket creation will always succeed, and we check the quota for bucket and volume when the data is actually written. Each write needs to check whether the current bucket is exceeding the limit and the current total volume usage is exceeding the limit.
+Total bucket quota should not be greater than its Volume quota. If we have a 10MB Volume, The sum of the sizes of all buckets under this volume cannot exceed 10MB, otherwise the bucket set quota fails.
 
 #### Clear the quota for Volume1. The Bucket cleanup command is similar.
 ```shell

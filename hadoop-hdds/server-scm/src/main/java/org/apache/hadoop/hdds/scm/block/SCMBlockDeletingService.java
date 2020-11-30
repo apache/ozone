@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -66,9 +67,9 @@ public class SCMBlockDeletingService extends BackgroundService {
 
   public SCMBlockDeletingService(DeletedBlockLog deletedBlockLog,
       ContainerManager containerManager, NodeManager nodeManager,
-      EventPublisher eventPublisher, long interval, long serviceTimeout,
+      EventPublisher eventPublisher, Duration interval, long serviceTimeout,
       ConfigurationSource conf) {
-    super("SCMBlockDeletingService", interval, TimeUnit.MILLISECONDS,
+    super("SCMBlockDeletingService", interval.toMillis(), TimeUnit.MILLISECONDS,
         BLOCK_DELETING_SERVICE_CORE_POOL_SIZE, serviceTimeout);
     this.deletedBlockLog = deletedBlockLog;
     this.containerManager = containerManager;
@@ -143,7 +144,7 @@ public class SCMBlockDeletingService extends BackgroundService {
               // We should stop caching new commands if num of un-processed
               // command is bigger than a limit, e.g 50. In case datanode goes
               // offline for sometime, the cached commands be flooded.
-              eventPublisher.fireEvent(SCMEvents.RETRIABLE_DATANODE_COMMAND,
+              eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
                   new CommandForDatanode<>(dnId,
                       new DeleteBlocksCommand(dnTXs)));
               if (LOG.isDebugEnabled()) {

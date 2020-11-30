@@ -30,10 +30,8 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import com.google.common.base.Preconditions;
 import org.apache.commons.collections.MapIterator;
 import org.apache.commons.collections.map.LRUMap;
-import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
-import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -158,19 +156,8 @@ public final class ContainerCache extends LRUMap {
 
       try {
         long start = Time.monotonicNow();
-        DatanodeStore store;
-
-        if (schemaVersion.equals(OzoneConsts.SCHEMA_V1)) {
-          store = new DatanodeStoreSchemaOneImpl(conf,
-                  containerID, containerDBPath);
-        } else if (schemaVersion.equals(OzoneConsts.SCHEMA_V2)) {
-          store = new DatanodeStoreSchemaTwoImpl(conf,
-                  containerID, containerDBPath);
-        } else {
-          throw new IllegalArgumentException(
-                  "Unrecognized database schema version: " + schemaVersion);
-        }
-
+        DatanodeStore store = BlockUtils.getUncachedDatanodeStore(containerID,
+            containerDBPath, schemaVersion, conf, false);
         db = new ReferenceCountedDB(store, containerDBPath);
         metrics.incDbOpenLatency(Time.monotonicNow() - start);
       } catch (Exception e) {

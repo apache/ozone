@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.shell;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.List;
@@ -36,6 +37,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.test.GenericTestUtils;
@@ -48,6 +50,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
+
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -525,4 +529,42 @@ public class TestOzoneShellHA {
     }
   }
 
+  @Test
+  public void testShQuota() throws IOException {
+    ObjectStore objectStore = cluster.getClient().getObjectStore();
+    try {
+      // Test --quota option.
+
+      String[] args =
+          new String[] {"volume", "create", "vol1", "--quota", "100BYTES"};
+      execute(ozoneShell, args);
+      assertEquals(100, objectStore.getVolume("vol1").getQuotaInBytes());
+      out.reset();
+
+      args =
+          new String[] {"bucket", "create", "vol1/buck1", "--quota", "10BYTES"};
+      execute(ozoneShell, args);
+      assertEquals(10,
+          objectStore.getVolume("vol1").getBucket("buck1").getQuotaInBytes());
+
+      // Test --space-quota option.
+
+      args = new String[] {"volume", "create", "vol2", "--space-quota",
+          "100BYTES"};
+      execute(ozoneShell, args);
+      assertEquals(100, objectStore.getVolume("vol2").getQuotaInBytes());
+      out.reset();
+
+      args = new String[] {"bucket", "create", "vol2/buck2", "--space-quota",
+          "10BYTES"};
+      execute(ozoneShell, args);
+      assertEquals(10,
+          objectStore.getVolume("vol2").getBucket("buck2").getQuotaInBytes());
+    } finally {
+      objectStore.getVolume("vol1").deleteBucket("buck1");
+      objectStore.deleteVolume("vol1");
+      objectStore.getVolume("vol2").deleteBucket("buck2");
+      objectStore.deleteVolume("vol2");
+    }
+  }
 }

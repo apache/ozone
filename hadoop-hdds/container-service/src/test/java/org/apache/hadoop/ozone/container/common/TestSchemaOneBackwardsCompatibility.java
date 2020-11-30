@@ -27,11 +27,14 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
@@ -52,11 +55,19 @@ import org.yaml.snakeyaml.Yaml;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
-import java.util.*;
+import java.util.List;
+import java.util.UUID;
+import java.util.ArrayList;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Arrays;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -225,8 +236,22 @@ public class TestSchemaOneBackwardsCompatibility {
   @Test
   public void testDelete() throws Exception {
     final long numBlocksToDelete = TestDB.NUM_PENDING_DELETION_BLOCKS;
+    String datanodeUuid = UUID.randomUUID().toString();
+    ContainerSet containerSet = makeContainerSet();
+    VolumeSet volumeSet = new MutableVolumeSet(datanodeUuid, conf);
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
+            metrics, c -> {
+        });
+    long initialTotalSpace = newKvData().getBytesUsed();
+    long blockSpace = initialTotalSpace / TestDB.KEY_COUNT;
 
-    runBlockDeletingService();
+    runBlockDeletingService(keyValueHandler);
+
+    long currentTotalSpace = newKvData().getBytesUsed();
+    long numberOfBlocksDeleted =
+        (initialTotalSpace - currentTotalSpace) / blockSpace;
 
     // Expected values after blocks with #deleting# prefix in original DB are
     // deleted.
@@ -242,7 +267,7 @@ public class TestSchemaOneBackwardsCompatibility {
       assertEquals(expectedDeletingBlocks,
               countDeletingBlocks(refCountedDB));
       assertEquals(expectedDeletedBlocks,
-              countDeletedBlocks(refCountedDB));
+          TestDB.NUM_DELETED_BLOCKS + numberOfBlocksDeleted);
       assertEquals(expectedRegularBlocks,
               countUnprefixedBlocks(refCountedDB));
 
@@ -269,6 +294,14 @@ public class TestSchemaOneBackwardsCompatibility {
    */
   @Test
   public void testReadDeletedBlockChunkInfo() throws Exception {
+    String datanodeUuid = UUID.randomUUID().toString();
+    ContainerSet containerSet = makeContainerSet();
+    VolumeSet volumeSet = new MutableVolumeSet(datanodeUuid, conf);
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    KeyValueHandler keyValueHandler =
+        new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
+            metrics, c -> {
+        });
     try(ReferenceCountedDB refCountedDB = BlockUtils.getDB(newKvData(), conf)) {
       // Read blocks that were already deleted before the upgrade.
       List<? extends Table.KeyValue<String, ChunkInfoList>> deletedBlocks =
@@ -290,25 +323,22 @@ public class TestSchemaOneBackwardsCompatibility {
 
       Assert.assertEquals(TestDB.NUM_DELETED_BLOCKS, preUpgradeBlocks.size());
 
-      runBlockDeletingService();
+      long initialTotalSpace = newKvData().getBytesUsed();
+      long blockSpace = initialTotalSpace / TestDB.KEY_COUNT;
 
-      // After the block deleting service runs, get the updated list of
+      runBlockDeletingService(keyValueHandler);
+
+      long currentTotalSpace = newKvData().getBytesUsed();
+
+      // After the block deleting service runs, get the number of
       // deleted blocks.
-      deletedBlocks = refCountedDB.getStore()
-                      .getDeletedBlocksTable().getRangeKVs(null, 100);
-
-      int numPostUpgradeDeletesFound = 0;
-      for(Table.KeyValue<String, ChunkInfoList> chunkListKV: deletedBlocks) {
-        if (!preUpgradeBlocks.contains(chunkListKV.getKey())) {
-          numPostUpgradeDeletesFound++;
-          Assert.assertNotNull(chunkListKV.getValue());
-        }
-      }
+      long numberOfBlocksDeleted =
+          (initialTotalSpace - currentTotalSpace) / blockSpace;
 
       // The blocks that were originally marked for deletion should now be
       // deleted.
       Assert.assertEquals(TestDB.NUM_PENDING_DELETION_BLOCKS,
-              numPostUpgradeDeletesFound);
+              numberOfBlocksDeleted);
     }
   }
 
@@ -448,21 +478,22 @@ public class TestSchemaOneBackwardsCompatibility {
     }
   }
 
-  private void runBlockDeletingService() throws Exception {
+  private void runBlockDeletingService(KeyValueHandler keyValueHandler)
+      throws Exception {
     conf.setInt(OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL, 10);
     conf.setInt(OzoneConfigKeys.OZONE_BLOCK_DELETING_LIMIT_PER_CONTAINER, 2);
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
-            metadataDir.getAbsolutePath());
+        metadataDir.getAbsolutePath());
 
-    OzoneContainer container = makeMockOzoneContainer();
+    OzoneContainer container = makeMockOzoneContainer(keyValueHandler);
 
     BlockDeletingServiceTestImpl service =
-            new BlockDeletingServiceTestImpl(container, 1000, conf);
+        new BlockDeletingServiceTestImpl(container, 1000, conf);
     service.start();
     GenericTestUtils.waitFor(service::isStarted, 100, 3000);
     service.runDeletingTasks();
-    GenericTestUtils.waitFor(() -> service.getTimesOfProcessed() == 1,
-            100, 3000);
+    GenericTestUtils
+        .waitFor(() -> service.getTimesOfProcessed() == 1, 100, 3000);
   }
 
   private ContainerSet makeContainerSet() throws Exception {
@@ -473,7 +504,8 @@ public class TestSchemaOneBackwardsCompatibility {
     return containerSet;
   }
 
-  private OzoneContainer makeMockOzoneContainer() throws Exception {
+  private OzoneContainer makeMockOzoneContainer(KeyValueHandler keyValueHandler)
+      throws Exception {
     ContainerSet containerSet = makeContainerSet();
 
     OzoneContainer ozoneContainer = mock(OzoneContainer.class);
@@ -481,8 +513,7 @@ public class TestSchemaOneBackwardsCompatibility {
     when(ozoneContainer.getWriteChannel()).thenReturn(null);
     ContainerDispatcher dispatcher = mock(ContainerDispatcher.class);
     when(ozoneContainer.getDispatcher()).thenReturn(dispatcher);
-    KeyValueHandler handler = mock(KeyValueHandler.class);
-    when(dispatcher.getHandler(any())).thenReturn(handler);
+    when(dispatcher.getHandler(any())).thenReturn(keyValueHandler);
 
     return ozoneContainer;
   }

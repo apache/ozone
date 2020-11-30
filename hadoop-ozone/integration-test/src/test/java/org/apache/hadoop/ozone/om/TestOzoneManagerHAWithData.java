@@ -23,7 +23,6 @@ import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
@@ -249,42 +248,6 @@ public class TestOzoneManagerHAWithData extends TestOzoneManagerHA {
       Assert.assertEquals(NOT_A_FILE, ex.getResult());
     }
 
-  }
-
-  /**
-   * This method createFile and verifies the file is successfully created or
-   * not.
-   * @param ozoneBucket
-   * @param keyName
-   * @param data
-   * @param recursive
-   * @param overwrite
-   * @throws Exception
-   */
-  public void testCreateFile(OzoneBucket ozoneBucket, String keyName,
-      String data, boolean recursive, boolean overwrite)
-      throws Exception {
-
-    OzoneOutputStream ozoneOutputStream = ozoneBucket.createFile(keyName,
-        data.length(), ReplicationType.RATIS, ReplicationFactor.ONE,
-        overwrite, recursive);
-
-    ozoneOutputStream.write(data.getBytes(), 0, data.length());
-    ozoneOutputStream.close();
-
-    OzoneKeyDetails ozoneKeyDetails = ozoneBucket.getKey(keyName);
-
-    Assert.assertEquals(keyName, ozoneKeyDetails.getName());
-    Assert.assertEquals(ozoneBucket.getName(), ozoneKeyDetails.getBucketName());
-    Assert.assertEquals(ozoneBucket.getVolumeName(),
-        ozoneKeyDetails.getVolumeName());
-    Assert.assertEquals(data.length(), ozoneKeyDetails.getDataSize());
-
-    OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName);
-
-    byte[] fileContent = new byte[data.getBytes().length];
-    ozoneInputStream.read(fileContent);
-    Assert.assertEquals(data, new String(fileContent));
   }
 
   @Test
