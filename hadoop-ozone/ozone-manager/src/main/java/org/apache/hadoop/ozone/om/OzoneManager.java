@@ -57,6 +57,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Trash;
+import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -143,7 +144,6 @@ import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
-import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.snapshot.OzoneManagerSnapshotProvider;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DBUpdatesRequest;
@@ -201,6 +201,7 @@ import static org.apache.hadoop.hdds.security.x509.certificates.utils.Certificat
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import static org.apache.hadoop.io.retry.RetryPolicies.retryUpToMaximumCountWithFixedSleep;
+import static org.apache.hadoop.ozone.OmUtils.MAX_TRXN_ID;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY;
@@ -1286,7 +1287,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             return FileSystem.get(fsconf);
           }
         });
-
+    conf.setClass("fs.trash.classname", TrashPolicyOzone.class,
+        TrashPolicy.class);
     this.emptier = new Thread(new Trash(fs, conf).
       getEmptier(), "Trash Emptier");
     this.emptier.setDaemon(true);
@@ -1309,7 +1311,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     RPC.setProtocolEngine(configuration, OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
     this.omServerProtocol = new OzoneManagerProtocolServerSideTranslatorPB(
-        this, omRatisServer, omClientProtocolMetrics, isRatisEnabled);
+        this, omRatisServer, omClientProtocolMetrics, isRatisEnabled,
+        getLastTrxnIndexForNonRatis());
 
     BlockingService omService = newReflectiveBlockingService(omServerProtocol);
 
@@ -1335,6 +1338,27 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } else {
       omRatisServer = null;
     }
+  }
+
+  public long getObjectIdFromTxId(long trxnId) {
+    return OmUtils.getObjectIdFromTxId(metadataManager.getOmEpoch(),
+        trxnId);
+  }
+
+  @VisibleForTesting
+  long getLastTrxnIndexForNonRatis() throws IOException {
+    OMTransactionInfo omTransactionInfo =
+        OMTransactionInfo.readTransactionInfo(metadataManager);
+    // If the OMTransactionInfo does not exist in DB or if the term is not -1
+    // (corresponding to non-Ratis cluster), return 0 so that new incoming
+    // requests can have transaction index starting from 1.
+    if (omTransactionInfo == null || omTransactionInfo.getTerm() != -1) {
+      return 0;
+    }
+    // If there exists a last transaction index in DB, the new incoming
+    // requests in non-Ratis cluster must have transaction index
+    // incrementally increasing from the stored transaction index onwards.
+    return omTransactionInfo.getTransactionIndex();
   }
 
   public OMRatisSnapshotInfo getSnapshotInfo() {
@@ -3044,6 +3068,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         checkAcls(obj.getResourceType(), obj.getStoreType(), ACLType.WRITE_ACL,
             obj.getVolumeName(), obj.getBucketName(), obj.getKeyName());
       }
+      metrics.incNumAddAcl();
       switch (obj.getResourceType()) {
       case VOLUME:
         return volumeManager.addAcl(obj, acl);
@@ -3085,6 +3110,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         checkAcls(obj.getResourceType(), obj.getStoreType(), ACLType.WRITE_ACL,
             obj.getVolumeName(), obj.getBucketName(), obj.getKeyName());
       }
+      metrics.incNumRemoveAcl();
       switch (obj.getResourceType()) {
       case VOLUME:
         return volumeManager.removeAcl(obj, acl);
@@ -3127,6 +3153,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         checkAcls(obj.getResourceType(), obj.getStoreType(), ACLType.WRITE_ACL,
             obj.getVolumeName(), obj.getBucketName(), obj.getKeyName());
       }
+      metrics.incNumSetAcl();
       switch (obj.getResourceType()) {
       case VOLUME:
         return volumeManager.setAcl(obj, acls);
@@ -3166,6 +3193,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         checkAcls(obj.getResourceType(), obj.getStoreType(), ACLType.READ_ACL,
             obj.getVolumeName(), obj.getBucketName(), obj.getKeyName());
       }
+      metrics.incNumGetAcl();
       switch (obj.getResourceType()) {
       case VOLUME:
         return volumeManager.getAcl(obj);
@@ -3296,7 +3324,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
       LOG.info("Reloaded OM state with Term: {} and Index: {}", term,
           lastAppliedIndex);
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       String errorMsg = "Failed to reload OM state and instantiate services.";
       exitManager.exitSystem(1, errorMsg, ex, LOG);
     }
@@ -3306,7 +3334,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (dbBackup != null) {
         FileUtils.deleteFully(dbBackup);
       }
-    } catch (IOException e) {
+    } catch (Exception e) {
       LOG.error("Failed to delete the backup of the original DB {}", dbBackup);
     }
 
@@ -3671,8 +3699,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           "configured by S3Gateway");
     }
     if (!metadataManager.getVolumeTable().isExist(dbVolumeKey)) {
-      long transactionID = (Long.MAX_VALUE - 1) >> 8;
-      long objectID = OMFileRequest.getObjIDFromTxId(transactionID);
+      // the highest transaction ID is reserved for this operation.
+      long transactionID = MAX_TRXN_ID + 1;
+      long objectID = OmUtils.addEpochToTxId(metadataManager.getOmEpoch(),
+          transactionID);
       String userName =
           UserGroupInformation.getCurrentUser().getShortUserName();
 
@@ -3746,7 +3776,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     return omVolumeArgs.build();
-
   }
 
 }

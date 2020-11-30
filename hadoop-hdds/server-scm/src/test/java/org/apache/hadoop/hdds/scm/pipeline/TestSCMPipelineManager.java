@@ -132,6 +132,7 @@ public class TestSCMPipelineManager {
       Pipeline pipeline = pipelineManager
           .createPipeline(HddsProtos.ReplicationType.RATIS,
               HddsProtos.ReplicationFactor.THREE);
+      pipelineManager.openPipeline(pipeline.getId());
       pipelines.add(pipeline);
     }
     pipelineManager.close();
@@ -147,7 +148,8 @@ public class TestSCMPipelineManager {
     pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
         mockRatisProvider);
     for (Pipeline p : pipelines) {
-      pipelineManager.openPipeline(p.getId());
+      // After reload, pipelines should be in open state
+      Assert.assertTrue(pipelineManager.getPipeline(p.getId()).isOpen());
     }
     List<Pipeline> pipelineList =
         pipelineManager.getPipelines(HddsProtos.ReplicationType.RATIS);

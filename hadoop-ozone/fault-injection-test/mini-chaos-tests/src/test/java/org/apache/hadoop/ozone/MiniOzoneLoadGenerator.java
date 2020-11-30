@@ -23,12 +23,14 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.loadgenerators.DataBuffer;
 import org.apache.hadoop.ozone.loadgenerators.LoadExecutors;
 import org.apache.hadoop.ozone.loadgenerators.LoadGenerator;
-import org.apache.hadoop.ozone.utils.LoadBucket;
+import org.apache.hadoop.ozone.loadgenerators.LoadBucket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -48,7 +50,7 @@ public class MiniOzoneLoadGenerator {
 
   MiniOzoneLoadGenerator(OzoneVolume volume, int numThreads,
       int numBuffers, OzoneConfiguration conf, String omServiceId,
-      List<Class<? extends LoadGenerator>> loadGenratorClazzes)
+      Set<Class<? extends LoadGenerator>> loadGenratorClazzes)
       throws Exception {
     DataBuffer buffer = new DataBuffer(numBuffers);
     loadGenerators = new ArrayList<>();
@@ -92,7 +94,7 @@ public class MiniOzoneLoadGenerator {
    * Builder to create Ozone load generator.
    */
   public static class Builder {
-    private List<Class<? extends LoadGenerator>> clazzes = new ArrayList<>();
+    private Set<Class<? extends LoadGenerator>> clazzes = new HashSet<>();
     private String omServiceId;
     private OzoneConfiguration conf;
     private int numBuffers;

@@ -814,10 +814,8 @@ public class BasicOzoneFileSystem extends FileSystem {
     // removing leading '/' char
     String key = path.toUri().getPath();
 
-    if (OzoneFSUtils.isValidName(key)) {
-      key = path.toUri().getPath();
-    } else {
-      throw new InvalidPathException("Invalid path Name" + key);
+    if (!OzoneFSUtils.isValidName(key)) {
+      throw new InvalidPathException("Invalid path Name " + key);
     }
     LOG.trace("path for key:{} is:{}", key, path);
     return key.substring(1);

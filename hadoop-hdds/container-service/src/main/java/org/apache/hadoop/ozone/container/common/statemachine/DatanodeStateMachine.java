@@ -56,6 +56,7 @@ import org.apache.hadoop.util.Time;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -412,6 +413,11 @@ public class DatanodeStateMachine implements Closeable {
     stateMachineThread =  new ThreadFactoryBuilder()
         .setDaemon(true)
         .setNameFormat("Datanode State Machine Thread - %d")
+        .setUncaughtExceptionHandler((Thread t, Throwable ex) -> {
+          String message = "Terminate Datanode, encounter uncaught exception"
+              + " in Datanode State Machine Thread";
+          ExitUtils.terminate(1, message, ex, LOG);
+        })
         .build().newThread(startStateMachineTask);
     stateMachineThread.start();
   }

@@ -331,6 +331,14 @@ public class ReplicationManager
         return;
       }
 
+      /**
+       * We don't need to take any action for a DELETE container - eventually
+       * it will be removed from SCM.
+       */
+      if (state == LifeCycleState.DELETED) {
+        return;
+      }
+
       ContainerReplicaCount replicaSet =
           getContainerReplicaCount(container, replicas);
       ContainerPlacementStatus placementStatus = getPlacementStatus(
