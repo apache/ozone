@@ -234,6 +234,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService.newReflectiveBlockingService;
 
 import org.apache.hadoop.util.Time;
@@ -3510,7 +3511,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @return Return true if this node is the leader, false otherwsie.
    */
   public boolean isLeader() {
-    return isRatisEnabled ? omRatisServer.isLeader() : true;
+    return isRatisEnabled ? omRatisServer.checkLeaderStatus() == LEADER_AND_READY : true;
   }
 
   /**
@@ -3521,7 +3522,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @return
    */
   public boolean isLeaderReady() {
-    return isRatisEnabled ? omRatisServer.isLeaderReady() : true;
+    return isRatisEnabled ? omRatisServer.checkLeaderStatus() == LEADER_AND_READY : true;
   }
 
   /**

@@ -26,12 +26,8 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -546,45 +542,37 @@ public final class OzoneManagerRatisServer {
     return properties;
   }
 
-  /**
-   * Check if the current OM node is the leader node.
-   * @return true if Leader, false otherwise.
-   */
-  public boolean isLeader() {
-    Preconditions.checkState(server instanceof RaftServerProxy);
-    RaftServerImpl serverImpl = null;
-    try {
-      serverImpl = ((RaftServerProxy) server).getImpl(raftGroupId);
-      if (serverImpl != null) {
-        return serverImpl.isLeader();
-      }
-    } catch (IOException ioe) {
-      // In this case we return not a leader.
-      LOG.error("Fail to get RaftServer impl and therefore it's not clear " +
-          "whether it's leader. ", ioe);
-    }
-    return false;
+  public enum RaftServerStatus {
+    NOT_LEADER,
+    LEADER_AND_NOTREADY,
+    LEADER_AND_READY;
   }
 
   /**
-   * Return true, if the current OM node is leader and in ready state to
-   * process the requests.
-   * @return
+   * Check Leader status and return the state of the RaftServer.
+   *
+   * @return RaftServerStatus.
    */
-  public boolean isLeaderReady() {
+  public RaftServerStatus checkLeaderStatus() {
     Preconditions.checkState(server instanceof RaftServerProxy);
     RaftServerImpl serverImpl = null;
     try {
       serverImpl = ((RaftServerProxy) server).getImpl(raftGroupId);
       if (serverImpl != null) {
-        return serverImpl.isLeaderReady();
+        if (!serverImpl.isLeader()) {
+          return RaftServerStatus.NOT_LEADER;
+        } else if (serverImpl.isLeaderReady()) {
+          return RaftServerStatus.LEADER_AND_READY;
+        } else {
+          return RaftServerStatus.LEADER_AND_NOTREADY;
+        }
       }
     } catch (IOException ioe) {
       // In this case we return not a leader.
       LOG.error("Fail to get RaftServer impl and therefore it's not clear " +
           "whether it's leader. ", ioe);
     }
-    return false;
+    return RaftServerStatus.NOT_LEADER;
   }
 
   public int getServerPort() {
