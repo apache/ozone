@@ -53,7 +53,7 @@ import org.junit.Test;
 public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
   private final String keyPrefix = "key";
-  private final int TIMEOUT_MILLIS = 30000;
+  private final int timeoutMillis = 30000;
 
   /**
    * Calls prepare on all OMs when they have no transaction information.
@@ -109,7 +109,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     // Make sure all OMs have logs from writing data, so we can check that
     // they are purged after prepare.
     for (OzoneManager om: cluster.getOzoneManagersList()) {
-      LambdaTestUtils.await(TIMEOUT_MILLIS, 1000,
+      LambdaTestUtils.await(timeoutMillis, 1000,
           () -> logFilesPresentInRatisPeer(om));
     }
 
@@ -177,7 +177,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     // Make sure all OMs have logs from writing data, so we can check that
     // they are purged after prepare.
     for (OzoneManager om: cluster.getOzoneManagersList()) {
-      LambdaTestUtils.await(TIMEOUT_MILLIS, 1000,
+      LambdaTestUtils.await(timeoutMillis, 1000,
           () -> logFilesPresentInRatisPeer(om));
     }
 
@@ -216,7 +216,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     // it missed once it receives the prepare transaction.
     cluster.restartOzoneManager(downedOM, true);
     // Wait for other OMs to catch this one up on transactions.
-    LambdaTestUtils.await(TIMEOUT_MILLIS, 1000,
+    LambdaTestUtils.await(timeoutMillis, 1000,
         () -> downedOM.getRatisSnapshotIndex() == prepareIndex);
     checkPrepared(downedOM, prepareIndex);
 
@@ -278,7 +278,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
       long prepareRequestLogIndex) throws Exception {
     // Log files are deleted after the snapshot is taken,
     // So once log files have been deleted, OM should be prepared.
-    LambdaTestUtils.await(TIMEOUT_MILLIS, 1000,
+    LambdaTestUtils.await(timeoutMillis, 1000,
         () -> !logFilesPresentInRatisPeer(om));
     checkPrepared(om, prepareRequestLogIndex);
   }
