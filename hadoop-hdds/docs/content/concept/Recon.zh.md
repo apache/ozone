@@ -78,8 +78,8 @@ Recon 可以与配置为收集指标的任何 Prometheus 实例集成，并且�
    
 ## 持续状态
 
- * [OM database]({{< ref "concept/OzoneManager.md#persisted-state" >}})的本地副本
- * [SCM database]({{< ref "concept/StorageContainerManager.md#persisted-state" >}})的本地副本
+ * [OM database]({{< ref "concept/OzoneManager.zh.md#persisted-state" >}})的本地副本
+ * [SCM database]({{< ref "concept/StorageContainerManager.zh.md#persisted-state" >}})的本地副本
  * 以下数据将保留在指定 RocksDB 目录中的 Recon 中： 
      * ContainerKey 表
          * 存储映射（容器，键） -> 计数
