@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.ozone.lease;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -28,6 +25,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static org.apache.hadoop.ozone.lease.Lease.messageForResource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * LeaseManager is someone who can provide you leases based on your
@@ -120,7 +119,9 @@ public class LeaseManager<T> {
     }
     Lease<T> lease = new Lease<>(resource, timeout);
     activeLeases.put(resource, lease);
-    leaseMonitorThread.interrupt();
+    synchronized (leaseMonitorThread) {
+      leaseMonitorThread.notifyAll();
+    }
     return lease;
   }
 
@@ -171,7 +172,9 @@ public class LeaseManager<T> {
     checkStatus();
     LOG.debug("Shutting down LeaseManager service");
     leaseMonitor.disable();
-    leaseMonitorThread.interrupt();
+    synchronized (leaseMonitorThread) {
+      leaseMonitorThread.notifyAll();
+    }
     for(T resource : activeLeases.keySet()) {
       try {
         release(resource);
@@ -230,12 +233,10 @@ public class LeaseManager<T> {
         }
 
         try {
-          if(!Thread.interrupted()) {
-            Thread.sleep(sleepTime);
-          }
+          Thread.sleep(sleepTime);
         } catch (InterruptedException e) {
           // This means a new lease is added to activeLeases.
-          LOG.error("Execution was interrupted ", e);
+          LOG.warn("Lease manager is interrupted. Shutting down...", e);
           Thread.currentThread().interrupt();
         }
       }
