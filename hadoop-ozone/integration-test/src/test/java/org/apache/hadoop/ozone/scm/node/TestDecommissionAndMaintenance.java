@@ -66,6 +66,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
@@ -154,12 +155,12 @@ public class TestDecommissionAndMaintenance {
     scmClient.decommissionNodes(Arrays.asList(
         getDNHostAndPort(toDecommission)));
 
+    waitForDnToReachOpState(toDecommission, DECOMMISSIONED);
     // Ensure one node transitioned to DECOMMISSIONING
     List<DatanodeDetails> decomNodes = nm.getNodes(
-        DECOMMISSIONING,
+        DECOMMISSIONED,
         HEALTHY);
     assertEquals(1, decomNodes.size());
-    waitForDnToReachOpState(toDecommission, DECOMMISSIONED);
 
     // Should now be 4 replicas online as the DN is still alive but
     // in the DECOMMISSIONED state.
@@ -210,7 +211,7 @@ public class TestDecommissionAndMaintenance {
       throws Exception {
     // First stop the replicationManager so nodes marked for decommission cannot
     // make any progress. THe node will be stuck DECOMMISSIONING
-    scm.getReplicationManager().stop();
+    stopReplicationManager();
     // Generate some data and then pick a DN to decommission which is hosting a
     // container. This ensures it will not decommission immediately due to
     // having no containers.
@@ -411,7 +412,7 @@ public class TestDecommissionAndMaintenance {
   public void testEnteringMaintenanceNodeCompletesAfterSCMRestart()
       throws Exception {
     // Stop Replication Manager to sure no containers are replicated
-    scm.getReplicationManager().stop();
+    stopReplicationManager();
     // Generate some data on the empty cluster to create some containers
     generateData(20, "key", ReplicationFactor.THREE, ReplicationType.RATIS);
     // Locate any container and find its open pipeline
@@ -425,12 +426,12 @@ public class TestDecommissionAndMaintenance {
         .map(d -> getDNHostAndPort(d))
         .collect(Collectors.toList()), 0);
 
-    // Ensure all 3 DNs go to maintenance
+    // Ensure all 3 DNs go to entering_maintenance
     for(DatanodeDetails dn : forMaintenance) {
-      waitForDnToReachOpState(dn, IN_MAINTENANCE);
+      waitForDnToReachPersistedOpState(dn, ENTERING_MAINTENANCE);
     }
-
     cluster.restartStorageContainerManager(true);
+    setManagers();
 
     List<DatanodeDetails> newDns = new ArrayList<>();
     for(DatanodeDetails dn : forMaintenance) {
@@ -438,7 +439,7 @@ public class TestDecommissionAndMaintenance {
     }
 
     // Ensure all 3 DNs go to maintenance
-    for(DatanodeDetails dn : forMaintenance) {
+    for(DatanodeDetails dn : newDns) {
       waitForDnToReachOpState(dn, IN_MAINTENANCE);
     }
 
@@ -690,6 +691,18 @@ public class TestDecommissionAndMaintenance {
         () -> getContainerReplicas(container).size() == 3,
         200, 30000);
     return container;
+  }
+
+  /**
+   * Wait for the ReplicationManager thread to start, and when it does, stop
+   * it.
+   * @throws Exception
+   */
+  private void stopReplicationManager() throws Exception {
+    GenericTestUtils.waitFor(
+        () -> scm.getReplicationManager().isRunning(),
+        200, 30000);
+    scm.getReplicationManager().stop();
   }
 
 }
