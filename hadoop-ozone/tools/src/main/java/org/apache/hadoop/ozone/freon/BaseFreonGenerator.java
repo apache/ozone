@@ -482,4 +482,12 @@ public class BaseFreonGenerator {
       return OzoneClientFactory.getRpcClient(conf);
     }
   }
+
+  public void setTestNo(long testNo) {
+    this.testNo = testNo;
+  }
+
+  public void setThreadNo(int threadNo) {
+    this.threadNo = threadNo;
+  }
 }
