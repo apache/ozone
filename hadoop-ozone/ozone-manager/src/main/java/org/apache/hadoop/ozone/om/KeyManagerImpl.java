@@ -24,6 +24,7 @@ import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -55,7 +56,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundService;
@@ -2313,7 +2313,7 @@ public class KeyManagerImpl implements KeyManager {
   @VisibleForTesting
   void sortDatanodes(String clientMachine, OmKeyInfo... keyInfos) {
     if (keyInfos != null && clientMachine != null && !clientMachine.isEmpty()) {
-      Map<PipelineID, List<DatanodeDetails>> sortedPipelines = new HashMap<>();
+      Map<Set<String>, List<DatanodeDetails>> sortedPipelines = new HashMap<>();
       for (OmKeyInfo keyInfo : keyInfos) {
         OmKeyLocationInfoGroup key = keyInfo.getLatestVersionLocations();
         if (key == null) {
@@ -2322,21 +2322,22 @@ public class KeyManagerImpl implements KeyManager {
         }
         for (OmKeyLocationInfo k : key.getLocationList()) {
           Pipeline pipeline = k.getPipeline();
-          PipelineID pipelineId = pipeline.getId();
-          List<DatanodeDetails> sortedNodes = sortedPipelines.get(pipelineId);
+          List<DatanodeDetails> nodes = pipeline.getNodes();
+          List<String> uuidList = toNodeUuid(nodes);
+          Set<String> uuidSet = new HashSet<>(uuidList);
+          List<DatanodeDetails> sortedNodes = sortedPipelines.get(uuidSet);
           if (sortedNodes == null) {
-            List<DatanodeDetails> nodes = pipeline.getNodes();
             if (nodes.isEmpty()) {
-              LOG.warn("No datanodes in pipeline {}", pipelineId);
+              LOG.warn("No datanodes in pipeline {}", pipeline.getId());
               continue;
             }
-            sortedNodes = sortDatanodes(clientMachine, nodes, keyInfo);
+            sortedNodes = sortDatanodes(clientMachine, nodes, keyInfo, uuidList);
             if (sortedNodes != null) {
-              sortedPipelines.put(pipelineId, sortedNodes);
+              sortedPipelines.put(uuidSet, sortedNodes);
             }
           } else if (LOG.isDebugEnabled()) {
             LOG.debug("Found sorted datanodes for pipeline {} and client {} "
-                + "in cache", pipelineId, clientMachine);
+                + "in cache", pipeline.getId(), clientMachine);
           }
           pipeline.setNodesInOrder(sortedNodes);
         }
@@ -2345,11 +2346,7 @@ public class KeyManagerImpl implements KeyManager {
   }
 
   private List<DatanodeDetails> sortDatanodes(String clientMachine,
-      List<DatanodeDetails> nodes, OmKeyInfo keyInfo) {
-    List<String> nodeList = new ArrayList<>(nodes.size());
-    for (DatanodeDetails node : nodes) {
-      nodeList.add(node.getUuidString());
-    }
+      List<DatanodeDetails> nodes, OmKeyInfo keyInfo, List<String> nodeList) {
     List<DatanodeDetails> sortedNodes = null;
     try {
       sortedNodes = scmClient.getBlockClient()
@@ -2363,8 +2360,16 @@ public class KeyManagerImpl implements KeyManager {
           + " volume={}, bucket={}, key={}, client={}, datanodes={}, "
           + " exception={}",
           keyInfo.getVolumeName(), keyInfo.getBucketName(),
-          keyInfo.getKeyName(), clientMachine, nodes, e.getMessage());
+          keyInfo.getKeyName(), clientMachine, nodeList, e.getMessage());
     }
     return sortedNodes;
+  }
+
+  private static List<String> toNodeUuid(Collection<DatanodeDetails> nodes) {
+    List<String> nodeSet = new ArrayList<>(nodes.size());
+    for (DatanodeDetails node : nodes) {
+      nodeSet.add(node.getUuidString());
+    }
+    return nodeSet;
   }
 }
