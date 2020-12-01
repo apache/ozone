@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.OzoneConsts.CLIENT_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 import java.io.File;
@@ -37,13 +38,18 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareRequest;
 import org.apache.hadoop.test.LambdaTestUtils;
+import org.apache.ratis.protocol.ClientId;
+import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.RaftClientRequest;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -63,8 +69,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   public void testPrepareWithoutTransactions() throws Exception {
     MiniOzoneHAClusterImpl cluster = getCluster();
     OzoneManager leader = cluster.getOMLeader();
-    OMResponse omResponse =
-        leader.getOmRatisServer().submitRequest(buildPrepareRequest());
+    OMResponse omResponse = submitPrepareRequest(leader.getOmRatisServer());
     // Get the log index of the prepare request.
     long prepareRequestLogIndex =
         omResponse.getPrepareResponse().getTxnID();
@@ -114,8 +119,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     }
 
     OzoneManager leader = cluster.getOMLeader();
-    OMResponse omResponse =
-        leader.getOmRatisServer().submitRequest(buildPrepareRequest());
+    OMResponse omResponse = submitPrepareRequest(leader.getOmRatisServer());
     // Get the log index of the prepare request.
     long prepareRequestLogIndex =
         omResponse.getPrepareResponse().getTxnID();
@@ -150,7 +154,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    * @throws Exception
    */
   // TODO: Fix this test so it passes.
-  // @Test
+  //   @Test
   public void testPrepareDownedOM() throws Exception {
     // Index of the OM that will be shut down during this test.
     final int shutdownOMIndex = 2;
@@ -195,8 +199,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
     // Submit prepare request via Ratis.
     OzoneManager leaderOM = cluster.getOMLeader();
-    long prepareIndex =
-        leaderOM.getOmRatisServer().submitRequest(buildPrepareRequest())
+    long prepareIndex = submitPrepareRequest(leaderOM.getOmRatisServer())
             .getPrepareResponse()
             .getTxnID();
 
@@ -299,5 +302,26 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
       Assert.assertEquals(txnInfo.getTransactionIndex(),
           prepareRequestLogIndex);
     }
+  }
+
+  private OMResponse submitPrepareRequest (
+      OzoneManagerRatisServer server) throws Exception {
+    PrepareRequest requestProto = PrepareRequest.newBuilder().build();
+
+    OMRequest omRequest = OMRequest.newBuilder()
+        .setPrepareRequest(requestProto)
+        .setCmdType(Type.Prepare)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+
+    RaftClientRequest raftClientRequest = new RaftClientRequest(
+        ClientId.randomId(),
+        server.getRaftPeerId(),
+        server.getRaftGroupId(),
+        0,
+        Message.valueOf(OMRatisHelper.convertRequestToByteString(omRequest)),
+        RaftClientRequest.writeRequestType(), null);
+
+    return server.submitRequest(omRequest, raftClientRequest);
   }
 }
