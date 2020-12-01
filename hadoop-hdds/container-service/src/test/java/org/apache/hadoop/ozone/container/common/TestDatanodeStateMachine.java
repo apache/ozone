@@ -32,7 +32,6 @@ import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeatureCatalog;
 import org.apache.hadoop.ipc.RPC;
@@ -40,14 +39,16 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.InitDatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.RunningDatanodeState;
+import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
-import org.apache.hadoop.ozone.upgrade.TestUpgradeUtils;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 
@@ -439,25 +440,30 @@ public class TestDatanodeStateMachine {
   public void testStartupSlvLessThanMlv() throws Exception {
     // Add subdirectories under the temporary folder where the version file
     // will be placed.
-    File datanodeSubdir = tempFolder.newFolder("hdds");
-
+    File hddsRootDir = tempFolder.newFolder(HddsVolume.HDDS_VOLUME_DIR);
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
         tempFolder.getRoot().getAbsolutePath());
 
-    // Set metadata layout version larger then software layout version.
+    // Set metadata layout version larger than software layout version.
     int largestSlv = 0;
     for (LayoutFeature f: HDDSLayoutFeatureCatalog.HDDSLayoutFeature.values()) {
       largestSlv = Math.max(largestSlv, f.layoutVersion());
     }
     int mlv = largestSlv + 1;
 
+    DatanodeDetails dnDetails = getNewDatanodeDetails();
     // Create version file with MLV > SLV, which should fail datanode state
     // machine construction.
-    TestUpgradeUtils.createVersionFile(datanodeSubdir,
-        HddsProtos.NodeType.DATANODE, mlv);
+    DatanodeVersionFile versionFile = new DatanodeVersionFile(
+        UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(),
+        dnDetails.getUuidString(),
+        System.currentTimeMillis(),
+        mlv);
+    versionFile.createVersionFile(HddsVolumeUtil.getVersionFile(hddsRootDir));
 
     try {
-      new DatanodeStateMachine(getNewDatanodeDetails(), conf, null, null);
+      new DatanodeStateMachine(dnDetails, conf, null, null);
       Assert.fail("Expected InconsistentStorageStateException due to " +
           "incorrect MLV on DatanodeStateMachine creation.");
     } catch(InconsistentStorageStateException e) {
