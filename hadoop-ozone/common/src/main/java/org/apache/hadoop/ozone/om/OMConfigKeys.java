@@ -168,13 +168,6 @@ public final class OMConfigKeys {
       OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT
       = TimeDuration.valueOf(120, TimeUnit.SECONDS);
 
-  // OM Leader server role check interval
-  public static final String OZONE_OM_RATIS_SERVER_ROLE_CHECK_INTERVAL_KEY
-      = "ozone.om.ratis.server.role.check.interval";
-  public static final TimeDuration
-      OZONE_OM_RATIS_SERVER_ROLE_CHECK_INTERVAL_DEFAULT
-      = TimeDuration.valueOf(15, TimeUnit.SECONDS);
-
   // OM SnapshotProvider configurations
   public static final String OZONE_OM_RATIS_SNAPSHOT_DIR =
       "ozone.om.ratis.snapshot.dir";

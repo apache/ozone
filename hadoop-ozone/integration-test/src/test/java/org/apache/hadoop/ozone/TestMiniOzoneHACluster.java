@@ -107,6 +107,6 @@ public class TestMiniOzoneHACluster {
     Assert.assertNotNull("Timed out waiting OM leader election to finish: "
             + "no leader or more than one leader.", ozoneManager);
     Assert.assertTrue("Should have gotten the leader!",
-        ozoneManager.get().isLeader());
+        ozoneManager.get().isLeaderReady());
   }
 }
