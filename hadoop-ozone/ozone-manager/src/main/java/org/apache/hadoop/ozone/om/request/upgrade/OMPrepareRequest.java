@@ -106,7 +106,8 @@ public class OMPrepareRequest extends OMClientRequest {
       RaftServerImpl serverImpl =
           server.getImpl(omRatisServer.getRaftGroup().getGroupId());
 
-      takeSnapshotAndPurgeLogs(serverImpl);
+      takeSnapshotAndPurgeLogs(((RaftServerProxy) omRatisServer.getServer())
+          .getImpl(omRatisServer.getRaftGroup().getGroupId()));
 
       // TODO: Create marker file with txn index.
 

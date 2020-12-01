@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.OzoneConsts.CLIENT_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 import java.io.File;
@@ -304,8 +303,8 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     }
   }
 
-  private OMResponse submitPrepareRequest (
-      OzoneManagerRatisServer server) throws Exception {
+  private OMResponse submitPrepareRequest(OzoneManagerRatisServer server)
+      throws Exception {
     PrepareRequest requestProto = PrepareRequest.newBuilder().build();
 
     OMRequest omRequest = OMRequest.newBuilder()
