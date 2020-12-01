@@ -97,7 +97,7 @@ the data from the data node.
 
 For a detailed view of Ozone Manager this section gives a quick overview about the provided network services and the stored persisted data.
 
-**Network services provided by Ozone Manager:**
+### Network services provided by Ozone Manager:
 
 Ozone provides a network service for the client and for administration commands. The main service calls
 
@@ -115,7 +115,7 @@ Ozone provides a network service for the client and for administration commands.
    * ServiceList (used for service discovery)
    * DBUpdates (used by [Recon]({{< ref "feature/Recon.md" >}}) downloads snapshots)
 
-**Persisted state**
+### Persisted state
 
 The following data is persisted in Ozone Manager side in a specific RocksDB directory:
  

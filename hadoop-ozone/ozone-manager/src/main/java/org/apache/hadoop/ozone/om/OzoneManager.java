@@ -234,6 +234,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService.newReflectiveBlockingService;
 
 import org.apache.hadoop.util.Time;
@@ -3324,7 +3325,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
       LOG.info("Reloaded OM state with Term: {} and Index: {}", term,
           lastAppliedIndex);
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       String errorMsg = "Failed to reload OM state and instantiate services.";
       exitManager.exitSystem(1, errorMsg, ex, LOG);
     }
@@ -3334,7 +3335,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (dbBackup != null) {
         FileUtils.deleteFully(dbBackup);
       }
-    } catch (IOException e) {
+    } catch (Exception e) {
       LOG.error("Failed to delete the backup of the original DB {}", dbBackup);
     }
 
@@ -3502,21 +3503,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public long getMaxUserVolumeCount() {
     return maxUserVolumeCount;
   }
-
   /**
-   * Checks the Leader status of OM Ratis Server.
-   * Note that this status has a small window of error. It should not be used
-   * to determine the absolute leader status.
-   * If it is the leader, the role status is cached till Ratis server
-   * notifies of leader change. If it is not leader, the role information is
-   * retrieved through by submitting a GroupInfoRequest to Ratis server.
-   * <p>
-   * If ratis is not enabled, then it always returns true.
+   * Return true, if the current OM node is leader and in ready state to
+   * process the requests.
    *
-   * @return Return true if this node is the leader, false otherwsie.
+   * If ratis is not enabled, then it always returns true.
+   * @return
    */
-  public boolean isLeader() {
-    return isRatisEnabled ? omRatisServer.isLeader() : true;
+  public boolean isLeaderReady() {
+    return isRatisEnabled ?
+        omRatisServer.checkLeaderStatus() == LEADER_AND_READY : true;
   }
 
   /**

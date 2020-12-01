@@ -71,12 +71,13 @@ public class RDBStore implements DBStore {
   @VisibleForTesting
   public RDBStore(File dbFile, DBOptions options,
                   Set<TableConfig> families) throws IOException {
-    this(dbFile, options, new WriteOptions(), families, new CodecRegistry());
+    this(dbFile, options, new WriteOptions(), families, new CodecRegistry(),
+        false);
   }
 
   public RDBStore(File dbFile, DBOptions options,
       WriteOptions writeOptions, Set<TableConfig> families,
-                  CodecRegistry registry)
+                  CodecRegistry registry, boolean readOnly)
       throws IOException {
     Preconditions.checkNotNull(dbFile, "DB file location cannot be null");
     Preconditions.checkNotNull(families);
@@ -108,8 +109,13 @@ public class RDBStore implements DBStore {
         extraCf.forEach(cf -> columnFamilyDescriptors.add(cf.getDescriptor()));
       }
 
-      db = RocksDB.open(dbOptions, dbLocation.getAbsolutePath(),
-          columnFamilyDescriptors, columnFamilyHandles);
+      if (readOnly) {
+        db = RocksDB.openReadOnly(dbOptions, dbLocation.getAbsolutePath(),
+            columnFamilyDescriptors, columnFamilyHandles);
+      } else {
+        db = RocksDB.open(dbOptions, dbLocation.getAbsolutePath(),
+            columnFamilyDescriptors, columnFamilyHandles);
+      }
 
       for (int x = 0; x < columnFamilyHandles.size(); x++) {
         handleTable.put(

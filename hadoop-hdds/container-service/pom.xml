@@ -46,6 +46,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdds-common</artifactId>
       <type>test-jar</type>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
@@ -54,6 +55,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdds-client</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>commons-codec</groupId>
+      <artifactId>commons-codec</artifactId>
     </dependency>
     <dependency>
       <groupId>io.dropwizard.metrics</groupId>
@@ -98,11 +103,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdfs</artifactId>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-log4j12</artifactId>
       <scope>test</scope>
-      <type>test-jar</type>
     </dependency>
+
   </dependencies>
 
   <build>

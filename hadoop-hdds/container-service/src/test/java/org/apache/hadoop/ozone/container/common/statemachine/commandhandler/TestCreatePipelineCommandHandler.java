@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.client.RaftClient;
+import org.apache.ratis.client.api.GroupManagementApi;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.RaftGroup;
@@ -64,6 +65,7 @@ public class TestCreatePipelineCommandHandler {
   private StateContext stateContext;
   private SCMConnectionManager connectionManager;
   private RaftClient raftClient;
+  private GroupManagementApi raftClientGroupManager;
 
   @Before
   public void setup() throws Exception {
@@ -71,8 +73,11 @@ public class TestCreatePipelineCommandHandler {
     stateContext = Mockito.mock(StateContext.class);
     connectionManager = Mockito.mock(SCMConnectionManager.class);
     raftClient = Mockito.mock(RaftClient.class);
+    raftClientGroupManager = Mockito.mock(GroupManagementApi.class);
     final RaftClient.Builder builder = mockRaftClientBuilder();
     Mockito.when(builder.build()).thenReturn(raftClient);
+    Mockito.when(raftClient.getGroupManagementApi(
+        Mockito.any(RaftPeerId.class))).thenReturn(raftClientGroupManager);
     PowerMockito.mockStatic(RaftClient.class);
     PowerMockito.when(RaftClient.newBuilder()).thenReturn(builder);
   }
@@ -121,8 +126,8 @@ public class TestCreatePipelineCommandHandler {
     Mockito.verify(writeChanel, Mockito.times(1))
         .addGroup(pipelineID.getProtobuf(), datanodes, priorityList);
 
-    Mockito.verify(raftClient, Mockito.times(2))
-        .groupAdd(Mockito.any(RaftGroup.class), Mockito.any(RaftPeerId.class));
+    Mockito.verify(raftClientGroupManager, Mockito.times(2))
+        .add(Mockito.any(RaftGroup.class));
   }
 
   @Test
@@ -150,8 +155,8 @@ public class TestCreatePipelineCommandHandler {
     Mockito.verify(writeChanel, Mockito.times(0))
         .addGroup(pipelineID.getProtobuf(), datanodes);
 
-    Mockito.verify(raftClient, Mockito.times(0))
-        .groupAdd(Mockito.any(RaftGroup.class), Mockito.any(RaftPeerId.class));
+    Mockito.verify(raftClientGroupManager, Mockito.times(0))
+        .add(Mockito.any(RaftGroup.class));
   }
 
   private List<DatanodeDetails> getDatanodes() {

@@ -29,7 +29,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -41,9 +40,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.TopNOrderedContainerDeletionChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -293,29 +290,15 @@ public class BlockDeletingService extends BackgroundService {
           }
         }
 
-        // Once files are deleted... replace deleting entries with deleted
-        // entries
+        // Once blocks are deleted... remove the blockID from blockDataTable.
         try(BatchOperation batch = meta.getStore().getBatchHandler()
                 .initBatchOperation()) {
-          Table< String, ChunkInfoList > deletedBlocksTable =
-              meta.getStore().getDeletedBlocksTable();
           for (String entry : succeedBlocks) {
-            List< ContainerProtos.ChunkInfo > chunkList =
-                blockDataTable.get(entry).getChunks();
-            String blockId = entry.substring(
-                OzoneConsts.DELETING_KEY_PREFIX.length());
-
-            deletedBlocksTable.putWithBatch(
-                batch, blockId,
-                new ChunkInfoList(chunkList));
             blockDataTable.deleteWithBatch(batch, entry);
           }
-
           int deleteBlockCount = succeedBlocks.size();
           containerData.updateAndCommitDBCounters(meta, batch,
               deleteBlockCount);
-
-
           // update count of pending deletion blocks and block count in
           // in-memory container status.
           containerData.decrPendingDeletionBlocks(deleteBlockCount);

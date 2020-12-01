@@ -34,6 +34,30 @@
   <build>
     <plugins>
       <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>dist</id>
+            <phase>prepare-package</phase>
+            <goals>
+              <goal>exec</goal>
+            </goals>
+            <configuration>
+              <executable>${shell-executable}</executable>
+              <workingDirectory>${project.build.directory}</workingDirectory>
+              <arguments>
+                <argument>
+                  ${basedir}/dev-support/bin/dist-layout-stitching
+                </argument>
+                <argument>${project.build.directory}</argument>
+                <argument>${hdds.version}</argument>
+              </arguments>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
         <executions>
@@ -134,30 +158,6 @@
                   <filtering>true</filtering>
                 </resource>
               </resources>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>exec-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>dist</id>
-            <phase>prepare-package</phase>
-            <goals>
-              <goal>exec</goal>
-            </goals>
-            <configuration>
-              <executable>${shell-executable}</executable>
-              <workingDirectory>${project.build.directory}</workingDirectory>
-              <arguments>
-                <argument>
-                  ${basedir}/dev-support/bin/dist-layout-stitching
-                </argument>
-                <argument>${project.build.directory}</argument>
-                <argument>${hdds.version}</argument>
-              </arguments>
             </configuration>
           </execution>
         </executions>
