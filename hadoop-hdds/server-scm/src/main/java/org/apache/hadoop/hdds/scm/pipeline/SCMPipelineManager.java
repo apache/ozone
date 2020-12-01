@@ -273,14 +273,14 @@ public class SCMPipelineManager implements PipelineManager {
       throw new IOException("Pipeline creation is not allowed as safe mode " +
           "prechecks have not yet passed");
     }
+    if (freezePipelineCreation.get()) {
+      LOG.debug("Pipeline creation is frozen while an upgrade is in " +
+          "progress");
+      throw new IOException("Pipeline creation is frozen while an upgrade " +
+          "is in progress");
+    }
     lock.writeLock().lock();
     try {
-      if (freezePipelineCreation.get()) {
-        LOG.debug("Pipeline creation is frozen while an upgrade is in " +
-            "progress");
-        throw new IOException("Pipeline creation is frozen while an upgrade " +
-            "is in progress");
-      }
       Pipeline pipeline = pipelineFactory.create(type, factor);
       pipelineStore.put(pipeline.getId(), pipeline);
       stateManager.addPipeline(pipeline);
@@ -724,18 +724,14 @@ public class SCMPipelineManager implements PipelineManager {
 
   @Override
   public void freezePipelineCreation() {
-    lock.writeLock().lock();
     freezePipelineCreation.set(true);
     backgroundPipelineCreator.pause();
-    lock.writeLock().unlock();
   }
 
   @Override
   public void resumePipelineCreation() {
-    lock.writeLock().lock();
     freezePipelineCreation.set(false);
     backgroundPipelineCreator.resume();
-    lock.writeLock().unlock();
   }
 
   public Table<PipelineID, Pipeline> getPipelineStore() {

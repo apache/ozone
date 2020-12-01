@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 
@@ -66,25 +67,30 @@ public class SCMUpgradeFinalizer extends
 
     @Override
     public Void call() throws IOException {
-      emitStartingMsg();
-      versionManager.setUpgradeState(FINALIZATION_IN_PROGRESS);
-      /*
-       * Before we can call finalize the feature, we need to make sure that
-       * all existing pipelines are closed and pipeline Manger would freeze
-       * all new pipeline creation.
-       */
-      storageContainerManager.preFinalizeUpgrade();
+      try {
+        emitStartingMsg();
+        versionManager.setUpgradeState(FINALIZATION_IN_PROGRESS);
+        /*
+         * Before we can call finalize the feature, we need to make sure that
+         * all existing pipelines are closed and pipeline Manger would freeze
+         * all new pipeline creation.
+         */
+        storageContainerManager.preFinalizeUpgrade();
 
-      for (HDDSLayoutFeature f : versionManager.unfinalizedFeatures()) {
-        finalizeFeature(f, storageContainerManager.getScmStorageConfig());
-        updateLayoutVersionInVersionFile(f,
-            storageContainerManager.getScmStorageConfig());
-        versionManager.finalized(f);
+        for (HDDSLayoutFeature f : versionManager.unfinalizedFeatures()) {
+          finalizeFeature(f, storageContainerManager.getScmStorageConfig());
+          updateLayoutVersionInVersionFile(f,
+              storageContainerManager.getScmStorageConfig());
+          versionManager.finalized(f);
+        }
+        versionManager.completeFinalization();
+        storageContainerManager.postFinalizeUpgrade();
+        emitFinishedMsg();
+        return null;
+      } finally {
+        versionManager.setUpgradeState(FINALIZATION_DONE);
+        isDone = true;
       }
-      versionManager.completeFinalization();
-      storageContainerManager.postFinalizeUpgrade();
-      emitFinishedMsg();
-      return null;
     }
   }
 }

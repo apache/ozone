@@ -57,6 +57,10 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
     this.versionManager = versionManager;
   }
 
+  public boolean isFinalizationDone() {
+    return isDone;
+  }
+
   public StatusAndMessages preFinalize(String upgradeClientID, T id)
       throws UpgradeException {
     switch (versionManager.getUpgradeState()) {
@@ -108,7 +112,7 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
     }
     assertClientId(upgradeClientID);
     List<String> returningMsgs = new ArrayList<>(msgs.size()+10);
-    Status status = isDone ? FINALIZATION_DONE : FINALIZATION_IN_PROGRESS;
+    Status status = versionManager.getUpgradeState();
     while (msgs.size() > 0) {
       returningMsgs.add(msgs.poll());
     }

@@ -41,6 +41,7 @@ import java.util.Optional;
 import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.ALREADY_FINALIZED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.STARTING_FINALIZATION;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.instanceOf;
@@ -73,8 +74,8 @@ public class TestOMUpgradeFinalizer {
 
   @Test
   public void testEmitsFinalizedStatusIfAlreadyFinalized() throws Exception {
-    when(versionManager.needsFinalization()).thenReturn(false);
 
+    when(versionManager.getUpgradeState()).thenReturn(ALREADY_FINALIZED);
     OMUpgradeFinalizer finalizer = new OMUpgradeFinalizer(versionManager);
     StatusAndMessages ret = finalizer.finalize(CLIENT_ID, null);
 
@@ -109,6 +110,10 @@ public class TestOMUpgradeFinalizer {
     OMUpgradeFinalizer finalizer = new OMUpgradeFinalizer(versionManager);
     finalizer.finalize(CLIENT_ID, mockOzoneManager(2));
 
+
+    if (finalizer.isFinalizationDone()) {
+      when(versionManager.getUpgradeState()).thenReturn(FINALIZATION_DONE);
+    }
     StatusAndMessages ret = finalizer.reportStatus(CLIENT_ID, false);
 
     assertEquals(UpgradeFinalizer.Status.FINALIZATION_DONE, ret.status());
@@ -123,6 +128,9 @@ public class TestOMUpgradeFinalizer {
     OMUpgradeFinalizer finalizer = new OMUpgradeFinalizer(versionManager);
     finalizer.finalize(CLIENT_ID, mockOzoneManager(2));
 
+    if (finalizer.isFinalizationDone()) {
+      when(versionManager.getUpgradeState()).thenReturn(FINALIZATION_DONE);
+    }
     StatusAndMessages ret = finalizer.reportStatus(OTHER_CLIENT_ID, true);
 
     assertEquals(UpgradeFinalizer.Status.FINALIZATION_DONE, ret.status());
@@ -176,6 +184,9 @@ public class TestOMUpgradeFinalizer {
     verify(om.getOmStorage(), once())
         .setLayoutVersion(f.layoutVersion());
 
+    if (finalizer.isFinalizationDone()) {
+      when(versionManager.getUpgradeState()).thenReturn(FINALIZATION_DONE);
+    }
     StatusAndMessages status = finalizer.reportStatus(CLIENT_ID, false);
     assertEquals(FINALIZATION_DONE, status.status());
     assertFalse(status.msgs().isEmpty());
@@ -205,6 +216,9 @@ public class TestOMUpgradeFinalizer {
           ((UpgradeException) e).getResult(),
           LAYOUT_FEATURE_FINALIZATION_FAILED
       );
+    }
+    if (finalizer.isFinalizationDone()) {
+      when(versionManager.getUpgradeState()).thenReturn(FINALIZATION_DONE);
     }
 
     // Verify that we have never removed the upgradeToLV from the storage
@@ -240,6 +254,7 @@ public class TestOMUpgradeFinalizer {
   private void setupVersionManagerMockToFinalize(
       Iterable<OMLayoutFeature> lfs
   ) {
+    when(versionManager.getUpgradeState()).thenReturn(FINALIZATION_REQUIRED);
     when(versionManager.needsFinalization()).thenReturn(true);
     when(versionManager.unfinalizedFeatures()).thenReturn(lfs);
   }

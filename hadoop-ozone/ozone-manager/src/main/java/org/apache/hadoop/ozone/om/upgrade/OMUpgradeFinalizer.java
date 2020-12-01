@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 
@@ -92,18 +93,23 @@ public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
 
     @Override
     public Void call() throws IOException {
-      emitStartingMsg();
-      versionManager.setUpgradeState(FINALIZATION_IN_PROGRESS);
+      try {
+        emitStartingMsg();
+        versionManager.setUpgradeState(FINALIZATION_IN_PROGRESS);
 
-      for (OMLayoutFeature f : versionManager.unfinalizedFeatures()) {
-        finalizeFeature(f);
-        updateLayoutVersionInVersionFile(f, ozoneManager.getOmStorage());
-        versionManager.finalized(f);
+        for (OMLayoutFeature f : versionManager.unfinalizedFeatures()) {
+          finalizeFeature(f);
+          updateLayoutVersionInVersionFile(f, ozoneManager.getOmStorage());
+          versionManager.finalized(f);
+        }
+
+        versionManager.completeFinalization();
+        emitFinishedMsg();
+        return null;
+      } finally {
+        versionManager.setUpgradeState(FINALIZATION_DONE);
+        isDone = true;
       }
-
-      versionManager.completeFinalization();
-      emitFinishedMsg();
-      return null;
     }
 
     private void finalizeFeature(OMLayoutFeature feature)
