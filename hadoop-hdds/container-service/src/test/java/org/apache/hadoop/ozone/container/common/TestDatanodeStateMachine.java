@@ -33,22 +33,16 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeatureCatalog;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.InitDatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.RunningDatanodeState;
-import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 
@@ -60,9 +54,7 @@ import org.junit.After;
 import org.junit.Assert;
 import static org.junit.Assert.assertTrue;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,9 +62,6 @@ import org.slf4j.LoggerFactory;
  * Tests the datanode state machine class and its states.
  */
 public class TestDatanodeStateMachine {
-  @Rule
-  public TemporaryFolder tempFolder = new TemporaryFolder();
-
   private static final Logger LOG =
       LoggerFactory.getLogger(TestDatanodeStateMachine.class);
   // Changing it to 1, as current code checks for multiple scm directories,
@@ -428,50 +417,6 @@ public class TestDatanodeStateMachine {
         Assert.fail("Unexpected exception found");
       }
     });
-  }
-
-  /**
-   * Tests that {@link DatanodeStateMachine} will throw an exception on
-   * creation when it reads in a VERSION file indicating a metadata layout
-   * version larger than its software layout version.
-   * @throws Exception
-   */
-  @Test
-  public void testStartupSlvLessThanMlv() throws Exception {
-    // Add subdirectories under the temporary folder where the version file
-    // will be placed.
-    File hddsRootDir = tempFolder.newFolder(HddsVolume.HDDS_VOLUME_DIR);
-    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
-        tempFolder.getRoot().getAbsolutePath());
-
-    // Set metadata layout version larger than software layout version.
-    int largestSlv = 0;
-    for (LayoutFeature f: HDDSLayoutFeatureCatalog.HDDSLayoutFeature.values()) {
-      largestSlv = Math.max(largestSlv, f.layoutVersion());
-    }
-    int mlv = largestSlv + 1;
-
-    DatanodeDetails dnDetails = getNewDatanodeDetails();
-    // Create version file with MLV > SLV, which should fail datanode state
-    // machine construction.
-    DatanodeVersionFile versionFile = new DatanodeVersionFile(
-        UUID.randomUUID().toString(),
-        UUID.randomUUID().toString(),
-        dnDetails.getUuidString(),
-        System.currentTimeMillis(),
-        mlv);
-    versionFile.createVersionFile(HddsVolumeUtil.getVersionFile(hddsRootDir));
-
-    try {
-      new DatanodeStateMachine(dnDetails, conf, null, null);
-      Assert.fail("Expected InconsistentStorageStateException due to " +
-          "incorrect MLV on DatanodeStateMachine creation.");
-    } catch(InconsistentStorageStateException e) {
-      String expectedMessage = String.format("Invalid layOutVersion. Version " +
-              "file has layOutVersion as %s and latest Datanode layOutVersion" +
-              " is %s", mlv, largestSlv);
-      GenericTestUtils.assertExceptionContains(expectedMessage, e);
-    }
   }
 
   private DatanodeDetails getNewDatanodeDetails() {
