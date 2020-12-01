@@ -56,12 +56,12 @@ import org.slf4j.LoggerFactory;
  */
 public class OpenKeyCleanupService extends BackgroundService {
   private static final Logger LOG =
-      LoggerFactory.getLogger(KeyDeletingService.class);
+      LoggerFactory.getLogger(OpenKeyCleanupService.class);
 
   // Use only a single thread for open key deletion. Multiple threads would read
   // from the same table and can send deletion requests for same key multiple
   // times.
-  private final static int KEY_DELETING_CORE_POOL_SIZE = 1;
+  private final static int OPEN_KEY_CLEANUP_CORE_POOL_SIZE = 1;
 
   private final OzoneManager ozoneManager;
   private final KeyManager keyManager;
@@ -75,7 +75,7 @@ public class OpenKeyCleanupService extends BackgroundService {
       long serviceInterval, ConfigurationSource conf) {
 
     super("OpenKeyCleanupService", serviceInterval, TimeUnit.MILLISECONDS,
-        KEY_DELETING_CORE_POOL_SIZE);
+        OPEN_KEY_CLEANUP_CORE_POOL_SIZE);
     this.ozoneManager = ozoneManager;
     this.keyManager = keyManager;
 
