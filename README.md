@@ -1,6 +1,7 @@
 Apache Ozone
 ===
 
+
 Ozone is a scalable, redundant, and distributed object store for Hadoop and Cloud-native environments. Apart from scaling to billions of objects of varying sizes, Ozone can function effectively in containerized environments such as Kubernetes and YARN.
 
 
