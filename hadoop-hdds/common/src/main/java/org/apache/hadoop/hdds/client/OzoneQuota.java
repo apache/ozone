@@ -157,7 +157,7 @@ public final class OzoneQuota {
     }
 
     String uppercase = quotaInBytes.toUpperCase()
-       .replaceAll("\\s+", "");
+        .replaceAll("\\s+", "");
     String size = "";
     long nSize = 0;
     Units currUnit = Units.MB;
@@ -201,8 +201,8 @@ public final class OzoneQuota {
       nSize = Long.parseLong(size);
     } catch (NumberFormatException e) {
       throw new IllegalArgumentException("Invalid values for quota, to ensure" +
-           " that the Quota format is legal(supported values are BYTES, KB, " +
-           "MB, GB and TB).");
+          " that the Quota format is legal(supported values are BYTES, KB, " +
+          "MB, GB and TB).");
     } catch  (ArithmeticException e) {
       LOG.debug("long overflow:\n{}", quotaMultiplyExact);
       throw new IllegalArgumentException("Invalid values for quota, the quota" +
@@ -260,6 +260,6 @@ public final class OzoneQuota {
   @Override
   public String toString() {
     return "Space Bytes Quota: " + rawQuotaInBytes.toString() + "\n" +
-       "Counts Quota: " + quotaInCounts;
+        "Counts Quota: " + quotaInCounts;
   }
 }
