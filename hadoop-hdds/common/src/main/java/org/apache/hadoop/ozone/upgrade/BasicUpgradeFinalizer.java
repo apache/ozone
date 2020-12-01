@@ -61,7 +61,8 @@ public class BasicUpgradeFinalizer<T, V extends AbstractLayoutVersionManager>
     return isDone;
   }
 
-  public StatusAndMessages preFinalize(String upgradeClientID, T id)
+  public synchronized StatusAndMessages preFinalize(String upgradeClientID,
+                                                    T id)
       throws UpgradeException {
     switch (versionManager.getUpgradeState()) {
     case STARTING_FINALIZATION:
