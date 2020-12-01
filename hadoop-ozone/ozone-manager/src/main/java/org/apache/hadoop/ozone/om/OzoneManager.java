@@ -1208,6 +1208,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("OM HttpServer failed to start.", ex);
     }
 
+    omRpcServer.start();
+    isOmRpcServerRunning = true;
+
     // TODO: Start this thread only on the leader node.
     //  Should be fixed after HDDS-4451.
     startTrashEmptier(configuration);
