@@ -22,11 +22,10 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
+import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.io.retry.RetryPolicy.RetryAction;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
@@ -44,21 +43,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.apache.hadoop.hdds.HddsUtils.getHostName;
+import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
-import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForBlockClients;
-import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
-import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 
 /**
- * Failover proxy provider for SCM block location.
+ * Failover proxy provider for SCM container location.
  */
-public class SCMBlockLocationFailoverProxyProvider implements
-    FailoverProxyProvider<ScmBlockLocationProtocolPB>, Closeable {
+public class SCMContainerLocationFailoverProxyProvider implements
+    FailoverProxyProvider<StorageContainerLocationProtocolPB>, Closeable {
   public static final Logger LOG =
-      LoggerFactory.getLogger(SCMBlockLocationFailoverProxyProvider.class);
+      LoggerFactory.getLogger(SCMContainerLocationFailoverProxyProvider.class);
 
-  private Map<String, ProxyInfo<ScmBlockLocationProtocolPB>> scmProxies;
+  private Map<String, ProxyInfo<StorageContainerLocationProtocolPB>> scmProxies;
   private Map<String, SCMProxyInfo> scmProxyInfoMap;
   private List<String> scmNodeIDList;
 
@@ -66,33 +65,31 @@ public class SCMBlockLocationFailoverProxyProvider implements
   private int currentProxyIndex;
 
   private final ConfigurationSource conf;
+  private final SCMClientConfig scmClientConfig;
   private final long scmVersion;
 
   private final String scmServiceId;
-
-  private String lastAttemptedLeader;
 
   private final int maxRetryCount;
   private final long retryInterval;
 
   public static final String SCM_DUMMY_NODEID_PREFIX = "scm";
 
-  public SCMBlockLocationFailoverProxyProvider(ConfigurationSource conf) {
+  public SCMContainerLocationFailoverProxyProvider(ConfigurationSource conf) {
     this.conf = conf;
-    this.scmVersion = RPC.getProtocolVersion(ScmBlockLocationProtocolPB.class);
+    this.scmVersion = RPC.getProtocolVersion(
+        StorageContainerLocationProtocolPB.class);
     this.scmServiceId = conf.getTrimmed(OZONE_SCM_SERVICE_IDS_KEY);
     this.scmProxies = new HashMap<>();
     this.scmProxyInfoMap = new HashMap<>();
     this.scmNodeIDList = new ArrayList<>();
     loadConfigs();
 
-
     this.currentProxyIndex = 0;
     currentProxySCMNodeId = scmNodeIDList.get(currentProxyIndex);
-
-    SCMClientConfig config = conf.getObject(SCMClientConfig.class);
-    this.maxRetryCount = config.getRetryCount();
-    this.retryInterval = config.getRetryInterval();
+    scmClientConfig = conf.getObject(SCMClientConfig.class);
+    this.maxRetryCount = scmClientConfig.getRetryCount();
+    this.retryInterval = scmClientConfig.getRetryInterval();
   }
 
   @VisibleForTesting
@@ -102,10 +99,10 @@ public class SCMBlockLocationFailoverProxyProvider implements
     Collection<InetSocketAddress> resultList = new ArrayList<>();
     if (!scmAddressList.isEmpty()) {
       final int port = getPortNumberFromConfigKeys(conf,
-          ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY)
-          .orElse(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT);
+          ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY)
+          .orElse(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT);
       for (String scmAddress : scmAddressList) {
-        LOG.info("SCM Address for proxy is {}", scmAddress);
+        LOG.debug("SCM Address for proxy is {}", scmAddress);
 
         Optional<String> hostname = getHostName(scmAddress);
         if (hostname.isPresent()) {
@@ -116,7 +113,7 @@ public class SCMBlockLocationFailoverProxyProvider implements
     }
     if (resultList.isEmpty()) {
       // fall back
-      resultList.add(getScmAddressForBlockClients(conf));
+      resultList.add(getScmAddressForClients(conf));
     }
     return resultList;
   }
@@ -133,8 +130,8 @@ public class SCMBlockLocationFailoverProxyProvider implements
       scmNodeIndex++;
       SCMProxyInfo scmProxyInfo = new SCMProxyInfo(
           scmServiceId, nodeId, scmAddress);
-      ProxyInfo<ScmBlockLocationProtocolPB> proxy = new ProxyInfo<>(
-          null, scmProxyInfo.toString());
+      ProxyInfo<StorageContainerLocationProtocolPB> proxy
+          = new ProxyInfo<>(null, scmProxyInfo.toString());
       scmProxies.put(nodeId, proxy);
       scmProxyInfoMap.put(nodeId, scmProxyInfo);
       scmNodeIDList.add(nodeId);
@@ -160,7 +157,8 @@ public class SCMBlockLocationFailoverProxyProvider implements
   }
 
   @Override
-  public void performFailover(ScmBlockLocationProtocolPB newLeader) {
+  public void performFailover(
+      StorageContainerLocationProtocolPB newLeader) {
     // Should do nothing here.
     LOG.debug("Failing over to next proxy. {}", getCurrentProxyOMNodeId());
   }
@@ -178,26 +176,30 @@ public class SCMBlockLocationFailoverProxyProvider implements
   }
 
   @Override
-  public Class<ScmBlockLocationProtocolPB> getInterface() {
-    return ScmBlockLocationProtocolPB.class;
+  public Class<
+      StorageContainerLocationProtocolPB> getInterface() {
+    return StorageContainerLocationProtocolPB.class;
   }
 
   @Override
   public synchronized void close() throws IOException {
-    for (ProxyInfo<ScmBlockLocationProtocolPB> proxy : scmProxies.values()) {
-      ScmBlockLocationProtocolPB scmProxy = proxy.proxy;
+    for (ProxyInfo<StorageContainerLocationProtocolPB>
+        proxy : scmProxies.values()) {
+      StorageContainerLocationProtocolPB scmProxy =
+          proxy.proxy;
       if (scmProxy != null) {
         RPC.stopProxy(scmProxy);
       }
     }
   }
 
-  public RetryAction getRetryAction(int failovers) {
+  public RetryPolicy.RetryAction getRetryAction(int failovers) {
     if (failovers < maxRetryCount) {
-      return new RetryAction(RetryAction.RetryDecision.FAILOVER_AND_RETRY,
+      return new RetryPolicy.RetryAction(
+          RetryPolicy.RetryAction.RetryDecision.FAILOVER_AND_RETRY,
           getRetryInterval());
     } else {
-      return RetryAction.FAIL;
+      return RetryPolicy.RetryAction.FAIL;
     }
   }
 
@@ -207,7 +209,7 @@ public class SCMBlockLocationFailoverProxyProvider implements
   }
 
   private synchronized int nextProxyIndex() {
-    lastAttemptedLeader = currentProxySCMNodeId;
+//    lastAttemptedLeader = currentProxySCMNodeId;
 
     // round robin the next proxy
     currentProxyIndex = (currentProxyIndex + 1) % scmProxies.size();
@@ -215,17 +217,18 @@ public class SCMBlockLocationFailoverProxyProvider implements
     return currentProxyIndex;
   }
 
-  private synchronized boolean assignLeaderToNode(String newLeaderNodeId) {
+  synchronized boolean assignLeaderToNode(String newLeaderNodeId) {
     if (!currentProxySCMNodeId.equals(newLeaderNodeId)) {
       if (scmProxies.containsKey(newLeaderNodeId)) {
-        lastAttemptedLeader = currentProxySCMNodeId;
+//        lastAttemptedLeader = currentProxySCMNodeId;
         currentProxySCMNodeId = newLeaderNodeId;
         currentProxyIndex = scmNodeIDList.indexOf(currentProxySCMNodeId);
         return true;
       }
-    } else {
-      lastAttemptedLeader = currentProxySCMNodeId;
     }
+//    } else {
+//      lastAttemptedLeader = currentProxySCMNodeId;
+//    }
     return false;
   }
 
@@ -233,11 +236,12 @@ public class SCMBlockLocationFailoverProxyProvider implements
    * Creates proxy object if it does not already exist.
    */
   private void createSCMProxyIfNeeded(ProxyInfo proxyInfo,
-                                     String nodeId) {
+                                      String nodeId) {
     if (proxyInfo.proxy == null) {
       InetSocketAddress address = scmProxyInfoMap.get(nodeId).getAddress();
       try {
-        ScmBlockLocationProtocolPB proxy = createSCMProxy(address);
+        StorageContainerLocationProtocolPB proxy =
+            createSCMProxy(address);
         try {
           proxyInfo.proxy = proxy;
         } catch (IllegalAccessError iae) {
@@ -252,28 +256,29 @@ public class SCMBlockLocationFailoverProxyProvider implements
     }
   }
 
-  private ScmBlockLocationProtocolPB createSCMProxy(
+  private StorageContainerLocationProtocolPB createSCMProxy(
       InetSocketAddress scmAddress) throws IOException {
     Configuration hadoopConf =
         LegacyHadoopConfigurationSource.asHadoopConfiguration(conf);
-    RPC.setProtocolEngine(hadoopConf, ScmBlockLocationProtocolPB.class,
+    RPC.setProtocolEngine(hadoopConf, StorageContainerLocationProtocolPB.class,
         ProtobufRpcEngine.class);
-    return RPC.getProxy(ScmBlockLocationProtocolPB.class, scmVersion,
-        scmAddress, UserGroupInformation.getCurrentUser(), hadoopConf,
-        NetUtils.getDefaultSocketFactory(hadoopConf),
-        (int)conf.getObject(SCMClientConfig.class).getRpcTimeOut());
+    return RPC.getProxy(
+        StorageContainerLocationProtocolPB.class,
+        scmVersion, scmAddress, UserGroupInformation.getCurrentUser(),
+        hadoopConf, NetUtils.getDefaultSocketFactory(hadoopConf),
+        (int)scmClientConfig.getRpcTimeOut());
   }
 
-  public RetryPolicy getSCMBlockLocationRetryPolicy(String newLeader) {
+  public RetryPolicy getSCMContainerLocationRetryPolicy(
+      String suggestedLeader) {
     RetryPolicy retryPolicy = new RetryPolicy() {
       @Override
       public RetryAction shouldRetry(Exception e, int retry,
                                      int failover, boolean b) {
-        performFailoverToAssignedLeader(newLeader);
+        performFailoverToAssignedLeader(suggestedLeader);
         return getRetryAction(failover);
       }
     };
     return retryPolicy;
   }
 }
-

@@ -17,14 +17,11 @@
  */
 package org.apache.hadoop.hdds.scm.cli;
 
-import javax.net.SocketFactory;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -41,20 +38,13 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
+import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-import org.apache.hadoop.ipc.Client;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.security.UserGroupInformation;
 
 import com.google.common.base.Preconditions;
-import static org.apache.hadoop.hdds.HddsUtils.getScmAddressForClients;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
@@ -116,25 +106,13 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   public static StorageContainerLocationProtocol newContainerRpcClient(
-      ConfigurationSource configSource) throws IOException {
-
-    Class<StorageContainerLocationProtocolPB> protocol =
-        StorageContainerLocationProtocolPB.class;
-    Configuration conf =
-        LegacyHadoopConfigurationSource.asHadoopConfiguration(configSource);
-    RPC.setProtocolEngine(conf, protocol, ProtobufRpcEngine.class);
-    long version = RPC.getProtocolVersion(protocol);
-    InetSocketAddress scmAddress = getScmAddressForClients(configSource);
-    UserGroupInformation user = UserGroupInformation.getCurrentUser();
-    SocketFactory socketFactory = NetUtils.getDefaultSocketFactory(conf);
-    int rpcTimeOut = Client.getRpcTimeout(conf);
-
-    StorageContainerLocationProtocolPB rpcProxy =
-        RPC.getProxy(protocol, version, scmAddress, user, conf,
-            socketFactory, rpcTimeOut);
+      ConfigurationSource configSource) {
+    SCMContainerLocationFailoverProxyProvider proxyProvider =
+        new SCMContainerLocationFailoverProxyProvider(configSource);
 
     StorageContainerLocationProtocolClientSideTranslatorPB client =
-        new StorageContainerLocationProtocolClientSideTranslatorPB(rpcProxy);
+        new StorageContainerLocationProtocolClientSideTranslatorPB(
+            proxyProvider);
     return TracingUtil.createProxy(
         client, StorageContainerLocationProtocol.class, configSource);
   }
