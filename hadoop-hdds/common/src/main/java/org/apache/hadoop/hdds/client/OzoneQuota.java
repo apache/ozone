@@ -34,7 +34,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.TB;
  */
 public final class OzoneQuota {
   public static final Logger LOG =
-          LoggerFactory.getLogger(OzoneQuota.class);
+      LoggerFactory.getLogger(OzoneQuota.class);
 
   public static final String OZONE_QUOTA_BYTES = "BYTES";
   public static final String OZONE_QUOTA_KB = "KB";
@@ -76,19 +76,19 @@ public final class OzoneQuota {
      */
     public long sizeInBytes() {
       switch (this.unit) {
-        case BYTES:
-          return this.getSize();
-        case KB:
-          return this.getSize() * KB;
-        case MB:
-          return this.getSize() * MB;
-        case GB:
-          return this.getSize() * GB;
-        case TB:
-          return this.getSize() * TB;
-        case UNDEFINED:
-        default:
-          return -1;
+      case BYTES:
+        return this.getSize();
+      case KB:
+        return this.getSize() * KB;
+      case MB:
+        return this.getSize() * MB;
+      case GB:
+        return this.getSize() * GB;
+      case TB:
+        return this.getSize() * TB;
+      case UNDEFINED:
+      default:
+        return -1;
       }
     }
 
@@ -149,15 +149,15 @@ public final class OzoneQuota {
    * @return OzoneQuota object
    */
   public static OzoneQuota parseQuota(String quotaInBytes,
-                                      long quotaInCounts) {
+      long quotaInCounts) {
 
     if (Strings.isNullOrEmpty(quotaInBytes)) {
       throw new IllegalArgumentException(
-              "Quota string cannot be null or empty.");
+          "Quota string cannot be null or empty.");
     }
 
     String uppercase = quotaInBytes.toUpperCase()
-            .replaceAll("\\s+", "");
+       .replaceAll("\\s+", "");
     String size = "";
     long nSize = 0;
     Units currUnit = Units.MB;
@@ -166,47 +166,47 @@ public final class OzoneQuota {
     try {
       if (uppercase.endsWith(OZONE_QUOTA_KB)) {
         size = uppercase
-                .substring(0, uppercase.length() - OZONE_QUOTA_KB.length());
+            .substring(0, uppercase.length() - OZONE_QUOTA_KB.length());
         currUnit = Units.KB;
         quotaMultiplyExact = Math.multiplyExact(Long.parseLong(size), KB);
       }
 
       if (uppercase.endsWith(OZONE_QUOTA_MB)) {
         size = uppercase
-                .substring(0, uppercase.length() - OZONE_QUOTA_MB.length());
+            .substring(0, uppercase.length() - OZONE_QUOTA_MB.length());
         currUnit = Units.MB;
         quotaMultiplyExact = Math.multiplyExact(Long.parseLong(size), MB);
       }
 
       if (uppercase.endsWith(OZONE_QUOTA_GB)) {
         size = uppercase
-                .substring(0, uppercase.length() - OZONE_QUOTA_GB.length());
+            .substring(0, uppercase.length() - OZONE_QUOTA_GB.length());
         currUnit = Units.GB;
         quotaMultiplyExact = Math.multiplyExact(Long.parseLong(size), GB);
       }
 
       if (uppercase.endsWith(OZONE_QUOTA_TB)) {
         size = uppercase
-                .substring(0, uppercase.length() - OZONE_QUOTA_TB.length());
+            .substring(0, uppercase.length() - OZONE_QUOTA_TB.length());
         currUnit = Units.TB;
         quotaMultiplyExact = Math.multiplyExact(Long.parseLong(size), TB);
       }
 
       if (uppercase.endsWith(OZONE_QUOTA_BYTES)) {
         size = uppercase
-                .substring(0, uppercase.length() - OZONE_QUOTA_BYTES.length());
+            .substring(0, uppercase.length() - OZONE_QUOTA_BYTES.length());
         currUnit = Units.BYTES;
         quotaMultiplyExact = Math.multiplyExact(Long.parseLong(size), 1L);
       }
       nSize = Long.parseLong(size);
     } catch (NumberFormatException e) {
       throw new IllegalArgumentException("Invalid values for quota, to ensure" +
-              " that the Quota format is legal(supported values are BYTES, KB, " +
-              "MB, GB and TB).");
+           " that the Quota format is legal(supported values are BYTES, KB, " +
+           "MB, GB and TB).");
     } catch  (ArithmeticException e) {
       LOG.debug("long overflow:\n{}", quotaMultiplyExact);
       throw new IllegalArgumentException("Invalid values for quota, the quota" +
-              " value cannot be greater than Long.MAX_VALUE BYTES");
+          " value cannot be greater than Long.MAX_VALUE BYTES");
     }
 
     if (nSize < 0) {
@@ -214,7 +214,7 @@ public final class OzoneQuota {
     }
 
     return new OzoneQuota(quotaInCounts,
-            new RawQuotaInBytes(currUnit, nSize));
+        new RawQuotaInBytes(currUnit, nSize));
   }
 
 
@@ -227,7 +227,7 @@ public final class OzoneQuota {
    * @return OzoneQuota object
    */
   public static OzoneQuota getOzoneQuota(long quotaInBytes,
-                                         long quotaInCounts) {
+      long quotaInCounts) {
     long size;
     Units unit;
     if (quotaInBytes % TB == 0) {
@@ -260,6 +260,6 @@ public final class OzoneQuota {
   @Override
   public String toString() {
     return "Space Bytes Quota: " + rawQuotaInBytes.toString() + "\n" +
-            "Counts Quota: " + quotaInCounts;
+       "Counts Quota: " + quotaInCounts;
   }
 }
