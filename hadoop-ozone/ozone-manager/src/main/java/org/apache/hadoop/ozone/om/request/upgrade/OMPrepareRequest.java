@@ -148,6 +148,9 @@ public class OMPrepareRequest extends OMClientRequest {
       Thread.sleep(DOUBLE_BUFFER_FLUSH_CHECK_INTERVAL.toMillis());
     }
 
+    // If the timeout waiting for all transactions to reach the state machine
+    // is exceeded, the exception is propagated, resulting in an error response
+    // to the client. They can retry the prepare request.
     if (!success) {
       throw new IOException(String.format("After waiting for %d seconds, " +
               "State Machine has not applied  all the transactions.",
@@ -165,6 +168,10 @@ public class OMPrepareRequest extends OMClientRequest {
 
     StateMachine stateMachine = impl.getStateMachine();
     long snapshotIndex = stateMachine.takeSnapshot();
+
+    // If the snapshot indices from Ratis and the state machine do not match,
+    // the exception is propagated, resulting in an error response to the
+    // client. They can retry the prepare request.
     if (snapshotIndex != stateMachine.getLastAppliedTermIndex().getIndex()) {
       throw new IOException("Index from Snapshot does not match last applied " +
           "Index");
