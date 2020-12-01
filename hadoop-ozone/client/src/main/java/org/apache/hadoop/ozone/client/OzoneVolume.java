@@ -85,8 +85,6 @@ public class OzoneVolume extends WithMetadata {
 
   private int listCacheSize;
 
-  private long usedBytes;
-
   /**
    * Constructs OzoneVolume instance.
    * @param conf Configuration object.
@@ -133,17 +131,6 @@ public class OzoneVolume extends WithMetadata {
     this(conf, proxy, name, admin, owner, quotaInBytes, quotaInCounts,
         creationTime, acls, metadata);
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
-  }
-
-  @SuppressWarnings("parameternumber")
-  public OzoneVolume(ConfigurationSource conf, ClientProtocol proxy,
-      String name, String admin, String owner, long quotaInBytes,
-      long quotaInCounts, long creationTime, long modificationTime,
-      List<OzoneAcl> acls, Map<String, String> metadata,
-      long usedBytes) {
-    this(conf, proxy, name, admin, owner, quotaInBytes, quotaInCounts,
-        creationTime, acls, metadata);
-    this.usedBytes = usedBytes;
   }
 
   @SuppressWarnings("parameternumber")
@@ -267,10 +254,6 @@ public class OzoneVolume extends WithMetadata {
    */
   public List<OzoneAcl> getAcls() {
     return acls;
-  }
-
-  public long getUsedBytes() {
-    return usedBytes;
   }
 
   /**

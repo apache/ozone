@@ -19,8 +19,6 @@
 package org.apache.hadoop.ozone.loadgenerators;
 
 import org.apache.commons.lang3.RandomUtils;
-import org.apache.hadoop.ozone.utils.LoadBucket;
-import org.apache.hadoop.ozone.utils.TestProbability;
 
 import java.nio.ByteBuffer;
 import java.util.Optional;
@@ -38,7 +36,6 @@ public class AgedLoadGenerator extends LoadGenerator {
   private final AtomicInteger agedFileWrittenIndex;
   private final AtomicInteger agedFileAllocationIndex;
   private final LoadBucket agedLoadBucket;
-  private final TestProbability agedWriteProbability;
   private final DataBuffer dataBuffer;
 
   public AgedLoadGenerator(DataBuffer data, LoadBucket agedLoadBucket) {
@@ -46,12 +43,11 @@ public class AgedLoadGenerator extends LoadGenerator {
     this.agedFileWrittenIndex = new AtomicInteger(0);
     this.agedFileAllocationIndex = new AtomicInteger(0);
     this.agedLoadBucket = agedLoadBucket;
-    this.agedWriteProbability = TestProbability.valueOf(10);
   }
 
   @Override
   public void generateLoad() throws Exception {
-    if (agedWriteProbability.isTrue()) {
+    if (RandomUtils.nextInt(0, 100) <= 10) {
       synchronized (agedFileAllocationIndex) {
         int index = agedFileAllocationIndex.getAndIncrement();
         ByteBuffer buffer = dataBuffer.getBuffer(index);

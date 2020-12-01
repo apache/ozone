@@ -312,8 +312,7 @@ public class RpcClient implements ClientProtocol {
         volume.getModificationTime(),
         volume.getAclMap().ozoneAclGetProtobuf().stream().
             map(OzoneAcl::fromProtobuf).collect(Collectors.toList()),
-        volume.getMetadata(),
-        volume.getUsedBytes().sum());
+        volume.getMetadata());
   }
 
   @Override
@@ -369,8 +368,7 @@ public class RpcClient implements ClientProtocol {
         volume.getModificationTime(),
         volume.getAclMap().ozoneAclGetProtobuf().stream().
             map(OzoneAcl::fromProtobuf).collect(Collectors.toList()),
-        volume.getMetadata(),
-        volume.getUsedBytes().sum()))
+        volume.getMetadata()))
         .collect(Collectors.toList());
   }
 
@@ -625,7 +623,7 @@ public class RpcClient implements ClientProtocol {
             .getEncryptionKeyInfo().getKeyName() : null,
         bucketInfo.getSourceVolume(),
         bucketInfo.getSourceBucket(),
-        bucketInfo.getUsedBytes().sum(),
+        bucketInfo.getUsedBytes(),
         bucketInfo.getQuotaInBytes(),
         bucketInfo.getQuotaInCounts()
     );
@@ -652,7 +650,7 @@ public class RpcClient implements ClientProtocol {
             .getEncryptionKeyInfo().getKeyName() : null,
         bucket.getSourceVolume(),
         bucket.getSourceBucket(),
-        bucket.getUsedBytes().sum(),
+        bucket.getUsedBytes(),
         bucket.getQuotaInBytes(),
         bucket.getQuotaInCounts()))
         .collect(Collectors.toList());
@@ -666,7 +664,7 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
-    if (clientConfig.isStreamBufferFlushDelay()) {
+    if (checkKeyNameEnabled) {
       HddsClientUtils.verifyKeyName(keyName);
     }
     HddsClientUtils.checkNotNull(keyName, type, factor);

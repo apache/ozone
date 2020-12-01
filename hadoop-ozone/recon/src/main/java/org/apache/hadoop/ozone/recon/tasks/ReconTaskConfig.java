@@ -53,8 +53,8 @@ public class ReconTaskConfig {
       defaultValue = "300s",
       tags = { ConfigTag.RECON, ConfigTag.OZONE },
       description = "The time interval of the periodic check for " +
-          "containers with zero replicas in the cluster as reported by " +
-          "Datanodes."
+          "unhealthy containers in the cluster as reported " +
+          "by Datanodes."
   )
   private long missingContainerTaskInterval = Duration.ofMinutes(5).toMillis();
 

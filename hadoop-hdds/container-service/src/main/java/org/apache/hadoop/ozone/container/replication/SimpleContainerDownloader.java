@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.cert.X509Certificate;
@@ -34,6 +33,7 @@ import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,29 +79,25 @@ public class SimpleContainerDownloader implements ContainerDownloader {
 
     CompletableFuture<Path> result = null;
 
-    //There is a chance for the download is successful but import is failed,
-    //due to data corruption. We need a random selected datanode to have a
-    //chance to succeed next time.
-    final ArrayList<DatanodeDetails> shuffledDatanodes =
-        new ArrayList<>(sourceDatanodes);
-    Collections.shuffle(shuffledDatanodes);
+    final List<DatanodeDetails> shuffledDatanodes =
+        shuffleDatanodes(sourceDatanodes);
 
     for (DatanodeDetails datanode : shuffledDatanodes) {
       try {
         if (result == null) {
           result = downloadContainer(containerId, datanode);
         } else {
-          result = result
-              .exceptionally(t -> {
-                LOG.error("Error on replicating container: " + containerId
-                    + " Trying the next datanode", t);
-                try {
-                  return downloadContainer(containerId, datanode).join();
-                } catch (IOException e) {
-                  throw new RuntimeException(e);
-                }
 
-              });
+          result = result.exceptionally(t -> {
+            LOG.error("Error on replicating container: " + containerId, t);
+            try {
+              return downloadContainer(containerId, datanode).join();
+            } catch (Exception e) {
+              LOG.error("Error on replicating container: " + containerId,
+                  e);
+              return null;
+            }
+          });
         }
       } catch (Exception ex) {
         LOG.error(String.format(
@@ -111,6 +107,22 @@ public class SimpleContainerDownloader implements ContainerDownloader {
     }
     return result;
 
+  }
+
+  //There is a chance for the download is successful but import is failed,
+  //due to data corruption. We need a random selected datanode to have a
+  //chance to succeed next time.
+  @NotNull
+  protected List<DatanodeDetails> shuffleDatanodes(
+      List<DatanodeDetails> sourceDatanodes
+  ) {
+
+    final ArrayList<DatanodeDetails> shuffledDatanodes =
+        new ArrayList<>(sourceDatanodes);
+
+    Collections.shuffle(shuffledDatanodes);
+
+    return shuffledDatanodes;
   }
 
   @VisibleForTesting
@@ -123,15 +135,16 @@ public class SimpleContainerDownloader implements ContainerDownloader {
         new GrpcReplicationClient(datanode.getIpAddress(),
             datanode.getPort(Name.REPLICATION).getValue(),
             workingDirectory, securityConfig, caCert);
-    result = grpcReplicationClient.download(containerId).thenApply(
-        path -> {
+    result = grpcReplicationClient.download(containerId)
+        .thenApply(r -> {
           try {
             grpcReplicationClient.close();
           } catch (Exception e) {
-            LOG.error("Can't close GRPC client", e);
+            LOG.error("Couldn't close Grpc replication client", e);
           }
-          return path;
+          return r;
         });
+
     return result;
   }
 

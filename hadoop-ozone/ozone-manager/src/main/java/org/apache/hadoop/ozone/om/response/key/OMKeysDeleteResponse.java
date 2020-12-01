@@ -89,10 +89,6 @@ public class OMKeysDeleteResponse extends AbstractOMKeyDeleteResponse {
           deleteKey, omKeyInfo);
     }
 
-    // update volume usedBytes.
-    omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
-        omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
-        omVolumeArgs);
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
         omMetadataManager.getBucketKey(omVolumeArgs.getVolume(),
