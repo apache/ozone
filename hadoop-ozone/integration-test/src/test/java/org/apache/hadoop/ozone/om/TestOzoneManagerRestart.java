@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -54,7 +53,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDC
 import org.junit.AfterClass;
 import org.junit.Assert;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD;
 import static org.junit.Assert.fail;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -89,7 +87,6 @@ public class TestOzoneManagerRestart {
     scmId = UUID.randomUUID().toString();
     omId = UUID.randomUUID().toString();
     conf.setBoolean(OZONE_ACL_ENABLED, true);
-    conf.setTimeDuration(OZONE_OPEN_KEY_EXPIRE_THRESHOLD, 2, TimeUnit.SECONDS);
     conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
     conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
     cluster =  MiniOzoneCluster.newBuilder(conf)

@@ -46,7 +46,6 @@ import java.io.IOException;
 import java.net.ConnectException;
 import java.util.UUID;
 import java.util.HashMap;
-import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_RETRY_INTERVAL_KEY;
@@ -54,7 +53,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OPEN_KEY_EXPIRE_THRESHOLD;
 import static org.junit.Assert.fail;
 
 /**
@@ -129,7 +127,6 @@ public abstract class TestOzoneManagerHA {
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS,
         OZONE_ADMINISTRATORS_WILDCARD);
-    conf.setTimeDuration(OZONE_OPEN_KEY_EXPIRE_THRESHOLD, 2, TimeUnit.SECONDS);
     conf.setInt(OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
         OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS);
     conf.setInt(IPC_CLIENT_CONNECT_MAX_RETRIES_KEY,
