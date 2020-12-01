@@ -80,7 +80,7 @@ public abstract class AbstractContractUnbufferTest
 
   @Test
   public void testUnbufferOnClosedFile() throws IOException {
-    describe("unbuffer a file before a read");
+    describe("unbuffer a file after it is closed");
     FSDataInputStream stream = null;
     try {
       stream = getFileSystem().open(file);

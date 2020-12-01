@@ -163,12 +163,13 @@ public class BlockInputStream extends InputStream
   }
 
   private void refreshPipeline(IOException cause) throws IOException {
-    LOG.error("Unable to read information for block {} from pipeline {}: {}",
+    LOG.info("Unable to read information for block {} from pipeline {}: {}",
         blockID, pipeline.getId(), cause.getMessage());
     if (refreshPipelineFunction != null) {
       LOG.debug("Re-fetching pipeline for block {}", blockID);
       Pipeline newPipeline = refreshPipelineFunction.apply(blockID);
       if (newPipeline == null || newPipeline.equals(pipeline)) {
+        LOG.warn("No new pipeline for block {}", blockID);
         throw cause;
       } else {
         LOG.debug("New pipeline got for block {}", blockID);

@@ -76,9 +76,8 @@ public class ChunkInputStream extends InputStream
 
   // Position of the ChunkInputStream is maintained by this variable (if a
   // seek is performed. This position is w.r.t to the chunk only and not the
-  // block or key. This variable is set only if either the buffers are not
-  // yet allocated or the if the allocated buffers do not cover the seeked
-  // position. Once the chunk is read, this variable is reset.
+  // block or key. This variable is also set before attempting a read to enable
+  // retry.  Once the chunk is read, this variable is reset.
   private long chunkPosition = -1;
 
   private final Token<? extends TokenIdentifier> token;

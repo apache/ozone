@@ -417,7 +417,7 @@ public class TestKeyInputStream {
   }
 
   @Test
-  public void unbuffer() throws Exception {
+  public void readAfterReplicationWithUnbuffering() throws Exception {
     testReadAfterReplication(true);
   }
 
