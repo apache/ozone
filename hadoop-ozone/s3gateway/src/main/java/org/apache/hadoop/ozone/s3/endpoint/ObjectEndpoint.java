@@ -209,6 +209,9 @@ public class ObjectEndpoint extends EndpointBase {
               " considered as Unix Paths. Path has Violated FS Semantics " +
               "which caused put operation to fail.");
           throw os3Exception;
+        } else if ((((OMException) ex).getResult() ==
+            ResultCodes.PERMISSION_DENIED)) {
+          throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED, keyPath);
         }
       }
       throw ex;
@@ -320,6 +323,9 @@ public class ObjectEndpoint extends EndpointBase {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         throw S3ErrorTable.newError(S3ErrorTable
             .NO_SUCH_KEY, keyPath);
+      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+        throw S3ErrorTable.newError(S3ErrorTable
+            .PERMISSION_DENIED, keyPath);
       } else {
         throw ex;
       }
@@ -619,6 +625,9 @@ public class ObjectEndpoint extends EndpointBase {
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw S3ErrorTable.newError(NO_SUCH_UPLOAD,
             uploadID);
+      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED,
+            bucket + "/" + key);
       }
       throw ex;
     }
@@ -675,6 +684,9 @@ public class ObjectEndpoint extends EndpointBase {
       if (ex.getResult() == ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR) {
         throw S3ErrorTable.newError(NO_SUCH_UPLOAD,
             uploadID);
+      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED,
+            bucket + "/" + key + "/" + uploadID);
       }
       throw ex;
     }
@@ -760,6 +772,9 @@ public class ObjectEndpoint extends EndpointBase {
         throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_KEY, sourceKey);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_BUCKET, sourceBucket);
+      } else if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
+        throw S3ErrorTable.newError(S3ErrorTable.PERMISSION_DENIED,
+            destBucket + "/" + destkey);
       }
       throw ex;
     } finally {

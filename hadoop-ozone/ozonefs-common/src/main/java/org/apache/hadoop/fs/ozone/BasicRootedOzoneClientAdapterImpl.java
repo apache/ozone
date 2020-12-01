@@ -615,7 +615,7 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   @Override
-  public Iterator<BasicKeyInfo> listKeys(String pathStr) {
+  public Iterator<BasicKeyInfo> listKeys(String pathStr) throws IOException {
     incrementCounter(Statistic.OBJECTS_LIST, 1);
     OFSPath ofsPath = new OFSPath(pathStr);
     String key = ofsPath.getKeyName();
