@@ -30,7 +30,6 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.TestHddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -442,7 +441,6 @@ public class TestDatanodeStateMachine {
     // will be placed.
     File datanodeSubdir = tempFolder.newFolder("hdds");
 
-    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
         tempFolder.getRoot().getAbsolutePath());
 

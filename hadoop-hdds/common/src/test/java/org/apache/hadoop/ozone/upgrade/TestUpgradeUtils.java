@@ -25,13 +25,15 @@ import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
 
-public class TestUpgradeUtils {
+public final class TestUpgradeUtils {
+  private TestUpgradeUtils() { }
+
   /**
    * Creates a VERSION file for the specified node type under the directory
    * {@code parentDir}.
    */
   public static File createVersionFile(File parentDir,
-    HddsProtos.NodeType nodeType, int mlv) throws IOException {
+      HddsProtos.NodeType nodeType, int mlv) throws IOException {
 
     final String versionFileName = "VERSION";
 
