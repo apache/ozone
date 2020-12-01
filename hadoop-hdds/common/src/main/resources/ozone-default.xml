@@ -1131,7 +1131,7 @@
   </property>
 
   <property>
-    <name>ozone.open.key.cleanup.service.interval</name>
+    <name>ozone.om.open.key.cleanup.service.interval</name>
     <value>24h</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
     <description>
@@ -1142,7 +1142,7 @@
   </property>
 
   <property>
-    <name>ozone.open.key.expire.threshold</name>
+    <name>ozone.om.open.key.expire.threshold</name>
     <value>7d</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
     <description>
@@ -1153,7 +1153,7 @@
   </property>
 
   <property>
-    <name>ozone.open.key.cleanup.limit.per.task</name>
+    <name>ozone.om.open.key.cleanup.limit.per.task</name>
     <value>1000</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
     <description>
