@@ -107,7 +107,6 @@ import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.lock.LockManager;
-import org.apache.hadoop.ozone.protocol.commands.RetriableDatanodeEventWatcher;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
@@ -324,14 +323,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     PipelineActionHandler pipelineActionHandler =
         new PipelineActionHandler(pipelineManager, conf);
-
-
-    RetriableDatanodeEventWatcher retriableDatanodeEventWatcher =
-        new RetriableDatanodeEventWatcher<>(
-            SCMEvents.RETRIABLE_DATANODE_COMMAND,
-            SCMEvents.DELETE_BLOCK_STATUS,
-            commandWatcherLeaseManager);
-    retriableDatanodeEventWatcher.start(eventQueue);
 
     scmAdminUsernames = conf.getTrimmedStringCollection(OzoneConfigKeys
         .OZONE_ADMINISTRATORS);
