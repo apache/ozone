@@ -269,7 +269,9 @@ public class SCMPipelineManager implements PipelineManager {
     lock.writeLock().lock();
     try {
       Pipeline pipeline = pipelineFactory.create(type, factor);
-      pipelineStore.put(pipeline.getId(), pipeline);
+      if (pipelineStore != null) {
+        pipelineStore.put(pipeline.getId(), pipeline);
+      }
       stateManager.addPipeline(pipeline);
       nodeManager.addPipeline(pipeline);
       recordMetricsForPipeline(pipeline);
@@ -405,6 +407,23 @@ public class SCMPipelineManager implements PipelineManager {
     }
   }
 
+  private void updatePipelineStateInDb(PipelineID pipelineId,
+                                       Pipeline.PipelineState state)
+          throws IOException {
+    // null check is here to prevent the case where SCM store
+    // is closed but the staleNode handlers/pipleine creations
+    // still try to access it.
+    if (pipelineStore != null) {
+      try {
+        pipelineStore.put(pipelineId, getPipeline(pipelineId));
+      } catch (IOException ex) {
+        LOG.info("Pipeline {} state update failed", pipelineId);
+        // revert back to old state in memory
+        stateManager.updatePipelineState(pipelineId, state);
+      }
+    }
+  }
+
   @Override
   public void removeContainerFromPipeline(PipelineID pipelineID,
       ContainerID containerID) throws IOException {
@@ -436,7 +455,10 @@ public class SCMPipelineManager implements PipelineManager {
   public void openPipeline(PipelineID pipelineId) throws IOException {
     lock.writeLock().lock();
     try {
+      Pipeline.PipelineState state = stateManager.
+              getPipeline(pipelineId).getPipelineState();
       Pipeline pipeline = stateManager.openPipeline(pipelineId);
+      updatePipelineStateInDb(pipelineId, state);
       metrics.incNumPipelineCreated();
       metrics.createPerPipelineMetrics(pipeline);
     } finally {
@@ -535,7 +557,10 @@ public class SCMPipelineManager implements PipelineManager {
   @Override
   public void activatePipeline(PipelineID pipelineID)
       throws IOException {
+    Pipeline.PipelineState state = stateManager.
+            getPipeline(pipelineID).getPipelineState();
     stateManager.activatePipeline(pipelineID);
+    updatePipelineStateInDb(pipelineID, state);
   }
 
   /**
@@ -547,7 +572,10 @@ public class SCMPipelineManager implements PipelineManager {
   @Override
   public void deactivatePipeline(PipelineID pipelineID)
       throws IOException {
+    Pipeline.PipelineState state = stateManager.
+            getPipeline(pipelineID).getPipelineState();
     stateManager.deactivatePipeline(pipelineID);
+    updatePipelineStateInDb(pipelineID, state);
   }
 
   /**
@@ -600,7 +628,10 @@ public class SCMPipelineManager implements PipelineManager {
   private void finalizePipeline(PipelineID pipelineId) throws IOException {
     lock.writeLock().lock();
     try {
+      Pipeline.PipelineState state = stateManager.
+              getPipeline(pipelineId).getPipelineState();
       stateManager.finalizePipeline(pipelineId);
+      updatePipelineStateInDb(pipelineId, state);
       Set<ContainerID> containerIDs = stateManager.getContainers(pipelineId);
       for (ContainerID containerID : containerIDs) {
         eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
@@ -669,6 +700,15 @@ public class SCMPipelineManager implements PipelineManager {
 
     // shutdown pipeline provider.
     pipelineFactory.shutdown();
+    lock.writeLock().lock();
+    try {
+      pipelineStore.close();
+      pipelineStore = null;
+    } catch (Exception ex) {
+      LOG.error("Pipeline  store close failed", ex);
+    } finally {
+      lock.writeLock().unlock();
+    }
   }
 
   /**

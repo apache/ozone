@@ -14,7 +14,7 @@
 # limitations under the License.
 github:
   description: "Scalable, redundant, and distributed object store for Apache Hadoop"
-  homepage: https://hadoop.apache.org/ozone/
+  homepage: https://ozone.apache.org
   labels:
     - hadoop
     - object-store
