@@ -23,6 +23,7 @@ package org.apache.hadoop.hdds.scm.server;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -135,7 +136,8 @@ public class SCMDatanodeProtocolServer implements
     heartbeatDispatcher = new SCMDatanodeHeartbeatDispatcher(
         scm.getScmNodeManager(), eventPublisher);
 
-    InetSocketAddress datanodeRpcAddr = getDataNodeBindAddress(conf);
+    InetSocketAddress datanodeRpcAddr = new InetSocketAddress("127.0.0.1", new ServerSocket(0).getLocalPort());
+//    InetSocketAddress datanodeRpcAddr = getDataNodeBindAddress(conf);
 
     protocolMessageMetrics = getProtocolMessageMetrics();
 

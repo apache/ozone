@@ -379,6 +379,8 @@ public final class ScmConfigKeys {
       = "ozone.scm.ratis.enable";
   public static final boolean OZONE_SCM_HA_ENABLE_DEFAULT
       = false;
+  public static final String OZONE_SCM_RATIS_BIND_ADDRESS_KEY
+      = "ozone.scm.ratis.address";
   public static final String OZONE_SCM_RATIS_PORT_KEY
       = "ozone.scm.ratis.port";
   public static final int OZONE_SCM_RATIS_PORT_DEFAULT

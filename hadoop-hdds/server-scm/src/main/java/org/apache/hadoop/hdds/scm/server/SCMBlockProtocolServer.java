@@ -23,6 +23,7 @@ package org.apache.hadoop.hdds.scm.server;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -117,8 +118,10 @@ public class SCMBlockProtocolServer implements
                 new ScmBlockLocationProtocolServerSideTranslatorPB(this,
                     protocolMessageMetrics));
 
-    final InetSocketAddress scmBlockAddress = HddsServerUtil
-        .getScmBlockClientBindAddress(conf);
+//    final InetSocketAddress scmBlockAddress = HddsServerUtil
+//        .getScmBlockClientBindAddress(conf);
+    InetSocketAddress scmBlockAddress = new InetSocketAddress("127.0.0.1", new ServerSocket(0).getLocalPort());
+
     blockRpcServer =
         startRpcServer(
             conf,

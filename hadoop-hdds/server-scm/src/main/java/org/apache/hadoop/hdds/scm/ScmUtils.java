@@ -18,14 +18,23 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import com.google.common.base.Joiner;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmOps;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.safemode.Precheck;
 
+import org.apache.hadoop.net.NetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * SCM utility class.
@@ -59,5 +68,32 @@ public final class ScmUtils {
       throw new IllegalArgumentException("Unable to create path: " + dirFile);
     }
     return dirFile;
+  }
+
+  public static Collection<String> getSCMNodeIds(ConfigurationSource conf,
+      String scmServiceId) {
+    String key = addSuffix(ScmConfigKeys.OZONE_SCM_NODES_KEY, scmServiceId);
+    return conf.getTrimmedStringCollection(key);
+  }
+
+  private static String addSuffix(String key, String suffix) {
+    if (suffix == null || suffix.isEmpty()) {
+      return key;
+    }
+    assert !suffix.startsWith(".") :
+            "suffix '" + suffix + "' should not already have '.' prepended.";
+    return key + "." + suffix;
+  }
+
+  public static String addKeySuffixes(String key, String... suffixes) {
+    String keySuffix = concatSuffixes(suffixes);
+    return addSuffix(key, keySuffix);
+  }
+
+  private static String concatSuffixes(String... suffixes) {
+    if (suffixes == null) {
+      return null;
+    }
+    return Joiner.on(".").skipNulls().join(suffixes);
   }
 }

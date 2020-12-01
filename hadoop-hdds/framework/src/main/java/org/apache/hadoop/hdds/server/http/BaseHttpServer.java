@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.server.http;
 import javax.servlet.http.HttpServlet;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.net.URI;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -90,9 +91,11 @@ public abstract class BaseHttpServer {
     this.conf = conf;
     policy = getHttpPolicy(conf);
     if (isEnabled()) {
-      this.httpAddress = getHttpBindAddress();
-      this.httpsAddress = getHttpsBindAddress();
+//      this.httpAddress = getHttpBindAddress();
+//      this.httpsAddress = getHttpsBindAddress();
 
+      this.httpAddress = new InetSocketAddress("127.0.0.1", new ServerSocket(0).getLocalPort());
+      this.httpsAddress = new InetSocketAddress("127.0.0.1", new ServerSocket(0).getLocalPort());
       // Avoid registering o.a.h.http.PrometheusServlet in HttpServer2.
       // TODO: Replace "hadoop.prometheus.endpoint.enabled" with
       // CommonConfigurationKeysPublic.HADOOP_PROMETHEUS_ENABLED when possible.

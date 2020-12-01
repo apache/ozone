@@ -17,15 +17,26 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.ratis.protocol.RaftGroup;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
@@ -37,10 +48,14 @@ public final class SCMNodeDetails {
   private String scmServiceId;
   private String scmNodeId;
   private InetSocketAddress rpcAddress;
-  private int rpcPort;
   private int ratisPort;
   private String httpAddress;
   private String httpsAddress;
+  private String blockProtocolServerAddress;
+  private String clientProtocolServerAddress;
+  private String datanodeProtocolServerAddress;
+  private RaftGroup raftGroup;
+  private RaftPeerId selfPeerId;
 
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMNodeDetails.class);
@@ -49,15 +64,24 @@ public final class SCMNodeDetails {
    * Constructs SCMNodeDetails object.
    */
   private SCMNodeDetails(String serviceId, String nodeId,
-                        InetSocketAddress rpcAddr, int rpcPort, int ratisPort,
-                        String httpAddress, String httpsAddress) {
+                        InetSocketAddress rpcAddr, int ratisPort,
+                        String httpAddress, String httpsAddress,
+                        String blockProtocolServerAddress,
+                        String clientProtocolServerAddress,
+                        String datanodeProtocolServerAddress,
+                        RaftGroup group,
+                        RaftPeerId selfPeerId) {
     this.scmServiceId = serviceId;
     this.scmNodeId = nodeId;
     this.rpcAddress = rpcAddr;
-    this.rpcPort = rpcPort;
     this.ratisPort = ratisPort;
     this.httpAddress = httpAddress;
     this.httpsAddress = httpsAddress;
+    this.blockProtocolServerAddress = blockProtocolServerAddress;
+    this.clientProtocolServerAddress = clientProtocolServerAddress;
+    this.datanodeProtocolServerAddress = datanodeProtocolServerAddress;
+    this.raftGroup = group;
+    this.selfPeerId = selfPeerId;
   }
 
   @Override
@@ -66,7 +90,6 @@ public final class SCMNodeDetails {
         + "scmServiceId=" + scmServiceId +
         ", scmNodeId=" + scmNodeId +
         ", rpcAddress=" + rpcAddress +
-        ", rpcPort=" + rpcPort +
         ", ratisPort=" + ratisPort +
         ", httpAddress=" + httpAddress +
         ", httpsAddress=" + httpsAddress +
@@ -80,14 +103,42 @@ public final class SCMNodeDetails {
     private String scmServiceId;
     private String scmNodeId;
     private InetSocketAddress rpcAddress;
-    private int rpcPort;
     private int ratisPort;
     private String httpAddr;
     private String httpsAddr;
+    private String blockProtocolServerAddress;
+    private String clientProtocolServerAddress;
+    private String datanodeProtocolServerAddress;
+    private RaftGroup raftGroup;
+    private RaftPeerId selfPeerId;
+
+    public Builder setBlockProtocolServerAddress(String address) {
+      this.blockProtocolServerAddress = address;
+      return this;
+    }
+
+    public Builder setClientProtocolServerAddress(String address) {
+      this.clientProtocolServerAddress = address;
+      return this;
+    }
+
+    public Builder setDatanodeProtocolServerAddress(String address) {
+      this.datanodeProtocolServerAddress = address;
+      return this;
+    }
+
+    public Builder setRaftGroup(RaftGroup rpcAddr) {
+      this.raftGroup = raftGroup;
+      return this;
+    }
+
+    public Builder setSelfPeerId(RaftPeerId selfPeerId) {
+      this.selfPeerId = selfPeerId;
+      return this;
+    }
 
     public Builder setRpcAddress(InetSocketAddress rpcAddr) {
       this.rpcAddress = rpcAddr;
-      this.rpcPort = rpcAddress.getPort();
       return this;
     }
 
@@ -117,8 +168,10 @@ public final class SCMNodeDetails {
     }
 
     public SCMNodeDetails build() {
-      return new SCMNodeDetails(scmServiceId, scmNodeId, rpcAddress, rpcPort,
-          ratisPort, httpAddr, httpsAddr);
+      return new SCMNodeDetails(scmServiceId, scmNodeId, rpcAddress,
+          ratisPort, httpAddr, httpsAddr, blockProtocolServerAddress,
+          clientProtocolServerAddress, datanodeProtocolServerAddress,
+          raftGroup, selfPeerId);
     }
   }
 
@@ -140,10 +193,6 @@ public final class SCMNodeDetails {
 
   public int getRatisPort() {
     return ratisPort;
-  }
-
-  public int getRpcPort() {
-    return rpcPort;
   }
 
   public String getRpcAddressString() {
@@ -177,5 +226,54 @@ public final class SCMNodeDetails {
         .setSCMServiceId(localSCMServiceId)
         .build();
     return scmNodeDetails;
+  }
+
+  public static SCMNodeDetails initHA(
+          OzoneConfiguration conf) throws IOException {
+    String localScmServiceId = conf.getTrimmed(ScmConfigKeys.OZONE_SCM_INTERNAL_SERVICE_ID);
+    if (localScmServiceId == null) {
+      throw new IOException("serviceId is not provided");
+    }
+
+    LOG.info("ServiceID for StorageContainerManager is {}", localScmServiceId);
+    String scmNodeId = conf.get(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY);
+    if (scmNodeId == null) {
+      String errorMessage = "SCM NODE ID is not provided by ozone.scm.node.id "
+              + conf.get(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY);
+      throw new IOException(errorMessage);
+    }
+    RaftPeerId selfPeerId = RaftPeerId.getRaftPeerId(scmNodeId);
+    InetSocketAddress thisRatisAddr = null;
+    Collection<String> scmNodeIds = ScmUtils.getSCMNodeIds(conf, localScmServiceId);
+    final List<RaftPeer> raftPeers = new ArrayList<>();
+    for (String nodeId : scmNodeIds) {
+      RaftPeerId peerId = RaftPeerId.getRaftPeerId(nodeId);
+      String ratisAddrKey = ScmUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_RATIS_BIND_ADDRESS_KEY,
+              localScmServiceId, nodeId);
+      String ratisPortKey = ScmUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY,
+              localScmServiceId, nodeId);
+      String ratisAddr = conf.get(ratisAddrKey);
+      int ratisPort = conf.getInt(ratisPortKey, 0);
+      if (nodeId.equals(scmNodeId)) {
+        thisRatisAddr = new InetSocketAddress(ratisAddr, ratisPort);
+      }
+      raftPeers.add(new RaftPeer(peerId, ratisAddr + ":" + ratisPort));
+    }
+
+    LOG.info("Build a RaftGroup for SCMHA: {} ", raftPeers);
+
+    RaftGroupId raftGroupId = RaftGroupId.valueOf(UUID.nameUUIDFromBytes(
+            localScmServiceId.getBytes(StandardCharsets.UTF_8)));
+
+    RaftGroup raftGroup = RaftGroup.valueOf(raftGroupId, raftPeers);
+
+    SCMNodeDetails.Builder builder = new Builder();
+    builder.setSCMNodeId(scmNodeId)
+            .setSCMServiceId(localScmServiceId)
+            .setRatisPort(thisRatisAddr.getPort())
+            .setRaftGroup(raftGroup)
+            .setSelfPeerId(selfPeerId);
+
+    return builder.build();
   }
 }

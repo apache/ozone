@@ -23,6 +23,7 @@ package org.apache.hadoop.hdds.scm.server;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -125,8 +126,10 @@ public class SCMClientProtocolServer implements
             new StorageContainerLocationProtocolServerSideTranslatorPB(this,
                 protocolMetrics));
 
-    final InetSocketAddress scmAddress = HddsServerUtil
-        .getScmClientBindAddress(conf);
+//    final InetSocketAddress scmAddress = HddsServerUtil
+//        .getScmClientBindAddress(conf);
+    InetSocketAddress scmAddress = new InetSocketAddress("127.0.0.1", new ServerSocket(0).getLocalPort());
+
     clientRpcServer =
         startRpcServer(
             conf,
