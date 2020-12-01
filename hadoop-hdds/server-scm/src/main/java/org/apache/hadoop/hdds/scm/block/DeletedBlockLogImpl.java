@@ -18,11 +18,12 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import java.io.IOException;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
+import java.util.Set;
+import java.util.Map;
+import java.util.LinkedHashSet;
+import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
@@ -35,8 +36,9 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto.DeleteBlockTransactionResult;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.command.CommandStatusReportHandler.DeleteBlockStatus;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
@@ -354,23 +356,40 @@ public class DeletedBlockLogImpl
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
                scmMetadataStore.getDeletedBlocksTXTable().iterator()) {
         int numBlocksAdded = 0;
+        BatchOperation batch =
+            scmMetadataStore.getBatchHandler().initBatchOperation();
+        List<DeletedBlocksTransaction> delTx =
+            new ArrayList<>();
         while (iter.hasNext() && numBlocksAdded < blockDeletionLimit) {
-          Table.KeyValue<Long, DeletedBlocksTransaction> keyValue =
-              iter.next();
+          Table.KeyValue<Long, DeletedBlocksTransaction> keyValue = iter.next();
           DeletedBlocksTransaction txn = keyValue.getValue();
           final ContainerID id = ContainerID.valueof(txn.getContainerID());
-          if (txn.getCount() > -1 && txn.getCount() <= maxRetry
-              && !containerManager.getContainer(id).isOpen()) {
-            numBlocksAdded += txn.getLocalIDCount();
-            getTransaction(txn, transactions);
-            transactionToDNsCommitMap
-                .putIfAbsent(txn.getTxID(), new LinkedHashSet<>());
+          try {
+            if (txn.getCount() > -1 && txn.getCount() <= maxRetry
+                && !containerManager.getContainer(id).isOpen()) {
+              numBlocksAdded += txn.getLocalIDCount();
+              getTransaction(txn, transactions);
+              transactionToDNsCommitMap
+                  .putIfAbsent(txn.getTxID(), new LinkedHashSet<>());
+            }
+          } catch (ContainerNotFoundException ex) {
+            delTx.add(txn);
           }
         }
+        deleteTransaction(delTx, batch);
+        scmMetadataStore.getBatchHandler().commitBatchOperation(batch);
       }
       return transactions;
     } finally {
       lock.unlock();
+    }
+  }
+
+  public void deleteTransaction(List<DeletedBlocksTransaction> delTx,
+      BatchOperation batch) throws IOException {
+    for (int i = 0; i < delTx.size(); i++) {
+      scmMetadataStore.getDeletedBlocksTXTable()
+          .deleteWithBatch(batch, delTx.get(i).getTxID());
     }
   }
 
