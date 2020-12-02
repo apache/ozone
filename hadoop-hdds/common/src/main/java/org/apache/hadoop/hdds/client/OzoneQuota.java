@@ -22,7 +22,6 @@ import com.google.common.base.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.OzoneConsts.KB;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
@@ -35,7 +34,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.TB;
  */
 public final class OzoneQuota {
   public static final Logger LOG =
-          LoggerFactory.getLogger(OzoneQuota.class);
+      LoggerFactory.getLogger(OzoneQuota.class);
 
   public static final String OZONE_QUOTA_BYTES = "BYTES";
   public static final String OZONE_QUOTA_KB = "KB";
@@ -156,16 +155,16 @@ public final class OzoneQuota {
    * @return OzoneQuota object
    */
   public static OzoneQuota parseQuota(String quotaInBytes,
-                                      long quotaInCounts) {
+      long quotaInCounts) {
 
     setQuotaList();
     if (Strings.isNullOrEmpty(quotaInBytes)) {
       throw new IllegalArgumentException(
-              "Quota string cannot be null or empty.");
+         "Quota string cannot be null or empty.");
     }
 
     String uppercase = quotaInBytes.toUpperCase()
-            .replaceAll("\\s+", "");
+        .replaceAll("\\s+", "");
     String size = "";
     long nSize = 0;
     Units currUnit = Units.MB;
@@ -190,7 +189,7 @@ public final class OzoneQuota {
     } catch  (ArithmeticException e) {
       LOG.debug("long overflow:\n{}", quotaMultiplyExact);
       throw new IllegalArgumentException("Invalid values for quota, the quota" +
-              " value cannot be greater than Long.MAX_VALUE BYTES");
+          " value cannot be greater than Long.MAX_VALUE BYTES");
     }
 
     if (nSize < 0) {
@@ -198,7 +197,7 @@ public final class OzoneQuota {
     }
 
     return new OzoneQuota(quotaInCounts,
-            new RawQuotaInBytes(currUnit, nSize));
+        new RawQuotaInBytes(currUnit, nSize));
   }
 
 
@@ -235,6 +234,6 @@ public final class OzoneQuota {
   @Override
   public String toString() {
     return "Space Bytes Quota: " + rawQuotaInBytes.toString() + "\n" +
-            "Counts Quota: " + quotaInCounts;
+        "Counts Quota: " + quotaInCounts;
   }
 }
