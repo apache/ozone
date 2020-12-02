@@ -24,32 +24,44 @@ import java.util.ArrayList;
  *This class contains arraylist for storage constant used in OzoneQuota.
  */
 public class QuotaList {
-    public ArrayList<String> OZONE_QUOTA;
-    public ArrayList<OzoneQuota.Units> unitQuota;
-    public ArrayList<Long> sizeQuota;
+  private ArrayList<String> ozoneQuota;
+  private ArrayList<OzoneQuota.Units> unitQuota;
+  private ArrayList<Long> sizeQuota;
 
-    public QuotaList(){
-        OZONE_QUOTA = new ArrayList<String>();
-        unitQuota = new ArrayList<OzoneQuota.Units>();
-        sizeQuota = new ArrayList<Long>();
-    }
+  public QuotaList(){
+    ozoneQuota = new ArrayList<String>();
+    unitQuota = new ArrayList<OzoneQuota.Units>();
+    sizeQuota = new ArrayList<Long>();
+  }
 
-    public void addQuotaList(String oQuota, OzoneQuota.Units uQuota, Long sQuota){
-        OZONE_QUOTA.add(oQuota);
-        unitQuota.add(uQuota);
-        sizeQuota.add(sQuota);
-    }
+  public void addQuotaList(String oQuota, OzoneQuota.Units uQuota, Long sQuota){
+    ozoneQuota.add(oQuota);
+    unitQuota.add(uQuota);
+    sizeQuota.add(sQuota);
+  }
 
-    public OzoneQuota.Units getUnits(String oQuota){
-        return unitQuota.get(OZONE_QUOTA.indexOf(oQuota));
-    }
+  public ArrayList<String> getOzoneQuotaArray() {
+    return this.ozoneQuota;
+  }
 
-    public Long getQuotaSize(OzoneQuota.Units uQuota){
-        return sizeQuota.get(unitQuota.indexOf(uQuota));
-    }
+  public ArrayList<Long> getSizeQuotaArray() {
+    return this.sizeQuota;
+  }
 
-    public OzoneQuota.Units getQuotaUnit(Long sQuota){
-        return unitQuota.get(sizeQuota.indexOf(sQuota));
-    }
+  public ArrayList<OzoneQuota.Units> getUnitQuotaArray() {
+    return this.unitQuota;
+  }
+
+  public OzoneQuota.Units getUnits(String oQuota){
+    return unitQuota.get(ozoneQuota.indexOf(oQuota));
+  }
+
+  public Long getQuotaSize(OzoneQuota.Units uQuota){
+    return sizeQuota.get(unitQuota.indexOf(uQuota));
+  }
+
+  public OzoneQuota.Units getQuotaUnit(Long sQuota){
+    return unitQuota.get(sizeQuota.indexOf(sQuota));
+  }
 
 }

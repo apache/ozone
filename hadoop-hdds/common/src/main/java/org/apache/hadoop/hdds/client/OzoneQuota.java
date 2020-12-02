@@ -89,7 +89,7 @@ public final class OzoneQuota {
     public long sizeInBytes() {
       long sQuote = -1L;
       setQuotaList();
-      for(Units quota:quotaList.unitQuota){
+      for(Units quota:quotaList.getUnitQuotaArray()){
         if(quota == this.unit){
           sQuote = quotaList.getQuotaSize(quota);
           break;
@@ -171,7 +171,7 @@ public final class OzoneQuota {
     long quotaMultiplyExact = 0;
 
     try {
-      for(String quota:quotaList.OZONE_QUOTA){
+      for(String quota:quotaList.getOzoneQuotaArray()){
         if (uppercase.endsWith((quota))){
           size = uppercase
                   .substring(0, uppercase.length() - quota.length());
@@ -214,7 +214,7 @@ public final class OzoneQuota {
     long size = 1L;
     Units unit = Units.BYTES;
     setQuotaList();
-    for (Long quota:quotaList.sizeQuota){
+    for (Long quota:quotaList.getSizeQuotaArray()){
       if(quotaInBytes % quota == 0){
         size = quotaInBytes / quota;
         unit = quotaList.getQuotaUnit(quota);
