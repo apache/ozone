@@ -160,7 +160,7 @@ public final class OzoneQuota {
     setQuotaList();
     if (Strings.isNullOrEmpty(quotaInBytes)) {
       throw new IllegalArgumentException(
-         "Quota string cannot be null or empty.");
+          "Quota string cannot be null or empty.");
     }
 
     String uppercase = quotaInBytes.toUpperCase()
