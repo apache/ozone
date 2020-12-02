@@ -79,7 +79,6 @@ import org.apache.hadoop.hdds.scm.server.SCMClientProtocolServer;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeatureCatalog;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
@@ -92,9 +91,7 @@ import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
-import org.apache.hadoop.ozone.upgrade.TestUpgradeUtils;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
@@ -104,7 +101,6 @@ import org.junit.Test;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.rules.ExpectedException;
-import org.junit.rules.TemporaryFolder;
 import org.junit.rules.Timeout;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Mockito;
@@ -131,9 +127,6 @@ public class TestStorageContainerManager {
 
   @Rule
   public ExpectedException exception = ExpectedException.none();
-
-  @Rule
-  public TemporaryFolder folder= new TemporaryFolder();
 
   @BeforeClass
   public static void setup() throws IOException {
@@ -670,43 +663,6 @@ public class TestStorageContainerManager {
           CloseContainerCommandMatcher(dnUuid, commandForDatanode)));
     } finally {
       cluster.shutdown();
-    }
-  }
-
-  /**
-   * Tests that SCM will throw an exception on creation when it reads in a
-   * VERSION file indicating a metadata layout version larger than its
-   * software layout version.
-   * @throws Exception
-   */
-  @Test
-  public void testStartupSlvLessThanMlv() throws Exception {
-    // Add subdirectories under the temporary folder where the version file
-    // will be placed.
-    File scmSubdir = folder.newFolder("scm", "current");
-
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS,
-        folder.getRoot().getAbsolutePath());
-
-    // Set metadata layout version larger then software layout version.
-    int largestSlv = 0;
-    for (LayoutFeature f: HDDSLayoutFeatureCatalog.HDDSLayoutFeature.values()) {
-      largestSlv = Math.max(largestSlv, f.layoutVersion());
-    }
-    int mlv = largestSlv + 1;
-
-    // Create version file with MLV > SLV, which should fail the SCM
-    // construction.
-    TestUpgradeUtils.createVersionFile(scmSubdir, NodeType.SCM, mlv);
-
-    try {
-      new StorageContainerManager(conf);
-      Assert.fail("Expected IOException due to incorrect MLV on SCM creation.");
-    } catch(IOException e) {
-      String expectedMessage = String.format("Metadata layout version (%s) > " +
-              "software layout version (%s)", mlv, largestSlv);
-      GenericTestUtils.assertExceptionContains(expectedMessage, e);
     }
   }
 
