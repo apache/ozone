@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.HashSet;
 import java.util.Set;
 
 import org.apache.hadoop.ozone.common.Storage;
@@ -106,7 +107,6 @@ public final class OMLayoutVersionManagerImpl
           e,
           NOT_SUPPORTED_OPERATION);
     }
-
     registerOzoneManagerRequests();
   }
 
@@ -125,40 +125,48 @@ public final class OMLayoutVersionManagerImpl
 
   private void registerOzoneManagerRequests() {
     try {
-      Reflections reflections = new Reflections(new ConfigurationBuilder()
-          .setUrls(ClasspathHelper.forPackage(OM_REQUEST_CLASS_PACKAGE))
-          .setScanners(new SubTypesScanner())
-          .setExpandSuperTypes(false));
-
-      Set<Class<? extends OMClientRequest>> subTypes =
-          reflections.getSubTypesOf(OMClientRequest.class);
-      for (Class<? extends OMClientRequest> requestClass : subTypes) {
-        if (Modifier.isAbstract(requestClass.getModifiers())) {
-          continue;
-        }
+      for (Class<? extends OMClientRequest> reqClass : getRequestClasses()) {
         try {
-          Method getRequestTypeMethod = requestClass.getMethod(
+          Method getRequestTypeMethod = reqClass.getMethod(
               "getRequestType");
           String type = (String) getRequestTypeMethod.invoke(null);
           LOG.debug("Registering {} with OmVersionFactory.",
-              requestClass.getSimpleName());
+              reqClass.getSimpleName());
           BelongsToLayoutVersion annotation =
-              requestClass.getAnnotation(BelongsToLayoutVersion.class);
+              reqClass.getAnnotation(BelongsToLayoutVersion.class);
           if (annotation == null) {
             registerRequestType(type, INITIAL_VERSION.layoutVersion(),
-                requestClass);
+                reqClass);
           } else {
             registerRequestType(type, annotation.value().layoutVersion(),
-                requestClass);
+                reqClass);
           }
         } catch (NoSuchMethodException nsmEx) {
           LOG.warn("Found a class {} with request type not defined. ",
-              requestClass.getSimpleName());
+              reqClass.getSimpleName());
         }
       }
     } catch (Exception ex) {
       LOG.error("Exception registering OM client request.", ex);
     }
+  }
+
+  @VisibleForTesting
+  public static Set<Class<? extends OMClientRequest>> getRequestClasses() {
+    Reflections reflections = new Reflections(new ConfigurationBuilder()
+        .setUrls(ClasspathHelper.forPackage(OM_REQUEST_CLASS_PACKAGE))
+        .setScanners(new SubTypesScanner())
+        .setExpandSuperTypes(false));
+    Set<Class<? extends OMClientRequest>> validRequests = new HashSet<>();
+
+    Set<Class<? extends OMClientRequest>> subTypes =
+        reflections.getSubTypesOf(OMClientRequest.class);
+    for (Class<? extends OMClientRequest> requestClass : subTypes) {
+      if (!Modifier.isAbstract(requestClass.getModifiers())) {
+        validRequests.add(requestClass);
+      }
+    }
+    return validRequests;
   }
 
   private void registerRequestType(String type, int version,

@@ -16,39 +16,44 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.request.key;
+package org.apache.hadoop.ozone.om.request;
 
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.CREATE_EC;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.ERASURE_CODING;
 
-import java.io.IOException;
-
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.BelongsToLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
- * Handles Create EC Key  request. (To be removed later)
+ * Mock OM request which is unsupported still.
  */
-@BelongsToLayoutVersion(CREATE_EC)
-public class OMECKeyCreateRequest extends OMKeyCreateRequest {
+@BelongsToLayoutVersion(ERASURE_CODING)
+public class UnsupportedMockNewOMRequest extends OMClientRequest {
 
-  public OMECKeyCreateRequest(OMRequest omRequest) {
+  public UnsupportedMockNewOMRequest(OMRequest omRequest) {
     super(omRequest);
   }
 
   @Override
-  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    // V2 impl here.
-    return null;
+  public OMClientResponse validateAndUpdateCache(
+      OzoneManager ozoneManager,
+      long transactionLogIndex,
+      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+    return new OMClientResponse(
+        OMResponse.newBuilder().setSuccess(true).build()) {
+      @Override
+      protected void addToDBBatch(OMMetadataManager omMetadataManager,
+                                  BatchOperation batchOperation) {
+      }
+    };
   }
 
-  @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
-    // V2 impl here.
-    return null;
+  public static String getRequestType() {
+    return UnsupportedMockNewOMRequest.class.getSimpleName();
   }
-
 }

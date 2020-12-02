@@ -31,8 +31,11 @@ public class HDDSLayoutFeatureCatalog {
    * List of HDDS Features.
    */
   public enum HDDSLayoutFeature implements LayoutFeature {
+    //////////////////////////////  //////////////////////////////
     INITIAL_VERSION(0, "Initial Layout Version"),
     FIRST_UPGRADE_VERSION(1, "First Layout Version After Upgrade");
+
+    //////////////////////////////  //////////////////////////////
 
     private int layoutVersion;
     private String description;
