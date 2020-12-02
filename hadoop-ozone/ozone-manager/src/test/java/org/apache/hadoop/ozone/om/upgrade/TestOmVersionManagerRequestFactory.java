@@ -33,7 +33,8 @@ import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
-import org.apache.hadoop.ozone.om.request.key.OMECKeyCreateRequest;
+import org.apache.hadoop.ozone.om.request.UnsupportedMockNewOMRequest;
+import org.apache.hadoop.ozone.om.request.key.OMMockECKeyCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.junit.Assert;
@@ -72,7 +73,7 @@ public class TestOmVersionManagerRequestFactory {
 
     // Try getting 'CreateKey' again. Should return CreateECKey.
     requestType = omVersionManager.getRequestHandler(CreateKey.name());
-    Assert.assertEquals(requestType, OMECKeyCreateRequest.class);
+    Assert.assertEquals(requestType, OMMockECKeyCreateRequest.class);
   }
 
   @Test
@@ -87,6 +88,9 @@ public class TestOmVersionManagerRequestFactory {
             .collect(Collectors.toList());
 
     for (Class<? extends OMClientRequest> c : collect) {
+      if (c.equals(UnsupportedMockNewOMRequest.class)) {
+        continue;
+      }
       Method getRequestTypeMethod = null;
       try {
         getRequestTypeMethod = c.getMethod("getRequestType");

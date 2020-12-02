@@ -23,7 +23,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 /**
  * Stub OM Action class to help with understanding. Will be removed.
  */
-public class NewOmFeatureUpgradeAction implements OmUpgradeAction {
+public class ECFeatureOnFinalizeAction implements OmUpgradeAction {
 
   @Override
   public void executeAction(OzoneManager ozoneManager) {

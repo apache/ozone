@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.CREATE_EC;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.ERASURE_CODING;
 
 /**
  * Test util class. To be removed.
@@ -31,7 +31,7 @@ public class OMLayoutFeatureUtil {
    * "disallowed" by just adding the following annotation, thereby keeping the
    * method logic and upgrade logic separate.
    */
-  @DisallowedUntilLayoutVersion(CREATE_EC)
+  @DisallowedUntilLayoutVersion(ERASURE_CODING)
   public String ecMethod() {
     // Blah Blah EC Blah....
     return "ec";

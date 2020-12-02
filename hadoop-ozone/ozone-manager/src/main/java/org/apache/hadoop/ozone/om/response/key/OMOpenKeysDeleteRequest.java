@@ -41,6 +41,7 @@ import java.util.HashMap;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteOpenKeys;
 
 /**
  * Handles requests to move open keys from the open key table to the delete
@@ -188,5 +189,9 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
     }
 
     return deletedKeys;
+  }
+
+  public static String getRequestType() {
+    return DeleteOpenKeys.name();
   }
 }
