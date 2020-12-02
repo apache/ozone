@@ -36,6 +36,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import org.apache.ratis.server.impl.RaftServerImpl;
 import org.apache.ratis.server.impl.RaftServerProxy;
 import org.apache.ratis.server.raftlog.RaftLog;
+import org.apache.ratis.server.raftlog.RaftLogIndex;
 import org.apache.ratis.statemachine.StateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,8 +107,7 @@ public class OMPrepareRequest extends OMClientRequest {
       RaftServerImpl serverImpl =
           server.getImpl(omRatisServer.getRaftGroup().getGroupId());
 
-      takeSnapshotAndPurgeLogs(((RaftServerProxy) omRatisServer.getServer())
-          .getImpl(omRatisServer.getRaftGroup().getGroupId()));
+      takeSnapshotAndPurgeLogs(serverImpl);
 
       // TODO: Create marker file with txn index.
 
@@ -166,36 +166,29 @@ public class OMPrepareRequest extends OMClientRequest {
    */
   public static long takeSnapshotAndPurgeLogs(RaftServerImpl impl)
       throws IOException {
-
     StateMachine stateMachine = impl.getStateMachine();
     long snapshotIndex = stateMachine.takeSnapshot();
+    RaftLog raftLog = impl.getState().getLog();
+    long raftLogIndex = raftLog.getLastEntryTermIndex().getIndex();
 
-    // If the snapshot indices from Ratis and the state machine do not match,
-    // the exception is propagated, resulting in an error response to the
-    // client. They can retry the prepare request.
-    if (snapshotIndex != stateMachine.getLastAppliedTermIndex().getIndex()) {
-      throw new IOException("Index from Snapshot does not match last applied " +
-          "Index");
+    if (snapshotIndex != raftLogIndex) {
+      throw new IOException("Snapshot index " + snapshotIndex + " does not " +
+          "match last log index " + raftLogIndex);
     }
 
-    RaftLog raftLog = impl.getState().getLog();
-    // In order to get rid of all logs, make sure we also account for
-    // intermediate Ratis entries that do not pertain to OM.
-    long lastIndex = Math.max(snapshotIndex,
-        raftLog.getLastEntryTermIndex().getIndex());
-
     CompletableFuture<Long> purgeFuture =
-        raftLog.syncWithSnapshot(lastIndex);
+        raftLog.syncWithSnapshot(snapshotIndex);
     try {
       Long purgeIndex = purgeFuture.get();
-      if (purgeIndex != lastIndex) {
+      if (purgeIndex != snapshotIndex) {
         throw new IOException("Purge index " + purgeIndex +
-            " does not match last index " + lastIndex);
+            " does not match last index " + snapshotIndex);
       }
     } catch (Exception e) {
       throw new IOException("Unable to purge logs.", e);
     }
-    return lastIndex;
+
+    return snapshotIndex;
   }
 
   public static String getRequestType() {
