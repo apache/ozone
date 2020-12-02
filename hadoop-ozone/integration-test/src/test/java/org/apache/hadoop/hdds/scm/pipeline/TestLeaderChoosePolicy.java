@@ -38,7 +38,7 @@ import java.util.UUID;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PIPELINE_LIMIT;
 
 /**
  * Tests for LeaderChoosePolicy.
@@ -54,7 +54,7 @@ public class TestLeaderChoosePolicy {
       throws Exception {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         GenericTestUtils.getRandomizedTempPath());
-    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, datanodePipelineLimit);
+    conf.setInt(OZONE_SCM_DATANODE_PIPELINE_LIMIT, datanodePipelineLimit);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
             .setNumDatanodes(numDatanodes)

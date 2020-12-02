@@ -59,7 +59,7 @@ import java.util.function.Predicate;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PIPELINE_LIMIT;
 
 /**
  * Tests delete key operation with a slow follower in the datanode
@@ -108,7 +108,7 @@ public class TestContainerReplicationEndToEnd {
         conf.getObject(ReplicationManagerConfiguration.class);
     replicationConf.setInterval(Duration.ofMillis(containerReportInterval));
     conf.setFromObject(replicationConf);
-    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 2);
+    conf.setInt(OZONE_SCM_DATANODE_PIPELINE_LIMIT, 2);
 
     conf.setQuietMode(false);
     cluster =
