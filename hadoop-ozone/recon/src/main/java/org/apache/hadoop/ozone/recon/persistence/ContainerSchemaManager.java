@@ -23,8 +23,8 @@ import static org.jooq.impl.DSL.count;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
-import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.daos.ContainerHistoryDao;
@@ -50,8 +50,9 @@ public class ContainerSchemaManager {
   private UnhealthyContainersDao unhealthyContainersDao;
   private ContainerSchemaDefinition containerSchemaDefinition;
 
-  // TODO: Move this?
-  public Map<Long, Map<String, ContainerReplicaHistory>> historyMap = new ConcurrentHashMap<>();
+  // TODO: Move?
+  public Map<Long, Map<ContainerReplica, Long>> seenMap =
+      new ConcurrentHashMap<>();
 
   @Inject
   public ContainerSchemaManager(ContainerHistoryDao containerHistoryDao,
@@ -119,7 +120,7 @@ public class ContainerSchemaManager {
     unhealthyContainersDao.insert(recs);
   }
 
-  // TODO: REMOVE THIS FUNCTION
+  // TODO: Improve
   public void upsertContainerHistory(long containerID, String datanode,
                                      long time) {
     DSLContext dslContext = containerSchemaDefinition.getDSLContext();
@@ -146,21 +147,30 @@ public class ContainerSchemaManager {
         containerHistoryDao.fetchByContainerId(containerID);
 
     // Update result with in-memory map
-    Map<String, ContainerReplicaHistory> dnReplicaHistoryMap =
-        historyMap.get(containerID);
+    Map<ContainerReplica, Long> dnReplicaHistoryMap = seenMap.get(containerID);
     if (dnReplicaHistoryMap != null) {
       for (ContainerHistory containerHistory : result) {
         final String dnHost = containerHistory.getDatanodeHost();
-        ContainerReplicaHistory crh = dnReplicaHistoryMap.get(dnHost);
-        if (crh != null) {
-          containerHistory.setLastReportTimestamp(crh.getLastSeenTime());
+
+        // TODO: This nested loop will and must be eliminated.
+        //  For testing correctness only.
+        for (ContainerReplica replica : dnReplicaHistoryMap.keySet()) {
+          if (dnHost.equals(replica.getDatanodeDetails().getHostName())) {
+            final Long lastSeen = dnReplicaHistoryMap.get(replica);
+            if (lastSeen != null) {
+              containerHistory.setLastReportTimestamp(lastSeen);
+            }
+            break;
+          }
         }
+
       }
     }
 
     return result;
   }
 
+  // TODO: Check
   public List<ContainerHistory> getLatestContainerHistory(long containerID,
                                                           int limit) {
     DSLContext dslContext = containerSchemaDefinition.getDSLContext();

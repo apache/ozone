@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.FI
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -182,32 +183,42 @@ public class ReconContainerManager extends SCMContainerManager {
       ContainerReplica replica)
       throws ContainerNotFoundException {
     super.updateContainerReplica(containerID, replica);
-    long currentTime = System.currentTimeMillis();
-    String datanodeHost = replica.getDatanodeDetails().getHostName();
-
-    // If the replica doesn't exist in in-memory map, add to DB and add to map
-    // TODO: SCMContainerManager Table<ContainerID, ContainerInfo> containerStore already has some info. use that for DB write?
+    final long currTime = System.currentTimeMillis();
 
     final long id = containerID.getId();
-    Map<String, ContainerReplicaHistory> dnReplicaHistoryMap =
-        containerSchemaManager.historyMap.get(id);
+    // Map from DataNode (UUID) to container replica last seen time
+    Map<ContainerReplica, Long> lastSeenOnDNs =
+        containerSchemaManager.seenMap.get(id);
 
-    if (dnReplicaHistoryMap == null) {
+    // If the replica doesn't exist in in-memory map, add to DB and add to map
+    if (lastSeenOnDNs == null) {
       // New ContainerID.
-      // Note there could still be slight collision,
-      // but it should be fine for the use case.
-      containerSchemaManager.historyMap.putIfAbsent(id,
-          new ConcurrentHashMap<String, ContainerReplicaHistory>() {{
-            put(datanodeHost, new ContainerReplicaHistory(currentTime, currentTime));
+      containerSchemaManager.seenMap.putIfAbsent(id,
+          new ConcurrentHashMap<ContainerReplica, Long>() {{
+            put(replica, currTime);
           }});
-      // Flush to DB
-      containerSchemaManager.upsertContainerHistory(id, datanodeHost, currentTime);
+      // Flush to DB. TODO: Use RocksDB.
+      // NOTE: SCMContainerManager already has Table<ContainerID, ContainerInfo>
+      // TODO: Use UUID instead of host name as identifier in DB.
+      containerSchemaManager.upsertContainerHistory(
+          id, replica.getDatanodeDetails().getHostName(), currTime);
     } else {
-      // ContainerID exists.
-      ContainerReplicaHistory replicaHistory = dnReplicaHistoryMap.get(datanodeHost);
-      assert(replicaHistory != null);
-      // Update timestamp in memory only
-      replicaHistory.setLastSeenTime(currentTime);
+      // ContainerID exists, update timestamp in memory.
+      lastSeenOnDNs.put(replica, currTime);
+
+      // Flush any DataNodes removed from the replica set to DB
+      // THOUGHT: Or just put this flush logic in removeContainerReplica() ?
+      Set<ContainerReplica> replicas = getContainerReplicas(containerID);
+      for (ContainerReplica dnReplica : lastSeenOnDNs.keySet()) {
+        if (!replicas.contains(dnReplica)) {
+          // Flush to DB. TODO: Use RocksDB.
+          final long lastSeenTime = lastSeenOnDNs.get(dnReplica);
+          containerSchemaManager.upsertContainerHistory(
+              id, dnReplica.getDatanodeDetails().getHostName(), lastSeenTime);
+          // Remove from map
+          lastSeenOnDNs.remove(dnReplica);
+        }
+      }
     }
 
   }
