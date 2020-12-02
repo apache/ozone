@@ -44,6 +44,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+
 /**
  * Integration tests for the open key cleanup service on OM.
  */
@@ -438,7 +440,20 @@ public class TestOpenKeyCleanupService {
     }
 
     for (int i = 0; i < numKeys; i++) {
-      String key = UUID.randomUUID().toString();
+      String key = null;
+      if (i == 0) {
+        // Add one messy key with lots of separators for testing.
+        key = OM_KEY_PREFIX +
+            UUID.randomUUID().toString() +
+            OM_KEY_PREFIX +
+            OM_KEY_PREFIX +
+            UUID.randomUUID().toString() +
+            OM_KEY_PREFIX +
+            OM_KEY_PREFIX;
+      } else {
+        key = UUID.randomUUID().toString();
+      }
+
       long clientID = new Random().nextLong();
 
       OmKeyInfo keyInfo = TestOMRequestUtils.createOmKeyInfo(volume,

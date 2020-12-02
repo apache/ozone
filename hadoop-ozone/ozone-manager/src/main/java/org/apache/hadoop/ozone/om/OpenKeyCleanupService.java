@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,6 +66,8 @@ public class OpenKeyCleanupService extends BackgroundService {
 
   private final OzoneManager ozoneManager;
   private final KeyManager keyManager;
+  // Dummy client ID to use for response, since this is triggered by a
+  // service, not the client.
   private final ClientId clientId = ClientId.randomId();
   private final TimeDuration expireThreshold;
   private final int cleanupLimitPerTask;
@@ -222,30 +225,34 @@ public class OpenKeyCleanupService extends BackgroundService {
    */
   private void addToMap(Map<Pair<String, String>, List<OpenKey>>
       openKeysPerBucket, String openKeyName) {
-    // Parse volume and bucket name
-    String[] split = openKeyName.split(OM_KEY_PREFIX);
-
     // First element of the split is an empty string since the key begins
     // with the separator.
-    Preconditions.assertTrue(split.length == 5, "Unable to separate volume, " +
-            "bucket, key, and client ID from open key {}.", openKeyName);
+    // Key may contain multiple instances of the separator as well, for example:
+    // /volume/bucket/dir1//dir2/dir3/file1////10000
+    String[] split = openKeyName.split(OM_KEY_PREFIX);
+    Preconditions.assertTrue(split.length >= 5, "Unable to separate volume, " +
+        "bucket, key, and client ID from open key {}.", openKeyName);
 
     Pair<String, String> volumeBucketPair = Pair.of(split[1], split[2]);
+    String key = String.join(OM_KEY_PREFIX,
+        Arrays.copyOfRange(split, 3, split.length - 1));
+    String clientID = split[split.length - 1];
+
     if (!openKeysPerBucket.containsKey(volumeBucketPair)) {
       openKeysPerBucket.put(volumeBucketPair, new ArrayList<>());
     }
 
     try {
       OpenKey openKey = OpenKey.newBuilder()
-          .setName(split[3])
-          .setClientID(Long.parseLong(split[4]))
+          .setName(key)
+          .setClientID(Long.parseLong(clientID))
           .build();
       openKeysPerBucket.get(volumeBucketPair).add(openKey);
     } catch (NumberFormatException ex) {
       // If the client ID cannot be parsed correctly, do not add the key to
       // the map.
       LOG.error("Failed to parse client ID {} as a long from open key {}.",
-          split[4], openKeyName, ex);
+          clientID, openKeyName, ex);
     }
   }
 }
