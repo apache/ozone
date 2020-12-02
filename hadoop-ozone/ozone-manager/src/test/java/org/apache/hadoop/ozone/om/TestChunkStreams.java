@@ -58,7 +58,7 @@ public class TestChunkStreams {
               }
 
               @Override
-              public synchronized long getPos() throws IOException {
+              public synchronized long getPos() {
                 return pos;
               }
 
@@ -114,7 +114,7 @@ public class TestChunkStreams {
               }
 
               @Override
-              public synchronized long getPos() throws IOException {
+              public synchronized long getPos() {
                 return pos;
               }
 

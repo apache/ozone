@@ -15,29 +15,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.fs.ozone;
+package org.apache.hadoop.fs.ozone.contract.rooted;
 
-import org.apache.hadoop.fs.FileSystem.Statistics;
-import org.apache.hadoop.fs.StreamCapabilities;
-import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.contract.AbstractContractUnbufferTest;
+import org.apache.hadoop.fs.contract.AbstractFSContract;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 
-import java.io.InputStream;
+import java.io.IOException;
 
-final class CapableOzoneFSInputStream extends OzoneFSInputStream
-    implements StreamCapabilities {
+/**
+ * Ozone contract tests for {@link org.apache.hadoop.fs.CanUnbuffer#unbuffer}.
+ */
+public class ITestRootedOzoneContractUnbuffer
+    extends AbstractContractUnbufferTest {
 
-  CapableOzoneFSInputStream(InputStream inputStream, Statistics statistics) {
-    super(inputStream, statistics);
+  @BeforeClass
+  public static void createCluster() throws IOException {
+    RootedOzoneContract.createCluster();
+  }
+
+  @AfterClass
+  public static void teardownCluster() {
+    RootedOzoneContract.destroyCluster();
   }
 
   @Override
-  public boolean hasCapability(String capability) {
-    switch (StringUtils.toLowerCase(capability)) {
-    case OzoneStreamCapabilities.READBYTEBUFFER:
-    case OzoneStreamCapabilities.UNBUFFER:
-      return true;
-    default:
-      return false;
-    }
+  protected AbstractFSContract createContract(Configuration conf) {
+    return new RootedOzoneContract(conf);
   }
 }
