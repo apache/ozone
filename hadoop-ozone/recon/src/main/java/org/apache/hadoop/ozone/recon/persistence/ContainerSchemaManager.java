@@ -24,6 +24,7 @@ import static org.jooq.impl.DSL.count;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
+import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.daos.ContainerHistoryDao;
@@ -37,6 +38,8 @@ import org.jooq.Record;
 import org.jooq.Record2;
 import org.jooq.SelectQuery;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Provide a high level API to access the Container Schema.
@@ -46,6 +49,9 @@ public class ContainerSchemaManager {
   private ContainerHistoryDao containerHistoryDao;
   private UnhealthyContainersDao unhealthyContainersDao;
   private ContainerSchemaDefinition containerSchemaDefinition;
+
+  // TODO: Move this?
+  public Map<Long, Map<String, ContainerReplicaHistory>> historyMap = new ConcurrentHashMap<>();
 
   @Inject
   public ContainerSchemaManager(ContainerHistoryDao containerHistoryDao,
@@ -113,6 +119,7 @@ public class ContainerSchemaManager {
     unhealthyContainersDao.insert(recs);
   }
 
+  // TODO: REMOVE THIS FUNCTION
   public void upsertContainerHistory(long containerID, String datanode,
                                      long time) {
     DSLContext dslContext = containerSchemaDefinition.getDSLContext();
@@ -135,7 +142,23 @@ public class ContainerSchemaManager {
   }
 
   public List<ContainerHistory> getAllContainerHistory(long containerID) {
-    return containerHistoryDao.fetchByContainerId(containerID);
+    List<ContainerHistory> result =
+        containerHistoryDao.fetchByContainerId(containerID);
+
+    // Update result with in-memory map
+    Map<String, ContainerReplicaHistory> dnReplicaHistoryMap =
+        historyMap.get(containerID);
+    if (dnReplicaHistoryMap != null) {
+      for (ContainerHistory containerHistory : result) {
+        final String dnHost = containerHistory.getDatanodeHost();
+        ContainerReplicaHistory crh = dnReplicaHistoryMap.get(dnHost);
+        if (crh != null) {
+          containerHistory.setLastReportTimestamp(crh.getLastSeenTime());
+        }
+      }
+    }
+
+    return result;
   }
 
   public List<ContainerHistory> getLatestContainerHistory(long containerID,

@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.recon.scm;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.FINALIZE;
 
 import java.io.IOException;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -170,7 +172,7 @@ public class ReconContainerManager extends SCMContainerManager {
   }
 
   /**
-   * Add a container Replica for given DataNode.
+   * Add a container Replica for given DataNode. Thread safe.
    *
    * @param containerID
    * @param replica
@@ -180,11 +182,34 @@ public class ReconContainerManager extends SCMContainerManager {
       ContainerReplica replica)
       throws ContainerNotFoundException {
     super.updateContainerReplica(containerID, replica);
-    // Update container_history table
     long currentTime = System.currentTimeMillis();
     String datanodeHost = replica.getDatanodeDetails().getHostName();
-    containerSchemaManager.upsertContainerHistory(containerID.getId(),
-        datanodeHost, currentTime);
+
+    // If the replica doesn't exist in in-memory map, add to DB and add to map
+    // TODO: SCMContainerManager Table<ContainerID, ContainerInfo> containerStore already has some info. use that for DB write?
+
+    final long id = containerID.getId();
+    Map<String, ContainerReplicaHistory> dnReplicaHistoryMap =
+        containerSchemaManager.historyMap.get(id);
+
+    if (dnReplicaHistoryMap == null) {
+      // New ContainerID.
+      // Note there could still be slight collision,
+      // but it should be fine for the use case.
+      containerSchemaManager.historyMap.putIfAbsent(id,
+          new ConcurrentHashMap<String, ContainerReplicaHistory>() {{
+            put(datanodeHost, new ContainerReplicaHistory(currentTime, currentTime));
+          }});
+      // Flush to DB
+      containerSchemaManager.upsertContainerHistory(id, datanodeHost, currentTime);
+    } else {
+      // ContainerID exists.
+      ContainerReplicaHistory replicaHistory = dnReplicaHistoryMap.get(datanodeHost);
+      assert(replicaHistory != null);
+      // Update timestamp in memory only
+      replicaHistory.setLastSeenTime(currentTime);
+    }
+
   }
 
   public ContainerSchemaManager getContainerSchemaManager() {
