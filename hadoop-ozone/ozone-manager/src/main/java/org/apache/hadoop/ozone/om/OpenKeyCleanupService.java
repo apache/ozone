@@ -130,7 +130,7 @@ public class OpenKeyCleanupService extends BackgroundService {
       // OzoneManager can be null for testing
       return true;
     }
-    return ozoneManager.isLeader();
+    return ozoneManager.isLeaderReady();
   }
 
   private class OpenKeyCleanupTask implements BackgroundTask {
