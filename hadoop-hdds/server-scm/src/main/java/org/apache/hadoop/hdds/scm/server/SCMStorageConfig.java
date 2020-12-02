@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.common.Storage;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
-import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.STORAGE_DIR;
@@ -69,7 +68,11 @@ public class SCMStorageConfig extends Storage {
   protected Properties getNodeProperties() {
     String scmId = getScmId();
     if (scmId == null) {
-      scmId = UUID.randomUUID().toString();
+      // TODO:
+      //  Please check https://issues.apache.org/jira/browse/HDDS-4538
+      //  hard code clusterID and scmUuid on HDDS-2823,
+      //  so that multi SCMs won't cause chaos in Datanode side.
+      scmId = "3a11fedb-cce5-46ac-bb0d-cfdf17df9a19";
     }
     Properties scmProperties = new Properties();
     scmProperties.setProperty(SCM_ID, scmId);
