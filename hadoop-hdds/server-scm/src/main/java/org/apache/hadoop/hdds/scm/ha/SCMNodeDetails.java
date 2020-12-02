@@ -37,7 +37,10 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import sun.nio.ch.Net;
 
+import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 
@@ -127,8 +130,8 @@ public final class SCMNodeDetails {
       return this;
     }
 
-    public Builder setRaftGroup(RaftGroup rpcAddr) {
-      this.raftGroup = raftGroup;
+    public Builder setRaftGroup(RaftGroup group) {
+      this.raftGroup = group;
       return this;
     }
 
@@ -175,6 +178,18 @@ public final class SCMNodeDetails {
     }
   }
 
+  public RaftPeerId getSelfPeerId() {
+    return selfPeerId;
+  }
+
+  public RaftGroupId getRaftGroupId() {
+    return raftGroup.getGroupId();
+  }
+
+  public RaftGroup getRaftGroup() {
+    return raftGroup;
+  }
+
   public String getSCMServiceId() {
     return scmServiceId;
   }
@@ -197,6 +212,18 @@ public final class SCMNodeDetails {
 
   public String getRpcAddressString() {
     return NetUtils.getHostPortString(rpcAddress);
+  }
+
+  public InetSocketAddress getDatanodeProtocolServerAddress() {
+    return NetUtils.createSocketAddr(datanodeProtocolServerAddress);
+  }
+
+  public InetSocketAddress getClientProtocolServerAddress() {
+    return NetUtils.createSocketAddr(clientProtocolServerAddress);
+  }
+
+  public InetSocketAddress getBlockProtocolServerAddress() {
+    return NetUtils.createSocketAddr(blockProtocolServerAddress);
   }
 
   public static SCMNodeDetails initStandAlone(
@@ -238,8 +265,8 @@ public final class SCMNodeDetails {
     LOG.info("ServiceID for StorageContainerManager is {}", localScmServiceId);
     String scmNodeId = conf.get(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY);
     if (scmNodeId == null) {
-      String errorMessage = "SCM NODE ID is not provided by ozone.scm.node.id "
-              + conf.get(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY);
+      String errorMessage = "SCM NODE ID is not provided by "
+              + ScmConfigKeys.OZONE_SCM_NODE_ID_KEY;
       throw new IOException(errorMessage);
     }
     RaftPeerId selfPeerId = RaftPeerId.getRaftPeerId(scmNodeId);
@@ -260,11 +287,10 @@ public final class SCMNodeDetails {
       raftPeers.add(new RaftPeer(peerId, ratisAddr + ":" + ratisPort));
     }
 
-    LOG.info("Build a RaftGroup for SCMHA: {} ", raftPeers);
+    LOG.info("Building a RaftGroup for Scm HA: {} ", raftPeers);
 
     RaftGroupId raftGroupId = RaftGroupId.valueOf(UUID.nameUUIDFromBytes(
             localScmServiceId.getBytes(StandardCharsets.UTF_8)));
-
     RaftGroup raftGroup = RaftGroup.valueOf(raftGroupId, raftPeers);
 
     SCMNodeDetails.Builder builder = new Builder();
@@ -272,8 +298,48 @@ public final class SCMNodeDetails {
             .setSCMServiceId(localScmServiceId)
             .setRatisPort(thisRatisAddr.getPort())
             .setRaftGroup(raftGroup)
-            .setSelfPeerId(selfPeerId);
+            .setSelfPeerId(selfPeerId)
+            .setHttpAddress(loadHAHttpAddress(conf, localScmServiceId, scmNodeId))
+            .setHttpsAddress(loadHAHttpsAddress(conf, localScmServiceId, scmNodeId))
+            .setBlockProtocolServerAddress(loadHAScmBlockProtocolServerAddress(conf, localScmServiceId, scmNodeId))
+            .setClientProtocolServerAddress(loadHAClientProtocolServerAddress(conf, localScmServiceId, scmNodeId))
+            .setDatanodeProtocolServerAddress(loadHADatanodeProtocolServerAddress(conf, localScmServiceId, scmNodeId));
 
     return builder.build();
+  }
+
+  private static String loadHAScmBlockProtocolServerAddress(OzoneConfiguration config,
+      String localScmServiceId, String nodeId) {
+    String addressKey = ScmUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
+        localScmServiceId, nodeId);
+    return config.get(addressKey);
+  }
+
+  private static String loadHAClientProtocolServerAddress(OzoneConfiguration config,
+      String localScmServiceId, String nodeId) {
+    String addressKey = ScmUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY,
+        localScmServiceId, nodeId);
+    return config.get(addressKey);
+  }
+
+  private static String loadHADatanodeProtocolServerAddress(OzoneConfiguration config,
+      String localScmServiceId, String nodeId) {
+    String addressKey = ScmUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY,
+        localScmServiceId, nodeId);
+    return config.get(addressKey);
+  }
+
+  private static String loadHAHttpAddress(OzoneConfiguration config,
+      String localScmServiceId, String nodeId) {
+    String addressKey = ScmUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY,
+        localScmServiceId, nodeId);
+    return config.get(addressKey);
+  }
+
+  private static String loadHAHttpsAddress(OzoneConfiguration config,
+      String localScmServiceId, String nodeId) {
+    String addressKey = ScmUtils.addKeySuffixes(ScmConfigKeys.OZONE_SCM_HTTPS_ADDRESS_KEY,
+        localScmServiceId, nodeId);
+    return config.get(addressKey);
   }
 }

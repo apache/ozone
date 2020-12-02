@@ -27,6 +27,7 @@ import java.util.*;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmUtils;
+import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAConfiguration;
 import org.apache.hadoop.hdds.scm.safemode.HealthyPipelineSafeModeRule;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
@@ -316,7 +317,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       ReconServer reconServer = null;
       try {
         createSCMService();
-//        createOMService();
+        createOMService();
         if (includeRecon) {
           configureRecon();
           reconServer = new ReconServer();
@@ -346,15 +347,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       initializeScmStorage(scmStore);
       SCMConfigurator configurator = new SCMConfigurator();
       StorageContainerManager scm = StorageContainerManager.createSCM(conf, configurator);
-//      StorageContainerManager scm = TestUtils.getScm(conf, configurator);
-//      StorageContainerManager scm = TestUtils.getScmSimple(conf);
-//      HealthyPipelineSafeModeRule rule =
-//              scm.getScmSafeModeManager().getHealthyPipelineSafeModeRule();
-//      if (rule != null) {
-//        // Set threshold to wait for safe mode exit - this is needed since a
-//        // pipeline is marked open only after leader election.
-//        rule.setHealthyPipelineThresholdCount(numOfDatanodes / 3);
-//      }
       return scm;
     }
 
@@ -414,8 +406,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         try {
           basePort = 20000 + RANDOM.nextInt(1000) * 4;
           initSCMHAConfig(basePort);
-          int port = basePort;
-          for (int i = 1; i <= numOfSCMs; i++, port+=6) {
+          // int port = basePort;
+          for (int i = 1; i <= numOfSCMs; i++) {
             String scmNodeId = scmNodeIdBaseStr + i;
             OzoneConfiguration config = new OzoneConfiguration(conf);
             config.set(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY, scmNodeId);
@@ -429,17 +421,15 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
           }
           break;
         } catch (BindException e) {
-          throw new RuntimeException(e);
-//          for (StorageContainerManager scm : scmList) {
-//            scm.stop();
-//            scm.join();
-//            LOG.info("Stopping SCM server at client Rpc: {}, Datanode Rpc:{}",
-//                scm.getClientRpcAddress(), scm.getDatanodeRpcAddress());
-//          }
-//          scmList.clear();
-//          ++retryCount;
-//          LOG.info("MiniOzoneHACluster port conflicts, retried {} times",
-//              retryCount);
+         for (StorageContainerManager scm : scmList) {
+           scm.stop();
+           scm.join();
+           LOG.info("Stopping SCM server: {}", scm.getSCMNodeDetails());
+         }
+         scmList.clear();
+         ++retryCount;
+         LOG.info("MiniOzoneHACluster port conflicts, retried {} times",
+             retryCount);
         }
       }
 
@@ -547,11 +537,11 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
             ScmConfigKeys.OZONE_SCM_RATIS_BIND_ADDRESS_KEY, scmServiceId, scmNodeId);
 
         conf.set(scmClientAddrKey, "127.0.0.1:" + port);
-        conf.set(scmBlockClientAddrKey, "127.0.0.1:" + (port + 2));
-        conf.set(scmDatanodeAddrKey, "127.0.0.1:" + (port + 3));
-        conf.setInt(scmHttpAddrKey, port + 4);
-        conf.setInt(scmHttpsAddrKey, port + 5);
-        conf.setInt(scmRatisProtKey, port + 6);
+        conf.set(scmBlockClientAddrKey, "127.0.0.1:" + (port + 1));
+        conf.set(scmDatanodeAddrKey, "127.0.0.1:" + (port + 2));
+        conf.set(scmHttpAddrKey, "127.0.0.1:" + (port + 3));
+        conf.set(scmHttpsAddrKey, "127.0.0.1:" + (port + 4));
+        conf.setInt(scmRatisProtKey, port + 5);
         conf.set(scmRatisAddressKey, "127.0.0.1");
       }
 
@@ -601,19 +591,23 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
           throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> {
       boolean status = false;
+      boolean foundLead = false;
       for (StorageContainerManager scm : storageContainerManagers) {
-//        final int healthy = scm.getNodeCount(HEALTHY);
-        final boolean foundLead = scm.getScmHAManager().isLeader();
-//        final boolean exitSafeMode = !scm.isInSafeMode();
-//        LOG.info(exitSafeMode ? "Cluster exits safe mode" :
-//                        "Waiting for cluster to exit safe mode",
-//                healthy);
-        status |= foundLead;
-      }
+       final int healthy = scm.getNodeCount(HEALTHY);
+       foundLead = scm.getScmHAManager().isLeader();
+       final boolean exitSafeMode = !scm.isInSafeMode();
+       LOG.info(exitSafeMode ? "Cluster exits safe mode" :
+                       "Waiting for cluster to exit safe mode",
+               healthy);
 
-     LOG.info(status ? "Cluster has elected a SCM leader" :
-                        "Waiting for SCM to elect a leader");
+        status |= foundLead;
+        status &= exitSafeMode;
+      }
+      LOG.info(foundLead ? "Cluster has elected a SCM leader" :
+          "Waiting for SCM to elect a leader");
+
       return status;
     }, 1000, waitForClusterToBeReadyTimeout);
+    System.out.println();
   }
 }

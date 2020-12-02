@@ -52,6 +52,7 @@ import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -169,6 +170,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private SCMMetadataStore scmMetadataStore;
   private SCMHAManager scmHAManager;
 
+  private SCMNodeDetails scmNodeDetails;
+
   private final EventQueue eventQueue;
   /*
    * HTTP endpoint for JMX access.
@@ -254,6 +257,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           "failure.", ResultCodes.SCM_NOT_INITIALIZED);
     }
 
+    if (conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
+        ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT)) {
+      scmNodeDetails = SCMNodeDetails.initHA(conf);
+    }
+
     /**
      * Important : This initialization sequence is assumed by some of our tests.
      * The testSecureOzoneCluster assumes that security checks have to be
@@ -286,7 +294,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             HDDS_SCM_WATCHER_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
     commandWatcherLeaseManager = new LeaseManager<>("CommandWatcher",
         watcherTimeout);
-    initializeSystemManagers(conf, configurator);
+    initializeSystemManagers(conf, configurator, scmNodeDetails);
 
     CloseContainerEventHandler closeContainerHandler =
         new CloseContainerEventHandler(pipelineManager, containerManager);
@@ -416,7 +424,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @throws IOException - on Failure.
    */
   private void initializeSystemManagers(OzoneConfiguration conf,
-                                       SCMConfigurator configurator)
+                                       SCMConfigurator configurator,
+                                       SCMNodeDetails scmNodeDetails)
       throws IOException {
     if (configurator.getNetworkTopology() != null) {
       clusterMap = configurator.getNetworkTopology();
@@ -427,7 +436,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getSCMHAManager() != null) {
       scmHAManager = configurator.getSCMHAManager();
     } else {
-      scmHAManager = new SCMHAManagerImpl(conf);
+      scmHAManager = new SCMHAManagerImpl(conf, scmNodeDetails);
     }
 
     if(configurator.getScmNodeManager() != null) {
@@ -1029,6 +1038,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public ReplicationManager getReplicationManager() {
     return replicationManager;
+  }
+
+  @Override
+  public SCMNodeDetails getSCMNodeDetails() {
+    return scmNodeDetails;
   }
 
   /**

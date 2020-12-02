@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
@@ -118,9 +119,12 @@ public class SCMBlockProtocolServer implements
                 new ScmBlockLocationProtocolServerSideTranslatorPB(this,
                     protocolMessageMetrics));
 
-//    final InetSocketAddress scmBlockAddress = HddsServerUtil
-//        .getScmBlockClientBindAddress(conf);
-    InetSocketAddress scmBlockAddress = new InetSocketAddress("127.0.0.1", new ServerSocket(0).getLocalPort());
+    InetSocketAddress scmBlockAddress;
+    if (conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT)) {
+      scmBlockAddress = scm.getSCMNodeDetails().getBlockProtocolServerAddress();
+    } else {
+      scmBlockAddress = HddsServerUtil.getScmBlockClientBindAddress(conf);
+    }
 
     blockRpcServer =
         startRpcServer(

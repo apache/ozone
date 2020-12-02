@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ScmOps;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -126,9 +127,12 @@ public class SCMClientProtocolServer implements
             new StorageContainerLocationProtocolServerSideTranslatorPB(this,
                 protocolMetrics));
 
-//    final InetSocketAddress scmAddress = HddsServerUtil
-//        .getScmClientBindAddress(conf);
-    InetSocketAddress scmAddress = new InetSocketAddress("127.0.0.1", new ServerSocket(0).getLocalPort());
+    InetSocketAddress scmAddress;
+    if (conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT)) {
+      scmAddress = scm.getSCMNodeDetails().getClientProtocolServerAddress();
+    } else {
+      scmAddress = HddsServerUtil.getScmClientBindAddress(conf);
+    }
 
     clientRpcServer =
         startRpcServer(

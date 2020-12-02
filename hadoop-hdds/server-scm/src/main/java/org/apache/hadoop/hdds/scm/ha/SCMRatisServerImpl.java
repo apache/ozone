@@ -53,7 +53,6 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMRatisServerImpl.class);
 
-  private final InetSocketAddress address;
   private final RaftServer server;
   private final RaftGroupId raftGroupId;
   private final RaftGroup raftGroup;
@@ -65,16 +64,25 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   // TODO: Refactor and remove ConfigurationSource and use only
   //  SCMHAConfiguration.
   SCMRatisServerImpl(final SCMHAConfiguration haConf,
-                     final ConfigurationSource conf)
+                     final ConfigurationSource conf,
+                     final SCMNodeDetails scmNodeDetails)
       throws IOException {
+    RaftProperties serverProperties = RatisUtil.newRaftProperties(haConf, conf);
+    if (scmNodeDetails != null) {
+      this.raftPeerId = scmNodeDetails.getSelfPeerId();
+      this.raftGroupId = scmNodeDetails.getRaftGroupId();
+      this.raftGroup = scmNodeDetails.getRaftGroup();
+      GrpcConfigKeys.Server.setPort(serverProperties,
+          scmNodeDetails.getRatisPort());
+    } else {
+      SCMHAGroupBuilder scmHAGroupBuilder = new SCMHAGroupBuilder(haConf, conf);
+      this.raftPeerId = scmHAGroupBuilder.getPeerId();
+      this.raftGroupId = scmHAGroupBuilder.getRaftGroupId();
+      this.raftGroup = scmHAGroupBuilder.getRaftGroup();
+      GrpcConfigKeys.Server.setPort(serverProperties,
+          scmHAGroupBuilder.getAddress().getPort());
+    }
 
-    SCMHAGroupBuilder scmHAGroupBuilder = new SCMHAGroupBuilder(haConf, conf);
-    this.raftPeerId = scmHAGroupBuilder.getPeerId();
-    this.raftGroupId = scmHAGroupBuilder.getRaftGroupId();
-    this.raftGroup = scmHAGroupBuilder.getRaftGroup();
-
-    this.address = scmHAGroupBuilder.getAddress();
-    final RaftProperties serverProperties = scmHAGroupBuilder.getRaftProperties();
     this.scmStateMachine = new SCMStateMachine();
     this.server = RaftServer.newBuilder()
         .setServerId(raftPeerId)
@@ -188,11 +196,11 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
     SCMHAGroupBuilder(final SCMHAConfiguration haConf,
         final ConfigurationSource conf) throws IOException {
-      if (conf.get(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY) != null) {
-        loadConfigBasedOnScmId(haConf, conf);
-      } else {
-        loadConfigBasedOnSCMNames(haConf, conf);
-      }
+      // if (conf.get(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY) != null) {
+      //   loadConfigBasedOnScmId(haConf, conf);
+      // } else {
+      loadConfigBasedOnSCMNames(haConf, conf);
+      // }
     }
 
     private void loadConfigBasedOnScmId(final SCMHAConfiguration haConf,

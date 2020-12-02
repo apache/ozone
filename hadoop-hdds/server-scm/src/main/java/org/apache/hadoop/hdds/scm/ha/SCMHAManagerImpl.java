@@ -52,14 +52,11 @@ public class SCMHAManagerImpl implements SCMHAManager {
   /**
    * Creates SCMHAManager instance.
    */
-  public SCMHAManagerImpl(final ConfigurationSource conf) throws IOException {
+  public SCMHAManagerImpl(final ConfigurationSource conf,
+      final SCMNodeDetails scmNodeDetails) throws IOException {
     this.conf = conf;
-//    try {
-      this.ratisServer = new SCMRatisServerImpl(
-              conf.getObject(SCMHAConfiguration.class), conf);
-//    } catch (RuntimeException e) {
-//      this.ratisServer = new SCMRatisServerImpl(new SCMHAConfiguration(), conf);
-//    }
+    this.ratisServer = new SCMRatisServerImpl(
+        conf.getObject(SCMHAConfiguration.class), conf, scmNodeDetails);
   }
 
   /**
