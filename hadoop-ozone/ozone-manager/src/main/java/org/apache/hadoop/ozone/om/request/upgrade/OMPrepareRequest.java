@@ -126,7 +126,7 @@ public class OMPrepareRequest extends OMClientRequest {
   }
 
   private static void waitForDoubleBufferFlush(
-      OzoneManager ozoneManager, long txnLogIndex)
+      OzoneManager ozoneManager, long indexToWaitFor)
       throws InterruptedException, IOException {
 
     long endTime = System.currentTimeMillis() +
@@ -137,16 +137,21 @@ public class OMPrepareRequest extends OMClientRequest {
       // If no transactions have been persisted to the DB, transaction info
       // will be null, not zero, causing a null pointer exception within
       // ozoneManager#getRatisSnaphotIndex.
-      // Get the transaction directly instead.
-      OMTransactionInfo txnInfo = ozoneManager.getMetadataManager()
+      // Get the transaction directly instead to handle the case when it is
+      // null.
+      OMTransactionInfo dbTxnInfo = ozoneManager.getMetadataManager()
           .getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
-      if (txnInfo == null) {
-        success = (txnLogIndex == 0);
+      if (dbTxnInfo == null) {
+        // If there are no transactions in the DB, we are prepared to log
+        // index 0 only.
+        success = (indexToWaitFor == 0);
       } else {
-        success = (txnInfo.getTransactionIndex() == txnLogIndex);
+        success = (dbTxnInfo.getTransactionIndex() == indexToWaitFor);
       }
 
-      Thread.sleep(DOUBLE_BUFFER_FLUSH_CHECK_INTERVAL.toMillis());
+      if (!success) {
+        Thread.sleep(DOUBLE_BUFFER_FLUSH_CHECK_INTERVAL.toMillis());
+      }
     }
 
     // If the timeout waiting for all transactions to reach the state machine
