@@ -49,6 +49,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Map;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_EMPTY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -77,6 +78,7 @@ public class OMKeyDeleteRequestV1 extends OMKeyDeleteRequest {
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
     String keyName = keyArgs.getKeyName();
+    boolean recursive = keyArgs.getRecursive();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumKeyDeletes();
@@ -113,7 +115,7 @@ public class OMKeyDeleteRequestV1 extends OMKeyDeleteRequest {
                       bucketName, keyName, 0);
 
       if (keyStatus == null) {
-        throw new OMException("Key not found", KEY_NOT_FOUND);
+        throw new OMException("Key not found. Key:" + keyName, KEY_NOT_FOUND);
       }
 
       OmKeyInfo omKeyInfo = keyStatus.getKeyInfo();
@@ -125,6 +127,13 @@ public class OMKeyDeleteRequestV1 extends OMKeyDeleteRequest {
               omKeyInfo.getParentObjectID(), omKeyInfo.getFileName());
 
       if (keyStatus.isDirectory()) {
+        // Check if there are any sub path exists under the user requested path
+        if (!recursive && OMFileRequest.hasChildren(omKeyInfo,
+                omMetadataManager)) {
+          throw new OMException("Directory is not empty. Key:" + keyName,
+                  DIRECTORY_NOT_EMPTY);
+        }
+
         // Update dir cache.
         omMetadataManager.getDirectoryTable().addCacheEntry(
                 new CacheKey<>(ozonePathKey),

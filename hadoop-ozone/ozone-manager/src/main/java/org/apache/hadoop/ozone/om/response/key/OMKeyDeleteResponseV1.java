@@ -31,12 +31,13 @@ import javax.annotation.Nonnull;
 import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 
 /**
  * Response for DeleteKey request.
  */
-@CleanupTableInfo(cleanupTables = {KEY_TABLE, DELETED_TABLE})
+@CleanupTableInfo(cleanupTables = {FILE_TABLE, DIRECTORY_TABLE, DELETED_TABLE})
 public class OMKeyDeleteResponseV1 extends OMKeyDeleteResponse {
 
   private boolean isDeleteDirectory;

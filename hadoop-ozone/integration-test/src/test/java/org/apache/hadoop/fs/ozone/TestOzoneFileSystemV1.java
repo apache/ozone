@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.LocatedFileStatus;
@@ -26,15 +25,8 @@ import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.jetbrains.annotations.NotNull;
 import org.junit.Assert;
 import org.junit.Rule;
@@ -48,11 +40,11 @@ import org.slf4j.LoggerFactory;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.Map;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.fail;
 
 /**
  * Ozone file system tests that are not covered by contract tests,
@@ -309,78 +301,6 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
   }
 
   /**
-   * Case-5) If new destin '/dst/source' exists then throws exception.
-   * If destination is a directory then rename source as sub-path of it.
-   * <p>
-   * For example: rename /a to /b will lead to /b/a. This new path should
-   * not exist.
-   */
-  protected void testRenameToNewSubDirShouldNotExist() throws Exception {
-    // Case-5.a) Rename directory from /a to /b.
-    // created /a
-    final Path aSourcePath = new Path(fs.getUri().toString() + "/a");
-    fs.mkdirs(aSourcePath);
-
-    // created /b
-    final Path bDestinPath = new Path(fs.getUri().toString() + "/b");
-    fs.mkdirs(bDestinPath);
-
-    // Add a sub-directory '/b/a' to '/b'. This is to verify that rename
-    // throws exception as new destin /b/a already exists.
-    final Path baPath = new Path(fs.getUri().toString() + "/b/a");
-    fs.mkdirs(baPath);
-
-    try {
-      fs.rename(aSourcePath, bDestinPath);
-      Assert.fail("Should fail as new destination dir exists!");
-    } catch (OMException ome) {
-      // expected as new sub-path /b/a already exists.
-      assertEquals(ome.getResult(), OMException.ResultCodes.KEY_ALREADY_EXISTS);
-    }
-
-    // Case-5.b) Rename file from /a/b/c/file1 to /a.
-    // Should be failed since /a/file1 exists.
-    final Path abcPath = new Path(fs.getUri().toString() + "/a/b/c");
-    fs.mkdirs(abcPath);
-    Path abcFile1 = new Path(abcPath, "/file1");
-    ContractTestUtils.touch(fs, abcFile1);
-
-    final Path aFile1 = new Path(fs.getUri().toString() + "/a/file1");
-    ContractTestUtils.touch(fs, aFile1);
-
-    final Path aDestinPath = new Path(fs.getUri().toString() + "/a");
-
-    try {
-      fs.rename(abcFile1, aDestinPath);
-      Assert.fail("Should fail as new destination file exists!");
-    } catch (OMException ome) {
-      // expected as new sub-path /b/a already exists.
-      assertEquals(ome.getResult(), OMException.ResultCodes.KEY_ALREADY_EXISTS);
-    }
-  }
-
-  /**
-   * Case-6) Rename directory to an existed file, should be failed.
-   */
-  protected void testRenameDirToFile() throws Exception {
-    final String root = "/root";
-    Path rootPath = new Path(fs.getUri().toString() + root);
-    fs.mkdirs(rootPath);
-
-    Path file1Destin = new Path(fs.getUri().toString() + root + "/file1");
-    ContractTestUtils.touch(fs, file1Destin);
-    Path abcRootPath = new Path(fs.getUri().toString() + "/a/b/c");
-    fs.mkdirs(abcRootPath);
-    try {
-      fs.rename(abcRootPath, file1Destin);
-      Assert.fail("key already exists /root_dir/file1");
-    } catch (OMException ome) {
-      // expected
-      assertEquals(ome.getResult(), OMException.ResultCodes.KEY_ALREADY_EXISTS);
-    }
-  }
-
-  /**
    * Fails if the (a) parent of dst does not exist or (b) parent is a file.
    */
   protected void testRenameDestinationParentDoesntExist() throws Exception {
@@ -425,74 +345,73 @@ public class TestOzoneFileSystemV1 extends TestOzoneFileSystem {
     testCreateFileShouldCheckExistenceOfDirWithSameName();
     // TODO: Cleanup keyTable and dirTable explicitly as FS delete operation
     //  is not yet implemented. This should be replaced with fs.delete() call.
-    tableCleanup();
+    deleteRootDir();
     testMakeDirsWithAnExistingDirectoryPath();
-    tableCleanup();
+    deleteRootDir();
     testCreateWithInvalidPaths();
-    tableCleanup();
+    deleteRootDir();
     testListStatusWithoutRecursiveSearch();
-    tableCleanup();
+    deleteRootDir();
     testListFilesRecursive();
-    tableCleanup();
+    deleteRootDir();
 
     testGetDirectoryModificationTime();
-    tableCleanup();
+    deleteRootDir();
 
     testListStatusOnRoot();
-    tableCleanup();
+    deleteRootDir();
     testListStatus();
-    tableCleanup();
+    deleteRootDir();
     testListStatusOnSubDirs();
-    tableCleanup();
+    deleteRootDir();
     testListStatusOnLargeDirectory();
-    tableCleanup();
+    deleteRootDir();
 
     testNonExplicitlyCreatedPathExistsAfterItsLeafsWereRemoved();
-    tableCleanup();
+    deleteRootDir();
 
     testRenameDir();
-    tableCleanup();
+    deleteRootDir();
     testRenameFile();
-    tableCleanup();
+    deleteRootDir();
     testRenameWithNonExistentSource();
-    tableCleanup();
+    deleteRootDir();
     testRenameDirToItsOwnSubDir();
-    tableCleanup();
+    deleteRootDir();
     testRenameSourceAndDestinAreSame();
-    tableCleanup();
+    deleteRootDir();
     testRenameToExistingDir();
-    tableCleanup();
+    deleteRootDir();
     testRenameToNewSubDirShouldNotExist();
-    tableCleanup();
+    deleteRootDir();
     testRenameDirToFile();
-    tableCleanup();
+    deleteRootDir();
     testRenameFileToDir();
-    tableCleanup();
+    deleteRootDir();
     testRenameDestinationParentDoesntExist();
-    tableCleanup();
+    deleteRootDir();
     testRenameToParentDir();
-    tableCleanup();
+    deleteRootDir();
 
     testSeekOnFileLength();
-    tableCleanup();
+    deleteRootDir();
 
     testFileDelete();
-    tableCleanup();
+    deleteRootDir();
 
     testDeleteRoot();
-    tableCleanup();
+    deleteRootDir();
 
     testRecursiveDelete();
-    tableCleanup();
+    deleteRootDir();
   }
 
   /**
-   * Cleanup keyTable and directoryTable explicitly as FS delete operation
-   * is not yet supported.
+   * Cleanup files and directories.
    *
    * @throws IOException DB failure
    */
-  protected void tableCleanup() throws IOException {
+  protected void deleteRootDir() throws IOException {
     Path root = new Path("/");
     FileStatus[] fileStatuses = fs.listStatus(root);
 
