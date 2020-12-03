@@ -41,7 +41,6 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
   private Long sequenceId;
   final private long keyCount;
   final private long bytesUsed;
-  // TODO: Put lastSeenTime here?
 
   private ContainerReplica(final ContainerID containerID,
       final ContainerReplicaProto.State state, final DatanodeDetails datanode,

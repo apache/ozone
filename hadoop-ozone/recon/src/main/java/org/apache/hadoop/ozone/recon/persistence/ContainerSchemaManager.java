@@ -23,8 +23,8 @@ import static org.jooq.impl.DSL.count;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
+import org.apache.hadoop.ozone.recon.scm.ContainerReplicaWithTimestamp;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.hadoop.ozone.recon.schema.tables.daos.ContainerHistoryDao;
@@ -39,7 +39,7 @@ import org.jooq.Record2;
 import org.jooq.SelectQuery;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.UUID;
 
 /**
  * Provide a high level API to access the Container Schema.
@@ -50,9 +50,7 @@ public class ContainerSchemaManager {
   private UnhealthyContainersDao unhealthyContainersDao;
   private ContainerSchemaDefinition containerSchemaDefinition;
 
-  // TODO: Move?
-  public Map<Long, Map<ContainerReplica, Long>> seenMap =
-      new ConcurrentHashMap<>();
+  private Map<Long, Map<UUID, ContainerReplicaWithTimestamp>> lastSeenMap;
 
   @Inject
   public ContainerSchemaManager(ContainerHistoryDao containerHistoryDao,
@@ -61,6 +59,7 @@ public class ContainerSchemaManager {
     this.containerHistoryDao = containerHistoryDao;
     this.unhealthyContainersDao = unhealthyContainersDao;
     this.containerSchemaDefinition = containerSchemaDefinition;
+    this.lastSeenMap = null;
   }
 
   /**
@@ -143,31 +142,30 @@ public class ContainerSchemaManager {
   }
 
   public List<ContainerHistory> getAllContainerHistory(long containerID) {
-    List<ContainerHistory> result =
+    List<ContainerHistory> resList =
         containerHistoryDao.fetchByContainerId(containerID);
 
-    // Update result with in-memory map
-    Map<ContainerReplica, Long> dnReplicaHistoryMap = seenMap.get(containerID);
-    if (dnReplicaHistoryMap != null) {
-      for (ContainerHistory containerHistory : result) {
-        final String dnHost = containerHistory.getDatanodeHost();
-
-        // TODO: This nested loop will and must be eliminated.
-        //  For testing correctness only.
-        for (ContainerReplica replica : dnReplicaHistoryMap.keySet()) {
-          if (dnHost.equals(replica.getDatanodeDetails().getHostName())) {
-            final Long lastSeen = dnReplicaHistoryMap.get(replica);
-            if (lastSeen != null) {
-              containerHistory.setLastReportTimestamp(lastSeen);
+    if (lastSeenMap != null) {
+      // Update result with in-memory map
+      Map<UUID, ContainerReplicaWithTimestamp> replicaLastSeenMap =
+          lastSeenMap.get(containerID);
+      if (replicaLastSeenMap != null) {
+        for (ContainerHistory res : resList) {
+          final String dnHost = res.getDatanodeHost();
+          // TODO: For testing only. Eliminate nested loop once switched to RDB
+          for (ContainerReplicaWithTimestamp ts : replicaLastSeenMap.values()) {
+            if (dnHost.equals(
+                ts.getContainerReplica().getDatanodeDetails().getHostName())) {
+              res.setLastReportTimestamp(ts.getLastSeenTime());
+              break;
             }
-            break;
           }
-        }
 
+        }
       }
     }
 
-    return result;
+    return resList;
   }
 
   // TODO: Check
@@ -181,5 +179,10 @@ public class ContainerSchemaManager {
         .orderBy(CONTAINER_HISTORY.LAST_REPORT_TIMESTAMP.desc())
         .limit(limit)
         .fetchInto(ContainerHistory.class);
+  }
+
+  public void setLastSeenMap(
+      Map<Long, Map<UUID, ContainerReplicaWithTimestamp>> lastSeenMap) {
+    this.lastSeenMap = lastSeenMap;
   }
 }

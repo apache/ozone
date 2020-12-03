@@ -22,7 +22,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.FI
 
 import java.io.IOException;
 import java.util.Map;
-import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
 import org.apache.hadoop.hdds.scm.container.SCMContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -55,6 +56,9 @@ public class ReconContainerManager extends SCMContainerManager {
   private StorageContainerServiceProvider scmClient;
   private ContainerSchemaManager containerSchemaManager;
 
+  private final Map<Long, Map<UUID, ContainerReplicaWithTimestamp>>
+      containerIDtoReplicaLastSeenMap;
+
   /**
    * Constructs a mapping class that creates mapping between container names
    * and pipelines.
@@ -75,6 +79,8 @@ public class ReconContainerManager extends SCMContainerManager {
     super(conf, containerStore, batchHandler, pipelineManager);
     this.scmClient = scm;
     this.containerSchemaManager = containerSchemaManager;
+    this.containerIDtoReplicaLastSeenMap = new ConcurrentHashMap<>();
+    containerSchemaManager.setLastSeenMap(containerIDtoReplicaLastSeenMap);
   }
 
   /**
@@ -173,54 +179,79 @@ public class ReconContainerManager extends SCMContainerManager {
   }
 
   /**
-   * Add a container Replica for given DataNode. Thread safe.
-   *
-   * @param containerID
-   * @param replica
+   * Add a container Replica for given DataNode.
    */
   @Override
   public void updateContainerReplica(ContainerID containerID,
       ContainerReplica replica)
       throws ContainerNotFoundException {
     super.updateContainerReplica(containerID, replica);
+
     final long currTime = System.currentTimeMillis();
-
     final long id = containerID.getId();
+    final DatanodeDetails dnInfo = replica.getDatanodeDetails();
+    final UUID dnUUID = dnInfo.getUuid();
+
     // Map from DataNode (UUID) to container replica last seen time
-    Map<ContainerReplica, Long> lastSeenOnDNs =
-        containerSchemaManager.seenMap.get(id);
+    final Map<UUID, ContainerReplicaWithTimestamp> replicaLastSeenMap =
+        containerIDtoReplicaLastSeenMap.get(id);
 
-    // If the replica doesn't exist in in-memory map, add to DB and add to map
-    if (lastSeenOnDNs == null) {
-      // New ContainerID.
-      containerSchemaManager.seenMap.putIfAbsent(id,
-          new ConcurrentHashMap<ContainerReplica, Long>() {{
-            put(replica, currTime);
+    boolean flushToDB = false;
+
+    // If replica doesn't exist in in-memory map, add to DB and add to map
+    if (replicaLastSeenMap == null) {
+      // putIfAbsent to avoid TOCTOU
+      containerIDtoReplicaLastSeenMap.putIfAbsent(id,
+          new ConcurrentHashMap<UUID, ContainerReplicaWithTimestamp>() {{
+            put(dnUUID, new ContainerReplicaWithTimestamp(replica, currTime));
           }});
-      // Flush to DB. TODO: Use RocksDB.
-      // NOTE: SCMContainerManager already has Table<ContainerID, ContainerInfo>
-      // TODO: Use UUID instead of host name as identifier in DB.
-      containerSchemaManager.upsertContainerHistory(
-          id, replica.getDatanodeDetails().getHostName(), currTime);
+      flushToDB = true;
     } else {
-      // ContainerID exists, update timestamp in memory.
-      lastSeenOnDNs.put(replica, currTime);
-
-      // Flush any DataNodes removed from the replica set to DB
-      // THOUGHT: Or just put this flush logic in removeContainerReplica() ?
-      Set<ContainerReplica> replicas = getContainerReplicas(containerID);
-      for (ContainerReplica dnReplica : lastSeenOnDNs.keySet()) {
-        if (!replicas.contains(dnReplica)) {
-          // Flush to DB. TODO: Use RocksDB.
-          final long lastSeenTime = lastSeenOnDNs.get(dnReplica);
-          containerSchemaManager.upsertContainerHistory(
-              id, dnReplica.getDatanodeDetails().getHostName(), lastSeenTime);
-          // Remove from map
-          lastSeenOnDNs.remove(dnReplica);
-        }
+      // ContainerID exists, update timestamp in memory
+      final ContainerReplicaWithTimestamp ts = replicaLastSeenMap.get(dnUUID);
+      if (ts == null) {
+        replicaLastSeenMap.put(dnUUID,
+            new ContainerReplicaWithTimestamp(replica, currTime));
+        flushToDB = true;
+      } else {
+        // Only update the last seen time field if the object exists
+        ts.setLastSeenTime(currTime);
       }
     }
 
+    if (flushToDB) {
+      // TODO: Use RDB. SCMContainerManager Table<ContainerID, ContainerInfo>
+      // TODO: Use UUID instead of host name as identifier in DB.
+      containerSchemaManager.upsertContainerHistory(
+          id, replica.getDatanodeDetails().getHostName(), currTime);
+    }
+  }
+
+  /**
+   * Remove a Container Replica of a given DataNode.
+   */
+  @Override
+  public void removeContainerReplica(ContainerID containerID,
+      ContainerReplica replica) throws ContainerNotFoundException,
+      ContainerReplicaNotFoundException {
+    super.removeContainerReplica(containerID, replica);
+
+    final long id = containerID.getId();
+    final DatanodeDetails dnInfo = replica.getDatanodeDetails();
+    final UUID dnUUID = dnInfo.getUuid();
+
+    final Map<UUID, ContainerReplicaWithTimestamp> replicaLastSeenMap =
+        containerIDtoReplicaLastSeenMap.get(id);
+
+    if (replicaLastSeenMap != null) {
+      final ContainerReplicaWithTimestamp ts = replicaLastSeenMap.get(dnUUID);
+      if (ts != null) {
+        // Flush to DB and remove from map. TODO: Use RocksDB.
+        containerSchemaManager.upsertContainerHistory(id,
+            replica.getDatanodeDetails().getHostName(), ts.getLastSeenTime());
+        replicaLastSeenMap.remove(dnUUID);
+      }
+    }
   }
 
   public ContainerSchemaManager getContainerSchemaManager() {
