@@ -356,9 +356,7 @@ public class DeletedBlockLogImpl
           ? extends Table.KeyValue<Long, DeletedBlocksTransaction>> iter =
                scmMetadataStore.getDeletedBlocksTXTable().iterator()) {
         int numBlocksAdded = 0;
-        BatchOperation batch =
-            scmMetadataStore.getBatchHandler().initBatchOperation();
-        List<DeletedBlocksTransaction> delTx =
+        List<DeletedBlocksTransaction> txnsToBePurged =
             new ArrayList<>();
         while (iter.hasNext() && numBlocksAdded < blockDeletionLimit) {
           Table.KeyValue<Long, DeletedBlocksTransaction> keyValue = iter.next();
@@ -373,11 +371,11 @@ public class DeletedBlockLogImpl
                   .putIfAbsent(txn.getTxID(), new LinkedHashSet<>());
             }
           } catch (ContainerNotFoundException ex) {
-            delTx.add(txn);
+            LOG.warn("Container: "+id+" was not found for the transaction: "+txn);
+            txnsToBePurged.add(txn);
           }
         }
-        deleteTransaction(delTx, batch);
-        scmMetadataStore.getBatchHandler().commitBatchOperation(batch);
+        purgeTransactions(txnsToBePurged);
       }
       return transactions;
     } finally {
@@ -385,12 +383,15 @@ public class DeletedBlockLogImpl
     }
   }
 
-  public void deleteTransaction(List<DeletedBlocksTransaction> delTx,
-      BatchOperation batch) throws IOException {
-    for (int i = 0; i < delTx.size(); i++) {
+  public void purgeTransactions(List<DeletedBlocksTransaction> txnsToBePurged)
+      throws IOException {
+    BatchOperation batch =
+        scmMetadataStore.getBatchHandler().initBatchOperation();
+    for (int i = 0; i < txnsToBePurged.size(); i++) {
       scmMetadataStore.getDeletedBlocksTXTable()
-          .deleteWithBatch(batch, delTx.get(i).getTxID());
+          .deleteWithBatch(batch, txnsToBePurged.get(i).getTxID());
     }
+    scmMetadataStore.getBatchHandler().commitBatchOperation(batch);
   }
 
   @Override
