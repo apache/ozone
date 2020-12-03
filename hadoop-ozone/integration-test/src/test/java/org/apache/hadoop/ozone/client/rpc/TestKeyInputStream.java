@@ -41,7 +41,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -59,6 +59,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERV
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.container.TestHelper.countReplicas;
 import static org.apache.hadoop.ozone.container.TestHelper.waitForReplicaCount;
+import static org.junit.Assert.fail;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -486,13 +487,23 @@ public class TestKeyInputStream {
 
   private static void waitForNodeToBecomeDead(
       DatanodeDetails datanode) throws TimeoutException, InterruptedException {
-    StorageContainerManager scm = cluster.getStorageContainerManager();
-    NodeManager nodeManager = scm.getScmNodeManager();
     GenericTestUtils.waitFor(() ->
-        HddsProtos.NodeState.DEAD == nodeManager.getNodeState(datanode),
+        HddsProtos.NodeState.DEAD == getNodeHealth(datanode),
         100, 30000);
     LOG.info("Node {} is {}", datanode.getUuidString(),
-        nodeManager.getNodeState(datanode));
+        getNodeHealth(datanode));
+  }
+
+  private static HddsProtos.NodeState getNodeHealth(DatanodeDetails dn) {
+    HddsProtos.NodeState health = null;
+    try {
+      NodeManager nodeManager =
+          cluster.getStorageContainerManager().getScmNodeManager();
+      health = nodeManager.getNodeStatus(dn).getHealth();
+    } catch (NodeNotFoundException e) {
+      fail("Unexpected NodeNotFound exception");
+    }
+    return health;
   }
 
   private byte[] writeRandomBytes(OutputStream key, int size)

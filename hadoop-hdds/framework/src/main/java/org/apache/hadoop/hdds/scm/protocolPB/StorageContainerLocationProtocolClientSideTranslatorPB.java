@@ -62,6 +62,9 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionNodesRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.RecommissionNodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -285,23 +288,89 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   /**
-   * Queries a list of Node Statuses.
+   * Queries a list of Nodes based on their operational state or health state.
+   * Passing a null for either value acts as a wildcard for that state.
+   *
+   * @param opState The operation state of the node
+   * @param nodeState The health of the node
+   * @return List of Datanodes.
    */
   @Override
-  public List<HddsProtos.Node> queryNode(HddsProtos.NodeState
-      nodeStatuses, HddsProtos.QueryScope queryScope, String poolName)
+  public List<HddsProtos.Node> queryNode(
+      HddsProtos.NodeOperationalState opState, HddsProtos.NodeState
+      nodeState, HddsProtos.QueryScope queryScope, String poolName)
       throws IOException {
     // TODO : We support only cluster wide query right now. So ignoring checking
     // queryScope and poolName
-    Preconditions.checkNotNull(nodeStatuses);
-    NodeQueryRequestProto request = NodeQueryRequestProto.newBuilder()
-        .setState(nodeStatuses)
+    NodeQueryRequestProto.Builder builder = NodeQueryRequestProto.newBuilder()
         .setTraceID(TracingUtil.exportCurrentSpan())
-        .setScope(queryScope).setPoolName(poolName).build();
+        .setScope(queryScope).setPoolName(poolName);
+    if (opState != null) {
+      builder.setOpState(opState);
+    }
+    if (nodeState != null) {
+      builder.setState(nodeState);
+    }
+    NodeQueryRequestProto request = builder.build();
     NodeQueryResponseProto response = submitRequest(Type.QueryNode,
-        builder -> builder.setNodeQueryRequest(request)).getNodeQueryResponse();
+        builder1 -> builder1.setNodeQueryRequest(request))
+        .getNodeQueryResponse();
     return response.getDatanodesList();
+  }
 
+  /**
+   * Attempts to decommission the list of nodes.
+   * @param nodes The list of hostnames or hostname:ports to decommission
+   * @throws IOException
+   */
+  @Override
+  public void decommissionNodes(List<String> nodes) throws IOException {
+    Preconditions.checkNotNull(nodes);
+    DecommissionNodesRequestProto request =
+        DecommissionNodesRequestProto.newBuilder()
+        .addAllHosts(nodes)
+        .build();
+    submitRequest(Type.DecommissionNodes,
+        builder -> builder.setDecommissionNodesRequest(request));
+  }
+
+  /**
+   * Attempts to recommission the list of nodes.
+   * @param nodes The list of hostnames or hostname:ports to recommission
+   * @throws IOException
+   */
+  @Override
+  public void recommissionNodes(List<String> nodes) throws IOException {
+    Preconditions.checkNotNull(nodes);
+    RecommissionNodesRequestProto request =
+        RecommissionNodesRequestProto.newBuilder()
+            .addAllHosts(nodes)
+            .build();
+    submitRequest(Type.RecommissionNodes,
+        builder -> builder.setRecommissionNodesRequest(request));
+  }
+
+  /**
+   * Attempts to put the list of nodes into maintenance mode.
+   *
+   * @param nodes The list of hostnames or hostname:ports to put into
+   *              maintenance
+   * @param endInHours A number of hours from now where the nodes will be taken
+   *                   out of maintenance automatically. Passing zero will
+   *                   allow the nodes to stay in maintenance indefinitely
+   * @throws IOException
+   */
+  @Override
+  public void startMaintenanceNodes(List<String> nodes, int endInHours)
+      throws IOException {
+    Preconditions.checkNotNull(nodes);
+    StartMaintenanceNodesRequestProto request =
+        StartMaintenanceNodesRequestProto.newBuilder()
+            .addAllHosts(nodes)
+            .setEndInHours(endInHours)
+            .build();
+    submitRequest(Type.StartMaintenanceNodes,
+        builder -> builder.setStartMaintenanceNodesRequest(request));
   }
 
   /**

@@ -62,6 +62,9 @@ message ScmContainerLocationRequest {
   optional GetPipelineRequestProto getPipelineRequest = 24;
   optional GetContainerWithPipelineBatchRequestProto getContainerWithPipelineBatchRequest = 25;
   optional GetSafeModeRuleStatusesRequestProto getSafeModeRuleStatusesRequest = 26;
+  optional DecommissionNodesRequestProto decommissionNodesRequest = 27;
+  optional RecommissionNodesRequestProto recommissionNodesRequest = 28;
+  optional StartMaintenanceNodesRequestProto startMaintenanceNodesRequest = 29;
 }
 
 message ScmContainerLocationResponse {
@@ -96,6 +99,9 @@ message ScmContainerLocationResponse {
   optional GetPipelineResponseProto getPipelineResponse = 24;
   optional GetContainerWithPipelineBatchResponseProto getContainerWithPipelineBatchResponse = 25;
   optional GetSafeModeRuleStatusesResponseProto getSafeModeRuleStatusesResponse = 26;
+  optional DecommissionNodesResponseProto decommissionNodesResponse = 27;
+  optional RecommissionNodesResponseProto recommissionNodesResponse = 28;
+  optional StartMaintenanceNodesResponseProto startMaintenanceNodesResponse = 29;
   enum Status {
     OK = 1;
     CONTAINER_ALREADY_EXISTS = 2;
@@ -126,6 +132,9 @@ enum Type {
   GetPipeline = 19;
   GetContainerWithPipelineBatch = 20;
   GetSafeModeRuleStatuses = 21;
+  DecommissionNodes = 22;
+  RecommissionNodes = 23;
+  StartMaintenanceNodes = 24;
 }
 
 /**
@@ -229,14 +238,49 @@ message SCMCloseContainerResponseProto {
  match the NodeState that we are requesting.
 */
 message NodeQueryRequestProto {
-  required NodeState state = 1;
+  optional NodeState state = 1;
   required QueryScope scope = 2;
   optional string poolName = 3; // if scope is pool, then pool name is needed.
   optional string traceID = 4;
+  optional NodeOperationalState opState = 5;
 }
 
 message NodeQueryResponseProto {
   repeated Node datanodes = 1;
+}
+
+/*
+  Decommission a list of hosts
+*/
+message DecommissionNodesRequestProto {
+  repeated string hosts = 1;
+}
+
+message DecommissionNodesResponseProto {
+  // empty response
+}
+
+/*
+  Recommission a list of hosts in maintenance or decommission states
+*/
+message RecommissionNodesRequestProto {
+  repeated string hosts = 1;
+}
+
+message RecommissionNodesResponseProto {
+  // empty response
+}
+
+/*
+  Place a list of hosts into maintenance mode
+*/
+message StartMaintenanceNodesRequestProto {
+  repeated string hosts = 1;
+  optional int64 endInHours = 2;
+}
+
+message StartMaintenanceNodesResponseProto {
+  // empty response
 }
 
 /**
@@ -349,5 +393,4 @@ message ReplicationManagerStatusResponseProto {
  */
 service StorageContainerLocationProtocolService {
   rpc submitRequest (ScmContainerLocationRequest) returns (ScmContainerLocationResponse);
-
 }

@@ -2325,6 +2325,17 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.datanode.admin.monitor.interval</name>
+    <value>30s</value>
+    <tag>SCM</tag>
+    <description>
+      This sets how frequently the datanode admin monitor runs to check for
+      nodes added to the admin workflow or removed from it. The progress
+      of decommissioning and entering maintenance nodes is also checked to see
+      if they have completed.
+    </description>
+  </property>
+  <property>
     <name>ozone.client.list.trash.keys.max</name>
     <value>1000</value>
     <tag>OZONE, CLIENT</tag>
