@@ -24,6 +24,8 @@ import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
 /**
  * Upgrade Action for StorageContainerManager which takes in an 'SCM' instance.
  */
-public interface SCMUpgradeAction<T> extends
+public class SCMUpgradeAction extends
     HDDSUpgradeAction<StorageContainerManager> {
+  public void executeAction(StorageContainerManager arg) throws Exception {
+  }
 }

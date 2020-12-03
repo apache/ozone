@@ -884,4 +884,10 @@ public class SCMNodeManager implements NodeManager {
   public HDDSLayoutVersionManager getLayoutVersionManager() {
     return scmLayoutVersionManager;
   }
+
+  @VisibleForTesting
+  @Override
+  public void forceNodesToHealthyReadOnly() {
+    nodeStateManager.forceNodesToHealthyReadOnly();
+  }
 }

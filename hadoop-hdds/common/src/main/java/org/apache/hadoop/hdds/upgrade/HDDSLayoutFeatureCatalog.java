@@ -39,7 +39,8 @@ public class HDDSLayoutFeatureCatalog {
 
     private int layoutVersion;
     private String description;
-    private Optional<HDDSUpgradeAction> hddsUpgradeAction = Optional.empty();
+    private Optional< ? extends HDDSUpgradeAction> hddsUpgradeAction =
+        Optional.empty();
 
     HDDSLayoutFeature(final int layoutVersion, String description) {
       this.layoutVersion = layoutVersion;

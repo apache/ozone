@@ -56,6 +56,13 @@ import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DECOMMISSIONED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
@@ -166,7 +173,7 @@ public class NodeStateManager implements Runnable, Closeable {
     this.state2EventMap = new HashMap<>();
     initialiseState2EventMap();
     Set<NodeState> finalStates = new HashSet<>();
-    finalStates.add(NodeState.DECOMMISSIONED);
+    finalStates.add(DECOMMISSIONED);
     // All DataNodes should start in HealthyReadOnly state.
     this.stateMachine = new StateMachine<>(NodeState.HEALTHY_READONLY,
         finalStates);
@@ -194,10 +201,10 @@ public class NodeStateManager implements Runnable, Closeable {
    * Populates state2event map.
    */
   private void initialiseState2EventMap() {
-    state2EventMap.put(NodeState.STALE, SCMEvents.STALE_NODE);
-    state2EventMap.put(NodeState.DEAD, SCMEvents.DEAD_NODE);
+    state2EventMap.put(STALE, SCMEvents.STALE_NODE);
+    state2EventMap.put(DEAD, SCMEvents.DEAD_NODE);
     state2EventMap
-        .put(NodeState.HEALTHY, SCMEvents.READ_ONLY_HEALTHY_TO_HEALTHY_NODE);
+        .put(HEALTHY, SCMEvents.READ_ONLY_HEALTHY_TO_HEALTHY_NODE);
     state2EventMap
         .put(NodeState.HEALTHY_READONLY,
             SCMEvents.NON_HEALTHY_TO_READONLY_HEALTHY_NODE);
@@ -289,38 +296,38 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   private void initializeStateMachine() {
     stateMachine.addTransition(
-        NodeState.HEALTHY_READONLY, NodeState.HEALTHY,
+        HEALTHY_READONLY, HEALTHY,
         NodeLifeCycleEvent.LAYOUT_MATCH);
     stateMachine.addTransition(
-        NodeState.HEALTHY_READONLY, NodeState.STALE,
+        HEALTHY_READONLY, STALE,
         NodeLifeCycleEvent.TIMEOUT);
     stateMachine.addTransition(
-        NodeState.HEALTHY_READONLY, NodeState.DECOMMISSIONING,
+        HEALTHY_READONLY, DECOMMISSIONING,
         NodeLifeCycleEvent.DECOMMISSION);
     stateMachine.addTransition(
-        NodeState.HEALTHY, NodeState.STALE, NodeLifeCycleEvent.TIMEOUT);
+        HEALTHY, STALE, NodeLifeCycleEvent.TIMEOUT);
     stateMachine.addTransition(
-        NodeState.HEALTHY, NodeState.HEALTHY_READONLY,
+        HEALTHY, HEALTHY_READONLY,
         NodeLifeCycleEvent.LAYOUT_MISMATCH);
     stateMachine.addTransition(
-        NodeState.STALE, NodeState.DEAD, NodeLifeCycleEvent.TIMEOUT);
+        STALE, DEAD, NodeLifeCycleEvent.TIMEOUT);
     stateMachine.addTransition(
-        NodeState.STALE, NodeState.HEALTHY_READONLY,
+        STALE, HEALTHY_READONLY,
         NodeLifeCycleEvent.RESTORE);
     stateMachine.addTransition(
-        NodeState.DEAD, NodeState.HEALTHY_READONLY,
+        DEAD, HEALTHY_READONLY,
         NodeLifeCycleEvent.RESURRECT);
     stateMachine.addTransition(
-        NodeState.HEALTHY, NodeState.DECOMMISSIONING,
+        HEALTHY, DECOMMISSIONING,
         NodeLifeCycleEvent.DECOMMISSION);
     stateMachine.addTransition(
-        NodeState.STALE, NodeState.DECOMMISSIONING,
+        STALE, DECOMMISSIONING,
         NodeLifeCycleEvent.DECOMMISSION);
     stateMachine.addTransition(
-        NodeState.DEAD, NodeState.DECOMMISSIONING,
+        DEAD, DECOMMISSIONING,
         NodeLifeCycleEvent.DECOMMISSION);
     stateMachine.addTransition(
-        NodeState.DECOMMISSIONING, NodeState.DECOMMISSIONED,
+        DECOMMISSIONING, DECOMMISSIONED,
         NodeLifeCycleEvent.DECOMMISSIONED);
 
   }
@@ -418,7 +425,7 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   public List<DatanodeInfo> getHealthyNodes() {
     List<DatanodeInfo> allHealthyNodes;
-    allHealthyNodes = getNodes(NodeState.HEALTHY);
+    allHealthyNodes = getNodes(HEALTHY);
     allHealthyNodes.addAll(getNodes(NodeState.HEALTHY_READONLY));
     return allHealthyNodes;
   }
@@ -429,7 +436,7 @@ public class NodeStateManager implements Runnable, Closeable {
    * @return list of stale nodes
    */
   public List<DatanodeInfo> getStaleNodes() {
-    return getNodes(NodeState.STALE);
+    return getNodes(STALE);
   }
 
   /**
@@ -438,7 +445,7 @@ public class NodeStateManager implements Runnable, Closeable {
    * @return list of dead nodes
    */
   public List<DatanodeInfo> getDeadNodes() {
-    return getNodes(NodeState.DEAD);
+    return getNodes(DEAD);
   }
 
   /**
@@ -500,7 +507,7 @@ public class NodeStateManager implements Runnable, Closeable {
    * @return healthy node count
    */
   public int getHealthyNodeCount() {
-    return getNodeCount(NodeState.HEALTHY) +
+    return getNodeCount(HEALTHY) +
         getNodeCount(NodeState.HEALTHY_READONLY);
   }
 
@@ -510,7 +517,7 @@ public class NodeStateManager implements Runnable, Closeable {
    * @return stale node count
    */
   public int getStaleNodeCount() {
-    return getNodeCount(NodeState.STALE);
+    return getNodeCount(STALE);
   }
 
   /**
@@ -519,7 +526,7 @@ public class NodeStateManager implements Runnable, Closeable {
    * @return dead node count
    */
   public int getDeadNodeCount() {
-    return getNodeCount(NodeState.DEAD);
+    return getNodeCount(DEAD);
   }
 
   /**
@@ -627,6 +634,24 @@ public class NodeStateManager implements Runnable, Closeable {
     // 4. And the most important reason, heartbeats are not blocked even if
     // this thread does not run, they will go into the processing queue.
     scheduleNextHealthCheck();
+  }
+
+  public void forceNodesToHealthyReadOnly() {
+    try {
+      List<UUID> nodes = nodeStateMap.getNodes(HEALTHY);
+      for (UUID id : nodes) {
+        DatanodeInfo node = nodeStateMap.getNodeInfo(id);
+        nodeStateMap.updateNodeState(node.getUuid(), HEALTHY,
+            HEALTHY_READONLY);
+        if (state2EventMap.containsKey(HEALTHY_READONLY)) {
+          eventPublisher.fireEvent(state2EventMap.get(HEALTHY_READONLY),
+              node);
+        }
+      }
+    } catch (NodeNotFoundException ex) {
+      LOG.error("Inconsistent NodeStateMap! {}", nodeStateMap);
+      ex.printStackTrace();
+    }
   }
 
   private void checkNodesHealth() {
