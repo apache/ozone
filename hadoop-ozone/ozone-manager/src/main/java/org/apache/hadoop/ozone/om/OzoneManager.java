@@ -142,6 +142,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OMRatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OMTransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.snapshot.OzoneManagerSnapshotProvider;
@@ -244,6 +245,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.FileUtils;
 import org.apache.ratis.util.LifeCycle;
@@ -344,7 +346,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private enum State {
     INITIALIZED,
     RUNNING,
-    PREPARING_FOR_UPGRADE,
+    PREPARED,
     STOPPED
   }
 
@@ -1223,8 +1225,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (!isPrepared) {
       omState = State.RUNNING;
     } else {
-      omState = State.PREPARING_FOR_UPGRADE;
-      LOG.info("Started OM services in upgrade mode.");
+      omState = State.PREPARED;
+      LOG.info("Started OM services in prepare mode.");
     }
   }
 
@@ -3824,5 +3826,43 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public OmLayoutVersionManager getVersionManager() {
     return versionManager;
+  }
+
+  /**
+   * Mark this Ozone Manager as being in or out of prepare mode.
+   * In prepare mode, an Ozone Manager has applied all transactions from
+   * its Ratis log and cleared out the log. It will not allow any write requests
+   * through until it is taken out of prepare mode.
+   *
+   * Blocking write requests while the OM is in prepare mode is enforced by
+   * {@link OzoneManagerStateMachine#preAppendTransaction}
+   * and {@link OzoneManagerRatisServer#submitRequest}
+   *
+   * @param prepare true if this Ozone Manager should be put in prepare mode,
+   * false if this Ozone Manager should be taken out of prepare mode.
+   */
+  public void setPrepared(boolean prepare) {
+    isPrepared = prepare;
+  }
+
+  public boolean isPrepared() {
+    return isPrepared;
+  }
+
+  /**
+   * If this Ozone Manager is not in prepare mode, returns true.
+   * If this Ozone Manager is in prepare mode, returns true only if {@code
+   * requestType} is{@code Prepare} or {@code CancelPrepare}. Returns false
+   * otherwise.
+   */
+  public boolean requestAllowed(OzoneManagerProtocolProtos.Type requestType) {
+    boolean requestAllowed = true;
+
+    if (isPrepared) {
+      // TODO: Also return true for cancel prepare when it is implemented.
+      requestAllowed = (requestType == OzoneManagerProtocolProtos.Type.Prepare);
+    }
+
+    return requestAllowed;
   }
 }

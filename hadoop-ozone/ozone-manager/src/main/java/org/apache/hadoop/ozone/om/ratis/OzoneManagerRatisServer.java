@@ -86,6 +86,7 @@ import org.apache.ratis.util.StringUtils;
 import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sun.misc.Request;
 
 import static org.apache.hadoop.ipc.RpcConstants.DUMMY_CLIENT_ID;
 import static org.apache.hadoop.ipc.RpcConstants.INVALID_CALL_ID;
@@ -128,10 +129,21 @@ public final class OzoneManagerRatisServer {
    * @throws ServiceException
    */
   public OMResponse submitRequest(OMRequest omRequest) throws ServiceException {
-    RaftClientRequest raftClientRequest =
-        createWriteRaftClientRequest(omRequest);
-    RaftClientReply raftClientReply = submitRequestToRatis(raftClientRequest);
-    return processReply(omRequest, raftClientReply);
+    // In prepare mode, only prepare and cancel requests are allowed to go
+    // through.
+    if (ozoneManager.requestAllowed(omRequest.getCmdType())) {
+      RaftClientRequest raftClientRequest =
+          createWriteRaftClientRequest(omRequest);
+      RaftClientReply raftClientReply = submitRequestToRatis(raftClientRequest);
+
+      return processReply(omRequest, raftClientReply);
+    }
+    else {
+      throw new ServiceException(
+          new OMException("Cannot submit write request " +
+          omRequest.getCmdType().name() + " when OM is in prepare mode.",
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION));
+    }
   }
 
   /**

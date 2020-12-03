@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -191,6 +192,30 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       return ctxt;
     }
     return handleStartTransactionRequests(raftClientRequest, omRequest);
+  }
+
+  public TransactionContext preAppendTransaction(TransactionContext trx)
+      throws IOException {
+    OMRequest request = OMRatisHelper.convertByteStringToOMRequest(
+        trx.getStateMachineLogEntry().getLogData());
+    OzoneManagerProtocolProtos.Type cmdType = request.getCmdType();
+
+    // In prepare mode, only prepare and cancel requests are allowed to go
+    // through.
+    if (ozoneManager.requestAllowed(cmdType)) {
+      if (cmdType == OzoneManagerProtocolProtos.Type.Prepare) {
+        ozoneManager.setPrepared(true);
+      }
+      // TODO: Add cancel prepare here after it is implemented.
+      return trx;
+    }
+    else {
+      // TODO: This will cause the node to step down as leader in ratis. This
+      //  may be a problem.
+      throw new OMException("Cannot apply write request " +
+          request.getCmdType().name() + " when OM is in prepare mode.",
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
   }
 
   /*
