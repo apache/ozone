@@ -371,7 +371,8 @@ public class DeletedBlockLogImpl
                   .putIfAbsent(txn.getTxID(), new LinkedHashSet<>());
             }
           } catch (ContainerNotFoundException ex) {
-            LOG.warn("Container: "+id+" was not found for the transaction: "+txn);
+            LOG.warn("Container: " + id + " was not found for the transaction: "
+                + txn);
             txnsToBePurged.add(txn);
           }
         }
