@@ -16,6 +16,9 @@
  */
 package org.apache.hadoop.ozone.scm.node;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -46,6 +49,12 @@ import static org.apache.hadoop.hdds.HddsConfigKeys
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.
+    NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.
+    NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.
+    NodeOperationalState.IN_MAINTENANCE;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys
     .OZONE_SCM_DEADNODE_INTERVAL;
@@ -98,7 +107,7 @@ public class TestQueryNode {
 
   @Test
   public void testHealthyNodesCount() throws Exception {
-    List<HddsProtos.Node> nodes = scmClient.queryNode(HEALTHY,
+    List<HddsProtos.Node> nodes = scmClient.queryNode(null, HEALTHY,
         HddsProtos.QueryScope.CLUSTER, "");
     assertEquals("Expected  live nodes", numOfDatanodes,
         nodes.size());
@@ -113,7 +122,7 @@ public class TestQueryNode {
             cluster.getStorageContainerManager().getNodeCount(STALE) == 2,
         100, 4 * 1000);
 
-    int nodeCount = scmClient.queryNode(STALE,
+    int nodeCount = scmClient.queryNode(null, STALE,
         HddsProtos.QueryScope.CLUSTER, "").size();
     assertEquals("Mismatch of expected nodes count", 2, nodeCount);
 
@@ -122,13 +131,63 @@ public class TestQueryNode {
         100, 4 * 1000);
 
     // Assert that we don't find any stale nodes.
-    nodeCount = scmClient.queryNode(STALE,
+    nodeCount = scmClient.queryNode(null, STALE,
         HddsProtos.QueryScope.CLUSTER, "").size();
     assertEquals("Mismatch of expected nodes count", 0, nodeCount);
 
     // Assert that we find the expected number of dead nodes.
-    nodeCount = scmClient.queryNode(DEAD,
+    nodeCount = scmClient.queryNode(null, DEAD,
         HddsProtos.QueryScope.CLUSTER, "").size();
     assertEquals("Mismatch of expected nodes count", 2, nodeCount);
+  }
+
+  @Test
+  public void testNodeOperationalStates() throws Exception {
+    StorageContainerManager scm = cluster.getStorageContainerManager();
+    NodeManager nm = scm.getScmNodeManager();
+
+    // Set one node to be something other than IN_SERVICE
+    DatanodeDetails node = nm.getAllNodes().get(0);
+    nm.setNodeOperationalState(node, DECOMMISSIONING);
+
+    // All nodes should be returned as they are all in service
+    int nodeCount = scmClient.queryNode(IN_SERVICE, HEALTHY,
+        HddsProtos.QueryScope.CLUSTER, "").size();
+    assertEquals(numOfDatanodes - 1, nodeCount);
+
+    // null acts as wildcard for opState
+    nodeCount = scmClient.queryNode(null, HEALTHY,
+        HddsProtos.QueryScope.CLUSTER, "").size();
+    assertEquals(numOfDatanodes, nodeCount);
+
+    // null acts as wildcard for nodeState
+    nodeCount = scmClient.queryNode(IN_SERVICE, null,
+        HddsProtos.QueryScope.CLUSTER, "").size();
+    assertEquals(numOfDatanodes - 1, nodeCount);
+
+    // Both null - should return all nodes
+    nodeCount = scmClient.queryNode(null, null,
+        HddsProtos.QueryScope.CLUSTER, "").size();
+    assertEquals(numOfDatanodes, nodeCount);
+
+    // No node should be returned
+    nodeCount = scmClient.queryNode(IN_MAINTENANCE, HEALTHY,
+        HddsProtos.QueryScope.CLUSTER, "").size();
+    assertEquals(0, nodeCount);
+
+    // Test all operational states by looping over them all and setting the
+    // state manually.
+    node = nm.getAllNodes().get(0);
+    for (HddsProtos.NodeOperationalState s :
+        HddsProtos.NodeOperationalState.values()) {
+      nm.setNodeOperationalState(node, s);
+      nodeCount = scmClient.queryNode(s, HEALTHY,
+          HddsProtos.QueryScope.CLUSTER, "").size();
+      if (s == IN_SERVICE) {
+        assertEquals(5, nodeCount);
+      } else {
+        assertEquals(1, nodeCount);
+      }
+    }
   }
 }
