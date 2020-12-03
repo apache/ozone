@@ -125,4 +125,8 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean,
    * @return boolean
    */
   boolean getSafeModeStatus();
+
+  void freezePipelineCreation();
+
+  void resumePipelineCreation();
 }

@@ -23,5 +23,9 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
 /**
  * Upgrade Action for SCM and DataNodes.
  */
-public interface HDDSUpgradeAction<T> extends UpgradeAction<T> {
+public class HDDSUpgradeAction<T> implements UpgradeAction<T> {
+  @Override
+  public void executeAction(T arg) throws Exception {
+
+  }
 }

@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
@@ -56,6 +57,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerActionsHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.ReplicationManager;
@@ -80,6 +82,8 @@ import org.apache.hadoop.hdds.scm.node.NonHealthyToReadOnlyHealthyNodeHandler;
 import org.apache.hadoop.hdds.scm.node.ReadOnlyHealthyToHealthyNodeHandler;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.StaleNodeHandler;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineActionHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineReportHandler;
@@ -119,6 +123,8 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.protobuf.BlockingService;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_WATCHER_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
+
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1156,5 +1162,107 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public HDDSLayoutVersionManager getLayoutVersionManager() {
     return scmLayoutVersionManager;
+  }
+
+  private void waitForAllContainersToClose() {
+    boolean containersFound = true;
+    while (containersFound) {
+      containersFound = false;
+      for (DatanodeDetails datanodeDetails : scmNodeManager.getAllNodes()) {
+        try {
+          for (ContainerID id : scmNodeManager.getContainers(datanodeDetails)) {
+            try {
+              final ContainerInfo container = containerManager.getContainer(id);
+              if (container.getState() == HddsProtos.LifeCycleState.OPEN ||
+                  container.getState() == HddsProtos.LifeCycleState.CLOSING) {
+                containersFound = true;
+                if (container.getState() == HddsProtos.LifeCycleState.OPEN) {
+                  eventQueue.fireEvent(SCMEvents.CLOSE_CONTAINER, id);
+                }
+              }
+            } catch (ContainerNotFoundException cnfe) {
+              LOG.warn("Container {} is not managed by ContainerManager.",
+                  id, cnfe);
+              continue;
+            }
+          }
+        } catch (NodeNotFoundException e) {
+          continue;
+        }
+      }
+      try {
+        if (containersFound) {
+          LOG.info("Waiting for all containers to close.");
+          Thread.sleep(5000);
+        }
+      } catch (InterruptedException e) {
+        continue;
+      }
+    }
+  }
+
+  private void waitForAllPipelinesToDestroy() throws IOException {
+    boolean pipelineFound = true;
+    while (pipelineFound) {
+      pipelineFound = false;
+      for (Pipeline pipeline : pipelineManager.getPipelines()) {
+        if (pipeline.getPipelineState() != CLOSED) {
+          pipelineFound = true;
+          pipelineManager.finalizeAndDestroyPipeline(pipeline, false);
+        }
+      }
+      try {
+        if (pipelineFound) {
+          LOG.info("Waiting for all pipelines to close.");
+          Thread.sleep(5000);
+        }
+      } catch (InterruptedException e) {
+        continue;
+      }
+    }
+  }
+
+  // This should be called in the context of a separate finalize upgrade thread.
+  // This function can block indefinitely till the conditions are met to safely
+  // finalize Upgrade.
+
+  public void preFinalizeUpgrade() throws IOException {
+    /**
+     * Ask pipeline manager to not create any new pipelines. Pipeline
+     * creation will remain frozen until postFinalizeUpgrade().
+     */
+    pipelineManager.freezePipelineCreation();
+
+    /**
+     * Ask all the existing data nodes to close any open containers and
+     * destroy existing pipelines
+     */
+    waitForAllPipelinesToDestroy();
+
+    /**
+     * We can not yet move all the existing data nodes to HEALTHY-READONLY
+     * state since the next heartbeat will move them back to HEALTHY state.
+     * This has to wait till postFinalizeUpgrade, when SCM MLV version is
+     * already upgraded as part of finalize processing.
+     * While in this state, it should be safe to do finalize processing for
+     * all new features. This will also update ondisk mlv version. Any
+     * disrupting upgrade can add a hook here to make sure that SCM is in a
+     * consistent state while finalizing the upgrade.
+     */
+  }
+
+  public void postFinalizeUpgrade() {
+    /**
+     * Don't wait for next heartbeat from datanodes in order to move them to
+     * Healthy-Readonly state. Force them to Healthy-ReadOnly state so that
+     * we can resume pipeline creation right away.
+     */
+    scmNodeManager.forceNodesToHealthyReadOnly();
+
+    /**
+     * Allow pipeline manager to create any new pipelines if it can
+     * find enough Healthy data nodes.
+     */
+    pipelineManager.resumePipelineCreation();
   }
 }

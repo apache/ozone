@@ -112,6 +112,16 @@ public interface UpgradeFinalizer<T> {
       Arrays.asList("Starting Finalization")
   );
 
+  StatusAndMessages FINALIZATION_IN_PROGRESS_MSG = new StatusAndMessages(
+      Status.FINALIZATION_IN_PROGRESS,
+      Arrays.asList("Finalization in progress")
+  );
+
+  StatusAndMessages FINALIZATION_REQUIRED_MSG = new StatusAndMessages(
+      Status.FINALIZATION_REQUIRED,
+      Arrays.asList("Finalization required")
+  );
+
   /**
    * Default message to provide when the service is in ALREADY_FINALIZED state.
    */

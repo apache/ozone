@@ -18,88 +18,46 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Queue;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentLinkedQueue;
-
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.*;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.UPDATE_LAYOUT_VERSION_FAILED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_IN_PROGRESS;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
+
+import org.apache.hadoop.ozone.om.OzoneManager;
+
+import java.io.IOException;
+import java.util.concurrent.Callable;
+import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 
 /**
  * UpgradeFinalizer implementation for the Ozone Manager service.
  */
-public class OMUpgradeFinalizer implements UpgradeFinalizer<OzoneManager> {
-
+public class OMUpgradeFinalizer extends BasicUpgradeFinalizer<OzoneManager,
+    OMLayoutVersionManagerImpl> {
   private  static final OmUpgradeAction NOOP = a -> {};
 
-  private OMLayoutVersionManagerImpl versionManager;
-  private String clientID;
-
-  private Queue<String> msgs = new ConcurrentLinkedQueue<>();
-  private boolean isDone = false;
-
   public OMUpgradeFinalizer(OMLayoutVersionManagerImpl versionManager) {
-    this.versionManager = versionManager;
+    super(versionManager);
   }
 
   @Override
   public StatusAndMessages finalize(String upgradeClientID, OzoneManager om)
       throws IOException {
-    if (!versionManager.needsFinalization()) {
-      return FINALIZED_MSG;
+    StatusAndMessages response = preFinalize(upgradeClientID, om);
+    if (response.status() != FINALIZATION_REQUIRED) {
+      return response;
     }
-    clientID = upgradeClientID;
-
-// This requires some more investigation on how to do it properly while
-// requests are on the fly, and post finalize features one by one.
-// Until that is done, monitoring is not really doing anything meaningful
-// but this is a tradoff we can take for the first iteration either if needed,
-// as the finalization of the first few features should not take that long.
-// Follow up JIRA is in HDDS-4286
-//    String threadName = "OzoneManager-Upgrade-Finalizer";
-//    ExecutorService executor =
-//        Executors.newSingleThreadExecutor(r -> new Thread(threadName));
-//    executor.submit(new Worker(om));
+    // This requires some more investigation on how to do it properly while
+    // requests are on the fly, and post finalize features one by one.
+    // Until that is done, monitoring is not really doing anything meaningful
+    // but this is a tradoff we can take for the first iteration either if
+    // needed, as the finalization of the first few features should not take
+    // that long. Follow up JIRA is in HDDS-4286
+    //    String threadName = "OzoneManager-Upgrade-Finalizer";
+    //    ExecutorService executor =
+    //        Executors.newSingleThreadExecutor(r -> new Thread(threadName));
+    //    executor.submit(new Worker(om));
     new Worker(om).call();
     return STARTING_MSG;
-  }
-
-  @Override
-  public synchronized StatusAndMessages reportStatus(
-      String upgradeClientID, boolean takeover
-  ) throws IOException {
-    if (takeover) {
-      clientID = upgradeClientID;
-    }
-    assertClientId(upgradeClientID);
-    List<String> returningMsgs = new ArrayList<>(msgs.size()+10);
-    Status status = isDone ? FINALIZATION_DONE : FINALIZATION_IN_PROGRESS;
-    while (msgs.size() > 0) {
-      returningMsgs.add(msgs.poll());
-    }
-    return new StatusAndMessages(status, returningMsgs);
-  }
-
-  private void assertClientId(String id) throws OMException {
-    if (!this.clientID.equals(id)) {
-      throw new OMException("Unknown client tries to get finalization status.\n"
-          + "The requestor is not the initiating client of the finalization,"
-          + " if you want to take over, and get unsent status messages, check"
-          + " -takeover option.", INVALID_REQUEST);
-    }
   }
 
   /**
@@ -134,26 +92,28 @@ public class OMUpgradeFinalizer implements UpgradeFinalizer<OzoneManager> {
     }
 
     @Override
-    public Void call() throws OMException {
+    public Void call() throws IOException {
       try {
         emitStartingMsg();
+        versionManager.setUpgradeState(FINALIZATION_IN_PROGRESS);
 
         for (OMLayoutFeature f : versionManager.unfinalizedFeatures()) {
           finalizeFeature(f);
-          updateLayoutVersionInVersionFile(f);
+          updateLayoutVersionInVersionFile(f, ozoneManager.getOmStorage());
           versionManager.finalized(f);
         }
 
         versionManager.completeFinalization();
         emitFinishedMsg();
+        return null;
       } finally {
+        versionManager.setUpgradeState(FINALIZATION_DONE);
         isDone = true;
       }
-      return null;
     }
 
     private void finalizeFeature(OMLayoutFeature feature)
-        throws OMException {
+        throws IOException {
       OmUpgradeAction action = feature.onFinalizeAction().orElse(NOOP);
 
       if (action == NOOP) {
@@ -161,7 +121,7 @@ public class OMUpgradeFinalizer implements UpgradeFinalizer<OzoneManager> {
         return;
       }
 
-      putFinalizationMarkIntoVersionFile(feature);
+      putFinalizationMarkIntoVersionFile(feature, ozoneManager.getOmStorage());
 
       emitStartingFinalizationActionMsg(feature.name());
       try {
@@ -171,159 +131,8 @@ public class OMUpgradeFinalizer implements UpgradeFinalizer<OzoneManager> {
       }
       emitFinishFinalizationActionMsg(feature.name());
 
-      removeFinalizationMarkFromVersionFile(feature);
-    }
-
-    private void updateLayoutVersionInVersionFile(OMLayoutFeature feature)
-        throws OMException {
-      int prevLayoutVersion = currentStoredLayoutVersion();
-
-      updateStorageLayoutVersion(feature.layoutVersion());
-      try {
-        persistStorage();
-      } catch (IOException e) {
-        updateStorageLayoutVersion(prevLayoutVersion);
-        logLayoutVersionUpdateFailureAndThrow(e);
-      }
-    }
-
-    private void putFinalizationMarkIntoVersionFile(OMLayoutFeature feature)
-        throws OMException {
-      try {
-        emitUpgradeToLayoutVersionPersistingMsg(feature.name());
-
-        setUpgradeToLayoutVersionInStorage(feature.layoutVersion());
-        persistStorage();
-
-        emitUpgradeToLayoutVersionPersistedMsg();
-      } catch (IOException e) {
-        logUpgradeToLayoutVersionPersistingFailureAndThrow(feature.name(), e);
-      }
-    }
-
-    private void removeFinalizationMarkFromVersionFile(OMLayoutFeature feature)
-        throws OMException {
-      try {
-        emitRemovingUpgradeToLayoutVersionMsg(feature.name());
-
-        unsetUpgradeToLayoutVersionInStorage();
-        persistStorage();
-
-        emitRemovedUpgradeToLayoutVersionMsg();
-      } catch (IOException e) {
-        logUpgradeToLayoutVersionRemovalFailureAndThrow(feature.name(), e);
-      }
-    }
-
-
-
-
-
-    private void setUpgradeToLayoutVersionInStorage(int version) {
-      ozoneManager.getOmStorage().setUpgradeToLayoutVersion(version);
-    }
-
-    private void unsetUpgradeToLayoutVersionInStorage() {
-      ozoneManager.getOmStorage().unsetUpgradeToLayoutVersion();
-    }
-
-    private int currentStoredLayoutVersion() {
-      return ozoneManager.getOmStorage().getLayoutVersion();
-    }
-
-    private void updateStorageLayoutVersion(int version) {
-      ozoneManager.getOmStorage().setLayoutVersion(version);
-    }
-
-    private void persistStorage() throws IOException {
-      ozoneManager.getOmStorage().persistCurrentState();
-    }
-
-    private void emitNOOPMsg(String feature) {
-      String msg = "No finalization work defined for feature: " + feature + ".";
-      String msg2 = "Skipping.";
-
-      logAndEmit(msg);
-      logAndEmit(msg2);
-    }
-
-    private void emitStartingMsg() {
-      String msg = "Finalization started.";
-      logAndEmit(msg);
-    }
-
-    private void emitFinishedMsg() {
-      String msg = "Finalization is done.";
-      logAndEmit(msg);
-    }
-
-    private void emitStartingFinalizationActionMsg(String feature) {
-      String msg = "Executing finalization of feature: " + feature + ".";
-      logAndEmit(msg);
-    }
-
-    private void emitFinishFinalizationActionMsg(String feature) {
-      String msg = "The feature " + feature + " is finalized.";
-      logAndEmit(msg);
-    }
-
-    private void emitUpgradeToLayoutVersionPersistingMsg(String feature) {
-      String msg = "Mark finalization of " + feature + " in VERSION file.";
-      logAndEmit(msg);
-    }
-
-    private void emitUpgradeToLayoutVersionPersistedMsg() {
-      String msg = "Finalization mark placed.";
-      logAndEmit(msg);
-    }
-
-    private void emitRemovingUpgradeToLayoutVersionMsg(String feature) {
-      String msg = "Remove finalization mark of " + feature
-          + " feature from VERSION file.";
-      logAndEmit(msg);
-    }
-
-    private void emitRemovedUpgradeToLayoutVersionMsg() {
-      String msg = "Finalization mark removed.";
-      logAndEmit(msg);
-    }
-
-    private void logAndEmit(String msg) {
-      LOG.info(msg);
-      msgs.offer(msg);
-    }
-
-    private void logFinalizationFailureAndThrow(Exception e, String feature)
-        throws OMException {
-      String msg = "Error during finalization of " + feature + ".";
-      logAndThrow(e, msg, LAYOUT_FEATURE_FINALIZATION_FAILED);
-    }
-
-    private void logLayoutVersionUpdateFailureAndThrow(IOException e)
-        throws OMException {
-      String msg = "Updating the LayoutVersion in the VERSION file failed.";
-      logAndThrow(e, msg, UPDATE_LAYOUT_VERSION_FAILED);
-    }
-
-    private void logUpgradeToLayoutVersionPersistingFailureAndThrow(
-        String feature, IOException e
-    ) throws OMException {
-      String msg = "Failed to update VERSION file with the upgrading feature: "
-          + feature + ".";
-      logAndThrow(e, msg, PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED);
-    }
-
-    private void logUpgradeToLayoutVersionRemovalFailureAndThrow(
-        String feature, IOException e) throws OMException {
-      String msg =
-          "Failed to unmark finalization of " + feature + " LayoutFeature.";
-      logAndThrow(e, msg, REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED);
-    }
-
-    private void logAndThrow(Exception e, String msg, ResultCodes resultCode)
-        throws OMException {
-      LOG.error(msg, e);
-      throw new OMException(msg, e, resultCode);
+      removeFinalizationMarkFromVersionFile(feature,
+          ozoneManager.getOmStorage());
     }
   }
 }
