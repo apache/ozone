@@ -129,9 +129,12 @@ public class DeletedBlockLogImpl
         DeletedBlocksTransaction block =
             scmMetadataStore.getDeletedBlocksTXTable().get(txID);
         if (block == null) {
-          // Should we make this an error ? How can we not find the deleted
-          // TXID?
-          LOG.warn("Deleted TXID {} not found.", txID);
+          if (LOG.isDebugEnabled()) {
+            // This can occur due to race condition between retry and old
+            // service task where old task removes the transaction and the new
+            // task is resending
+            LOG.debug("Deleted TXID {} not found.", txID);
+          }
           continue;
         }
         DeletedBlocksTransaction.Builder builder = block.toBuilder();
@@ -196,9 +199,12 @@ public class DeletedBlockLogImpl
               transactionResult.getContainerID());
           if (dnsWithCommittedTxn == null) {
             // Mostly likely it's a retried delete command response.
-            LOG.debug("Transaction txId={} commit by dnId={} for containerID={}"
-                    + " failed. Corresponding entry not found.", txID, dnID,
-                containerId);
+            if (LOG.isDebugEnabled()) {
+              LOG.debug(
+                  "Transaction txId={} commit by dnId={} for containerID={}"
+                      + " failed. Corresponding entry not found.", txID, dnID,
+                  containerId);
+            }
             continue;
           }
 
@@ -218,12 +224,16 @@ public class DeletedBlockLogImpl
                 .collect(Collectors.toList());
             if (dnsWithCommittedTxn.containsAll(containerDns)) {
               transactionToDNsCommitMap.remove(txID);
-              LOG.debug("Purging txId={} from block deletion log", txID);
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("Purging txId={} from block deletion log", txID);
+              }
               scmMetadataStore.getDeletedBlocksTXTable().delete(txID);
             }
           }
-          LOG.debug("Datanode txId={} containerId={} committed by dnId={}",
-              txID, containerId, dnID);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Datanode txId={} containerId={} committed by dnId={}",
+                txID, containerId, dnID);
+          }
         } catch (IOException e) {
           LOG.warn("Could not commit delete block transaction: " +
               transactionResult.getTxID(), e);
