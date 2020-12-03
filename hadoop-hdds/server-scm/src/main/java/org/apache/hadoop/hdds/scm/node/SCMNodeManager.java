@@ -669,43 +669,6 @@ public class SCMNodeManager implements NodeManager {
   // Since datanode commands are added through event queue, onMessage method
   // should take care of adding commands to command queue.
   // Refactor and remove all the usage of this method and delete this method.
-  /**
-   * Only leader SCM can send SCMCommand to datanode, and needs record its
-   * term in the command so that datanode can distinguish commands from stale
-   * leader SCM by comparing term.
-   *
-   * There are 7 SCMCommands:
-   *    ReregisterCommand
-   *    ClosePipelineCommand
-   *    CreatePipelineCommand
-   *    CloseContainerCommand
-   *    ReplicateContainerCommand
-   *    DeleteContainerCommand
-   *    DeleteBlocksCommand
-   *
-   * They are sent by:
-   *    NodeManager
-   *    PipelineManager
-   *    ContainerManager
-   *    BlockManager
-   *    ReplicationManager and etc.
-   *
-   * Ideally term of SCMCommand should be queried from SCMHAManager::isLeader()
-   * before these managers decide to take an action.
-   *
-   * However till now only several of these managers have been integrated
-   * with HA, thus need NodeManager, as EventHandler for DATANODE_COMMAND,
-   * to play as a safe guard when receiving a SCMCommand:
-   *
-   * - If receive a SCMCommand when underling RaftServer is not leader,
-   *   drop the command.
-   *
-   * - If receive a SCMCommand when underling RaftServer is leader, meanwhile
-   *   term of SCMCommand is 0 (which is the default value of term and will
-   *   not be used under HA mode), log a warning and help set the term.
-   *   Notes that, term queried before putting into command queue may be not
-   *   accurate, since raft term may bump when managers are taking actions.
-   */
   @Override
   public void addDatanodeCommand(UUID dnId, SCMCommand command) {
     if (scmhaManager != null && command.getTerm() == 0) {
