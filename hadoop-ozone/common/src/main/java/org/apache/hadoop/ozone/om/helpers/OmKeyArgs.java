@@ -281,8 +281,8 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
-    public Builder setRecursive(boolean recursive) {
-      this.recursive = recursive;
+    public Builder setRecursive(boolean isRecursive) {
+      this.recursive = isRecursive;
       return this;
     }
 

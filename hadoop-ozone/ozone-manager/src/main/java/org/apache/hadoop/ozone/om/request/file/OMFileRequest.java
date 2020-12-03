@@ -806,12 +806,8 @@ public final class OMFileRequest {
 
     while (iterator.hasNext()) {
       OmDirectoryInfo dirInfo = iterator.value().getValue();
-      if (isImmediateChild(dirInfo.getParentObjectID(),
-              omKeyInfo.getObjectID())) {
-        return true; // found a sub path directory
-      } else {
-        return false; // no sub paths found
-      }
+      return isImmediateChild(dirInfo.getParentObjectID(),
+              omKeyInfo.getObjectID());
     }
     return false; // no sub paths found
   }
@@ -846,12 +842,8 @@ public final class OMFileRequest {
 
     while (iterator.hasNext()) {
       OmKeyInfo fileInfo = iterator.value().getValue();
-      if (isImmediateChild(fileInfo.getParentObjectID(),
-              omKeyInfo.getObjectID())) {
-        return true; // found a sub path file
-      } else {
-        return false; // no sub paths found
-      }
+      return isImmediateChild(fileInfo.getParentObjectID(),
+              omKeyInfo.getObjectID()); // found a sub path file
     }
     return false; // no sub paths found
   }
